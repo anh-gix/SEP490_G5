@@ -1,5 +1,4 @@
 const Role = require('../models/roleModel');
-const Permission = require('../models/permissionModel');
 
 // Get All Roles
 const getAllRoles = async (req, res) => {
@@ -35,13 +34,6 @@ const createRole = async (req, res) => {
     if (roleExists) {
       return res.status(400).json({ message: 'Role already exists' });
     }
-
-    // Check if permission exists
-    const permission = await Permission.findById(permissionId);
-    if (!permission) {
-      return res.status(400).json({ message: 'Permission not found' });
-    }
-
     const role = await Role.create({
       name,
       description,

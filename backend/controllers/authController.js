@@ -1,6 +1,5 @@
 const User = require('../models/userModel');
 const Role = require('../models/roleModel');
-const Permission = require('../models/permissionModel');
 const jwt = require('jsonwebtoken');
 
 // Generate JWT Token

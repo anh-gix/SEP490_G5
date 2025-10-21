@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import RouteScrollToTop from "./helper/RouteScrollToTop.jsx";
+import { AuthProvider } from "./contexts/AuthContext";
 import HomePageOne from "./pages/HomePageOne";
 import AboutPage from "./pages/AboutPage.jsx";
 import AboutFourPage from "./pages/AboutFourPage.jsx";
@@ -44,10 +45,11 @@ import HomePageSix from "./pages/HomePageSix.jsx";
 
 function App() {
   return (
-    <BrowserRouter>
-      <RouteScrollToTop />
+    <AuthProvider>
+      <BrowserRouter>
+        <RouteScrollToTop />
 
-      <Routes>
+        <Routes>
         <Route exact path='/' element={<HomePageOne />} />
         <Route exact path='/index-2' element={<HomePageTwo />} />
         <Route exact path='/index-3' element={<HomePageThree />} />
@@ -101,8 +103,9 @@ function App() {
         <Route exact path='/tuition-jobs' element={<TuitionJobsPage />} />
         <Route exact path='/tutor' element={<TutorPage />} />
         <Route exact path='/tutor-details' element={<TutorDetailsPage />} />
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

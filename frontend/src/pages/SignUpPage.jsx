@@ -1,7 +1,7 @@
 import Breadcrumb from "../components/Breadcrumb";
 import FooterOne from "../components/FooterOne";
 import HeaderOne from "../components/HeaderOne";
-import SignUpInner from "../components/SignUpInner";
+import SignUpInner from "../components/Authen/SignUpInner";
 import Animation from "../helper/Animation";
 import Preloader from "../helper/Preloader";
 

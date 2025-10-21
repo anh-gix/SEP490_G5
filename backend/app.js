@@ -11,7 +11,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/sep490_g5', {
+mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
@@ -22,7 +22,6 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/sep490_g5
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/roles', require('./routes/roleRoutes'));
-app.use('/api/permissions', require('./routes/permissionRoutes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

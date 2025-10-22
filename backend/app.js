@@ -22,6 +22,7 @@ mongoose.connect(process.env.MONGODB_URI, {
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/roles', require('./routes/roleRoutes'));
+app.use('/api/exams', require('./routes/examRoutes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

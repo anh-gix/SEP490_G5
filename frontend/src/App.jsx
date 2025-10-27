@@ -42,7 +42,8 @@ import TutorPage from "./pages/TutorPage.jsx";
 import TutorDetailsPage from "./pages/TutorDetailsPage.jsx";
 import HomePageFive from "./pages/HomePageFive.jsx";
 import HomePageSix from "./pages/HomePageSix.jsx";
-
+import Attendance from "./pages/Attendance.jsx";
+import ClassSchedulePage from "./pages/ClassSchedulePage.jsx";
 function App() {
   return (
     <AuthProvider>
@@ -92,6 +93,7 @@ function App() {
           path='/instructor-details'
           element={<InstructorDetailsPage />}
         />
+       
         <Route exact path='/instructor-two' element={<InstructorTwoPage />} />
         <Route exact path='/lesson-details' element={<LessonDetailsPage />} />
         <Route exact path='/pricing-plan' element={<PricingPlanPage />} />
@@ -103,6 +105,8 @@ function App() {
         <Route exact path='/tuition-jobs' element={<TuitionJobsPage />} />
         <Route exact path='/tutor' element={<TutorPage />} />
         <Route exact path='/tutor-details' element={<TutorDetailsPage />} />
+        <Route exact path='/attendance' element={<Attendance />} />
+        <Route exact path='/attendance/class/:classId' element={<ClassSchedulePage />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

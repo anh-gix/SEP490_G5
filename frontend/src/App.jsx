@@ -41,6 +41,7 @@ import TutorPage from "./pages/TutorPage.jsx";
 import TutorDetailsPage from "./pages/TutorDetailsPage.jsx";
 import HomePageFive from "./pages/HomePageFive.jsx";
 import HomePageSix from "./pages/HomePageSix.jsx";
+import ScheduleManagementPage from "./pages/ScheduleManagementPage.jsx";
 
 function App() {
   return (
@@ -101,6 +102,7 @@ function App() {
         <Route exact path='/tuition-jobs' element={<TuitionJobsPage />} />
         <Route exact path='/tutor' element={<TutorPage />} />
         <Route exact path='/tutor-details' element={<TutorDetailsPage />} />
+        <Route exact path='/schedule-management' element={<ScheduleManagementPage />} />
       </Routes>
     </BrowserRouter>
   );

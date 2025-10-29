@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Container, Card, Button, ButtonGroup, Form, Row, Col, Badge } from 'react-bootstrap';
 import ScheduleCalendar from './ScheduleCalendar';
+import ScheduleWeekly from './ScheduleWeekly';
 import ScheduleList from './ScheduleList';
 import CreateScheduleModal from './CreateScheduleModal';
 import EditScheduleModal from './EditScheduleModal';
 import MakeupClassModal from './MakeupClassModal';
 import RoomManagement from './RoomManagement';
-import './ScheduleManagement.css';
 
 const ScheduleManagement = () => {
-  const [viewMode, setViewMode] = useState('calendar'); // calendar or list
+  const [viewMode, setViewMode] = useState('weekly'); // calendar, weekly or list
   const [schedules, setSchedules] = useState([]);
   const [classes, setClasses] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -225,125 +226,200 @@ const ScheduleManagement = () => {
   };
 
   return (
-    <div className="schedule-management-container">
+    <Container fluid className="p-24">
       {/* Header */}
-      <div className="schedule-header">
-        <div className="header-left">
-          <h2>Quản lý lịch học</h2>
-          <p>Sắp xếp và quản lý lịch học cho các lớp</p>
+      <div className="d-flex justify-content-between align-items-center mb-24">
+        <div>
+          <h2 className="text-neutral-900 fw-bold mb-8">Quản lý lịch học</h2>
+          <p className="text-neutral-500 mb-0">Sắp xếp và quản lý lịch học cho các lớp</p>
         </div>
-        <div className="header-right">
-          <button 
-            className="btn btn-outline"
+        <div className="d-flex gap-12">
+          <Button 
+            className="btn-outline-main text-15 fw-medium px-20 py-10 radius-8"
             onClick={() => setShowRoomManagement(true)}
           >
-            <i className="fas fa-door-open"></i> Quản lý phòng học
-          </button>
-          <button 
-            className="btn btn-outline"
+            <i className="fas fa-door-open me-2"></i> Quản lý phòng học
+          </Button>
+          <Button 
+            className="btn-outline-main text-15 fw-medium px-20 py-10 radius-8"
             onClick={handleExportSchedule}
           >
-            <i className="fas fa-download"></i> Xuất lịch học
-          </button>
-          <button 
-            className="btn btn-primary"
+            <i className="fas fa-download me-2"></i> Xuất lịch học
+          </Button>
+          <Button 
+            className="btn-main text-15 fw-semibold px-24 py-12 radius-8"
             onClick={() => setShowCreateModal(true)}
           >
-            <i className="fas fa-plus"></i> Tạo lịch học
-          </button>
+            <i className="fas fa-plus me-2"></i> Tạo lịch học
+          </Button>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="schedule-filters">
-        <div className="filter-group">
-          <label>Lớp học</label>
-          <select name="classId" value={filters.classId} onChange={handleFilterChange}>
-            <option value="">Tất cả lớp</option>
-            {classes.map(cls => (
-              <option key={cls.id} value={cls.id}>{cls.name}</option>
-            ))}
-          </select>
-        </div>
+      <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+        <Card.Body className="p-24">
+          <Row className="g-3">
+            <Col md={2}>
+              <Form.Group>
+                <Form.Label className="text-neutral-700 fw-medium mb-8 text-13">Lớp học</Form.Label>
+                <Form.Select 
+                  size="sm" 
+                  name="classId" 
+                  value={filters.classId} 
+                  onChange={handleFilterChange}
+                  className="border-neutral-30 radius-8 py-8 px-12"
+                >
+                  <option value="">Tất cả lớp</option>
+                  {classes.map(cls => (
+                    <option key={cls.id} value={cls.id}>{cls.name}</option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </Col>
 
-        <div className="filter-group">
-          <label>Giảng viên</label>
-          <select name="teacherId" value={filters.teacherId} onChange={handleFilterChange}>
-            <option value="">Tất cả giảng viên</option>
-            {teachers.map(teacher => (
-              <option key={teacher.id} value={teacher.id}>{teacher.name}</option>
-            ))}
-          </select>
-        </div>
+            <Col md={2}>
+              <Form.Group>
+                <Form.Label className="text-neutral-700 fw-medium mb-8 text-13">Giảng viên</Form.Label>
+                <Form.Select 
+                  size="sm" 
+                  name="teacherId" 
+                  value={filters.teacherId} 
+                  onChange={handleFilterChange}
+                  className="border-neutral-30 radius-8 py-8 px-12"
+                >
+                  <option value="">Tất cả giảng viên</option>
+                  {teachers.map(teacher => (
+                    <option key={teacher.id} value={teacher.id}>{teacher.name}</option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </Col>
 
-        <div className="filter-group">
-          <label>Phòng học</label>
-          <select name="roomId" value={filters.roomId} onChange={handleFilterChange}>
-            <option value="">Tất cả phòng</option>
-            {rooms.map(room => (
-              <option key={room.id} value={room.id}>{room.name}</option>
-            ))}
-          </select>
-        </div>
+            <Col md={2}>
+              <Form.Group>
+                <Form.Label className="text-neutral-700 fw-medium mb-8 text-13">Phòng học</Form.Label>
+                <Form.Select 
+                  size="sm" 
+                  name="roomId" 
+                  value={filters.roomId} 
+                  onChange={handleFilterChange}
+                  className="border-neutral-30 radius-8 py-8 px-12"
+                >
+                  <option value="">Tất cả phòng</option>
+                  {rooms.map(room => (
+                    <option key={room.id} value={room.id}>{room.name}</option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </Col>
 
-        <div className="filter-group">
-          <label>Từ ngày</label>
-          <input 
-            type="date" 
-            name="startDate" 
-            value={filters.startDate} 
-            onChange={handleFilterChange}
-          />
-        </div>
+            <Col md={2}>
+              <Form.Group>
+                <Form.Label className="text-neutral-700 fw-medium mb-8 text-13">Từ ngày</Form.Label>
+                <Form.Control 
+                  size="sm"
+                  type="date" 
+                  name="startDate" 
+                  value={filters.startDate} 
+                  onChange={handleFilterChange}
+                  className="border-neutral-30 radius-8 py-8 px-12"
+                />
+              </Form.Group>
+            </Col>
 
-        <div className="filter-group">
-          <label>Đến ngày</label>
-          <input 
-            type="date" 
-            name="endDate" 
-            value={filters.endDate} 
-            onChange={handleFilterChange}
-          />
-        </div>
+            <Col md={2}>
+              <Form.Group>
+                <Form.Label className="text-neutral-700 fw-medium mb-8 text-13">Đến ngày</Form.Label>
+                <Form.Control 
+                  size="sm"
+                  type="date" 
+                  name="endDate" 
+                  value={filters.endDate} 
+                  onChange={handleFilterChange}
+                  className="border-neutral-30 radius-8 py-8 px-12"
+                />
+              </Form.Group>
+            </Col>
 
-        <div className="filter-group">
-          <label>Trạng thái</label>
-          <select name="status" value={filters.status} onChange={handleFilterChange}>
-            <option value="">Tất cả</option>
-            <option value="scheduled">Đã lên lịch</option>
-            <option value="completed">Đã hoàn thành</option>
-            <option value="cancelled">Đã hủy</option>
-            <option value="makeup">Học bù</option>
-          </select>
-        </div>
-
-        <div className="filter-actions">
-          <button className="btn btn-secondary" onClick={handleResetFilters}>
-            <i className="fas fa-redo"></i> Đặt lại
-          </button>
-        </div>
-      </div>
+            <Col md={2}>
+              <Form.Group>
+                <Form.Label className="text-neutral-700 fw-medium mb-8 text-13">Trạng thái</Form.Label>
+                <div className="d-flex gap-8">
+                  <Form.Select 
+                    size="sm" 
+                    name="status" 
+                    value={filters.status} 
+                    onChange={handleFilterChange} 
+                    className="flex-grow-1 border-neutral-30 radius-8 py-8 px-12"
+                  >
+                    <option value="">Tất cả</option>
+                    <option value="scheduled">Đã lên lịch</option>
+                    <option value="completed">Đã hoàn thành</option>
+                    <option value="cancelled">Đã hủy</option>
+                    <option value="makeup">Học bù</option>
+                  </Form.Select>
+                  <Button 
+                    size="sm" 
+                    className="btn-outline-main radius-8 px-12"
+                    onClick={handleResetFilters} 
+                    title="Đặt lại"
+                  >
+                    <i className="fas fa-redo"></i>
+                  </Button>
+                </div>
+              </Form.Group>
+            </Col>
+          </Row>
+        </Card.Body>
+      </Card>
 
       {/* View Toggle */}
-      <div className="view-toggle">
-        <button 
-          className={`toggle-btn ${viewMode === 'calendar' ? 'active' : ''}`}
-          onClick={() => setViewMode('calendar')}
-        >
-          <i className="fas fa-calendar"></i> Lịch
-        </button>
-        <button 
-          className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
-          onClick={() => setViewMode('list')}
-        >
-          <i className="fas fa-list"></i> Danh sách
-        </button>
+      <div className="d-flex justify-content-center mb-24">
+        <ButtonGroup>
+          <Button 
+            className={viewMode === 'calendar' 
+              ? 'btn-main text-15 fw-medium px-20 py-10' 
+              : 'btn-outline-main text-15 fw-medium px-20 py-10'}
+            onClick={() => setViewMode('calendar')}
+          >
+            <i className="fas fa-calendar me-2"></i> Tháng
+          </Button>
+          <Button 
+            className={viewMode === 'weekly' 
+              ? 'btn-main text-15 fw-medium px-20 py-10' 
+              : 'btn-outline-main text-15 fw-medium px-20 py-10'}
+            onClick={() => setViewMode('weekly')}
+          >
+            <i className="fas fa-calendar-week me-2"></i> Tuần
+          </Button>
+          <Button 
+            className={viewMode === 'list' 
+              ? 'btn-main text-15 fw-medium px-20 py-10' 
+              : 'btn-outline-main text-15 fw-medium px-20 py-10'}
+            onClick={() => setViewMode('list')}
+          >
+            <i className="fas fa-list me-2"></i> Danh sách
+          </Button>
+        </ButtonGroup>
       </div>
 
       {/* Content */}
-      <div className="schedule-content">
+      <div>
         {viewMode === 'calendar' ? (
           <ScheduleCalendar 
+            schedules={schedules}
+            onEditSchedule={(schedule) => {
+              setSelectedSchedule(schedule);
+              setShowEditModal(true);
+            }}
+            onDeleteSchedule={handleDeleteSchedule}
+            onCreateMakeup={(schedule) => {
+              setSelectedSchedule(schedule);
+              setShowMakeupModal(true);
+            }}
+          />
+        ) : viewMode === 'weekly' ? (
+          <ScheduleWeekly 
             schedules={schedules}
             onEditSchedule={(schedule) => {
               setSelectedSchedule(schedule);
@@ -420,7 +496,7 @@ const ScheduleManagement = () => {
           onUpdate={fetchRooms}
         />
       )}
-    </div>
+    </Container>
   );
 };
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import './ScheduleList.css';
+import { Table, Badge, Button, ButtonGroup, Dropdown } from 'react-bootstrap';
 
 const ScheduleList = ({ 
   schedules, 
@@ -105,62 +105,87 @@ const ScheduleList = ({
   };
 
   return (
-    <div className="schedule-list">
+    <div>
       {/* Bulk actions */}
       {selectedSchedules.length > 0 && (
-        <div className="bulk-actions">
-          <span>{selectedSchedules.length} lịch học đã chọn</span>
-          <button className="btn btn-danger" onClick={handleBulkDelete}>
-            <i className="fas fa-trash"></i> Xóa đã chọn
-          </button>
+        <div className="d-flex justify-content-between align-items-center mb-16 p-16 bg-main-25 rounded-12 border border-main-100">
+          <span className="text-neutral-900 fw-semibold">{selectedSchedules.length} lịch học đã chọn</span>
+          <Button 
+            className="btn-danger text-13 fw-medium px-16 py-8 radius-8"
+            onClick={handleBulkDelete}
+          >
+            <i className="fas fa-trash me-2"></i> Xóa đã chọn
+          </Button>
         </div>
       )}
 
       {/* Table */}
-      <div className="table-container">
-        <table className="schedule-table">
-          <thead>
+      <div className="bg-white border border-neutral-30 rounded-12 overflow-hidden">
+        <Table className="mb-0" hover responsive>
+          <thead style={{ backgroundColor: 'var(--main-25)' }}>
             <tr>
-              <th className="checkbox-col">
+              <th style={{ width: '50px', padding: '16px' }}>
                 <input
                   type="checkbox"
+                  className="form-check-input"
                   checked={selectedSchedules.length === schedules.length && schedules.length > 0}
                   onChange={handleSelectAll}
                 />
               </th>
-              <th onClick={() => handleSort('date')} className="sortable">
+              <th 
+                onClick={() => handleSort('date')} 
+                style={{ cursor: 'pointer', padding: '16px' }}
+                className="text-neutral-900 fw-semibold"
+              >
                 Ngày học <SortIcon field="date" />
               </th>
-              <th>Thời gian</th>
-              <th onClick={() => handleSort('className')} className="sortable">
+              <th className="text-neutral-900 fw-semibold" style={{ padding: '16px' }}>Thời gian</th>
+              <th 
+                onClick={() => handleSort('className')} 
+                style={{ cursor: 'pointer', padding: '16px' }}
+                className="text-neutral-900 fw-semibold"
+              >
                 Lớp học <SortIcon field="className" />
               </th>
-              <th>Buổi học</th>
-              <th onClick={() => handleSort('teacherName')} className="sortable">
+              <th className="text-neutral-900 fw-semibold" style={{ padding: '16px' }}>Buổi học</th>
+              <th 
+                onClick={() => handleSort('teacherName')} 
+                style={{ cursor: 'pointer', padding: '16px' }}
+                className="text-neutral-900 fw-semibold"
+              >
                 Giảng viên <SortIcon field="teacherName" />
               </th>
-              <th onClick={() => handleSort('roomName')} className="sortable">
+              <th 
+                onClick={() => handleSort('roomName')} 
+                style={{ cursor: 'pointer', padding: '16px' }}
+                className="text-neutral-900 fw-semibold"
+              >
                 Phòng học <SortIcon field="roomName" />
               </th>
-              <th>Loại</th>
-              <th onClick={() => handleSort('status')} className="sortable">
+              <th className="text-neutral-900 fw-semibold" style={{ padding: '16px' }}>Loại</th>
+              <th 
+                onClick={() => handleSort('status')} 
+                style={{ cursor: 'pointer', padding: '16px' }}
+                className="text-neutral-900 fw-semibold"
+              >
                 Trạng thái <SortIcon field="status" />
               </th>
-              <th className="actions-col">Hành động</th>
+              <th style={{ width: '180px', padding: '16px' }} className="text-neutral-900 fw-semibold">Hành động</th>
             </tr>
           </thead>
           <tbody>
             {sortedSchedules.length > 0 ? (
               sortedSchedules.map(schedule => (
-                <tr key={schedule.id} className={selectedSchedules.includes(schedule.id) ? 'selected' : ''}>
-                  <td>
+                <tr key={schedule.id} className={selectedSchedules.includes(schedule.id) ? 'bg-main-25' : ''}>
+                  <td style={{ padding: '16px' }}>
                     <input
                       type="checkbox"
+                      className="form-check-input"
                       checked={selectedSchedules.includes(schedule.id)}
                       onChange={() => handleSelectSchedule(schedule.id)}
                     />
                   </td>
-                  <td>
+                  <td className="text-neutral-700" style={{ padding: '16px' }}>
                     {new Date(schedule.date).toLocaleDateString('vi-VN', {
                       weekday: 'short',
                       day: '2-digit',
@@ -168,91 +193,97 @@ const ScheduleList = ({
                       year: 'numeric'
                     })}
                   </td>
-                  <td>{schedule.startTime} - {schedule.endTime}</td>
-                  <td>
-                    <strong>{schedule.className}</strong>
+                  <td className="text-nowrap text-neutral-700" style={{ padding: '16px' }}>{schedule.startTime} - {schedule.endTime}</td>
+                  <td style={{ padding: '16px' }}>
+                    <strong className="text-neutral-900">{schedule.className}</strong>
                   </td>
-                  <td>
-                    <div className="lesson-info">
-                      <span className="lesson-number">Buổi {schedule.lessonNumber}</span>
-                      <span className="lesson-topic">{schedule.lessonTopic}</span>
+                  <td style={{ padding: '16px' }}>
+                    <div>
+                      <Badge className="bg-neutral-600 text-white px-10 py-4 text-12">Buổi {schedule.lessonNumber}</Badge>
+                      <div className="text-13 text-neutral-500 mt-8">{schedule.lessonTopic}</div>
                     </div>
                   </td>
-                  <td>{schedule.teacherName}</td>
-                  <td>{schedule.roomName}</td>
-                  <td>
-                    <span className={`type-badge type-${schedule.type}`}>
+                  <td className="text-neutral-700" style={{ padding: '16px' }}>{schedule.teacherName}</td>
+                  <td className="text-neutral-700" style={{ padding: '16px' }}>{schedule.roomName}</td>
+                  <td style={{ padding: '16px' }}>
+                    <Badge className={schedule.type === 'makeup' ? 'bg-warning-600 text-white' : 'bg-info-500 text-white'}>
                       {getTypeText(schedule.type)}
-                    </span>
+                    </Badge>
                   </td>
-                  <td>
-                    <span className={`status-badge status-${schedule.status}`}>
+                  <td style={{ padding: '16px' }}>
+                    <Badge 
+                      className={
+                        schedule.status === 'scheduled' ? 'bg-success-600 text-white px-12 py-6' :
+                        schedule.status === 'completed' ? 'bg-main-600 text-white px-12 py-6' :
+                        schedule.status === 'cancelled' ? 'bg-danger-600 text-white px-12 py-6' : 'bg-warning-600 text-white px-12 py-6'
+                      }
+                    >
                       {getStatusText(schedule.status)}
-                    </span>
+                    </Badge>
                   </td>
-                  <td>
-                    <div className="action-buttons">
-                      <button
-                        className="action-btn edit"
+                  <td style={{ padding: '16px' }}>
+                    <ButtonGroup size="sm">
+                      <Button
+                        className="btn-outline-main text-13 px-10 py-6"
                         onClick={() => onEditSchedule(schedule)}
-                        title="Chỉnh sửa"
+                        title="Sửa"
                       >
                         <i className="fas fa-edit"></i>
-                      </button>
-                      <button
-                        className="action-btn makeup"
+                      </Button>
+                      <Button
+                        className="btn-outline-warning text-13 px-10 py-6"
                         onClick={() => onCreateMakeup(schedule)}
-                        title="Tạo lịch học bù"
+                        title="Học bù"
                       >
                         <i className="fas fa-calendar-plus"></i>
-                      </button>
-                      <button
-                        className="action-btn delete"
+                      </Button>
+                      <Button
+                        className="btn-outline-danger text-13 px-10 py-6"
                         onClick={() => onDeleteSchedule(schedule.id)}
                         title="Xóa"
                       >
                         <i className="fas fa-trash"></i>
-                      </button>
-                    </div>
+                      </Button>
+                    </ButtonGroup>
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="10" className="no-data">
-                  <i className="fas fa-inbox"></i>
-                  <p>Không có lịch học nào</p>
+                <td colSpan="10" className="text-center py-40" style={{ padding: '40px' }}>
+                  <i className="fas fa-inbox fa-3x text-neutral-400 mb-16 d-block"></i>
+                  <p className="mb-0 text-neutral-500">Không có lịch học nào</p>
                 </td>
               </tr>
             )}
           </tbody>
-        </table>
+        </Table>
       </div>
 
       {/* Summary */}
       {schedules.length > 0 && (
-        <div className="schedule-summary">
-          <div className="summary-item">
-            <span className="summary-label">Tổng số lịch:</span>
-            <span className="summary-value">{schedules.length}</span>
+        <div className="d-flex justify-content-around p-20 bg-main-25 rounded-12 mt-24 border border-main-100">
+          <div className="text-center">
+            <div className="text-neutral-500 text-13 mb-8">Tổng số lịch</div>
+            <div className="text-neutral-900 fw-bold text-20">{schedules.length}</div>
           </div>
-          <div className="summary-item">
-            <span className="summary-label">Đã lên lịch:</span>
-            <span className="summary-value">
+          <div className="text-center">
+            <div className="text-neutral-500 text-13 mb-8">Đã lên lịch</div>
+            <div className="text-success-600 fw-bold text-20">
               {schedules.filter(s => s.status === 'scheduled').length}
-            </span>
+            </div>
           </div>
-          <div className="summary-item">
-            <span className="summary-label">Đã hoàn thành:</span>
-            <span className="summary-value">
+          <div className="text-center">
+            <div className="text-neutral-500 text-13 mb-8">Đã hoàn thành</div>
+            <div className="text-main-600 fw-bold text-20">
               {schedules.filter(s => s.status === 'completed').length}
-            </span>
+            </div>
           </div>
-          <div className="summary-item">
-            <span className="summary-label">Học bù:</span>
-            <span className="summary-value">
+          <div className="text-center">
+            <div className="text-neutral-500 text-13 mb-8">Học bù</div>
+            <div className="text-warning-600 fw-bold text-20">
               {schedules.filter(s => s.type === 'makeup').length}
-            </span>
+            </div>
           </div>
         </div>
       )}

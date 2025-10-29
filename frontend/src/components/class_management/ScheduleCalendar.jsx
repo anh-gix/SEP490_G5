@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import './ScheduleCalendar.css';
+import { Card, Button, Badge, Dropdown } from 'react-bootstrap';
 
 const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateMakeup }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -88,157 +88,199 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
   };
 
   return (
-    <div className="schedule-calendar">
-      {/* Calendar Header */}
-      <div className="calendar-header">
-        <button className="nav-btn" onClick={goToPreviousMonth}>
-          <i className="fas fa-chevron-left"></i>
-        </button>
-        <div className="current-month">
-          <h3>{formatMonthYear()}</h3>
-          <button className="today-btn" onClick={goToToday}>Hôm nay</button>
-        </div>
-        <button className="nav-btn" onClick={goToNextMonth}>
-          <i className="fas fa-chevron-right"></i>
-        </button>
-      </div>
+    <div>
+      <Card>
+        <Card.Header className="bg-white">
+          {/* Calendar Header */}
+          <div className="d-flex justify-content-between align-items-center">
+            <Button variant="outline-primary" size="sm" onClick={goToPreviousMonth}>
+              <i className="fas fa-chevron-left"></i>
+            </Button>
+            <div className="text-center">
+              <h5 className="mb-1">{formatMonthYear()}</h5>
+              <Button variant="link" size="sm" onClick={goToToday}>Hôm nay</Button>
+            </div>
+            <Button variant="outline-primary" size="sm" onClick={goToNextMonth}>
+              <i className="fas fa-chevron-right"></i>
+            </Button>
+          </div>
+        </Card.Header>
 
-      {/* Calendar Grid */}
-      <div className="calendar-grid">
-        {/* Weekday headers */}
-        {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map(day => (
-          <div key={day} className="calendar-weekday">{day}</div>
-        ))}
+        <Card.Body className="p-0">
+          {/* Calendar Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0 }}>
+            {/* Weekday headers */}
+            {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map(day => (
+              <div 
+                key={day} 
+                className="text-center fw-bold py-2 border-bottom bg-light"
+                style={{ fontSize: '14px', color: '#6c757d' }}
+              >
+                {day}
+              </div>
+            ))}
 
-        {/* Calendar days */}
-        {calendarData.map((dayData, index) => {
-          const daySchedules = getSchedulesForDate(dayData.date);
-          const isSelectedDate = selectedDate?.toDateString() === dayData.date.toDateString();
-          
-          return (
-            <div
-              key={index}
-              className={`calendar-day ${!dayData.isCurrentMonth ? 'other-month' : ''} ${
-                isToday(dayData.date) ? 'today' : ''
-              } ${isSelectedDate ? 'selected' : ''}`}
-              onClick={() => setSelectedDate(dayData.date)}
-            >
-              <div className="day-number">{dayData.date.getDate()}</div>
+            {/* Calendar days */}
+            {calendarData.map((dayData, index) => {
+              const daySchedules = getSchedulesForDate(dayData.date);
+              const isSelectedDate = selectedDate?.toDateString() === dayData.date.toDateString();
               
-              {daySchedules.length > 0 && (
-                <div className="day-schedules">
-                  {daySchedules.slice(0, 3).map(schedule => (
-                    <div
-                      key={schedule.id}
-                      className="schedule-item"
-                      style={{ borderLeftColor: getStatusColor(schedule.status) }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEditSchedule(schedule);
-                      }}
-                    >
-                      <span className="schedule-time">{schedule.startTime}</span>
-                      <span className="schedule-class">{schedule.className}</span>
-                    </div>
-                  ))}
-                  {daySchedules.length > 3 && (
-                    <div className="more-schedules">
-                      +{daySchedules.length - 3} lịch khác
+              return (
+                <div
+                  key={index}
+                  className={`border p-2 ${!dayData.isCurrentMonth ? 'bg-light text-muted' : ''} ${
+                    isToday(dayData.date) ? 'bg-primary bg-opacity-10' : ''
+                  } ${isSelectedDate ? 'border-primary border-2' : ''}`}
+                  style={{ 
+                    minHeight: '100px', 
+                    cursor: 'pointer',
+                    position: 'relative'
+                  }}
+                  onClick={() => setSelectedDate(dayData.date)}
+                >
+                  <div 
+                    className={`fw-bold ${isToday(dayData.date) ? 'text-primary' : ''}`}
+                    style={{ fontSize: '14px' }}
+                  >
+                    {dayData.date.getDate()}
+                  </div>
+                  
+                  {daySchedules.length > 0 && (
+                    <div className="mt-1 d-flex flex-column gap-1">
+                      {daySchedules.slice(0, 3).map(schedule => (
+                        <div
+                          key={schedule.id}
+                          className="p-1 rounded"
+                          style={{ 
+                            borderLeft: `3px solid ${getStatusColor(schedule.status)}`,
+                            background: 'rgba(0,0,0,0.02)',
+                            fontSize: '10px',
+                            cursor: 'pointer'
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditSchedule(schedule);
+                          }}
+                        >
+                          <div className="fw-bold">{schedule.startTime}</div>
+                          <div className="text-truncate">{schedule.className}</div>
+                        </div>
+                      ))}
+                      {daySchedules.length > 3 && (
+                        <div className="text-muted small">
+                          +{daySchedules.length - 3} lịch khác
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </Card.Body>
+      </Card>
 
       {/* Selected Date Details */}
       {selectedDate && (
-        <div className="selected-date-details">
-          <div className="details-header">
-            <h4>
+        <Card className="mt-3">
+          <Card.Header className="d-flex justify-content-between align-items-center">
+            <h5 className="mb-0">
               Lịch học ngày {selectedDate.toLocaleDateString('vi-VN', {
                 weekday: 'long',
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric'
               })}
-            </h4>
-            <button className="close-btn" onClick={() => setSelectedDate(null)}>
+            </h5>
+            <Button variant="link" size="sm" onClick={() => setSelectedDate(null)}>
               <i className="fas fa-times"></i>
-            </button>
-          </div>
+            </Button>
+          </Card.Header>
 
-          <div className="schedules-list">
+          <Card.Body>
             {getSchedulesForDate(selectedDate).length > 0 ? (
-              getSchedulesForDate(selectedDate).map(schedule => (
-                <div key={schedule.id} className="schedule-detail-card">
-                  <div className="schedule-info">
-                    <div className="info-row">
-                      <span className="label">Thời gian:</span>
-                      <span className="value">{schedule.startTime} - {schedule.endTime}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="label">Lớp:</span>
-                      <span className="value">{schedule.className}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="label">Giảng viên:</span>
-                      <span className="value">{schedule.teacherName}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="label">Phòng:</span>
-                      <span className="value">{schedule.roomName}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="label">Buổi học:</span>
-                      <span className="value">Buổi {schedule.lessonNumber} - {schedule.lessonTopic}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="label">Trạng thái:</span>
-                      <span className={`status-badge status-${schedule.status}`}>
-                        {schedule.status === 'scheduled' && 'Đã lên lịch'}
-                        {schedule.status === 'completed' && 'Đã hoàn thành'}
-                        {schedule.status === 'cancelled' && 'Đã hủy'}
-                        {schedule.status === 'makeup' && 'Học bù'}
-                      </span>
-                    </div>
-                  </div>
+              <div className="d-flex flex-column gap-3">
+                {getSchedulesForDate(selectedDate).map(schedule => (
+                  <Card key={schedule.id} className="shadow-sm">
+                    <Card.Body>
+                      <div className="row g-2 mb-3">
+                        <div className="col-md-6">
+                          <small className="text-muted">Thời gian:</small>
+                          <div className="fw-bold">{schedule.startTime} - {schedule.endTime}</div>
+                        </div>
+                        <div className="col-md-6">
+                          <small className="text-muted">Lớp:</small>
+                          <div className="fw-bold">{schedule.className}</div>
+                        </div>
+                        <div className="col-md-6">
+                          <small className="text-muted">Giảng viên:</small>
+                          <div>{schedule.teacherName}</div>
+                        </div>
+                        <div className="col-md-6">
+                          <small className="text-muted">Phòng:</small>
+                          <div>{schedule.roomName}</div>
+                        </div>
+                        <div className="col-md-6">
+                          <small className="text-muted">Buổi học:</small>
+                          <div>Buổi {schedule.lessonNumber} - {schedule.lessonTopic}</div>
+                        </div>
+                        <div className="col-md-6">
+                          <small className="text-muted">Trạng thái:</small>
+                          <div>
+                            <Badge 
+                              bg={
+                                schedule.status === 'scheduled' ? 'success' :
+                                schedule.status === 'completed' ? 'primary' :
+                                schedule.status === 'cancelled' ? 'danger' : 'warning'
+                              }
+                            >
+                              {schedule.status === 'scheduled' && 'Đã lên lịch'}
+                              {schedule.status === 'completed' && 'Đã hoàn thành'}
+                              {schedule.status === 'cancelled' && 'Đã hủy'}
+                              {schedule.status === 'makeup' && 'Học bù'}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
 
-                  <div className="schedule-actions">
-                    <button 
-                      className="action-btn edit"
-                      onClick={() => onEditSchedule(schedule)}
-                      title="Chỉnh sửa"
-                    >
-                      <i className="fas fa-edit"></i>
-                    </button>
-                    <button 
-                      className="action-btn makeup"
-                      onClick={() => onCreateMakeup(schedule)}
-                      title="Tạo lịch học bù"
-                    >
-                      <i className="fas fa-calendar-plus"></i>
-                    </button>
-                    <button 
-                      className="action-btn delete"
-                      onClick={() => onDeleteSchedule(schedule.id)}
-                      title="Xóa"
-                    >
-                      <i className="fas fa-trash"></i>
-                    </button>
-                  </div>
-                </div>
-              ))
+                      <div className="d-flex gap-2">
+                        <Button 
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => onEditSchedule(schedule)}
+                        >
+                          <i className="fas fa-edit me-1"></i>
+                          Sửa
+                        </Button>
+                        <Button 
+                          variant="outline-warning"
+                          size="sm"
+                          onClick={() => onCreateMakeup(schedule)}
+                        >
+                          <i className="fas fa-calendar-plus me-1"></i>
+                          Học bù
+                        </Button>
+                        <Button 
+                          variant="outline-danger"
+                          size="sm"
+                          onClick={() => onDeleteSchedule(schedule.id)}
+                        >
+                          <i className="fas fa-trash me-1"></i>
+                          Xóa
+                        </Button>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                ))}
+              </div>
             ) : (
-              <div className="no-schedules">
-                <i className="fas fa-calendar-times"></i>
-                <p>Không có lịch học nào trong ngày này</p>
+              <div className="text-center text-muted py-5">
+                <i className="fas fa-calendar-times fa-3x mb-3 d-block"></i>
+                <p className="mb-0">Không có lịch học nào trong ngày này</p>
               </div>
             )}
-          </div>
-        </div>
+          </Card.Body>
+        </Card>
       )}
     </div>
   );

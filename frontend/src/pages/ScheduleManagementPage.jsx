@@ -1,11 +1,12 @@
 import React from 'react';
+import AcademicLayout from '../components/class_management/AcademicLayout';
 import ScheduleManagement from '../components/class_management/ScheduleManagement';
 
 const ScheduleManagementPage = () => {
   return (
-    <div className="schedule-management-page">
+    <AcademicLayout>
       <ScheduleManagement />
-    </div>
+    </AcademicLayout>
   );
 };
 

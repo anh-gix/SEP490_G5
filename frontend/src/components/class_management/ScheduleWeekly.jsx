@@ -125,17 +125,28 @@ const ScheduleWeekly = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateM
   };
 
   return (
-    <Card>
-      <Card.Header className="bg-white">
+    <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+      <Card.Header className="bg-main-25 border-0 p-20">
         <div className="d-flex justify-content-between align-items-center">
-          <Button variant="outline-primary" size="sm" onClick={goToPreviousWeek}>
+          <Button 
+            className="btn-outline-main text-14 fw-medium px-12 py-8 radius-8"
+            onClick={goToPreviousWeek}
+          >
             <i className="fas fa-chevron-left"></i>
           </Button>
           <div className="text-center">
-            <h5 className="mb-1">{formatWeekRange()}</h5>
-            <Button variant="link" size="sm" onClick={goToCurrentWeek}>Tuần này</Button>
+            <h5 className="text-neutral-900 fw-semibold mb-4">{formatWeekRange()}</h5>
+            <Button 
+              className="btn-link text-main-600 text-13 fw-medium p-0"
+              onClick={goToCurrentWeek}
+            >
+              Tuần này
+            </Button>
           </div>
-          <Button variant="outline-primary" size="sm" onClick={goToNextWeek}>
+          <Button 
+            className="btn-outline-main text-14 fw-medium px-12 py-8 radius-8"
+            onClick={goToNextWeek}
+          >
             <i className="fas fa-chevron-right"></i>
           </Button>
         </div>
@@ -240,58 +251,79 @@ const ScheduleWeekly = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateM
                                 style={{ padding: '2px' }}
                               >
                                 <Button
-                                  variant="light"
+                                  className="bg-main-600 text-white border-0"
                                   size="sm"
                                   style={{ 
-                                    padding: '1px 4px', 
-                                    fontSize: '8px',
+                                    padding: '0', 
+                                    fontSize: '10px',
                                     lineHeight: 1,
-                                    border: '1px solid #dee2e6',
-                                    opacity: 0.8
+                                    width: '13px',
+                                    height: '13px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: '2px',
+                                    opacity: 0.9
                                   }}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     onEditSchedule(schedule);
                                   }}
                                   title="Sửa"
+                                  onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                  onMouseLeave={(e) => e.currentTarget.style.opacity = '0.9'}
                                 >
-                                  <i className="fas fa-edit"></i>
+                                  <i className="fas fa-edit" style={{ fontSize: '9px' }}></i>
                                 </Button>
                                 <Button
-                                  variant="light"
+                                  className="bg-warning-600 text-white border-0"
                                   size="sm"
                                   style={{ 
-                                    padding: '1px 4px', 
-                                    fontSize: '8px',
+                                    padding: '0', 
+                                    fontSize: '10px',
                                     lineHeight: 1,
-                                    border: '1px solid #dee2e6',
-                                    opacity: 0.8
+                                    width: '13px',
+                                    height: '13px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: '2px',
+                                    opacity: 0.9
                                   }}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     onCreateMakeup(schedule);
                                   }}
                                   title="Học bù"
+                                  onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                  onMouseLeave={(e) => e.currentTarget.style.opacity = '0.9'}
                                 >
-                                  <i className="fas fa-calendar-plus"></i>
+                                  <i className="fas fa-calendar-plus" style={{ fontSize: '9px' }}></i>
                                 </Button>
                                 <Button
-                                  variant="light"
+                                  className="bg-danger-600 text-white border-0"
                                   size="sm"
                                   style={{ 
-                                    padding: '1px 4px', 
-                                    fontSize: '8px',
+                                    padding: '0', 
+                                    fontSize: '10px',
                                     lineHeight: 1,
-                                    border: '1px solid #dee2e6',
-                                    opacity: 0.8
+                                    width: '13px',
+                                    height: '13px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: '2px',
+                                    opacity: 0.9
                                   }}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     onDeleteSchedule(schedule.id);
                                   }}
                                   title="Xóa"
+                                  onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                                  onMouseLeave={(e) => e.currentTarget.style.opacity = '0.9'}
                                 >
-                                  <i className="fas fa-trash"></i>
+                                  <i className="fas fa-trash" style={{ fontSize: '8px' }}></i>
                                 </Button>
                               </div>
                             </Card.Body>
@@ -308,23 +340,23 @@ const ScheduleWeekly = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateM
       </Card.Body>
 
       {/* Legend */}
-      <Card.Footer className="bg-light">
-        <div className="d-flex justify-content-center gap-3 flex-wrap">
-          <div className="d-flex align-items-center gap-2">
-            <Badge bg="success" style={{ width: '12px', height: '12px', padding: 0 }}></Badge>
-            <span className="small">Đã lên lịch</span>
+      <Card.Footer className="bg-neutral-25 border-0 p-16">
+        <div className="d-flex justify-content-center gap-16 flex-wrap">
+          <div className="d-flex align-items-center gap-8">
+            <Badge className="bg-success-600" style={{ width: '12px', height: '12px', padding: 0, borderRadius: '2px' }}></Badge>
+            <span className="text-13 text-neutral-700">Đã lên lịch</span>
           </div>
-          <div className="d-flex align-items-center gap-2">
-            <Badge bg="primary" style={{ width: '12px', height: '12px', padding: 0 }}></Badge>
-            <span className="small">Đã hoàn thành</span>
+          <div className="d-flex align-items-center gap-8">
+            <Badge className="bg-main-600" style={{ width: '12px', height: '12px', padding: 0, borderRadius: '2px' }}></Badge>
+            <span className="text-13 text-neutral-700">Đã hoàn thành</span>
           </div>
-          <div className="d-flex align-items-center gap-2">
-            <Badge bg="warning" style={{ width: '12px', height: '12px', padding: 0 }}></Badge>
-            <span className="small">Học bù</span>
+          <div className="d-flex align-items-center gap-8">
+            <Badge className="bg-warning-600" style={{ width: '12px', height: '12px', padding: 0, borderRadius: '2px' }}></Badge>
+            <span className="text-13 text-neutral-700">Học bù</span>
           </div>
-          <div className="d-flex align-items-center gap-2">
-            <Badge bg="danger" style={{ width: '12px', height: '12px', padding: 0 }}></Badge>
-            <span className="small">Đã hủy</span>
+          <div className="d-flex align-items-center gap-8">
+            <Badge className="bg-danger-600" style={{ width: '12px', height: '12px', padding: 0, borderRadius: '2px' }}></Badge>
+            <span className="text-13 text-neutral-700">Đã hủy</span>
           </div>
         </div>
       </Card.Footer>

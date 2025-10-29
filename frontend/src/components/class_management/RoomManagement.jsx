@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import './RoomManagement.css';
+import { Modal, Button, Form, Table, Badge } from 'react-bootstrap';
 
 const RoomManagement = ({ rooms, onClose, onUpdate }) => {
   const [roomList, setRoomList] = useState(rooms);
@@ -113,25 +113,27 @@ const RoomManagement = ({ rooms, onClose, onUpdate }) => {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content room-management-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>Quản lý phòng học</h3>
-          <button className="close-btn" onClick={onClose}>
-            <i className="fas fa-times"></i>
-          </button>
-        </div>
+    <Modal show={true} onHide={onClose} size="xl" centered>
+      <Modal.Header closeButton>
+        <Modal.Title>Quản lý phòng học</Modal.Title>
+      </Modal.Header>
 
-        <div className="modal-body">
-          {/* Add/Edit Form */}
-          {showAddForm && (
-            <form onSubmit={editingRoom ? handleUpdateRoom : handleAddRoom} className="room-form">
-              <h4>{editingRoom ? 'Chỉnh sửa phòng học' : 'Thêm phòng học mới'}</h4>
-              
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Tên phòng <span className="required">*</span></label>
-                  <input
+      <Modal.Body>
+        {/* Add/Edit Form */}
+        {showAddForm && (
+          <Form 
+            onSubmit={editingRoom ? handleUpdateRoom : handleAddRoom}
+            className="mb-4 p-3 border rounded bg-light"
+          >
+            <h5 className="mb-3">
+              {editingRoom ? 'Chỉnh sửa phòng học' : 'Thêm phòng học mới'}
+            </h5>
+            
+            <div className="row g-3 mb-3">
+              <div className="col-md-4">
+                <Form.Group>
+                  <Form.Label>Tên phòng <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
                     type="text"
                     name="name"
                     value={formData.name}
@@ -139,11 +141,13 @@ const RoomManagement = ({ rooms, onClose, onUpdate }) => {
                     placeholder="Ví dụ: Room 101"
                     required
                   />
-                </div>
+                </Form.Group>
+              </div>
 
-                <div className="form-group">
-                  <label>Sức chứa <span className="required">*</span></label>
-                  <input
+              <div className="col-md-4">
+                <Form.Group>
+                  <Form.Label>Sức chứa <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
                     type="number"
                     name="capacity"
                     value={formData.capacity}
@@ -152,125 +156,148 @@ const RoomManagement = ({ rooms, onClose, onUpdate }) => {
                     placeholder="Số lượng học viên"
                     required
                   />
-                </div>
+                </Form.Group>
+              </div>
 
-                <div className="form-group">
-                  <label>Trạng thái</label>
-                  <select name="status" value={formData.status} onChange={handleInputChange}>
+              <div className="col-md-4">
+                <Form.Group>
+                  <Form.Label>Trạng thái</Form.Label>
+                  <Form.Select 
+                    name="status" 
+                    value={formData.status} 
+                    onChange={handleInputChange}
+                  >
                     <option value="active">Hoạt động</option>
                     <option value="maintenance">Bảo trì</option>
                     <option value="inactive">Không hoạt động</option>
-                  </select>
-                </div>
+                  </Form.Select>
+                </Form.Group>
               </div>
+            </div>
 
-              <div className="form-group full-width">
-                <label>Thiết bị</label>
-                <div className="equipment-selector">
-                  {equipmentOptions.map(equipment => (
-                    <label key={equipment} className="equipment-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={formData.equipment.includes(equipment)}
-                        onChange={() => handleEquipmentToggle(equipment)}
-                      />
-                      <span>{equipment}</span>
-                    </label>
-                  ))}
-                </div>
+            <Form.Group className="mb-3">
+              <Form.Label>Thiết bị</Form.Label>
+              <div className="d-flex flex-wrap gap-3">
+                {equipmentOptions.map(equipment => (
+                  <Form.Check
+                    key={equipment}
+                    type="checkbox"
+                    id={`equipment-${equipment}`}
+                    label={equipment}
+                    checked={formData.equipment.includes(equipment)}
+                    onChange={() => handleEquipmentToggle(equipment)}
+                  />
+                ))}
               </div>
+            </Form.Group>
 
-              <div className="form-actions">
-                <button type="button" className="btn btn-secondary" onClick={resetForm}>
-                  Hủy
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  <i className="fas fa-save"></i> {editingRoom ? 'Cập nhật' : 'Thêm mới'}
-                </button>
-              </div>
-            </form>
-          )}
+            <div className="d-flex gap-2">
+              <Button variant="secondary" onClick={resetForm}>
+                <i className="fas fa-times me-2"></i>Hủy
+              </Button>
+              <Button variant="primary" type="submit">
+                <i className="fas fa-save me-2"></i>
+                {editingRoom ? 'Cập nhật' : 'Thêm mới'}
+              </Button>
+            </div>
+          </Form>
+        )}
 
-          {/* Add button */}
-          {!showAddForm && (
-            <button 
-              className="btn btn-primary add-room-btn"
-              onClick={() => setShowAddForm(true)}
-            >
-              <i className="fas fa-plus"></i> Thêm phòng học mới
-            </button>
-          )}
+        {/* Add button */}
+        {!showAddForm && (
+          <Button 
+            variant="primary"
+            className="mb-3"
+            onClick={() => setShowAddForm(true)}
+          >
+            <i className="fas fa-plus me-2"></i>
+            Thêm phòng học mới
+          </Button>
+        )}
 
-          {/* Room list */}
-          <div className="rooms-list">
-            <h4>Danh sách phòng học ({roomList.length})</h4>
-            
-            <div className="rooms-grid">
+        {/* Room list */}
+        <div>
+          <h5 className="mb-3">Danh sách phòng học ({roomList.length})</h5>
+          
+          {roomList.length > 0 ? (
+            <div className="row g-3">
               {roomList.map(room => (
-                <div key={room.id} className={`room-card status-${room.status || 'active'}`}>
-                  <div className="room-header">
-                    <h5>{room.name}</h5>
-                    <span className={`status-badge status-${room.status || 'active'}`}>
-                      {room.status === 'active' && 'Hoạt động'}
-                      {room.status === 'maintenance' && 'Bảo trì'}
-                      {room.status === 'inactive' && 'Không hoạt động'}
-                    </span>
-                  </div>
-
-                  <div className="room-info">
-                    <div className="info-item">
-                      <i className="fas fa-users"></i>
-                      <span>Sức chứa: {room.capacity} người</span>
+                <div key={room.id} className="col-md-6 col-lg-4">
+                  <div className={`card h-100 ${
+                    room.status === 'maintenance' ? 'border-warning' :
+                    room.status === 'inactive' ? 'border-danger' :
+                    'border-success'
+                  }`}>
+                    <div className="card-header d-flex justify-content-between align-items-center">
+                      <strong>{room.name}</strong>
+                      <Badge bg={
+                        room.status === 'maintenance' ? 'warning' :
+                        room.status === 'inactive' ? 'danger' :
+                        'success'
+                      }>
+                        {room.status === 'active' && 'Hoạt động'}
+                        {room.status === 'maintenance' && 'Bảo trì'}
+                        {room.status === 'inactive' && 'Không hoạt động'}
+                      </Badge>
                     </div>
-                    
-                    {room.equipment && room.equipment.length > 0 && (
-                      <div className="info-item">
-                        <i className="fas fa-tools"></i>
-                        <div className="equipment-list">
-                          {room.equipment.map((eq, index) => (
-                            <span key={index} className="equipment-tag">{eq}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
 
-                  <div className="room-actions">
-                    <button
-                      className="action-btn edit"
-                      onClick={() => handleEditRoom(room)}
-                      title="Chỉnh sửa"
-                    >
-                      <i className="fas fa-edit"></i>
-                    </button>
-                    <button
-                      className="action-btn delete"
-                      onClick={() => handleDeleteRoom(room.id)}
-                      title="Xóa"
-                    >
-                      <i className="fas fa-trash"></i>
-                    </button>
+                    <div className="card-body">
+                      <div className="d-flex align-items-center gap-2 mb-2">
+                        <i className="fas fa-users text-muted"></i>
+                        <span>Sức chứa: <strong>{room.capacity}</strong> người</span>
+                      </div>
+                      
+                      {room.equipment && room.equipment.length > 0 && (
+                        <div className="d-flex align-items-start gap-2">
+                          <i className="fas fa-tools text-muted mt-1"></i>
+                          <div className="d-flex flex-wrap gap-1">
+                            {room.equipment.map((eq, index) => (
+                              <Badge key={index} bg="secondary" pill className="small">
+                                {eq}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="card-footer bg-white d-flex gap-2 justify-content-end">
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={() => handleEditRoom(room)}
+                        title="Chỉnh sửa"
+                      >
+                        <i className="fas fa-edit"></i>
+                      </Button>
+                      <Button
+                        variant="outline-danger"
+                        size="sm"
+                        onClick={() => handleDeleteRoom(room.id)}
+                        title="Xóa"
+                      >
+                        <i className="fas fa-trash"></i>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
-
-              {roomList.length === 0 && (
-                <div className="no-rooms">
-                  <i className="fas fa-door-open"></i>
-                  <p>Chưa có phòng học nào</p>
-                </div>
-              )}
             </div>
-          </div>
+          ) : (
+            <div className="text-center py-5">
+              <i className="fas fa-door-open fa-4x text-muted mb-3 d-block"></i>
+              <h5 className="text-muted">Chưa có phòng học nào</h5>
+            </div>
+          )}
         </div>
+      </Modal.Body>
 
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>
-            Đóng
-          </button>
-        </div>
-      </div>
-    </div>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onClose}>
+          Đóng
+        </Button>
+      </Modal.Footer>
+    </Modal>
   );
 };
 

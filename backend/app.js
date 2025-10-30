@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const router = require('./routes');
+require('./models');
 require('dotenv').config();
 
 const app = express();
@@ -22,7 +24,7 @@ mongoose.connect(process.env.MONGODB_URI, {
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/roles', require('./routes/roleRoutes'));
-
+app.use('/api/v1', router); // Use the centralized router
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);

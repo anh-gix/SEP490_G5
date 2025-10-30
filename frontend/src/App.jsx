@@ -43,13 +43,50 @@ import TutorDetailsPage from "./pages/TutorDetailsPage.jsx";
 import HomePageFive from "./pages/HomePageFive.jsx";
 import HomePageSix from "./pages/HomePageSix.jsx";
 
+
+//import page components
+import Dashboard from "./components/CenterHead/pages/CenterHeadDashboard.jsx";
+import PendingCoursesList from "./components/CenterHead/pages/PendingCourseList.jsx";
+import CourseDetails from "./components/CenterHead/pages/CourseDetail.jsx";
+import PendingSchedulesList from "./components/CenterHead/pages/PendingScheduleList.jsx";
+import { Navigate } from "react-router-dom";
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <RouteScrollToTop />
+        <div className="app-container">
+          {/* Main Content */}
+          <main className="main-content p-24 p-sm-32 p-md-40">
+            <div className="container-fluid">
+              <Routes>
+                {/* Dashboard */}
+                <Route path="/" element={<Dashboard />} />
 
-        <Routes>
+                {/* Courses Routes */}
+                <Route
+                  path="/courses/pending"
+                  element={<PendingCoursesList />}
+                />
+                <Route
+                  path="/courses/:id/details"
+                  element={<CourseDetails />}
+                />
+
+                {/* Schedules Routes */}
+                <Route
+                  path="/schedules/pending"
+                  element={<PendingSchedulesList />}
+                />
+
+                {/* Redirect unknown routes to dashboard */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </div>
+          </main>
+        </div>
+
+        {/* <Routes>
         <Route exact path='/' element={<HomePageOne />} />
         <Route exact path='/index-2' element={<HomePageTwo />} />
         <Route exact path='/index-3' element={<HomePageThree />} />
@@ -103,7 +140,7 @@ function App() {
         <Route exact path='/tuition-jobs' element={<TuitionJobsPage />} />
         <Route exact path='/tutor' element={<TutorPage />} />
         <Route exact path='/tutor-details' element={<TutorDetailsPage />} />
-        </Routes>
+        </Routes> */}
       </BrowserRouter>
     </AuthProvider>
   );

@@ -43,104 +43,113 @@ import TutorDetailsPage from "./pages/TutorDetailsPage.jsx";
 import HomePageFive from "./pages/HomePageFive.jsx";
 import HomePageSix from "./pages/HomePageSix.jsx";
 
-
 //import page components
 import Dashboard from "./components/CenterHead/pages/CenterHeadDashboard.jsx";
 import PendingCoursesList from "./components/CenterHead/pages/PendingCourseList.jsx";
 import CourseDetails from "./components/CenterHead/pages/CourseDetail.jsx";
 import PendingSchedulesList from "./components/CenterHead/pages/PendingScheduleList.jsx";
 import { Navigate } from "react-router-dom";
+import Attendance from "./pages/Attendance.jsx";
+import ClassSchedulePage from "./pages/ClassSchedulePage.jsx";
+import AttendanceDetailPage from "./pages/AttendanceDetailPage.jsx";
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <RouteScrollToTop />
-        <div className="app-container">
-          {/* Main Content */}
-          <main className="main-content p-24 p-sm-32 p-md-40">
-            <div className="container-fluid">
-              <Routes>
-                {/* Dashboard */}
-                <Route path="/" element={<Dashboard />} />
+      <RouteScrollToTop />
+        <Routes>
+          
+          {/* Dashboard */}
+          {/* <Route path="/" element={<Dashboard />} /> */}
 
-                {/* Courses Routes */}
-                <Route
-                  path="/courses/pending"
-                  element={<PendingCoursesList />}
-                />
-                <Route
-                  path="/courses/:id/details"
-                  element={<CourseDetails />}
-                />
+          {/* Courses Routes */}
+          <Route path="/courses/pending" element={<PendingCoursesList />} />
+          <Route path="/courses/:id/details" element={<CourseDetails />} />
 
-                {/* Schedules Routes */}
-                <Route
-                  path="/schedules/pending"
-                  element={<PendingSchedulesList />}
-                />
+          {/* Schedules Routes */}
+          <Route path="/schedules/pending" element={<PendingSchedulesList />} />
 
-                {/* Redirect unknown routes to dashboard */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </div>
-          </main>
-        </div>
+          {/* Redirect unknown routes to dashboard */}
+          <Route path="*" element={<Navigate to="/" replace />} />
 
-        {/* <Routes>
-        <Route exact path='/' element={<HomePageOne />} />
-        <Route exact path='/index-2' element={<HomePageTwo />} />
-        <Route exact path='/index-3' element={<HomePageThree />} />
-        <Route exact path='/index-4' element={<HomePageFour />} />
-        <Route exact path='/index-5' element={<HomePageFive />} />
-        <Route exact path='/index-6' element={<HomePageSix />} />
-        <Route exact path='/about' element={<AboutPage />} />
-        <Route exact path='/about-two' element={<AboutTwoPage />} />
-        <Route exact path='/about-three' element={<AboutThreePage />} />
-        <Route exact path='/about-four' element={<AboutFourPage />} />
-        <Route exact path='/apply-admission' element={<ApplyAdmissionPage />} />
-        <Route exact path='/blog' element={<BlogPage />} />
-        <Route exact path='/blog-classic' element={<BlogClassicPage />} />
-        <Route exact path='/blog-details' element={<BlogDetailsPage />} />
-        <Route exact path='/blog-list' element={<BlogListPage />} />
-        <Route
-          exact
-          path='/book-online-class'
-          element={<BookOnlineClassPage />}
-        />
-        <Route exact path='/cart' element={<CartPage />} />
-        <Route exact path='/checkout' element={<CheckoutPage />} />
-        <Route exact path='/contact' element={<ContactPage />} />
-        <Route exact path='/course' element={<CoursePage />} />
-        <Route exact path='/course-details' element={<CourseDetailsPage />} />
-        <Route
-          exact
-          path='/course-list-view'
-          element={<CourseListViewPage />}
-        />
-        <Route exact path='/event-details' element={<EventDetailsPage />} />
-        <Route exact path='/events' element={<EventsPage />} />
-        <Route exact path='/faq' element={<FaqPage />} />
-        <Route exact path='/favorite-course' element={<FavoriteCoursePage />} />
-        <Route exact path='/find-tutors' element={<FindTutorsPage />} />
-        <Route exact path='/gallery' element={<GalleryPage />} />
-        <Route exact path='/instructor' element={<InstructorPage />} />
-        <Route
-          exact
-          path='/instructor-details'
-          element={<InstructorDetailsPage />}
-        />
-        <Route exact path='/instructor-two' element={<InstructorTwoPage />} />
-        <Route exact path='/lesson-details' element={<LessonDetailsPage />} />
-        <Route exact path='/pricing-plan' element={<PricingPlanPage />} />
-        <Route exact path='/privacy-policy' element={<PrivacyPolicyPage />} />
-        <Route exact path='/product' element={<ProductPage />} />
-        <Route exact path='/product-details' element={<ProductDetailsPage />} />
-        <Route exact path='/sign-in' element={<SignInPage />} />
-        <Route exact path='/sign-up' element={<SignUpPage />} />
-        <Route exact path='/tuition-jobs' element={<TuitionJobsPage />} />
-        <Route exact path='/tutor' element={<TutorPage />} />
-        <Route exact path='/tutor-details' element={<TutorDetailsPage />} />
-        </Routes> */}
+          <Route exact path="/" element={<HomePageOne />} />
+          <Route exact path="/index-2" element={<HomePageTwo />} />
+          <Route exact path="/index-3" element={<HomePageThree />} />
+          <Route exact path="/index-4" element={<HomePageFour />} />
+          <Route exact path="/index-5" element={<HomePageFive />} />
+          <Route exact path="/index-6" element={<HomePageSix />} />
+          <Route exact path="/about" element={<AboutPage />} />
+          <Route exact path="/about-two" element={<AboutTwoPage />} />
+          <Route exact path="/about-three" element={<AboutThreePage />} />
+          <Route exact path="/about-four" element={<AboutFourPage />} />
+          <Route
+            exact
+            path="/apply-admission"
+            element={<ApplyAdmissionPage />}
+          />
+          <Route exact path="/blog" element={<BlogPage />} />
+          <Route exact path="/blog-classic" element={<BlogClassicPage />} />
+          <Route exact path="/blog-details" element={<BlogDetailsPage />} />
+          <Route exact path="/blog-list" element={<BlogListPage />} />
+          <Route
+            exact
+            path="/book-online-class"
+            element={<BookOnlineClassPage />}
+          />
+          <Route exact path="/cart" element={<CartPage />} />
+          <Route exact path="/checkout" element={<CheckoutPage />} />
+          <Route exact path="/contact" element={<ContactPage />} />
+          <Route exact path="/course" element={<CoursePage />} />
+          <Route exact path="/course-details" element={<CourseDetailsPage />} />
+          <Route
+            exact
+            path="/course-list-view"
+            element={<CourseListViewPage />}
+          />
+          <Route exact path="/event-details" element={<EventDetailsPage />} />
+          <Route exact path="/events" element={<EventsPage />} />
+          <Route exact path="/faq" element={<FaqPage />} />
+          <Route
+            exact
+            path="/favorite-course"
+            element={<FavoriteCoursePage />}
+          />
+          <Route exact path="/find-tutors" element={<FindTutorsPage />} />
+          <Route exact path="/gallery" element={<GalleryPage />} />
+          <Route exact path="/instructor" element={<InstructorPage />} />
+          <Route
+            exact
+            path="/instructor-details"
+            element={<InstructorDetailsPage />}
+          />
+
+          <Route exact path="/instructor-two" element={<InstructorTwoPage />} />
+          <Route exact path="/lesson-details" element={<LessonDetailsPage />} />
+          <Route exact path="/pricing-plan" element={<PricingPlanPage />} />
+          <Route exact path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route exact path="/product" element={<ProductPage />} />
+          <Route
+            exact
+            path="/product-details"
+            element={<ProductDetailsPage />}
+          />
+          <Route exact path="/sign-in" element={<SignInPage />} />
+          <Route exact path="/sign-up" element={<SignUpPage />} />
+          <Route exact path="/tuition-jobs" element={<TuitionJobsPage />} />
+          <Route exact path="/tutor" element={<TutorPage />} />
+          <Route exact path="/tutor-details" element={<TutorDetailsPage />} />
+          <Route exact path="/attendance" element={<Attendance />} />
+          <Route
+            exact
+            path="/attendance/class/:classId"
+            element={<ClassSchedulePage />}
+          />
+          <Route
+            exact
+            path="/attendance/schedule/:scheduleId"
+            element={<AttendanceDetailPage />}
+          />
+        </Routes>
       </BrowserRouter>
     </AuthProvider>
   );

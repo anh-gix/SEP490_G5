@@ -25,6 +25,9 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/roles', require('./routes/roleRoutes'));
 app.use('/api/v1', router); // Use the centralized router
+app.use('/api/exams', require('./routes/examRoutes'));
+app.use('/api/class-schedules', require('./routes/classScheduleRoutes'));
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);

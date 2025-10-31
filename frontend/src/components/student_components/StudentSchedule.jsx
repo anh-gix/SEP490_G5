@@ -1,0 +1,710 @@
+import React, { useState, useEffect } from 'react';
+import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table } from 'react-bootstrap';
+import RequestAbsenceModal from './RequestAbsenceModal';
+
+/**
+ * Student Schedule Component
+ * Trang xem lịch học dành cho học viên
+ */
+const StudentSchedule = () => {
+  const [viewMode, setViewMode] = useState('week'); // 'week', 'month', or 'list'
+  const [selectedWeek, setSelectedWeek] = useState(getCurrentWeek());
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [schedules, setSchedules] = useState([]);
+  const [showAbsenceModal, setShowAbsenceModal] = useState(false);
+  const [selectedSchedule, setSelectedSchedule] = useState(null);
+  const [filterStatus, setFilterStatus] = useState('all');
+
+  useEffect(() => {
+    fetchSchedules();
+  }, [selectedWeek, filterStatus]);
+
+  function getCurrentWeek() {
+    const today = new Date();
+    const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 1));
+    return firstDayOfWeek;
+  }
+
+  const fetchSchedules = async () => {
+    try {
+      // TODO: Replace with actual API call
+      // Mock data
+      const mockData = [
+        {
+          id: 1,
+          date: '2025-11-03',
+          dayOfWeek: 'Thứ 2',
+          startTime: '18:00',
+          endTime: '20:00',
+          lessonNumber: 19,
+          topic: 'Present Perfect Tense',
+          teacher: 'Trần Thị B',
+          room: 'Room 102',
+          status: 'upcoming',
+          attendanceStatus: null,
+          className: 'A2-Evening-01'
+        },
+        {
+          id: 2,
+          date: '2025-11-04',
+          dayOfWeek: 'Thứ 3',
+          startTime: '18:00',
+          endTime: '20:00',
+          lessonNumber: 20,
+          topic: 'Reading Comprehension',
+          teacher: 'Trần Thị B',
+          room: 'Room 102',
+          status: 'upcoming',
+          attendanceStatus: null,
+          className: 'A2-Evening-01'
+        },
+        {
+          id: 3,
+          date: '2025-10-29',
+          dayOfWeek: 'Thứ 2',
+          startTime: '18:00',
+          endTime: '20:00',
+          lessonNumber: 17,
+          topic: 'Past Simple Tense',
+          teacher: 'Trần Thị B',
+          room: 'Room 102',
+          status: 'completed',
+          attendanceStatus: 'present',
+          className: 'A2-Evening-01'
+        },
+        {
+          id: 4,
+          date: '2025-10-31',
+          dayOfWeek: 'Thứ 4',
+          startTime: '18:00',
+          endTime: '20:00',
+          lessonNumber: 18,
+          topic: 'Listening Practice',
+          teacher: 'Trần Thị B',
+          room: 'Room 102',
+          status: 'completed',
+          attendanceStatus: 'present',
+          className: 'A2-Evening-01'
+        }
+      ];
+      setSchedules(mockData);
+    } catch (error) {
+      console.error('Error fetching schedules:', error);
+    }
+  };
+
+  const getWeekDays = () => {
+    const days = [];
+    const current = new Date(selectedWeek);
+    
+    for (let i = 0; i < 7; i++) {
+      days.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+    return days;
+  };
+
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      upcoming: { bg: 'bg-info-500', text: 'Sắp diễn ra' },
+      completed: { bg: 'bg-neutral-600', text: 'Đã học' },
+      cancelled: { bg: 'bg-danger-600', text: 'Đã hủy' }
+    };
+
+    const config = statusConfig[status] || statusConfig.upcoming;
+    return (
+      <Badge className={`${config.bg} text-white px-12 py-6 text-12`}>
+        {config.text}
+      </Badge>
+    );
+  };
+
+  const getAttendanceBadge = (attendance) => {
+    if (!attendance) return null;
+
+    const attendanceConfig = {
+      present: { bg: 'bg-success-600', text: 'Có mặt', icon: 'fa-check' },
+      absent: { bg: 'bg-danger-600', text: 'Vắng', icon: 'fa-times' },
+      late: { bg: 'bg-warning-600', text: 'Trễ', icon: 'fa-clock' },
+      excused: { bg: 'bg-info-500', text: 'Có phép', icon: 'fa-file-alt' }
+    };
+
+    const config = attendanceConfig[attendance] || attendanceConfig.present;
+    return (
+      <Badge className={`${config.bg} text-white px-12 py-6 text-12`}>
+        <i className={`fas ${config.icon} me-1`}></i>
+        {config.text}
+      </Badge>
+    );
+  };
+
+  const handleRequestAbsence = (schedule) => {
+    setSelectedSchedule(schedule);
+    setShowAbsenceModal(true);
+  };
+
+  const navigateWeek = (direction) => {
+    const newDate = new Date(selectedWeek);
+    newDate.setDate(newDate.getDate() + (direction * 7));
+    setSelectedWeek(newDate);
+  };
+
+  const navigateMonth = (direction) => {
+    const newDate = new Date(selectedMonth);
+    newDate.setMonth(newDate.getMonth() + direction);
+    setSelectedMonth(newDate);
+  };
+
+  const getMonthDays = () => {
+    const year = selectedMonth.getFullYear();
+    const month = selectedMonth.getMonth();
+    
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    
+    const firstDayOfWeek = firstDay.getDay() || 7; // 1-7 (Mon-Sun)
+    const daysInMonth = lastDay.getDate();
+    
+    const days = [];
+    
+    // Add previous month days
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    for (let i = firstDayOfWeek - 2; i >= 0; i--) {
+      days.push({
+        date: new Date(year, month - 1, prevMonthLastDay - i),
+        isCurrentMonth: false
+      });
+    }
+    
+    // Add current month days
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push({
+        date: new Date(year, month, i),
+        isCurrentMonth: true
+      });
+    }
+    
+    // Add next month days to complete the grid
+    const remainingDays = 42 - days.length; // 6 rows * 7 days
+    for (let i = 1; i <= remainingDays; i++) {
+      days.push({
+        date: new Date(year, month + 1, i),
+        isCurrentMonth: false
+      });
+    }
+    
+    return days;
+  };
+
+  const filteredSchedules = schedules.filter(schedule => {
+    if (filterStatus === 'all') return true;
+    if (filterStatus === 'upcoming') return schedule.status === 'upcoming';
+    if (filterStatus === 'completed') return schedule.status === 'completed';
+    return true;
+  });
+
+  const renderWeekView = () => {
+    const weekDays = getWeekDays();
+
+    return (
+      <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+        <Card.Body className="p-0">
+          <div className="schedule-week-view d-flex flex-column">
+            {/* Week Days Header */}
+            <div className="d-flex border-bottom border-neutral-100">
+              {weekDays.map((day, index) => {
+                const isToday = day.toDateString() === new Date().toDateString();
+                return (
+                  <div 
+                    key={index}
+                    className={`text-center py-16 ${
+                      isToday ? 'bg-main-600' : 'bg-neutral-50'
+                    }`}
+                    style={{ flex: '1 1 0', minWidth: '0', borderRight: index < 6 ? '1px solid #E9ECEF' : 'none' }}
+                  >
+                    <div className={`text-12 fw-medium mb-4 ${isToday ? 'text-white' : 'text-neutral-500'}`}>
+                      {day.toLocaleDateString('vi-VN', { weekday: 'short' })}
+                    </div>
+                    <div className={`text-20 fw-bold ${isToday ? 'text-white' : 'text-neutral-900'}`}>
+                      {day.getDate()}
+                    </div>
+                    <div className={`text-11 ${isToday ? 'text-white' : 'text-neutral-400'}`}>
+                      Tháng {day.getMonth() + 1}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Schedule Content */}
+            <div className="d-flex" style={{ minHeight: '500px' }}>
+              {weekDays.map((day, index) => {
+                const daySchedules = schedules.filter(s => {
+                  const scheduleDate = new Date(s.date);
+                  return scheduleDate.toDateString() === day.toDateString();
+                });
+
+                const isToday = day.toDateString() === new Date().toDateString();
+
+                return (
+                  <div 
+                    key={index}
+                    className={`p-12 ${
+                      isToday ? 'bg-main-25' : 'bg-white'
+                    }`}
+                    style={{ 
+                      flex: '1 1 0', 
+                      minWidth: '0',
+                      borderRight: index < 6 ? '1px solid #E9ECEF' : 'none'
+                    }}
+                  >
+                    {daySchedules.length > 0 ? (
+                      <div className="d-flex flex-column gap-8">
+                        {daySchedules.map(schedule => (
+                          <div
+                            key={schedule.id}
+                            className={`border rounded-8 p-12 cursor-pointer transition-2 ${
+                              schedule.status === 'upcoming'
+                                ? 'border-main-200 bg-main-50 hover-shadow-sm'
+                                : schedule.attendanceStatus === 'present'
+                                ? 'border-success-200 bg-success-50'
+                                : schedule.attendanceStatus === 'absent'
+                                ? 'border-danger-200 bg-danger-50'
+                                : 'border-neutral-200 bg-neutral-50'
+                            }`}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <div className="d-flex align-items-start justify-content-between mb-8">
+                              <div className="text-neutral-900 fw-bold text-13">
+                                {schedule.startTime}
+                              </div>
+                              {schedule.attendanceStatus && (
+                                <div className={`rounded-circle ${
+                                  schedule.attendanceStatus === 'present' ? 'bg-success-600' :
+                                  schedule.attendanceStatus === 'absent' ? 'bg-danger-600' :
+                                  'bg-warning-600'
+                                }`} style={{ width: '8px', height: '8px' }}></div>
+                              )}
+                            </div>
+
+                            {/* Class Name */}
+                            <div className="text-neutral-900 fw-bold text-12 mb-6" style={{
+                              display: '-webkit-box',
+                              WebkitLineClamp: 1,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden'
+                            }}>
+                              <i className="fas fa-book-open me-1" style={{ fontSize: '10px', color: '#0D74FF' }}></i>
+                              {schedule.className}
+                            </div>
+                            
+                            <div className="text-neutral-900 fw-semibold text-13 mb-6" style={{
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              lineHeight: '1.4'
+                            }}>
+                              {schedule.topic}
+                            </div>
+
+                            <div className="text-neutral-600 text-11 mb-6">
+                              <i className="fas fa-chalkboard-teacher me-1" style={{ fontSize: '10px' }}></i>
+                              {schedule.teacher}
+                            </div>
+
+                            <div className="text-neutral-500 text-11 mb-8">
+                              <i className="fas fa-door-open me-1" style={{ fontSize: '10px' }}></i>
+                              {schedule.room}
+                            </div>
+
+                            {schedule.status === 'upcoming' && (
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRequestAbsence(schedule);
+                                }}
+                                className="btn-outline-warning w-100 py-6 radius-6"
+                                style={{ fontSize: '11px' }}
+                              >
+                                <i className="fas fa-hand-paper me-1"></i>
+                                Xin nghỉ
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-40 text-neutral-300">
+                        <i className="fas fa-calendar-times" style={{ fontSize: '20px' }}></i>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </Card.Body>
+      </Card>
+    );
+  };
+
+  const renderMonthView = () => {
+    const monthDays = getMonthDays();
+    const weekDayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+    return (
+      <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+        <Card.Body className="p-0">
+          {/* Month Header */}
+          <div className="d-flex border-bottom border-neutral-100">
+            {weekDayNames.map((day, index) => (
+              <div 
+                key={index}
+                className="flex-fill text-center py-12 bg-neutral-50 border-end border-neutral-100"
+              >
+                <div className="text-13 fw-semibold text-neutral-700">{day}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar Grid */}
+          <div className="d-flex flex-wrap">
+            {monthDays.map((dayObj, index) => {
+              const day = dayObj.date;
+              const daySchedules = schedules.filter(s => {
+                const scheduleDate = new Date(s.date);
+                return scheduleDate.toDateString() === day.toDateString();
+              });
+
+              const isToday = day.toDateString() === new Date().toDateString();
+
+              return (
+                <div
+                  key={index}
+                  className={`border-end border-bottom border-neutral-100 p-8 ${
+                    !dayObj.isCurrentMonth ? 'bg-neutral-25' : 'bg-white'
+                  }`}
+                  style={{ 
+                    width: `${100 / 7}%`,
+                    minHeight: '100px',
+                    opacity: dayObj.isCurrentMonth ? 1 : 0.5
+                  }}
+                >
+                  <div className="d-flex justify-content-between align-items-start mb-8">
+                    <div className={`rounded-circle d-flex align-items-center justify-content-center ${
+                      isToday ? 'bg-main-600 text-white' : 'text-neutral-700'
+                    }`} style={{ 
+                      width: isToday ? '28px' : 'auto',
+                      height: isToday ? '28px' : 'auto',
+                      fontSize: '13px',
+                      fontWeight: isToday ? 'bold' : 'normal'
+                    }}>
+                      {day.getDate()}
+                    </div>
+                    {daySchedules.length > 0 && (
+                      <Badge className="bg-main-600 text-white" style={{ fontSize: '10px', padding: '2px 6px' }}>
+                        {daySchedules.length}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="d-flex flex-column gap-4">
+                    {daySchedules.slice(0, 2).map(schedule => (
+                      <div
+                        key={schedule.id}
+                        className={`rounded-6 px-6 py-4 cursor-pointer ${
+                          schedule.status === 'upcoming'
+                            ? 'bg-main-100 border-start border-main-600 border-2'
+                            : schedule.attendanceStatus === 'present'
+                            ? 'bg-success-100 border-start border-success-600 border-2'
+                            : schedule.attendanceStatus === 'absent'
+                            ? 'bg-danger-100 border-start border-danger-600 border-2'
+                            : 'bg-neutral-100 border-start border-neutral-400 border-2'
+                        }`}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => handleRequestAbsence(schedule)}
+                      >
+                        <div className="text-neutral-900 fw-medium" style={{ 
+                          fontSize: '11px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          {schedule.startTime} {schedule.className}
+                        </div>
+                      </div>
+                    ))}
+                    {daySchedules.length > 2 && (
+                      <div className="text-main-600 text-11 fw-medium">
+                        +{daySchedules.length - 2} khác
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card.Body>
+      </Card>
+    );
+  };
+
+  const renderListView = () => {
+    return (
+      <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+        <Card.Body className="p-0">
+          <div className="table-responsive">
+            <Table hover className="mb-0">
+              <thead>
+                <tr className="bg-main-25">
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">
+                    Ngày
+                  </th>
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">
+                    Thời gian
+                  </th>
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">
+                    Lớp học
+                  </th>
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">
+                    Buổi học
+                  </th>
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">
+                    Chủ đề
+                  </th>
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">
+                    Giảng viên
+                  </th>
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">
+                    Phòng
+                  </th>
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">
+                    Trạng thái
+                  </th>
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">
+                    Chuyên cần
+                  </th>
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">
+                    Thao tác
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSchedules.length > 0 ? (
+                  filteredSchedules.map((schedule) => (
+                    <tr key={schedule.id} className="transition-2">
+                      <td className="px-20 py-16 text-neutral-700 text-13">
+                        {formatDate(schedule.date)}
+                      </td>
+                      <td className="px-20 py-16 text-neutral-700 text-13">
+                        {schedule.startTime} - {schedule.endTime}
+                      </td>
+                      <td className="px-20 py-16 text-neutral-900 fw-semibold text-13">
+                        <i className="fas fa-book-open me-2" style={{ color: '#0D74FF' }}></i>
+                        {schedule.className}
+                      </td>
+                      <td className="px-20 py-16 text-neutral-700 text-13">
+                        Buổi {schedule.lessonNumber}
+                      </td>
+                      <td className="px-20 py-16 text-neutral-900 fw-medium text-13">
+                        {schedule.topic}
+                      </td>
+                      <td className="px-20 py-16 text-neutral-700 text-13">
+                        {schedule.teacher}
+                      </td>
+                      <td className="px-20 py-16 text-neutral-700 text-13">
+                        {schedule.room}
+                      </td>
+                      <td className="px-20 py-16 text-13">
+                        {getStatusBadge(schedule.status)}
+                      </td>
+                      <td className="px-20 py-16 text-13">
+                        {getAttendanceBadge(schedule.attendanceStatus)}
+                      </td>
+                      <td className="px-20 py-16 text-center">
+                        {schedule.status === 'upcoming' && (
+                          <Button
+                            onClick={() => handleRequestAbsence(schedule)}
+                            className="btn-outline-warning text-13 fw-medium px-12 py-6 radius-6"
+                          >
+                            <i className="fas fa-hand-paper me-1"></i>
+                            Xin nghỉ
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="10" className="text-center py-40">
+                      <i className="fas fa-calendar-times fa-3x text-neutral-400 mb-16"></i>
+                      <p className="text-neutral-500 mb-0">Không có lịch học nào</p>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </Table>
+          </div>
+        </Card.Body>
+
+        {/* Summary Footer */}
+        {filteredSchedules.length > 0 && (
+          <Card.Footer className="bg-main-25 border-main-100 p-16">
+            <Row>
+              <Col md={6}>
+                <div className="text-neutral-700 text-13">
+                  Tổng số: <span className="fw-semibold text-neutral-900">{filteredSchedules.length}</span> buổi học
+                </div>
+              </Col>
+              <Col md={6} className="text-md-end">
+                <div className="text-neutral-700 text-13">
+                  Đã học: <span className="fw-semibold text-success-600">
+                    {filteredSchedules.filter(s => s.attendanceStatus === 'present').length}
+                  </span> | 
+                  Vắng: <span className="fw-semibold text-danger-600 ms-1">
+                    {filteredSchedules.filter(s => s.attendanceStatus === 'absent').length}
+                  </span>
+                </div>
+              </Col>
+            </Row>
+          </Card.Footer>
+        )}
+      </Card>
+    );
+  };
+
+  return (
+    <Container fluid className="py-24 px-24">
+      {/* Header */}
+      <div className="d-flex justify-content-between align-items-center mb-24">
+        <div>
+          <h3 className="text-neutral-900 fw-bold mb-8">Lịch học của tôi</h3>
+          <p className="text-neutral-500 mb-0">Quản lý lịch học và điểm danh</p>
+        </div>
+      </div>
+
+      {/* Filters & Controls */}
+      <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+        <Card.Body className="p-20">
+          <Row className="align-items-center">
+            <Col lg={4}>
+              {/* Navigation */}
+              <div className="d-flex align-items-center gap-12">
+                <Button
+                  onClick={() => viewMode === 'month' ? navigateMonth(-1) : navigateWeek(-1)}
+                  className="btn-outline-main text-13 fw-medium px-12 py-8 radius-8"
+                >
+                  <i className="fas fa-chevron-left"></i>
+                </Button>
+                <div className="text-center flex-grow-1">
+                  <div className="text-neutral-900 fw-semibold text-15">
+                    {viewMode === 'month' 
+                      ? selectedMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })
+                      : selectedWeek.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })
+                    }
+                  </div>
+                  {viewMode === 'week' && (
+                    <div className="text-neutral-500 text-13">
+                      Tuần {Math.ceil(selectedWeek.getDate() / 7)}
+                    </div>
+                  )}
+                </div>
+                <Button
+                  onClick={() => viewMode === 'month' ? navigateMonth(1) : navigateWeek(1)}
+                  className="btn-outline-main text-13 fw-medium px-12 py-8 radius-8"
+                >
+                  <i className="fas fa-chevron-right"></i>
+                </Button>
+              </div>
+            </Col>
+
+            <Col lg={4}>
+              {/* Filter by Status */}
+              <Form.Group>
+                <Form.Select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="border-neutral-30 radius-8 px-16 py-10 text-13"
+                >
+                  <option value="all">Tất cả trạng thái</option>
+                  <option value="upcoming">Sắp diễn ra</option>
+                  <option value="completed">Đã hoàn thành</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+
+            <Col lg={4}>
+              {/* View Toggle */}
+              <div className="d-flex justify-content-end gap-12">
+                <ButtonGroup>
+                  <Button
+                    onClick={() => setViewMode('week')}
+                    className={viewMode === 'week' ? 'btn-main' : 'btn-outline-main'}
+                    style={{ fontSize: '13px', padding: '8px 16px' }}
+                  >
+                    <i className="fas fa-calendar-week me-2"></i>
+                    Tuần
+                  </Button>
+                  <Button
+                    onClick={() => setViewMode('month')}
+                    className={viewMode === 'month' ? 'btn-main' : 'btn-outline-main'}
+                    style={{ fontSize: '13px', padding: '8px 16px' }}
+                  >
+                    <i className="fas fa-calendar-alt me-2"></i>
+                    Tháng
+                  </Button>
+                  <Button
+                    onClick={() => setViewMode('list')}
+                    className={viewMode === 'list' ? 'btn-main' : 'btn-outline-main'}
+                    style={{ fontSize: '13px', padding: '8px 16px' }}
+                  >
+                    <i className="fas fa-list me-2"></i>
+                    Danh sách
+                  </Button>
+                </ButtonGroup>
+
+                <Button
+                  onClick={() => {
+                    setSelectedWeek(getCurrentWeek());
+                    setSelectedMonth(new Date());
+                  }}
+                  className="btn-outline-main text-13 fw-medium px-16 py-8 radius-8"
+                >
+                  <i className="fas fa-calendar-day me-2"></i>
+                  Hôm nay
+                </Button>
+              </div>
+            </Col>
+          </Row>
+        </Card.Body>
+      </Card>
+
+      {/* Schedule Content */}
+      {viewMode === 'week' && renderWeekView()}
+      {viewMode === 'month' && renderMonthView()}
+      {viewMode === 'list' && renderListView()}
+
+      {/* Request Absence Modal */}
+      <RequestAbsenceModal
+        show={showAbsenceModal}
+        onHide={() => setShowAbsenceModal(false)}
+        schedule={selectedSchedule}
+        onSuccess={() => {
+          setShowAbsenceModal(false);
+          fetchSchedules();
+        }}
+      />
+    </Container>
+  );
+};
+
+export default StudentSchedule;

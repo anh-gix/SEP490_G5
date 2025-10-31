@@ -1,128 +1,179 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Nav, Badge } from 'react-bootstrap';
+import { NavLink, useLocation } from 'react-router-dom';
 
 /**
  * Academic Navigation Component
- * Menu điều hướng giữa các module của Giáo vụ
+ * Sidebar navigation dành cho Giáo vụ
  */
 const AcademicNavigation = () => {
   const location = useLocation();
 
-  const navItems = [
+  const menuItems = [
     {
-      path: '/academic-dashboard',
+      title: 'Dashboard',
       icon: 'fa-home',
-      label: 'Dashboard',
-      description: 'Tổng quan'
+      path: '/academic-dashboard',
+      color: 'main'
     },
     {
-      path: '/schedule-management',
+      title: 'Quản lý Lịch học',
       icon: 'fa-calendar-alt',
-      label: 'Quản lý Lịch học',
-      description: 'Sắp xếp lịch học'
+      path: '/schedule-management',
+      color: 'info'
     },
     {
-      path: '/class-management',
+      title: 'Quản lý Lớp học',
       icon: 'fa-chalkboard-teacher',
-      label: 'Quản lý Lớp học',
-      description: 'Quản lý lớp & học viên'
+      path: '/class-management',
+      color: 'success'
+    },
+    {
+      title: 'Quản lý Phòng học',
+      icon: 'fa-door-open',
+      path: '/room-management',
+      color: 'warning'
+    },
+    {
+      title: 'Giảng viên',
+      icon: 'fa-user-tie',
+      path: '/teacher-management',
+      color: 'main'
+    },
+    {
+      title: 'Báo cáo',
+      icon: 'fa-chart-bar',
+      path: '/reports',
+      color: 'info'
     }
   ];
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => {
+    return location.pathname === path || location.pathname.startsWith(path + '/');
+  };
 
   return (
-    <div className="p-24" style={{ color: 'white', height: '100%' }}>
+    <div className="academic-navigation bg-white border-end border-neutral-100 d-flex flex-column" 
+         style={{ width: '280px', minHeight: '100vh', height: '100%', position: 'sticky', top: 0 }}>
       {/* Header */}
-      <div className="mb-24 pb-20" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+      <div className="p-24 border-bottom border-neutral-100">
         <div className="d-flex align-items-center gap-12">
-          <i className="fas fa-graduation-cap" style={{ fontSize: '32px', color: 'var(--main-600)' }}></i>
-          <span className="text-white" style={{ fontSize: '20px', fontWeight: 700 }}>Module Giáo Vụ</span>
+          <div 
+            className="rounded-12 d-flex align-items-center justify-content-center"
+            style={{ 
+              width: '48px',
+              height: '48px',
+              background: 'linear-gradient(135deg, #0D74FF 0%, #0A5FD9 100%)'
+            }}
+          >
+            <i className="fas fa-user-cog text-white fa-lg"></i>
+          </div>
+          <div>
+            <h6 className="text-neutral-900 fw-bold mb-0">Giáo vụ</h6>
+            <p className="text-neutral-500 mb-0 text-13">Quản lý đào tạo</p>
+          </div>
         </div>
       </div>
 
-      {/* Menu */}
-      <Nav className="flex-column gap-8">
-        {navItems.map((item) => (
-          <Nav.Item key={item.path}>
-            <Link
-              to={item.path}
-              className="text-decoration-none transition-2"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '16px',
-                padding: '16px',
-                borderRadius: '12px',
-                background: isActive(item.path) 
-                  ? 'var(--main-600)' 
-                  : 'transparent',
-                color: isActive(item.path) ? 'white' : 'rgba(255,255,255,0.7)',
-                transition: 'all 0.3s ease',
-                position: 'relative',
-                boxShadow: isActive(item.path) ? '0 4px 16px rgba(13, 116, 255, 0.3)' : 'none'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive(item.path)) {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-                  e.currentTarget.style.color = 'white';
-                  e.currentTarget.style.transform = 'translateX(6px)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive(item.path)) {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
-                  e.currentTarget.style.transform = 'translateX(0)';
-                }
-              }}
-            >
-              <div 
+      {/* Menu Items */}
+      <div className="p-24 flex-grow-1">
+        <nav className="d-flex flex-column gap-8">
+          {menuItems.map((item, index) => {
+            const active = isActive(item.path);
+            
+            return (
+              <NavLink
+                key={index}
+                to={item.path}
+                className={`nav-item d-flex align-items-center gap-12 px-16 py-12 rounded-8 text-decoration-none transition-2 ${
+                  active 
+                    ? 'text-white' 
+                    : 'text-neutral-700'
+                }`}
                 style={{
-                  width: '44px',
-                  height: '44px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: '10px',
-                  background: isActive(item.path) 
-                    ? 'rgba(255,255,255,0.2)' 
-                    : 'rgba(255,255,255,0.1)',
-                  fontSize: '18px',
-                  transition: 'all 0.3s ease'
+                  backgroundColor: active ? '#0D74FF' : 'transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) {
+                    e.currentTarget.style.backgroundColor = '#F8F9FA';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }
                 }}
               >
-                <i className={`fas ${item.icon}`}></i>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div className="fw-semibold mb-4" style={{ fontSize: '15px' }}>
-                  {item.label}
-                </div>
-                <div className="text-13" style={{ opacity: 0.85 }}>
-                  {item.description}
-                </div>
-              </div>
-              {isActive(item.path) && (
                 <div 
-                  style={{
-                    position: 'absolute',
-                    right: 0,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    width: '4px',
-                    height: '28px',
-                    background: 'white',
-                    borderRadius: '4px 0 0 4px'
+                  className={`d-flex align-items-center justify-content-center rounded-8`}
+                  style={{ 
+                    width: '40px',
+                    height: '40px',
+                    minWidth: '40px',
+                    backgroundColor: active ? 'rgba(255, 255, 255, 0.2)' : '#F1F3F5'
                   }}
-                />
-              )}
-            </Link>
-          </Nav.Item>
-        ))}
-      </Nav>
+                >
+                  <i 
+                    className={`fas ${item.icon}`}
+                    style={{ 
+                      fontSize: '16px',
+                      color: active ? 'white' : `var(--${item.color}-600)`
+                    }}
+                  ></i>
+                </div>
+                <span className={`fw-${active ? 'semibold' : 'medium'} text-14`}>
+                  {item.title}
+                </span>
+              </NavLink>
+            );
+          })}
+        </nav>
+      </div>
 
-      
+      {/* Quick Stats */}
+      <div className="px-24 pb-24">
+        <div className="rounded-12 p-20" style={{ background: 'linear-gradient(135deg, #0D74FF 0%, #0A5FD9 100%)' }}>
+          <div className="text-white mb-12">
+            <i className="fas fa-chart-line me-2"></i>
+            <span className="fw-semibold text-14">Thống kê</span>
+          </div>
+          <div className="d-flex flex-column gap-8">
+            <div className="d-flex justify-content-between align-items-center">
+              <span className="text-white text-13" style={{ opacity: 0.9 }}>Lớp đang học</span>
+              <span className="text-white fw-bold text-15">24</span>
+            </div>
+            <div className="d-flex justify-content-between align-items-center">
+              <span className="text-white text-13" style={{ opacity: 0.9 }}>Học viên</span>
+              <span className="text-white fw-bold text-15">385</span>
+            </div>
+            <div className="d-flex justify-content-between align-items-center">
+              <span className="text-white text-13" style={{ opacity: 0.9 }}>Giảng viên</span>
+              <span className="text-white fw-bold text-15">18</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Help Section */}
+      <div className="px-24 pb-24">
+        <div className="bg-info-50 border border-info-100 rounded-12 p-16">
+          <div className="d-flex gap-12">
+            <div className="bg-info-500 text-white rounded-circle d-flex align-items-center justify-content-center"
+                 style={{ width: '32px', height: '32px', minWidth: '32px' }}>
+              <i className="fas fa-question"></i>
+            </div>
+            <div>
+              <h6 className="text-neutral-900 fw-semibold text-13 mb-4">Cần hỗ trợ?</h6>
+              <p className="text-neutral-600 text-12 mb-8">
+                Xem hướng dẫn sử dụng hệ thống
+              </p>
+              <a href="/help" className="text-info-500 text-12 fw-medium text-decoration-none">
+                Xem hướng dẫn <i className="fas fa-arrow-right ms-1"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

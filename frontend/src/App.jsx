@@ -42,6 +42,14 @@ import TutorPage from "./pages/TutorPage.jsx";
 import TutorDetailsPage from "./pages/TutorDetailsPage.jsx";
 import HomePageFive from "./pages/HomePageFive.jsx";
 import HomePageSix from "./pages/HomePageSix.jsx";
+import ScheduleManagementPage from "./pages/ScheduleManagementPage.jsx";
+import ClassManagementPage from "./pages/ClassManagementPage.jsx";
+import AcademicDashboardPage from "./pages/AcademicDashboardPage.jsx";
+import StudentDashboardPage from "./pages/StudentDashboardPage.jsx";
+import StudentSchedulePage from "./pages/StudentSchedulePage.jsx";
+import StudentCoursesPage from "./pages/StudentCoursesPage.jsx";
+import StudentClassDetailPage from "./pages/StudentClassDetailPage.jsx";
+import StudentAssignmentsPage from "./pages/StudentAssignmentsPage.jsx";
 
 //import page components
 import Dashboard from "./components/CenterHead/pages/CenterHeadDashboard.jsx";
@@ -56,7 +64,7 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-      <RouteScrollToTop />
+      {/* <RouteScrollToTop /> */}
         <Routes>
           
           {/* Dashboard */}
@@ -149,6 +157,13 @@ function App() {
             path="/attendance/schedule/:scheduleId"
             element={<AttendanceDetailPage />}
           />
+
+{/*  Studen management */}
+        <Route exact path='/student/dashboard' element={<StudentDashboardPage />} />
+        <Route exact path='/student/schedule' element={<StudentSchedulePage />} />
+        <Route exact path='/student/courses' element={<StudentCoursesPage />} />
+        <Route exact path='/student/class/:classId' element={<StudentClassDetailPage />} />
+        <Route exact path='/student/assignments' element={<StudentAssignmentsPage />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

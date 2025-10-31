@@ -44,6 +44,11 @@ import HomePageSix from "./pages/HomePageSix.jsx";
 import ScheduleManagementPage from "./pages/ScheduleManagementPage.jsx";
 import ClassManagementPage from "./pages/ClassManagementPage.jsx";
 import AcademicDashboardPage from "./pages/AcademicDashboardPage.jsx";
+import StudentDashboardPage from "./pages/StudentDashboardPage.jsx";
+import StudentSchedulePage from "./pages/StudentSchedulePage.jsx";
+import StudentCoursesPage from "./pages/StudentCoursesPage.jsx";
+import StudentClassDetailPage from "./pages/StudentClassDetailPage.jsx";
+import StudentAssignmentsPage from "./pages/StudentAssignmentsPage.jsx";
 
 function App() {
   return (
@@ -109,6 +114,13 @@ function App() {
         <Route exact path='/schedule-management' element={<ScheduleManagementPage />} />
         <Route exact path='/class-management' element={<ClassManagementPage />} />
         <Route exact path='/academic-dashboard' element={<AcademicDashboardPage />} />
+        
+        {/* Student Module Routes */}
+        <Route exact path='/student/dashboard' element={<StudentDashboardPage />} />
+        <Route exact path='/student/schedule' element={<StudentSchedulePage />} />
+        <Route exact path='/student/courses' element={<StudentCoursesPage />} />
+        <Route exact path='/student/class/:classId' element={<StudentClassDetailPage />} />
+        <Route exact path='/student/assignments' element={<StudentAssignmentsPage />} />
       </Routes>
     </BrowserRouter>
   );

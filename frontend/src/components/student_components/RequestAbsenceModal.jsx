@@ -165,7 +165,7 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
                   Chủ đề:
                 </span>
                 <span className="text-neutral-900 fw-medium text-13">
-                  Buổi {schedule.lessonNumber} - {schedule.topic}
+                  Buổi {schedule.lessonNumber} - {schedule.subject}
                 </span>
               </div>
               <div className="d-flex">

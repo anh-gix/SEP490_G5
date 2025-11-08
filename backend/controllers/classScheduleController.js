@@ -185,3 +185,102 @@ exports.getAttendanceByClassSchedule = async (req, res) => {
     res.status(500).json({ message: "Lỗi server", error: err.message });
   }
 };
+
+// =========================
+// 📚 LẤY LỊCH HỌC CỦA HỌC SINH
+// =========================
+exports.getStudentSchedule = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    // Tìm tất cả StudentSchedule của học sinh và populate các thông tin cần thiết
+    const studentSchedules = await StudentSchedule.find({ student: studentId })
+      .populate({
+        path: "classSchedule",
+        select: "date startTime endTime room class topic",
+        populate: [
+          {
+            path: "class",
+            select: "name subject teacherId",
+            populate: {
+              path: "teacherId",
+              select: "username email",
+            },
+          },
+          {
+            path: "room",
+            select: "room_name location",
+          },
+        ],
+      })
+      .lean(); // Sử dụng lean() để có thể sort dễ dàng hơn
+
+    // Sắp xếp theo ngày và giờ bắt đầu
+    studentSchedules.sort((a, b) => {
+      if (!a.classSchedule || !b.classSchedule) return 0;
+      const dateA = new Date(a.classSchedule.date);
+      const dateB = new Date(b.classSchedule.date);
+      if (dateA.getTime() !== dateB.getTime()) {
+        return dateA - dateB;
+      }
+      // Nếu cùng ngày, sắp xếp theo startTime
+      return (a.classSchedule.startTime || "").localeCompare(b.classSchedule.startTime || "");
+    });
+
+    // Nếu không có lịch học, trả về mảng rỗng thay vì lỗi 404
+    if (!studentSchedules || studentSchedules.length === 0) {
+      return res.status(200).json({
+        message: "Học sinh này chưa có lịch học nào.",
+        total: 0,
+        schedules: [],
+      });
+    }
+
+    // Format dữ liệu để trả về đúng định dạng yêu cầu
+    const formattedSchedules = studentSchedules
+      .filter((ss) => ss.classSchedule) // Lọc những schedule hợp lệ
+      .map((ss) => {
+        const classSchedule = ss.classSchedule;
+        const classInfo = classSchedule.class;
+        const teacher = classInfo?.teacherId;
+        const room = classSchedule.room;
+
+        return {
+          _id: ss._id,
+          startTime: classSchedule.startTime,
+          endTime: classSchedule.endTime,
+          className: classInfo?.name || "N/A",
+          subject: classInfo?.subject || "N/A",
+          teacher: teacher
+            ? {
+                _id: teacher._id,
+                username: teacher.username,
+                email: teacher.email,
+              }
+            : null,
+          room: room
+            ? {
+                _id: room._id,
+                room_name: room.room_name,
+                location: room.location,
+              }
+            : null,
+          date: classSchedule.date,
+          topic: classSchedule.topic,
+          attendance: ss.attendance,
+        };
+      });
+
+    res.status(200).json({
+      message: "Lấy lịch học của học sinh thành công.",
+      total: formattedSchedules.length,
+      schedules: formattedSchedules,
+    });
+  } catch (error) {
+    console.error("❌ Lỗi khi lấy lịch học của học sinh:", error);
+    res.status(500).json({
+      message: "Lỗi server khi lấy lịch học của học sinh.",
+      error: error.message,
+    });
+  }
+};

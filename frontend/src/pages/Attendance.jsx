@@ -21,8 +21,7 @@ const Attendance = () => {
       try {
         setLoading(true);
         if (user && user._id) {
-          const hardcodedUserId = "670fd02e7e1b8b4a3fcd9b22";
-          const response = await classScheduleService.getClassesByTeacher(hardcodedUserId);
+          const response = await classScheduleService.getClassesByTeacher(user._id);
           setClasses(response);
         }
       } catch (err) {

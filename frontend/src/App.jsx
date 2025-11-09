@@ -60,6 +60,7 @@ import { Navigate } from "react-router-dom";
 import Attendance from "./pages/Attendance.jsx";
 import ClassSchedulePage from "./pages/ClassSchedulePage.jsx";
 import AttendanceDetailPage from "./pages/AttendanceDetailPage.jsx";
+import BulkUserUploadPage from "./pages/BulkUserUploadPage.jsx";
 function App() {
   return (
     <AuthProvider>
@@ -76,6 +77,7 @@ function App() {
 
           {/* Schedules Routes */}
           <Route path="/schedules/pending" element={<PendingSchedulesList />} />
+          <Route path="/bulk-users/upload" element={<BulkUserUploadPage />} />
 
           {/* Redirect unknown routes to dashboard */}
           <Route path="*" element={<Navigate to="/" replace />} />

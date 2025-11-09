@@ -105,7 +105,7 @@ const StudentSchedule = () => {
         startTime: item.startTime,
         endTime: item.endTime,
         lessonNumber: index + 1, // Có thể thay bằng session number nếu có
-        topic: item.subject || 'Chưa có chủ đề',
+        topic: item.topic || 'Chưa có chủ đề',
         teacher: item.teacher?.username || item.teacher?.email || 'Chưa có thông tin',
         room: item.room ? `${item.room.room_name}${item.room.location ? ` - ${item.room.location}` : ''}` : 'Chưa có phòng',
         status: status,
@@ -136,8 +136,8 @@ const StudentSchedule = () => {
     try {
       setLoading(true);
       setError(null);
-      const hardfixId = "670fd02e7e1b8b4a3fcd9b23";
-      const response = await studentScheduleService.getStudentSchedule(hardfixId);/* cái trong ngoặc phải là currentUser._id */
+    
+      const response = await studentScheduleService.getStudentSchedule(currentUser._id);/* cái trong ngoặc phải là currentUser._id */
       
       if (response && response.schedules && Array.isArray(response.schedules)) {
         const transformedData = transformScheduleData(response.schedules);

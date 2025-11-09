@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
@@ -6,7 +6,7 @@ import Table from '../compo/Table';
 import Button from '../compo/Button';
 import Badge from '../compo/Badge';
 // import { courseAPI } from '../services/api';
-import { mockPendingCourses, simulateApiDelay } from '../../../helper/mockData';
+import { mockPendingCourses, simulateApiDelay } from '../../../helper/mockdata';
 import { formatDate } from '../../../helper/helper';
 
 const PendingCoursesList = () => {
@@ -46,7 +46,7 @@ const PendingCoursesList = () => {
   };
 
   const breadcrumbItems = [
-    { label: 'Trang chủ', path: '/' },
+    { label: 'Dashboard', path: '/center-head/dashboard' },
     { label: 'Giáo trình chờ duyệt', path: '/courses/pending' },
   ];
 

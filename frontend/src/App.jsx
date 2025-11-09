@@ -50,12 +50,17 @@ import StudentSchedulePage from "./pages/StudentSchedulePage.jsx";
 import StudentCoursesPage from "./pages/StudentCoursesPage.jsx";
 import StudentClassDetailPage from "./pages/StudentClassDetailPage.jsx";
 import StudentAssignmentsPage from "./pages/StudentAssignmentsPage.jsx";
-
-//import page components
-import Dashboard from "./components/CenterHead/pages/CenterHeadDashboard.jsx";
-import PendingCoursesList from "./components/CenterHead/pages/PendingCourseList.jsx";
-import CourseDetails from "./components/CenterHead/pages/CourseDetail.jsx";
-import PendingSchedulesList from "./components/CenterHead/pages/PendingScheduleList.jsx";
+import CenterHeadDashboardPage from "./pages/CenterHeadDashboardPage.jsx";
+import PendingCoursesPage from "./pages/PendingCoursesPage.jsx";
+import CourseDetailPage from "./pages/CourseDetailPage.jsx";
+import PendingSchedulesPage from "./pages/PendingSchedulesPage.jsx";
+import UserListPage from "./pages/UserListPage.jsx";
+import RoleManagementPage from "./pages/RoleManagementPage.jsx";
+import ProgramListPage from "./pages/ProgramListPage.jsx";
+import ClassListPage from "./pages/ClassListPage.jsx";
+import RoomListPage from "./pages/RoomListPage.jsx";
+import ExamListPage from "./pages/ExamListPage.jsx";
+import ReportsOverviewPage from "./pages/ReportsOverviewPage.jsx";
 import { Navigate } from "react-router-dom";
 import Attendance from "./pages/Attendance.jsx";
 import ClassSchedulePage from "./pages/ClassSchedulePage.jsx";
@@ -67,15 +72,30 @@ function App() {
       {/* <RouteScrollToTop /> */}
         <Routes>
           
-          {/* Dashboard */}
-          {/* <Route path="/" element={<Dashboard />} /> */}
+          {/* Center Head Routes */}
+          <Route path="/center-head/dashboard" element={<CenterHeadDashboardPage />} />
 
-          {/* Courses Routes */}
-          <Route path="/courses/pending" element={<PendingCoursesList />} />
-          <Route path="/courses/:id/details" element={<CourseDetails />} />
+          {/* User Management */}
+          <Route path="/center-head/users" element={<UserListPage />} />
+          <Route path="/center-head/roles" element={<RoleManagementPage />} />
 
-          {/* Schedules Routes */}
-          <Route path="/schedules/pending" element={<PendingSchedulesList />} />
+          {/* Program & Course Management */}
+          <Route path="/center-head/programs" element={<ProgramListPage />} />
+          <Route path="/courses/pending" element={<PendingCoursesPage />} />
+          <Route path="/courses/:id/details" element={<CourseDetailPage />} />
+
+          {/* Class & Schedule Management */}
+          <Route path="/center-head/classes" element={<ClassListPage />} />
+          <Route path="/schedules/pending" element={<PendingSchedulesPage />} />
+
+          {/* Room Management */}
+          <Route path="/center-head/rooms" element={<RoomListPage />} />
+
+          {/* Exam Management */}
+          <Route path="/center-head/exams" element={<ExamListPage />} />
+
+          {/* Reports & Analytics */}
+          <Route path="/center-head/reports" element={<ReportsOverviewPage />} />
 
           {/* Redirect unknown routes to dashboard */}
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -170,6 +190,9 @@ function App() {
         <Route exact path='/academic-dashboard' element={<AcademicDashboardPage />} />
         <Route exact path='/schedule-management' element={<ScheduleManagementPage />} />
         <Route exact path='/class-management' element={<ClassManagementPage />} />
+
+        {/* Center Head management */}
+        <Route exact path='/center-head/dashboard' element={<CenterHeadDashboardPage />} />
 
         </Routes>
       </BrowserRouter>

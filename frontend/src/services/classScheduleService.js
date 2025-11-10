@@ -1,7 +1,7 @@
 import axios from 'axios';
 const API_PORT = import.meta.env.VITE_API_PORT;
 // Tạo axios instance với base URL cho class schedule API
-const API_BASE_URL = `http://localhost:9999/api/class-schedules`;
+const API_BASE_URL = `http://localhost:8080/api/class-schedules`;
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {

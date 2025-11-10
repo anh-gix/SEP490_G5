@@ -72,7 +72,6 @@ function App() {
           {/* <Route path="/" element={<Dashboard />} /> */}
 
           {/* Schedules Routes */}
-          <Route path="/schedules/pending" element={<PendingSchedulesList />} />
           <Route path="/bulk-users/upload" element={<BulkUserUploadPage />} />
 
           {/* Redirect unknown routes to dashboard */}
@@ -170,8 +169,6 @@ function App() {
         <Route exact path='/schedule-management' element={<ScheduleManagementPage />} />
         <Route exact path='/class-management' element={<ClassManagementPage />} />
 
-        {/* Center Head management */}
-        <Route exact path='/center-head/dashboard' element={<CenterHeadDashboardPage />} />
 
         </Routes>
       </BrowserRouter>

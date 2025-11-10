@@ -84,7 +84,7 @@ const ClassSchedulePage = () => {
     <>
       <Preloader />
       <Animation />
-      <HeaderOne />
+      
       <Breadcrumb title={"Lịch học"} />
       {loading ? (
         <div className='blog-page-section py-120'>

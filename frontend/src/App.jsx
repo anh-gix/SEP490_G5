@@ -56,6 +56,7 @@ import ClassSchedulePage from "./pages/ClassSchedulePage.jsx";
 import AttendanceDetailPage from "./pages/AttendanceDetailPage.jsx";
 import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";
 import Profile from "./pages/Profile.jsx";
+import BulkUserUploadPage from "./pages/BulkUserUploadPage.jsx";
 function App() {
   return (
     <AuthProvider>
@@ -67,6 +68,12 @@ function App() {
           {centerHeadRoutes.map((route, index) => (
             <Route key={index} path={route.path} element={route.element} />
           ))}
+          {/* Dashboard */}
+          {/* <Route path="/" element={<Dashboard />} /> */}
+
+          {/* Schedules Routes */}
+          <Route path="/schedules/pending" element={<PendingSchedulesList />} />
+          <Route path="/bulk-users/upload" element={<BulkUserUploadPage />} />
 
           {/* Redirect unknown routes to dashboard */}
           <Route path="*" element={<Navigate to="/" replace />} />

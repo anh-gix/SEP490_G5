@@ -1,7 +1,7 @@
 import axios from 'axios';
 const API_PORT = import.meta.env.VITE_API_PORT;
 // Tạo axios instance với base URL
-const API_BASE_URL = `http://localhost:${API_PORT}/api/auth`;
+const API_BASE_URL = `http://localhost:9999/api/auth`;
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {

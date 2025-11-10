@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table, Spinner, Alert } from 'react-bootstrap';
 import RequestAbsenceModal from './RequestAbsenceModal';
+import { useAuth } from '../../contexts/AuthContext';
+import studentScheduleService from '../../services/studentScheduleService';
 
 /**
  * Student Schedule Component
  * Trang xem lịch học dành cho học viên
  */
 const StudentSchedule = () => {
+  const { user } = useAuth();
   const [viewMode, setViewMode] = useState('week'); // 'week', 'month', or 'list'
   const [selectedWeek, setSelectedWeek] = useState(getCurrentWeek());
   const [selectedMonth, setSelectedMonth] = useState(new Date());
@@ -14,10 +17,48 @@ const StudentSchedule = () => {
   const [showAbsenceModal, setShowAbsenceModal] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchSchedules();
-  }, [selectedWeek, filterStatus]);
+    if (user && user._id) {
+      fetchSchedules();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?._id]); // Chỉ fetch khi user._id thay đổi
+
+  // Không cần fetch lại khi selectedWeek hoặc filterStatus thay đổi vì đã có dữ liệu
+
+  // Auto-refresh để cập nhật status theo thời gian thực (mỗi phút)
+  useEffect(() => {
+    if (schedules.length > 0) {
+      const interval = setInterval(() => {
+        // Tính lại status cho tất cả schedules
+        setSchedules(prevSchedules => {
+          return prevSchedules.map(schedule => {
+            const now = new Date();
+            const scheduleDate = new Date(schedule.date);
+            
+            if (isNaN(scheduleDate.getTime())) {
+              return schedule;
+            }
+            
+            if (schedule.endTime && typeof schedule.endTime === 'string') {
+              const timeParts = schedule.endTime.split(':').map(Number);
+              if (timeParts.length === 2 && !isNaN(timeParts[0]) && !isNaN(timeParts[1])) {
+                scheduleDate.setHours(timeParts[0], timeParts[1], 0, 0);
+              }
+            }
+
+            const newStatus = scheduleDate < now ? 'completed' : 'upcoming';
+            return { ...schedule, status: newStatus };
+          });
+        });
+      }, 60000); // Cập nhật mỗi phút
+
+      return () => clearInterval(interval);
+    }
+  }, [schedules.length]); // Chỉ phụ thuộc vào length để tránh vòng lặp vô hạn
 
   function getCurrentWeek() {
     const today = new Date();
@@ -25,71 +66,92 @@ const StudentSchedule = () => {
     return firstDayOfWeek;
   }
 
+  // Hàm tính toán status dựa trên thời gian thực
+  const calculateStatus = (date, endTime) => {
+    const now = new Date();
+    const scheduleDate = new Date(date);
+    
+    // Đảm bảo date là đối tượng Date hợp lệ
+    if (isNaN(scheduleDate.getTime())) {
+      return 'upcoming';
+    }
+    
+    // Parse endTime (format: "HH:MM")
+    if (endTime && typeof endTime === 'string') {
+      const timeParts = endTime.split(':').map(Number);
+      if (timeParts.length === 2 && !isNaN(timeParts[0]) && !isNaN(timeParts[1])) {
+        scheduleDate.setHours(timeParts[0], timeParts[1], 0, 0);
+      }
+    }
+
+    // Nếu ngày và giờ kết thúc đã qua thì là completed
+    if (scheduleDate < now) {
+      return 'completed';
+    }
+    return 'upcoming';
+  };
+
+  // Hàm chuyển đổi dữ liệu từ API sang format component
+  const transformScheduleData = (apiData) => {
+    return apiData.map((item, index) => {
+      const scheduleDate = new Date(item.date);
+      const status = calculateStatus(item.date, item.endTime);
+      const attendanceStatus = item.attendance?.status || null;
+
+      return {
+        id: item._id,
+        date: scheduleDate.toISOString().split('T')[0],
+        dayOfWeek: getDayOfWeek(scheduleDate),
+        startTime: item.startTime,
+        endTime: item.endTime,
+        lessonNumber: index + 1, // Có thể thay bằng session number nếu có
+        topic: item.topic || 'Chưa có chủ đề',
+        teacher: item.teacher?.username || item.teacher?.email || 'Chưa có thông tin',
+        room: item.room ? `${item.room.room_name}${item.room.location ? ` - ${item.room.location}` : ''}` : 'Chưa có phòng',
+        status: status,
+        attendanceStatus: attendanceStatus,
+        className: item.className || 'N/A',
+        subject: item.subject || 'N/A',
+        rawData: item // Lưu raw data để dùng cho các chức năng khác
+      };
+    });
+  };
+
+  // Hàm lấy thứ trong tuần
+  const getDayOfWeek = (date) => {
+    const days = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+    return days[date.getDay()];
+  };
+
   const fetchSchedules = async () => {
+    // Lấy user từ AuthContext hoặc localStorage
+    const currentUser = user || JSON.parse(localStorage.getItem('user') || 'null');
+    
+    if (!currentUser || !currentUser._id) {
+      setError('Không tìm thấy thông tin học sinh. Vui lòng đăng nhập lại.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      // TODO: Replace with actual API call
-      // Mock data
-      const mockData = [
-        {
-          id: 1,
-          date: '2025-11-03',
-          dayOfWeek: 'Thứ 2',
-          startTime: '18:00',
-          endTime: '20:00',
-          lessonNumber: 19,
-          topic: 'Present Perfect Tense',
-          teacher: 'Trần Thị B',
-          room: 'Room 102',
-          status: 'upcoming',
-          attendanceStatus: null,
-          className: 'A2-Evening-01'
-        },
-        {
-          id: 2,
-          date: '2025-11-04',
-          dayOfWeek: 'Thứ 3',
-          startTime: '18:00',
-          endTime: '20:00',
-          lessonNumber: 20,
-          topic: 'Reading Comprehension',
-          teacher: 'Trần Thị B',
-          room: 'Room 102',
-          status: 'upcoming',
-          attendanceStatus: null,
-          className: 'A2-Evening-01'
-        },
-        {
-          id: 3,
-          date: '2025-10-29',
-          dayOfWeek: 'Thứ 2',
-          startTime: '18:00',
-          endTime: '20:00',
-          lessonNumber: 17,
-          topic: 'Past Simple Tense',
-          teacher: 'Trần Thị B',
-          room: 'Room 102',
-          status: 'completed',
-          attendanceStatus: 'present',
-          className: 'A2-Evening-01'
-        },
-        {
-          id: 4,
-          date: '2025-10-31',
-          dayOfWeek: 'Thứ 4',
-          startTime: '18:00',
-          endTime: '20:00',
-          lessonNumber: 18,
-          topic: 'Listening Practice',
-          teacher: 'Trần Thị B',
-          room: 'Room 102',
-          status: 'completed',
-          attendanceStatus: 'present',
-          className: 'A2-Evening-01'
-        }
-      ];
-      setSchedules(mockData);
+      setLoading(true);
+      setError(null);
+    
+      const response = await studentScheduleService.getStudentSchedule(currentUser._id);/* cái trong ngoặc phải là currentUser._id */
+      
+      if (response && response.schedules && Array.isArray(response.schedules)) {
+        const transformedData = transformScheduleData(response.schedules);
+        setSchedules(transformedData);
+      } else {
+        setSchedules([]);
+      }
     } catch (error) {
       console.error('Error fetching schedules:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Không thể tải lịch học. Vui lòng thử lại sau.';
+      setError(errorMessage);
+      setSchedules([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -248,8 +310,13 @@ const StudentSchedule = () => {
             <div className="d-flex" style={{ minHeight: '500px' }}>
               {weekDays.map((day, index) => {
                 const daySchedules = schedules.filter(s => {
+                  if (!s.date) return false;
                   const scheduleDate = new Date(s.date);
-                  return scheduleDate.toDateString() === day.toDateString();
+                  const compareDate = new Date(day);
+                  // So sánh chỉ ngày, tháng, năm
+                  return scheduleDate.getDate() === compareDate.getDate() &&
+                         scheduleDate.getMonth() === compareDate.getMonth() &&
+                         scheduleDate.getFullYear() === compareDate.getFullYear();
                 });
 
                 const isToday = day.toDateString() === new Date().toDateString();
@@ -284,7 +351,7 @@ const StudentSchedule = () => {
                           >
                             <div className="d-flex align-items-start justify-content-between mb-8">
                               <div className="text-neutral-900 fw-bold text-13">
-                                {schedule.startTime}
+                                {schedule.startTime} - {schedule.endTime}
                               </div>
                               {schedule.attendanceStatus && (
                                 <div className={`rounded-circle ${
@@ -381,8 +448,13 @@ const StudentSchedule = () => {
             {monthDays.map((dayObj, index) => {
               const day = dayObj.date;
               const daySchedules = schedules.filter(s => {
+                if (!s.date) return false;
                 const scheduleDate = new Date(s.date);
-                return scheduleDate.toDateString() === day.toDateString();
+                const compareDate = new Date(day);
+                // So sánh chỉ ngày, tháng, năm
+                return scheduleDate.getDate() === compareDate.getDate() &&
+                       scheduleDate.getMonth() === compareDate.getMonth() &&
+                       scheduleDate.getFullYear() === compareDate.getFullYear();
               });
 
               const isToday = day.toDateString() === new Date().toDateString();
@@ -439,7 +511,16 @@ const StudentSchedule = () => {
                           overflow: 'hidden',
                           textOverflow: 'ellipsis'
                         }}>
-                          {schedule.startTime} {schedule.className}
+                          {schedule.startTime} - {schedule.endTime}
+                        </div>
+                        <div className="text-neutral-700 fw-normal" style={{ 
+                          fontSize: '10px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          marginTop: '2px'
+                        }}>
+                          {schedule.className}
                         </div>
                       </div>
                     ))}
@@ -547,7 +628,20 @@ const StudentSchedule = () => {
                   <tr>
                     <td colSpan="10" className="text-center py-40">
                       <i className="fas fa-calendar-times fa-3x text-neutral-400 mb-16"></i>
-                      <p className="text-neutral-500 mb-0">Không có lịch học nào</p>
+                      <p className="text-neutral-500 mb-0">
+                        {loading ? 'Đang tải...' : 'Không có lịch học nào'}
+                      </p>
+                      {!loading && (
+                        <Button 
+                          variant="outline-primary" 
+                          size="sm" 
+                          onClick={fetchSchedules}
+                          className="mt-16"
+                        >
+                          <i className="fas fa-sync-alt me-2"></i>
+                          Tải lại
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 )}
@@ -688,10 +782,35 @@ const StudentSchedule = () => {
         </Card.Body>
       </Card>
 
+      {/* Error Message */}
+      {error && (
+        <Alert variant="danger" className="mb-24" dismissible onClose={() => setError(null)}>
+          <Alert.Heading>Lỗi!</Alert.Heading>
+          <p>{error}</p>
+          <Button variant="outline-danger" size="sm" onClick={fetchSchedules}>
+            Thử lại
+          </Button>
+        </Alert>
+      )}
+
+      {/* Loading Spinner */}
+      {loading && (
+        <div className="text-center py-40">
+          <Spinner animation="border" role="status" variant="primary">
+            <span className="visually-hidden">Đang tải...</span>
+          </Spinner>
+          <p className="text-neutral-500 mt-16">Đang tải lịch học...</p>
+        </div>
+      )}
+
       {/* Schedule Content */}
-      {viewMode === 'week' && renderWeekView()}
-      {viewMode === 'month' && renderMonthView()}
-      {viewMode === 'list' && renderListView()}
+      {!loading && (
+        <>
+          {viewMode === 'week' && renderWeekView()}
+          {viewMode === 'month' && renderMonthView()}
+          {viewMode === 'list' && renderListView()}
+        </>
+      )}
 
       {/* Request Absence Modal */}
       <RequestAbsenceModal

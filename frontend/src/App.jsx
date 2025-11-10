@@ -60,6 +60,7 @@ import { Navigate } from "react-router-dom";
 import Attendance from "./pages/Attendance.jsx";
 import ClassSchedulePage from "./pages/ClassSchedulePage.jsx";
 import AttendanceDetailPage from "./pages/AttendanceDetailPage.jsx";
+import Profile from "./pages/Profile.jsx";
 function App() {
   return (
     <AuthProvider>
@@ -80,8 +81,8 @@ function App() {
           {/* Redirect unknown routes to dashboard */}
           <Route path="*" element={<Navigate to="/" replace />} />
 
-          <Route exact path="/" element={<HomePageOne />} />
-          <Route exact path="/index-2" element={<HomePageTwo />} />
+          <Route exact path="/" element={<HomePageTwo />} />
+          <Route exact path="/index-2" element={<HomePageOne />} />
           <Route exact path="/index-3" element={<HomePageThree />} />
           <Route exact path="/index-4" element={<HomePageFour />} />
           <Route exact path="/index-5" element={<HomePageFive />} />
@@ -142,11 +143,12 @@ function App() {
             element={<ProductDetailsPage />}
           />
           <Route exact path="/sign-in" element={<SignInPage />} />
+          <Route exact path="/profile" element={<Profile />} />
           <Route exact path="/sign-up" element={<SignUpPage />} />
           <Route exact path="/tuition-jobs" element={<TuitionJobsPage />} />
           <Route exact path="/tutor" element={<TutorPage />} />
           <Route exact path="/tutor-details" element={<TutorDetailsPage />} />
-          <Route exact path="/attendance" element={<Attendance />} />
+          <Route exact path="/attendance" element={<Attendance />} /> // Route for attendance page
           <Route
             exact
             path="/attendance/class/:classId"

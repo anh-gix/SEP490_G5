@@ -50,21 +50,11 @@ import StudentSchedulePage from "./pages/StudentSchedulePage.jsx";
 import StudentCoursesPage from "./pages/StudentCoursesPage.jsx";
 import StudentClassDetailPage from "./pages/StudentClassDetailPage.jsx";
 import StudentAssignmentsPage from "./pages/StudentAssignmentsPage.jsx";
-import CenterHeadDashboardPage from "./pages/CenterHeadDashboardPage.jsx";
-import PendingCoursesPage from "./pages/PendingCoursesPage.jsx";
-import CourseDetailPage from "./pages/CourseDetailPage.jsx";
-import PendingSchedulesPage from "./pages/PendingSchedulesPage.jsx";
-import UserListPage from "./pages/UserListPage.jsx";
-import RoleManagementPage from "./pages/RoleManagementPage.jsx";
-import ProgramListPage from "./pages/ProgramListPage.jsx";
-import ClassListPage from "./pages/ClassListPage.jsx";
-import RoomListPage from "./pages/RoomListPage.jsx";
-import ExamListPage from "./pages/ExamListPage.jsx";
-import ReportsOverviewPage from "./pages/ReportsOverviewPage.jsx";
 import { Navigate } from "react-router-dom";
 import Attendance from "./pages/Attendance.jsx";
 import ClassSchedulePage from "./pages/ClassSchedulePage.jsx";
 import AttendanceDetailPage from "./pages/AttendanceDetailPage.jsx";
+import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";
 function App() {
   return (
     <AuthProvider>
@@ -73,29 +63,9 @@ function App() {
         <Routes>
           
           {/* Center Head Routes */}
-          <Route path="/center-head/dashboard" element={<CenterHeadDashboardPage />} />
-
-          {/* User Management */}
-          <Route path="/center-head/users" element={<UserListPage />} />
-          <Route path="/center-head/roles" element={<RoleManagementPage />} />
-
-          {/* Program & Course Management */}
-          <Route path="/center-head/programs" element={<ProgramListPage />} />
-          <Route path="/courses/pending" element={<PendingCoursesPage />} />
-          <Route path="/courses/:id/details" element={<CourseDetailPage />} />
-
-          {/* Class & Schedule Management */}
-          <Route path="/center-head/classes" element={<ClassListPage />} />
-          <Route path="/schedules/pending" element={<PendingSchedulesPage />} />
-
-          {/* Room Management */}
-          <Route path="/center-head/rooms" element={<RoomListPage />} />
-
-          {/* Exam Management */}
-          <Route path="/center-head/exams" element={<ExamListPage />} />
-
-          {/* Reports & Analytics */}
-          <Route path="/center-head/reports" element={<ReportsOverviewPage />} />
+          {centerHeadRoutes.map((route, index) => (
+            <Route key={index} path={route.path} element={route.element} />
+          ))}
 
           {/* Redirect unknown routes to dashboard */}
           <Route path="*" element={<Navigate to="/" replace />} />

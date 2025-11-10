@@ -342,8 +342,8 @@ const saveBulkUsers = async (req, res) => {
           continue;
         }
 
-        // Tạo password ngẫu nhiên
-        const password = generatePassword();
+        // Sử dụng password từ frontend nếu có, nếu không thì generate mới
+        const password = userData.password || generatePassword();
 
         // Tạo user mới
         const newUser = await User.create({

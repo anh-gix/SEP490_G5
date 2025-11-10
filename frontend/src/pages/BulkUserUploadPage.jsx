@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Container, Row, Col, Card, Button, Form, Table, Alert, Spinner, Badge } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Form, Table, Alert, Spinner, Badge, Modal } from 'react-bootstrap';
 import bulkUserService from '../services/bulkUserService';
 import axios from 'axios';
 
@@ -13,6 +13,9 @@ const BulkUserUploadPage = () => {
   const [selectedRoleId, setSelectedRoleId] = useState('');
   const [roles, setRoles] = useState([]);
   const [saveResults, setSaveResults] = useState(null);
+  const [showFormatModal, setShowFormatModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [previewData, setPreviewData] = useState(null); // Lưu dữ liệu preview (chưa lưu DB)
   const fileInputRef = useRef(null);
 
   // Lấy danh sách roles khi component mount
@@ -92,7 +95,17 @@ const BulkUserUploadPage = () => {
     }
   };
 
-  const handleSave = async () => {
+  // Hàm generate password ngẫu nhiên (giống backend)
+  const generatePassword = () => {
+    const length = 8;
+    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    return Array.from(crypto.getRandomValues(new Uint8Array(length)))
+      .map(x => charset[x % charset.length])
+      .join('');
+  };
+
+  // Generate preview (chưa lưu DB)
+  const handleSave = () => {
     if (!selectedRoleId) {
       alert('Vui lòng chọn role cho các tài khoản');
       return;
@@ -103,18 +116,66 @@ const BulkUserUploadPage = () => {
       return;
     }
 
-    if (!window.confirm(`Bạn có chắc chắn muốn tạo ${users.length} tài khoản với role đã chọn?`)) {
+    // Generate password cho mỗi user và tạo preview data
+    const previewUsers = users.map(user => ({
+      ...user,
+      password: generatePassword() // Generate password ở frontend
+    }));
+
+    // Tạo preview data (chưa lưu DB)
+    const preview = {
+      users: previewUsers,
+      roleId: selectedRoleId,
+      total: previewUsers.length,
+      success: previewUsers.length,
+      failed: 0
+    };
+
+    setPreviewData(preview);
+    setSaveResults({
+      success: previewUsers.length,
+      failed: 0,
+      total: previewUsers.length,
+      results: {
+        success: previewUsers,
+        failed: []
+      },
+      isPreview: true // Đánh dấu đây là preview, chưa lưu DB
+    });
+  };
+
+  // Xác nhận và lưu vào DB
+  const handleConfirmSave = async () => {
+    if (!previewData) {
       return;
     }
 
+    setShowConfirmModal(false);
     setSaving(true);
+
     try {
-      const response = await bulkUserService.saveBulkUsers(users, selectedRoleId);
-      setSaveResults(response);
-      alert(`Đã tạo ${response.success} tài khoản thành công, ${response.failed} tài khoản thất bại`);
+      // Gọi API để lưu vào database (gửi kèm password đã generate ở preview)
+      const response = await bulkUserService.saveBulkUsers(previewData.users, previewData.roleId);
+      
+      // Cập nhật kết quả (đã lưu DB)
+      // Lưu lại password từ preview để hiển thị (vì đây là lần cuối có thể xem)
+      setSaveResults({
+        ...response,
+        isPreview: false, // Đã lưu DB
+        // Giữ lại password từ preview cho lần hiển thị cuối cùng
+        previewPasswords: previewData.users.reduce((acc, user) => {
+          acc[user.email] = user.password;
+          return acc;
+        }, {})
+      });
+      
+      // Reset preview data
+      setPreviewData(null);
+      
+      alert(`Đã thêm ${response.success} tài khoản vào hệ thống thành công, ${response.failed} tài khoản thất bại`);
     } catch (error) {
       console.error('Error saving users:', error);
-      alert(error.message || 'Không thể lưu tài khoản');
+      alert(error.message || 'Không thể lưu tài khoản vào hệ thống');
     } finally {
       setSaving(false);
     }
@@ -126,7 +187,9 @@ const BulkUserUploadPage = () => {
     setErrors([]);
     setDuplicates([]);
     setSaveResults(null);
+    setPreviewData(null);
     setSelectedRoleId('');
+    setShowConfirmModal(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -146,14 +209,26 @@ const BulkUserUploadPage = () => {
           <Row>
             <Col md={8}>
               <Form.Group className="mb-16">
-                <Form.Label className="fw-semibold mb-8">Chọn file Excel</Form.Label>
+                <div className="d-flex align-items-center justify-content-between mb-8">
+                  <Form.Label className="fw-semibold mb-0">Chọn file Excel
+                      <Button
+                    size="sm"
+                    onClick={() => setShowFormatModal(true)}
+                    
+                  >
+                    <i className="fas fa-info-circle me-1"></i>
+                    Lưu ý
+                  </Button>
+                  </Form.Label>
+                
+                </div>
                 <Form.Control
                   type="file"
                   accept=".xlsx,.xls"
                   onChange={handleFileChange}
                   ref={fileInputRef}
                 />
-                <Form.Text className="text-muted">
+                <Form.Text className="text-danger">
                   File Excel phải có các cột: email, username, phone, address
                 </Form.Text>
               </Form.Group>
@@ -181,12 +256,17 @@ const BulkUserUploadPage = () => {
           </Row>
 
           {file && (
-            <div className="mt-16">
-              <Badge bg="info" className="me-2">
+            <div className="mt-16 d-flex align-items-center gap-12">
+              <Badge bg="info" className="d-inline-flex align-items-center px-12 py-6">
                 <i className="fas fa-file-excel me-1"></i>
                 {file.name}
               </Badge>
-              <Button variant="link" size="sm" onClick={handleReset} className="text-danger">
+              <Button 
+                variant="danger" 
+                size="sm" 
+                onClick={handleReset}
+                className="d-inline-flex align-items-center"
+              >
                 <i className="fas fa-times me-1"></i>
                 Xóa file
               </Button>
@@ -295,31 +375,47 @@ const BulkUserUploadPage = () => {
                 onClick={handleSave}
                 disabled={!selectedRoleId || saving}
               >
-                {saving ? (
-                  <>
-                    <Spinner size="sm" className="me-2" />
-                    Đang lưu...
-                  </>
-                ) : (
-                  <>
-                    <i className="fas fa-save me-2"></i>
-                    Save
-                  </>
-                )}
+                <i className="fas fa-eye me-2"></i>
+                Preview
               </Button>
             </div>
           </Card.Body>
         </Card>
       )}
 
-      {/* Save Results */}
+      {/* Save Results / Preview */}
       {saveResults && (
         <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
           <Card.Body className="p-20">
-            <h5 className="mb-16">Kết quả lưu tài khoản</h5>
+            <div className="d-flex justify-content-between align-items-center mb-16">
+              <h5 className="mb-0">
+                {saveResults.isPreview ? 'Preview tài khoản (Chưa lưu vào hệ thống)' : 'Kết quả lưu tài khoản'}
+              </h5>
+              {saveResults.isPreview && (
+                <Badge bg="warning" className="px-12 py-6">
+                  <i className="fas fa-exclamation-triangle me-1"></i>
+                  Chưa lưu vào hệ thống
+                </Badge>
+              )}
+            </div>
+
+            {saveResults.isPreview && (
+              <Alert variant="warning" className="mb-16">
+                <strong>
+                  <i className="fas fa-info-circle me-2"></i>
+                  Lưu ý quan trọng:
+                </strong>
+                <ul className="mb-0 mt-8">
+                  <li>Đây là preview của các tài khoản sẽ được tạo</li>
+                  <li>Password được generate tự động và chỉ hiển thị một lần</li>
+                  <li>Vui lòng lưu lại thông tin password trước khi thêm vào hệ thống</li>
+                  <li>Sau khi thêm vào hệ thống, bạn sẽ không thể xem lại password</li>
+                </ul>
+              </Alert>
+            )}
             
             <Alert variant="success" className="mb-16">
-              <strong>Thành công:</strong> {saveResults.success} tài khoản
+              <strong>Số lượng tài khoản:</strong> {saveResults.success} tài khoản
             </Alert>
 
             {saveResults.failed > 0 && (
@@ -330,7 +426,11 @@ const BulkUserUploadPage = () => {
 
             {saveResults.results?.success && saveResults.results.success.length > 0 && (
               <div className="mb-16">
-                <h6 className="mb-8">Tài khoản đã tạo thành công:</h6>
+                <h6 className="mb-8">
+                  {saveResults.isPreview 
+                    ? 'Tài khoản sẽ được tạo (Preview):' 
+                    : 'Tài khoản đã tạo thành công:'}
+                </h6>
                 <div className="table-responsive">
                   <Table striped bordered hover size="sm">
                     <thead>
@@ -341,16 +441,34 @@ const BulkUserUploadPage = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {saveResults.results.success.map((user, index) => (
-                        <tr key={index}>
-                          <td>{user.email}</td>
-                          <td>{user.username}</td>
-                          <td className="fw-bold text-success">{user.password}</td>
-                        </tr>
-                      ))}
+                      {saveResults.results.success.map((user, index) => {
+                        // Nếu là preview, dùng password từ user object
+                        // Nếu đã lưu DB, dùng password từ previewPasswords hoặc từ response
+                        const password = saveResults.isPreview 
+                          ? user.password 
+                          : (saveResults.previewPasswords?.[user.email] || user.password || 'Đã lưu (không thể xem lại)');
+                        
+                        return (
+                          <tr key={index}>
+                            <td>{user.email}</td>
+                            <td>{user.username}</td>
+                            <td className="fw-bold text-success">
+                              {saveResults.isPreview ? password : (password.includes('không thể xem lại') ? (
+                                <span className="text-muted">{password}</span>
+                              ) : password)}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </Table>
                 </div>
+                {!saveResults.isPreview && (
+                  <Alert variant="info" className="mt-12 mb-0">
+                    <i className="fas fa-info-circle me-2"></i>
+                    <strong>Lưu ý:</strong> Password chỉ hiển thị một lần. Vui lòng lưu lại thông tin trước khi đóng trang này.
+                  </Alert>
+                )}
               </div>
             )}
 
@@ -379,9 +497,166 @@ const BulkUserUploadPage = () => {
                 </div>
               </div>
             )}
+
+            {/* Nút Thêm vào hệ thống (chỉ hiện khi là preview) */}
+            {saveResults.isPreview && (
+              <div className="mt-16 text-center">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  onClick={() => setShowConfirmModal(true)}
+                  disabled={saving}
+                  className="px-24 py-12"
+                >
+                  {saving ? (
+                    <>
+                      <Spinner size="sm" className="me-2" />
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-database me-2"></i>
+                      Thêm vào hệ thống
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           </Card.Body>
         </Card>
       )}
+
+      {/* Modal xác nhận thêm vào hệ thống */}
+      <Modal 
+        show={showConfirmModal} 
+        onHide={() => setShowConfirmModal(false)}
+        size="lg"
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title className="text-warning">
+            <i className="fas fa-exclamation-triangle me-2"></i>
+            Xác nhận thêm tài khoản vào hệ thống
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Alert variant="warning" className="mb-16">
+            <h6 className="fw-bold mb-12">
+              <i className="fas fa-info-circle me-2"></i>
+              Cảnh báo quan trọng
+            </h6>
+            <p className="mb-8">
+              <strong>Hãy đảm bảo chắc chắn bạn đã lưu thông tin tài khoản và mật khẩu.</strong>
+            </p>
+            <p className="mb-0">
+              Sau khi thêm vào hệ thống, bạn sẽ <strong className="text-danger">KHÔNG THỂ</strong> truy xuất lại thông tin mật khẩu nữa.
+            </p>
+          </Alert>
+
+          <div className="mb-16">
+            <p className="mb-8"><strong>Thông tin sẽ được thêm:</strong></p>
+            <ul>
+              <li>Số lượng tài khoản: <strong>{previewData?.total || 0}</strong></li>
+              <li>Role: <strong>{roles.find(r => r._id === previewData?.roleId)?.name || previewData?.roleId}</strong></li>
+            </ul>
+          </div>
+
+          <Alert variant="info" className="mb-0">
+            <p className="mb-0">
+              <i className="fas fa-check-circle me-2"></i>
+              Bạn đã lưu lại tất cả thông tin tài khoản và mật khẩu chưa?
+            </p>
+          </Alert>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowConfirmModal(false)}>
+            <i className="fas fa-times me-2"></i>
+            Hủy
+          </Button>
+          <Button variant="primary" onClick={handleConfirmSave} disabled={saving}>
+            {saving ? (
+              <>
+                <Spinner size="sm" className="me-2" />
+                Đang xử lý...
+              </>
+            ) : (
+              <>
+                <i className="fas fa-check me-2"></i>
+                Xác nhận thêm vào hệ thống
+              </>
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal hiển thị format mẫu */}
+      <Modal 
+        show={showFormatModal} 
+        onHide={() => setShowFormatModal(false)}
+        size="lg"
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="fas fa-info-circle me-2 text-info"></i>
+            Định dạng file Excel mẫu
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="text-center mb-16">
+            <p className="fw-semibold text-primary mb-16" style={{ fontSize: '16px' }}>
+              Hãy để định dạng giống thế này
+            </p>
+            <div className="border rounded p-16 bg-light" style={{ overflow: 'auto' }}>
+              <img 
+                src="/assets/images/Screenshot%202025-11-09%20182157.png" 
+                alt="Định dạng Excel mẫu" 
+                className="img-fluid"
+                style={{ 
+                  maxWidth: '100%', 
+                  height: 'auto',
+                  display: 'block',
+                  margin: '0 auto'
+                }}
+                onError={(e) => {
+                  console.error('Error loading image:', e);
+                  // Thử đường dẫn với khoảng trắng
+                  if (e.target.src.includes('%20')) {
+                    e.target.src = '/assets/images/Screenshot 2025-11-09 182157.png';
+                  } else {
+                    e.target.style.display = 'none';
+                    const errorDiv = e.target.nextElementSibling;
+                    if (errorDiv) {
+                      errorDiv.style.display = 'block';
+                    }
+                  }
+                }}
+              />
+              <div style={{ display: 'none' }} className="text-danger text-center p-16">
+                <i className="fas fa-exclamation-triangle me-2"></i>
+                Không thể tải ảnh mẫu. Vui lòng kiểm tra đường dẫn file.
+              </div>
+            </div>
+            <div className="mt-16 text-start">
+              <Alert variant="info" className="mb-0">
+                <strong>Lưu ý:</strong>
+                <ul className="mb-0 mt-8">
+                  <li>File Excel phải có header ở dòng đầu tiên: <code>email</code>, <code>username</code>, <code>phone</code>, <code>address</code></li>
+                  <li>Các cột có thể viết hoa hoặc viết thường (Email, email, EMAIL đều được)</li>
+                  <li>Dữ liệu bắt đầu từ dòng thứ 2</li>
+                  <li>Email phải đúng định dạng email hợp lệ</li>
+                  <li>Phone và address không được để trống</li>
+                </ul>
+              </Alert>
+            </div>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowFormatModal(false)}>
+            Đóng
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };

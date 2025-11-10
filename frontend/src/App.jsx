@@ -50,16 +50,13 @@ import StudentSchedulePage from "./pages/StudentSchedulePage.jsx";
 import StudentCoursesPage from "./pages/StudentCoursesPage.jsx";
 import StudentClassDetailPage from "./pages/StudentClassDetailPage.jsx";
 import StudentAssignmentsPage from "./pages/StudentAssignmentsPage.jsx";
-
-//import page components
-import Dashboard from "./components/CenterHead/pages/CenterHeadDashboard.jsx";
-import PendingCoursesList from "./components/CenterHead/pages/PendingCourseList.jsx";
-import CourseDetails from "./components/CenterHead/pages/CourseDetail.jsx";
-import PendingSchedulesList from "./components/CenterHead/pages/PendingScheduleList.jsx";
 import { Navigate } from "react-router-dom";
 import Attendance from "./pages/Attendance.jsx";
 import ClassSchedulePage from "./pages/ClassSchedulePage.jsx";
 import AttendanceDetailPage from "./pages/AttendanceDetailPage.jsx";
+import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";
+import Profile from "./pages/Profile.jsx";
+import BulkUserUploadPage from "./pages/BulkUserUploadPage.jsx";
 function App() {
   return (
     <AuthProvider>
@@ -67,21 +64,21 @@ function App() {
       {/* <RouteScrollToTop /> */}
         <Routes>
           
+          {/* Center Head Routes */}
+          {centerHeadRoutes.map((route, index) => (
+            <Route key={index} path={route.path} element={route.element} />
+          ))}
           {/* Dashboard */}
           {/* <Route path="/" element={<Dashboard />} /> */}
 
-          {/* Courses Routes */}
-          <Route path="/courses/pending" element={<PendingCoursesList />} />
-          <Route path="/courses/:id/details" element={<CourseDetails />} />
-
           {/* Schedules Routes */}
-          <Route path="/schedules/pending" element={<PendingSchedulesList />} />
+          <Route path="/bulk-users/upload" element={<BulkUserUploadPage />} />
 
           {/* Redirect unknown routes to dashboard */}
           <Route path="*" element={<Navigate to="/" replace />} />
 
-          <Route exact path="/" element={<HomePageOne />} />
-          <Route exact path="/index-2" element={<HomePageTwo />} />
+          <Route exact path="/" element={<HomePageTwo />} />
+          <Route exact path="/index-2" element={<HomePageOne />} />
           <Route exact path="/index-3" element={<HomePageThree />} />
           <Route exact path="/index-4" element={<HomePageFour />} />
           <Route exact path="/index-5" element={<HomePageFive />} />
@@ -142,11 +139,12 @@ function App() {
             element={<ProductDetailsPage />}
           />
           <Route exact path="/sign-in" element={<SignInPage />} />
+          <Route exact path="/profile" element={<Profile />} />
           <Route exact path="/sign-up" element={<SignUpPage />} />
           <Route exact path="/tuition-jobs" element={<TuitionJobsPage />} />
           <Route exact path="/tutor" element={<TutorPage />} />
           <Route exact path="/tutor-details" element={<TutorDetailsPage />} />
-          <Route exact path="/attendance" element={<Attendance />} />
+          <Route exact path="/attendance" element={<Attendance />} /> // Route for attendance page
           <Route
             exact
             path="/attendance/class/:classId"
@@ -170,6 +168,7 @@ function App() {
         <Route exact path='/academic-dashboard' element={<AcademicDashboardPage />} />
         <Route exact path='/schedule-management' element={<ScheduleManagementPage />} />
         <Route exact path='/class-management' element={<ClassManagementPage />} />
+
 
         </Routes>
       </BrowserRouter>

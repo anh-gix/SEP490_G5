@@ -1,7 +1,7 @@
 import axios from 'axios';
 const API_PORT = import.meta.env.VITE_API_PORT;
 // Tạo axios instance với base URL cho class schedule API
-const API_BASE_URL = `http://localhost:${API_PORT}/api/class-schedules`;
+const API_BASE_URL = `http://localhost:8080/api/class-schedules`;
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -29,6 +29,8 @@ export const classScheduleService = {
   getClassesByTeacher: async (teacherId) => {
     try {
       const response = await api.get(`/teacher/${teacherId}/classes`);
+      console.log(teacherId);
+      
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy danh sách lớp' };

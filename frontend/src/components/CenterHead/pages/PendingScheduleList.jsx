@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Table from '../compo/Table';
 import Button from '../compo/Button';
-import Badge from '../compo/Badge';
 // import { scheduleAPI } from '../services/api';
-import { mockPendingSchedules, simulateApiDelay } from '../../../helper/mockData';
+import { mockPendingSchedules, simulateApiDelay } from '../../../helper/mockdata';
 import { formatDateTime, formatTime } from '../../../helper/helper';
 
 const PendingSchedulesList = () => {
@@ -105,7 +104,7 @@ const PendingSchedulesList = () => {
   };
 
   const breadcrumbItems = [
-    { label: 'Trang chủ', path: '/' },
+    { label: 'Dashboard', path: '/center-head/dashboard' },
     { label: 'Lịch học đặc biệt', path: '/schedules/pending' },
   ];
 

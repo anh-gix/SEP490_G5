@@ -29,6 +29,8 @@ export const classScheduleService = {
   getClassesByTeacher: async (teacherId) => {
     try {
       const response = await api.get(`/teacher/${teacherId}/classes`);
+      console.log(teacherId);
+      
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy danh sách lớp' };

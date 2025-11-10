@@ -31,7 +31,7 @@ exports.getSchedulesByClass = async (req, res) => {
     const { classId } = req.params;
 
     const schedules = await ClassSchedule.find({ class: classId })
-      .select("sessionNumber date startTime endTime room")
+      .select("session date startTime endTime room")
       .populate("room", "room_name") // ✅ thêm populate phòng học
       .sort({ date: 1 });
 
@@ -39,6 +39,8 @@ exports.getSchedulesByClass = async (req, res) => {
       return res.status(404).json({ message: "Lớp này chưa có lịch học." });
     }
 
+    console.log(schedules);
+    
     res.status(200).json(schedules);
   } catch (error) {
     console.error("❌ Lỗi khi lấy lịch học:", error);

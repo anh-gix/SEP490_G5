@@ -90,6 +90,16 @@ export const authService = {
     return localStorage.getItem('token');
   },
 
+  // Đổi mật khẩu
+  changePassword: async ({ currentPassword, newPassword }) => {
+    try {
+      const response = await api.post('/change-password', { currentPassword, newPassword });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Đổi mật khẩu thất bại' };
+    }
+  },
+
   // Lưu user data vào localStorage
   saveUserData: (userData) => {
     localStorage.setItem('token', userData.token);

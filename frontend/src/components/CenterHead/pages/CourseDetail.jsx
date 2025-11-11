@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
@@ -6,7 +6,7 @@ import Button from '../compo/Button';
 import Badge from '../compo/Badge';
 import Tabs from '../compo/Tabs';
 // import { courseAPI } from '../services/api';
-import { getCourseById, simulateApiDelay } from '../../../helper/mockData';
+import { getCourseById, simulateApiDelay } from '../../../helper/mockdata';
 import { formatDate } from '../../../helper/helper';
 
 const CourseDetails = () => {
@@ -100,7 +100,7 @@ const CourseDetails = () => {
   };
 
   const breadcrumbItems = [
-    { label: 'Trang chủ', path: '/' },
+    { label: 'Dashboard', path: '/center-head/dashboard' },
     { label: 'Giáo trình chờ duyệt', path: '/courses/pending' },
     { label: 'Chi tiết giáo trình', path: `/courses/${id}/details` },
   ];

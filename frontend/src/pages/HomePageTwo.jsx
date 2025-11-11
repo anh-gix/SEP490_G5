@@ -6,7 +6,7 @@ import ExploreCourseTwo from "../components/ExploreCourseTwo";
 import FaqOne from "../components/FaqOne";
 import FeaturesTwo from "../components/FeaturesTwo";
 import FooterTwo from "../components/FooterTwo";
-import HeaderOne from "../components/HeaderOne";
+import HeaderOne from "../components/HomePageforStudent/HeaderOne";
 import InfoSectionOne from "../components/InfoSectionOne";
 import JoinCommunityOne from "../components/JoinCommunityOne";
 import TestimonialsTwo from "../components/TestimonialsTwo";

@@ -6,6 +6,9 @@ const ministryController = require("../controllers/ministryController");
 // ✅ Lấy danh sách lớp của giáo viên
 router.get("/teacher/:teacherId/classes", classScheduleController.getClassesByTeacher);
 
+// ✅ Lấy lịch dạy của giáo viên
+router.get("/teacher/:teacherId/schedule", classScheduleController.getTeacherSchedule);
+
 // ✅ Lấy lịch học theo lớp
 router.get("/class/:classId/schedules", classScheduleController.getSchedulesByClass);
 

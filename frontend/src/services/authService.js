@@ -1,7 +1,7 @@
 import axios from 'axios';
 const API_PORT = import.meta.env.VITE_API_PORT;
 // Tạo axios instance với base URL
-const API_BASE_URL = `http://localhost:${API_PORT}/api/auth`;
+const API_BASE_URL = `http://localhost:8080/api/auth`;
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -88,6 +88,16 @@ export const authService = {
   // Lấy token từ localStorage
   getToken: () => {
     return localStorage.getItem('token');
+  },
+
+  // Đổi mật khẩu
+  changePassword: async ({ currentPassword, newPassword }) => {
+    try {
+      const response = await api.post('/change-password', { currentPassword, newPassword });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Đổi mật khẩu thất bại' };
+    }
   },
 
   // Lưu user data vào localStorage

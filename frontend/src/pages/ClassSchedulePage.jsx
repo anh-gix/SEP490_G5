@@ -20,6 +20,8 @@ const ClassSchedulePage = () => {
       try {
         setLoading(true);
         if (classId) {
+          console.log(classId);
+          
           const response = await classScheduleService.getSchedulesByClass(classId);
           setSchedules(response);
           if (response.length > 0 && response[0].class) {
@@ -82,7 +84,7 @@ const ClassSchedulePage = () => {
     <>
       <Preloader />
       <Animation />
-      <HeaderOne />
+      
       <Breadcrumb title={"Lịch học"} />
       {loading ? (
         <div className='blog-page-section py-120'>

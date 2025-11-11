@@ -2,8 +2,8 @@
 
 // Dashboard Stats
 export const mockDashboardStats = {
-  pendingCourses: 5,
-  pendingSchedules: 2,
+  pendingCourses: 5, // Khớp với mockPendingCourses.length
+  pendingSchedules: 4, // Khớp với mockPendingSchedules.length
   approvedCourses: 12,
   rejectedCourses: 3,
 };

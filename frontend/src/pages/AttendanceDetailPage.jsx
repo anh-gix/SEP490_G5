@@ -86,7 +86,6 @@ const AttendanceDetailPage = () => {
     <>
       <Preloader />
       <Animation />
-      <HeaderOne />
       <Breadcrumb title={"Điểm danh chi tiết"} />
       {loading ? (
         <div className='blog-page-section py-120'>

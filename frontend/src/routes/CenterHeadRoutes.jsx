@@ -1,0 +1,43 @@
+import CenterHeadDashboardPage from "../pages/CenterHeadDashboardPage.jsx";
+import UserListPage from "../pages/UserListPage.jsx";
+import RoleManagementPage from "../pages/RoleManagementPage.jsx";
+import ProgramListPage from "../pages/ProgramListPage.jsx";
+import PendingCoursesPage from "../pages/PendingCoursesPage.jsx";
+import CourseDetailPage from "../pages/CourseDetailPage.jsx";
+import ClassListPage from "../pages/ClassListPage.jsx";
+import PendingSchedulesPage from "../pages/PendingSchedulesPage.jsx";
+import RoomListPage from "../pages/RoomListPage.jsx";
+import ExamListPage from "../pages/ExamListPage.jsx";
+import ReportsOverviewPage from "../pages/ReportsOverviewPage.jsx";
+
+/**
+ * CenterHeadRoutes
+ *
+ * Tất cả routes cho Center Head
+ */
+export const centerHeadRoutes = [
+  // Dashboard
+  { path: '/center-head/dashboard', element: <CenterHeadDashboardPage /> },
+
+  // I. User Management
+  { path: '/center-head/users', element: <UserListPage /> },
+  { path: '/center-head/roles', element: <RoleManagementPage /> },
+
+  // II. Program & Course Management
+  { path: '/center-head/programs', element: <ProgramListPage /> },
+  { path: '/courses/pending', element: <PendingCoursesPage /> },
+  { path: '/courses/:id/details', element: <CourseDetailPage /> },
+
+  // III. Class & Schedule Management
+  { path: '/center-head/classes', element: <ClassListPage /> },
+  { path: '/schedules/pending', element: <PendingSchedulesPage /> },
+
+  // IV. Room Management
+  { path: '/center-head/rooms', element: <RoomListPage /> },
+
+  // V. Exam Management
+  { path: '/center-head/exams', element: <ExamListPage /> },
+
+  // VI. Reports & Analytics
+  { path: '/center-head/reports', element: <ReportsOverviewPage /> },
+];

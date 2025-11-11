@@ -164,7 +164,8 @@ function App() {
         <Route exact path='/student/courses' element={<StudentCoursesPage />} />
         <Route exact path='/student/class/:classId' element={<StudentClassDetailPage />} />
         <Route exact path='/student/assignments' element={<StudentAssignmentsPage />} />
-
+ 
+ 
 
         {/* Academic management */}
         <Route exact path='/academic-dashboard' element={<AcademicDashboardPage />} />

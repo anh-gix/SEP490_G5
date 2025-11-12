@@ -3,8 +3,18 @@ const router = express.Router();
 const examController = require("../controllers/examController");
 const upload = examController.uploadMiddleware;
 
-// 🧠 Lấy danh sách bài thi
+
+
+// 🧠 Lấy danh sách bài thi (với pagination và filters)
 router.get("/", examController.getAllExams);
+
+// lấy thông tin chi tiết
+router.get("/:id", examController.getExamById);
+// publish/unpublish bài thi
+router.post("/:id/publish", examController.publishExam);
+router.post("/:id/unpublish", examController.unpublishExam);
+//danh sách bài làm
+router.get("/:id/submissions", examController.getExamSubmissions);
 
 // 🧩 Bắt đầu làm bài
 router.post("/start", examController.startExam);

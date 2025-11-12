@@ -22,10 +22,49 @@ exports.uploadMiddleware = upload;
 // ================== 1. LẤY DANH SÁCH BÀI THI ==================
 exports.getAllExams = async (req, res) => {
   try {
-    const exams = await Exam.find({ isPublished: true });
-    res.json(exams);
+    const { search = '', examType = '', level = '', isPublished } = req.query;
+
+    // Build query
+    const query = {};
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+    if (examType) {
+      query.examType = examType;
+    }
+    if (level) {
+      query.level = level;
+    }
+    if (isPublished !== undefined) {
+      query.isPublished = isPublished === 'true';
+    }
+
+    const exams = await Exam.find(query)
+      .populate('createdBy', 'username email')
+      .sort({ createdAt: -1 });
+
+    // Get statistics
+    const stats = {
+      total: await Exam.countDocuments(),
+      published: await Exam.countDocuments({ isPublished: true }),
+      draft: await Exam.countDocuments({ isPublished: false })
+    };
+
+    res.status(200).json({
+      success: true,
+      data: exams,
+      stats,
+      count: exams.length
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách bài thi',
+      error: err.message
+    });
   }
 };
 
@@ -154,5 +193,145 @@ exports.uploadSpeakingRecording = async (req, res) => {
     res.json({ message: "Speaking uploaded", fileUrl, submission });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+// ================== 6. PUBLISH EXAM ==================
+exports.publishExam = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const exam = await Exam.findById(id);
+    if (!exam) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bài thi'
+      });
+    }
+
+    if (exam.isPublished) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bài thi đã được xuất bản'
+      });
+    }
+
+    exam.isPublished = true;
+    exam.publishedAt = new Date();
+    await exam.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Xuất bản bài thi thành công',
+      data: exam
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi xuất bản bài thi',
+      error: err.message
+    });
+  }
+};
+
+// ================== 7. UNPUBLISH EXAM ==================
+exports.unpublishExam = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const exam = await Exam.findById(id);
+    if (!exam) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bài thi'
+      });
+    }
+
+    if (!exam.isPublished) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bài thi chưa được xuất bản'
+      });
+    }
+
+    exam.isPublished = false;
+    exam.unpublishedAt = new Date();
+    await exam.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Hủy xuất bản bài thi thành công',
+      data: exam
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi hủy xuất bản bài thi',
+      error: err.message
+    });
+  }
+};
+
+// ================== 8. GET EXAM BY ID WITH DETAILS ==================
+exports.getExamById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const exam = await Exam.findById(id).populate('createdBy', 'username email');
+
+    if (!exam) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bài thi'
+      });
+    }
+
+    // Get submission count
+    const submissionCount = await Submission.countDocuments({ examId: id });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...exam.toObject(),
+        submissionCount
+      }
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy thông tin bài thi',
+      error: err.message
+    });
+  }
+};
+
+// ================== 9. GET EXAM SUBMISSIONS ==================
+exports.getExamSubmissions = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const exam = await Exam.findById(id);
+    if (!exam) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bài thi'
+      });
+    }
+
+    const submissions = await Submission.find({ examId: id })
+      .populate('studentId', 'username email')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: submissions,
+      count: submissions.length
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách bài làm',
+      error: err.message
+    });
   }
 };

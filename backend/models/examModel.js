@@ -31,6 +31,8 @@ const examSchema = new mongoose.Schema(
     totalDuration: Number,
     sections: [sectionSchema],
     isPublished: { type: Boolean, default: false },
+    publishedAt: { type: Date },
+    unpublishedAt: { type: Date },
   },
   { timestamps: true }
 );

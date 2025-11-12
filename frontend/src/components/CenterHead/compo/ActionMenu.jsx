@@ -59,11 +59,11 @@ const ActionMenu = ({
         >
           {actions.map((action, index) => {
             const variantClass = {
-              danger: "text-danger-600",
-              warning: "text-warning-600",
-              primary: "text-main-600",
-              success: "text-success-600",
-            }[action.variant] || "text-neutral-900";
+              danger: "text-danger",
+              warning: "text-warning",
+              primary: "text-primary",
+              success: "text-success",
+            }[action.variant] || "text-dark";
 
             return (
               <button

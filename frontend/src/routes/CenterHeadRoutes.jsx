@@ -1,5 +1,7 @@
 import CenterHeadDashboardPage from "../pages/CenterHeadDashboardPage.jsx";
 import UserListPage from "../pages/UserListPage.jsx";
+import UserCreatePage from "../pages/UserCreatePage.jsx";
+import UserEditPage from "../pages/UserEditPage.jsx";
 import RoleManagementPage from "../pages/RoleManagementPage.jsx";
 import ProgramListPage from "../pages/ProgramListPage.jsx";
 import PendingCoursesPage from "../pages/PendingCoursesPage.jsx";
@@ -21,6 +23,8 @@ export const centerHeadRoutes = [
 
   // I. User Management
   { path: '/center-head/users', element: <UserListPage /> },
+  { path: '/center-head/users/create', element: <UserCreatePage /> },
+  { path: '/center-head/users/:id/edit', element: <UserEditPage /> },
   { path: '/center-head/roles', element: <RoleManagementPage /> },
 
   // II. Program & Course Management

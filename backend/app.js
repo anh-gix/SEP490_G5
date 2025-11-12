@@ -29,6 +29,12 @@ app.use('/api/exams', require('./routes/examRoutes'));
 app.use('/api/class-schedules', require('./routes/classScheduleRoutes'));
 app.use('/api/student-schedules', require('./routes/studentScheduleRoutes'));
 
+// Center Head Routes
+app.use('/api/center-head', require('./routes/centerHeadRoutes'));
+app.use('/api/programs', require('./routes/programRoutes'));
+app.use('/api/rooms', require('./routes/roomRoutes'));
+app.use('/api/reports', require('./routes/reportRoutes'));
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);

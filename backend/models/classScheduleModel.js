@@ -21,8 +21,13 @@ const classScheduleSchema = new Schema({
     // Lý do
     reason: { type: String, required: true }, // "Học bù do nghỉ lễ", "Dạy bù ngoài giờ"
     rejectionReason: { type: String }, // Lý do từ chối
-    
-    
+
+    // Approval tracking
+    approvedAt: { type: Date },
+    approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    rejectedAt: { type: Date },
+    rejectedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+
     status: {
         type: String,
         enum: ['draft', 'pending_approval', 'approved', 'rejected'],

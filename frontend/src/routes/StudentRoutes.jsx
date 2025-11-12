@@ -7,20 +7,28 @@ import StudentAssignmentsPage from "../pages/StudentAssignmentsPage.jsx";
 /**
  * StudentRoutes
  *
- * Tất cả routes cho Student
+ * Tất cả routes cho Học viên (Student)
  */
 export const studentRoutes = [
   // Dashboard
   { path: '/student/dashboard', element: <StudentDashboardPage /> },
 
-  // Schedule Management
+  // I. Schedule
   { path: '/student/schedule', element: <StudentSchedulePage /> },
 
-  // Course Management
+  // II. My Classes
   { path: '/student/courses', element: <StudentCoursesPage /> },
   { path: '/student/class/:classId', element: <StudentClassDetailPage /> },
 
-  // Assignments
+  // III. Assignments
   { path: '/student/assignments', element: <StudentAssignmentsPage /> },
-];
 
+  // IV. Materials (future)
+  // { path: '/student/materials', element: <StudentMaterialsPage /> },
+
+  // V. Grades (future)
+  // { path: '/student/grades', element: <StudentGradesPage /> },
+
+  // VI. Leave Request (future)
+  // { path: '/student/leave-request', element: <StudentLeaveRequestPage /> },
+];

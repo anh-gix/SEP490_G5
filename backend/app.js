@@ -12,6 +12,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Static file serving for uploads (PDF files, etc.)
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Database connection
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,

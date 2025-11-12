@@ -42,21 +42,12 @@ import TutorPage from "./pages/TutorPage.jsx";
 import TutorDetailsPage from "./pages/TutorDetailsPage.jsx";
 import HomePageFive from "./pages/HomePageFive.jsx";
 import HomePageSix from "./pages/HomePageSix.jsx";
-import ScheduleManagementPage from "./pages/ScheduleManagementPage.jsx";
-import ClassManagementPage from "./pages/ClassManagementPage.jsx";
-import AcademicDashboardPage from "./pages/AcademicDashboardPage.jsx";
-import StudentDashboardPage from "./pages/StudentDashboardPage.jsx";
-import StudentSchedulePage from "./pages/StudentSchedulePage.jsx";
-import StudentCoursesPage from "./pages/StudentCoursesPage.jsx";
-import StudentClassDetailPage from "./pages/StudentClassDetailPage.jsx";
-import StudentAssignmentsPage from "./pages/StudentAssignmentsPage.jsx";
 import { Navigate } from "react-router-dom";
-import Attendance from "./pages/Attendance.jsx";
-import ClassSchedulePage from "./pages/ClassSchedulePage.jsx";
-import AttendanceDetailPage from "./pages/AttendanceDetailPage.jsx";
 import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";
 import Profile from "./pages/Profile.jsx";
-import BulkUserUploadPage from "./pages/BulkUserUploadPage.jsx";
+import { teacherRoutes } from "./routes/TeacherRoutes.jsx";
+import { studentRoutes } from "./routes/StudentRoutes.jsx";
+import { ministryRoutes } from "./routes/MinistryRoutes.jsx";
 function App() {
   return (
     <AuthProvider>
@@ -68,11 +59,6 @@ function App() {
           {centerHeadRoutes.map((route, index) => (
             <Route key={index} path={route.path} element={route.element} />
           ))}
-          {/* Dashboard */}
-          {/* <Route path="/" element={<Dashboard />} /> */}
-
-          {/* Schedules Routes */}
-          <Route path="/bulk-users/upload" element={<BulkUserUploadPage />} />
 
           {/* Redirect unknown routes to dashboard */}
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -144,31 +130,21 @@ function App() {
           <Route exact path="/tuition-jobs" element={<TuitionJobsPage />} />
           <Route exact path="/tutor" element={<TutorPage />} />
           <Route exact path="/tutor-details" element={<TutorDetailsPage />} />
-          <Route exact path="/attendance" element={<Attendance />} /> // Route for attendance page
-          <Route
-            exact
-            path="/attendance/class/:classId"
-            element={<ClassSchedulePage />}
-          />
-          <Route
-            exact
-            path="/attendance/schedule/:scheduleId"
-            element={<AttendanceDetailPage />}
-          />
 
-{/*  Studen management */}
-        <Route exact path='/student/dashboard' element={<StudentDashboardPage />} />
-        <Route exact path='/student/schedule' element={<StudentSchedulePage />} />
-        <Route exact path='/student/courses' element={<StudentCoursesPage />} />
-        <Route exact path='/student/class/:classId' element={<StudentClassDetailPage />} />
-        <Route exact path='/student/assignments' element={<StudentAssignmentsPage />} />
+          {/* Teacher Routes */}
+          {teacherRoutes.map((route, index) => (
+            <Route key={index} path={route.path} element={route.element} />
+          ))}
 
+          {/*  Student Routes */}
+          {studentRoutes.map((route, index) => (
+          <Route key={index} path={route.path} element={route.element} />
+          ))}
 
-        {/* Academic management */}
-        <Route exact path='/academic-dashboard' element={<AcademicDashboardPage />} />
-        <Route exact path='/schedule-management' element={<ScheduleManagementPage />} />
-        <Route exact path='/class-management' element={<ClassManagementPage />} />
-
+          {/* Ministry Routes */}
+          {ministryRoutes.map((route, index) => (
+            <Route key={index} path={route.path} element={route.element} />
+          ))}
 
         </Routes>
       </BrowserRouter>

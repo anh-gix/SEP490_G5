@@ -49,6 +49,7 @@ import AttendanceDetailPage from "./pages/AttendanceDetailPage.jsx";
 import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";
 import { academicRoutes } from "./routes/AcademicRoutes.jsx";
 import { studentRoutes } from "./routes/StudentRoutes.jsx";
+import { teacherRoutes } from "./routes/TeacherRoutes.jsx";
 import Profile from "./pages/Profile.jsx";
 import BulkUserUploadPage from "./pages/BulkUserUploadPage.jsx";
 function App() {
@@ -71,6 +72,11 @@ function App() {
           {/* Student Routes */}
           {studentRoutes.map((route, index) => (
             <Route key={`student-${index}`} path={route.path} element={route.element} />
+          ))}
+
+          {/* Teacher Routes */}
+          {teacherRoutes.map((route, index) => (
+            <Route key={`teacher-${index}`} path={route.path} element={route.element} />
           ))}
 
           {/* Dashboard */}

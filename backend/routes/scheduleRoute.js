@@ -61,8 +61,16 @@ const upload = multer({
   }
 });
 
-// Routes cho schedule
+// Routes cho schedule CRUD
+router.get('/stats', scheduleController.getScheduleStats);
 router.get('/pending', scheduleController.getPendingSchedules);
+router.get('/:id', scheduleController.getScheduleById);
+router.get('/', scheduleController.getAllSchedules);
+router.post('/', scheduleController.createSchedule);
+router.put('/:id', scheduleController.updateSchedule);
+router.delete('/:id', scheduleController.deleteSchedule);
+
+// Routes cho schedule approval workflow
 router.patch('/:id/approve', scheduleController.approveSchedule);
 router.patch('/:id/reject', scheduleController.rejectSchedule);
 

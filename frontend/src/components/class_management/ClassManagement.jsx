@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Container, Card, Button, Form, Row, Col, Badge, ButtonGroup } from 'react-bootstrap';
+﻿import React, { useState, useEffect } from 'react';
+import { Container, Card, Button, Form, Row, Col, Spinner, Alert } from 'react-bootstrap';
 import ClassList from './ClassList';
 import CreateClassModal from './CreateClassModal';
 import EditClassModal from './EditClassModal';
 import ClassDetails from './ClassDetails';
+import classService from '../../services/classService';
 
 const ClassManagement = () => {
   const [classes, setClasses] = useState([]);
@@ -11,6 +12,8 @@ const ClassManagement = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
     level: '',
     status: '',
@@ -19,116 +22,79 @@ const ClassManagement = () => {
 
   const fetchClasses = async () => {
     try {
-      const response = await fetch('/api/classes?' + new URLSearchParams(filters));
-      const data = await response.json();
-      setClasses(data);
-    } catch (error) {
-      console.error('Error fetching classes:', error);
-      // Mock data
-      setClasses([
-        {
-          id: 1,
-          name: 'A1-Morning-01',
-          level: 'A1',
-          program: 'Tiếng Anh Giao tiếp',
-          band: 'Band 1',
-          status: 'active',
-          startDate: '2025-01-15',
-          endDate: '2025-04-15',
-          schedule: 'T2-4-6, 8:00-10:00',
-          teacherId: 1,
-          teacherName: 'Nguyễn Văn A',
-          roomId: 1,
-          roomName: 'Room 101',
-          totalStudents: 20,
-          maxStudents: 25,
-          currentLesson: 5,
-          totalLessons: 30,
-          completionRate: 16.67
-        },
-        {
-          id: 2,
-          name: 'A2-Evening-01',
-          level: 'A2',
-          program: 'Tiếng Anh Giao tiếp',
-          band: 'Band 2',
-          status: 'active',
-          startDate: '2025-02-01',
-          endDate: '2025-05-01',
-          schedule: 'T3-5-7, 18:00-20:00',
-          teacherId: 2,
-          teacherName: 'Trần Thị B',
-          roomId: 2,
-          roomName: 'Room 102',
-          totalStudents: 18,
-          maxStudents: 25,
-          currentLesson: 8,
-          totalLessons: 30,
-          completionRate: 26.67
-        },
-        {
-          id: 3,
-          name: 'B1-Weekend-01',
-          level: 'B1',
-          program: 'Tiếng Anh Giao tiếp',
-          band: 'Band 3',
-          status: 'pending',
-          startDate: '2025-11-01',
-          endDate: '2026-02-01',
-          schedule: 'T7-CN, 9:00-12:00',
-          teacherId: 3,
-          teacherName: 'Lê Văn C',
-          roomId: 3,
-          roomName: 'Room 201',
-          totalStudents: 15,
-          maxStudents: 20,
-          currentLesson: 0,
-          totalLessons: 40,
-          completionRate: 0
-        }
-      ]);
+      setLoading(true);
+      setError(null);
+      
+      const params = {};
+      if (filters.level) params.level = filters.level;
+      if (filters.status) params.status = filters.status;
+      if (filters.search) params.search = filters.search;
+      
+      const response = await classService.getAllClasses(params);
+      
+      const transformedClasses = response.classes.map(cls => ({
+        id: cls._id,
+        name: cls.name,
+        level: cls.level || 'N/A',
+        program: cls.courseName || cls.course?.name || 'N/A',
+        band: cls.course?.level || cls.level,
+        status: cls.status,
+        startDate: cls.startDate ? new Date(cls.startDate).toISOString().split('T')[0] : 'N/A',
+        endDate: cls.endDate ? new Date(cls.endDate).toISOString().split('T')[0] : 'N/A',
+        schedule: 'N/A',
+        teacherId: cls.teacher?._id || cls.teacherId || null,
+        // use flattened teacherName from backend if present, otherwise fallback to username
+        teacherName: cls.teacherName || cls.teacher?.username || 'N/A',
+        roomId: null,
+        roomName: 'N/A',
+        totalStudents: cls.totalStudents || cls.students?.length || 0,
+        maxStudents: cls.maxStudents || 25,
+        currentLesson: cls.totalSchedules || 0,
+        totalLessons: cls.totalSchedules || 0,
+        completionRate: typeof cls.completionRate !== 'undefined' ? cls.completionRate : (cls.stats?.completionRate || 0)
+      }));
+      
+      setClasses(transformedClasses);
+    } catch (err) {
+      console.error('Error fetching classes:', err);
+      setError(err.message || 'Không thể tải danh sách lớp học');
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchClasses();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   const handleCreateClass = async (classData) => {
     try {
-      const response = await fetch('/api/classes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(classData)
-      });
-      const newClass = await response.json();
-      setClasses([...classes, newClass]);
+      setLoading(true);
+      await classService.createClass(classData);
       setShowCreateModal(false);
       alert('Tạo lớp học thành công!');
-      fetchClasses();
-    } catch (error) {
-      console.error('Error creating class:', error);
-      alert('Có lỗi xảy ra khi tạo lớp học!');
+      await fetchClasses();
+    } catch (err) {
+      console.error('Error creating class:', err);
+      alert(err.message || 'Có lỗi xảy ra khi tạo lớp học!');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleEditClass = async (classData) => {
     try {
-      const response = await fetch(`/api/classes/${classData.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(classData)
-      });
-      const updatedClass = await response.json();
-      setClasses(classes.map(c => c.id === updatedClass.id ? updatedClass : c));
+      setLoading(true);
+      await classService.updateClass(classData.id, classData);
       setShowEditModal(false);
       setSelectedClass(null);
       alert('Cập nhật lớp học thành công!');
-      fetchClasses();
-    } catch (error) {
-      console.error('Error updating class:', error);
-      alert('Có lỗi xảy ra khi cập nhật lớp học!');
+      await fetchClasses();
+    } catch (err) {
+      console.error('Error updating class:', err);
+      alert(err.message || 'Có lỗi xảy ra khi cập nhật lớp học!');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -136,12 +102,15 @@ const ClassManagement = () => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa lớp học này?')) return;
     
     try {
-      await fetch(`/api/classes/${classId}`, { method: 'DELETE' });
-      setClasses(classes.filter(c => c.id !== classId));
+      setLoading(true);
+      await classService.deleteClass(classId);
       alert('Xóa lớp học thành công!');
-    } catch (error) {
-      console.error('Error deleting class:', error);
-      alert('Có lỗi xảy ra khi xóa lớp học!');
+      await fetchClasses();
+    } catch (err) {
+      console.error('Error deleting class:', err);
+      alert(err.message || 'Có lỗi xảy ra khi xóa lớp học!');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -165,7 +134,20 @@ const ClassManagement = () => {
 
   return (
     <Container fluid className="py-24 px-24">
-      {/* Header */}
+      {loading && (
+        <div className="text-center py-5">
+          <Spinner animation="border" variant="primary" />
+          <p className="mt-3 text-neutral-500">Đang tải dữ liệu...</p>
+        </div>
+      )}
+
+      {error && (
+        <Alert variant="danger" dismissible onClose={() => setError(null)} className="mb-24">
+          <Alert.Heading>Lỗi!</Alert.Heading>
+          <p>{error}</p>
+        </Alert>
+      )}
+
       <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
         <Card.Body className="p-24">
           <Row className="align-items-center">
@@ -186,7 +168,6 @@ const ClassManagement = () => {
         </Card.Body>
       </Card>
 
-      {/* Filters */}
       <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
         <Card.Body className="p-24">
           <Row className="g-3 align-items-end">
@@ -219,8 +200,7 @@ const ClassManagement = () => {
                   <option value="B1">B1</option>
                   <option value="B2">B2</option>
                   <option value="C1">C1</option>
-                  <option value="TOEIC">TOEIC</option>
-                  <option value="IELTS">IELTS</option>
+                  <option value="C2">C2</option>
                 </Form.Select>
               </Form.Group>
             </Col>
@@ -256,7 +236,6 @@ const ClassManagement = () => {
         </Card.Body>
       </Card>
 
-      {/* Stats */}
       <Row className="g-3 mb-24">
         <Col md={6} lg={3}>
           <Card className="bg-white border border-main-200 rounded-12 box-shadow-sm transition-2 item-hover">
@@ -325,7 +304,6 @@ const ClassManagement = () => {
         </Col>
       </Row>
 
-      {/* Class List */}
       <ClassList
         classes={classes}
         onEdit={(classItem) => {
@@ -336,7 +314,6 @@ const ClassManagement = () => {
         onViewDetails={handleViewDetails}
       />
 
-      {/* Modals */}
       {showCreateModal && (
         <CreateClassModal
           onClose={() => setShowCreateModal(false)}

@@ -14,6 +14,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Database connection
 mongoose.connect(process.env.MONGODB_URI, {
+  dbName: process.env.DB_NAME,
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
@@ -28,6 +29,18 @@ app.use('/api/v1', router); // Use the centralized router
 app.use('/api/exams', require('./routes/examRoutes'));
 app.use('/api/class-schedules', require('./routes/classScheduleRoutes'));
 app.use('/api/student-schedules', require('./routes/studentScheduleRoutes'));
+
+// Academic Staff Routes
+app.use('/api/rooms', require('./routes/roomRoutes'));
+app.use('/api/teachers', require('./routes/teacherRoutes'));
+app.use('/api/reports', require('./routes/reportRoutes'));
+
+// Class Routes
+app.use('/api/classes', require('./routes/classRoutes'));
+
+// Schedule Routes
+app.use('/api/schedules', require('./routes/scheduleRoute'));
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {

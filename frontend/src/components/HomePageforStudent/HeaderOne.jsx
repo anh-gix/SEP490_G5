@@ -114,6 +114,7 @@ const HeaderOne = () => {
         { to: "/blog-details", label: "Blog Details" },
       ],
     },
+    { to: "/exams", label: "Đề thi IELTS" },
     { to: "/contact", label: "Contact" },
   ];
 

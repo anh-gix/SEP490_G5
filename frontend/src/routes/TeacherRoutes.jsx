@@ -1,3 +1,6 @@
+import Attendance from "../pages/Attendance.jsx";
+import ClassSchedulePage from "../pages/ClassSchedulePage.jsx";
+import AttendanceDetailPage from "../pages/AttendanceDetailPage.jsx";
 import TeacherDashboardPage from "../pages/TeacherDashboardPage.jsx";
 import TeacherSchedulePage from "../pages/TeacherSchedulePage.jsx";
 import TeacherClassesPage from "../pages/TeacherClassesPage.jsx";
@@ -9,10 +12,23 @@ import TeacherClassDetailPage from "../pages/TeacherClassDetailPage.jsx";
 /**
  * TeacherRoutes
  *
- * Tất cả routes cho Giảng viên (Teacher)
+ * Tất cả routes cho Teacher
  */
+// export const teacherRoutes = [
+//   // Attendance Management
+//   { path: '/attendance', element: <Attendance /> },
+//   { path: '/attendance/class/:classId', element: <ClassSchedulePage /> },
+//   { path: '/attendance/schedule/:scheduleId', element: <AttendanceDetailPage /> },
+// ];
+
+//  * Tất cả routes cho Giảng viên (Teacher)
+//  */
 export const teacherRoutes = [
+  { path: '/attendance', element: <Attendance /> },
+     { path: '/attendance/class/:classId', element: <ClassSchedulePage /> },
+     { path: '/attendance/schedule/:scheduleId', element: <AttendanceDetailPage /> },
   // Dashboard
+  
   { path: '/teacher/dashboard', element: <TeacherDashboardPage /> },
 
   // I. Schedule

@@ -3,6 +3,10 @@ import StudentSchedulePage from "../pages/StudentSchedulePage.jsx";
 import StudentCoursesPage from "../pages/StudentCoursesPage.jsx";
 import StudentClassDetailPage from "../pages/StudentClassDetailPage.jsx";
 import StudentAssignmentsPage from "../pages/StudentAssignmentsPage.jsx";
+import ToeicPractice from "../components/student_components/ToeicPractice.jsx";
+import ToeicTestTaking from "../components/student_components/ToeicTestTaking.jsx";
+import ToeicTestResult from "../components/student_components/ToeicTestResult.jsx";
+import ToeicTestHistory from "../components/student_components/ToeicTestHistory.jsx";
 
 /**
  * StudentRoutes
@@ -23,12 +27,18 @@ export const studentRoutes = [
   // III. Assignments
   { path: '/student/assignments', element: <StudentAssignmentsPage /> },
 
-  // IV. Materials (future)
+  // IV. TOEIC Practice
+  { path: '/student/toeic', element: <ToeicPractice /> },
+  { path: '/student/toeic/test/:testId', element: <ToeicTestTaking /> },
+  { path: '/student/toeic/result/:testId', element: <ToeicTestResult /> },
+  { path: '/student/toeic/history', element: <ToeicTestHistory /> },
+
+  // V. Materials (future)
   // { path: '/student/materials', element: <StudentMaterialsPage /> },
 
-  // V. Grades (future)
+  // VI. Grades (future)
   // { path: '/student/grades', element: <StudentGradesPage /> },
 
-  // VI. Leave Request (future)
+  // VII. Leave Request (future)
   // { path: '/student/leave-request', element: <StudentLeaveRequestPage /> },
 ];

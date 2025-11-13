@@ -14727,3 +14727,88 @@ table.dataTable.display > tbody > tr > * {
     display: block !important;
   }
 }
+
+/* Custom TOEIC Filter Button Styles */
+.filter-btn-all {
+  background-color: #fff !important;
+  color: #487FFF !important;
+  border: 1px solid #487FFF !important;
+}
+
+.filter-btn-all:hover {
+  background-color: #487FFF !important;
+  color: #fff !important;
+}
+
+.filter-btn-full {
+  background-color: #fff !important;
+  color: #8B5CF6 !important;
+  border: 1px solid #8B5CF6 !important;
+}
+
+.filter-btn-full:hover,
+.filter-btn-full.active {
+  background-color: #8B5CF6 !important;
+  color: #fff !important;
+}
+
+.filter-btn-listening {
+  background-color: #fff !important;
+  color: #3B82F6 !important;
+  border: 1px solid #3B82F6 !important;
+}
+
+.filter-btn-listening:hover,
+.filter-btn-listening.active {
+  background-color: #3B82F6 !important;
+  color: #fff !important;
+}
+
+.filter-btn-reading {
+  background-color: #fff !important;
+  color: #F59E0B !important;
+  border: 1px solid #F59E0B !important;
+}
+
+.filter-btn-reading:hover,
+.filter-btn-reading.active {
+  background-color: #F59E0B !important;
+  color: #fff !important;
+}
+
+.filter-btn-secondary {
+  background-color: #fff !important;
+  color: #6C757D !important;
+  border: 1px solid #6C757D !important;
+}
+
+.filter-btn-secondary:hover,
+.filter-btn-secondary.active {
+  background-color: #6C757D !important;
+  color: #fff !important;
+}
+
+.filter-btn-success {
+  background-color: #fff !important;
+  color: #10B981 !important;
+  border: 1px solid #10B981 !important;
+}
+
+.filter-btn-success:hover,
+.filter-btn-success.active {
+  background-color: #10B981 !important;
+  color: #fff !important;
+}
+
+.filter-btn-primary {
+  background-color: #fff !important;
+  color: #487FFF !important;
+  border: 1px solid #487FFF !important;
+}
+
+.filter-btn-primary:hover,
+.filter-btn-primary.active {
+  background-color: #487FFF !important;
+  color: #fff !important;
+}
+

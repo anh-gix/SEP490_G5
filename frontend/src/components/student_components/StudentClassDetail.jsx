@@ -163,7 +163,7 @@ const StudentClassDetail = () => {
     <Row className="g-3">
       <Col lg={8}>
         {/* Class Description */}
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+        <Card className="bg-white border-0 rounded-12 mb- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}24">
           <Card.Header className="border-0 p-20" style={{ background: 'linear-gradient(135deg, #F0F7FF 0%, #E6F2FF 100%)' }}>
             <h5 className="text-neutral-900 fw-semibold mb-0">Giới thiệu khóa học</h5>
           </Card.Header>
@@ -180,7 +180,7 @@ const StudentClassDetail = () => {
         </Card>
 
         {/* Schedule Info */}
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+        <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
           <Card.Header className="border-0 p-20" style={{ background: 'linear-gradient(135deg, #F0F7FF 0%, #E6F2FF 100%)' }}>
             <h5 className="text-neutral-900 fw-semibold mb-0">Thông tin lịch học</h5>
           </Card.Header>
@@ -245,7 +245,7 @@ const StudentClassDetail = () => {
 
       <Col lg={4}>
         {/* Teacher Info */}
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+        <Card className="bg-white border-0 rounded-12 mb- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}24">
           <Card.Header className="border-0 p-20" style={{ background: 'linear-gradient(135deg, #F0F7FF 0%, #E6F2FF 100%)' }}>
             <h5 className="text-neutral-900 fw-semibold mb-0">Giảng viên</h5>
           </Card.Header>
@@ -275,7 +275,7 @@ const StudentClassDetail = () => {
         </Card>
 
         {/* Quick Stats */}
-        <Card className="bg-gradient border-0 rounded-12 box-shadow-sm text-white"
+        <Card className="bg-gradient border-0 rounded-12 text-white style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}"
               style={{ background: 'linear-gradient(135deg, var(--main-600) 0%, var(--main-700) 100%)' }}>
           <Card.Body className="p-20">
             <h6 className="text-white fw-semibold mb-16">Thống kê nhanh</h6>
@@ -300,7 +300,7 @@ const StudentClassDetail = () => {
   );
 
   const renderMaterials = () => (
-    <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+    <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
       <Card.Header className="bg-main-25 border-0 p-20">
         <div className="d-flex justify-content-between align-items-center">
           <h5 className="text-neutral-900 fw-semibold mb-0">Tài liệu học tập</h5>
@@ -359,7 +359,7 @@ const StudentClassDetail = () => {
   const renderHomework = () => (
     <div className="d-flex flex-column gap-3">
       {homework.map(hw => (
-        <Card key={hw.id} className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+        <Card key={hw.id} className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
           <Card.Body className="p-20">
             <Row className="align-items-start">
               <Col md={8}>
@@ -429,7 +429,7 @@ const StudentClassDetail = () => {
     <Row className="g-3">
       <Col lg={6}>
         {/* Attendance Stats */}
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+        <Card className="bg-white border-0 rounded-12 mb- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}24">
           <Card.Header className="border-0 p-20" style={{ background: 'linear-gradient(135deg, #F0F7FF 0%, #E6F2FF 100%)' }}>
             <h5 className="text-neutral-900 fw-semibold mb-0">Thống kê chuyên cần</h5>
           </Card.Header>
@@ -462,7 +462,7 @@ const StudentClassDetail = () => {
         </Card>
 
         {/* Grade History */}
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+        <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
           <Card.Header className="border-0 p-20" style={{ background: 'linear-gradient(135deg, #F0F7FF 0%, #E6F2FF 100%)' }}>
             <h5 className="text-neutral-900 fw-semibold mb-0">Lịch sử điểm</h5>
           </Card.Header>
@@ -499,7 +499,7 @@ const StudentClassDetail = () => {
 
       <Col lg={6}>
         {/* Average Score */}
-        <Card className="bg-gradient border-0 rounded-12 box-shadow-sm text-white mb-24"
+        <Card className="bg-gradient border-0 rounded-12 text-white style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }} mb-24"
               style={{ background: 'linear-gradient(135deg, var(--warning-600) 0%, var(--warning-700) 100%)' }}>
           <Card.Body className="p-24 text-center">
             <div className="text-white text-48 fw-bold mb-8">{progress?.averageScore}</div>
@@ -508,7 +508,7 @@ const StudentClassDetail = () => {
         </Card>
 
         {/* CLO Achievement */}
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+        <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
           <Card.Header className="border-0 p-20" style={{ background: 'linear-gradient(135deg, #F0F7FF 0%, #E6F2FF 100%)' }}>
             <h5 className="text-neutral-900 fw-semibold mb-0">Đạt chuẩn đầu ra (CLO)</h5>
           </Card.Header>
@@ -566,7 +566,7 @@ const StudentClassDetail = () => {
       </nav>
 
       {/* Header */}
-      <Card className="bg-gradient border-0 rounded-12 box-shadow-sm mb-24"
+      <Card className="bg-gradient border-0 rounded-12 mb- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}24"
             style={{ background: 'linear-gradient(135deg, #0D74FF 0%, #0A5FD9 100%)' }}>
         <Card.Body className="p-24">
           <Row className="align-items-center">
@@ -595,7 +595,7 @@ const StudentClassDetail = () => {
 
       {/* Tabs */}
       <Tab.Container activeKey={activeTab} onSelect={(k) => setActiveTab(k)}>
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+        <Card className="bg-white border-0 rounded-12 mb- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}24">
           <Card.Header className="bg-white border-0 p-0">
             <Nav variant="tabs" className="border-0 px-20 pt-20">
               <Nav.Item>

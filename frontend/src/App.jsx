@@ -42,16 +42,19 @@ import TutorPage from "./pages/TutorPage.jsx";
 import TutorDetailsPage from "./pages/TutorDetailsPage.jsx";
 import HomePageFive from "./pages/HomePageFive.jsx";
 import HomePageSix from "./pages/HomePageSix.jsx";
+
+import StudentExamListPage from "./pages/StudentExamListPage.jsx";
+import ExamDetailPage from "./pages/ExamDetailPage.jsx";
+import ReadingExamPage from "./pages/ReadingExamPage.jsx";
+import ReadingResultPage from "./pages/ReadingResultPage.jsx";
+
 import { Navigate } from "react-router-dom";
-import Attendance from "./pages/Attendance.jsx";
-import ClassSchedulePage from "./pages/ClassSchedulePage.jsx";
-import AttendanceDetailPage from "./pages/AttendanceDetailPage.jsx";
 import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";
 import { academicRoutes } from "./routes/AcademicRoutes.jsx";
-import { studentRoutes } from "./routes/StudentRoutes.jsx";
-import { teacherRoutes } from "./routes/TeacherRoutes.jsx";
 import Profile from "./pages/Profile.jsx";
-import BulkUserUploadPage from "./pages/BulkUserUploadPage.jsx";
+import { teacherRoutes } from "./routes/TeacherRoutes.jsx";
+import { studentRoutes } from "./routes/StudentRoutes.jsx";
+import { ministryRoutes } from "./routes/MinistryRoutes.jsx";
 function App() {
   return (
     <AuthProvider>
@@ -78,12 +81,15 @@ function App() {
           {teacherRoutes.map((route, index) => (
             <Route key={`teacher-${index}`} path={route.path} element={route.element} />
           ))}
+          {/* Ministry Routes */}
+          {ministryRoutes.map((route, index) => (
+            <Route key={`ministry-${index}`} path={route.path} element={route.element} />
+          ))}
 
           {/* Dashboard */}
           {/* <Route path="/" element={<Dashboard />} /> */}
 
-          {/* Schedules Routes */}
-          <Route path="/bulk-users/upload" element={<BulkUserUploadPage />} />
+
 
           {/* Redirect unknown routes to dashboard */}
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -155,16 +161,19 @@ function App() {
           <Route exact path="/tuition-jobs" element={<TuitionJobsPage />} />
           <Route exact path="/tutor" element={<TutorPage />} />
           <Route exact path="/tutor-details" element={<TutorDetailsPage />} />
-          <Route exact path="/attendance" element={<Attendance />} /> // Route for attendance page
+
+          {/* Exam Routes */}
+          <Route exact path="/exams" element={<StudentExamListPage />} />
+          <Route exact path="/exams/:id" element={<ExamDetailPage />} />
           <Route
             exact
-            path="/attendance/class/:classId"
-            element={<ClassSchedulePage />}
+            path="/exams/:examId/submissions/:submissionId/reading"
+            element={<ReadingExamPage />}
           />
           <Route
             exact
-            path="/attendance/schedule/:scheduleId"
-            element={<AttendanceDetailPage />}
+            path="/exams/:examId/submissions/:submissionId/reading/result"
+            element={<ReadingResultPage />}
           />
 
         </Routes>

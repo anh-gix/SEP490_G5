@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import { Container, Row, Col, Card, Button, Form, Table, Alert, Spinner, Badge, Modal } from 'react-bootstrap';
 import bulkUserService from '../services/bulkUserService';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 const BulkUserUploadPage = () => {
   const [file, setFile] = useState(null);
@@ -23,7 +25,7 @@ const BulkUserUploadPage = () => {
     const fetchRoles = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get('http://localhost:8080/api/roles', {
+        const response = await axios.get('http://localhost:9999/api/roles', {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -136,6 +138,7 @@ const BulkUserUploadPage = () => {
       success: previewUsers.length,
       failed: 0,
       total: previewUsers.length,
+      roleId: selectedRoleId, // Lưu roleId để hiển thị
       results: {
         success: previewUsers,
         failed: []
@@ -159,9 +162,11 @@ const BulkUserUploadPage = () => {
       
       // Cập nhật kết quả (đã lưu DB)
       // Lưu lại password từ preview để hiển thị (vì đây là lần cuối có thể xem)
+      const savedRoleId = previewData.roleId;
       setSaveResults({
         ...response,
         isPreview: false, // Đã lưu DB
+        roleId: savedRoleId, // Lưu roleId để hiển thị
         // Giữ lại password từ preview cho lần hiển thị cuối cùng
         previewPasswords: previewData.users.reduce((acc, user) => {
           acc[user.email] = user.password;
@@ -181,17 +186,122 @@ const BulkUserUploadPage = () => {
     }
   };
 
+  /**
+   * Hàm reset toàn bộ state về trạng thái ban đầu khi người dùng muốn xóa file và bắt đầu lại
+   * 
+   * Chức năng:
+   * 1. Xóa file đã chọn (setFile(null))
+   * 2. Xóa danh sách users đã parse (setUsers([]))
+   * 3. Xóa danh sách lỗi (setErrors([]))
+   * 4. Xóa danh sách trùng lặp (setDuplicates([]))
+   * 5. Xóa kết quả lưu/preview (setSaveResults(null))
+   * 6. Xóa dữ liệu preview (setPreviewData(null))
+   * 7. Reset role đã chọn (setSelectedRoleId(''))
+   * 8. Đóng modal xác nhận nếu đang mở (setShowConfirmModal(false))
+   * 9. Reset giá trị của input file về rỗng để có thể chọn lại file cùng tên
+   * 
+   * Lưu ý: Hàm này được gọi khi:
+   * - Người dùng click icon X trong badge tên file (dòng 394)
+   */
   const handleReset = () => {
+    // 1. Xóa file đã chọn
     setFile(null);
+    
+    // 2. Xóa danh sách users đã parse từ file Excel
     setUsers([]);
+    
+    // 3. Xóa danh sách lỗi validation (nếu có)
     setErrors([]);
+    
+    // 4. Xóa danh sách email/username trùng lặp (nếu có)
     setDuplicates([]);
+    
+    // 5. Xóa kết quả preview hoặc kết quả sau khi lưu vào DB
     setSaveResults(null);
+    
+    // 6. Xóa dữ liệu preview (chứa password đã generate)
     setPreviewData(null);
+    
+    // 7. Reset role đã chọn về trạng thái ban đầu
     setSelectedRoleId('');
+    
+    // 8. Đóng modal xác nhận thêm vào hệ thống (nếu đang mở)
     setShowConfirmModal(false);
+    
+    // 9. Reset giá trị của input file về rỗng
+    // Điều này quan trọng vì nếu không reset, khi chọn lại file cùng tên,
+    // event onChange sẽ không được trigger (trình duyệt nghĩ rằng file không thay đổi)
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  // Hàm export dữ liệu ra file Excel
+  const handleExportExcel = () => {
+    if (!saveResults || !saveResults.results?.success || saveResults.results.success.length === 0) {
+      alert('Không có dữ liệu để xuất');
+      return;
+    }
+
+    try {
+      // Lấy roleId và roleName
+      const roleId = saveResults.roleId || previewData?.roleId || selectedRoleId;
+      const roleName = roles.find(r => r._id === roleId)?.name || roles.find(r => r._id === roleId)?.roleName || roleId || 'N/A';
+
+      // Chuẩn bị dữ liệu để export
+      const exportData = saveResults.results.success.map((user, index) => {
+        // Lấy password
+        const password = saveResults.isPreview 
+          ? user.password 
+          : (saveResults.previewPasswords?.[user.email] || user.password || 'Đã lưu (không thể xem lại)');
+
+        return {
+          'STT': index + 1,
+          'Email': user.email || '',
+          'Username': user.username || '',
+          'Role': roleName,
+          'Password': password,
+          'Phone': user.phone || '',
+          'Address': user.address || ''
+        };
+      });
+
+      // Tạo workbook và worksheet
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Danh sách tài khoản');
+
+      // Điều chỉnh độ rộng cột
+      const colWidths = [
+        { wch: 5 },  // STT
+        { wch: 30 }, // Email
+        { wch: 20 }, // Username
+        { wch: 15 }, // Role
+        { wch: 15 }, // Password
+        { wch: 15 }, // Phone
+        { wch: 40 }  // Address
+      ];
+      ws['!cols'] = colWidths;
+
+      // Tạo tên file với timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const fileName = `Danh_sach_tai_khoan_${timestamp}.xlsx`;
+
+      // Xuất file
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      saveAs(blob, fileName);
+
+      // Thông báo thành công
+      const message = saveResults.isPreview 
+        ? `Đã xuất thành công ${exportData.length} tài khoản (Preview) ra file Excel!\nVui lòng lưu file này trước khi thêm vào hệ thống.`
+        : `Đã xuất thành công ${exportData.length} tài khoản ra file Excel!`;
+      alert(message);
+    } catch (error) {
+      console.error('Error exporting Excel:', error);
+      alert('Có lỗi xảy ra khi xuất file Excel: ' + error.message);
     }
   };
 
@@ -228,9 +338,6 @@ const BulkUserUploadPage = () => {
                   onChange={handleFileChange}
                   ref={fileInputRef}
                 />
-                <Form.Text className="text-danger">
-                  File Excel phải có các cột: email, username, phone, address
-                </Form.Text>
               </Form.Group>
             </Col>
             <Col md={4} className="d-flex align-items-end">
@@ -255,21 +362,56 @@ const BulkUserUploadPage = () => {
             </Col>
           </Row>
 
+          {/* 
+            Hiển thị badge tên file với icon X để xóa file khi có file được chọn
+            - Badge hiển thị tên file đã chọn với icon Excel
+            - Icon X bên trong badge (màu trắng, có thể click) cho phép người dùng xóa file và reset toàn bộ state
+            - Khi click vào icon X, hàm handleReset() sẽ được gọi để:
+              + Xóa file khỏi state
+              + Xóa tất cả dữ liệu đã parse (users, errors, duplicates)
+              + Xóa kết quả preview/save
+              + Reset role đã chọn
+              + Clear input file để có thể chọn lại file
+          */}
           {file && (
-            <div className="mt-16 d-flex align-items-center gap-12">
-              <Badge bg="info" className="d-inline-flex align-items-center px-12 py-6">
-                <i className="fas fa-file-excel me-1"></i>
-                {file.name}
-              </Badge>
-              <Button 
-                variant="danger" 
-                size="sm" 
-                onClick={handleReset}
-                className="d-inline-flex align-items-center"
+            <div className="mt-16">
+              {/* Badge hiển thị tên file với icon X để xóa */}
+              <Badge 
+                bg="info" 
+                className="d-inline-flex align-items-center px-12 py-6"
+                style={{ fontSize: '14px', cursor: 'default' }}
               >
-                <i className="fas fa-times me-1"></i>
-                Xóa file
-              </Button>
+                <i className="fas fa-file-excel me-2"></i>
+                <span className="me-2" style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {file.name}
+                </span>
+                {/* Icon X có thể click để xóa file */}
+                <span
+                  onClick={handleReset}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.transform = 'scale(1.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                  style={{ 
+                    cursor: 'pointer',
+                    marginLeft: '8px',
+                    padding: '2px 4px',
+                    borderRadius: '4px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s ease',
+                    lineHeight: '1'
+                  }}
+                  title="Xóa file"
+                >
+                  <i className="fas fa-times" style={{ fontSize: '12px' }}></i>
+                </span>
+              </Badge>
             </div>
           )}
         </Card.Body>
@@ -366,10 +508,6 @@ const BulkUserUploadPage = () => {
             </div>
 
             <div className="d-flex justify-content-end gap-12 mt-16">
-              <Button variant="outline-secondary" onClick={handleReset}>
-                <i className="fas fa-redo me-2"></i>
-                Reset
-              </Button>
               <Button
                 variant="success"
                 onClick={handleSave}
@@ -407,9 +545,7 @@ const BulkUserUploadPage = () => {
                 </strong>
                 <ul className="mb-0 mt-8">
                   <li>Đây là preview của các tài khoản sẽ được tạo</li>
-                  <li>Password được generate tự động và chỉ hiển thị một lần</li>
-                  <li>Vui lòng lưu lại thông tin password trước khi thêm vào hệ thống</li>
-                  <li>Sau khi thêm vào hệ thống, bạn sẽ không thể xem lại password</li>
+                  <li><strong>Vui lòng bấm nút "Xuất Excel" để tải file chứa thông tin các tài khoản </strong></li>
                 </ul>
               </Alert>
             )}
@@ -426,17 +562,29 @@ const BulkUserUploadPage = () => {
 
             {saveResults.results?.success && saveResults.results.success.length > 0 && (
               <div className="mb-16">
-                <h6 className="mb-8">
-                  {saveResults.isPreview 
-                    ? 'Tài khoản sẽ được tạo (Preview):' 
-                    : 'Tài khoản đã tạo thành công:'}
-                </h6>
+                <div className="d-flex justify-content-between align-items-center mb-8">
+                  <h6 className="mb-0">
+                    {saveResults.isPreview 
+                      ? 'Tài khoản sẽ được tạo (Preview):' 
+                      : 'Tài khoản đã tạo thành công:'}
+                  </h6>
+                  <Button
+                    variant="success"
+                    size="sm"
+                    onClick={handleExportExcel}
+                    className="d-inline-flex align-items-center"
+                  >
+                    <i className="fas fa-file-excel me-2"></i>
+                    Xuất Excel ({saveResults.results.success.length} tài khoản)
+                  </Button>
+                </div>
                 <div className="table-responsive">
                   <Table striped bordered hover size="sm">
                     <thead>
                       <tr>
                         <th>Email</th>
                         <th>Username</th>
+                        <th>Role</th>
                         <th>Password</th>
                       </tr>
                     </thead>
@@ -448,10 +596,19 @@ const BulkUserUploadPage = () => {
                           ? user.password 
                           : (saveResults.previewPasswords?.[user.email] || user.password || 'Đã lưu (không thể xem lại)');
                         
+                        // Lấy roleId từ saveResults, previewData, hoặc selectedRoleId
+                        const roleId = saveResults.roleId || previewData?.roleId || selectedRoleId || user.roleId;
+                        
+                        // Tìm tên role từ mảng roles
+                        const roleName = roles.find(r => r._id === roleId)?.name || roles.find(r => r._id === roleId)?.roleName || roleId || 'N/A';
+                        
                         return (
                           <tr key={index}>
                             <td>{user.email}</td>
                             <td>{user.username}</td>
+                            <td>
+                              <Badge bg="info">{roleName}</Badge>
+                            </td>
                             <td className="fw-bold text-success">
                               {saveResults.isPreview ? password : (password.includes('không thể xem lại') ? (
                                 <span className="text-muted">{password}</span>
@@ -463,12 +620,7 @@ const BulkUserUploadPage = () => {
                     </tbody>
                   </Table>
                 </div>
-                {!saveResults.isPreview && (
-                  <Alert variant="info" className="mt-12 mb-0">
-                    <i className="fas fa-info-circle me-2"></i>
-                    <strong>Lưu ý:</strong> Password chỉ hiển thị một lần. Vui lòng lưu lại thông tin trước khi đóng trang này.
-                  </Alert>
-                )}
+             
               </div>
             )}
 
@@ -564,7 +716,7 @@ const BulkUserUploadPage = () => {
           <Alert variant="info" className="mb-0">
             <p className="mb-0">
               <i className="fas fa-check-circle me-2"></i>
-              Bạn đã lưu lại tất cả thông tin tài khoản và mật khẩu chưa?
+              Bạn đã lưu lại tất cả thông tin tài khoản vừa tạo chưa?
             </p>
           </Alert>
         </Modal.Body>

@@ -42,11 +42,15 @@ import TutorPage from "./pages/TutorPage.jsx";
 import TutorDetailsPage from "./pages/TutorDetailsPage.jsx";
 import HomePageFive from "./pages/HomePageFive.jsx";
 import HomePageSix from "./pages/HomePageSix.jsx";
+
+import StudentExamListPage from "./pages/StudentExamListPage.jsx";
+import ExamDetailPage from "./pages/ExamDetailPage.jsx";
+import ReadingExamPage from "./pages/ReadingExamPage.jsx";
+import ReadingResultPage from "./pages/ReadingResultPage.jsx";
+
 import { Navigate } from "react-router-dom";
 import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";
 import { academicRoutes } from "./routes/AcademicRoutes.jsx";
-import { studentRoutes } from "./routes/StudentRoutes.jsx";
-import { teacherRoutes } from "./routes/TeacherRoutes.jsx";
 import Profile from "./pages/Profile.jsx";
 import { teacherRoutes } from "./routes/TeacherRoutes.jsx";
 import { studentRoutes } from "./routes/StudentRoutes.jsx";
@@ -77,12 +81,15 @@ function App() {
           {teacherRoutes.map((route, index) => (
             <Route key={`teacher-${index}`} path={route.path} element={route.element} />
           ))}
+          {/* Ministry Routes */}
+          {ministryRoutes.map((route, index) => (
+            <Route key={`ministry-${index}`} path={route.path} element={route.element} />
+          ))}
 
           {/* Dashboard */}
           {/* <Route path="/" element={<Dashboard />} /> */}
 
-          {/* Schedules Routes */}
-          <Route path="/bulk-users/upload" element={<BulkUserUploadPage />} />
+
 
           {/* Redirect unknown routes to dashboard */}
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -154,6 +161,20 @@ function App() {
           <Route exact path="/tuition-jobs" element={<TuitionJobsPage />} />
           <Route exact path="/tutor" element={<TutorPage />} />
           <Route exact path="/tutor-details" element={<TutorDetailsPage />} />
+
+          {/* Exam Routes */}
+          <Route exact path="/exams" element={<StudentExamListPage />} />
+          <Route exact path="/exams/:id" element={<ExamDetailPage />} />
+          <Route
+            exact
+            path="/exams/:examId/submissions/:submissionId/reading"
+            element={<ReadingExamPage />}
+          />
+          <Route
+            exact
+            path="/exams/:examId/submissions/:submissionId/reading/result"
+            element={<ReadingResultPage />}
+          />
 
         </Routes>
       </BrowserRouter>

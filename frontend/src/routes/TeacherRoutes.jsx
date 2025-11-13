@@ -24,7 +24,11 @@ import TeacherClassDetailPage from "../pages/TeacherClassDetailPage.jsx";
 //  * Tất cả routes cho Giảng viên (Teacher)
 //  */
 export const teacherRoutes = [
+  { path: '/attendance', element: <Attendance /> },
+     { path: '/attendance/class/:classId', element: <ClassSchedulePage /> },
+     { path: '/attendance/schedule/:scheduleId', element: <AttendanceDetailPage /> },
   // Dashboard
+  
   { path: '/teacher/dashboard', element: <TeacherDashboardPage /> },
 
   // I. Schedule

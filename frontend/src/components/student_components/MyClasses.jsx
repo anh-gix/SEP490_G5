@@ -118,7 +118,7 @@ const MyClasses = () => {
           
           return (
             <Col key={cls.id} md={6} lg={4}>
-              <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm transition-2 item-hover h-100">
+              <Card className="bg-white border-0 rounded-12 transition- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}2 item-hover h-100">
                 {/* Card Header with Image/Color */}
                 <div 
                   className="bg-gradient p-24 rounded-top-12"
@@ -245,7 +245,7 @@ const MyClasses = () => {
 
         {filteredClasses.length === 0 && (
           <Col xs={12}>
-            <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+            <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
               <Card.Body className="text-center py-60">
                 <i className="fas fa-book-open fa-4x text-neutral-400 mb-20"></i>
                 <h5 className="text-neutral-700 fw-semibold mb-8">Không tìm thấy lớp học nào</h5>
@@ -267,7 +267,7 @@ const MyClasses = () => {
           const progress = Math.round((cls.completedLessons / cls.totalLessons) * 100);
           
           return (
-            <Card key={cls.id} className="bg-white border border-neutral-30 rounded-12 box-shadow-sm transition-2 item-hover">
+            <Card key={cls.id} className="bg-white border-0 rounded-12 transition- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}2 item-hover">
               <Card.Body className="p-20">
                 <Row className="align-items-center">
                   {/* Class Info */}
@@ -372,7 +372,7 @@ const MyClasses = () => {
         })}
 
         {filteredClasses.length === 0 && (
-          <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+          <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="text-center py-60">
               <i className="fas fa-book-open fa-4x text-neutral-400 mb-20"></i>
               <h5 className="text-neutral-700 fw-semibold mb-8">Không tìm thấy lớp học nào</h5>
@@ -397,7 +397,7 @@ const MyClasses = () => {
       </div>
 
       {/* Filters & Controls */}
-      <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+      <Card className="bg-white border-0 rounded-12 mb-24" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
         <Card.Body className="p-20">
           <Row className="align-items-center">
             <Col lg={4}>
@@ -463,7 +463,7 @@ const MyClasses = () => {
       {/* Summary Stats */}
       <Row className="g-3 mb-24">
         <Col md={3}>
-          <Card className="bg-main-25 border border-main-200 rounded-12 box-shadow-sm">
+          <Card className="bg-main-25 border border-main-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
                 <div>
@@ -481,7 +481,7 @@ const MyClasses = () => {
           </Card>
         </Col>
         <Col md={3}>
-          <Card className="bg-success-25 border border-success-200 rounded-12 box-shadow-sm">
+          <Card className="bg-success-25 border border-success-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
                 <div>
@@ -499,7 +499,7 @@ const MyClasses = () => {
           </Card>
         </Col>
         <Col md={3}>
-          <Card className="bg-warning-25 border border-warning-200 rounded-12 box-shadow-sm">
+          <Card className="bg-warning-25 border border-warning-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
                 <div>
@@ -517,7 +517,7 @@ const MyClasses = () => {
           </Card>
         </Col>
         <Col md={3}>
-          <Card className="bg-info-25 border border-info-200 rounded-12 box-shadow-sm">
+          <Card className="bg-info-25 border border-info-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
                 <div>

@@ -138,7 +138,7 @@ const StudentAssignments = () => {
 
         return (
           <Col key={assignment.id} md={6} lg={4}>
-            <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm transition-2 item-hover h-100">
+            <Card className="bg-white border-0 rounded-12 transition- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}2 item-hover h-100">
               <Card.Body className="p-20">
                 <div className="d-flex justify-content-between align-items-start mb-12">
                   {getStatusBadge(isOverdue ? 'late' : assignment.status)}
@@ -211,7 +211,7 @@ const StudentAssignments = () => {
   );
 
   const renderListView = () => (
-    <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+    <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
       <Card.Body className="p-0">
         <Table hover className="mb-0">
           <thead>
@@ -289,7 +289,7 @@ const StudentAssignments = () => {
       {/* Summary Stats */}
       <Row className="g-3 mb-24">
         <Col md={3}>
-          <Card className="bg-warning-25 border border-warning-200 rounded-12 box-shadow-sm">
+          <Card className="bg-warning-25 border border-warning-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
                 <div>
@@ -307,7 +307,7 @@ const StudentAssignments = () => {
           </Card>
         </Col>
         <Col md={3}>
-          <Card className="bg-info-25 border border-info-200 rounded-12 box-shadow-sm">
+          <Card className="bg-info-25 border border-info-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
                 <div>
@@ -325,7 +325,7 @@ const StudentAssignments = () => {
           </Card>
         </Col>
         <Col md={3}>
-          <Card className="bg-success-25 border border-success-200 rounded-12 box-shadow-sm">
+          <Card className="bg-success-25 border border-success-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
                 <div>
@@ -343,7 +343,7 @@ const StudentAssignments = () => {
           </Card>
         </Col>
         <Col md={3}>
-          <Card className="bg-main-25 border border-main-200 rounded-12 box-shadow-sm">
+          <Card className="bg-main-25 border border-main-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
                 <div>
@@ -366,7 +366,7 @@ const StudentAssignments = () => {
       </Row>
 
       {/* Filters */}
-      <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+      <Card className="bg-white border-0 rounded-12 mb- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}24">
         <Card.Body className="p-20">
           <Row className="align-items-center">
             <Col lg={4}>
@@ -434,7 +434,7 @@ const StudentAssignments = () => {
       {filteredAssignments.length > 0 ? (
         viewMode === 'grid' ? renderGridView() : renderListView()
       ) : (
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+        <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
           <Card.Body className="text-center py-60">
             <i className="fas fa-tasks fa-4x text-neutral-400 mb-20"></i>
             <h5 className="text-neutral-700 fw-semibold mb-8">Không tìm thấy bài tập nào</h5>

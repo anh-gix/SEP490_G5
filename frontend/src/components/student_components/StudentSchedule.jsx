@@ -277,7 +277,7 @@ const StudentSchedule = () => {
     const weekDays = getWeekDays();
 
     return (
-      <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+      <Card className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
         <Card.Body className="p-0">
           <div className="schedule-week-view d-flex flex-column">
             {/* Week Days Header */}
@@ -429,7 +429,7 @@ const StudentSchedule = () => {
     const weekDayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
     return (
-      <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+      <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
         <Card.Body className="p-0">
           {/* Month Header */}
           <div className="d-flex border-bottom border-neutral-100">
@@ -541,7 +541,7 @@ const StudentSchedule = () => {
 
   const renderListView = () => {
     return (
-      <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+      <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
         <Card.Body className="p-0">
           <div className="table-responsive">
             <Table hover className="mb-0">
@@ -687,7 +687,7 @@ const StudentSchedule = () => {
       </div>
 
       {/* Filters & Controls */}
-      <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+      <Card className="bg-white border-0 rounded-12 mb- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}24">
         <Card.Body className="p-20">
           <Row className="align-items-center">
             <Col lg={4}>

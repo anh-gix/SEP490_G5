@@ -1,12 +1,12 @@
 import React from 'react';
 import TeacherNavigation from '../components/teacher_components/TeacherNavigation';
-import TeacherClassDetail from '../components/teacher_components/TeacherClassDetail';
+import LessonDetail from '../components/teacher_components/LessonDetail';
 
 /**
- * Teacher Class Detail Page
- * Layout page cho chi tiết lớp học
+ * Lesson Detail Page
+ * Layout page cho chi tiết buổi học
  */
-const TeacherClassDetailPage = () => {
+const LessonDetailPage = () => {
   return (
     <div className="d-flex" style={{ minHeight: '100vh' }}>
       {/* Sidebar Navigation */}
@@ -14,10 +14,10 @@ const TeacherClassDetailPage = () => {
 
       {/* Main Content */}
       <div className="flex-grow-1" style={{ backgroundColor: '#F5F7FA' }}>
-        <TeacherClassDetail />
+        <LessonDetail />
       </div>
     </div>
   );
 };
 
-export default TeacherClassDetailPage;
+export default LessonDetailPage;

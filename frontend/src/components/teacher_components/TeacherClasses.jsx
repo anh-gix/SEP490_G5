@@ -324,7 +324,7 @@ const TeacherClasses = () => {
 
                   {/* Card Footer */}
                   <Card.Footer className="bg-neutral-25 border-0 p-16">
-                    <Link to={`/teacher/class/${cls.id}`} className="text-decoration-none">
+                    <Link to={`/teacher/classes/${cls.id}`} className="text-decoration-none">
                       <Button className="btn-main text-13 fw-semibold w-100 py-10 radius-8">
                         <i className="fas fa-arrow-right me-2"></i>
                         Quản lý lớp học
@@ -375,7 +375,7 @@ const TeacherClasses = () => {
                     </td>
                     <td className="px-20 py-16">{getStatusBadge(cls.status)}</td>
                     <td className="px-20 py-16 text-center">
-                      <Link to={`/teacher/class/${cls.id}`}>
+                      <Link to={`/teacher/classes/${cls.id}`}>
                         <Button className="btn-outline-main text-13 px-12 py-6 radius-6">
                           Quản lý
                         </Button>

@@ -85,6 +85,38 @@ export const examService = {
       throw error.response?.data || { message: 'Không thể lấy kết quả' };
     }
   },
+
+  // Lấy thông tin section Listening
+  getListeningSection: async (examId, submissionId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions/${submissionId}/listening`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy thông tin phần Listening' };
+    }
+  },
+
+  // Nộp đáp án Listening
+  submitListeningAnswers: async (examId, submissionId, answers) => {
+    try {
+      const response = await api.post(`/${examId}/submissions/${submissionId}/listening/submit`, {
+        answers,
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể nộp đáp án' };
+    }
+  },
+
+  // Xem kết quả Listening
+  getListeningResult: async (examId, submissionId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions/${submissionId}/listening/result`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy kết quả' };
+    }
+  },
 };
 
 export default examService;

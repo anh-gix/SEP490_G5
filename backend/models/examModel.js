@@ -4,6 +4,11 @@ const answerKeySchema = new mongoose.Schema({
   questionNumber: { type: Number, required: true },
   correctAnswer: { type: String, required: true },
   maxScore: { type: Number, default: 1 },
+  questionType: {
+    type: String,
+    enum: ["multiple_choice", "input", "true_false"],
+    required: true,
+  },
 });
 
 const sectionSchema = new mongoose.Schema({

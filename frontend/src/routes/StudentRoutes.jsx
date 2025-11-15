@@ -3,6 +3,12 @@ import StudentSchedulePage from "../pages/StudentSchedulePage.jsx";
 import StudentCoursesPage from "../pages/StudentCoursesPage.jsx";
 import StudentClassDetailPage from "../pages/StudentClassDetailPage.jsx";
 import StudentAssignmentsPage from "../pages/StudentAssignmentsPage.jsx";
+import StudentExamListPage from "../pages/StudentExamListPage.jsx";
+import ExamDetailPage from "../pages/ExamDetailPage.jsx";
+import ReadingExamPage from "../pages/ReadingExamPage.jsx";
+import ReadingResultPage from "../pages/ReadingResultPage.jsx";
+import ListeningExamPage from "../pages/ListeningExamPage.jsx";
+import ListeningResultPage from "../pages/ListeningResultPage.jsx";
 
 /**
  * StudentRoutes
@@ -31,4 +37,10 @@ export const studentRoutes = [
 
   // VI. Leave Request (future)
   // { path: '/student/leave-request', element: <StudentLeaveRequestPage /> },
+  { path: '/exams', element: <StudentExamListPage /> },
+  { path: '/exams/:id', element: <ExamDetailPage /> },
+  { path: '/exams/:examId/submissions/:submissionId/reading', element: <ReadingExamPage /> },
+  { path: '/exams/:examId/submissions/:submissionId/reading/result', element: <ReadingResultPage /> },
+  { path: '/exams/:examId/submissions/:submissionId/listening', element: <ListeningExamPage /> },
+  { path: '/exams/:examId/submissions/:submissionId/listening/result', element: <ListeningResultPage /> },
 ];

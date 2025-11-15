@@ -19,6 +19,15 @@ router.post("/:examId/submissions/:submissionId/reading/submit", verifyToken, ex
 // 📊 Xem kết quả Reading (protected)
 router.get("/:examId/submissions/:submissionId/reading/result", verifyToken, examController.getReadingResult);
 
+// 🎧 Lấy thông tin section Listening (protected)
+router.get("/:examId/submissions/:submissionId/listening", verifyToken, examController.getListeningSection);
+
+// 📝 Nộp đáp án Listening (protected)
+router.post("/:examId/submissions/:submissionId/listening/submit", verifyToken, examController.submitListeningAnswers);
+
+// 📊 Xem kết quả Listening (protected)
+router.get("/:examId/submissions/:submissionId/listening/result", verifyToken, examController.getListeningResult);
+
 // 🧠 Lấy thông tin bài thi theo ID (public) - đặt cuối để tránh conflict
 router.get("/:id", examController.getExamById);
 

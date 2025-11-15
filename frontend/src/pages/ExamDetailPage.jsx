@@ -110,6 +110,8 @@ const ExamDetailPage = () => {
 
     if (sectionType === "reading") {
       navigate(`/exams/${id}/submissions/${submission._id}/reading`);
+    } else if (sectionType === "listening") {
+      navigate(`/exams/${id}/submissions/${submission._id}/listening`);
     }
     // Add other sections later
   };

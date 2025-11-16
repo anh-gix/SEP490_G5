@@ -37,24 +37,24 @@ const StudentNavigation = () => {
       path: '/student/toeic',
       color: 'main'
     },
-    {
-      title: 'Tài liệu học tập',
-      icon: 'fa-file-alt',
-      path: '/student/materials',
-      color: 'main'
-    },
-    {
-      title: 'Điểm số',
-      icon: 'fa-star',
-      path: '/student/grades',
-      color: 'warning'
-    },
-    {
-      title: 'Xin nghỉ học',
-      icon: 'fa-hand-paper',
-      path: '/student/leave-request',
-      color: 'danger'
-    }
+    // {
+    //   title: 'Tài liệu học tập',
+    //   icon: 'fa-file-alt',
+    //   path: '/student/materials',
+    //   color: 'main'
+    // },
+    // {
+    //   title: 'Điểm số',
+    //   icon: 'fa-star',
+    //   path: '/student/grades',
+    //   color: 'warning'
+    // },
+    // {
+    //   title: 'Xin nghỉ học',
+    //   icon: 'fa-hand-paper',
+    //   path: '/student/leave-request',
+    //   color: 'danger'
+    // }
   ];
 
   const userInfo = {

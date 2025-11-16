@@ -55,12 +55,12 @@ const StudentDashboard = () => {
 
       setWeekSchedule(weekDays);
 
-      // Assignments with different statuses
+      // Assignments with different statuses - Updated dates
       setAssignments([
         {
           id: 1,
           title: 'Unit 6 - Grammar Exercise',
-          dueDate: '2025-11-05',
+          dueDate: '2025-11-18',
           status: 'pending',
           subject: 'Grammar',
           priority: 'high'
@@ -68,7 +68,7 @@ const StudentDashboard = () => {
         {
           id: 2,
           title: 'Reading Comprehension Test',
-          dueDate: '2025-11-07',
+          dueDate: '2025-11-20',
           status: 'pending',
           subject: 'Reading',
           priority: 'medium'
@@ -76,9 +76,25 @@ const StudentDashboard = () => {
         {
           id: 3,
           title: 'Listening Practice Unit 5',
-          dueDate: '2025-11-03',
-          status: 'overdue',
+          dueDate: '2025-11-16',
+          status: 'pending',
           subject: 'Listening',
+          priority: 'medium'
+        },
+        {
+          id: 4,
+          title: 'Vocabulary Quiz - Unit 7',
+          dueDate: '2025-11-22',
+          status: 'pending',
+          subject: 'Vocabulary',
+          priority: 'low'
+        },
+        {
+          id: 5,
+          title: 'Speaking Practice Recording',
+          dueDate: '2025-11-12',
+          status: 'overdue',
+          subject: 'Speaking',
           priority: 'high'
         }
       ]);
@@ -325,7 +341,7 @@ const StudentDashboard = () => {
                   <i className="fas fa-chart-line text-success-600 me-2"></i>
                   Kết quả luyện đề TOEIC
                 </h6>
-                <Link to="/student/exams">
+                <Link to="/student/toeic">
                   <Button className="btn-sm btn-outline-main text-12 px-16 py-8">
                     Xem tất cả
                   </Button>

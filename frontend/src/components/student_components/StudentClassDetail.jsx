@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Nav, Tab, Form, ProgressBar, Table, Alert } from 'react-bootstrap';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 
 /**
  * Student Class Detail Component
@@ -8,6 +8,7 @@ import { useParams, Link } from 'react-router-dom';
  */
 const StudentClassDetail = () => {
   const { classId } = useParams();
+  const location = useLocation();
   const [classInfo, setClassInfo] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [materials, setMaterials] = useState([]);
@@ -17,6 +18,12 @@ const StudentClassDetail = () => {
   useEffect(() => {
     fetchClassDetail();
   }, [classId]);
+
+  useEffect(() => {
+    if (location.hash === '#homework' || location.state?.openHomeworkTab) {
+      setActiveTab('homework');
+    }
+  }, [location.hash, location.state?.openHomeworkTab]);
 
   const fetchClassDetail = async () => {
     try {
@@ -94,7 +101,7 @@ const StudentClassDetail = () => {
           title: 'Reading Comprehension Test',
           description: 'Read the passage and answer questions',
           dueDate: '2025-11-07',
-          status: 'pending',
+          status: 'submitted',
           score: null,
           submittedDate: null,
           feedback: null,
@@ -381,40 +388,16 @@ const StudentClassDetail = () => {
                     </span>
                   )}
                 </div>
-
-                {hw.status === 'graded' && (
-                  <Alert variant="success" className="bg-success-50 border-success-200 rounded-8 mb-12 py-12">
-                    <div className="d-flex justify-content-between align-items-center">
-                      <span className="text-neutral-700 text-13">
-                        <i className="fas fa-star text-warning-600 me-2"></i>
-                        Điểm: <strong>{hw.score}/10</strong>
-                      </span>
-                    </div>
-                    {hw.feedback && (
-                      <div className="mt-8 text-neutral-700 text-13">
-                        <strong>Nhận xét:</strong> {hw.feedback}
-                      </div>
-                    )}
-                  </Alert>
-                )}
               </Col>
               <Col md={4} className="text-md-end">
-                {hw.status === 'pending' && (
-                  <Button className="btn-main text-13 fw-semibold px-20 py-10 radius-8">
-                    <i className="fas fa-upload me-2"></i>
-                    Nộp bài
-                  </Button>
-                )}
-                {hw.status === 'submitted' && (
-                  <Button className="btn-outline-main text-13 fw-medium px-20 py-10 radius-8">
+                {(
+                  <Button
+                    as={Link}
+                    to={`/student/class/${classId}/homework/${hw.id}`}
+                    className="btn-outline-main text-13 fw-medium px-20 py-10 radius-8"
+                  >
                     <i className="fas fa-eye me-2"></i>
-                    Xem bài nộp
-                  </Button>
-                )}
-                {hw.status === 'graded' && (
-                  <Button className="btn-outline-success text-13 fw-medium px-20 py-10 radius-8">
-                    <i className="fas fa-file-download me-2"></i>
-                    Tải bài chấm
+                    Xem chi tiết
                   </Button>
                 )}
               </Col>

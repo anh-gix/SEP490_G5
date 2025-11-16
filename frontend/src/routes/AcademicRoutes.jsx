@@ -12,20 +12,20 @@ import ReportsPage from "../pages/AcademicStaff/ReportsPage.jsx";
  */
 export const academicRoutes = [
   // Dashboard
-  { path: '/academic-dashboard', element: <AcademicDashboardPage /> },
+  { path: '/academic/dashboard', element: <AcademicDashboardPage /> },
 
   // I. Schedule Management
-  { path: '/schedule-management', element: <ScheduleManagementPage /> },
+  { path: 'academic/schedule-management', element: <ScheduleManagementPage /> },
 
   // II. Class Management
-  { path: '/class-management', element: <ClassManagementPage /> },
+  { path: '/academic/class-management', element: <ClassManagementPage /> },
 
   // III. Room Management
-  { path: '/room-management', element: <RoomManagementPage /> },
+  { path: '/academic/room-management', element: <RoomManagementPage /> },
 
   // IV. Teacher Management
-  { path: '/teacher-management', element: <TeacherManagementPage /> },
+  { path: '/academic/teacher-management', element: <TeacherManagementPage /> },
 
   // V. Reports
-  { path: '/reports', element: <ReportsPage /> },
+  { path: '/academic/ reports', element: <ReportsPage /> },
 ];

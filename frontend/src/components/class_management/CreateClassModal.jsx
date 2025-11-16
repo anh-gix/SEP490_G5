@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
 import scheduleService from '../../services/scheduleService';
 import roomService from '../../services/roomService';
+import teacherService from '../../services/teacherService';
 
 const createEmptyScheduleEntry = () => ({
   id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -11,6 +12,9 @@ const createEmptyScheduleEntry = () => ({
 });
 
 const CreateClassModal = ({ onClose, onSubmit }) => {
+  // Flag để test với mock data - đặt thành true để bypass API
+  const USE_MOCK_DATA = false; // Đổi thành true để test với mock data
+  
   const [formData, setFormData] = useState({
     name: '',
     level: '',
@@ -25,11 +29,11 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     tuitionFee: 0
   });
 
-  const teachers = [
+  const [teachers, setTeachers] = useState([
     { id: 1, name: 'Nguyễn Văn A' },
     { id: 2, name: 'Trần Thị B' },
     { id: 3, name: 'Lê Văn C' }
-  ];
+  ]);
 
   const [rooms, setRooms] = useState([
     { id: 1, name: 'Room 101', capacity: 30 },
@@ -38,36 +42,95 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   ]);
 
   const [existingSchedules, setExistingSchedules] = useState(() => {
+    // Mock data để test conflict - chỉ dùng khi API chưa có dữ liệu
+    const today = new Date();
+    const nextMonth = new Date(today);
+    nextMonth.setMonth(today.getMonth() + 1);
+    const twoMonthsLater = new Date(today);
+    twoMonthsLater.setMonth(today.getMonth() + 2);
+    const threeMonthsLater = new Date(today);
+    threeMonthsLater.setMonth(today.getMonth() + 3);
+
+    // Format dates as YYYY-MM-DD
+    const formatDate = (date) => date.toISOString().split('T')[0];
+
     const mockData = [
+      // Mock 1: Room 101, Teacher 1, Thứ 2, 08:00-10:00, từ hôm nay đến 1 tháng sau
+      // → Sẽ conflict nếu bạn chọn: Room 101, Thứ 2, 08:00-10:00, cùng date range
       {
         id: 'mock-1',
         roomId: 1,
         roomName: 'Room 101',
+        teacherId: 1,
+        teacherName: 'Nguyễn Văn A',
         day: '2',
         startTime: '08:00',
-        endTime: '10:00'
+        endTime: '10:00',
+        startDate: formatDate(today),
+        endDate: formatDate(nextMonth)
       },
+      // Mock 2: Room 102, Teacher 2, Thứ 4, 18:00-20:00, từ 1 tháng sau đến 2 tháng sau
+      // → Không conflict với mock-1 (khác ngày, khác date range)
       {
         id: 'mock-2',
         roomId: 2,
         roomName: 'Room 102',
+        teacherId: 2,
+        teacherName: 'Trần Thị B',
         day: '4',
         startTime: '18:00',
-        endTime: '20:00'
+        endTime: '20:00',
+        startDate: formatDate(nextMonth),
+        endDate: formatDate(twoMonthsLater)
       },
+      // Mock 3: Room 101, Teacher 3, Thứ 6, 14:00-16:00, từ hôm nay đến 2 tháng sau
+      // → Không conflict với mock-1 (cùng room nhưng khác ngày)
       {
         id: 'mock-3',
         roomId: 1,
         roomName: 'Room 101',
+        teacherId: 3,
+        teacherName: 'Lê Văn C',
         day: '6',
         startTime: '14:00',
-        endTime: '16:00'
+        endTime: '16:00',
+        startDate: formatDate(today),
+        endDate: formatDate(twoMonthsLater)
+      },
+      // Mock 4: Room 101, Teacher 2, Thứ 2, 09:00-11:00, từ hôm nay đến 1 tháng sau
+      // → CONFLICT với mock-1: cùng room, cùng ngày, overlap thời gian (08:00-10:00 vs 09:00-11:00), overlap date range
+      {
+        id: 'mock-4',
+        roomId: 1,
+        roomName: 'Room 101',
+        teacherId: 2,
+        teacherName: 'Trần Thị B',
+        day: '2',
+        startTime: '09:00',
+        endTime: '11:00',
+        startDate: formatDate(today),
+        endDate: formatDate(nextMonth)
+      },
+      // Mock 5: Room 201, Teacher 1, Thứ 2, 08:00-10:00, từ 2 tháng sau đến 3 tháng sau
+      // → KHÔNG conflict với mock-1 (cùng teacher, cùng ngày/giờ nhưng khác date range)
+      {
+        id: 'mock-5',
+        roomId: 3,
+        roomName: 'Room 201',
+        teacherId: 1,
+        teacherName: 'Nguyễn Văn A',
+        day: '2',
+        startTime: '08:00',
+        endTime: '10:00',
+        startDate: formatDate(twoMonthsLater),
+        endDate: formatDate(threeMonthsLater)
       }
     ];
     return mockData;
   });
   const [roomLoading, setRoomLoading] = useState(false);
   const [roomError, setRoomError] = useState(null);
+  const [dateError, setDateError] = useState('');
 
   const programs = [
     { id: 1, name: 'Tiếng Anh Giao tiếp', levels: ['A1', 'A2', 'B1', 'B2', 'C1'] },
@@ -85,8 +148,39 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     { value: 'CN', label: 'Chủ nhật' }
   ];
 
+  // Get today's date in YYYY-MM-DD format
+  const getTodayDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    
+    // Validate dates when they change (use setTimeout to validate after state update)
+    if (name === 'startDate' || name === 'endDate') {
+      const today = getTodayDate();
+      
+      // Get the updated values
+      const newStartDate = name === 'startDate' ? value : formData.startDate;
+      const newEndDate = name === 'endDate' ? value : formData.endDate;
+      
+      // Validate start date is not in the past
+      if (name === 'startDate' && value && value < today) {
+        setDateError('Ngày khai giảng không được là quá khứ!');
+      }
+      // Validate if both dates are filled
+      else if (newStartDate && newEndDate && newEndDate <= newStartDate) {
+        setDateError('Ngày kết thúc phải sau ngày khai giảng!');
+      }
+      else {
+        setDateError('');
+      }
+    }
+    
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -142,11 +236,32 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       return;
     }
 
+    // Validate start date is not in the past
+    const today = getTodayDate();
+    if (formData.startDate && formData.startDate < today) {
+      alert('Ngày khai giảng không được là quá khứ!');
+      setDateError('Ngày khai giảng không được là quá khứ!');
+      return;
+    }
+
+    // Validate date range
+    if (formData.startDate && formData.endDate && formData.endDate <= formData.startDate) {
+      alert('Ngày kết thúc phải sau ngày khai giảng!');
+      setDateError('Ngày kết thúc phải sau ngày khai giảng!');
+      return;
+    }
+
     onSubmit(formData);
   };
 
   useEffect(() => {
     const fetchExistingSchedules = async () => {
+      // Nếu USE_MOCK_DATA = true, bỏ qua API và giữ nguyên mock data
+      if (USE_MOCK_DATA) {
+        setRoomLoading(false);
+        return;
+      }
+
       try {
         setRoomLoading(true);
         setRoomError(null);
@@ -165,7 +280,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           }
         }
       } catch (error) {
-        setRoomError('Đang sử dụng dữ liệu mẫu để kiểm tra phòng trống.');
+        // Sử dụng mock data nếu API lỗi
       } finally {
         setRoomLoading(false);
       }
@@ -190,6 +305,56 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
     fetchRooms();
   }, []);
+
+  useEffect(() => {
+    const fetchTeachers = async () => {
+      try {
+        const response = await teacherService.getAllTeachers();
+        
+        if (response && (response.teachers || response.data)) {
+          const fetchedTeachers = response.teachers || response.data || [];
+          if (fetchedTeachers.length > 0) {
+            console.log('📋 Teacher đầu tiên:', fetchedTeachers[0]);
+            console.log('📋 Tất cả keys trong teacher:', Object.keys(fetchedTeachers[0]));
+          }
+          setTeachers(fetchedTeachers);
+        }
+      } catch (error) {
+        // Sử dụng mock data nếu API lỗi
+      }
+    };
+
+    fetchTeachers();
+  }, []);
+
+  // Cập nhật mock data với _id từ DB sau khi fetch teachers
+  useEffect(() => {
+    if (USE_MOCK_DATA && teachers.length > 0) {
+      // Tạo map teacherName -> _id từ teachers
+      const teacherNameToIdMap = {};
+      teachers.forEach(teacher => {
+        const teacherName = teacher.name || teacher.teacherName || teacher.fullName;
+        const teacherId = teacher._id || teacher.id;
+        if (teacherName && teacherId) {
+          teacherNameToIdMap[teacherName] = teacherId;
+        }
+      });
+
+      // Cập nhật existingSchedules với _id từ DB
+      setExistingSchedules(prevSchedules => {
+        const updatedSchedules = prevSchedules.map(schedule => {
+          if (schedule.teacherName && teacherNameToIdMap[schedule.teacherName]) {
+            return {
+              ...schedule,
+              teacherId: teacherNameToIdMap[schedule.teacherName] // Cập nhật với _id từ DB
+            };
+          }
+          return schedule;
+        });
+        return updatedSchedules;
+      });
+    }
+  }, [teachers, USE_MOCK_DATA]);
 
   const parseDateToDayOfWeek = (dateValue) => {
     if (!dateValue) return null;
@@ -243,6 +408,18 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     return startA < endB && startB < endA;
   };
 
+  const hasDateRangeOverlap = (startDateA, endDateA, startDateB, endDateB) => {
+    if (!startDateA || !endDateA || !startDateB || !endDateB) return true; // Nếu thiếu thông tin, coi như có overlap để an toàn
+    
+    const startA = new Date(startDateA);
+    const endA = new Date(endDateA);
+    const startB = new Date(startDateB);
+    const endB = new Date(endDateB);
+    
+    // Kiểm tra overlap: startA < endB && startB < endA
+    return startA <= endB && startB <= endA;
+  };
+
   const filledScheduleEntries = useMemo(
     () =>
       formData.scheduleEntries.filter(
@@ -252,7 +429,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   );
 
   const conflictingRoomIds = useMemo(() => {
-    if (!filledScheduleEntries.length || !existingSchedules.length) {
+    if (!filledScheduleEntries.length || !existingSchedules.length || !formData.startDate || !formData.endDate) {
       return new Set();
     }
 
@@ -310,9 +487,29 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             schedule.endHour
         );
 
-        const hasOverlap = hasTimeOverlap(entryStart, entryEnd, scheduleStart, scheduleEnd);
+        const hasTimeConflict = hasTimeOverlap(entryStart, entryEnd, scheduleStart, scheduleEnd);
 
-        if (hasOverlap) {
+        // Kiểm tra date range overlap
+        const scheduleStartDate = 
+          schedule.startDate ||
+          schedule.class?.startDate ||
+          schedule.classStartDate ||
+          schedule.start_date;
+        const scheduleEndDate = 
+          schedule.endDate ||
+          schedule.class?.endDate ||
+          schedule.classEndDate ||
+          schedule.end_date;
+
+        const hasDateConflict = hasDateRangeOverlap(
+          formData.startDate,
+          formData.endDate,
+          scheduleStartDate,
+          scheduleEndDate
+        );
+
+        // Chỉ coi là conflict nếu có cả time overlap VÀ date range overlap
+        if (hasTimeConflict && hasDateConflict) {
           if (scheduleRoomId) {
             conflicts.add(String(scheduleRoomId));
           }
@@ -324,10 +521,120 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     });
 
     return conflicts;
-  }, [filledScheduleEntries, existingSchedules]);
+  }, [filledScheduleEntries, existingSchedules, formData.startDate, formData.endDate]);
+
+  const conflictingTeacherIds = useMemo(() => {
+    if (!filledScheduleEntries.length || !existingSchedules.length || !formData.startDate || !formData.endDate) {
+      return new Set();
+    }
+
+    const conflicts = new Set();
+
+    filledScheduleEntries.forEach((entry) => {
+      const entryDay = normalizeDayValue(entry.day);
+      const entryStart = parseTime(entry.startTime);
+      const entryEnd = parseTime(entry.endTime);
+
+      existingSchedules.forEach((schedule) => {
+        const scheduleTeacherId =
+          schedule.teacherId ||
+          schedule.teacherID ||
+          schedule.teacher?.id ||
+          schedule.teacher?._id ||
+          schedule.instructorId ||
+          schedule.instructor?.id ||
+          schedule.instructor?._id;
+        const scheduleTeacherName = schedule.teacherName || schedule.teacher?.name || schedule.instructor?.name;
+
+        if (!scheduleTeacherId && !scheduleTeacherName) {
+          return;
+        }
+
+        // Try to get day from various possible fields
+        let scheduleDayRaw = 
+          schedule.day ||
+          schedule.dayOfWeek ||
+          schedule.day_of_week ||
+          schedule.weekDay ||
+          schedule.date ||
+          schedule.scheduleDate ||
+          schedule.classDate;
+        
+        // If we have a date, try to parse it to day of week
+        if (!scheduleDayRaw && (schedule.date || schedule.scheduleDate || schedule.classDate)) {
+          scheduleDayRaw = schedule.date || schedule.scheduleDate || schedule.classDate;
+        }
+        
+        const scheduleDay = normalizeDayValue(scheduleDayRaw);
+
+        if (!scheduleDay || scheduleDay !== entryDay) {
+          return;
+        }
+
+        const scheduleStart = parseTime(
+          schedule.startTime ||
+            schedule.start_time ||
+            schedule.time?.start ||
+            schedule.startHour
+        );
+
+        const scheduleEnd = parseTime(
+          schedule.endTime ||
+            schedule.end_time ||
+            schedule.time?.end ||
+            schedule.endHour
+        );
+
+        const hasTimeConflict = hasTimeOverlap(entryStart, entryEnd, scheduleStart, scheduleEnd);
+
+        // Kiểm tra date range overlap
+        const scheduleStartDate = 
+          schedule.startDate ||
+          schedule.class?.startDate ||
+          schedule.classStartDate ||
+          schedule.start_date;
+        const scheduleEndDate = 
+          schedule.endDate ||
+          schedule.class?.endDate ||
+          schedule.classEndDate ||
+          schedule.end_date;
+
+        const hasDateConflict = hasDateRangeOverlap(
+          formData.startDate,
+          formData.endDate,
+          scheduleStartDate,
+          scheduleEndDate
+        );
+
+        // Chỉ coi là conflict nếu có cả time overlap VÀ date range overlap
+        if (hasTimeConflict && hasDateConflict) {
+          console.log('🔴 CONFLICT Teacher:', {
+            scheduleId: schedule.id,
+            scheduleTeacherId,
+            scheduleTeacherName,
+            entryDay,
+            scheduleDay,
+            entryTime: `${entryStart}-${entryEnd}`,
+            scheduleTime: `${scheduleStart}-${scheduleEnd}`,
+            entryDateRange: `${formData.startDate} - ${formData.endDate}`,
+            scheduleDateRange: `${scheduleStartDate} - ${scheduleEndDate}`,
+            hasTimeConflict,
+            hasDateConflict
+          });
+          // Chỉ thêm ID vào conflicts, không thêm name (vì name có thể trùng và không đáng tin cậy)
+          if (scheduleTeacherId) {
+            conflicts.add(String(scheduleTeacherId));
+          }
+        }
+      });
+    });
+
+    console.log('📋 Conflicting Teacher IDs:', Array.from(conflicts));
+    return conflicts;
+  }, [filledScheduleEntries, existingSchedules, formData.startDate, formData.endDate]);
 
   const filteredRooms = useMemo(() => {
-    if (!filledScheduleEntries.length || !existingSchedules.length) {
+    if (!filledScheduleEntries.length || !existingSchedules.length || !formData.startDate || !formData.endDate) {
       return rooms;
     }
 
@@ -350,7 +657,46 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         return !hasIdConflict && !hasNameConflict;
       }
     );
-  }, [filledScheduleEntries, existingSchedules, rooms, conflictingRoomIds]);
+  }, [filledScheduleEntries, existingSchedules, rooms, conflictingRoomIds, formData.startDate, formData.endDate]);
+
+  const filteredTeachers = useMemo(() => {
+    if (!filledScheduleEntries.length || !existingSchedules.length || !formData.startDate || !formData.endDate) {
+      return teachers;
+    }
+
+    return teachers.filter(
+      (teacher) => {
+        // API có thể trả về _id (MongoDB) hoặc id
+        const teacherId = teacher._id || teacher.id;
+        const teacherIdStr = String(teacherId);
+        
+        // Lấy teacherName với nhiều fallback (giống như trong render)
+        const teacherName = 
+          teacher.name || 
+          teacher.teacherName || 
+          teacher.fullName ||
+          (teacher.firstName && teacher.lastName ? `${teacher.firstName} ${teacher.lastName}` : null) ||
+          (teacher.firstName || teacher.lastName) ||
+          teacher.username ||
+          teacher.email?.split('@')[0] ||
+          `Giáo viên ${teacherId}`;
+        
+        // Chỉ so sánh bằng ID (không so sánh bằng name vì name có thể trùng và không đáng tin cậy)
+        const hasIdConflict = conflictingTeacherIds.has(teacherIdStr) || conflictingTeacherIds.has(String(teacher.id));
+        
+        console.log('🔍 Checking Teacher:', {
+          teacherId,
+          teacherIdStr,
+          teacherName,
+          conflictingIds: Array.from(conflictingTeacherIds),
+          hasIdConflict,
+          willShow: !hasIdConflict ? '✅ SHOW' : '🚫 HIDE'
+        });
+        
+        return !hasIdConflict;
+      }
+    );
+  }, [filledScheduleEntries, existingSchedules, teachers, conflictingTeacherIds, formData.startDate, formData.endDate]);
 
   useEffect(() => {
     if (
@@ -364,14 +710,26 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     }
   }, [filteredRooms, formData.roomId]);
 
+  useEffect(() => {
+    if (
+      formData.teacherId &&
+      !filteredTeachers.some(teacher => {
+        const teacherId = teacher._id || teacher.id;
+        return String(teacherId) === String(formData.teacherId) || String(teacher.id) === String(formData.teacherId);
+      })
+    ) {
+      setFormData(prev => ({ ...prev, teacherId: '' }));
+    }
+  }, [filteredTeachers, formData.teacherId]);
+
   return (
     <Modal show={true} onHide={onClose} size="xl" centered backdrop="static">
-      <Modal.Header closeButton className="bg-main-600 text-white border-0 p-24">
-        <Modal.Title className="fw-bold">
-          <i className="fas fa-plus-circle me-2"></i>
-          Tạo lớp học mới
-        </Modal.Title>
-      </Modal.Header>
+        <Modal.Header closeButton className="bg-main-600 text-white border-0 p-24">
+          <Modal.Title className="fw-bold">
+            <i className="fas fa-plus-circle me-2"></i>
+            Tạo lớp học mới
+          </Modal.Title>
+        </Modal.Header>
 
       <Form onSubmit={handleSubmit}>
         <Modal.Body className="p-24" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
@@ -394,8 +752,14 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     name="startDate"
                     value={formData.startDate}
                     onChange={handleInputChange}
-                    className="border-neutral-30 radius-8 px-16 py-10"
+                    min={getTodayDate()}
+                    className={`border-neutral-30 radius-8 px-16 py-10 ${dateError ? 'border-danger' : ''}`}
                   />
+                  {dateError && dateError.includes('quá khứ') && (
+                    <Form.Text className="text-danger-600 text-12 d-block mt-4">
+                      {dateError}
+                    </Form.Text>
+                  )}
                 </Form.Group>
               </div>
               <div className="col-md-6">
@@ -408,8 +772,14 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     name="endDate"
                     value={formData.endDate}
                     onChange={handleInputChange}
-                    className="border-neutral-30 radius-8 px-16 py-10"
+                    min={formData.startDate || getTodayDate()}
+                    className={`border-neutral-30 radius-8 px-16 py-10 ${dateError ? 'border-danger' : ''}`}
                   />
+                  {dateError && dateError.includes('kết thúc') && (
+                    <Form.Text className="text-danger-600 text-12 d-block mt-4">
+                      {dateError}
+                    </Form.Text>
+                  )}
                 </Form.Group>
               </div>
             </div>
@@ -532,10 +902,33 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     className="border-neutral-30 radius-8 px-16 py-10"
                   >
                     <option value="">-- Chọn giáo viên --</option>
-                    {teachers.map(t => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
+                    {filteredTeachers.length === 0 && (
+                      <option value="" disabled>
+                        Không còn giáo viên phù hợp
+                      </option>
+                    )}
+                    {filteredTeachers.map(t => {
+                      const teacherId = t._id || t.id;
+                      // Hỗ trợ nhiều format tên từ API
+                      const teacherName = 
+                        t.name || 
+                        t.teacherName || 
+                        t.fullName ||
+                        (t.firstName && t.lastName ? `${t.firstName} ${t.lastName}` : null) ||
+                        (t.firstName || t.lastName) ||
+                        t.username ||
+                        t.email?.split('@')[0] ||
+                        `Giáo viên ${teacherId}`;
+                      return (
+                        <option key={teacherId} value={teacherId}>
+                          {teacherName}
+                        </option>
+                      );
+                    })}
                   </Form.Select>
+                  <Form.Text className="text-neutral-500 text-12">
+                    Chỉ hiển thị giáo viên chưa bị trùng với lịch đã chọn.
+                  </Form.Text>
                 </Form.Group>
               </div>
 
@@ -674,21 +1067,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     value={formData.tuitionFee}
                     onChange={handleInputChange}
                     placeholder="0"
-                    className="border-neutral-30 radius-8 px-16 py-10"
-                  />
-                </Form.Group>
-              </div>
-
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">Sĩ số tối đa</Form.Label>
-                  <Form.Control
-                    type="number"
-                    name="maxStudents"
-                    value={formData.maxStudents}
-                    onChange={handleInputChange}
-                    min="1"
-                    max="50"
                     className="border-neutral-30 radius-8 px-16 py-10"
                   />
                 </Form.Group>

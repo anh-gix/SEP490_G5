@@ -379,13 +379,13 @@ const RoomManagementFull = () => {
 
                   {/* Actions */}
                   <div className="d-flex gap-8">
-                    <Button 
+                    <button 
                       className="btn-outline-main flex-grow-1 text-13 px-12 py-8 radius-6"
                       onClick={() => handleViewSchedule(room)}
                     >
                       <i className="fas fa-calendar me-1"></i>
                       Lịch sử dụng
-                    </Button>
+                    </button>
                     <Button 
                       className="btn-outline-info text-13 px-12 py-8 radius-6"
                       onClick={() => handleEdit(room)}

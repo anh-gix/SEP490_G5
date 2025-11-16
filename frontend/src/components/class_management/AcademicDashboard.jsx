@@ -11,18 +11,18 @@ const AcademicDashboard = () => {
     totalClasses: 0,
     activeClasses: 0,
     totalStudents: 0,
-    totalTeachers: 0,
-    todaySchedules: 0,
-    upcomingEvents: 0
+    totalTeachers: 0
   });
 
   const [recentActivities, setRecentActivities] = useState([]);
+  const [workRequests, setWorkRequests] = useState([]);
+  const [activeTab, setActiveTab] = useState('activities'); // 'activities' or 'requests'
   const [todaySchedule, setTodaySchedule] = useState([]);
   const [classProgress, setClassProgress] = useState([]);
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, []); 
 
   const fetchDashboardData = async () => {
     try {
@@ -32,9 +32,7 @@ const AcademicDashboard = () => {
         totalClasses: 45,
         activeClasses: 38,
         totalStudents: 856,
-        totalTeachers: 24,
-        todaySchedules: 12,
-        upcomingEvents: 5
+        totalTeachers: 24
       });
 
       setRecentActivities([
@@ -69,6 +67,64 @@ const AcademicDashboard = () => {
           time: '2 giờ trước',
           icon: 'fa-check-circle',
           color: 'success'
+        }
+      ]);
+
+      setWorkRequests([
+        {
+          id: 1,
+          type: 'new_class',
+          requester: 'Trưởng trung tâm',
+          message: 'Yêu cầu xếp lớp A1-Morning-06 cho học viên mới',
+          priority: 'high',
+          time: '5 phút trước',
+          icon: 'fa-chalkboard-teacher',
+          color: 'danger',
+          status: 'pending'
+        },
+        {
+          id: 2,
+          type: 'makeup_class',
+          requester: 'Nguyễn Văn A (SV001)',
+          message: 'Xin nghỉ học bù buổi ngày 18/11 - Lý do: Ốm',
+          priority: 'medium',
+          time: '15 phút trước',
+          icon: 'fa-calendar-times',
+          color: 'warning',
+          status: 'pending'
+        },
+        {
+          id: 3,
+          type: 'new_class',
+          requester: 'Trưởng trung tâm',
+          message: 'Yêu cầu mở lớp B2-Evening-03 - Bắt đầu 25/11',
+          priority: 'high',
+          time: '30 phút trước',
+          icon: 'fa-chalkboard-teacher',
+          color: 'danger',
+          status: 'pending'
+        },
+        {
+          id: 4,
+          type: 'makeup_class',
+          requester: 'Trần Thị B (SV015)',
+          message: 'Xin nghỉ học bù buổi ngày 20/11 - Lý do: Công tác',
+          priority: 'medium',
+          time: '1 giờ trước',
+          icon: 'fa-calendar-times',
+          color: 'warning',
+          status: 'pending'
+        },
+        {
+          id: 5,
+          type: 'schedule_change',
+          requester: 'GV Lê Văn C',
+          message: 'Đề nghị đổi lịch dạy từ tối thứ 3 sang tối thứ 5',
+          priority: 'low',
+          time: '2 giờ trước',
+          icon: 'fa-exchange-alt',
+          color: 'info',
+          status: 'pending'
         }
       ]);
 
@@ -186,9 +242,9 @@ const AcademicDashboard = () => {
         <p className="text-neutral-500 mb-0">Tổng quan hoạt động và thống kê hệ thống</p>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Compact version (4 cards only) */}
       <Row className="g-3 mb-24">
-        <Col md={6} lg={4} xl={2}>
+        <Col md={6} lg={3}>
           <Card className="bg-white border border-main-200 rounded-12 box-shadow-sm transition-2 item-hover h-100">
             <Card.Body className="p-20">
               <div className="d-flex align-items-center justify-content-between mb-12">
@@ -204,7 +260,7 @@ const AcademicDashboard = () => {
           </Card>
         </Col>
 
-        <Col md={6} lg={4} xl={2}>
+        <Col md={6} lg={3}>
           <Card className="bg-white border border-success-200 rounded-12 box-shadow-sm transition-2 item-hover h-100">
             <Card.Body className="p-20">
               <div className="d-flex align-items-center justify-content-between mb-12">
@@ -220,7 +276,7 @@ const AcademicDashboard = () => {
           </Card>
         </Col>
 
-        <Col md={6} lg={4} xl={2}>
+        <Col md={6} lg={3}>
           <Card className="bg-white border border-info-200 rounded-12 box-shadow-sm transition-2 item-hover h-100">
             <Card.Body className="p-20">
               <div className="d-flex align-items-center justify-content-between mb-12">
@@ -236,7 +292,7 @@ const AcademicDashboard = () => {
           </Card>
         </Col>
 
-        <Col md={6} lg={4} xl={2}>
+        <Col md={6} lg={3}>
           <Card className="bg-white border border-warning-200 rounded-12 box-shadow-sm transition-2 item-hover h-100">
             <Card.Body className="p-20">
               <div className="d-flex align-items-center justify-content-between mb-12">
@@ -248,38 +304,6 @@ const AcademicDashboard = () => {
               </div>
               <h3 className="text-neutral-900 fw-bold mb-4">{stats.totalTeachers}</h3>
               <p className="text-neutral-500 mb-0 text-13">Giảng viên</p>
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col md={6} lg={4} xl={2}>
-          <Card className="bg-white border border-neutral-200 rounded-12 box-shadow-sm transition-2 item-hover h-100">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center justify-content-between mb-12">
-                <div className="bg-neutral-700 text-white rounded-circle d-flex align-items-center justify-content-center"
-                     style={{ width: '48px', height: '48px' }}>
-                  <i className="fas fa-calendar-day"></i>
-                </div>
-                <Badge className="bg-neutral-100 text-neutral-700 px-10 py-4">Hôm nay</Badge>
-              </div>
-              <h3 className="text-neutral-900 fw-bold mb-4">{stats.todaySchedules}</h3>
-              <p className="text-neutral-500 mb-0 text-13">Lịch học hôm nay</p>
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col md={6} lg={4} xl={2}>
-          <Card className="bg-white border border-danger-200 rounded-12 box-shadow-sm transition-2 item-hover h-100">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center justify-content-between mb-12">
-                <div className="bg-danger-600 text-white rounded-circle d-flex align-items-center justify-content-center"
-                     style={{ width: '48px', height: '48px' }}>
-                  <i className="fas fa-bell"></i>
-                </div>
-                <Badge className="bg-danger-50 text-danger-600 px-10 py-4">New</Badge>
-              </div>
-              <h3 className="text-neutral-900 fw-bold mb-4">{stats.upcomingEvents}</h3>
-              <p className="text-neutral-500 mb-0 text-13">Sự kiện sắp tới</p>
             </Card.Body>
           </Card>
         </Col>
@@ -342,27 +366,116 @@ const AcademicDashboard = () => {
           </Card>
         </Col>
 
-        {/* Recent Activities */}
+        {/* Recent Activities & Work Requests */}
         <Col lg={4}>
           <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24 h-100">
             <Card.Header className="bg-main-25 border-0 p-20">
-              <h5 className="text-neutral-900 fw-semibold mb-0">Hoạt động gần đây</h5>
-            </Card.Header>
-            <Card.Body className="p-20">
-              <div className="d-flex flex-column gap-16">
-                {recentActivities.map(activity => (
-                  <div key={activity.id} className="d-flex gap-12 pb-16 border-bottom border-neutral-100">
-                    {getActivityIcon(activity)}
-                    <div className="flex-grow-1">
-                      <p className="text-neutral-700 mb-4 text-14">{activity.message}</p>
-                      <span className="text-neutral-400 text-12">
-                        <i className="fas fa-clock me-1"></i>
-                        {activity.time}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+              <div className="d-flex gap-8 mb-0">
+                <Button
+                  size="sm"
+                  className={`flex-fill text-13 fw-medium px-16 py-8 radius-8 ${
+                    activeTab === 'activities' ? 'btn-main' : 'btn-outline-main'
+                  }`}
+                  onClick={() => setActiveTab('activities')}
+                >
+                  <i className="fas fa-history me-2"></i>
+                  Hoạt động
+                </Button>
+                <Button
+                  size="sm"
+                  className={`flex-fill text-13 fw-medium px-16 py-8 radius-8 position-relative ${
+                    activeTab === 'requests' ? 'btn-main' : 'btn-outline-main'
+                  }`}
+                  onClick={() => setActiveTab('requests')}
+                >
+                  <i className="fas fa-tasks me-2"></i>
+                  Yêu cầu
+                  {workRequests.filter(r => r.status === 'pending').length > 0 && (
+                    <Badge 
+                      className="position-absolute top-0 start-100 translate-middle bg-danger-600 rounded-pill"
+                      style={{ padding: '2px 6px', fontSize: '10px' }}
+                    >
+                      {workRequests.filter(r => r.status === 'pending').length}
+                    </Badge>
+                  )}
+                </Button>
               </div>
+            </Card.Header>
+            <Card.Body className="p-20" style={{ maxHeight: '500px', overflowY: 'auto' }}>
+              {activeTab === 'activities' ? (
+                <div className="d-flex flex-column gap-16">
+                  {recentActivities.map(activity => (
+                    <div key={activity.id} className="d-flex gap-12 pb-16 border-bottom border-neutral-100">
+                      {getActivityIcon(activity)}
+                      <div className="flex-grow-1">
+                        <p className="text-neutral-700 mb-4 text-14">{activity.message}</p>
+                        <span className="text-neutral-400 text-12">
+                          <i className="fas fa-clock me-1"></i>
+                          {activity.time}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="d-flex flex-column gap-12">
+                  {workRequests.map(request => {
+                    const priorityColors = {
+                      high: { bg: 'bg-danger-50', border: 'border-danger-200', badge: 'bg-danger-600' },
+                      medium: { bg: 'bg-warning-50', border: 'border-warning-200', badge: 'bg-warning-600' },
+                      low: { bg: 'bg-info-50', border: 'border-info-200', badge: 'bg-info-600' }
+                    };
+                    const colors = priorityColors[request.priority];
+
+                    return (
+                      <Card 
+                        key={request.id} 
+                        className={`${colors.bg} border ${colors.border} rounded-12 transition-2 item-hover`}
+                      >
+                        <Card.Body className="p-16">
+                          <div className="d-flex gap-12 mb-10">
+                            {getActivityIcon(request)}
+                            <div className="flex-grow-1">
+                              <div className="d-flex justify-content-between align-items-start mb-6">
+                                <Badge className={`${colors.badge} text-white px-8 py-4 text-11 fw-semibold`}>
+                                  {request.priority === 'high' && 'Ưu tiên cao'}
+                                  {request.priority === 'medium' && 'Trung bình'}
+                                  {request.priority === 'low' && 'Thấp'}
+                                </Badge>
+                                <span className="text-neutral-400 text-11">
+                                  <i className="fas fa-clock me-1"></i>
+                                  {request.time}
+                                </span>
+                              </div>
+                              <p className="text-neutral-700 mb-6 text-13 fw-medium">{request.message}</p>
+                              <p className="text-neutral-500 mb-0 text-12">
+                                <i className="fas fa-user me-1"></i>
+                                {request.requester}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="d-flex gap-8 mt-12">
+                            <Button 
+                              size="sm" 
+                              className="btn-success text-12 fw-medium flex-fill px-12 py-6"
+                            >
+                              <i className="fas fa-check me-1"></i>
+                              Xử lý
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              className="btn-outline-neutral text-12 fw-medium flex-fill px-12 py-6"
+                            >
+                              <i className="fas fa-eye me-1"></i>
+                              Chi tiết
+                            </Button>
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </Card.Body>
           </Card>
         </Col>

@@ -13,7 +13,14 @@ const TeacherClassDetail = () => {
   const [students, setStudents] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [assignments, setAssignments] = useState([]);
+  const [lessons, setLessons] = useState([]);
   const [showMaterialModal, setShowMaterialModal] = useState(false);
+  const [showAssignmentDetail, setShowAssignmentDetail] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [showGradingModal, setShowGradingModal] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState(null);
+  const [gradeScore, setGradeScore] = useState('');
+  const [gradeComment, setGradeComment] = useState('');
 
   useEffect(() => {
     fetchClassDetails();
@@ -121,7 +128,12 @@ const TeacherClassDetail = () => {
         submitted: 18,
         total: 25,
         graded: 10,
-        averageScore: 7.8
+        averageScore: 7.8,
+        submissions: [
+          { studentId: 1, studentName: 'Nguyễn Văn A', submittedAt: '2025-11-18T14:30:00', score: 8.5, status: 'graded' },
+          { studentId: 2, studentName: 'Trần Thị B', submittedAt: '2025-11-19T10:15:00', score: 7.0, status: 'graded' },
+          { studentId: 3, studentName: 'Lê Văn C', submittedAt: '2025-11-19T16:45:00', score: null, status: 'submitted' }
+        ]
       },
       {
         id: 2,
@@ -131,7 +143,80 @@ const TeacherClassDetail = () => {
         submitted: 25,
         total: 25,
         graded: 20,
-        averageScore: 8.2
+        averageScore: 8.2,
+        submissions: [
+          { studentId: 1, studentName: 'Nguyễn Văn A', submittedAt: '2025-11-14T09:20:00', score: 9.0, status: 'graded' },
+          { studentId: 2, studentName: 'Trần Thị B', submittedAt: '2025-11-14T11:30:00', score: 8.5, status: 'graded' }
+        ]
+      }
+    ];
+
+    const mockLessons = [
+      {
+        id: 1,
+        lessonNumber: 1,
+        date: '2025-09-01',
+        time: '18:00-20:00',
+        topic: 'Introduction & Greetings',
+        status: 'completed',
+        attendanceCount: 24,
+        totalStudents: 25,
+        hasAttendance: true
+      },
+      {
+        id: 2,
+        lessonNumber: 2,
+        date: '2025-09-03',
+        time: '18:00-20:00',
+        topic: 'Present Simple Tense',
+        status: 'completed',
+        attendanceCount: 23,
+        totalStudents: 25,
+        hasAttendance: true
+      },
+      {
+        id: 3,
+        lessonNumber: 3,
+        date: '2025-09-05',
+        time: '18:00-20:00',
+        topic: 'Daily Routines & Activities',
+        status: 'completed',
+        attendanceCount: 25,
+        totalStudents: 25,
+        hasAttendance: true
+      },
+      {
+        id: 18,
+        lessonNumber: 18,
+        date: '2025-11-11',
+        time: '18:00-20:00',
+        topic: 'Past Continuous',
+        status: 'completed',
+        attendanceCount: 22,
+        totalStudents: 25,
+        hasAttendance: true
+      },
+      {
+        id: 19,
+        lessonNumber: 19,
+        date: '2025-11-13',
+        time: '18:00-20:00',
+        topic: 'Present Perfect Tense',
+        status: 'upcoming',
+        attendanceCount: 0,
+        totalStudents: 25,
+        hasAttendance: false
+      },
+      {
+        id: 20,
+        lessonNumber: 20,
+        date: '2025-11-15',
+        time: '18:00-20:00',
+        topic: 'Present Perfect vs Past Simple',
+        status: 'scheduled',
+        attendanceCount: 0,
+        totalStudents: 25,
+        hasAttendance: false
       }
     ];
 
@@ -139,6 +224,7 @@ const TeacherClassDetail = () => {
     setStudents(mockStudents);
     setMaterials(mockMaterials);
     setAssignments(mockAssignments);
+    setLessons(mockLessons);
   };
 
   const getFileIcon = (type) => {
@@ -161,12 +247,56 @@ const TeacherClassDetail = () => {
     return colors[type] || 'text-neutral-600';
   };
 
+  const getLessonStatusBadge = (status) => {
+    const statusConfig = {
+      completed: { bg: 'bg-success-600', text: 'Đã học' },
+      upcoming: { bg: 'bg-warning-600', text: 'Sắp diễn ra' },
+      scheduled: { bg: 'bg-neutral-400', text: 'Đã lên lịch' }
+    };
+    const config = statusConfig[status] || statusConfig.scheduled;
+    return <Badge className={`${config.bg} text-white px-10 py-4 text-11`}>{config.text}</Badge>;
+  };
+
+  const handleViewAssignment = (assignment) => {
+    setSelectedAssignment(assignment);
+    setShowAssignmentDetail(true);
+  };
+
+  const handleGradeSubmission = (submission) => {
+    setSelectedSubmission(submission);
+    setGradeScore(submission.score || '');
+    setGradeComment('');
+    setShowGradingModal(true);
+  };
+
+  const handleSaveGrade = () => {
+    // TODO: API call to save grade
+    console.log('Saving grade:', {
+      submissionId: selectedSubmission.studentId,
+      score: gradeScore,
+      comment: gradeComment
+    });
+    setShowGradingModal(false);
+    setGradeScore('');
+    setGradeComment('');
+  };
+
+  const handleDownloadSubmission = (submission) => {
+    // TODO: Implement download logic
+    console.log('Downloading submission for:', submission.studentName);
+  };
+
+  const handleDownloadAllSubmissions = () => {
+    // TODO: Implement download all logic
+    console.log('Downloading all submissions for assignment:', selectedAssignment.title);
+  };
+
   if (!classInfo) {
     return <div>Loading...</div>;
   }
 
   return (
-    <Container fluid className="py-24 px-24" style={{ backgroundColor: '#f8f9fa' }}>
+    <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
       {/* Breadcrumb */}
       <div className="mb-16">
         <Link to="/teacher/classes" className="text-neutral-600 text-13 text-decoration-none">
@@ -396,6 +526,78 @@ const TeacherClassDetail = () => {
               </div>
             </Tab>
 
+            {/* Lessons Tab */}
+            <Tab eventKey="lessons" title={
+              <span className="px-8">
+                <i className="fas fa-calendar-week me-2"></i>
+                Lịch trình ({lessons.length} buổi)
+              </span>
+            }>
+              <div className="p-0">
+                <Table hover className="mb-0">
+                  <thead>
+                    <tr className="bg-neutral-25">
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Buổi</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Ngày học</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Thời gian</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Chủ đề</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Điểm danh</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Trạng thái</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lessons.map(lesson => (
+                      <tr key={lesson.id}>
+                        <td className="px-20 py-16">
+                          <Badge className="bg-neutral-100 text-neutral-900 px-10 py-6">
+                            Buổi {lesson.lessonNumber}
+                          </Badge>
+                        </td>
+                        <td className="px-20 py-16 text-neutral-900 fw-medium text-13">
+                          {new Date(lesson.date).toLocaleDateString('vi-VN', { 
+                            weekday: 'short', 
+                            day: '2-digit', 
+                            month: '2-digit',
+                            year: 'numeric'
+                          })}
+                        </td>
+                        <td className="px-20 py-16 text-neutral-700 text-13">{lesson.time}</td>
+                        <td className="px-20 py-16">
+                          <div className="text-neutral-900 text-14">{lesson.topic}</div>
+                        </td>
+                        <td className="px-20 py-16 text-center">
+                          {lesson.hasAttendance ? (
+                            <div>
+                              <span className="text-neutral-900 fw-medium text-13">
+                                {lesson.attendanceCount}/{lesson.totalStudents}
+                              </span>
+                              <div className="text-neutral-500 text-11">
+                                {Math.round((lesson.attendanceCount / lesson.totalStudents) * 100)}%
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-neutral-400 text-12">Chưa điểm danh</span>
+                          )}
+                        </td>
+                        <td className="px-20 py-16 text-center">
+                          {getLessonStatusBadge(lesson.status)}
+                        </td>
+                        <td className="px-20 py-16 text-center">
+                          <Link to={`/teacher/lessons/${lesson.id}`}>
+                            <Button className="btn-outline-main text-12 px-12 py-6 radius-6">
+                              <i className="fas fa-eye me-1"></i>
+                              Chi tiết
+                            </Button>
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
+            </Tab>
+
             {/* Materials Tab */}
             <Tab eventKey="materials" title={
               <span className="px-8">
@@ -520,7 +722,10 @@ const TeacherClassDetail = () => {
                           <span className="text-neutral-900 fw-bold text-14">{assignment.averageScore}</span>
                         </td>
                         <td className="px-20 py-16 text-center">
-                          <Button className="btn-outline-main text-12 px-12 py-6 radius-6">
+                          <Button 
+                            className="btn-outline-main text-12 px-12 py-6 radius-6"
+                            onClick={() => handleViewAssignment(assignment)}
+                          >
                             <i className="fas fa-eye me-1"></i>
                             Chi tiết
                           </Button>
@@ -534,6 +739,231 @@ const TeacherClassDetail = () => {
           </Tabs>
         </Card.Body>
       </Card>
+
+      {/* Assignment Detail Modal */}
+      <Modal 
+        show={showAssignmentDetail} 
+        onHide={() => setShowAssignmentDetail(false)}
+        size="lg"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            {selectedAssignment?.title}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedAssignment && (
+            <>
+              {/* Assignment Info */}
+              <Row className="mb-20">
+                <Col md={3}>
+                  <div className="text-neutral-600 text-12 mb-4">Loại bài tập</div>
+                  <Badge className={
+                    selectedAssignment.type === 'homework' ? 'bg-info-100 text-info-600' :
+                    selectedAssignment.type === 'practice' ? 'bg-warning-100 text-warning-600' :
+                    'bg-danger-100 text-danger-600'
+                  }>
+                    {selectedAssignment.type === 'homework' ? 'Bài tập' :
+                     selectedAssignment.type === 'practice' ? 'Luyện tập' : 'Kiểm tra'}
+                  </Badge>
+                </Col>
+                <Col md={3}>
+                  <div className="text-neutral-600 text-12 mb-4">Hạn nộp</div>
+                  <div className="text-neutral-900 fw-medium text-13">
+                    {new Date(selectedAssignment.dueDate).toLocaleDateString('vi-VN')}
+                  </div>
+                </Col>
+                <Col md={3}>
+                  <div className="text-neutral-600 text-12 mb-4">Tỷ lệ nộp</div>
+                  <div className="text-neutral-900 fw-bold text-14">
+                    {selectedAssignment.submitted}/{selectedAssignment.total}
+                    <span className="text-neutral-500 fw-normal text-12 ms-1">
+                      ({Math.round((selectedAssignment.submitted / selectedAssignment.total) * 100)}%)
+                    </span>
+                  </div>
+                </Col>
+                <Col md={3}>
+                  <div className="text-neutral-600 text-12 mb-4">Điểm trung bình</div>
+                  <div className="text-main-600 fw-bold text-16">{selectedAssignment.averageScore}</div>
+                </Col>
+              </Row>
+
+              {/* Submissions List */}
+              <div className="border-top pt-20">
+                <div className="d-flex justify-content-between align-items-center mb-16">
+                  <h6 className="text-neutral-900 fw-semibold mb-0">
+                    Danh sách nộp bài ({selectedAssignment.submissions.length})
+                  </h6>
+                  {selectedAssignment.submissions.length > 0 && (
+                    <Button 
+                      className="btn-success text-12 px-16 py-8 radius-8"
+                      onClick={handleDownloadAllSubmissions}
+                    >
+                      <i className="fas fa-download me-2"></i>
+                      Tải hết bài tập
+                    </Button>
+                  )}
+                </div>
+                <Table hover className="mb-0">
+                  <thead>
+                    <tr className="bg-neutral-25">
+                      <th className="px-16 py-12 text-neutral-900 fw-semibold text-12 border-0">STT</th>
+                      <th className="px-16 py-12 text-neutral-900 fw-semibold text-12 border-0">Học viên</th>
+                      <th className="px-16 py-12 text-neutral-900 fw-semibold text-12 border-0">Thời gian nộp</th>
+                      <th className="px-16 py-12 text-neutral-900 fw-semibold text-12 border-0 text-center">Điểm</th>
+                      <th className="px-16 py-12 text-neutral-900 fw-semibold text-12 border-0 text-center">Trạng thái</th>
+                      <th className="px-16 py-12 text-neutral-900 fw-semibold text-12 border-0 text-center">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedAssignment.submissions.map((submission, index) => (
+                      <tr key={submission.studentId}>
+                        <td className="px-16 py-12 text-neutral-700 text-12">{index + 1}</td>
+                        <td className="px-16 py-12 text-neutral-900 text-13">{submission.studentName}</td>
+                        <td className="px-16 py-12 text-neutral-700 text-12">
+                          {new Date(submission.submittedAt).toLocaleString('vi-VN')}
+                        </td>
+                        <td className="px-16 py-12 text-center">
+                          {submission.score !== null ? (
+                            <span className="text-neutral-900 fw-bold text-13">{submission.score}</span>
+                          ) : (
+                            <span className="text-neutral-400 text-12">Chưa chấm</span>
+                          )}
+                        </td>
+                        <td className="px-16 py-12 text-center">
+                          <Badge className={
+                            submission.status === 'graded' ? 'bg-success-100 text-success-600' :
+                            submission.status === 'submitted' ? 'bg-warning-100 text-warning-600' :
+                            'bg-neutral-100 text-neutral-600'
+                          }>
+                            {submission.status === 'graded' ? 'Đã chấm' :
+                             submission.status === 'submitted' ? 'Chờ chấm' : 'Chưa nộp'}
+                          </Badge>
+                        </td>
+                        <td className="px-16 py-12 text-center">
+                          <div className="d-flex gap-4 justify-content-center">
+                            <Button 
+                              className="btn-outline-success text-11 px-8 py-4 radius-6"
+                              onClick={() => handleDownloadSubmission(submission)}
+                              title="Tải bài"
+                            >
+                              <i className="fas fa-download"></i>
+                            </Button>
+                            <Button 
+                              className={submission.status === 'graded' ? 'btn-outline-main text-11 px-10 py-4 radius-6' : 'btn-main text-11 px-10 py-4 radius-6'}
+                              onClick={() => handleGradeSubmission(submission)}
+                            >
+                              <i className={`fas ${submission.status === 'graded' ? 'fa-edit' : 'fa-pen'} me-1`}></i>
+                              {submission.status === 'graded' ? 'Sửa điểm' : 'Chấm điểm'}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+
+                {/* Not Submitted Students */}
+                {selectedAssignment.total > selectedAssignment.submissions.length && (
+                  <div className="mt-16 p-12 bg-warning-25 border border-warning-200 rounded-8">
+                    <div className="text-warning-700 text-12">
+                      <i className="fas fa-exclamation-triangle me-2"></i>
+                      <strong>{selectedAssignment.total - selectedAssignment.submissions.length} học viên</strong> chưa nộp bài
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button className="btn-outline-neutral" onClick={() => setShowAssignmentDetail(false)}>
+            Đóng
+          </Button>
+          <Button className="btn-main">
+            <i className="fas fa-file-export me-2"></i>
+            Xuất báo cáo
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Grading Modal */}
+      <Modal show={showGradingModal} onHide={() => setShowGradingModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Chấm điểm bài tập</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedSubmission && (
+            <>
+              <div className="mb-20 p-16 bg-neutral-50 rounded-8">
+                <div className="d-flex justify-content-between align-items-center mb-8">
+                  <span className="text-neutral-600 text-12">Học viên</span>
+                  <span className="text-neutral-900 fw-semibold text-14">{selectedSubmission.studentName}</span>
+                </div>
+                <div className="d-flex justify-content-between align-items-center">
+                  <span className="text-neutral-600 text-12">Thời gian nộp</span>
+                  <span className="text-neutral-700 text-13">
+                    {new Date(selectedSubmission.submittedAt).toLocaleString('vi-VN')}
+                  </span>
+                </div>
+              </div>
+
+              <Form>
+                <Form.Group className="mb-16">
+                  <Form.Label className="text-neutral-900 fw-semibold text-13">
+                    Điểm số <span className="text-danger-600">*</span>
+                  </Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="0.1"
+                    placeholder="Nhập điểm (0-10)"
+                    value={gradeScore}
+                    onChange={(e) => setGradeScore(e.target.value)}
+                    className="radius-8"
+                  />
+                  <Form.Text className="text-muted">
+                    Nhập điểm từ 0 đến 10
+                  </Form.Text>
+                </Form.Group>
+
+                <Form.Group className="mb-16">
+                  <Form.Label className="text-neutral-900 fw-semibold text-13">Nhận xét</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={4}
+                    placeholder="Nhận xét về bài làm của học viên..."
+                    value={gradeComment}
+                    onChange={(e) => setGradeComment(e.target.value)}
+                    className="radius-8"
+                  />
+                </Form.Group>
+
+                <div className="p-12 bg-info-25 border border-info-200 rounded-8">
+                  <div className="text-info-700 text-12">
+                    <i className="fas fa-info-circle me-2"></i>
+                    Điểm số và nhận xét sẽ được gửi đến học viên sau khi lưu
+                  </div>
+                </div>
+              </Form>
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button className="btn-outline-neutral" onClick={() => setShowGradingModal(false)}>
+            Hủy
+          </Button>
+          <Button 
+            className="btn-main"
+            onClick={handleSaveGrade}
+            disabled={!gradeScore || gradeScore < 0 || gradeScore > 10}
+          >
+            <i className="fas fa-save me-2"></i>
+            Lưu điểm
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       {/* Upload Material Modal */}
       <Modal show={showMaterialModal} onHide={() => setShowMaterialModal(false)}>

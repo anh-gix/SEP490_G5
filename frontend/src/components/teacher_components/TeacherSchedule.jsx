@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table } from 'react-bootstrap';
 
 /**
@@ -221,17 +222,21 @@ const TeacherSchedule = () => {
                     {daySchedules.length > 0 ? (
                       <div className="d-flex flex-column gap-8">
                         {daySchedules.map(schedule => (
-                          <div
+                          <Link 
                             key={schedule.id}
-                            className={`border rounded-8 p-12 cursor-pointer transition-2 ${
-                              schedule.status === 'upcoming'
-                                ? 'border-main-200 bg-main-50 hover-shadow-sm'
-                                : schedule.status === 'completed'
-                                ? 'border-success-200 bg-success-50'
-                                : 'border-neutral-200 bg-neutral-50'
-                            }`}
-                            style={{ cursor: 'pointer' }}
+                            to={`/teacher/lessons/${schedule.id}`}
+                            className="text-decoration-none"
                           >
+                            <div
+                              className={`border rounded-8 p-12 cursor-pointer transition-2 ${
+                                schedule.status === 'upcoming'
+                                  ? 'border-main-200 bg-main-50 hover-shadow-sm'
+                                  : schedule.status === 'completed'
+                                  ? 'border-success-200 bg-success-50'
+                                  : 'border-neutral-200 bg-neutral-50'
+                              }`}
+                              style={{ cursor: 'pointer' }}
+                            >
                             <div className="d-flex align-items-start justify-content-between mb-8">
                               <div className="text-neutral-900 fw-bold text-13">
                                 {schedule.startTime}
@@ -290,6 +295,7 @@ const TeacherSchedule = () => {
                               </Button>
                             )}
                           </div>
+                        </Link>
                         ))}
                       </div>
                     ) : (
@@ -414,27 +420,57 @@ const TeacherSchedule = () => {
               <tbody>
                 {filteredSchedules.length > 0 ? (
                   filteredSchedules.map((schedule) => (
-                    <tr key={schedule.id} className="transition-2">
-                      <td className="px-20 py-16 text-neutral-700 text-13">{formatDate(schedule.date)}</td>
-                      <td className="px-20 py-16 text-neutral-700 text-13">{schedule.startTime} - {schedule.endTime}</td>
-                      <td className="px-20 py-16 text-main-600 fw-semibold text-13">{schedule.className}</td>
-                      <td className="px-20 py-16 text-neutral-700 text-13">Buổi {schedule.lessonNumber}</td>
-                      <td className="px-20 py-16 text-neutral-900 fw-medium text-13">{schedule.topic}</td>
-                      <td className="px-20 py-16 text-neutral-700 text-13">{schedule.room}</td>
-                      <td className="px-20 py-16 text-neutral-700 text-13">{schedule.totalStudents}</td>
+                    <tr key={schedule.id} className="transition-2" style={{ cursor: 'pointer' }}>
+                      <td className="px-20 py-16 text-neutral-700 text-13">
+                        <Link to={`/teacher/lessons/${schedule.id}`} className="text-decoration-none text-neutral-700">
+                          {formatDate(schedule.date)}
+                        </Link>
+                      </td>
+                      <td className="px-20 py-16 text-neutral-700 text-13">
+                        <Link to={`/teacher/lessons/${schedule.id}`} className="text-decoration-none text-neutral-700">
+                          {schedule.startTime} - {schedule.endTime}
+                        </Link>
+                      </td>
+                      <td className="px-20 py-16 text-main-600 fw-semibold text-13">
+                        <Link to={`/teacher/lessons/${schedule.id}`} className="text-decoration-none text-main-600">
+                          {schedule.className}
+                        </Link>
+                      </td>
+                      <td className="px-20 py-16 text-neutral-700 text-13">
+                        <Link to={`/teacher/lessons/${schedule.id}`} className="text-decoration-none text-neutral-700">
+                          Buổi {schedule.lessonNumber}
+                        </Link>
+                      </td>
+                      <td className="px-20 py-16 text-neutral-900 fw-medium text-13">
+                        <Link to={`/teacher/lessons/${schedule.id}`} className="text-decoration-none text-neutral-900">
+                          {schedule.topic}
+                        </Link>
+                      </td>
+                      <td className="px-20 py-16 text-neutral-700 text-13">
+                        <Link to={`/teacher/lessons/${schedule.id}`} className="text-decoration-none text-neutral-700">
+                          {schedule.room}
+                        </Link>
+                      </td>
+                      <td className="px-20 py-16 text-neutral-700 text-13">
+                        <Link to={`/teacher/lessons/${schedule.id}`} className="text-decoration-none text-neutral-700">
+                          {schedule.totalStudents}
+                        </Link>
+                      </td>
                       <td className="px-20 py-16 text-13">{getStatusBadge(schedule.status)}</td>
                       <td className="px-20 py-16 text-center">
-                        {schedule.status === 'upcoming' && (
-                          <Button className="btn-main text-13 fw-medium px-12 py-6 radius-6">
-                            <i className="fas fa-chalkboard-teacher me-1"></i>
-                            Vào lớp
+                        <Link to={`/teacher/lessons/${schedule.id}`}>
+                          <Button className="btn-outline-main text-13 fw-medium px-12 py-6 radius-6 me-2">
+                            <i className="fas fa-eye me-1"></i>
+                            Chi tiết
                           </Button>
-                        )}
+                        </Link>
                         {schedule.status === 'completed' && !schedule.attendanceCompleted && (
-                          <Button className="btn-outline-warning text-13 fw-medium px-12 py-6 radius-6">
-                            <i className="fas fa-user-check me-1"></i>
-                            Điểm danh
-                          </Button>
+                          <Link to={`/teacher/attendance/${schedule.id}`}>
+                            <Button className="btn-outline-warning text-13 fw-medium px-12 py-6 radius-6">
+                              <i className="fas fa-user-check me-1"></i>
+                              Điểm danh
+                            </Button>
+                          </Link>
                         )}
                       </td>
                     </tr>

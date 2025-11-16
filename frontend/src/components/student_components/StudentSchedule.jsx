@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table, Spinner, Alert } from 'react-bootstrap';
 import RequestAbsenceModal from './RequestAbsenceModal';
 import { useAuth } from '../../contexts/AuthContext';
-import studentScheduleService from '../../services/studentScheduleService';
+// import studentScheduleService from '../../services/studentScheduleService'; // TODO: Temporarily disabled for mock data
 
 /**
  * Student Schedule Component
@@ -127,20 +127,160 @@ const StudentSchedule = () => {
     // Lấy user từ AuthContext hoặc localStorage
     const currentUser = user || JSON.parse(localStorage.getItem('user') || 'null');
     
-    if (!currentUser || !currentUser._id) {
-      setError('Không tìm thấy thông tin học sinh. Vui lòng đăng nhập lại.');
-      setLoading(false);
-      return;
-    }
+    console.log('Current user:', currentUser); // Debug
+    
+    // TODO: Temporarily skip user check for mock data
+    // if (!currentUser || !currentUser._id) {
+    //   setError('Không tìm thấy thông tin học sinh. Vui lòng đăng nhập lại.');
+    //   setLoading(false);
+    //   return;
+    // }
 
     try {
       setLoading(true);
       setError(null);
     
-      const response = await studentScheduleService.getStudentSchedule(currentUser._id);/* cái trong ngoặc phải là currentUser._id */
+      // TODO: Temporarily using mock data instead of API
+      // const response = await studentScheduleService.getStudentSchedule(currentUser._id);
+      
+      // Mock schedule data
+      const today = new Date();
+      const mockSchedules = [
+        // Previous week
+        {
+          _id: '1',
+          date: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 10).toISOString(),
+          startTime: '18:00',
+          endTime: '20:00',
+          topic: 'Introduction & Greetings',
+          teacher: { username: 'Nguyễn Văn A' },
+          room: { room_name: '102', location: 'Tòa A' },
+          className: 'A2-Evening-01',
+          subject: 'Grammar',
+          attendance: { status: 'present' }
+        },
+        {
+          _id: '2',
+          date: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 8).toISOString(),
+          startTime: '18:00',
+          endTime: '20:00',
+          topic: 'Present Simple Tense',
+          teacher: { username: 'Nguyễn Văn A' },
+          room: { room_name: '102', location: 'Tòa A' },
+          className: 'A2-Evening-01',
+          subject: 'Grammar',
+          attendance: { status: 'present' }
+        },
+        {
+          _id: '3',
+          date: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6).toISOString(),
+          startTime: '18:00',
+          endTime: '20:00',
+          topic: 'Daily Routines & Activities',
+          teacher: { username: 'Nguyễn Văn A' },
+          room: { room_name: '102', location: 'Tòa A' },
+          className: 'A2-Evening-01',
+          subject: 'Vocabulary',
+          attendance: { status: 'present' }
+        },
+        // This week
+        {
+          _id: '4',
+          date: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 3).toISOString(),
+          startTime: '18:00',
+          endTime: '20:00',
+          topic: 'Reading Comprehension Skills',
+          teacher: { username: 'Nguyễn Văn A' },
+          room: { room_name: '102', location: 'Tòa A' },
+          className: 'A2-Evening-01',
+          subject: 'Reading',
+          attendance: { status: 'present' }
+        },
+        {
+          _id: '5',
+          date: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1).toISOString(),
+          startTime: '18:00',
+          endTime: '20:00',
+          topic: 'Listening Practice - Part 1',
+          teacher: { username: 'Nguyễn Văn A' },
+          room: { room_name: '102', location: 'Tòa A' },
+          className: 'A2-Evening-01',
+          subject: 'Listening',
+          attendance: { status: 'present' }
+        },
+        // Upcoming lessons
+        {
+          _id: '6',
+          date: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString(),
+          startTime: '18:00',
+          endTime: '20:00',
+          topic: 'Present Perfect Tense',
+          teacher: { username: 'Nguyễn Văn A' },
+          room: { room_name: '102', location: 'Tòa A' },
+          className: 'A2-Evening-01',
+          subject: 'Grammar',
+          attendance: null
+        },
+        {
+          _id: '7',
+          date: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 3).toISOString(),
+          startTime: '18:00',
+          endTime: '20:00',
+          topic: 'Past Continuous Tense',
+          teacher: { username: 'Nguyễn Văn A' },
+          room: { room_name: '102', location: 'Tòa A' },
+          className: 'A2-Evening-01',
+          subject: 'Grammar',
+          attendance: null
+        },
+        {
+          _id: '8',
+          date: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 5).toISOString(),
+          startTime: '18:00',
+          endTime: '20:00',
+          topic: 'Writing Skills - Email Writing',
+          teacher: { username: 'Nguyễn Văn A' },
+          room: { room_name: '102', location: 'Tòa A' },
+          className: 'A2-Evening-01',
+          subject: 'Writing',
+          attendance: null
+        },
+        {
+          _id: '9',
+          date: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 8).toISOString(),
+          startTime: '18:00',
+          endTime: '20:00',
+          topic: 'Speaking Practice - Conversations',
+          teacher: { username: 'Nguyễn Văn A' },
+          room: { room_name: '102', location: 'Tòa A' },
+          className: 'A2-Evening-01',
+          subject: 'Speaking',
+          attendance: null
+        },
+        {
+          _id: '10',
+          date: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 10).toISOString(),
+          startTime: '18:00',
+          endTime: '20:00',
+          topic: 'Review & Practice Test',
+          teacher: { username: 'Nguyễn Văn A' },
+          room: { room_name: '102', location: 'Tòa A' },
+          className: 'A2-Evening-01',
+          subject: 'Review',
+          attendance: null
+        }
+      ];
+
+      const response = {
+        schedules: mockSchedules
+      };
+      
+      console.log('Mock schedules:', mockSchedules); // Debug
+      console.log('Response:', response); // Debug
       
       if (response && response.schedules && Array.isArray(response.schedules)) {
         const transformedData = transformScheduleData(response.schedules);
+        console.log('Transformed data:', transformedData); // Debug
         setSchedules(transformedData);
       } else {
         setSchedules([]);
@@ -429,7 +569,7 @@ const StudentSchedule = () => {
     const weekDayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
     return (
-      <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
+      <Card className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
         <Card.Body className="p-0">
           {/* Month Header */}
           <div className="d-flex border-bottom border-neutral-100">
@@ -541,7 +681,7 @@ const StudentSchedule = () => {
 
   const renderListView = () => {
     return (
-      <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
+      <Card className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
         <Card.Body className="p-0">
           <div className="table-responsive">
             <Table hover className="mb-0">
@@ -687,7 +827,7 @@ const StudentSchedule = () => {
       </div>
 
       {/* Filters & Controls */}
-      <Card className="bg-white border-0 rounded-12 mb- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}24">
+      <Card className="bg-white border-0 rounded-12 mb-24" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
         <Card.Body className="p-20">
           <Row className="align-items-center">
             <Col lg={4}>

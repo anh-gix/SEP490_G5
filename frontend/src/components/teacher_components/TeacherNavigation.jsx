@@ -38,12 +38,6 @@ const TeacherNavigation = () => {
       color: 'main'
     },
     {
-      title: 'Chấm điểm',
-      icon: 'fa-star',
-      path: '/teacher/grading',
-      color: 'warning'
-    },
-    {
       title: 'Tài liệu giảng dạy',
       icon: 'fa-file-alt',
       path: '/teacher/materials',

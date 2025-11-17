@@ -109,7 +109,7 @@ const ScheduleManagement = () => {
       const response = await teacherService.getAllTeachers();
       const transformedTeachers = response.teachers.map(t => ({
         id: t._id,
-        name: `${t.firstName} ${t.lastName}`,
+        name: t.username || t.email || 'N/A',
         email: t.email
       }));
       setTeachers(transformedTeachers);

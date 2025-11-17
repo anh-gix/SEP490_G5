@@ -17,6 +17,9 @@
   "scripts": {
     "start": "nodemon index.js",
     "seed": "node seed-all-data.js",
+    "seed:all": "node scripts/seedAllSystem.js",
+    "seed:level-band": "node scripts/seedLevelBandMapping.js",
+    "update:course-bands": "node scripts/updateCourseBands.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {

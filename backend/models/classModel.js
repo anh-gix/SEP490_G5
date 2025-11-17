@@ -5,11 +5,6 @@ const classSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  level: {
-    type: String,
-    enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'],
-    required: true
-  },
   course: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Course"
@@ -23,24 +18,25 @@ const classSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "User"
   }],
+  // Thêm room (id)
+  room: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Room"
+  },
   startDate: {
     type: Date
   },
   endDate: {
     type: Date
   },
+  //Luu lai so luong sinh vien toi da cua lop luc khai giang
   maxStudents: {
     type: Number,
-    default: 25
   },
   status: {
     type: String,
     enum: ['pending', 'active', 'completed', 'cancelled'],
     default: 'pending'
-  },
-  // Legacy fields for compatibility
-  subject: {
-    type: String
   },
   teacherId: {
     type: mongoose.Schema.Types.ObjectId,

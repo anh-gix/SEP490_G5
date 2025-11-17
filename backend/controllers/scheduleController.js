@@ -25,7 +25,7 @@ exports.getAllSchedules = async (req, res) => {
     let schedules = await ClassSchedule.find(query)
       .populate({
         path: 'class',
-        select: 'name level teacher',
+        select: 'name level teacher startDate endDate', // Thêm startDate và endDate để check conflict
         populate: { path: 'teacher', select: 'fullName email' }
       })
       .populate('room', 'room_name location capacity')

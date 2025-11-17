@@ -11,10 +11,21 @@ exports.getAllTeachers = async (req, res) => {
     const { status, search } = req.query;
     
     // First, find the teacher role
-    const teacherRole = await Role.findOne({ name: 'teacher' });
+    const teacherRole = await Role.findOne({ name: 'Teacher' });
+    
     if (!teacherRole) {
-      return res.status(404).json({ message: "Không tìm thấy role giảng viên" });
+      // Log all available roles for debugging
+      const allRoles = await Role.find({}).select('name');
+      console.error('❌ Không tìm thấy role Teacher. Các roles hiện có:', allRoles);
+      return res.status(404).json({ 
+        success: false,
+        message: "Không tìm thấy role giảng viên",
+        error: "Role 'Teacher' không tồn tại trong database",
+        availableRoles: allRoles.map(r => r.name)
+      });
     }
+    
+    console.log('✅ Found teacher role:', teacherRole.name, teacherRole._id);
     
     let query = { roleId: teacherRole._id };
     
@@ -28,15 +39,18 @@ exports.getAllTeachers = async (req, res) => {
     
     const teachers = await User.find(query)
       .select('-password -token')
-      .populate('roleId', 'name')
+      .populate('roleId', 'name description')
       .sort({ username: 1 });
+    
+    console.log(`📋 Found ${teachers.length} users with roleId: ${teacherRole._id} (${teacherRole.name})`);
     
     // Get additional info for each teacher
     const teachersWithStats = await Promise.all(
       teachers.map(async (teacher) => {
-        const classCount = await Class.countDocuments({ teacherId: teacher._id });
-        const classes = await Class.find({ teacherId: teacher._id }).select('students');
-        const totalStudents = classes.reduce((sum, cls) => sum + cls.students.length, 0);
+        // Class model uses 'teacher' field, not 'teacherId'
+        const classCount = await Class.countDocuments({ teacher: teacher._id });
+        const classes = await Class.find({ teacher: teacher._id }).select('students');
+        const totalStudents = classes.reduce((sum, cls) => sum + (cls.students?.length || 0), 0);
         
         return {
           ...teacher.toObject(),
@@ -48,7 +62,10 @@ exports.getAllTeachers = async (req, res) => {
       })
     );
     
+    console.log(`✅ Returning ${teachersWithStats.length} teachers to frontend`);
+    
     res.status(200).json({
+      success: true,
       message: "Lấy danh sách giảng viên thành công",
       total: teachersWithStats.length,
       teachers: teachersWithStats
@@ -135,7 +152,7 @@ exports.createTeacher = async (req, res) => {
     }
     
     // Find teacher role
-    const teacherRole = await Role.findOne({ name: 'teacher' });
+    const teacherRole = await Role.findOne({ name: 'Teacher' });
     if (!teacherRole) {
       return res.status(404).json({ message: "Không tìm thấy role giảng viên" });
     }
@@ -276,11 +293,14 @@ exports.getTeacherSchedule = async (req, res) => {
     const { id } = req.params;
     const { startDate, endDate } = req.query;
     
-    // Find all classes taught by this teacher
-    const teacherClasses = await Class.find({ teacherId: id }).select('_id name subject');
+    // Find all classes taught by this teacher (Class model uses 'teacher' field, not 'teacherId')
+    const teacherClasses = await Class.find({ teacher: id })
+      .select('_id name startDate endDate')
+      .lean();
     
     if (!teacherClasses || teacherClasses.length === 0) {
       return res.status(200).json({
+        success: true,
         message: "Giảng viên này chưa có lớp nào",
         total: 0,
         schedules: []
@@ -289,7 +309,7 @@ exports.getTeacherSchedule = async (req, res) => {
     
     const classIds = teacherClasses.map(cls => cls._id);
     
-    let query = { class: { $in: classIds } };
+    let query = { class: { $in: classIds }, status: 'approved' };
     
     // Filter by date range if provided
     if (startDate && endDate) {
@@ -300,18 +320,32 @@ exports.getTeacherSchedule = async (req, res) => {
     }
     
     const schedules = await ClassSchedule.find(query)
-      .populate('class', 'name subject')
+      .populate('class', 'name startDate endDate')
       .populate('room', 'room_name location')
-      .sort({ date: 1, startTime: 1 });
+      .populate('session', 'title order')
+      .sort({ date: 1, startTime: 1 })
+      .lean();
+    
+    // Add class date range info to each schedule for easier conflict checking
+    const schedulesWithClassInfo = schedules.map(schedule => {
+      const classInfo = teacherClasses.find(c => c._id.toString() === schedule.class._id.toString());
+      return {
+        ...schedule,
+        classStartDate: classInfo?.startDate,
+        classEndDate: classInfo?.endDate
+      };
+    });
     
     res.status(200).json({
+      success: true,
       message: "Lấy lịch dạy của giảng viên thành công",
-      total: schedules.length,
-      schedules
+      total: schedulesWithClassInfo.length,
+      schedules: schedulesWithClassInfo
     });
   } catch (error) {
     console.error("❌ Lỗi khi lấy lịch dạy:", error);
     res.status(500).json({ 
+      success: false,
       message: "Lỗi server khi lấy lịch dạy",
       error: error.message 
     });
@@ -324,7 +358,7 @@ exports.getTeacherSchedule = async (req, res) => {
 exports.getTeacherStats = async (req, res) => {
   try {
     // Find teacher role
-    const teacherRole = await Role.findOne({ name: 'teacher' });
+    const teacherRole = await Role.findOne({ name: 'Teacher' });
     if (!teacherRole) {
       return res.status(404).json({ message: "Không tìm thấy role giảng viên" });
     }

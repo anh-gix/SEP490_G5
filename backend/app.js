@@ -37,6 +37,7 @@ app.use('/api/student-schedules', require('./routes/studentScheduleRoutes'));
 // Academic Staff Routes
 app.use('/api/rooms', require('./routes/roomRoutes'));
 app.use('/api/teachers', require('./routes/teacherRoutes'));
+app.use('/api/students', require('./routes/studentRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
 
 // Class Routes

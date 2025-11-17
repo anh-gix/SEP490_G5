@@ -32,10 +32,16 @@ const AcademicNavigation = () => {
       color: 'warning'
     },
     {
-      title: 'Giảng viên',
+      title: 'Quản lý giảng viên',
       icon: 'fa-user-tie',
       path: '/academic/teacher-management',
       color: 'main'
+    },
+    {
+      title: 'Quản lý học viên',
+      icon: 'fa-user-graduate',
+      path: '/academic/student-management',
+      color: 'success'
     },
     {
       title: 'Báo cáo',

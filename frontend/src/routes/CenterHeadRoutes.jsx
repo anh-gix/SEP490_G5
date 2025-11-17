@@ -4,12 +4,14 @@ import UserCreatePage from "../pages/UserCreatePage.jsx";
 import UserEditPage from "../pages/UserEditPage.jsx";
 import RoleManagementPage from "../pages/RoleManagementPage.jsx";
 import ProgramListPage from "../pages/ProgramListPage.jsx";
+import ProgramDetailPage from "../pages/ProgramDetailPage.jsx";
 import PendingCoursesPage from "../pages/PendingCoursesPage.jsx";
 import CourseDetailPage from "../pages/CourseDetailPage.jsx";
 import ClassListPage from "../pages/ClassListPage.jsx";
 import PendingSchedulesPage from "../pages/PendingSchedulesPage.jsx";
 import RoomListPage from "../pages/RoomListPage.jsx";
 import ExamListPage from "../pages/ExamListPage.jsx";
+import ExamCreatePage from "../pages/ExamCreatePage.jsx";
 import ReportsOverviewPage from "../pages/ReportsOverviewPage.jsx";
 
 /**
@@ -29,6 +31,7 @@ export const centerHeadRoutes = [
 
   // II. Program & Course Management
   { path: '/center-head/programs', element: <ProgramListPage /> },
+  { path: '/center-head/programs/:id', element: <ProgramDetailPage /> },
   { path: '/courses/pending', element: <PendingCoursesPage /> },
   { path: '/courses/:id/details', element: <CourseDetailPage /> },
 
@@ -41,6 +44,7 @@ export const centerHeadRoutes = [
 
   // V. Exam Management
   { path: '/center-head/exams', element: <ExamListPage /> },
+  { path: '/center-head/exams/create', element: <ExamCreatePage /> },
 
   // VI. Reports & Analytics
   { path: '/center-head/reports', element: <ReportsOverviewPage /> },

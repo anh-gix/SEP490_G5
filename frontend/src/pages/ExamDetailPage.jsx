@@ -146,9 +146,33 @@ const ExamDetailPage = () => {
             </div>
           ) : exam ? (
             <>
-              {!submission ? (
+              {!isAuthenticated ? (
                 <>
-                  {/* Hiển thị thông tin đề thi khi chưa bắt đầu làm bài */}
+                  {/* Hiển thị thông báo khi chưa đăng nhập */}
+                
+
+                  <div className='bg-warning-25 rounded-16 p-32 mb-40 border border-warning-200'>
+                    <div className='text-center'>
+                      <div className='mb-16'>
+                        <i className='ph ph-warning text-warning-600 text-4xl' />
+                      </div>
+                      <h3 className='mb-8'>Bạn chưa đăng nhập</h3>
+                      <p className='text-neutral-600 mb-24'>
+                        Vui lòng đăng nhập để có thể bắt đầu làm bài thi
+                      </p>
+                      <button
+                        onClick={() => navigate("/sign-in")}
+                        className='btn btn-primary btn-lg px-40 py-16 rounded-pill'
+                      >
+                        Tiến hành đăng nhập
+                        <i className='ph ph-arrow-right ms-8' />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : !submission ? (
+                <>
+                  {/* Hiển thị thông tin đề thi khi đã đăng nhập nhưng chưa bắt đầu làm bài */}
                   <div className='bg-main-25 rounded-16 p-24 mb-40 border border-neutral-30'>
                     <h2 className='mb-16'>{exam.title}</h2>
                     {exam.description && (

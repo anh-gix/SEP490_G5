@@ -19,7 +19,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 exports.uploadMiddleware = upload;
 
-// ================== 1. LẤY DANH SÁCH BÀI THI ==================
+// ================== 1. LẤY DANH SÁCH TẤT CẢ BÀI THI ==================
 exports.getAllExams = async (req, res) => {
   try {
     const exams = await Exam.find({ isPublished: true });

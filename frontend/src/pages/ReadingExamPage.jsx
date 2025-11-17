@@ -11,7 +11,7 @@ import { useAuth } from "../contexts/AuthContext";
 const ReadingExamPage = () => {
   const { examId, submissionId } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [sectionData, setSectionData] = useState(null);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
@@ -75,6 +75,11 @@ const ReadingExamPage = () => {
 
   // Fetch section + initialize state
   useEffect(() => {
+    // Đợi AuthContext hoàn thành việc kiểm tra authentication trước khi redirect
+    if (authLoading) {
+      return;
+    }
+
     if (!isAuthenticated) {
       navigate("/sign-in");
       return;
@@ -121,7 +126,7 @@ const ReadingExamPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [examId, submissionId, isAuthenticated, navigate]);
+  }, [examId, submissionId, isAuthenticated, authLoading, navigate]);
 
   // Timer effect: start interval once, stop when timeRemaining reaches 0, auto-submit
   useEffect(() => {
@@ -198,7 +203,7 @@ const ReadingExamPage = () => {
     return Array.from({ length: sectionData.section.questionCount }, (_, i) => i + 1);
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <>
         <Preloader />
@@ -217,7 +222,7 @@ const ReadingExamPage = () => {
     <>
       <Preloader />
       <Animation />
-      <HeaderOne />
+     
       <Breadcrumb title={"Reading Section"} />
 
       <section className="py-40">
@@ -385,7 +390,6 @@ const ReadingExamPage = () => {
         </div>
       </section>
 
-      <FooterOne />
     </>
   );
 };

@@ -11,7 +11,7 @@ import { useAuth } from "../contexts/AuthContext";
 const ListeningExamPage = () => {
   const { examId, submissionId } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [sectionData, setSectionData] = useState(null);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
@@ -84,6 +84,11 @@ const ListeningExamPage = () => {
 
   // Fetch section + initialize state
   useEffect(() => {
+    // Đợi AuthContext hoàn thành việc kiểm tra authentication trước khi redirect
+    if (authLoading) {
+      return;
+    }
+
     if (!isAuthenticated) {
       navigate("/sign-in");
       return;
@@ -130,7 +135,7 @@ const ListeningExamPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [examId, submissionId, isAuthenticated, navigate]);
+  }, [examId, submissionId, isAuthenticated, authLoading, navigate]);
 
   // Timer effect: start interval once, stop when timeRemaining reaches 0, auto-submit
   useEffect(() => {
@@ -254,7 +259,7 @@ const ListeningExamPage = () => {
 
  
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <>
         <Preloader />
@@ -273,7 +278,7 @@ const ListeningExamPage = () => {
     <>
       <Preloader />
       <Animation />
-      <HeaderOne />
+     
       <Breadcrumb title={"Listening Section"} />
 
       <section className="py-40">
@@ -494,8 +499,6 @@ const ListeningExamPage = () => {
           </div>
         </div>
       </section>
-
-      <FooterOne />
     </>
   );
 };

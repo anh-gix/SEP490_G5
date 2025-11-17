@@ -1,6 +1,6 @@
 import React from 'react';
-import StudentNavigation from '../components/student_components/StudentNavigation';
-import StudentAssignments from '../components/student_components/StudentAssignments';
+import StudentNavigation from '../../components/student_components/StudentNavigation.jsx';
+import StudentAssignments from '../../components/student_components/StudentAssignments';
 
 /**
  * Student Assignments Page

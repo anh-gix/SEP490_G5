@@ -1,6 +1,6 @@
 import React from 'react';
-import TeacherNavigation from '../components/teacher_components/TeacherNavigation';
-import TeacherGrading from '../components/teacher_components/TeacherGrading';
+import TeacherNavigation from '../../components/teacher_components/TeacherNavigation.jsx';
+import TeacherGrading from '../../components/teacher_components/TeacherGrading';
 
 /**
  * Teacher Grading Page

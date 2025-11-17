@@ -1,5 +1,5 @@
 import React from 'react';
-import AcademicNavigation from '../../components/class_management/AcademicNavigation';
+import AcademicNavigation from '../../components/class_management/AcademicNavigation.jsx';
 import RoomManagementFull from '../../components/class_management/RoomManagementFullAPI';
 
 /**

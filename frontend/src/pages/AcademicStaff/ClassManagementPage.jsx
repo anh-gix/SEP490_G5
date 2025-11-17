@@ -1,6 +1,6 @@
 import React from 'react';
-import AcademicLayout from '../components/class_management/AcademicLayout';
-import ClassManagement from '../components/class_management/ClassManagement';
+import AcademicLayout from '../../components/class_management/AcademicLayout.jsx';
+import ClassManagement from '../../components/class_management/ClassManagement';
 
 const ClassManagementPage = () => {
   return (

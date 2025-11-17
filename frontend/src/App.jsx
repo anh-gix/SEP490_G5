@@ -43,7 +43,7 @@ import TutorDetailsPage from "./pages/TutorDetailsPage.jsx";
 import HomePageFive from "./pages/HomePageFive.jsx";
 import HomePageSix from "./pages/HomePageSix.jsx";
 
-import StudentExamListPage from "./pages/StudentExamListPage.jsx";
+import StudentExamListPage from "./pages/StudentPages/StudentExamListPage.jsx";
 import ExamDetailPage from "./pages/ExamDetailPage.jsx";
 import ReadingExamPage from "./pages/ReadingExamPage.jsx";
 import ReadingResultPage from "./pages/ReadingResultPage.jsx";

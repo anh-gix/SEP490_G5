@@ -772,10 +772,10 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     Object.entries(teacherSchedules).forEach(([teacherId, schedules]) => {
       if (!schedules || schedules.length === 0) return;
 
-      filledScheduleEntries.forEach((entry) => {
-        const entryDay = normalizeDayValue(entry.day);
-        const entryStart = parseTime(entry.startTime);
-        const entryEnd = parseTime(entry.endTime);
+    filledScheduleEntries.forEach((entry) => {
+      const entryDay = normalizeDayValue(entry.day);
+      const entryStart = parseTime(entry.startTime);
+      const entryEnd = parseTime(entry.endTime);
 
         schedules.forEach((schedule) => {
           // Get day of week from schedule date
@@ -784,8 +784,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
           // Check if same day of week
           if (!scheduleDay || scheduleDay !== entryDay) {
-            return;
-          }
+          return;
+        }
 
           // Check time overlap
           const scheduleStart = parseTime(schedule.startTime);
@@ -793,35 +793,35 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           const hasTimeConflict = hasTimeOverlap(entryStart, entryEnd, scheduleStart, scheduleEnd);
 
           if (!hasTimeConflict) {
-            return;
-          }
+          return;
+        }
 
           // Check date range overlap with class (not just schedule date)
           const scheduleClassStartDate = 
-            schedule.classStartDate ||
+          schedule.classStartDate ||
             schedule.class?.startDate ||
             schedule.startDate;
           const scheduleClassEndDate = 
-            schedule.classEndDate ||
+          schedule.classEndDate ||
             schedule.class?.endDate ||
             schedule.endDate;
 
           // Kiểm tra overlap giữa khoảng thời gian lớp học mới và lớp học cũ của giáo viên
-          const hasDateConflict = hasDateRangeOverlap(
-            formData.startDate,
-            formData.endDate,
+        const hasDateConflict = hasDateRangeOverlap(
+          formData.startDate,
+          formData.endDate,
             scheduleClassStartDate,
             scheduleClassEndDate
-          );
+        );
 
           if (hasDateConflict) {
-            console.log('🔴 CONFLICT Teacher:', {
+          console.log('🔴 CONFLICT Teacher:', {
               teacherId,
               scheduleId: schedule._id || schedule.id,
-              entryDay,
-              scheduleDay,
-              entryTime: `${entryStart}-${entryEnd}`,
-              scheduleTime: `${scheduleStart}-${scheduleEnd}`,
+            entryDay,
+            scheduleDay,
+            entryTime: `${entryStart}-${entryEnd}`,
+            scheduleTime: `${scheduleStart}-${scheduleEnd}`,
               newClassDateRange: `${formData.startDate} - ${formData.endDate}`,
               existingClassDateRange: `${scheduleClassStartDate} - ${scheduleClassEndDate}`,
               scheduleDate: scheduleDate
@@ -938,12 +938,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
   return (
     <Modal show={true} onHide={onClose} size="xl" centered backdrop="static">
-        <Modal.Header closeButton className="bg-main-600 text-white border-0 p-24">
-          <Modal.Title className="fw-bold">
-            <i className="fas fa-plus-circle me-2"></i>
-            Tạo lớp học mới
-          </Modal.Title>
-        </Modal.Header>
+      <Modal.Header closeButton className="bg-main-600 text-white border-0 p-24">
+        <Modal.Title className="fw-bold">
+          <i className="fas fa-plus-circle me-2"></i>
+          Tạo lớp học mới
+        </Modal.Title>
+      </Modal.Header>
 
       <Form onSubmit={handleSubmit}>
         <Modal.Body className="p-24" style={{ maxHeight: '70vh', overflowY: 'auto' }}>

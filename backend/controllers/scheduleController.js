@@ -26,18 +26,21 @@ exports.getAllSchedules = async (req, res) => {
       .populate({
         path: 'class',
         select: 'name level teacher startDate endDate', // Thêm startDate và endDate để check conflict
-        populate: { path: 'teacher', select: 'fullName email' }
+        populate: { path: 'teacher', select: 'username email' }
       })
+      .populate('teacher', 'username email') // Populate teacher field directly from ClassSchedule
       .populate('room', 'room_name location capacity')
       .populate('session', 'title order')
-      .populate('createdBy', 'fullName email')
+      .populate('createdBy', 'username email')
       .sort({ date: 1, startTime: 1 });
     
     // Filter by teacher if specified
     if (teacherId) {
-      schedules = schedules.filter(s => 
-        s.class?.teacher?._id.toString() === teacherId
-      );
+      schedules = schedules.filter(s => {
+        const scheduleTeacherId = s.teacher?._id?.toString();
+        const classTeacherId = s.class?.teacher?._id?.toString();
+        return scheduleTeacherId === teacherId || classTeacherId === teacherId;
+      });
     }
     
     res.status(200).json({
@@ -106,15 +109,28 @@ exports.getScheduleById = async (req, res) => {
     const schedule = await ClassSchedule.findById(req.params.id)
       .populate({
         path: 'class',
-        select: 'name level teacher students',
+        select: 'name level teacher students course',
         populate: [
-          { path: 'teacher', select: 'fullName email phone' },
-          { path: 'students', select: 'fullName email' }
+          { path: 'teacher', select: 'username email phone' },
+          { path: 'students', select: 'username email' },
+          { 
+            path: 'course', 
+            select: 'name type level band',
+            populate: { path: 'program', select: 'program_name name' }
+          }
         ]
       })
+      .populate('teacher', 'username email') // Populate teacher field directly from ClassSchedule
       .populate('room', 'room_name location capacity')
-      .populate('session', 'title order description')
-      .populate('createdBy', 'fullName email');
+      .populate({
+        path: 'session',
+        select: 'title order description content clos',
+        populate: {
+          path: 'clos',
+          select: 'code name detail documentUrl documentPath'
+        }
+      })
+      .populate('createdBy', 'username email');
     
     if (!schedule) {
       return res.status(404).json({

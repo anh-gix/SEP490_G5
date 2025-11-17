@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Nav, Tabs, Tab } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Nav, Tabs, Tab, Pagination } from 'react-bootstrap';
 import studentService from '../../services/studentService';
 
 /**
@@ -17,6 +17,7 @@ const StudentManagementAPI = () => {
   const [editingStudent, setEditingStudent] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentSchedule, setStudentSchedule] = useState([]);
+  const [schedulePage, setSchedulePage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [formData, setFormData] = useState({
@@ -153,6 +154,7 @@ const StudentManagementAPI = () => {
       // Fetch Student's schedule
       const scheduleData = await studentService.getStudentSchedule(student._id);
       setStudentSchedule(scheduleData.schedules || []);
+      setSchedulePage(1); // Reset to first page when opening modal
       
       setShowDetailModal(true);
     } catch (err) {
@@ -637,7 +639,7 @@ const StudentManagementAPI = () => {
       </Modal>
 
       {/* Student Detail Modal */}
-      <Modal show={showDetailModal} onHide={() => setShowDetailModal(false)} size="xl">
+      <Modal show={showDetailModal} onHide={() => { setShowDetailModal(false); setSchedulePage(1); }} size="xl">
         <Modal.Header closeButton>
           <Modal.Title>
             Chi tiết Học viên - {selectedStudent?.fullName}
@@ -725,39 +727,90 @@ const StudentManagementAPI = () => {
               {/* Schedule Tab */}
               <Tab eventKey="schedule" title={<><i className="fas fa-calendar me-2"></i>lịch học</>}>
                 {studentSchedule.length > 0 ? (
-                  <Table hover>
-                    <thead className="bg-neutral-25">
-                      <tr>
-                        <th className="px-16 py-12 text-13">Thời gian</th>
-                        <th className="px-16 py-12 text-13">Lớp học</th>
-                        <th className="px-16 py-12 text-13">Phòng</th>
-                        <th className="px-16 py-12 text-13">Chủ đề</th>
-                        <th className="px-16 py-12 text-13">Trạng thái</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {studentSchedule.map((schedule, index) => (
-                        <tr key={index}>
-                          <td className="px-16 py-12">
-                            <div className="text-14">
-                              {new Date(schedule.date).toLocaleDateString('vi-VN')}
-                            </div>
-                            <div className="text-13 text-muted">
-                              {schedule.startTime} - {schedule.endTime}
-                            </div>
-                          </td>
-                          <td className="px-16 py-12">{schedule.class?.name || 'N/A'}</td>
-                          <td className="px-16 py-12">{schedule.room?.room_name || 'N/A'}</td>
-                          <td className="px-16 py-12">{schedule.topic}</td>
-                          <td className="px-16 py-12">
-                            <Badge bg={schedule.status === 'approved' ? 'success' : 'warning'}>
-                              {schedule.status}
-                            </Badge>
-                          </td>
+                  <>
+                    <Table hover>
+                      <thead className="bg-neutral-25">
+                        <tr>
+                          <th className="px-16 py-12 text-13">Thời gian</th>
+                          <th className="px-16 py-12 text-13">Lớp học</th>
+                          <th className="px-16 py-12 text-13">Phòng</th>
+                          <th className="px-16 py-12 text-13">Chủ đề</th>
+                          <th className="px-16 py-12 text-13">Trạng thái</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </Table>
+                      </thead>
+                      <tbody>
+                        {studentSchedule
+                          .slice((schedulePage - 1) * 10, schedulePage * 10)
+                          .map((schedule, index) => (
+                          <tr key={index}>
+                            <td className="px-16 py-12">
+                              <div className="text-14">
+                                {new Date(schedule.date).toLocaleDateString('vi-VN')}
+                              </div>
+                              <div className="text-13 text-muted">
+                                {schedule.startTime} - {schedule.endTime}
+                              </div>
+                            </td>
+                            <td className="px-16 py-12">{schedule.class?.name || 'N/A'}</td>
+                            <td className="px-16 py-12">{schedule.room?.room_name || 'N/A'}</td>
+                            <td className="px-16 py-12">{schedule.topic}</td>
+                            <td className="px-16 py-12">
+                              <Badge bg={schedule.status === 'approved' ? 'success' : 'warning'}>
+                                {schedule.status}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                    {studentSchedule.length > 10 && (
+                      <div className="d-flex justify-content-center mt-3">
+                        <Pagination>
+                          <Pagination.First 
+                            onClick={() => setSchedulePage(1)} 
+                            disabled={schedulePage === 1}
+                          />
+                          <Pagination.Prev 
+                            onClick={() => setSchedulePage(prev => Math.max(1, prev - 1))} 
+                            disabled={schedulePage === 1}
+                          />
+                          {[...Array(Math.ceil(studentSchedule.length / 10))].map((_, i) => {
+                            const page = i + 1;
+                            // Show first page, last page, current page, and pages around current
+                            if (
+                              page === 1 ||
+                              page === Math.ceil(studentSchedule.length / 10) ||
+                              (page >= schedulePage - 1 && page <= schedulePage + 1)
+                            ) {
+                              return (
+                                <Pagination.Item
+                                  key={page}
+                                  active={page === schedulePage}
+                                  onClick={() => setSchedulePage(page)}
+                                >
+                                  {page}
+                                </Pagination.Item>
+                              );
+                            } else if (
+                              page === schedulePage - 2 ||
+                              page === schedulePage + 2
+                            ) {
+                              return <Pagination.Ellipsis key={page} />;
+                            }
+                            return null;
+                          })}
+                          <Pagination.Next 
+                            onClick={() => setSchedulePage(prev => Math.min(Math.ceil(studentSchedule.length / 10), prev + 1))} 
+                            disabled={schedulePage === Math.ceil(studentSchedule.length / 10)}
+                          />
+                          <Pagination.Last 
+                            onClick={() => setSchedulePage(Math.ceil(studentSchedule.length / 10))} 
+                            disabled={schedulePage === Math.ceil(studentSchedule.length / 10)}
+                          />
+                        </Pagination>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="text-center py-4 text-muted">
                     Chưa có lịch học
@@ -768,7 +821,7 @@ const StudentManagementAPI = () => {
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDetailModal(false)}>
+          <Button variant="secondary" onClick={() => { setShowDetailModal(false); setSchedulePage(1); }}>
             Đóng
           </Button>
         </Modal.Footer>

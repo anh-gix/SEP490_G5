@@ -1,10 +1,9 @@
-import StudentDashboardPage from "../pages/StudentDashboardPage.jsx";
-import StudentSchedulePage from "../pages/StudentSchedulePage.jsx";
-import StudentCoursesPage from "../pages/StudentCoursesPage.jsx";
-import StudentClassDetailPage from "../pages/StudentClassDetailPage.jsx";
-import StudentHomeworkDetailPage from "../pages/StudentHomeworkDetailPage.jsx";
-import StudentAssignmentsPage from "../pages/StudentAssignmentsPage.jsx";
-import StudentLessonDetailPage from "../pages/StudentLessonDetailPage.jsx";
+import StudentDashboardPage from "../pages/StudentPages/StudentDashboardPage.jsx";
+import StudentSchedulePage from "../pages/StudentPages/StudentSchedulePage.jsx";
+import StudentCoursesPage from "../pages/StudentPages/StudentCoursesPage.jsx";
+import StudentClassDetailPage from "../pages/StudentPages/StudentClassDetailPage.jsx";
+import StudentAssignmentsPage from "../pages/StudentPages/StudentAssignmentsPage.jsx";
+import StudentLessonDetailPage from "../pages/StudentPages/StudentLessonDetailPage.jsx";
 import ToeicPractice from "../components/student_components/ToeicPractice.jsx";
 import ToeicTestTaking from "../components/student_components/ToeicTestTaking.jsx";
 import ToeicTestResult from "../components/student_components/ToeicTestResult.jsx";
@@ -26,7 +25,6 @@ export const studentRoutes = [
   // II. My Classes
   { path: '/student/courses', element: <StudentCoursesPage /> },
   { path: '/student/class/:classId', element: <StudentClassDetailPage /> },
-  { path: '/student/class/:classId/homework/:homeworkId', element: <StudentHomeworkDetailPage /> },
 
   // III. Assignments
   { path: '/student/assignments', element: <StudentAssignmentsPage /> },

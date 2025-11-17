@@ -1,10 +1,10 @@
-import AcademicDashboardPage from "../pages/AcademicDashboardPage.jsx";
-import ScheduleManagementPage from "../pages/ScheduleManagementPage.jsx";
-import ClassManagementPage from "../pages/ClassManagementPage.jsx";
+import AcademicDashboardPage from "../pages/AcademicStaff/AcademicDashboardPage.jsx";
+import ScheduleManagementPage from "../pages/AcademicStaff/ScheduleManagementPage.jsx";
+import ClassManagementPage from "../pages/AcademicStaff/ClassManagementPage.jsx";
 import RoomManagementPage from "../pages/AcademicStaff/RoomManagementPage.jsx";
 import TeacherManagementPage from "../pages/AcademicStaff/TeacherManagementPage.jsx";
 import ReportsPage from "../pages/AcademicStaff/ReportsPage.jsx";
-import AcademicLessonDetailPage from "../pages/AcademicLessonDetailPage.jsx";
+import AcademicLessonDetailPage from "../pages/AcademicStaff/AcademicLessonDetailPage.jsx";
 
 /**
  * AcademicRoutes

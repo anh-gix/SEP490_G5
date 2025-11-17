@@ -32,9 +32,9 @@ const ExamDetailPage = () => {
             if (result.submission) {
               setSubmission(result.submission);
             }
-          } catch (err) {
+          } catch (error) {
             // If no submission exists, that's okay - user will start new one
-            console.log("No existing submission");
+            console.log("No existing submission", error);
           }
         }
         

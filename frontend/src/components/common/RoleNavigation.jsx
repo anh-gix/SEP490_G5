@@ -28,17 +28,22 @@ const RoleNavigation = ({
   };
 
   return (
-    <div 
-      className="role-navigation bg-white d-flex flex-column" 
-      style={{ 
-        width: '280px', 
-        minHeight: '100vh', 
-        height: '100%', 
-        position: 'sticky', 
-        top: 0,
-        borderRight: '1px solid #E9ECEF'
-      }}
-    >
+    <div className="role-navigation bg-white d-flex flex-column" 
+         style={{ 
+           width: '280px',
+           minWidth: '280px',
+           maxWidth: '280px',
+           minHeight: '100vh', 
+           height: '100vh',
+           maxHeight: '100vh',
+           position: 'sticky',
+           top: 0,
+           left: 0,
+           overflow: 'hidden',
+           flexShrink: 0,
+           borderRight: '1px solid #E9ECEF',
+           zIndex: 100
+         }}>
       {/* Header/Logo */}
       <div className="p-24 border-bottom" style={{ borderColor: '#E9ECEF' }}>
         <div className="d-flex align-items-center gap-12">
@@ -60,7 +65,7 @@ const RoleNavigation = ({
       </div>
 
       {/* Menu Items */}
-      <div className="p-24 flex-grow-1">
+      <div className="p-24 flex-grow-1" style={{ overflowY: 'auto', overflowX: 'hidden' }}>
         <nav className="d-flex flex-column gap-8">
           {menuItems.map((item, index) => {
             const active = isActive(item.path);
@@ -106,14 +111,7 @@ const RoleNavigation = ({
                     }}
                   ></i>
                 </div>
-                <span 
-                  className={`fw-${active ? 'semibold' : 'medium'} text-14`}
-                  style={{
-                    writingMode: 'horizontal-tb',
-                    textOrientation: 'mixed',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
+                <span className={`fw-${active ? 'semibold' : 'medium'} text-14`}>
                   {item.title}
                 </span>
               </NavLink>

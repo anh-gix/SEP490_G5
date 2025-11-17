@@ -1,5 +1,5 @@
 import React from 'react';
-import StudentNavigation from '../../components/student_components/StudentNavigation.jsx';
+import StudentNavigation from '../../components/student_components/StudentNavigation';
 import StudentClassDetail from '../../components/student_components/StudentClassDetail';
 
 /**

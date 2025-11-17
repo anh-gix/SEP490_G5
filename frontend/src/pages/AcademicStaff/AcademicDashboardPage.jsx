@@ -1,5 +1,5 @@
 import React from 'react';
-import AcademicLayout from '../../components/class_management/AcademicLayout.jsx';
+import AcademicLayout from '../../components/class_management/AcademicLayout';
 // import AcademicModuleDemo from '../../components/class_management/AcademicModuleDemo';
 import AcademicDashboard from '../../components/class_management/AcademicDashboard';
 

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import StudentNavigation from './StudentNavigation';
 import ToeicBreadcrumb from './ToeicBreadcrumb';
+import { toeicHistoryMock } from './student_mockdata';
 
 /**
  * TOEIC Test History - Lịch sử làm bài và biểu đồ tiến độ
@@ -20,76 +21,12 @@ const ToeicTestHistory = () => {
 
   const fetchHistory = async () => {
     try {
-      // TODO: API call
-      // Mock data
-      const mockHistory = [
-        {
-          id: 1,
-          testId: 1,
-          testTitle: 'TOEIC Practice Test 1',
-          type: 'full',
-          attemptDate: '2025-11-01',
-          totalScore: 805,
-          listeningScore: 385,
-          readingScore: 420,
-          timeSpent: 110,
-          correctAnswers: 161,
-          totalQuestions: 200
-        },
-        {
-          id: 2,
-          testId: 2,
-          testTitle: 'TOEIC Listening Practice 1',
-          type: 'listening',
-          attemptDate: '2025-10-28',
-          totalScore: 385,
-          listeningScore: 385,
-          readingScore: 0,
-          timeSpent: 43,
-          correctAnswers: 77,
-          totalQuestions: 100
-        },
-        {
-          id: 3,
-          testId: 3,
-          testTitle: 'TOEIC Reading Practice 1',
-          type: 'reading',
-          attemptDate: '2025-10-25',
-          totalScore: 420,
-          listeningScore: 0,
-          readingScore: 420,
-          timeSpent: 70,
-          correctAnswers: 84,
-          totalQuestions: 100
-        },
-        {
-          id: 4,
-          testId: 1,
-          testTitle: 'TOEIC Practice Test 1',
-          type: 'full',
-          attemptDate: '2025-10-20',
-          totalScore: 775,
-          listeningScore: 365,
-          readingScore: 410,
-          timeSpent: 115,
-          correctAnswers: 155,
-          totalQuestions: 200
-        },
-        {
-          id: 5,
-          testId: 2,
-          testTitle: 'TOEIC Listening Practice 1',
-          type: 'listening',
-          attemptDate: '2025-10-15',
-          totalScore: 355,
-          listeningScore: 355,
-          readingScore: 0,
-          timeSpent: 45,
-          correctAnswers: 71,
-          totalQuestions: 100
-        }
-      ];
+      // TODO: Replace with actual API call
+      // const response = await toeicApi.getTestHistory();
+      // setHistory(response.data);
       
+      // Using mock data
+      const mockHistory = toeicHistoryMock;
       setHistory(mockHistory);
       
       // Prepare chart data

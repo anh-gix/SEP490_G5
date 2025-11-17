@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import Breadcrumb from "../../components/Breadcrumb.jsx";
+import Breadcrumb from "../../components/Breadcrumb";
 import FooterOne from "../../components/FooterOne";
 import HeaderOne from "../../components/HomePageforStudent/HeaderOne";
 import Animation from "../../helper/Animation";

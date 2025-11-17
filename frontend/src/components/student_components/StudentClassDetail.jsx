@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Nav, Tab, Form, ProgressBar, Table, Alert } from 'react-bootstrap';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
+import { getClassDetailMock, materialsMock, homeworkMock, progressMock } from './student_mockdata';
 
 /**
  * Student Class Detail Component
@@ -8,7 +9,6 @@ import { useParams, Link, useLocation } from 'react-router-dom';
  */
 const StudentClassDetail = () => {
   const { classId } = useParams();
-  const location = useLocation();
   const [classInfo, setClassInfo] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [materials, setMaterials] = useState([]);
@@ -19,126 +19,20 @@ const StudentClassDetail = () => {
     fetchClassDetail();
   }, [classId]);
 
-  useEffect(() => {
-    if (location.hash === '#homework' || location.state?.openHomeworkTab) {
-      setActiveTab('homework');
-    }
-  }, [location.hash, location.state?.openHomeworkTab]);
-
   const fetchClassDetail = async () => {
     try {
       // TODO: Replace with actual API call
-      // Mock data
-      setClassInfo({
-        id: classId,
-        name: 'A2-Evening-01',
-        level: 'A2',
-        teacher: {
-          name: 'Trần Thị B',
-          email: 'tranthib@example.com',
-          phone: '0123456789',
-          avatar: null
-        },
-        schedule: 'Thứ 2, 4, 6 | 18:00 - 20:00',
-        room: 'Room 102',
-        startDate: '2025-09-01',
-        endDate: '2025-11-30',
-        totalLessons: 30,
-        completedLessons: 18,
-        description: 'Khóa học tiếng Anh cơ bản dành cho người mới bắt đầu, tập trung vào ngữ pháp cơ bản và giao tiếp hàng ngày.',
-        objectives: [
-          'Nắm vững ngữ pháp cơ bản tiếng Anh',
-          'Có thể giao tiếp trong các tình huống hàng ngày',
-          'Đọc hiểu các văn bản đơn giản',
-          'Viết các đoạn văn ngắn'
-        ]
-      });
-
-      setMaterials([
-        {
-          id: 1,
-          title: 'Unit 5 - Present Perfect Tense',
-          type: 'pdf',
-          size: '2.5 MB',
-          uploadDate: '2025-10-28',
-          downloadUrl: '#',
-          lessonNumber: 18
-        },
-        {
-          id: 2,
-          title: 'Grammar Exercise - Unit 5',
-          type: 'pdf',
-          size: '1.2 MB',
-          uploadDate: '2025-10-28',
-          downloadUrl: '#',
-          lessonNumber: 18
-        },
-        {
-          id: 3,
-          title: 'Listening Practice - Video',
-          type: 'video',
-          size: '45 MB',
-          uploadDate: '2025-10-25',
-          downloadUrl: '#',
-          lessonNumber: 17
-        }
-      ]);
-
-      setHomework([
-        {
-          id: 1,
-          title: 'Unit 6 - Grammar Exercise',
-          description: 'Complete exercises 1-10 on page 45',
-          dueDate: '2025-11-05',
-          status: 'pending',
-          score: null,
-          submittedDate: null,
-          feedback: null,
-          attachments: []
-        },
-        {
-          id: 2,
-          title: 'Reading Comprehension Test',
-          description: 'Read the passage and answer questions',
-          dueDate: '2025-11-07',
-          status: 'submitted',
-          score: null,
-          submittedDate: null,
-          feedback: null,
-          attachments: []
-        },
-        {
-          id: 3,
-          title: 'Unit 5 - Writing Assignment',
-          description: 'Write a short paragraph about your daily routine',
-          dueDate: '2025-10-30',
-          status: 'graded',
-          score: 9,
-          submittedDate: '2025-10-29',
-          feedback: 'Good work! Pay attention to verb tenses.',
-          attachments: ['assignment_5.pdf']
-        }
-      ]);
-
-      setProgress({
-        attendanceRate: 92,
-        totalPresent: 17,
-        totalAbsent: 1,
-        totalLate: 0,
-        averageScore: 8.5,
-        grades: [
-          { lessonNumber: 10, type: 'Quiz', score: 8.0, date: '2025-10-10' },
-          { lessonNumber: 12, type: 'Assignment', score: 9.0, date: '2025-10-15' },
-          { lessonNumber: 15, type: 'Midterm', score: 8.5, date: '2025-10-22' },
-          { lessonNumber: 18, type: 'Assignment', score: 9.0, date: '2025-10-29' }
-        ],
-        cloAchievement: [
-          { clo: 'CLO1', name: 'Ngữ pháp cơ bản', progress: 85, target: 100 },
-          { clo: 'CLO2', name: 'Giao tiếp hàng ngày', progress: 78, target: 100 },
-          { clo: 'CLO3', name: 'Đọc hiểu', progress: 90, target: 100 },
-          { clo: 'CLO4', name: 'Viết', progress: 82, target: 100 }
-        ]
-      });
+      // const response = await classApi.getClassDetail(classId);
+      // setClassInfo(response.classInfo);
+      // setMaterials(response.materials);
+      // setHomework(response.homework);
+      // setProgress(response.progress);
+      
+      // Using mock data
+      setClassInfo(getClassDetailMock(classId));
+      setMaterials(materialsMock);
+      setHomework(homeworkMock);
+      setProgress(progressMock);
     } catch (error) {
       console.error('Error fetching class detail:', error);
     }
@@ -388,16 +282,40 @@ const StudentClassDetail = () => {
                     </span>
                   )}
                 </div>
+
+                {hw.status === 'graded' && (
+                  <Alert variant="success" className="bg-success-50 border-success-200 rounded-8 mb-12 py-12">
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span className="text-neutral-700 text-13">
+                        <i className="fas fa-star text-warning-600 me-2"></i>
+                        Điểm: <strong>{hw.score}/10</strong>
+                      </span>
+                    </div>
+                    {hw.feedback && (
+                      <div className="mt-8 text-neutral-700 text-13">
+                        <strong>Nhận xét:</strong> {hw.feedback}
+                      </div>
+                    )}
+                  </Alert>
+                )}
               </Col>
               <Col md={4} className="text-md-end">
-                {(
-                  <Button
-                    as={Link}
-                    to={`/student/class/${classId}/homework/${hw.id}`}
-                    className="btn-outline-main text-13 fw-medium px-20 py-10 radius-8"
-                  >
+                {hw.status === 'pending' && (
+                  <Button className="btn-main text-13 fw-semibold px-20 py-10 radius-8">
+                    <i className="fas fa-upload me-2"></i>
+                    Nộp bài
+                  </Button>
+                )}
+                {hw.status === 'submitted' && (
+                  <Button className="btn-outline-main text-13 fw-medium px-20 py-10 radius-8">
                     <i className="fas fa-eye me-2"></i>
-                    Xem chi tiết
+                    Xem bài nộp
+                  </Button>
+                )}
+                {hw.status === 'graded' && (
+                  <Button className="btn-outline-success text-13 fw-medium px-20 py-10 radius-8">
+                    <i className="fas fa-file-download me-2"></i>
+                    Tải bài chấm
                   </Button>
                 )}
               </Col>

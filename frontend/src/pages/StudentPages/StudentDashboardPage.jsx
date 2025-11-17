@@ -1,6 +1,6 @@
 import React from 'react';
 import { Container, Row, Col } from 'react-bootstrap';
-import StudentNavigation from '../../components/student_components/StudentNavigation.jsx';
+import StudentNavigation from '../../components/student_components/StudentNavigation';
 import StudentDashboard from '../../components/student_components/StudentDashboard';
 
 /**

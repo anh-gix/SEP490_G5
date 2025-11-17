@@ -1,5 +1,5 @@
 import React from 'react';
-import TeacherNavigation from '../../components/teacher_components/TeacherNavigation.jsx';
+import TeacherNavigation from '../../components/teacher_components/TeacherNavigation';
 import TeacherAttendance from '../../components/teacher_components/TeacherAttendance';
 
 /**

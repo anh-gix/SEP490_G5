@@ -3,6 +3,7 @@ import { Container, Row, Col, Card, Button, Badge, ProgressBar, Table, Tabs, Tab
 import { useParams, Link } from 'react-router-dom';
 import StudentNavigation from './StudentNavigation';
 import ToeicBreadcrumb from './ToeicBreadcrumb';
+import { getToeicResultMock } from './student_mockdata';
 
 /**
  * TOEIC Test Result - Xem kết quả và giải thích đáp án
@@ -16,82 +17,13 @@ const ToeicTestResult = () => {
 
   const fetchResult = useCallback(async () => {
     try {
-      // TODO: API call
-      // Mock data
-      setResult({
-        testId: testId,
-        testTitle: 'TOEIC Practice Test 1',
-        attemptDate: '2025-11-01',
-        timeSpent: 110, // minutes
-        
-        scores: {
-          listening: {
-            correct: 77,
-            total: 100,
-            score: 385,
-            maxScore: 495
-          },
-          reading: {
-            correct: 84,
-            total: 100,
-            score: 420,
-            maxScore: 495
-          },
-          total: 805,
-          maxTotal: 990
-        },
-        
-        partScores: [
-          { part: 1, name: 'Photographs', correct: 5, total: 6, percentage: 83.3 },
-          { part: 2, name: 'Question-Response', correct: 20, total: 25, percentage: 80 },
-          { part: 3, name: 'Conversations', correct: 30, total: 39, percentage: 76.9 },
-          { part: 4, name: 'Talks', correct: 22, total: 30, percentage: 73.3 },
-          { part: 5, name: 'Incomplete Sentences', correct: 26, total: 30, percentage: 86.7 },
-          { part: 6, name: 'Text Completion', correct: 14, total: 16, percentage: 87.5 },
-          { part: 7, name: 'Reading Comprehension', correct: 44, total: 54, percentage: 81.5 }
-        ],
-        
-        // Sample detailed answers
-        answers: [
-          {
-            questionId: 1,
-            part: 1,
-            type: 'listening',
-            userAnswer: 'A',
-            correctAnswer: 'A',
-            isCorrect: true,
-            explanation: 'The photograph shows a woman sitting at a desk.',
-            audioUrl: '/audio/part1-q1.mp3'
-          },
-          {
-            questionId: 2,
-            part: 1,
-            type: 'listening',
-            userAnswer: 'B',
-            correctAnswer: 'C',
-            isCorrect: false,
-            explanation: 'The man is standing next to the car, not sitting in it.',
-            audioUrl: '/audio/part1-q2.mp3'
-          }
-          // ... more answers
-        ],
-        
-        insights: {
-          strengths: [
-            'Grammar (Part 5): 86.7% - Điểm mạnh của bạn',
-            'Text Completion (Part 6): 87.5% - Rất tốt'
-          ],
-          weaknesses: [
-            'Talks (Part 4): 73.3% - Cần cải thiện khả năng nghe monologue',
-            'Conversations (Part 3): 76.9% - Nên luyện thêm về đối thoại'
-          ],
-          recommendations: [
-            'Luyện nghe Part 4 với các bài nói chuyện ngắn',
-            'Tập trung vào từ vựng chuyên ngành business',
-            'Làm thêm các đề thi tương tự để cải thiện'
-          ]
-        }
-      });
+      // TODO: Replace with actual API call
+      // const response = await toeicApi.getTestResult(testId);
+      // setResult(response.data);
+      
+      // Using mock data
+      const mockData = getToeicResultMock(testId);
+      setResult(mockData);
     } catch (error) {
       console.error('Error fetching result:', error);
     }

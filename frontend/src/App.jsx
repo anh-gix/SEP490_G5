@@ -43,10 +43,10 @@ import TutorDetailsPage from "./pages/TutorDetailsPage.jsx";
 import HomePageFive from "./pages/HomePageFive.jsx";
 import HomePageSix from "./pages/HomePageSix.jsx";
 
-import StudentExamListPage from "./pages/StudentExamListPage.jsx";
-import ExamDetailPage from "./pages/ExamDetailPage.jsx";
-import ReadingExamPage from "./pages/ReadingExamPage.jsx";
-import ReadingResultPage from "./pages/ReadingResultPage.jsx";
+import StudentExamListPage from "./pages/StudentPages/StudentExamListPage.jsx";
+import ExamDetailPage from "./pages/StudentPages/ExamDetailPage.jsx";
+import ReadingExamPage from "./pages/StudentPages/ReadingExamPage.jsx";
+import ReadingResultPage from "./pages/StudentPages/ReadingResultPage.jsx";
 
 import { Navigate } from "react-router-dom";
 import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";

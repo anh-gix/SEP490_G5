@@ -1,6 +1,6 @@
 import React from 'react';
-import TeacherNavigation from '../components/teacher_components/TeacherNavigation';
-import TeacherAssignments from '../components/teacher_components/TeacherAssignments';
+import TeacherNavigation from '../../components/teacher_components/TeacherNavigation';
+import TeacherAssignments from '../../components/teacher_components/TeacherAssignments';
 
 /**
  * Teacher Assignments Page

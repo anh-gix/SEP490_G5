@@ -1,6 +1,6 @@
 import React from 'react';
-import AcademicNavigation from '../components/class_management/AcademicNavigation';
-import AcademicLessonDetail from '../components/class_management/AcademicLessonDetail';
+import AcademicNavigation from '../../components/class_management/AcademicNavigation';
+import AcademicLessonDetail from '../../components/class_management/AcademicLessonDetail';
 
 const AcademicLessonDetailPage = () => {
   return (

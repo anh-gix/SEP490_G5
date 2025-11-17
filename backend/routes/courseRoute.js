@@ -2,6 +2,15 @@ const express = require('express');
 const router = express.Router();
 const courseController = require('../controllers/courseController'); 
 
+// Lấy band từ type và level - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
+router.get('/band', courseController.getBandByTypeAndLevel);
+// Lấy tất cả mappings
+router.get('/mappings', courseController.getAllMappings);
+// Lấy levels theo type
+router.get('/levels', courseController.getLevelsByType);
+// Lấy types theo level
+router.get('/types', courseController.getTypesByLevel);
+
 //danh sachs chowf phee duyeejt
 router.get('/pending', courseController.getPendingCourses);
 

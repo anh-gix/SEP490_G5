@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
+import axios from 'axios';
 import scheduleService from '../../services/scheduleService';
 import roomService from '../../services/roomService';
 import teacherService from '../../services/teacherService';
@@ -127,12 +128,23 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   const [roomLoading, setRoomLoading] = useState(false);
   const [roomError, setRoomError] = useState(null);
   const [dateError, setDateError] = useState('');
+  const [mappings, setMappings] = useState([]); // Store all mappings from database
+  const [availablePrograms, setAvailablePrograms] = useState([]); // Programs filtered by selected level
+  const [availableLevels, setAvailableLevels] = useState([]); // Levels filtered by selected program
 
-  const programs = [
-    { id: 1, name: 'Tiếng Anh Giao tiếp', levels: ['A1', 'A2', 'B1', 'B2', 'C1'] },
-    { id: 2, name: 'TOEIC', levels: ['TOEIC 450', 'TOEIC 600', 'TOEIC 750+'] },
-    { id: 3, name: 'IELTS', levels: ['IELTS 4.0', 'IELTS 5.5', 'IELTS 6.5+'] }
-  ];
+  // Program name to type mapping
+  const programTypeMap = {
+    'IELTS': 'ielts',
+    'TOEIC': 'toeic',
+    'Tiếng Anh Giao tiếp': 'cam'
+  };
+
+  // Type to program name mapping
+  const typeProgramMap = {
+    'ielts': 'IELTS',
+    'toeic': 'TOEIC',
+    'cam': 'Tiếng Anh Giao tiếp'
+  };
 
   const daysOfWeek = [
     { value: '2', label: 'Thứ 2' },
@@ -151,6 +163,11 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  // Map program name to type
+  const getTypeFromProgram = (programName) => {
+    return programTypeMap[programName] || null;
   };
 
   const handleInputChange = (e) => {
@@ -179,6 +196,58 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     
     setFormData(prev => ({ ...prev, [name]: value }));
   };
+
+  // Auto-fetch band when program and level are selected
+  useEffect(() => {
+    const fetchBand = async () => {
+      console.log('🔄 useEffect triggered - program:', formData.program, 'level:', formData.level);
+      
+      if (!formData.program || !formData.level) {
+        // Clear band if program or level is empty
+        console.log('⚠️ Program or level is empty, clearing band');
+        setFormData(prev => ({ ...prev, band: '' }));
+        return;
+      }
+
+      const type = getTypeFromProgram(formData.program);
+      console.log('📋 Mapped program to type:', formData.program, '→', type);
+      
+      if (!type) {
+        console.warn('⚠️ Không tìm thấy type cho program:', formData.program);
+        return;
+      }
+
+      try {
+        console.log('🌐 Fetching band from API with params:', { type, level: formData.level });
+        const response = await axios.get('http://localhost:8080/api/v1/courses/band', {
+          params: {
+            type: type,
+            level: formData.level
+          }
+        });
+
+        console.log('✅ API Response:', response.data);
+
+        if (response.data && response.data.success && response.data.band) {
+          console.log('✅ Setting band to:', response.data.band);
+          setFormData(prev => ({ ...prev, band: response.data.band }));
+        } else {
+          console.warn('⚠️ No band found in response, clearing band');
+          // Clear band if no mapping found
+          setFormData(prev => ({ ...prev, band: '' }));
+        }
+      } catch (error) {
+        console.error('❌ Error fetching band:', error);
+        if (error.response) {
+          console.error('❌ Response data:', error.response.data);
+          console.error('❌ Response status:', error.response.status);
+        }
+        // Don't clear band on error, keep existing value
+      }
+    };
+
+    fetchBand();
+  }, [formData.program, formData.level]);
 
   const handleScheduleEntryChange = (id, field, value) => {
     setFormData(prev => ({
@@ -249,6 +318,76 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
     onSubmit(formData);
   };
+
+  // Fetch mappings from database on mount
+  useEffect(() => {
+    const fetchMappings = async () => {
+      try {
+        const response = await axios.get('http://localhost:8080/api/v1/courses/mappings');
+        if (response.data && response.data.success && response.data.mappings) {
+          setMappings(response.data.mappings);
+          console.log('✅ Loaded mappings from database:', response.data.mappings.length);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching mappings:', error);
+      }
+    };
+    fetchMappings();
+  }, []);
+
+  // Filter levels based on selected program
+  useEffect(() => {
+    if (!formData.program) {
+      // If no program selected, show all unique levels from mappings
+      const allLevels = [...new Set(mappings.map(m => m.level))].sort();
+      setAvailableLevels(allLevels);
+      return;
+    }
+
+    const type = getTypeFromProgram(formData.program);
+    if (!type) {
+      setAvailableLevels([]);
+      return;
+    }
+
+    const levelsForType = mappings
+      .filter(m => m.type === type)
+      .map(m => m.level)
+      .filter((level, index, self) => self.indexOf(level) === index) // Remove duplicates
+      .sort();
+    
+    setAvailableLevels(levelsForType);
+
+    // If current level is not available for selected program, clear it
+    if (formData.level && !levelsForType.includes(formData.level)) {
+      setFormData(prev => ({ ...prev, level: '', band: '' }));
+    }
+  }, [formData.program, mappings]);
+
+  // Filter programs based on selected level
+  useEffect(() => {
+    if (!formData.level) {
+      // If no level selected, show all unique programs from mappings
+      const allTypes = [...new Set(mappings.map(m => m.type))];
+      const allPrograms = allTypes.map(type => typeProgramMap[type]).filter(Boolean);
+      setAvailablePrograms(allPrograms);
+      return;
+    }
+
+    const programsForLevel = mappings
+      .filter(m => m.level === formData.level)
+      .map(m => m.type)
+      .filter((type, index, self) => self.indexOf(type) === index) // Remove duplicates
+      .map(type => typeProgramMap[type])
+      .filter(Boolean);
+    
+    setAvailablePrograms(programsForLevel);
+
+    // If current program is not available for selected level, clear it
+    if (formData.program && !programsForLevel.includes(formData.program)) {
+      setFormData(prev => ({ ...prev, program: '', band: '' }));
+    }
+  }, [formData.level, mappings]);
 
   useEffect(() => {
     const fetchExistingSchedules = async () => {
@@ -1097,8 +1236,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     className="border-neutral-30 radius-8 px-16 py-10"
                   >
                     <option value="">-- Chọn chương trình --</option>
-                    {programs.map(p => (
-                      <option key={p.id} value={p.name}>{p.name}</option>
+                    {availablePrograms.map(program => (
+                      <option key={program} value={program}>{program}</option>
                     ))}
                   </Form.Select>
                 </Form.Group>
@@ -1119,11 +1258,9 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     className="border-neutral-30 radius-8 px-16 py-10"
                   >
                     <option value="">-- Chọn cấp độ --</option>
-                    <option value="A1">A1</option>
-                    <option value="A2">A2</option>
-                    <option value="B1">B1</option>
-                    <option value="B2">B2</option>
-                    <option value="C1">C1</option>
+                    {availableLevels.map(level => (
+                      <option key={level} value={level}>{level}</option>
+                    ))}
                   </Form.Select>
                 </Form.Group>
               </div>

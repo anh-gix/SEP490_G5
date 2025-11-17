@@ -585,7 +585,7 @@ const RoomManagementFull = () => {
                           <div className="text-muted text-11">{schedule.startTime} - {schedule.endTime}</div>
                         </td>
                         <td className="px-16 py-12 text-13">{schedule.class?.name || 'N/A'}</td>
-                        <td className="px-16 py-12 text-13">{schedule.topic}</td>
+                        <td className="px-16 py-12 text-13">{schedule.session?.title || schedule.topic || 'N/A'}</td>
                         <td className="px-16 py-12">
                           <Badge className={schedule.status === 'approved' ? 'bg-success-600 text-white' : 'bg-info-500 text-white'}>
                             {schedule.status}

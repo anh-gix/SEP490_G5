@@ -28,15 +28,17 @@ const RoleNavigation = ({
   };
 
   return (
-    <div className="role-navigation bg-white d-flex flex-column" 
-         style={{ 
-           width: '280px', 
-           minHeight: '100vh', 
-           height: '100%', 
-           position: 'sticky', 
-           top: 0,
-           borderRight: '1px solid #E9ECEF'
-         }}>
+    <div 
+      className="role-navigation bg-white d-flex flex-column" 
+      style={{ 
+        width: '280px', 
+        minHeight: '100vh', 
+        height: '100%', 
+        position: 'sticky', 
+        top: 0,
+        borderRight: '1px solid #E9ECEF'
+      }}
+    >
       {/* Header/Logo */}
       <div className="p-24 border-bottom" style={{ borderColor: '#E9ECEF' }}>
         <div className="d-flex align-items-center gap-12">
@@ -104,7 +106,14 @@ const RoleNavigation = ({
                     }}
                   ></i>
                 </div>
-                <span className={`fw-${active ? 'semibold' : 'medium'} text-14`}>
+                <span 
+                  className={`fw-${active ? 'semibold' : 'medium'} text-14`}
+                  style={{
+                    writingMode: 'horizontal-tb',
+                    textOrientation: 'mixed',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
                   {item.title}
                 </span>
               </NavLink>

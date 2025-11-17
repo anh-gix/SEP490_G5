@@ -193,7 +193,7 @@ const ListeningResultPage = () => {
                 </Link>
                 <Link
                   to='/exams'
-                  className='btn btn-outline-primary px-40 py-16 rounded-pill'
+                  className='btn btn-secondary px-40 py-16 rounded-pill'
                 >
                   <i className='ph ph-list me-8' />
                   Danh sách bài thi

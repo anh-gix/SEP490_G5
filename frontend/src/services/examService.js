@@ -117,6 +117,38 @@ export const examService = {
       throw error.response?.data || { message: 'Không thể lấy kết quả' };
     }
   },
+
+  // Lấy thông tin section Writing
+  getWritingSection: async (examId, submissionId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions/${submissionId}/writing`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy thông tin phần Writing' };
+    }
+  },
+
+  // Nộp đáp án Writing
+  submitWritingAnswers: async (examId, submissionId, answers) => {
+    try {
+      const response = await api.post(`/${examId}/submissions/${submissionId}/writing/submit`, {
+        answers,
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể nộp đáp án' };
+    }
+  },
+
+  // Xem kết quả Writing
+  getWritingResult: async (examId, submissionId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions/${submissionId}/writing/result`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy kết quả' };
+    }
+  },
 };
 
 export default examService;

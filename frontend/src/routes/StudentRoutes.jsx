@@ -9,6 +9,8 @@ import ReadingExamPage from "../pages/ReadingExamPage.jsx";
 import ReadingResultPage from "../pages/ReadingResultPage.jsx";
 import ListeningExamPage from "../pages/ListeningExamPage.jsx";
 import ListeningResultPage from "../pages/ListeningResultPage.jsx";
+import WritingExamPage from "../pages/WritingExamPage.jsx";
+import WritingResultPage from "../pages/WritingResultPage.jsx";
 
 /**
  * StudentRoutes
@@ -43,4 +45,6 @@ export const studentRoutes = [
   { path: '/exams/:examId/submissions/:submissionId/reading/result', element: <ReadingResultPage /> },
   { path: '/exams/:examId/submissions/:submissionId/listening', element: <ListeningExamPage /> },
   { path: '/exams/:examId/submissions/:submissionId/listening/result', element: <ListeningResultPage /> },
+  { path: '/exams/:examId/submissions/:submissionId/writing', element: <WritingExamPage /> },
+  { path: '/exams/:examId/submissions/:submissionId/writing/result', element: <WritingResultPage /> },
 ];

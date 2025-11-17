@@ -298,7 +298,7 @@ const ListeningExamPage = () => {
                         key={index}
                         onClick={() => handleAudioChange(index)}
                         className={`btn ${
-                          currentAudioIndex === index ? "btn-primary" : "btn-outline-primary"
+                          currentAudioIndex === index ? "btn-primary" : "btn-primary"
                         } px-16 py-8 rounded-pill text-sm`}
                       >
                         Audio {index + 1}

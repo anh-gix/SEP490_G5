@@ -1,6 +1,5 @@
 
 const Course = require('../models/courseModel');
-const LevelBandMapping = require('../models/levelBandMappingModel');
 
 // [Màn 2] Lấy danh sách Giáo trình chờ duyệt
 exports.getPendingCourses = async (req, res) => {
@@ -119,7 +118,7 @@ exports.requestRevision = async (req, res) => {
     }
 };
 
-// Lấy band từ type và level
+// Lấy band từ type và level (từ course table)
 exports.getBandByTypeAndLevel = async (req, res) => {
     try {
         const { type, level } = req.query;
@@ -134,22 +133,22 @@ exports.getBandByTypeAndLevel = async (req, res) => {
             });
         }
 
-        console.log('🔍 Searching for mapping with type:', type, 'level:', level);
-        const mapping = await LevelBandMapping.findOne({ type, level });
+        console.log('🔍 Searching for course with type:', type, 'level:', level);
+        const course = await Course.findOne({ type, level }).select('band');
         
-        if (!mapping) {
-            console.warn('⚠️ No mapping found for type:', type, 'level:', level);
+        if (!course || !course.band) {
+            console.warn('⚠️ No course found with type:', type, 'level:', level);
             return res.status(200).json({
                 success: true,
                 band: null,
-                message: 'Không tìm thấy band mapping cho type và level này'
+                message: 'Không tìm thấy band cho type và level này'
             });
         }
 
-        console.log('✅ Found mapping:', mapping);
+        console.log('✅ Found band:', course.band);
         res.status(200).json({
             success: true,
-            band: mapping.band
+            band: course.band
         });
     } catch (err) {
         console.error('❌ Error in getBandByTypeAndLevel:', err);
@@ -161,10 +160,19 @@ exports.getBandByTypeAndLevel = async (req, res) => {
     }
 };
 
-// Lấy tất cả level-band mappings
+// Lấy tất cả level-band mappings (từ course table)
 exports.getAllMappings = async (req, res) => {
     try {
-        const mappings = await LevelBandMapping.find().sort({ type: 1, level: 1 });
+        const courses = await Course.find({})
+            .select('type level band')
+            .sort({ type: 1, level: 1 });
+        
+        // Format như LevelBandMapping để tương thích với frontend
+        const mappings = courses.map(course => ({
+            type: course.type,
+            level: course.level,
+            band: course.band
+        }));
         
         res.status(200).json({
             success: true,
@@ -180,7 +188,7 @@ exports.getAllMappings = async (req, res) => {
     }
 };
 
-// Lấy các levels theo type
+// Lấy các levels theo type (từ course table)
 exports.getLevelsByType = async (req, res) => {
     try {
         const { type } = req.query;
@@ -192,12 +200,12 @@ exports.getLevelsByType = async (req, res) => {
             });
         }
 
-        const mappings = await LevelBandMapping.find({ type }).sort({ level: 1 });
-        const levels = [...new Set(mappings.map(m => m.level))];
+        const levels = await Course.distinct('level', { type });
+        const sortedLevels = levels.sort();
         
         res.status(200).json({
             success: true,
-            levels: levels
+            levels: sortedLevels
         });
     } catch (err) {
         console.error('❌ Error in getLevelsByType:', err);
@@ -209,7 +217,7 @@ exports.getLevelsByType = async (req, res) => {
     }
 };
 
-// Lấy các types theo level
+// Lấy các types theo level (từ course table)
 exports.getTypesByLevel = async (req, res) => {
     try {
         const { level } = req.query;
@@ -221,15 +229,55 @@ exports.getTypesByLevel = async (req, res) => {
             });
         }
 
-        const mappings = await LevelBandMapping.find({ level }).sort({ type: 1 });
-        const types = [...new Set(mappings.map(m => m.type))];
+        const types = await Course.distinct('type', { level });
+        const sortedTypes = types.sort();
         
         res.status(200).json({
             success: true,
-            types: types
+            types: sortedTypes
         });
     } catch (err) {
         console.error('❌ Error in getTypesByLevel:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Lỗi máy chủ', 
+            error: err.message 
+        });
+    }
+};
+
+// Lấy tất cả types từ course table
+exports.getAllCourseTypes = async (req, res) => {
+    try {
+        const types = await Course.distinct('type');
+        const sortedTypes = types.sort();
+        
+        res.status(200).json({
+            success: true,
+            types: sortedTypes
+        });
+    } catch (err) {
+        console.error('❌ Error in getAllCourseTypes:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Lỗi máy chủ', 
+            error: err.message 
+        });
+    }
+};
+
+// Lấy tất cả levels từ course table
+exports.getAllCourseLevels = async (req, res) => {
+    try {
+        const levels = await Course.distinct('level');
+        const sortedLevels = levels.sort();
+        
+        res.status(200).json({
+            success: true,
+            levels: sortedLevels
+        });
+    } catch (err) {
+        console.error('❌ Error in getAllCourseLevels:', err);
         res.status(500).json({ 
             success: false, 
             message: 'Lỗi máy chủ', 

@@ -19,8 +19,8 @@ const sessionSchema = new Schema({
         url: String
     }],
     learningType: {
-        type: String
-
+        type: String,
+        default: 'theory'
     },
 
     clos: [{

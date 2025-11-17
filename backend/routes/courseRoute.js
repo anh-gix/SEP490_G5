@@ -10,6 +10,10 @@ router.get('/mappings', courseController.getAllMappings);
 router.get('/levels', courseController.getLevelsByType);
 // Lấy types theo level
 router.get('/types', courseController.getTypesByLevel);
+// Lấy tất cả types từ course
+router.get('/all-types', courseController.getAllCourseTypes);
+// Lấy tất cả levels từ course
+router.get('/all-levels', courseController.getAllCourseLevels);
 
 //danh sachs chowf phee duyeejt
 router.get('/pending', courseController.getPendingCourses);

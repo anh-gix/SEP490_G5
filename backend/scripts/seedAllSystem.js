@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 
 // Import all models
 const Permission = require('../models/permissionModel');
-const LevelBandMapping = require('../models/levelBandMappingModel');
 const Role = require('../models/roleModel');
 const User = require('../models/userModel');
 const Program = require('../models/programModel');
@@ -16,6 +15,7 @@ const Class = require('../models/classModel');
 const ClassSchedule = require('../models/classScheduleModel');
 const StudentSchedule = require('../models/studentScheduleModel');
 const Exam = require('../models/examModel');
+const Submission = require('../models/submissionModel');
 
 // Store created IDs for linking
 const seedData = {
@@ -34,6 +34,7 @@ const seedData = {
 
 async function clearDatabase() {
     console.log('\n🗑️  Clearing existing data...');
+    await Submission.deleteMany({});
     await StudentSchedule.deleteMany({});
     await ClassSchedule.deleteMany({});
     await Class.deleteMany({});
@@ -46,7 +47,6 @@ async function clearDatabase() {
     await Program.deleteMany({});
     await User.deleteMany({});
     await Role.deleteMany({});
-    await LevelBandMapping.deleteMany({});
     await Permission.deleteMany({});
     console.log('✅ Database cleared\n');
 }
@@ -66,31 +66,6 @@ async function seedPermissions() {
     console.log(`✅ Created ${created.length} permissions\n`);
 }
 
-async function seedLevelBandMapping() {
-    console.log('📝 Seeding Level-Band Mappings...');
-    const mappings = [
-        // IELTS
-        { type: 'ielts', level: 'A1', band: '0-2.5' },
-        { type: 'ielts', level: 'A2', band: '3.0-3.5' },
-        { type: 'ielts', level: 'B1', band: '4.0-5.0' },
-        { type: 'ielts', level: 'B2', band: '5.5-6.5' },
-        { type: 'ielts', level: 'C1', band: '7.0-8.0' },
-        { type: 'ielts', level: 'C2', band: '8.5-9.0' },
-        // TOEIC
-        { type: 'toeic', level: 'A1', band: '0-250' },
-        { type: 'toeic', level: 'A2', band: '251-500' },
-        { type: 'toeic', level: 'B1', band: '501-700' },
-        { type: 'toeic', level: 'B2', band: '701-900' },
-        { type: 'toeic', level: 'C1', band: '901-990' },
-        { type: 'toeic', level: 'C2', band: '990+' },
-        // CAM
-        { type: 'cam', level: 'Pre-A1', band: 'Starter' },
-        { type: 'cam', level: 'A1', band: 'Mover' }
-    ];
-    
-    await LevelBandMapping.insertMany(mappings);
-    console.log(`✅ Created ${mappings.length} level-band mappings\n`);
-}
 
 async function seedRoles() {
     console.log('📝 Seeding Roles...');
@@ -347,13 +322,23 @@ async function seedCLOs() {
 async function seedCourses() {
     console.log('📝 Seeding Courses...');
     
-    // Lấy LevelBandMapping để map band
-    const LevelBandMapping = mongoose.model('LevelBandMapping');
-    const mappings = await LevelBandMapping.find().lean();
-    const mappingMap = {};
-    mappings.forEach(m => {
-        mappingMap[`${m.type}_${m.level}`] = m.band;
-    });
+    // Mapping band values (hardcoded since LevelBandMapping is removed)
+    const mappingMap = {
+        'ielts_A1': '0-2.5',
+        'ielts_A2': '3.0-3.5',
+        'ielts_B1': '4.0-5.0',
+        'ielts_B2': '5.5-6.5',
+        'ielts_C1': '7.0-8.0',
+        'ielts_C2': '8.5-9.0',
+        'toeic_A1': '0-250',
+        'toeic_A2': '251-500',
+        'toeic_B1': '501-700',
+        'toeic_B2': '701-900',
+        'toeic_C1': '901-990',
+        'toeic_C2': '990+',
+        'cam_Pre-A1': 'Starter',
+        'cam_A1': 'Mover'
+    };
     
     const courses = [
         // IELTS courses
@@ -393,6 +378,42 @@ async function seedCourses() {
             createdBy: seedData.users[1]._id,
             status: 'approved'
         },
+        {
+            name: 'IELTS Elementary A2',
+            description: 'Khóa học IELTS sơ cấp',
+            program: seedData.programs[1]._id,
+            type: 'ielts',
+            level: 'A2',
+            band: mappingMap['ielts_A2'] || '3.0-3.5',
+            tuitionFee: 3500000,
+            clos: [seedData.clos[0]._id, seedData.clos[1]._id],
+            createdBy: seedData.users[1]._id,
+            status: 'approved'
+        },
+        {
+            name: 'IELTS Upper Intermediate B2',
+            description: 'Khóa học IELTS trung cấp cao',
+            program: seedData.programs[1]._id,
+            type: 'ielts',
+            level: 'B2',
+            band: mappingMap['ielts_B2'] || '5.5-6.5',
+            tuitionFee: 6000000,
+            clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
+            createdBy: seedData.users[1]._id,
+            status: 'approved'
+        },
+        {
+            name: 'IELTS Proficiency C2',
+            description: 'Khóa học IELTS thành thạo',
+            program: seedData.programs[1]._id,
+            type: 'ielts',
+            level: 'C2',
+            band: mappingMap['ielts_C2'] || '8.5-9.0',
+            tuitionFee: 8000000,
+            clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
+            createdBy: seedData.users[1]._id,
+            status: 'approved'
+        },
         // TOEIC courses
         {
             name: 'TOEIC Beginner A1',
@@ -414,6 +435,54 @@ async function seedCourses() {
             level: 'B1',
             band: mappingMap['toeic_B1'] || '501-700',
             tuitionFee: 4000000,
+            clos: [seedData.clos[3]._id, seedData.clos[4]._id],
+            createdBy: seedData.users[1]._id,
+            status: 'approved'
+        },
+        {
+            name: 'TOEIC Elementary A2',
+            description: 'Khóa học TOEIC sơ cấp',
+            program: seedData.programs[1]._id,
+            type: 'toeic',
+            level: 'A2',
+            band: mappingMap['toeic_A2'] || '251-500',
+            tuitionFee: 3000000,
+            clos: [seedData.clos[3]._id, seedData.clos[4]._id],
+            createdBy: seedData.users[1]._id,
+            status: 'approved'
+        },
+        {
+            name: 'TOEIC Upper Intermediate B2',
+            description: 'Khóa học TOEIC trung cấp cao',
+            program: seedData.programs[1]._id,
+            type: 'toeic',
+            level: 'B2',
+            band: mappingMap['toeic_B2'] || '701-900',
+            tuitionFee: 5000000,
+            clos: [seedData.clos[3]._id, seedData.clos[4]._id],
+            createdBy: seedData.users[1]._id,
+            status: 'approved'
+        },
+        {
+            name: 'TOEIC Advanced C1',
+            description: 'Khóa học TOEIC nâng cao',
+            program: seedData.programs[1]._id,
+            type: 'toeic',
+            level: 'C1',
+            band: mappingMap['toeic_C1'] || '901-990',
+            tuitionFee: 6000000,
+            clos: [seedData.clos[3]._id, seedData.clos[4]._id],
+            createdBy: seedData.users[1]._id,
+            status: 'approved'
+        },
+        {
+            name: 'TOEIC Proficiency C2',
+            description: 'Khóa học TOEIC thành thạo',
+            program: seedData.programs[1]._id,
+            type: 'toeic',
+            level: 'C2',
+            band: mappingMap['toeic_C2'] || '990+',
+            tuitionFee: 7000000,
             clos: [seedData.clos[3]._id, seedData.clos[4]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved'
@@ -456,7 +525,8 @@ async function seedSessions() {
     
     // Tạo sessions cho mỗi course (3-5 sessions mỗi course)
     seedData.courses.forEach((course, courseIndex) => {
-        const sessionCount = courseIndex < 3 ? 5 : 3; // IELTS courses có 5 sessions, còn lại 3
+        // IELTS courses có 5 sessions, TOEIC và CAM có 3 sessions
+        const sessionCount = course.type === 'ielts' ? 5 : 3;
         
         for (let i = 1; i <= sessionCount; i++) {
             sessions.push({
@@ -475,7 +545,7 @@ async function seedSessions() {
     // Update courses with sessions
     let sessionIndex = 0;
     for (const course of seedData.courses) {
-        const sessionCount = seedData.courses.indexOf(course) < 3 ? 5 : 3;
+        const sessionCount = course.type === 'ielts' ? 5 : 3;
         const courseSessions = created.slice(sessionIndex, sessionIndex + sessionCount);
         await Course.findByIdAndUpdate(course._id, {
             sessions: courseSessions.map(s => s._id)
@@ -763,7 +833,6 @@ async function seed() {
 
         // Seed in order
         await seedPermissions();
-        await seedLevelBandMapping();
         await seedRoles();
         await seedUsers();
         await seedPrograms();

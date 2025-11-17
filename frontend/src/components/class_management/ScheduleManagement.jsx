@@ -259,21 +259,9 @@ const ScheduleManagement = () => {
         <div className="d-flex gap-12">
           <Button 
             className="btn-outline-main text-15 fw-medium px-20 py-10 radius-8"
-            onClick={() => setShowRoomManagement(true)}
-          >
-            <i className="fas fa-door-open me-2"></i> Quản lý phòng học
-          </Button>
-          <Button 
-            className="btn-outline-main text-15 fw-medium px-20 py-10 radius-8"
             onClick={handleExportSchedule}
           >
             <i className="fas fa-download me-2"></i> Xuất lịch học
-          </Button>
-          <Button 
-            className="btn-main text-15 fw-semibold px-24 py-12 radius-8"
-            onClick={() => setShowCreateModal(true)}
-          >
-            <i className="fas fa-plus me-2"></i> Tạo lịch học
           </Button>
         </div>
       </div>

@@ -319,75 +319,130 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     onSubmit(formData);
   };
 
-  // Fetch mappings from database on mount
+  // Fetch types and levels from course table on mount
   useEffect(() => {
-    const fetchMappings = async () => {
+    const fetchCourseData = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/api/v1/courses/mappings');
-        if (response.data && response.data.success && response.data.mappings) {
-          setMappings(response.data.mappings);
-          console.log('✅ Loaded mappings from database:', response.data.mappings.length);
+        // Fetch all types and levels from course table
+        const [typesResponse, levelsResponse] = await Promise.all([
+          axios.get('http://localhost:8080/api/v1/courses/all-types'),
+          axios.get('http://localhost:8080/api/v1/courses/all-levels')
+        ]);
+        
+        if (typesResponse.data?.success && typesResponse.data.types) {
+          const allTypes = typesResponse.data.types;
+          const allPrograms = allTypes.map(type => typeProgramMap[type]).filter(Boolean);
+          setAvailablePrograms(allPrograms);
+          console.log('✅ Loaded types from course table:', allTypes.length);
+        }
+        
+        if (levelsResponse.data?.success && levelsResponse.data.levels) {
+          const allLevels = levelsResponse.data.levels;
+          setAvailableLevels(allLevels);
+          console.log('✅ Loaded levels from course table:', allLevels.length);
+        }
+        
+        // Also fetch mappings for band lookup (still needed for band display)
+        try {
+          const mappingsResponse = await axios.get('http://localhost:8080/api/v1/courses/mappings');
+          if (mappingsResponse.data && mappingsResponse.data.success && mappingsResponse.data.mappings) {
+            setMappings(mappingsResponse.data.mappings);
+            console.log('✅ Loaded mappings from course table:', mappingsResponse.data.mappings.length);
+          }
+        } catch (mappingsError) {
+          console.error('❌ Error fetching mappings:', mappingsError);
         }
       } catch (error) {
-        console.error('❌ Error fetching mappings:', error);
+        console.error('❌ Error fetching course data:', error);
       }
     };
-    fetchMappings();
+    fetchCourseData();
   }, []);
 
   // Filter levels based on selected program
   useEffect(() => {
-    if (!formData.program) {
-      // If no program selected, show all unique levels from mappings
-      const allLevels = [...new Set(mappings.map(m => m.level))].sort();
-      setAvailableLevels(allLevels);
-      return;
-    }
+    const filterLevels = async () => {
+      if (!formData.program) {
+        // If no program selected, show all levels from course table
+        try {
+          const response = await axios.get('http://localhost:8080/api/v1/courses/all-levels');
+          if (response.data?.success && response.data.levels) {
+            setAvailableLevels(response.data.levels);
+          }
+        } catch (error) {
+          console.error('❌ Error fetching all levels:', error);
+        }
+        return;
+      }
 
-    const type = getTypeFromProgram(formData.program);
-    if (!type) {
-      setAvailableLevels([]);
-      return;
-    }
+      const type = getTypeFromProgram(formData.program);
+      if (!type) {
+        setAvailableLevels([]);
+        return;
+      }
 
-    const levelsForType = mappings
-      .filter(m => m.type === type)
-      .map(m => m.level)
-      .filter((level, index, self) => self.indexOf(level) === index) // Remove duplicates
-      .sort();
+      // Fetch levels for this type from course table
+      try {
+        const response = await axios.get('http://localhost:8080/api/v1/courses/levels', {
+          params: { type }
+        });
+        if (response.data?.success && response.data.levels) {
+          setAvailableLevels(response.data.levels);
+          
+          // If current level is not available for selected program, clear it
+          if (formData.level && !response.data.levels.includes(formData.level)) {
+            setFormData(prev => ({ ...prev, level: '', band: '' }));
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error fetching levels by type:', error);
+      }
+    };
     
-    setAvailableLevels(levelsForType);
-
-    // If current level is not available for selected program, clear it
-    if (formData.level && !levelsForType.includes(formData.level)) {
-      setFormData(prev => ({ ...prev, level: '', band: '' }));
-    }
-  }, [formData.program, mappings]);
+    filterLevels();
+  }, [formData.program]);
 
   // Filter programs based on selected level
   useEffect(() => {
-    if (!formData.level) {
-      // If no level selected, show all unique programs from mappings
-      const allTypes = [...new Set(mappings.map(m => m.type))];
-      const allPrograms = allTypes.map(type => typeProgramMap[type]).filter(Boolean);
-      setAvailablePrograms(allPrograms);
-      return;
-    }
+    const filterPrograms = async () => {
+      if (!formData.level) {
+        // If no level selected, show all types from course table
+        try {
+          const response = await axios.get('http://localhost:8080/api/v1/courses/all-types');
+          if (response.data?.success && response.data.types) {
+            const allTypes = response.data.types;
+            const allPrograms = allTypes.map(type => typeProgramMap[type]).filter(Boolean);
+            setAvailablePrograms(allPrograms);
+          }
+        } catch (error) {
+          console.error('❌ Error fetching all types:', error);
+        }
+        return;
+      }
 
-    const programsForLevel = mappings
-      .filter(m => m.level === formData.level)
-      .map(m => m.type)
-      .filter((type, index, self) => self.indexOf(type) === index) // Remove duplicates
-      .map(type => typeProgramMap[type])
-      .filter(Boolean);
+      // Fetch types for this level from course table
+      try {
+        const response = await axios.get('http://localhost:8080/api/v1/courses/types', {
+          params: { level: formData.level }
+        });
+        if (response.data?.success && response.data.types) {
+          const programsForLevel = response.data.types
+            .map(type => typeProgramMap[type])
+            .filter(Boolean);
+          setAvailablePrograms(programsForLevel);
+
+          // If current program is not available for selected level, clear it
+          if (formData.program && !programsForLevel.includes(formData.program)) {
+            setFormData(prev => ({ ...prev, program: '', band: '' }));
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error fetching types by level:', error);
+      }
+    };
     
-    setAvailablePrograms(programsForLevel);
-
-    // If current program is not available for selected level, clear it
-    if (formData.program && !programsForLevel.includes(formData.program)) {
-      setFormData(prev => ({ ...prev, program: '', band: '' }));
-    }
-  }, [formData.level, mappings]);
+    filterPrograms();
+  }, [formData.level]);
 
   useEffect(() => {
     const fetchExistingSchedules = async () => {

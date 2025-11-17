@@ -1,6 +1,8 @@
 const ClassSchedule = require('../models/classScheduleModel');
 const Class = require('../models/classModel');
 const Room = require('../models/room');
+const Course = require('../models/courseModel');
+const Session = require('../models/sessionModel');
 
 /**
  * GET /api/schedules
@@ -214,6 +216,28 @@ exports.createSchedule = async (req, res) => {
     });
     
     await newSchedule.save();
+    
+    // Kiểm tra và cập nhật learningType nếu đến ngày test
+    if (session) {
+      try {
+        const classData = await Class.findById(classId).populate('course', 'testDate');
+        if (classData?.course?.testDate) {
+          const scheduleDate = new Date(date);
+          const testDate = new Date(classData.course.testDate);
+          // Chỉ so sánh ngày, không so sánh giờ
+          scheduleDate.setHours(0, 0, 0, 0);
+          testDate.setHours(0, 0, 0, 0);
+          
+          if (scheduleDate >= testDate) {
+            await Session.findByIdAndUpdate(session, { learningType: 'test' });
+            console.log(`✅ Updated session ${session} learningType to 'test' (schedule date >= test date)`);
+          }
+        }
+      } catch (err) {
+        console.error('⚠️ Error checking/updating test date:', err);
+        // Không throw error, chỉ log để không ảnh hưởng đến việc tạo schedule
+      }
+    }
     
     const populatedSchedule = await ClassSchedule.findById(newSchedule._id)
       .populate('class', 'name level')

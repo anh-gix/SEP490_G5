@@ -62,58 +62,11 @@ const courseSchema = new Schema({
         type: String,
         enum: ['draft', 'pending_approval', 'approved', 'needs_revision', 'archived'],
         default: 'draft'
+    },
+    // Ngày sẽ làm test
+    testDate: {
+        type: Date
     }
 }, { timestamps: true });
-
-// Pre-save hook để tự động set band từ database nếu chưa có
-courseSchema.pre('save', async function(next) {
-    // Chỉ set band nếu có type và level nhưng chưa có band
-    if (this.type && this.level && !this.band) {
-        try {
-            const LevelBandMapping = mongoose.model('LevelBandMapping');
-            const mapping = await LevelBandMapping.findOne({ 
-                type: this.type, 
-                level: this.level 
-            });
-            if (mapping) {
-                this.band = mapping.band;
-            }
-        } catch (error) {
-            // Nếu không tìm thấy mapping, để band là null
-            console.warn(`No mapping found for type: ${this.type}, level: ${this.level}`);
-        }
-    }
-    next();
-});
-
-// Static method để lấy band từ database
-courseSchema.statics.getBandByLevel = async function(type, level) {
-    const LevelBandMapping = mongoose.model('LevelBandMapping');
-    const mapping = await LevelBandMapping.findOne({ type, level });
-    return mapping ? mapping.band : null;
-};
-
-// Static method để lấy tất cả mappings
-courseSchema.statics.getAllMappings = async function() {
-    const LevelBandMapping = mongoose.model('LevelBandMapping');
-    return await LevelBandMapping.find().sort({ type: 1, level: 1 });
-};
-
-// Method để cập nhật band từ database
-courseSchema.methods.updateBandFromDB = async function() {
-    if (this.type && this.level) {
-        const LevelBandMapping = mongoose.model('LevelBandMapping');
-        const mapping = await LevelBandMapping.findOne({ 
-            type: this.type, 
-            level: this.level 
-        });
-        if (mapping) {
-            this.band = mapping.band;
-            await this.save();
-            return this.band;
-        }
-    }
-    return null;
-};
 
 module.exports = mongoose.model('Course', courseSchema);

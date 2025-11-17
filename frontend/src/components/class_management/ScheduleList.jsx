@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Table, Badge, Button, ButtonGroup, Dropdown } from 'react-bootstrap';
+import React, { useState, useEffect } from 'react';
+import { Table, Badge, Button, ButtonGroup, Dropdown, Pagination } from 'react-bootstrap';
 
 const ScheduleList = ({ 
   schedules, 
@@ -10,6 +10,7 @@ const ScheduleList = ({
   const [sortField, setSortField] = useState('date');
   const [sortDirection, setSortDirection] = useState('asc');
   const [selectedSchedules, setSelectedSchedules] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Sort schedules
   const sortedSchedules = [...schedules].sort((a, b) => {
@@ -48,6 +49,7 @@ const ScheduleList = ({
       setSortField(field);
       setSortDirection('asc');
     }
+    setCurrentPage(1); // Reset to first page when sorting changes
   };
 
   const handleSelectSchedule = (scheduleId) => {
@@ -61,10 +63,20 @@ const ScheduleList = ({
   };
 
   const handleSelectAll = (e) => {
+    // Calculate paginated schedules for current page
+    const itemsPerPage = 10;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentPageSchedules = sortedSchedules.slice(startIndex, endIndex);
+    
     if (e.target.checked) {
-      setSelectedSchedules(schedules.map(s => s.id));
+      // Select all items in current page
+      const currentPageIds = currentPageSchedules.map(s => s.id);
+      setSelectedSchedules(prev => [...new Set([...prev, ...currentPageIds])]);
     } else {
-      setSelectedSchedules([]);
+      // Deselect all items in current page
+      const currentPageIds = currentPageSchedules.map(s => s.id);
+      setSelectedSchedules(prev => prev.filter(id => !currentPageIds.includes(id)));
     }
   };
 
@@ -104,6 +116,18 @@ const ScheduleList = ({
       <i className="fas fa-sort-down"></i>;
   };
 
+  // Pagination logic
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(sortedSchedules.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedSchedules = sortedSchedules.slice(startIndex, endIndex);
+
+  // Reset to page 1 when schedules change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [schedules.length]);
+
   return (
     <div>
       {/* Bulk actions */}
@@ -128,7 +152,7 @@ const ScheduleList = ({
                 <input
                   type="checkbox"
                   className="form-check-input"
-                  checked={selectedSchedules.length === schedules.length && schedules.length > 0}
+                  checked={paginatedSchedules.length > 0 && paginatedSchedules.every(s => selectedSchedules.includes(s.id))}
                   onChange={handleSelectAll}
                 />
               </th>
@@ -174,8 +198,8 @@ const ScheduleList = ({
             </tr>
           </thead>
           <tbody>
-            {sortedSchedules.length > 0 ? (
-              sortedSchedules.map(schedule => (
+            {paginatedSchedules.length > 0 ? (
+              paginatedSchedules.map(schedule => (
                 <tr key={schedule.id} className={selectedSchedules.includes(schedule.id) ? 'bg-main-25' : ''}>
                   <td style={{ padding: '16px' }}>
                     <input
@@ -259,6 +283,55 @@ const ScheduleList = ({
           </tbody>
         </Table>
       </div>
+
+      {/* Pagination */}
+      {sortedSchedules.length > itemsPerPage && (
+        <div className="d-flex justify-content-center mt-3">
+          <Pagination>
+            <Pagination.First 
+              onClick={() => setCurrentPage(1)} 
+              disabled={currentPage === 1}
+            />
+            <Pagination.Prev 
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} 
+              disabled={currentPage === 1}
+            />
+            {[...Array(totalPages)].map((_, i) => {
+              const page = i + 1;
+              // Show first page, last page, current page, and pages around current
+              if (
+                page === 1 ||
+                page === totalPages ||
+                (page >= currentPage - 1 && page <= currentPage + 1)
+              ) {
+                return (
+                  <Pagination.Item
+                    key={page}
+                    active={page === currentPage}
+                    onClick={() => setCurrentPage(page)}
+                  >
+                    {page}
+                  </Pagination.Item>
+                );
+              } else if (
+                page === currentPage - 2 ||
+                page === currentPage + 2
+              ) {
+                return <Pagination.Ellipsis key={page} />;
+              }
+              return null;
+            })}
+            <Pagination.Next 
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} 
+              disabled={currentPage === totalPages}
+            />
+            <Pagination.Last 
+              onClick={() => setCurrentPage(totalPages)} 
+              disabled={currentPage === totalPages}
+            />
+          </Pagination>
+        </div>
+      )}
 
       {/* Summary */}
       {schedules.length > 0 && (

@@ -48,77 +48,39 @@ const ScheduleManagement = () => {
       if (filters.endDate) params.endDate = filters.endDate;
       if (filters.status) params.status = filters.status;
       
-      // const response = await scheduleService.getAllSchedules(params);
+      const response = await scheduleService.getAllSchedules(params);
       
-      // const transformedSchedules = response.schedules.map(sch => ({
-      //   id: sch._id,
-      //   classId: sch.class?._id,
-      //   className: sch.class?.name || 'N/A',
-      //   teacherId: sch.class?.teacher?._id,
-      //   teacherName: sch.class?.teacher ? `${sch.class.teacher.firstName} ${sch.class.teacher.lastName}` : 'N/A',
-      //   roomId: sch.room?._id,
-      //   roomName: sch.room?.room_name || 'N/A',
-      //   date: sch.date ? new Date(sch.date).toISOString().split('T')[0] : 'N/A',
-      //   startTime: sch.startTime || 'N/A',
-      //   endTime: sch.endTime || 'N/A',
-      //   lessonNumber: sch.session?.sessionNumber || 0,
-      //   lessonTopic: sch.topic || sch.session?.topic || 'N/A',
-      //   status: sch.status || 'draft',
-      //   type: 'regular'
-      // }));
+      // Transform API response to match component's expected format
+      const transformedSchedules = (response.schedules || response.data || []).map(sch => {
+        // Format date to YYYY-MM-DD
+        let dateStr = 'N/A';
+        if (sch.date) {
+          if (sch.date instanceof Date) {
+            dateStr = sch.date.toISOString().split('T')[0];
+          } else if (typeof sch.date === 'string') {
+            dateStr = sch.date.split('T')[0];
+          }
+        }
+        
+        return {
+          id: sch._id || sch.id,
+          classId: sch.class?._id || sch.classId,
+          className: sch.class?.name || 'N/A',
+          teacherId: sch.teacher?._id || sch.class?.teacher?._id || sch.teacherId,
+          teacherName: sch.teacher?.username || sch.class?.teacher?.username || 'N/A',
+          roomId: sch.room?._id || sch.roomId,
+          roomName: sch.room?.room_name || 'N/A',
+          date: dateStr,
+          startTime: sch.startTime || 'N/A',
+          endTime: sch.endTime || 'N/A',
+          lessonNumber: sch.session?.order || sch.session?.sessionNumber || 0,
+          lessonTopic: sch.session?.title || sch.topic || 'N/A',
+          status: sch.status || 'draft',
+          type: sch.type || 'regular'
+        };
+      });
       
-      // Mock data for testing - Multiple classes in same time slots
-      const mockSchedules = [
-        // Monday - Multiple classes at 8:00
-        { id: 1, classId: 'c1', className: 'TOEIC 450 - A1', teacherId: 't1', teacherName: 'Nguyễn Văn A', roomId: 'r1', roomName: 'P.101', date: '2025-11-17', startTime: '08:00', endTime: '10:00', lessonNumber: 5, lessonTopic: 'Listening Practice', status: 'scheduled', type: 'regular' },
-        { id: 2, classId: 'c2', className: 'TOEIC 650 - B1', teacherId: 't2', teacherName: 'Trần Thị B', roomId: 'r2', roomName: 'P.102', date: '2025-11-17', startTime: '08:00', endTime: '10:00', lessonNumber: 8, lessonTopic: 'Reading Comprehension', status: 'scheduled', type: 'regular' },
-        { id: 3, classId: 'c3', className: 'TOEIC 850 - C1', teacherId: 't3', teacherName: 'Lê Văn C', roomId: 'r3', roomName: 'P.103', date: '2025-11-17', startTime: '08:00', endTime: '10:00', lessonNumber: 12, lessonTopic: 'Advanced Grammar', status: 'scheduled', type: 'regular' },
-        
-        // Monday - Multiple classes at 10:00
-        { id: 4, classId: 'c4', className: 'TOEIC 550 - A2', teacherId: 't4', teacherName: 'Phạm Thị D', roomId: 'r4', roomName: 'P.104', date: '2025-11-17', startTime: '10:00', endTime: '12:00', lessonNumber: 6, lessonTopic: 'Vocabulary Building', status: 'scheduled', type: 'regular' },
-        { id: 5, classId: 'c5', className: 'TOEIC 750 - B2', teacherId: 't5', teacherName: 'Hoàng Văn E', roomId: 'r5', roomName: 'P.105', date: '2025-11-17', startTime: '10:00', endTime: '12:00', lessonNumber: 10, lessonTopic: 'Business English', status: 'scheduled', type: 'regular' },
-        
-        // Monday afternoon
-        { id: 6, classId: 'c1', className: 'TOEIC 450 - A1', teacherId: 't1', teacherName: 'Nguyễn Văn A', roomId: 'r1', roomName: 'P.101', date: '2025-11-17', startTime: '14:00', endTime: '16:00', lessonNumber: 6, lessonTopic: 'Speaking Practice', status: 'scheduled', type: 'regular' },
-        { id: 7, classId: 'c6', className: 'TOEIC 900+ - Expert', teacherId: 't6', teacherName: 'Vũ Thị F', roomId: 'r6', roomName: 'P.106', date: '2025-11-17', startTime: '14:00', endTime: '16:00', lessonNumber: 15, lessonTopic: 'Mock Test', status: 'scheduled', type: 'regular' },
-        
-        // Monday evening - Multiple classes
-        { id: 8, classId: 'c2', className: 'TOEIC 650 - B1', teacherId: 't2', teacherName: 'Trần Thị B', roomId: 'r2', roomName: 'P.102', date: '2025-11-17', startTime: '18:00', endTime: '20:00', lessonNumber: 9, lessonTopic: 'Writing Skills', status: 'scheduled', type: 'regular' },
-        { id: 9, classId: 'c7', className: 'TOEIC Intensive', teacherId: 't7', teacherName: 'Đỗ Văn G', roomId: 'r7', roomName: 'P.107', date: '2025-11-17', startTime: '18:00', endTime: '20:00', lessonNumber: 4, lessonTopic: 'Part 5-6 Practice', status: 'scheduled', type: 'regular' },
-        
-        // Tuesday - Multiple classes throughout the day
-        { id: 10, classId: 'c3', className: 'TOEIC 850 - C1', teacherId: 't3', teacherName: 'Lê Văn C', roomId: 'r3', roomName: 'P.103', date: '2025-11-18', startTime: '08:00', endTime: '10:00', lessonNumber: 13, lessonTopic: 'Advanced Listening', status: 'scheduled', type: 'regular' },
-        { id: 11, classId: 'c8', className: 'TOEIC Foundation', teacherId: 't8', teacherName: 'Bùi Thị H', roomId: 'r8', roomName: 'P.108', date: '2025-11-18', startTime: '08:00', endTime: '10:00', lessonNumber: 2, lessonTopic: 'Basic Grammar', status: 'scheduled', type: 'regular' },
-        { id: 12, classId: 'c4', className: 'TOEIC 550 - A2', teacherId: 't4', teacherName: 'Phạm Thị D', roomId: 'r4', roomName: 'P.104', date: '2025-11-18', startTime: '08:00', endTime: '10:00', lessonNumber: 7, lessonTopic: 'Part 1-2 Practice', status: 'scheduled', type: 'regular' },
-        
-        { id: 13, classId: 'c5', className: 'TOEIC 750 - B2', teacherId: 't5', teacherName: 'Hoàng Văn E', roomId: 'r5', roomName: 'P.105', date: '2025-11-18', startTime: '10:00', endTime: '12:00', lessonNumber: 11, lessonTopic: 'Professional Communication', status: 'scheduled', type: 'regular' },
-        { id: 14, classId: 'c9', className: 'TOEIC 600 Weekend', teacherId: 't9', teacherName: 'Ngô Văn I', roomId: 'r9', roomName: 'P.109', date: '2025-11-18', startTime: '10:00', endTime: '12:00', lessonNumber: 5, lessonTopic: 'Reading Strategies', status: 'scheduled', type: 'regular' },
-        
-        // Wednesday
-        { id: 15, classId: 'c1', className: 'TOEIC 450 - A1', teacherId: 't1', teacherName: 'Nguyễn Văn A', roomId: 'r1', roomName: 'P.101', date: '2025-11-19', startTime: '08:00', endTime: '10:00', lessonNumber: 7, lessonTopic: 'Pronunciation', status: 'scheduled', type: 'regular' },
-        { id: 16, classId: 'c2', className: 'TOEIC 650 - B1', teacherId: 't2', teacherName: 'Trần Thị B', roomId: 'r2', roomName: 'P.102', date: '2025-11-19', startTime: '14:00', endTime: '16:00', lessonNumber: 10, lessonTopic: 'Part 7 Practice', status: 'scheduled', type: 'regular' },
-        { id: 17, classId: 'c3', className: 'TOEIC 850 - C1', teacherId: 't3', teacherName: 'Lê Văn C', roomId: 'r3', roomName: 'P.103', date: '2025-11-19', startTime: '16:00', endTime: '18:00', lessonNumber: 14, lessonTopic: 'Test Strategy', status: 'scheduled', type: 'regular' },
-        
-        // Thursday - High density day
-        { id: 18, classId: 'c4', className: 'TOEIC 550 - A2', teacherId: 't4', teacherName: 'Phạm Thị D', roomId: 'r4', roomName: 'P.104', date: '2025-11-20', startTime: '08:00', endTime: '10:00', lessonNumber: 8, lessonTopic: 'Part 3-4 Practice', status: 'scheduled', type: 'regular' },
-        { id: 19, classId: 'c5', className: 'TOEIC 750 - B2', teacherId: 't5', teacherName: 'Hoàng Văn E', roomId: 'r5', roomName: 'P.105', date: '2025-11-20', startTime: '08:00', endTime: '10:00', lessonNumber: 12, lessonTopic: 'Email Writing', status: 'scheduled', type: 'regular' },
-        { id: 20, classId: 'c6', className: 'TOEIC 900+ - Expert', teacherId: 't6', teacherName: 'Vũ Thị F', roomId: 'r6', roomName: 'P.106', date: '2025-11-20', startTime: '08:00', endTime: '10:00', lessonNumber: 16, lessonTopic: 'Full Practice Test', status: 'completed', type: 'regular' },
-        { id: 21, classId: 'c7', className: 'TOEIC Intensive', teacherId: 't7', teacherName: 'Đỗ Văn G', roomId: 'r7', roomName: 'P.107', date: '2025-11-20', startTime: '08:00', endTime: '10:00', lessonNumber: 5, lessonTopic: 'Grammar Review', status: 'scheduled', type: 'regular' },
-        
-        // Friday
-        { id: 22, classId: 'c8', className: 'TOEIC Foundation', teacherId: 't8', teacherName: 'Bùi Thị H', roomId: 'r8', roomName: 'P.108', date: '2025-11-21', startTime: '14:00', endTime: '16:00', lessonNumber: 3, lessonTopic: 'Sentence Structure', status: 'scheduled', type: 'regular' },
-        { id: 23, classId: 'c9', className: 'TOEIC 600 Weekend', teacherId: 't9', teacherName: 'Ngô Văn I', roomId: 'r9', roomName: 'P.109', date: '2025-11-21', startTime: '16:00', endTime: '18:00', lessonNumber: 6, lessonTopic: 'Listening Part 3', status: 'scheduled', type: 'regular' },
-        
-        // Saturday - Weekend classes
-        { id: 24, classId: 'c1', className: 'TOEIC 450 - A1', teacherId: 't1', teacherName: 'Nguyễn Văn A', roomId: 'r1', roomName: 'P.101', date: '2025-11-22', startTime: '08:00', endTime: '10:00', lessonNumber: 8, lessonTopic: 'Weekend Practice', status: 'scheduled', type: 'regular' },
-        { id: 25, classId: 'c2', className: 'TOEIC 650 - B1', teacherId: 't2', teacherName: 'Trần Thị B', roomId: 'r2', roomName: 'P.102', date: '2025-11-22', startTime: '10:00', endTime: '12:00', lessonNumber: 11, lessonTopic: 'Mock Test Review', status: 'scheduled', type: 'regular' },
-        { id: 26, classId: 'c10', className: 'TOEIC Makeup Class', teacherId: 't1', teacherName: 'Nguyễn Văn A', roomId: 'r10', roomName: 'P.110', date: '2025-11-22', startTime: '14:00', endTime: '16:00', lessonNumber: 5, lessonTopic: 'Makeup: Vocabulary', status: 'scheduled', type: 'makeup' },
-        
-        // Sunday
-        { id: 27, classId: 'c3', className: 'TOEIC 850 - C1', teacherId: 't3', teacherName: 'Lê Văn C', roomId: 'r3', roomName: 'P.103', date: '2025-11-23', startTime: '10:00', endTime: '12:00', lessonNumber: 15, lessonTopic: 'Final Review', status: 'scheduled', type: 'regular' },
-      ];
-      
-      setSchedules(mockSchedules);
+      setSchedules(transformedSchedules);
     } catch (err) {
       console.error('Error fetching schedules:', err);
       setError(err.message || 'Không thể tải danh sách lịch học');

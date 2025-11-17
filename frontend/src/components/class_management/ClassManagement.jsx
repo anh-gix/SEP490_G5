@@ -35,9 +35,10 @@ const ClassManagement = () => {
       const transformedClasses = response.classes.map(cls => ({
         id: cls._id,
         name: cls.name,
-        level: cls.level || 'N/A',
+        level: cls.level || cls.course?.level || 'N/A', // Level từ course
         program: cls.courseName || cls.course?.name || 'N/A',
-        band: cls.course?.level || cls.level,
+        band: cls.band || cls.course?.band || 'N/A', // Band từ course
+        courseType: cls.courseType || cls.course?.type || 'N/A',
         status: cls.status,
         startDate: cls.startDate ? new Date(cls.startDate).toISOString().split('T')[0] : 'N/A',
         endDate: cls.endDate ? new Date(cls.endDate).toISOString().split('T')[0] : 'N/A',
@@ -45,8 +46,9 @@ const ClassManagement = () => {
         teacherId: cls.teacher?._id || cls.teacherId || null,
         // use flattened teacherName from backend if present, otherwise fallback to username
         teacherName: cls.teacherName || cls.teacher?.username || 'N/A',
-        roomId: null,
-        roomName: 'N/A',
+        roomId: cls.room?._id || null,
+        roomName: cls.roomName || cls.room?.room_name || 'N/A',
+        roomLocation: cls.roomLocation || cls.room?.location || 'N/A',
         totalStudents: cls.totalStudents || cls.students?.length || 0,
         maxStudents: cls.maxStudents || 25,
         currentLesson: cls.totalSchedules || 0,

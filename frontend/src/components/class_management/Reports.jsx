@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Form, Table, Badge, ProgressBar } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Form, Table, Badge, ProgressBar, Spinner, Alert } from 'react-bootstrap';
+import reportService from '../../services/reportService';
 
 /**
  * Reports Component
@@ -9,84 +10,65 @@ const Reports = () => {
   const [reportType, setReportType] = useState('overview');
   const [dateRange, setDateRange] = useState('thisMonth');
   const [statsData, setStatsData] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchReportData();
   }, [reportType, dateRange]);
 
   const fetchReportData = async () => {
-    // Mock data
-    setStatsData({
-      overview: {
-        totalClasses: 45,
-        activeClasses: 38,
-        totalStudents: 856,
-        totalTeachers: 24,
-        averageAttendance: 88.5,
-        completionRate: 92.3
-      },
-      classStats: [
-        {
-          level: 'A1',
-          total: 12,
-          active: 10,
-          students: 240,
-          avgAttendance: 90
-        },
-        {
-          level: 'A2',
-          total: 15,
-          active: 13,
-          students: 325,
-          avgAttendance: 87
-        },
-        {
-          level: 'B1',
-          total: 10,
-          active: 9,
-          students: 180,
-          avgAttendance: 85
-        },
-        {
-          level: 'B2',
-          total: 8,
-          active: 6,
-          students: 111,
-          avgAttendance: 92
+    try {
+      setLoading(true);
+      setError(null);
+      let data = {};
+
+      switch (reportType) {
+        case 'overview': {
+          const overviewResponse = await reportService.getOverviewReport();
+          data.overview = overviewResponse.overview || {};
+          
+          // Get class stats by level
+          const classResponse = await reportService.getClassReport();
+          data.classStats = classResponse.report?.classStats || [];
+          break;
         }
-      ],
-      teacherPerformance: [
-        {
-          id: 1,
-          name: 'Nguyễn Văn A',
-          classes: 3,
-          students: 75,
-          rating: 4.8,
-          attendance: 92
-        },
-        {
-          id: 2,
-          name: 'Trần Thị B',
-          classes: 2,
-          students: 50,
-          rating: 4.6,
-          attendance: 88
-        },
-        {
-          id: 3,
-          name: 'Lê Văn C',
-          classes: 4,
-          students: 100,
-          rating: 4.9,
-          attendance: 90
+        case 'classes': {
+          const classResponse = await reportService.getClassReport();
+          data.classStats = classResponse.report?.classStats || classResponse.classStats || [];
+          break;
         }
-      ],
-      revenueData: {
-        thisMonth: 250000000,
-        lastMonth: 230000000,
-        growth: 8.7
+        case 'students': {
+          const studentResponse = await reportService.getStudentReport();
+          data.studentStats = studentResponse.students || [];
+          break;
+        }
+        case 'teachers': {
+          const teacherResponse = await reportService.getTeacherReport();
+          data.teacherPerformance = teacherResponse.students || []; // Note: backend returns 'students' field for teacher report
+          break;
+        }
+        case 'financial': {
+          const financialResponse = await reportService.getFinancialReport({ period: dateRange });
+          data.revenueData = financialResponse.report?.revenueData || financialResponse.revenueData || {
+            thisMonth: 0,
+            lastMonth: 0,
+            growth: 0
+          };
+          break;
+        }
+        default:
+          break;
       }
-    });
+
+      setStatsData(data);
+    } catch (err) {
+      console.error('Error fetching report data:', err);
+      setError(err.message || 'Không thể tải dữ liệu báo cáo');
+      setStatsData({});
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getRatingStars = (rating) => {
@@ -132,6 +114,23 @@ const Reports = () => {
           </Button>
         </div>
       </div>
+
+      {loading && (
+        <div className="text-center py-5">
+          <Spinner animation="border" variant="primary" />
+          <p className="mt-3 text-neutral-500">Đang tải dữ liệu...</p>
+        </div>
+      )}
+
+      {error && (
+        <Alert variant="danger" dismissible onClose={() => setError(null)} className="mb-24">
+          <Alert.Heading>Lỗi!</Alert.Heading>
+          <p>{error}</p>
+        </Alert>
+      )}
+
+      {!loading && !error && (
+        <>
 
       {/* Report Type Tabs */}
       <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24">

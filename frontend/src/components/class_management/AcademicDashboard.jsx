@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, ProgressBar, Table } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, ProgressBar, Table, Spinner, Alert } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
+import classService from '../../services/classService';
+import scheduleService from '../../services/scheduleService';
+import roomService from '../../services/roomService';
+import axios from 'axios';
 
 /**
  * Academic Dashboard Component
@@ -22,6 +26,8 @@ const AcademicDashboard = () => {
   const [recentActivities, setRecentActivities] = useState([]);
   const [todaySchedule, setTodaySchedule] = useState([]);
   const [classProgress, setClassProgress] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -29,182 +35,163 @@ const AcademicDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // TODO: Replace with actual API calls
-      // Mock data for demonstration
+      setLoading(true);
+      setError(null);
 
-      setTodayOverview({
-        todaySchedules: 12,
-        absentStudents: 5,
-        lateStudents: 2,
-        pendingLeaveRequests: 8,
-        pendingMakeupClasses: 3,
-        newClassRequests: 2
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      const startOfDay = new Date(today);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(today);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      // Fetch today's schedules
+      const schedulesResponse = await scheduleService.getAllSchedules({ 
+        date: todayStr,
+        status: 'approved'
+      });
+      const todaySchedules = schedulesResponse.schedules || schedulesResponse || [];
+
+      // Fetch all classes for progress
+      const classesResponse = await classService.getAllClasses();
+      const classes = classesResponse.classes || [];
+
+      // Fetch rooms
+      const roomsResponse = await roomService.getAllRooms();
+      const rooms = roomsResponse.rooms || roomsResponse || [];
+
+      // Fetch absent/late students from today's schedules
+      const absentStudents = [];
+      const lateStudents = [];
+      
+      for (const schedule of todaySchedules) {
+        try {
+          const attendanceResponse = await axios.get(
+            `http://localhost:8080/api/class-schedules/${schedule._id || schedule.id}/attendance`
+          );
+          const attendances = attendanceResponse.data.attendances || attendanceResponse.data || [];
+          
+          for (const att of attendances) {
+            if (att.attendance?.status === 'absent') {
+              absentStudents.push({
+                id: att.student?._id || att.student,
+                name: att.student?.username || 'N/A',
+                studentId: att.student?._id || att.student,
+                class: schedule.class?.name || schedule.className || 'N/A',
+                time: schedule.startTime || 'N/A',
+                status: 'absent'
+              });
+            } else if (att.attendance?.status === 'late') {
+              lateStudents.push({
+                id: att.student?._id || att.student,
+                name: att.student?.username || 'N/A',
+                studentId: att.student?._id || att.student,
+                class: schedule.class?.name || schedule.className || 'N/A',
+                time: schedule.startTime || 'N/A',
+                status: 'late'
+              });
+            }
+          }
+        } catch (err) {
+          // Skip if attendance endpoint doesn't exist or fails
+          console.warn(`Could not fetch attendance for schedule ${schedule._id}:`, err);
+        }
+      }
+
+      // Transform today's schedules
+      const transformedTodaySchedule = todaySchedules.slice(0, 10).map((schedule, index) => {
+        const scheduleDate = new Date(schedule.date);
+        const startTime = new Date(`${schedule.date}T${schedule.startTime}`);
+        const endTime = new Date(`${schedule.date}T${schedule.endTime}`);
+        const now = new Date();
+        
+        let status = 'upcoming';
+        if (startTime <= now && now <= endTime) {
+          status = 'ongoing';
+        } else if (endTime < now) {
+          status = 'completed';
+        }
+
+        return {
+          id: schedule._id || schedule.id || index,
+          time: `${schedule.startTime || 'N/A'} - ${schedule.endTime || 'N/A'}`,
+          className: schedule.class?.name || schedule.className || 'N/A',
+          teacher: schedule.teacher?.username || schedule.teacherName || 'N/A',
+          room: schedule.room?.room_name || schedule.roomName || 'N/A',
+          status
+        };
       });
 
-      setAbsentStudentsList([
-        { id: 1, name: 'Nguyễn Văn A', studentId: 'SV001', class: 'A1-Morning-01', time: '08:00', status: 'absent' },
-        { id: 2, name: 'Trần Thị B', studentId: 'SV015', class: 'A1-Morning-01', time: '08:00', status: 'absent' },
-        { id: 3, name: 'Lê Văn C', studentId: 'SV023', class: 'A2-Morning-02', time: '10:30', status: 'late' },
-        { id: 4, name: 'Phạm Thị D', studentId: 'SV042', class: 'B1-Afternoon-01', time: '14:00', status: 'absent' },
-        { id: 5, name: 'Hoàng Văn E', studentId: 'SV058', class: 'A2-Evening-01', time: '18:00', status: 'late' }
-      ]);
+      // Build room schedule
+      const timeSlots = ['08:00-10:00', '10:30-12:30', '14:00-16:00', '18:00-20:00'];
+      const roomScheduleData = rooms.slice(0, 4).map(room => {
+        const schedules = timeSlots.map(timeSlot => {
+          const [startTime, endTime] = timeSlot.split('-');
+          const matchingSchedule = todaySchedules.find(s => 
+            s.room?._id?.toString() === room._id?.toString() &&
+            s.startTime === startTime &&
+            s.endTime === endTime
+          );
+          
+          if (matchingSchedule) {
+            return {
+              time: timeSlot,
+              class: matchingSchedule.class?.name || matchingSchedule.className || 'N/A',
+              status: 'occupied'
+            };
+          }
+          return {
+            time: timeSlot,
+            class: 'Free',
+            status: 'available'
+          };
+        });
 
-      setRoomSchedule([
-        { 
-          room: 'Room 101', 
-          location: 'Tầng 1',
-          schedules: [
-            { time: '08:00-10:00', class: 'A1-Morning-01', status: 'occupied' },
-            { time: '14:00-16:00', class: 'B1-Afternoon-01', status: 'occupied' },
-            { time: '18:00-20:00', class: 'Free', status: 'available' }
-          ]
-        },
-        { 
-          room: 'Room 102', 
-          location: 'Tầng 1',
-          schedules: [
-            { time: '08:00-10:00', class: 'Free', status: 'available' },
-            { time: '10:30-12:30', class: 'A2-Morning-02', status: 'occupied' },
-            { time: '18:00-20:00', class: 'A2-Evening-01', status: 'occupied' }
-          ]
-        },
-        { 
-          room: 'Room 201', 
-          location: 'Tầng 2',
-          schedules: [
-            { time: '08:00-10:00', class: 'Free', status: 'available' },
-            { time: '14:00-16:00', class: 'B1-Afternoon-01', status: 'occupied' },
-            { time: '18:00-20:00', class: 'Free', status: 'available' }
-          ]
-        },
-        { 
-          room: 'Room 103', 
-          location: 'Tầng 1',
-          schedules: [
-            { time: '08:00-10:00', class: 'Free', status: 'available' },
-            { time: '10:30-12:30', class: 'Free', status: 'available' },
-            { time: '18:00-20:00', class: 'C1-Evening-01', status: 'occupied' }
-          ]
-        }
-      ]);
+        return {
+          room: room.room_name || room.name || 'N/A',
+          location: room.location || 'N/A',
+          schedules
+        };
+      });
 
-      setRecentActivities([
-        {
-          id: 1,
-          type: 'class_created',
-          message: 'Lớp A1-Morning-05 đã được tạo',
-          time: '10 phút trước',
-          icon: 'fa-plus-circle',
-          color: 'success'
-        },
-        {
-          id: 2,
-          type: 'schedule_updated',
-          message: 'Lịch học lớp B1-Evening-02 đã được cập nhật',
-          time: '25 phút trước',
-          icon: 'fa-calendar-edit',
-          color: 'info'
-        },
-        {
-          id: 3,
-          type: 'teacher_assigned',
-          message: 'GV Nguyễn Văn A được phân công lớp A2-Weekend-01',
-          time: '1 giờ trước',
-          icon: 'fa-user-check',
-          color: 'primary'
-        },
-        {
-          id: 4,
-          type: 'class_completed',
-          message: 'Lớp C1-Morning-01 đã hoàn thành khóa học',
-          time: '2 giờ trước',
-          icon: 'fa-check-circle',
-          color: 'success'
-        },
-        {
-          id: 5,
-          type: 'student_registered',
-          message: '15 học viên mới đăng ký khóa học A1',
-          time: '3 giờ trước',
-          icon: 'fa-user-plus',
-          color: 'info'
-        },
-        {
-          id: 6,
-          type: 'room_booked',
-          message: 'Phòng 201 đã được đặt cho buổi học bù',
-          time: '4 giờ trước',
-          icon: 'fa-door-open',
-          color: 'warning'
-        }
-      ]);
+      // Calculate class progress
+      const classProgressData = classes.slice(0, 3).map(cls => {
+        const totalSchedules = cls.totalSchedules || 0;
+        const completedSchedules = cls.completedSchedules || 0;
+        const progress = totalSchedules > 0 ? Math.round((completedSchedules / totalSchedules) * 100) : 0;
 
-      setTodaySchedule([
-        {
-          id: 1,
-          time: '08:00 - 10:00',
-          className: 'A1-Morning-01',
-          teacher: 'Nguyễn Văn A',
-          room: 'Room 101',
-          status: 'ongoing'
-        },
-        {
-          id: 2,
-          time: '10:30 - 12:30',
-          className: 'A2-Morning-02',
-          teacher: 'Trần Thị B',
-          room: 'Room 102',
-          status: 'upcoming'
-        },
-        {
-          id: 3,
-          time: '14:00 - 16:00',
-          className: 'B1-Afternoon-01',
-          teacher: 'Lê Văn C',
-          room: 'Room 201',
-          status: 'upcoming'
-        },
-        {
-          id: 4,
-          time: '18:00 - 20:00',
-          className: 'A2-Evening-01',
-          teacher: 'Phạm Thị D',
-          room: 'Room 103',
-          status: 'upcoming'
-        }
-      ]);
+        return {
+          id: cls._id || cls.id,
+          name: cls.name || 'N/A',
+          level: cls.level || cls.course?.level || 'N/A',
+          progress,
+          students: cls.totalStudents || cls.students?.length || 0,
+          completedLessons: completedSchedules,
+          totalLessons: totalSchedules
+        };
+      });
 
-      setClassProgress([
-        {
-          id: 1,
-          name: 'A1-Morning-01',
-          level: 'A1',
-          progress: 75,
-          students: 20,
-          completedLessons: 22,
-          totalLessons: 30
-        },
-        {
-          id: 2,
-          name: 'A2-Evening-01',
-          level: 'A2',
-          progress: 60,
-          students: 18,
-          completedLessons: 18,
-          totalLessons: 30
-        },
-        {
-          id: 3,
-          name: 'B1-Weekend-01',
-          level: 'B1',
-          progress: 45,
-          students: 15,
-          completedLessons: 13,
-          totalLessons: 30
-        }
-      ]);
+      // Set overview stats
+      setTodayOverview({
+        todaySchedules: todaySchedules.length,
+        absentStudents: absentStudents.length,
+        lateStudents: lateStudents.length,
+        pendingLeaveRequests: 0, // TODO: Implement when leave request feature is added
+        pendingMakeupClasses: 0, // TODO: Implement when makeup class feature is added
+        newClassRequests: 0 // TODO: Implement when class request feature is added
+      });
+
+      setAbsentStudentsList([...absentStudents, ...lateStudents].slice(0, 10));
+      setRoomSchedule(roomScheduleData);
+      setRecentActivities([]); // TODO: Implement activity log endpoint
+      setTodaySchedule(transformedTodaySchedule);
+      setClassProgress(classProgressData);
+
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      setError('Không thể tải dữ liệu dashboard. Vui lòng thử lại sau.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -245,6 +232,17 @@ const AcademicDashboard = () => {
     );
   };
 
+  if (loading) {
+    return (
+      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
+        <div className="text-center py-5">
+          <Spinner animation="border" variant="primary" />
+          <p className="mt-3 text-neutral-500">Đang tải dữ liệu...</p>
+        </div>
+      </Container>
+    );
+  }
+
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
       {/* Header */}
@@ -259,6 +257,13 @@ const AcademicDashboard = () => {
           })}
         </p>
       </div>
+
+      {error && (
+        <Alert variant="danger" dismissible onClose={() => setError(null)} className="mb-24">
+          <Alert.Heading>Lỗi!</Alert.Heading>
+          <p>{error}</p>
+        </Alert>
+      )}
 
       {/* Today Overview - Priority Section */}
       <Card className="bg-white border-0 rounded-12 mb-20" 

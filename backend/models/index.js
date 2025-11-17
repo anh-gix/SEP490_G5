@@ -9,5 +9,7 @@ module.exports = {
     Session: require('./sessionModel'),
     User: require('./userModel'),
     Role: require('./roleModel'),
+    Permission: require('./permissionModel'),
+    LevelBandMapping: require('./levelBandMappingModel'),
     // Thêm các mô hình khác ở đây nếu cần
 };

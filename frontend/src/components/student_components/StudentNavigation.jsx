@@ -1,5 +1,5 @@
 import React from 'react';
-import RoleNavigation from '../common/RoleNavigation';
+import RoleNavigation from '../common/RoleNavigation.jsx';
 
 /**
  * Student Navigation Component

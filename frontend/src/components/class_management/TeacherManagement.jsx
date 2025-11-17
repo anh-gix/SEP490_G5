@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, Tabs, Tab, ProgressBar } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, Tabs, Tab, ProgressBar, Spinner, Alert } from 'react-bootstrap';
+import teacherService from '../../services/teacherService';
+import classService from '../../services/classService';
 
 /**
  * Teacher Management Component
@@ -14,6 +16,8 @@ const TeacherManagement = () => {
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -37,74 +41,72 @@ const TeacherManagement = () => {
 
   useEffect(() => {
     fetchTeachers();
-  }, []);
+  }, [searchTerm, filterStatus]);
 
   const fetchTeachers = async () => {
-    // Mock data
-    const mockTeachers = [
-      {
-        id: 1,
-        name: 'Nguyễn Văn A',
-        email: 'nguyenvana@example.com',
-        phone: '0901234567',
-        specialization: ['Speaking', 'IELTS'],
-        qualifications: 'CELTA, Master in English',
-        experience: 8,
-        status: 'active',
-        currentClasses: 3,
-        totalStudents: 75,
-        rating: 4.8,
-        totalLessons: 120,
-        completedLessons: 85,
-        avatar: null
-      },
-      {
-        id: 2,
-        name: 'Trần Thị B',
-        email: 'tranthib@example.com',
-        phone: '0901234568',
-        specialization: ['Listening', 'Grammar'],
-        qualifications: 'TESOL, Bachelor in English',
-        experience: 5,
-        status: 'active',
-        currentClasses: 2,
-        totalStudents: 50,
-        rating: 4.6,
-        totalLessons: 80,
-        completedLessons: 60
-      },
-      {
-        id: 3,
-        name: 'Lê Văn C',
-        email: 'levanc@example.com',
-        phone: '0901234569',
-        specialization: ['TOEIC', 'Business English'],
-        qualifications: 'CELTA, Bachelor in Business',
-        experience: 6,
-        status: 'active',
-        currentClasses: 4,
-        totalStudents: 100,
-        rating: 4.9,
-        totalLessons: 150,
-        completedLessons: 110
-      },
-      {
-        id: 4,
-        name: 'Phạm Thị D',
-        email: 'phamthid@example.com',
-        phone: '0901234570',
-        specialization: ['Writing', 'Reading'],
-        qualifications: 'TEFL, Master in Literature',
-        experience: 4,
-        status: 'inactive',
-        currentClasses: 0,
-        totalStudents: 0,
-        rating: 4.5,
-        totalLessons: 60,
-        completedLessons: 45
-      }
-    ];
-    setTeachers(mockTeachers);
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params = {};
+      if (searchTerm) params.search = searchTerm;
+      if (filterStatus && filterStatus !== 'all') params.status = filterStatus;
+      
+      const response = await teacherService.getAllTeachers(params);
+      const teachersData = response.teachers || [];
+      
+      // Get all classes to calculate stats
+      const classesResponse = await classService.getAllClasses();
+      const allClasses = classesResponse.classes || [];
+      
+      // Transform teachers data to match component format
+      const transformedTeachers = teachersData.map(teacher => {
+        // Find classes for this teacher
+        const teacherClasses = allClasses.filter(cls => 
+          cls.teacher?._id?.toString() === teacher._id?.toString() ||
+          cls.teacherId?.toString() === teacher._id?.toString()
+        );
+        
+        // Calculate stats
+        const currentClasses = teacherClasses.length;
+        const totalStudents = teacherClasses.reduce((sum, cls) => 
+          sum + (cls.totalStudents || cls.students?.length || 0), 0
+        );
+        
+        // Calculate total and completed lessons
+        let totalLessons = 0;
+        let completedLessons = 0;
+        teacherClasses.forEach(cls => {
+          totalLessons += cls.totalSchedules || 0;
+          completedLessons += cls.completedSchedules || 0;
+        });
+        
+        return {
+          id: teacher._id,
+          name: teacher.username || teacher.name || 'N/A',
+          email: teacher.email || 'N/A',
+          phone: teacher.phone || 'N/A',
+          specialization: teacher.specialization || [], // TODO: Add specialization field to User model
+          qualifications: teacher.qualifications || 'N/A', // TODO: Add qualifications field to User model
+          experience: teacher.experience || 0, // TODO: Add experience field to User model
+          status: teacher.status || 'active',
+          currentClasses,
+          totalStudents: teacher.stats?.totalStudents || totalStudents,
+          rating: teacher.rating || 0, // TODO: Add rating field to User model or calculate from reviews
+          totalLessons,
+          completedLessons,
+          avatar: teacher.avatar || null
+        };
+      });
+      
+      setTeachers(transformedTeachers);
+    } catch (err) {
+      console.error('Error fetching teachers:', err);
+      setError(err.message || 'Không thể tải danh sách giảng viên');
+      setTeachers([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleInputChange = (e) => {
@@ -232,6 +234,23 @@ const TeacherManagement = () => {
           Thêm giảng viên
         </Button>
       </div>
+
+      {loading && (
+        <div className="text-center py-5">
+          <Spinner animation="border" variant="primary" />
+          <p className="mt-3 text-neutral-500">Đang tải dữ liệu...</p>
+        </div>
+      )}
+
+      {error && (
+        <Alert variant="danger" dismissible onClose={() => setError(null)} className="mb-24">
+          <Alert.Heading>Lỗi!</Alert.Heading>
+          <p>{error}</p>
+        </Alert>
+      )}
+
+      {!loading && !error && (
+        <>
 
       {/* Stats Cards */}
       <Row className="g-3 mb-24">
@@ -834,6 +853,8 @@ const TeacherManagement = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+        </>
+      )}
     </Container>
   );
 };

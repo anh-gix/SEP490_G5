@@ -1,6 +1,8 @@
 import React from 'react';
+
 import StudentNavigation from '../../components/student_components/StudentNavigation';
 import StudentSchedule from '../../components/student_components/StudentSchedule';
+
 
 /**
  * Student Schedule Page

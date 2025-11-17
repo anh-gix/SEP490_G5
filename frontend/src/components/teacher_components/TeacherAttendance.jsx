@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal } from 'react-bootstrap';
 import { useParams } from 'react-router-dom';
+import { getAttendanceMockData } from './teacher_mockdata';
 
 /**
  * Teacher Attendance Component
@@ -23,67 +24,15 @@ const TeacherAttendance = () => {
   }, [scheduleId]);
 
   const fetchScheduleAttendance = async (id) => {
-    // Mock data - dựa trên studentScheduleModel
-    const mockSchedule = {
-      id: id,
-      className: 'A2-Evening-01',
-      date: '2025-11-12',
-      startTime: '18:00',
-      endTime: '20:00',
-      topic: 'Present Perfect Tense',
-      lessonNumber: 18,
-      room: 'Room 102'
-    };
-
-    const mockStudents = [
-      {
-        id: 1,
-        name: 'Nguyễn Văn A',
-        email: 'nguyenvana@example.com',
-        studentCode: 'SV001',
-        attendance: {
-          status: 'present', // present, absent, late, excused
-          checkInTime: '2025-11-12T18:05:00',
-          markedBy: null
-        }
-      },
-      {
-        id: 2,
-        name: 'Trần Thị B',
-        email: 'tranthib@example.com',
-        studentCode: 'SV002',
-        attendance: {
-          status: 'absent',
-          checkInTime: null,
-          markedBy: null
-        }
-      },
-      {
-        id: 3,
-        name: 'Lê Văn C',
-        email: 'levanc@example.com',
-        studentCode: 'SV003',
-        attendance: {
-          status: 'late',
-          checkInTime: '2025-11-12T18:25:00',
-          markedBy: null
-        }
-      },
-      {
-        id: 4,
-        name: 'Phạm Thị D',
-        email: 'phamthid@example.com',
-        studentCode: 'SV004',
-        attendance: {
-          status: 'excused',
-          checkInTime: null,
-          markedBy: null
-        }
-      }
-    ];
-
-    setScheduleInfo(mockSchedule);
-    setStudents(mockStudents);
+    // TODO: Replace with actual API call
+    // const response = await teacherAPI.getScheduleAttendance(id);
+    // setScheduleInfo(response.data.schedule);
+    // setStudents(response.data.students);
+    
+    // Using mock data
+    const mockData = getAttendanceMockData(id);
+    setScheduleInfo(mockData.schedule);
+    setStudents(mockData.students);
   };
 
   const fetchUpcomingSchedules = async () => {

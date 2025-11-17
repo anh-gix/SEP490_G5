@@ -9,11 +9,44 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
   const [formData, setFormData] = useState({
     reason: '',
     description: '',
-    attachments: []
+    attachments: [],
+    makeupDates: []
   });
   const [validated, setValidated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Generate available makeup dates (next 7 days, excluding weekends)
+  const getAvailableMakeupDates = () => {
+    const dates = [];
+    const currentDate = new Date();
+    let count = 0;
+    let daysAdded = 0;
+    
+    while (daysAdded < 7) {
+      count++;
+      const date = new Date(currentDate);
+      date.setDate(date.getDate() + count);
+      
+      // Skip weekends (0 = Sunday, 6 = Saturday)
+      if (date.getDay() !== 0 && date.getDay() !== 6) {
+        dates.push({
+          value: date.toISOString().split('T')[0],
+          label: date.toLocaleDateString('vi-VN', { 
+            weekday: 'long', 
+            day: '2-digit', 
+            month: '2-digit',
+            year: 'numeric'
+          })
+        });
+        daysAdded++;
+      }
+    }
+    
+    return dates;
+  };
+  
+  const availableMakeupDates = getAvailableMakeupDates();
 
   const reasonOptions = [
     { value: 'sick', label: 'Ốm đau, sức khỏe' },
@@ -37,6 +70,14 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
     setFormData(prev => ({
       ...prev,
       attachments: files
+    }));
+  };
+
+  const handleMakeupDateChange = (e) => {
+    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+    setFormData(prev => ({
+      ...prev,
+      makeupDates: selectedOptions
     }));
   };
 
@@ -68,7 +109,8 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
       setFormData({
         reason: '',
         description: '',
-        attachments: []
+        attachments: [],
+        makeupDates: []
       });
       setValidated(false);
 
@@ -91,7 +133,8 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
       setFormData({
         reason: '',
         description: '',
-        attachments: []
+        attachments: [],
+        makeupDates: []
       });
       setValidated(false);
       setError('');
@@ -232,6 +275,29 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
             </Form.Control.Feedback>
             <Form.Text className="text-neutral-500 text-12 mt-8">
               Cung cấp thông tin chi tiết giúp giáo vụ xử lý đơn nhanh hơn
+            </Form.Text>
+          </Form.Group>
+
+          <Form.Group className="mb-20">
+            <Form.Label className="text-neutral-900 fw-semibold text-13 mb-8">
+              Ngày có thể học bù (không bắt buộc)
+            </Form.Label>
+            <Form.Select
+              multiple
+              value={formData.makeupDates}
+              onChange={handleMakeupDateChange}
+              className="border-neutral-30 radius-8 px-16 py-10 text-13"
+              style={{ minHeight: '120px' }}
+            >
+              {availableMakeupDates.map(date => (
+                <option key={date.value} value={date.value}>
+                  {date.label}
+                </option>
+              ))}
+            </Form.Select>
+            <Form.Text className="text-neutral-500 text-12 mt-8">
+              <i className="fas fa-info-circle me-1"></i>
+              Giữ Ctrl (hoặc Cmd) để chọn nhiều ngày. Danh sách các ngày trong tuần tới mà bạn có thể tham gia học bù.
             </Form.Text>
           </Form.Group>
 

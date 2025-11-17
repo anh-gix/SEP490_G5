@@ -4,6 +4,7 @@ import StudentCoursesPage from "../pages/StudentCoursesPage.jsx";
 import StudentClassDetailPage from "../pages/StudentClassDetailPage.jsx";
 import StudentHomeworkDetailPage from "../pages/StudentHomeworkDetailPage.jsx";
 import StudentAssignmentsPage from "../pages/StudentAssignmentsPage.jsx";
+import StudentLessonDetailPage from "../pages/StudentLessonDetailPage.jsx";
 import ToeicPractice from "../components/student_components/ToeicPractice.jsx";
 import ToeicTestTaking from "../components/student_components/ToeicTestTaking.jsx";
 import ToeicTestResult from "../components/student_components/ToeicTestResult.jsx";
@@ -20,6 +21,7 @@ export const studentRoutes = [
 
   // I. Schedule
   { path: '/student/schedule', element: <StudentSchedulePage /> },
+  { path: '/student/lessons/:lessonId', element: <StudentLessonDetailPage /> },
 
   // II. My Classes
   { path: '/student/courses', element: <StudentCoursesPage /> },

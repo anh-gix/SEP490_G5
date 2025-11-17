@@ -1,14 +1,14 @@
 import Attendance from "../pages/Attendance.jsx";
 import ClassSchedulePage from "../pages/ClassSchedulePage.jsx";
 import AttendanceDetailPage from "../pages/AttendanceDetailPage.jsx";
-import TeacherDashboardPage from "../pages/TeacherDashboardPage.jsx";
-import TeacherSchedulePage from "../pages/TeacherSchedulePage.jsx";
-import TeacherClassesPage from "../pages/TeacherClassesPage.jsx";
-import TeacherAssignmentsPage from "../pages/TeacherAssignmentsPage.jsx";
-import TeacherAttendancePage from "../pages/TeacherAttendancePage.jsx";
-import TeacherGradingPage from "../pages/TeacherGradingPage.jsx";
-import TeacherClassDetailPage from "../pages/TeacherClassDetailPage.jsx";
-import LessonDetailPage from "../pages/LessonDetailPage.jsx";
+import TeacherDashboardPage from "../pages/TeacherPages/TeacherDashboardPage.jsx";
+import TeacherSchedulePage from "../pages/TeacherPages/TeacherSchedulePage.jsx";
+import TeacherClassesPage from "../pages/TeacherPages/TeacherClassesPage.jsx";
+import TeacherAssignmentsPage from "../pages/TeacherPages/TeacherAssignmentsPage.jsx";
+import TeacherAttendancePage from "../pages/TeacherPages/TeacherAttendancePage.jsx";
+import TeacherGradingPage from "../pages/TeacherPages/TeacherGradingPage.jsx";
+import TeacherClassDetailPage from "../pages/TeacherPages/TeacherClassDetailPage.jsx";
+import LessonDetailPage from "../pages/TeacherPages/LessonDetailPage.jsx";
 
 /**
  * TeacherRoutes

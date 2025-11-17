@@ -32,9 +32,6 @@ const ScheduleList = ({
       case 'roomName':
         comparison = a.roomName.localeCompare(b.roomName);
         break;
-      case 'status':
-        comparison = a.status.localeCompare(b.status);
-        break;
       default:
         break;
     }
@@ -87,16 +84,6 @@ const ScheduleList = ({
       selectedSchedules.forEach(id => onDeleteSchedule(id));
       setSelectedSchedules([]);
     }
-  };
-
-  const getStatusText = (status) => {
-    const statusMap = {
-      scheduled: 'Đã lên lịch',
-      completed: 'Đã hoàn thành',
-      cancelled: 'Đã hủy',
-      makeup: 'Học bù'
-    };
-    return statusMap[status] || status;
   };
 
   const getTypeText = (type) => {
@@ -187,13 +174,6 @@ const ScheduleList = ({
                 Phòng học <SortIcon field="roomName" />
               </th>
               <th className="text-neutral-900 fw-semibold" style={{ padding: '16px' }}>Loại</th>
-              <th 
-                onClick={() => handleSort('status')} 
-                style={{ cursor: 'pointer', padding: '16px' }}
-                className="text-neutral-900 fw-semibold"
-              >
-                Trạng thái <SortIcon field="status" />
-              </th>
               <th style={{ width: '180px', padding: '16px' }} className="text-neutral-900 fw-semibold">Hành động</th>
             </tr>
           </thead>
@@ -235,17 +215,6 @@ const ScheduleList = ({
                     </Badge>
                   </td>
                   <td style={{ padding: '16px' }}>
-                    <Badge 
-                      className={
-                        schedule.status === 'scheduled' ? 'bg-success-600 text-white px-12 py-6' :
-                        schedule.status === 'completed' ? 'bg-main-600 text-white px-12 py-6' :
-                        schedule.status === 'cancelled' ? 'bg-danger-600 text-white px-12 py-6' : 'bg-warning-600 text-white px-12 py-6'
-                      }
-                    >
-                      {getStatusText(schedule.status)}
-                    </Badge>
-                  </td>
-                  <td style={{ padding: '16px' }}>
                     <ButtonGroup size="sm">
                       <Button
                         className="btn-outline-main text-13 px-10 py-6"
@@ -274,7 +243,7 @@ const ScheduleList = ({
               ))
             ) : (
               <tr>
-                <td colSpan="10" className="text-center py-40" style={{ padding: '40px' }}>
+                <td colSpan="9" className="text-center py-40" style={{ padding: '40px' }}>
                   <i className="fas fa-inbox fa-3x text-neutral-400 mb-16 d-block"></i>
                   <p className="mb-0 text-neutral-500">Không có lịch học nào</p>
                 </td>
@@ -333,33 +302,6 @@ const ScheduleList = ({
         </div>
       )}
 
-      {/* Summary */}
-      {schedules.length > 0 && (
-        <div className="d-flex justify-content-around p-20 bg-main-25 rounded-12 mt-24 border border-main-100">
-          <div className="text-center">
-            <div className="text-neutral-500 text-13 mb-8">Tổng số lịch</div>
-            <div className="text-neutral-900 fw-bold text-20">{schedules.length}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-neutral-500 text-13 mb-8">Đã lên lịch</div>
-            <div className="text-success-600 fw-bold text-20">
-              {schedules.filter(s => s.status === 'scheduled').length}
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-neutral-500 text-13 mb-8">Đã hoàn thành</div>
-            <div className="text-main-600 fw-bold text-20">
-              {schedules.filter(s => s.status === 'completed').length}
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-neutral-500 text-13 mb-8">Học bù</div>
-            <div className="text-warning-600 fw-bold text-20">
-              {schedules.filter(s => s.type === 'makeup').length}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

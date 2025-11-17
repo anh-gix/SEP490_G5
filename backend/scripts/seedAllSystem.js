@@ -48,6 +48,18 @@ async function clearDatabase() {
     await User.deleteMany({});
     await Role.deleteMany({});
     await Permission.deleteMany({});
+    
+    // Xóa collection levelbandmappings nếu còn tồn tại (model đã bị xóa)
+    try {
+        await mongoose.connection.db.collection('levelbandmappings').drop();
+        console.log('✅ Dropped levelbandmappings collection');
+    } catch (err) {
+        // Collection không tồn tại hoặc đã bị xóa, bỏ qua lỗi
+        if (err.code !== 26) { // 26 = namespace not found
+            console.log(`⚠️  Could not drop levelbandmappings: ${err.message}`);
+        }
+    }
+    
     console.log('✅ Database cleared\n');
 }
 

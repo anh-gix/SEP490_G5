@@ -114,6 +114,7 @@ export const dashboardAssignmentsMock = [
 export const toeicResultsMock = [
   {
     id: 1,
+    type: 'toeic',
     testName: 'TOEIC Practice Test 1',
     date: '2025-11-01',
     listening: 385,
@@ -122,10 +123,33 @@ export const toeicResultsMock = [
   },
   {
     id: 2,
+    type: 'toeic',
     testName: 'TOEIC Practice Test 2',
     date: '2025-10-25',
     listening: 365,
     reading: 410,
     total: 775
+  },
+  {
+    id: 3,
+    type: 'ielts',
+    testName: 'IELTS Practice Test 1',
+    date: '2025-11-05',
+    listening: 7.0,
+    reading: 7.5,
+    writing: 6.5,
+    speaking: 7.0,
+    overallBand: 7.0
+  },
+  {
+    id: 4,
+    type: 'ielts',
+    testName: 'IELTS Practice Test 2',
+    date: '2025-10-28',
+    listening: 6.5,
+    reading: 7.0,
+    writing: 6.0,
+    speaking: 6.5,
+    overallBand: 6.5
   }
 ];

@@ -76,7 +76,7 @@ const AcademicLessonDetail = () => {
           'Áp dụng kiến thức vào thực tế'
         ],
         clos: schedule.session?.clos || [],
-        materials: schedule.session?.materials || schedule.session?.documents || [],
+        materials: schedule.class?.course?.materials || [],
         homework: schedule.session?.homework || 'Chưa có bài tập về nhà',
         homeworkDeadline: schedule.session?.homeworkDeadline || 'N/A',
         notes: schedule.notes || schedule.reason || 'Không có ghi chú'
@@ -368,8 +368,12 @@ const AcademicLessonDetail = () => {
           {lessonData.materials && lessonData.materials.length > 0 ? (
             <div className="d-flex flex-column gap-12">
               {lessonData.materials.map((material, index) => {
-                const materialName = typeof material === 'string' ? material : (material.name || 'Tài liệu');
-                const materialUrl = typeof material === 'object' ? material.url : null;
+                // Course materials is array of strings (URLs)
+                const materialUrl = typeof material === 'string' ? material : (material.url || null);
+                // Extract filename from URL or use default name
+                const materialName = typeof material === 'string' 
+                  ? (material.split('/').pop() || 'Tài liệu')
+                  : (material.name || 'Tài liệu');
                 
                 return (
                   <div 

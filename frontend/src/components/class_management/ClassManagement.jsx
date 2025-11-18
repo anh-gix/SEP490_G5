@@ -38,7 +38,7 @@ const ClassManagement = () => {
         level: cls.level || cls.course?.level || 'N/A', // Level từ course
         program: cls.courseName || cls.course?.name || 'N/A',
         band: cls.band || cls.course?.band || 'N/A', // Band từ course
-        courseType: cls.courseType || cls.course?.type || 'N/A',
+        courseType: cls.courseType || cls.course?.program?.type || 'N/A',
         status: cls.status,
         startDate: cls.startDate ? new Date(cls.startDate).toISOString().split('T')[0] : 'N/A',
         endDate: cls.endDate ? new Date(cls.endDate).toISOString().split('T')[0] : 'N/A',

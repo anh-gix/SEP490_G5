@@ -14,10 +14,6 @@ const sessionSchema = new Schema({
         type: String
 
     },
-    materials: [{
-        name: String,
-        url: String
-    }],
     learningType: {
         type: String,
         default: 'theory'

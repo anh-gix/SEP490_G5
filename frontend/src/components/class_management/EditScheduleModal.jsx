@@ -58,9 +58,9 @@ const EditScheduleModal = ({
 
     const updatedSchedule = {
       ...formData,
-      className: classes.find(c => c.id === parseInt(formData.classId))?.name,
-      teacherName: teachers.find(t => t.id === parseInt(formData.teacherId))?.name,
-      roomName: rooms.find(r => r.id === parseInt(formData.roomId))?.name
+      className: classes.find(c => String(c.id) === String(formData.classId))?.name,
+      teacherName: teachers.find(t => String(t.id) === String(formData.teacherId))?.name,
+      roomName: rooms.find(r => String(r.id) === String(formData.roomId))?.name
     };
 
     onSubmit(updatedSchedule);

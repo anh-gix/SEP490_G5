@@ -117,7 +117,7 @@ exports.getScheduleById = async (req, res) => {
           { path: 'students', select: 'username email' },
           { 
             path: 'course', 
-            select: 'name type level band',
+            select: 'name type level band materials',
             populate: { path: 'program', select: 'program_name name' }
           }
         ]

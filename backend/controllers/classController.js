@@ -3,6 +3,7 @@ const User = require("../models/userModel");
 const ClassSchedule = require("../models/classScheduleModel");
 const StudentSchedule = require("../models/studentScheduleModel");
 const Course = require("../models/courseModel");
+const Program = require("../models/programModel");
 
 // =========================
 // 📋 LẤY DANH SÁCH LỚP HỌC
@@ -14,10 +15,11 @@ exports.getAllClasses = async (req, res) => {
     const { level, status, search, courseId } = req.query;
     let query = {};
     
-    // Level filter: tìm trong course.level vì Class không còn level field
+    // Level filter: tìm trong program.level
     if (level) {
-      const coursesWithLevel = await Course.find({ level }).select('_id');
-      query.course = { $in: coursesWithLevel.map(c => c._id) };
+      const programsWithLevel = await Program.find({ level }).select('_id');
+      const coursesWithProgram = await Course.find({ program: { $in: programsWithLevel.map(p => p._id) } }).select('_id');
+      query.course = { $in: coursesWithProgram.map(c => c._id) };
     }
     if (status) query.status = status;
     if (courseId) query.course = courseId;
@@ -30,8 +32,8 @@ exports.getAllClasses = async (req, res) => {
       .populate('room', 'room_name location capacity')
       .populate({ 
         path: 'course', 
-        select: 'name type level band tuitionFee',
-        populate: { path: 'program', select: 'program_name name' } 
+        select: 'name',
+        populate: { path: 'program', select: 'program_name name level band tuitionFee type' } 
       })
       .sort({ createdAt: -1 })
       .lean();
@@ -65,10 +67,10 @@ exports.getAllClasses = async (req, res) => {
             teacherName: cls.teacher?.username || 'N/A',
             courseName: cls.course?.name || 'N/A',
             programName: cls.course?.program?.program_name || cls.course?.program?.name || 'N/A',
-            // Add level and band from course
-            level: cls.course?.level || 'N/A',
-            band: cls.course?.band || 'N/A',
-            courseType: cls.course?.type || 'N/A',
+            // Add level and band from program
+            level: cls.course?.program?.level || 'N/A',
+            band: cls.course?.program?.band || 'N/A',
+            courseType: cls.course?.program?.type || 'N/A',
             // Add room info
             roomName: cls.room?.room_name || 'N/A',
             roomLocation: cls.room?.location || 'N/A'
@@ -108,9 +110,9 @@ exports.getClassById = async (req, res) => {
       .populate('room', 'room_name location capacity')
       .populate({ 
         path: 'course', 
-        select: 'name type level band tuitionFee',
+        select: 'name',
         populate: [
-          { path: 'program', select: 'program_name name' },
+          { path: 'program', select: 'program_name name level band tuitionFee type' },
           {
             path: 'clos',
             select: 'code name detail mappedPLOs',
@@ -214,9 +216,9 @@ exports.getClassById = async (req, res) => {
         teacherName: classData.teacher?.username || 'N/A',
         courseName: classData.course?.name || 'N/A',
         programName: classData.course?.program?.program_name || classData.course?.program?.name || 'N/A',
-        level: classData.course?.level || 'N/A',
-        band: classData.course?.band || 'N/A',
-        courseType: classData.course?.type || 'N/A',
+        level: classData.course?.program?.level || 'N/A',
+        band: classData.course?.program?.band || 'N/A',
+        courseType: classData.course?.program?.type || 'N/A',
         roomName: classData.room?.room_name || 'N/A',
         roomLocation: classData.room?.location || 'N/A'
       }
@@ -309,8 +311,8 @@ exports.createClass = async (req, res) => {
       .populate('room', 'room_name location capacity')
       .populate({ 
         path: 'course', 
-        select: 'name type level band tuitionFee',
-        populate: { path: 'program', select: 'program_name name' } 
+        select: 'name',
+        populate: { path: 'program', select: 'program_name name level band tuitionFee type' } 
       });
     
     res.status(201).json({
@@ -376,8 +378,8 @@ exports.updateClass = async (req, res) => {
       .populate('room', 'room_name location capacity')
       .populate({ 
         path: 'course', 
-        select: 'name type level band tuitionFee',
-        populate: { path: 'program', select: 'program_name name' } 
+        select: 'name',
+        populate: { path: 'program', select: 'program_name name level band tuitionFee type' } 
       });
     
     res.status(200).json({

@@ -1,5 +1,6 @@
 
 const Course = require('../models/courseModel');
+const Program = require('../models/programModel');
 
 // [Màn 2] Lấy danh sách Giáo trình chờ duyệt
 exports.getPendingCourses = async (req, res) => {
@@ -118,7 +119,7 @@ exports.requestRevision = async (req, res) => {
     }
 };
 
-// Lấy band từ type và level (từ course table)
+// Lấy band từ type và level (từ program table)
 exports.getBandByTypeAndLevel = async (req, res) => {
     try {
         const { type, level } = req.query;
@@ -133,11 +134,11 @@ exports.getBandByTypeAndLevel = async (req, res) => {
             });
         }
 
-        console.log('🔍 Searching for course with type:', type, 'level:', level);
-        const course = await Course.findOne({ type, level }).select('band');
+        console.log('🔍 Searching for program with type:', type, 'level:', level);
+        const program = await Program.findOne({ type, level }).select('band');
         
-        if (!course || !course.band) {
-            console.warn('⚠️ No course found with type:', type, 'level:', level);
+        if (!program || !program.band) {
+            console.warn('⚠️ No program found with type:', type, 'level:', level);
             return res.status(200).json({
                 success: true,
                 band: null,
@@ -145,10 +146,10 @@ exports.getBandByTypeAndLevel = async (req, res) => {
             });
         }
 
-        console.log('✅ Found band:', course.band);
+        console.log('✅ Found band:', program.band);
         res.status(200).json({
             success: true,
-            band: course.band
+            band: program.band
         });
     } catch (err) {
         console.error('❌ Error in getBandByTypeAndLevel:', err);
@@ -160,18 +161,18 @@ exports.getBandByTypeAndLevel = async (req, res) => {
     }
 };
 
-// Lấy tất cả level-band mappings (từ course table)
+// Lấy tất cả level-band mappings (từ program table)
 exports.getAllMappings = async (req, res) => {
     try {
-        const courses = await Course.find({})
+        const programs = await Program.find({})
             .select('type level band')
             .sort({ type: 1, level: 1 });
         
         // Format như LevelBandMapping để tương thích với frontend
-        const mappings = courses.map(course => ({
-            type: course.type,
-            level: course.level,
-            band: course.band
+        const mappings = programs.map(program => ({
+            type: program.type,
+            level: program.level,
+            band: program.band
         }));
         
         res.status(200).json({
@@ -188,7 +189,7 @@ exports.getAllMappings = async (req, res) => {
     }
 };
 
-// Lấy các levels theo type (từ course table)
+// Lấy các levels theo type (từ program table)
 exports.getLevelsByType = async (req, res) => {
     try {
         const { type } = req.query;
@@ -200,7 +201,7 @@ exports.getLevelsByType = async (req, res) => {
             });
         }
 
-        const levels = await Course.distinct('level', { type });
+        const levels = await Program.distinct('level', { type });
         const sortedLevels = levels.sort();
         
         res.status(200).json({
@@ -217,7 +218,7 @@ exports.getLevelsByType = async (req, res) => {
     }
 };
 
-// Lấy các types theo level (từ course table)
+// Lấy các types theo level (từ program table)
 exports.getTypesByLevel = async (req, res) => {
     try {
         const { level } = req.query;
@@ -229,7 +230,7 @@ exports.getTypesByLevel = async (req, res) => {
             });
         }
 
-        const types = await Course.distinct('type', { level });
+        const types = await Program.distinct('type', { level });
         const sortedTypes = types.sort();
         
         res.status(200).json({
@@ -246,10 +247,10 @@ exports.getTypesByLevel = async (req, res) => {
     }
 };
 
-// Lấy tất cả types từ course table
+// Lấy tất cả types từ program table
 exports.getAllCourseTypes = async (req, res) => {
     try {
-        const types = await Course.distinct('type');
+        const types = await Program.distinct('type');
         const sortedTypes = types.sort();
         
         res.status(200).json({
@@ -266,10 +267,10 @@ exports.getAllCourseTypes = async (req, res) => {
     }
 };
 
-// Lấy tất cả levels từ course table
+// Lấy tất cả levels từ program table
 exports.getAllCourseLevels = async (req, res) => {
     try {
-        const levels = await Course.distinct('level');
+        const levels = await Program.distinct('level');
         const sortedLevels = levels.sort();
         
         res.status(200).json({

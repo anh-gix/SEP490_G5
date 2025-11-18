@@ -27,8 +27,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     maxStudents: 25,
     startDate: '',
     endDate: '',
-    scheduleEntries: [createEmptyScheduleEntry()],
-    tuitionFee: 0
+    scheduleEntries: [createEmptyScheduleEntry()]
   });
 
   const [teachers, setTeachers] = useState([]);
@@ -319,11 +318,11 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     onSubmit(formData);
   };
 
-  // Fetch types and levels from course table on mount
+  // Fetch types and levels from program table on mount
   useEffect(() => {
     const fetchCourseData = async () => {
       try {
-        // Fetch all types and levels from course table
+        // Fetch all types and levels from program table
         const [typesResponse, levelsResponse] = await Promise.all([
           axios.get('http://localhost:8080/api/v1/courses/all-types'),
           axios.get('http://localhost:8080/api/v1/courses/all-levels')
@@ -333,13 +332,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           const allTypes = typesResponse.data.types;
           const allPrograms = allTypes.map(type => typeProgramMap[type]).filter(Boolean);
           setAvailablePrograms(allPrograms);
-          console.log('✅ Loaded types from course table:', allTypes.length);
+          console.log('✅ Loaded types from program table:', allTypes.length);
         }
         
         if (levelsResponse.data?.success && levelsResponse.data.levels) {
           const allLevels = levelsResponse.data.levels;
           setAvailableLevels(allLevels);
-          console.log('✅ Loaded levels from course table:', allLevels.length);
+          console.log('✅ Loaded levels from program table:', allLevels.length);
         }
         
         // Also fetch mappings for band lookup (still needed for band display)
@@ -347,7 +346,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           const mappingsResponse = await axios.get('http://localhost:8080/api/v1/courses/mappings');
           if (mappingsResponse.data && mappingsResponse.data.success && mappingsResponse.data.mappings) {
             setMappings(mappingsResponse.data.mappings);
-            console.log('✅ Loaded mappings from course table:', mappingsResponse.data.mappings.length);
+            console.log('✅ Loaded mappings from program table:', mappingsResponse.data.mappings.length);
           }
         } catch (mappingsError) {
           console.error('❌ Error fetching mappings:', mappingsError);
@@ -363,7 +362,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   useEffect(() => {
     const filterLevels = async () => {
       if (!formData.program) {
-        // If no program selected, show all levels from course table
+        // If no program selected, show all levels from program table
         try {
           const response = await axios.get('http://localhost:8080/api/v1/courses/all-levels');
           if (response.data?.success && response.data.levels) {
@@ -381,7 +380,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         return;
       }
 
-      // Fetch levels for this type from course table
+      // Fetch levels for this type from program table
       try {
         const response = await axios.get('http://localhost:8080/api/v1/courses/levels', {
           params: { type }
@@ -406,7 +405,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   useEffect(() => {
     const filterPrograms = async () => {
       if (!formData.level) {
-        // If no level selected, show all types from course table
+        // If no level selected, show all types from program table
         try {
           const response = await axios.get('http://localhost:8080/api/v1/courses/all-types');
           if (response.data?.success && response.data.types) {
@@ -420,7 +419,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         return;
       }
 
-      // Fetch types for this level from course table
+      // Fetch types for this level from program table
       try {
         const response = await axios.get('http://localhost:8080/api/v1/courses/types', {
           params: { level: formData.level }
@@ -1329,22 +1328,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     value={formData.band}
                     onChange={handleInputChange}
                     placeholder="VD: Band 1"
-                    className="border-neutral-30 radius-8 px-16 py-10"
-                  />
-                </Form.Group>
-              </div>
-            </div>
-
-            <div className="row g-3">
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">Học phí (VNĐ)</Form.Label>
-                  <Form.Control
-                    type="number"
-                    name="tuitionFee"
-                    value={formData.tuitionFee}
-                    onChange={handleInputChange}
-                    placeholder="0"
                     className="border-neutral-30 radius-8 px-16 py-10"
                   />
                 </Form.Group>

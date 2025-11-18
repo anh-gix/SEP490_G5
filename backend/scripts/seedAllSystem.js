@@ -23,6 +23,7 @@ const seedData = {
     roles: [],
     users: [],
     programs: [],
+    programMap: {}, // Map for type_level -> programId
     plos: [],
     rooms: [],
     clos: [],
@@ -212,23 +213,199 @@ async function seedUsers() {
 
 async function seedPrograms() {
     console.log('📝 Seeding Programs...');
+    
+    // Mapping band values
+    const mappingMap = {
+        'ielts_A1': '0-2.5',
+        'ielts_A2': '3.0-3.5',
+        'ielts_B1': '4.0-5.0',
+        'ielts_B2': '5.5-6.5',
+        'ielts_C1': '7.0-8.0',
+        'ielts_C2': '8.5-9.0',
+        'toeic_A1': '0-250',
+        'toeic_A2': '251-500',
+        'toeic_B1': '501-700',
+        'toeic_B2': '701-900',
+        'toeic_C1': '901-990',
+        'toeic_C2': '990+',
+        'cam_Pre-A1': 'Starter',
+        'cam_A1': 'Mover'
+    };
+    
+    // Tuition fees
+    const tuitionFeeMap = {
+        'ielts_A1': 3000000,
+        'ielts_A2': 3500000,
+        'ielts_B1': 5000000,
+        'ielts_B2': 6000000,
+        'ielts_C1': 7000000,
+        'ielts_C2': 8000000,
+        'toeic_A1': 2500000,
+        'toeic_A2': 3000000,
+        'toeic_B1': 4000000,
+        'toeic_B2': 5000000,
+        'toeic_C1': 6000000,
+        'toeic_C2': 7000000,
+        'cam_Pre-A1': 2000000,
+        'cam_A1': 2500000
+    };
+    
     const programs = [
+        // IELTS programs
         {
-            code: 'PROG001',
-            program_name: 'Tiếng Anh Giao tiếp',
-            description: 'Chương trình đào tạo tiếng Anh giao tiếp từ cơ bản đến nâng cao',
+            code: 'IELTS_A1',
+            program_name: 'IELTS Foundation A1',
+            description: 'Chương trình IELTS cơ bản - Level A1',
+            type: 'ielts',
+            level: 'A1',
+            band: mappingMap['ielts_A1'],
+            tuitionFee: tuitionFeeMap['ielts_A1'],
             status: 'active'
         },
         {
-            code: 'PROG002',
-            program_name: 'TOEIC/IELTS',
-            description: 'Chương trình luyện thi TOEIC và IELTS',
+            code: 'IELTS_A2',
+            program_name: 'IELTS Elementary A2',
+            description: 'Chương trình IELTS sơ cấp - Level A2',
+            type: 'ielts',
+            level: 'A2',
+            band: mappingMap['ielts_A2'],
+            tuitionFee: tuitionFeeMap['ielts_A2'],
+            status: 'active'
+        },
+        {
+            code: 'IELTS_B1',
+            program_name: 'IELTS Intermediate B1',
+            description: 'Chương trình IELTS trung cấp - Level B1',
+            type: 'ielts',
+            level: 'B1',
+            band: mappingMap['ielts_B1'],
+            tuitionFee: tuitionFeeMap['ielts_B1'],
+            status: 'active'
+        },
+        {
+            code: 'IELTS_B2',
+            program_name: 'IELTS Upper Intermediate B2',
+            description: 'Chương trình IELTS trung cấp cao - Level B2',
+            type: 'ielts',
+            level: 'B2',
+            band: mappingMap['ielts_B2'],
+            tuitionFee: tuitionFeeMap['ielts_B2'],
+            status: 'active'
+        },
+        {
+            code: 'IELTS_C1',
+            program_name: 'IELTS Advanced C1',
+            description: 'Chương trình IELTS nâng cao - Level C1',
+            type: 'ielts',
+            level: 'C1',
+            band: mappingMap['ielts_C1'],
+            tuitionFee: tuitionFeeMap['ielts_C1'],
+            status: 'active'
+        },
+        {
+            code: 'IELTS_C2',
+            program_name: 'IELTS Proficiency C2',
+            description: 'Chương trình IELTS thành thạo - Level C2',
+            type: 'ielts',
+            level: 'C2',
+            band: mappingMap['ielts_C2'],
+            tuitionFee: tuitionFeeMap['ielts_C2'],
+            status: 'active'
+        },
+        // TOEIC programs
+        {
+            code: 'TOEIC_A1',
+            program_name: 'TOEIC Beginner A1',
+            description: 'Chương trình TOEIC cho người mới bắt đầu - Level A1',
+            type: 'toeic',
+            level: 'A1',
+            band: mappingMap['toeic_A1'],
+            tuitionFee: tuitionFeeMap['toeic_A1'],
+            status: 'active'
+        },
+        {
+            code: 'TOEIC_A2',
+            program_name: 'TOEIC Elementary A2',
+            description: 'Chương trình TOEIC sơ cấp - Level A2',
+            type: 'toeic',
+            level: 'A2',
+            band: mappingMap['toeic_A2'],
+            tuitionFee: tuitionFeeMap['toeic_A2'],
+            status: 'active'
+        },
+        {
+            code: 'TOEIC_B1',
+            program_name: 'TOEIC Intermediate B1',
+            description: 'Chương trình TOEIC trung cấp - Level B1',
+            type: 'toeic',
+            level: 'B1',
+            band: mappingMap['toeic_B1'],
+            tuitionFee: tuitionFeeMap['toeic_B1'],
+            status: 'active'
+        },
+        {
+            code: 'TOEIC_B2',
+            program_name: 'TOEIC Upper Intermediate B2',
+            description: 'Chương trình TOEIC trung cấp cao - Level B2',
+            type: 'toeic',
+            level: 'B2',
+            band: mappingMap['toeic_B2'],
+            tuitionFee: tuitionFeeMap['toeic_B2'],
+            status: 'active'
+        },
+        {
+            code: 'TOEIC_C1',
+            program_name: 'TOEIC Advanced C1',
+            description: 'Chương trình TOEIC nâng cao - Level C1',
+            type: 'toeic',
+            level: 'C1',
+            band: mappingMap['toeic_C1'],
+            tuitionFee: tuitionFeeMap['toeic_C1'],
+            status: 'active'
+        },
+        {
+            code: 'TOEIC_C2',
+            program_name: 'TOEIC Proficiency C2',
+            description: 'Chương trình TOEIC thành thạo - Level C2',
+            type: 'toeic',
+            level: 'C2',
+            band: mappingMap['toeic_C2'],
+            tuitionFee: tuitionFeeMap['toeic_C2'],
+            status: 'active'
+        },
+        // CAM programs
+        {
+            code: 'CAM_Pre-A1',
+            program_name: 'CAM Starter Pre-A1',
+            description: 'Chương trình CAM Starter cho trẻ em - Level Pre-A1',
+            type: 'cam',
+            level: 'Pre-A1',
+            band: mappingMap['cam_Pre-A1'],
+            tuitionFee: tuitionFeeMap['cam_Pre-A1'],
+            status: 'active'
+        },
+        {
+            code: 'CAM_A1',
+            program_name: 'CAM Mover A1',
+            description: 'Chương trình CAM Mover cho trẻ em - Level A1',
+            type: 'cam',
+            level: 'A1',
+            band: mappingMap['cam_A1'],
+            tuitionFee: tuitionFeeMap['cam_A1'],
             status: 'active'
         }
     ];
     
     const created = await Program.insertMany(programs);
     seedData.programs = created;
+    
+    // Create a map for easy lookup by type+level
+    seedData.programMap = {};
+    created.forEach(prog => {
+        const key = `${prog.type}_${prog.level}`;
+        seedData.programMap[key] = prog._id;
+    });
+    
     console.log(`✅ Created ${created.length} programs\n`);
 }
 
@@ -251,13 +428,22 @@ async function seedPLOs() {
     const created = await PLO.insertMany(plos);
     seedData.plos = created;
     
-    // Update Programs with PLOs
-    await Program.findByIdAndUpdate(seedData.programs[0]._id, {
-        plos: [created[0]._id, created[1]._id, created[2]._id, created[3]._id]
-    });
-    await Program.findByIdAndUpdate(seedData.programs[1]._id, {
-        plos: [created[4]._id, created[5]._id, created[6]._id, created[7]._id]
-    });
+    // Update Programs with PLOs - assign to CAM and IELTS/TOEIC programs
+    // CAM programs get PLOs 0-3, IELTS/TOEIC programs get PLOs 4-7
+    const camPrograms = seedData.programs.filter(p => p.type === 'cam');
+    const ieltsToeicPrograms = seedData.programs.filter(p => p.type === 'ielts' || p.type === 'toeic');
+    
+    for (const prog of camPrograms) {
+        await Program.findByIdAndUpdate(prog._id, {
+            plos: [created[0]._id, created[1]._id, created[2]._id, created[3]._id]
+        });
+    }
+    
+    for (const prog of ieltsToeicPrograms) {
+        await Program.findByIdAndUpdate(prog._id, {
+            plos: [created[4]._id, created[5]._id, created[6]._id, created[7]._id]
+        });
+    }
     
     console.log(`✅ Created ${created.length} PLOs\n`);
 }
@@ -334,192 +520,135 @@ async function seedCLOs() {
 async function seedCourses() {
     console.log('📝 Seeding Courses...');
     
-    // Mapping band values (hardcoded since LevelBandMapping is removed)
-    const mappingMap = {
-        'ielts_A1': '0-2.5',
-        'ielts_A2': '3.0-3.5',
-        'ielts_B1': '4.0-5.0',
-        'ielts_B2': '5.5-6.5',
-        'ielts_C1': '7.0-8.0',
-        'ielts_C2': '8.5-9.0',
-        'toeic_A1': '0-250',
-        'toeic_A2': '251-500',
-        'toeic_B1': '501-700',
-        'toeic_B2': '701-900',
-        'toeic_C1': '901-990',
-        'toeic_C2': '990+',
-        'cam_Pre-A1': 'Starter',
-        'cam_A1': 'Mover'
-    };
-    
     const courses = [
-        // IELTS courses
+        // IELTS courses - each course references the program by type+level
         {
-            name: 'IELTS Foundation A1',
-            description: 'Khóa học IELTS cơ bản cho người mới bắt đầu',
-            program: seedData.programs[1]._id,
-            type: 'ielts',
-            level: 'A1',
-            band: mappingMap['ielts_A1'] || '0-2.5',
-            tuitionFee: 3000000,
+            name: 'IELTS Foundation A1 - Nghe',
+            description: 'Khóa học IELTS cơ bản - Kỹ năng Nghe',
+            program: seedData.programMap['ielts_A1'],
             clos: [seedData.clos[0]._id, seedData.clos[1]._id],
             createdBy: seedData.users[1]._id, // Subject Leader
             status: 'approved'
         },
         {
-            name: 'IELTS Intermediate B1',
-            description: 'Khóa học IELTS trung cấp',
-            program: seedData.programs[1]._id,
-            type: 'ielts',
-            level: 'B1',
-            band: mappingMap['ielts_B1'] || '4.0-5.0',
-            tuitionFee: 5000000,
-            clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
-            createdBy: seedData.users[1]._id,
-            status: 'approved'
-        },
-        {
-            name: 'IELTS Advanced C1',
-            description: 'Khóa học IELTS nâng cao',
-            program: seedData.programs[1]._id,
-            type: 'ielts',
-            level: 'C1',
-            band: mappingMap['ielts_C1'] || '7.0-8.0',
-            tuitionFee: 7000000,
-            clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
-            createdBy: seedData.users[1]._id,
-            status: 'approved'
-        },
-        {
-            name: 'IELTS Elementary A2',
-            description: 'Khóa học IELTS sơ cấp',
-            program: seedData.programs[1]._id,
-            type: 'ielts',
-            level: 'A2',
-            band: mappingMap['ielts_A2'] || '3.0-3.5',
-            tuitionFee: 3500000,
+            name: 'IELTS Foundation A1 - Nói',
+            description: 'Khóa học IELTS cơ bản - Kỹ năng Nói',
+            program: seedData.programMap['ielts_A1'],
             clos: [seedData.clos[0]._id, seedData.clos[1]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved'
         },
         {
-            name: 'IELTS Upper Intermediate B2',
-            description: 'Khóa học IELTS trung cấp cao',
-            program: seedData.programs[1]._id,
-            type: 'ielts',
-            level: 'B2',
-            band: mappingMap['ielts_B2'] || '5.5-6.5',
-            tuitionFee: 6000000,
+            name: 'IELTS Intermediate B1 - Nghe',
+            description: 'Khóa học IELTS trung cấp - Kỹ năng Nghe',
+            program: seedData.programMap['ielts_B1'],
             clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved'
         },
         {
-            name: 'IELTS Proficiency C2',
-            description: 'Khóa học IELTS thành thạo',
-            program: seedData.programs[1]._id,
+            name: 'IELTS Intermediate B1 - Viết',
+            description: 'Khóa học IELTS trung cấp - Kỹ năng Viết',
+            program: seedData.programMap['ielts_B1'],
             type: 'ielts',
-            level: 'C2',
-            band: mappingMap['ielts_C2'] || '8.5-9.0',
-            tuitionFee: 8000000,
+            clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
+            createdBy: seedData.users[1]._id,
+            status: 'approved'
+        },
+        {
+            name: 'IELTS Advanced C1 - Đọc',
+            description: 'Khóa học IELTS nâng cao - Kỹ năng Đọc',
+            program: seedData.programMap['ielts_C1'],
+            clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
+            createdBy: seedData.users[1]._id,
+            status: 'approved'
+        },
+        {
+            name: 'IELTS Elementary A2 - Nghe',
+            description: 'Khóa học IELTS sơ cấp - Kỹ năng Nghe',
+            program: seedData.programMap['ielts_A2'],
+            clos: [seedData.clos[0]._id, seedData.clos[1]._id],
+            createdBy: seedData.users[1]._id,
+            status: 'approved'
+        },
+        {
+            name: 'IELTS Upper Intermediate B2 - Viết',
+            description: 'Khóa học IELTS trung cấp cao - Kỹ năng Viết',
+            program: seedData.programMap['ielts_B2'],
+            clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
+            createdBy: seedData.users[1]._id,
+            status: 'approved'
+        },
+        {
+            name: 'IELTS Proficiency C2 - Nói',
+            description: 'Khóa học IELTS thành thạo - Kỹ năng Nói',
+            program: seedData.programMap['ielts_C2'],
             clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved'
         },
         // TOEIC courses
         {
-            name: 'TOEIC Beginner A1',
-            description: 'Khóa học TOEIC cho người mới bắt đầu',
-            program: seedData.programs[1]._id,
-            type: 'toeic',
-            level: 'A1',
-            band: mappingMap['toeic_A1'] || '0-250',
-            tuitionFee: 2500000,
+            name: 'TOEIC Beginner A1 - Nghe',
+            description: 'Khóa học TOEIC cho người mới bắt đầu - Kỹ năng Nghe',
+            program: seedData.programMap['toeic_A1'],
             clos: [seedData.clos[3]._id, seedData.clos[4]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved'
         },
         {
-            name: 'TOEIC Intermediate B1',
-            description: 'Khóa học TOEIC trung cấp',
-            program: seedData.programs[1]._id,
-            type: 'toeic',
-            level: 'B1',
-            band: mappingMap['toeic_B1'] || '501-700',
-            tuitionFee: 4000000,
+            name: 'TOEIC Intermediate B1 - Đọc',
+            description: 'Khóa học TOEIC trung cấp - Kỹ năng Đọc',
+            program: seedData.programMap['toeic_B1'],
             clos: [seedData.clos[3]._id, seedData.clos[4]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved'
         },
         {
-            name: 'TOEIC Elementary A2',
-            description: 'Khóa học TOEIC sơ cấp',
-            program: seedData.programs[1]._id,
-            type: 'toeic',
-            level: 'A2',
-            band: mappingMap['toeic_A2'] || '251-500',
-            tuitionFee: 3000000,
+            name: 'TOEIC Elementary A2 - Nghe',
+            description: 'Khóa học TOEIC sơ cấp - Kỹ năng Nghe',
+            program: seedData.programMap['toeic_A2'],
             clos: [seedData.clos[3]._id, seedData.clos[4]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved'
         },
         {
-            name: 'TOEIC Upper Intermediate B2',
-            description: 'Khóa học TOEIC trung cấp cao',
-            program: seedData.programs[1]._id,
-            type: 'toeic',
-            level: 'B2',
-            band: mappingMap['toeic_B2'] || '701-900',
-            tuitionFee: 5000000,
+            name: 'TOEIC Upper Intermediate B2 - Đọc',
+            description: 'Khóa học TOEIC trung cấp cao - Kỹ năng Đọc',
+            program: seedData.programMap['toeic_B2'],
             clos: [seedData.clos[3]._id, seedData.clos[4]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved'
         },
         {
-            name: 'TOEIC Advanced C1',
-            description: 'Khóa học TOEIC nâng cao',
-            program: seedData.programs[1]._id,
-            type: 'toeic',
-            level: 'C1',
-            band: mappingMap['toeic_C1'] || '901-990',
-            tuitionFee: 6000000,
+            name: 'TOEIC Advanced C1 - Nghe',
+            description: 'Khóa học TOEIC nâng cao - Kỹ năng Nghe',
+            program: seedData.programMap['toeic_C1'],
             clos: [seedData.clos[3]._id, seedData.clos[4]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved'
         },
         {
-            name: 'TOEIC Proficiency C2',
-            description: 'Khóa học TOEIC thành thạo',
-            program: seedData.programs[1]._id,
-            type: 'toeic',
-            level: 'C2',
-            band: mappingMap['toeic_C2'] || '990+',
-            tuitionFee: 7000000,
+            name: 'TOEIC Proficiency C2 - Đọc',
+            description: 'Khóa học TOEIC thành thạo - Kỹ năng Đọc',
+            program: seedData.programMap['toeic_C2'],
             clos: [seedData.clos[3]._id, seedData.clos[4]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved'
         },
         // CAM courses
         {
-            name: 'CAM Starter Pre-A1',
-            description: 'Khóa học CAM Starter cho trẻ em',
-            program: seedData.programs[0]._id,
-            type: 'cam',
-            level: 'Pre-A1',
-            band: mappingMap['cam_Pre-A1'] || 'Starter',
-            tuitionFee: 2000000,
+            name: 'CAM Starter Pre-A1 - Giao tiếp',
+            description: 'Khóa học CAM Starter cho trẻ em - Giao tiếp cơ bản',
+            program: seedData.programMap['cam_Pre-A1'],
             clos: [seedData.clos[5]._id], // CLO006 - Giao tiếp cơ bản
             createdBy: seedData.users[1]._id,
             status: 'approved'
         },
         {
-            name: 'CAM Mover A1',
-            description: 'Khóa học CAM Mover cho trẻ em',
-            program: seedData.programs[0]._id,
-            type: 'cam',
-            level: 'A1',
-            band: mappingMap['cam_A1'] || 'Mover',
-            tuitionFee: 2500000,
+            name: 'CAM Mover A1 - Nghe nói',
+            description: 'Khóa học CAM Mover cho trẻ em - Nghe và Nói',
+            program: seedData.programMap['cam_A1'],
             clos: [seedData.clos[5]._id, seedData.clos[6]._id], // CLO006 và CLO007
             createdBy: seedData.users[1]._id,
             status: 'approved'
@@ -528,7 +657,7 @@ async function seedCourses() {
     
     const created = await Course.insertMany(courses);
     seedData.courses = created;
-    console.log(`✅ Created ${created.length} courses with band mapping\n`);
+    console.log(`✅ Created ${created.length} courses\n`);
 }
 
 async function seedSessions() {
@@ -536,9 +665,14 @@ async function seedSessions() {
     const sessions = [];
     
     // Tạo sessions cho mỗi course (3-5 sessions mỗi course)
-    seedData.courses.forEach((course, courseIndex) => {
+    // Need to populate program to get type
+    const coursesWithProgram = await Course.find({ _id: { $in: seedData.courses.map(c => c._id) } })
+        .populate('program', 'type');
+    
+    for (const course of coursesWithProgram) {
         // IELTS courses có 5 sessions, TOEIC và CAM có 3 sessions
-        const sessionCount = course.type === 'ielts' ? 5 : 3;
+        const courseType = course.program?.type || 'toeic'; // Default to toeic if no program
+        const sessionCount = courseType === 'ielts' ? 5 : 3;
         
         for (let i = 1; i <= sessionCount; i++) {
             sessions.push({
@@ -549,15 +683,16 @@ async function seedSessions() {
                 clos: course.clos.slice(0, Math.min(2, course.clos.length)) // Link 1-2 CLOs
             });
         }
-    });
+    }
     
     const created = await Session.insertMany(sessions);
     seedData.sessions = created;
     
     // Update courses with sessions
     let sessionIndex = 0;
-    for (const course of seedData.courses) {
-        const sessionCount = course.type === 'ielts' ? 5 : 3;
+    for (const course of coursesWithProgram) {
+        const courseType = course.program?.type || 'toeic'; // Default to toeic if no program
+        const sessionCount = courseType === 'ielts' ? 5 : 3;
         const courseSessions = created.slice(sessionIndex, sessionIndex + sessionCount);
         await Course.findByIdAndUpdate(course._id, {
             sessions: courseSessions.map(s => s._id)

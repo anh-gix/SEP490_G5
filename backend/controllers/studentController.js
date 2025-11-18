@@ -28,12 +28,20 @@ exports.getAllStudents = async (req, res) => {
     
     console.log('✅ Found student role:', studentRole.name, studentRole._id);
     
+    // Debug: Check all users in database
+    const allUsers = await User.find({}).select('username email roleId').populate('roleId', 'name');
+    console.log(`🔍 Total users in database: ${allUsers.length}`);
+    allUsers.forEach(user => {
+      console.log(`  - User: ${user.username} (${user.email}), Role: ${user.roleId?.name || 'N/A'}, RoleId: ${user.roleId?._id || user.roleId}`);
+    });
+    
     let query = { roleId: studentRole._id };
     
-    // Filter by status if provided
-    if (status && status !== 'all') {
-      query.status = status;
-    }
+    // Filter by status if provided (only if status field exists in User model)
+    // Note: User model doesn't have status field, so this filter is disabled
+    // if (status && status !== 'all') {
+    //   query.status = status;
+    // }
     
     // Search by username, email, or fullName
     if (search) {
@@ -43,6 +51,8 @@ exports.getAllStudents = async (req, res) => {
         { fullName: { $regex: search, $options: 'i' } }
       ];
     }
+    
+    console.log(`🔍 Query for students:`, JSON.stringify(query, null, 2));
     
     const students = await User.find(query)
       .select('-password -token')

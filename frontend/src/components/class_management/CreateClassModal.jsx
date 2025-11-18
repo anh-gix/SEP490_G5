@@ -4,6 +4,7 @@ import axios from 'axios';
 import scheduleService from '../../services/scheduleService';
 import roomService from '../../services/roomService';
 import teacherService from '../../services/teacherService';
+import studentService from '../../services/studentService';
 
 const createEmptyScheduleEntry = () => ({
   id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -27,11 +28,16 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     maxStudents: 25,
     startDate: '',
     endDate: '',
-    scheduleEntries: [createEmptyScheduleEntry()]
+    scheduleEntries: [createEmptyScheduleEntry()],
+    selectedStudents: []
   });
 
   const [teachers, setTeachers] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+  const [studentsLoading, setStudentsLoading] = useState(true);
+  const [studentsError, setStudentsError] = useState(null);
 
   const [teacherSchedules, setTeacherSchedules] = useState({}); // Map teacherId -> schedules
   const [existingSchedules, setExistingSchedules] = useState(() => {
@@ -196,6 +202,27 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleStudentToggle = (studentId) => {
+    setFormData(prev => {
+      const currentSelected = prev.selectedStudents || [];
+      const isSelected = currentSelected.includes(studentId);
+      
+      if (isSelected) {
+        // Remove student
+        return {
+          ...prev,
+          selectedStudents: currentSelected.filter(id => id !== studentId)
+        };
+      } else {
+        // Add student
+        return {
+          ...prev,
+          selectedStudents: [...currentSelected, studentId]
+        };
+      }
+    });
+  };
+
   // Auto-fetch band when program and level are selected
   useEffect(() => {
     const fetchBand = async () => {
@@ -315,7 +342,20 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       return;
     }
 
-    onSubmit(formData);
+    // Transform formData to match backend API expectations
+    const submitData = {
+      ...formData,
+      students: formData.selectedStudents || [], // Map selectedStudents to students for backend
+      teacher: formData.teacherId, // Map teacherId to teacher for backend
+      room: formData.roomId // Map roomId to room for backend
+    };
+
+    // Remove selectedStudents, teacherId, roomId from submitData as they're now mapped
+    delete submitData.selectedStudents;
+    delete submitData.teacherId;
+    delete submitData.roomId;
+
+    onSubmit(submitData);
   };
 
   // Fetch types and levels from program table on mount
@@ -523,6 +563,39 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     };
 
     fetchTeachers();
+  }, []);
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        setStudentsLoading(true);
+        setStudentsError(null);
+        console.log('🔍 Fetching students...');
+        // Không filter theo status vì User model không có field status
+        const response = await studentService.getAllStudents();
+        console.log('📋 Students API Response:', response);
+        
+        if (response && (response.students || response.data)) {
+          const fetchedStudents = response.students || response.data || [];
+          console.log('📋 Fetched students count:', fetchedStudents.length);
+          setStudents(fetchedStudents);
+        } else {
+          console.warn('⚠️ API response không có students hoặc data field:', response);
+          setStudents([]);
+          setStudentsError('Không tìm thấy dữ liệu học viên');
+        }
+      } catch (error) {
+        console.error('❌ Lỗi khi fetch students:', error);
+        setStudents([]);
+        const errorMessage = error.message || 'Không thể tải danh sách học viên';
+        setStudentsError(errorMessage);
+        console.error('❌ Error details:', error);
+      } finally {
+        setStudentsLoading(false);
+      }
+    };
+
+    fetchStudents();
   }, []);
 
   // Cập nhật mock data với _id từ DB sau khi fetch teachers
@@ -966,6 +1039,47 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     return filtered;
   }, [filledScheduleEntries, existingSchedules, teachers, conflictingTeacherIds, formData.startDate, formData.endDate]);
 
+  const filteredStudentList = useMemo(() => {
+    if (!studentSearchTerm) {
+      return students;
+    }
+
+    const searchLower = studentSearchTerm.toLowerCase();
+    return students.filter(student => {
+      const fullName = (student.fullName || '').toLowerCase();
+      const email = (student.email || '').toLowerCase();
+      const username = (student.username || '').toLowerCase();
+      
+      return fullName.includes(searchLower) || 
+             email.includes(searchLower) || 
+             username.includes(searchLower);
+    });
+  }, [students, studentSearchTerm]);
+
+  const handleSelectAllStudents = () => {
+    const filteredStudents = filteredStudentList;
+    const allSelected = filteredStudents.every(student => {
+      const studentId = student._id || student.id;
+      return formData.selectedStudents.includes(studentId);
+    });
+
+    if (allSelected) {
+      // Deselect all filtered students
+      const filteredIds = filteredStudents.map(student => student._id || student.id);
+      setFormData(prev => ({
+        ...prev,
+        selectedStudents: prev.selectedStudents.filter(id => !filteredIds.includes(id))
+      }));
+    } else {
+      // Select all filtered students
+      const filteredIds = filteredStudents.map(student => student._id || student.id);
+      setFormData(prev => ({
+        ...prev,
+        selectedStudents: [...new Set([...prev.selectedStudents, ...filteredIds])]
+      }));
+    }
+  };
+
   useEffect(() => {
     if (
       formData.roomId &&
@@ -1250,6 +1364,116 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                   )}
                 </Form.Group>
               </div>
+            </div>
+          </div>
+
+          {/* Students Selection */}
+          <div className="mb-24">
+            <h5 className="text-neutral-900 fw-semibold mb-16 pb-12 border-bottom border-neutral-100">
+              Học viên
+            </h5>
+            
+            <div className="mb-16">
+              <div className="d-flex justify-content-between align-items-center mb-12">
+                <Form.Label className="text-neutral-700 fw-medium mb-0">
+                  Chọn học viên cho lớp học
+                </Form.Label>
+                <div className="d-flex align-items-center gap-12">
+                  {formData.selectedStudents && formData.selectedStudents.length > 0 && (
+                    <span className="badge bg-main-600 text-white px-12 py-6 radius-8">
+                      Đã chọn: {formData.selectedStudents.length}
+                    </span>
+                  )}
+                  {filteredStudentList.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline-primary"
+                      size="sm"
+                      onClick={handleSelectAllStudents}
+                      className="text-13 fw-medium px-12 py-6 radius-8"
+                    >
+                      {filteredStudentList.every(student => {
+                        const studentId = student._id || student.id;
+                        return formData.selectedStudents.includes(studentId);
+                      }) ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <Form.Control
+                type="text"
+                placeholder="Tìm kiếm học viên theo tên, email hoặc username..."
+                value={studentSearchTerm}
+                onChange={(e) => setStudentSearchTerm(e.target.value)}
+                className="border-neutral-30 radius-8 px-16 py-10 mb-12"
+              />
+
+              <div 
+                className="border border-neutral-100 rounded-12 p-16"
+                style={{ maxHeight: '300px', overflowY: 'auto' }}
+              >
+                {studentsLoading ? (
+                  <div className="text-center text-neutral-500 py-20">
+                    <i className="fas fa-spinner fa-spin me-2"></i>
+                    Đang tải danh sách học viên...
+                  </div>
+                ) : studentsError ? (
+                  <div className="text-center py-20">
+                    <Alert variant="warning" className="mb-0">
+                      <i className="fas fa-exclamation-triangle me-2"></i>
+                      {studentsError}
+                    </Alert>
+                  </div>
+                ) : filteredStudentList.length === 0 ? (
+                  <div className="text-center text-neutral-500 py-20">
+                    {studentSearchTerm ? 'Không tìm thấy học viên nào phù hợp với từ khóa tìm kiếm' : 'Không có học viên nào trong hệ thống'}
+                  </div>
+                ) : (
+                  <div className="d-flex flex-column gap-8">
+                    {filteredStudentList.map(student => {
+                      const studentId = student._id || student.id;
+                      const isSelected = formData.selectedStudents.includes(studentId);
+                      // User model không có fullName, sử dụng username hoặc email làm tên hiển thị
+                      const displayName = student.fullName || student.name || student.username || student.email || 'N/A';
+                      const email = student.email || 'N/A';
+                      const username = student.username || 'N/A';
+                      
+                      return (
+                        <div
+                          key={studentId}
+                          className={`d-flex align-items-center p-12 rounded-8 border border-neutral-100 cursor-pointer transition-2 ${
+                            isSelected ? 'bg-main-50 border-main-200' : 'bg-white hover:bg-neutral-25'
+                          }`}
+                          onClick={() => handleStudentToggle(studentId)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <Form.Check
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleStudentToggle(studentId)}
+                            className="me-12"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <div className="flex-grow-1">
+                            <div className="fw-medium text-neutral-900 text-14">
+                              {displayName}
+                            </div>
+                            <div className="text-neutral-500 text-12">
+                              {email} • {username}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <Form.Text className="text-neutral-500 text-12 mt-8">
+                <i className="fas fa-info-circle me-1"></i>
+                Chọn học viên để thêm vào lớp học. Có thể thêm học viên sau khi tạo lớp.
+              </Form.Text>
             </div>
           </div>
 

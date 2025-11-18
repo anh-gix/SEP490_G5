@@ -80,6 +80,62 @@ exports.getAllTeachers = async (req, res) => {
 };
 
 // =========================
+// 👤 LẤY THÔNG TIN GIẢNG VIÊN HIỆN TẠI (từ token)
+// =========================
+exports.getCurrentTeacher = async (req, res) => {
+  try {
+    // req.user được set bởi verifyToken middleware
+    const teacherId = req.user._id;
+    
+    const teacher = await User.findById(teacherId)
+      .select('-password -token')
+      .populate('roleId', 'name');
+    
+    if (!teacher) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy giảng viên'
+      });
+    }
+    
+    // Kiểm tra role
+    if (teacher.roleId.name !== 'Teacher') {
+      return res.status(403).json({
+        success: false,
+        message: 'User không phải là giảng viên'
+      });
+    }
+    
+    // Get classes taught by this teacher
+    const classes = await Class.find({ teacher: teacherId })
+      .select('name course startDate endDate students')
+      .populate('course', 'name')
+      .lean();
+    
+    const totalStudents = classes.reduce((sum, cls) => sum + (cls.students?.length || 0), 0);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Lấy thông tin giảng viên thành công',
+      teacher: {
+        ...teacher.toObject(),
+        stats: {
+          classCount: classes.length,
+          totalStudents
+        }
+      }
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi lấy thông tin giảng viên hiện tại:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Lỗi server khi lấy thông tin giảng viên',
+      error: error.message 
+    });
+  }
+};
+
+// =========================
 // 🔍 LẤY THÔNG TIN 1 GIẢNG VIÊN
 // =========================
 exports.getTeacherById = async (req, res) => {
@@ -286,7 +342,86 @@ exports.deleteTeacher = async (req, res) => {
 };
 
 // =========================
-// 📅 LẤY LỊCH DẠY CỦA GIẢNG VIÊN
+// 📅 LẤY LỊCH DẠY CỦA GIẢNG VIÊN HIỆN TẠI (từ token)
+// =========================
+exports.getCurrentTeacherSchedule = async (req, res) => {
+  try {
+    // req.user được set bởi verifyToken middleware
+    const teacherId = req.user._id;
+    const { startDate, endDate } = req.query;
+    
+    // Find all classes taught by this teacher
+    const teacherClasses = await Class.find({ teacher: teacherId })
+      .select('_id name course startDate endDate')
+      .populate('course', 'name')
+      .lean();
+    
+    if (!teacherClasses || teacherClasses.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'Chưa có lớp học nào',
+        total: 0,
+        schedules: []
+      });
+    }
+    
+    const classIds = teacherClasses.map(cls => cls._id);
+    
+    let query = { class: { $in: classIds }, status: 'approved' };
+    
+    // Filter by date range if provided
+    if (startDate && endDate) {
+      query.date = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+    
+    const schedules = await ClassSchedule.find(query)
+      .populate('class', 'name course startDate endDate')
+      .populate({
+        path: 'class',
+        populate: {
+          path: 'course',
+          select: 'name'
+        }
+      })
+      .populate('room', 'room_name location')
+      .populate('session', 'title order content')
+      .sort({ date: 1, startTime: 1 })
+      .lean();
+    
+    // Format schedules with additional info
+    const formattedSchedules = schedules.map(schedule => ({
+      ...schedule,
+      className: schedule.class?.name,
+      courseName: schedule.class?.course?.name,
+      sessionTitle: schedule.session?.title,
+      sessionOrder: schedule.session?.order,
+      roomName: schedule.room?.room_name,
+      location: schedule.room?.location,
+      classStartDate: schedule.class?.startDate,
+      classEndDate: schedule.class?.endDate
+    }));
+    
+    res.status(200).json({
+      success: true,
+      message: 'Lấy lịch dạy thành công',
+      total: formattedSchedules.length,
+      schedules: formattedSchedules
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi lấy lịch dạy:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Lỗi server khi lấy lịch dạy',
+      error: error.message 
+    });
+  }
+};
+
+// =========================
+// 📅 LẤY LỊCH DẠY CỦA GIẢNG VIÊN (Admin use)
 // =========================
 exports.getTeacherSchedule = async (req, res) => {
   try {
@@ -348,6 +483,115 @@ exports.getTeacherSchedule = async (req, res) => {
       success: false,
       message: "Lỗi server khi lấy lịch dạy",
       error: error.message 
+    });
+  }
+};
+
+// =========================
+// 📖 LẤY CHI TIẾT BUỔI HỌC (ClassSchedule)
+// =========================
+exports.getLessonDetail = async (req, res) => {
+  try {
+    const { scheduleId } = req.params;
+    const teacherId = req.user._id;
+
+    // Find the schedule with full population
+    const schedule = await ClassSchedule.findById(scheduleId)
+      .populate({
+        path: 'class',
+        select: 'name course teacher students startDate endDate',
+        populate: [
+          {
+            path: 'course',
+            select: 'name description'
+          },
+          {
+            path: 'teacher',
+            select: 'username email'
+          },
+          {
+            path: 'students',
+            select: 'username email'
+          }
+        ]
+      })
+      .populate('room', 'room_name location capacity')
+      .populate('session', 'title order content learningType')
+      .lean();
+
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy buổi học'
+      });
+    }
+
+    // Verify teacher owns this class
+    if (schedule.class?.teacher?._id?.toString() !== teacherId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền xem buổi học này'
+      });
+    }
+
+    // Format response
+    const lessonDetail = {
+      _id: schedule._id,
+      date: schedule.date,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+      status: schedule.status,
+      
+      // Class info
+      className: schedule.class?.name,
+      courseName: schedule.class?.course?.name,
+      courseDescription: schedule.class?.course?.description,
+      classStartDate: schedule.class?.startDate,
+      classEndDate: schedule.class?.endDate,
+      
+      // Session info
+      sessionTitle: schedule.session?.title,
+      sessionOrder: schedule.session?.order,
+      sessionContent: schedule.session?.content,
+      learningType: schedule.session?.learningType,
+      
+      // Room info
+      roomName: schedule.room?.room_name,
+      roomLocation: schedule.room?.location,
+      roomCapacity: schedule.room?.capacity,
+      
+      // Teacher info
+      teacherName: schedule.class?.teacher?.username,
+      teacherEmail: schedule.class?.teacher?.email,
+      
+      // Student info
+      totalStudents: schedule.class?.students?.length || 0,
+      students: schedule.class?.students || [],
+      
+      // Homework
+      homework: schedule.homework || [],
+      
+      // Materials
+      material: schedule.material || [],
+      
+      // Mocktest
+      mocktest: schedule.mocktest,
+      
+      // Notes
+      note: schedule.note
+    };
+
+    res.status(200).json({
+      success: true,
+      message: 'Lấy chi tiết buổi học thành công',
+      lesson: lessonDetail
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi lấy chi tiết buổi học:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy chi tiết buổi học',
+      error: error.message
     });
   }
 };

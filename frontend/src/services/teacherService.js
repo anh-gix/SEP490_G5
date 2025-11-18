@@ -2,7 +2,50 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
+// Helper to get auth token
+const getAuthHeader = () => {
+  const token = localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 const teacherService = {
+  // Get current teacher info (from logged in user)
+  getCurrentTeacher: async () => {
+    try {
+      const response = await axios.get(`${API_URL}/teachers/me`, {
+        headers: getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get current teacher schedule (from logged in user)
+  getCurrentTeacherSchedule: async (params = {}) => {
+    try {
+      const response = await axios.get(`${API_URL}/teachers/me/schedule`, {
+        params,
+        headers: getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get lesson detail (ClassSchedule detail)
+  getLessonDetail: async (scheduleId) => {
+    try {
+      const response = await axios.get(`${API_URL}/teachers/me/lessons/${scheduleId}`, {
+        headers: getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
   // Get all teachers
   getAllTeachers: async (params = {}) => {
     try {

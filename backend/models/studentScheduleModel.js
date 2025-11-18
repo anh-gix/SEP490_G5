@@ -12,12 +12,6 @@ const studentScheduleSchema = new mongoose.Schema({
     required: true,
   },
 
-  // Cho phép điều chỉnh lịch riêng nếu có (ví dụ dời ngày, đổi phòng)
-  newDate: Date,
-  newStartTime: String,
-  newEndTime: String,
-  newRoom: String,
-
   // 🆕 Trường điểm danh
   attendance: {
     status: {

@@ -119,7 +119,7 @@ const TeacherSchedule = () => {
         className: item.class?.name || 'N/A',
         room: item.room?.room_name ? `Room ${item.room.room_name}` : 'Chưa có phòng',
         status: status,
-        totalStudents: 0, // TODO: Populate from class.students.length when available
+        totalStudents: item.totalStudents || 0, // Get from API response (counted from StudentSchedule)
         attendanceCompleted: false // TODO: Check attendance status via separate API call
       };
     });

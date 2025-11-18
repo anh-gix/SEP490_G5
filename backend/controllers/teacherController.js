@@ -2,6 +2,7 @@ const User = require("../models/userModel");
 const Role = require("../models/roleModel");
 const Class = require("../models/classModel");
 const ClassSchedule = require("../models/classScheduleModel");
+const StudentSchedule = require("../models/studentScheduleModel");
 
 // =========================
 // 📋 LẤY DANH SÁCH GIẢNG VIÊN
@@ -326,13 +327,40 @@ exports.getTeacherSchedule = async (req, res) => {
       .sort({ date: 1, startTime: 1 })
       .lean();
     
-    // Add class date range info to each schedule for easier conflict checking
+    // Get schedule IDs to count students
+    const scheduleIds = schedules.map(s => s._id);
+    
+    // Count students for each schedule from StudentSchedule table
+    const studentCounts = await StudentSchedule.aggregate([
+      {
+        $match: {
+          classSchedule: { $in: scheduleIds },
+          scheduleStatus: { $ne: 'cancelled' } // Exclude cancelled schedules
+        }
+      },
+      {
+        $group: {
+          _id: '$classSchedule',
+          studentCount: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Create a map for quick lookup
+    const studentCountMap = {};
+    studentCounts.forEach(item => {
+      studentCountMap[item._id.toString()] = item.studentCount;
+    });
+    
+    // Add class date range info and student count to each schedule
     const schedulesWithClassInfo = schedules.map(schedule => {
       const classInfo = teacherClasses.find(c => c._id.toString() === schedule.class._id.toString());
+      const studentCount = studentCountMap[schedule._id.toString()] || 0;
       return {
         ...schedule,
         classStartDate: classInfo?.startDate,
-        classEndDate: classInfo?.endDate
+        classEndDate: classInfo?.endDate,
+        totalStudents: studentCount
       };
     });
     

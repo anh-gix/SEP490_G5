@@ -1,92 +1,165 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table, Spinner, Alert } from 'react-bootstrap';
+import { useAuth } from '../../contexts/AuthContext';
+import teacherService from '../../services/teacherService';
 
 /**
  * Teacher Schedule Component
  * Lịch dạy của giảng viên - tương tự student schedule
  */
+// Helper function to get current week start (Monday)
+function getCurrentWeek() {
+  const today = new Date();
+  const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 1));
+  return firstDayOfWeek;
+}
+
 const TeacherSchedule = () => {
+  const { user } = useAuth();
   const [viewMode, setViewMode] = useState('week'); // 'week', 'month', or 'list'
   const [selectedWeek, setSelectedWeek] = useState(getCurrentWeek());
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [schedules, setSchedules] = useState([]);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchSchedules();
-  }, [selectedWeek, filterStatus]);
+  }, [selectedWeek, selectedMonth, viewMode, filterStatus, user]);
 
-  function getCurrentWeek() {
-    const today = new Date();
-    const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 1));
-    return firstDayOfWeek;
-  }
+  // Helper function to get day of week in Vietnamese
+  const getDayOfWeek = (date) => {
+    const days = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+    const dayIndex = new Date(date).getDay();
+    return days[dayIndex] || 'Thứ 2';
+  };
+
+  // Helper function to calculate status based on date and endTime
+  const calculateStatus = (date, endTime) => {
+    const now = new Date();
+    const scheduleDate = new Date(date);
+    
+    // Ensure date is valid
+    if (isNaN(scheduleDate.getTime())) {
+      return 'upcoming';
+    }
+    
+    // Parse endTime (format: "HH:MM")
+    if (endTime && typeof endTime === 'string') {
+      const timeParts = endTime.split(':').map(Number);
+      if (timeParts.length === 2 && !isNaN(timeParts[0]) && !isNaN(timeParts[1])) {
+        scheduleDate.setHours(timeParts[0], timeParts[1], 0, 0);
+      }
+    }
+
+    // If date and endTime have passed, it's completed
+    if (scheduleDate < now) {
+      return 'completed';
+    }
+    return 'upcoming';
+  };
+
+  // Helper function to get date range based on view mode
+  const getDateRangeForView = () => {
+    let startDate, endDate;
+
+    if (viewMode === 'week') {
+      // Start from selectedWeek (Monday)
+      startDate = new Date(selectedWeek);
+      // End on Sunday (6 days later)
+      endDate = new Date(selectedWeek);
+      endDate.setDate(endDate.getDate() + 6);
+    } else if (viewMode === 'month') {
+      // Start from first day of selected month
+      startDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
+      // End on last day of selected month
+      endDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
+    } else {
+      // For list view, use selectedWeek range
+      startDate = new Date(selectedWeek);
+      endDate = new Date(selectedWeek);
+      endDate.setDate(endDate.getDate() + 6);
+    }
+
+    // Format as YYYY-MM-DD
+    const formatDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    return {
+      startDate: formatDate(startDate),
+      endDate: formatDate(endDate)
+    };
+  };
+
+  // Transform API response data to component format
+  const transformScheduleData = (apiSchedules) => {
+    if (!apiSchedules || !Array.isArray(apiSchedules)) {
+      return [];
+    }
+
+    return apiSchedules.map((item) => {
+      const scheduleDate = new Date(item.date);
+      const dateString = scheduleDate.toISOString().split('T')[0];
+      const status = calculateStatus(item.date, item.endTime);
+
+      return {
+        id: item._id,
+        date: dateString,
+        dayOfWeek: getDayOfWeek(scheduleDate),
+        startTime: item.startTime || '',
+        endTime: item.endTime || '',
+        lessonNumber: item.session?.order || 0,
+        topic: item.session?.title || 'Chưa có chủ đề',
+        className: item.class?.name || 'N/A',
+        room: item.room?.room_name ? `Room ${item.room.room_name}` : 'Chưa có phòng',
+        status: status,
+        totalStudents: 0, // TODO: Populate from class.students.length when available
+        attendanceCompleted: false // TODO: Check attendance status via separate API call
+      };
+    });
+  };
 
   const fetchSchedules = async () => {
+    // Check if user exists
+    if (!user || !user._id) {
+      setError('Vui lòng đăng nhập để xem lịch dạy');
+      setSchedules([]);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
     try {
-      // TODO: Replace with actual API call
-      const mockData = [
-        {
-          id: 1,
-          date: '2025-11-13',
-          dayOfWeek: 'Thứ 4',
-          startTime: '18:00',
-          endTime: '20:00',
-          lessonNumber: 19,
-          topic: 'Present Perfect Tense',
-          className: 'A2-Evening-01',
-          room: 'Room 102',
-          status: 'upcoming',
-          totalStudents: 25,
-          attendanceCompleted: false
-        },
-        {
-          id: 2,
-          date: '2025-11-14',
-          dayOfWeek: 'Thứ 5',
-          startTime: '18:00',
-          endTime: '20:00',
-          lessonNumber: 20,
-          topic: 'Reading Comprehension',
-          className: 'A2-Evening-01',
-          room: 'Room 102',
-          status: 'upcoming',
-          totalStudents: 25,
-          attendanceCompleted: false
-        },
-        {
-          id: 3,
-          date: '2025-11-11',
-          dayOfWeek: 'Thứ 2',
-          startTime: '18:00',
-          endTime: '20:00',
-          lessonNumber: 17,
-          topic: 'Past Simple Tense',
-          className: 'A2-Evening-01',
-          room: 'Room 102',
-          status: 'completed',
-          totalStudents: 25,
-          attendanceCompleted: true
-        },
-        {
-          id: 4,
-          date: '2025-11-12',
-          dayOfWeek: 'Thứ 3',
-          startTime: '14:00',
-          endTime: '16:00',
-          lessonNumber: 12,
-          topic: 'Vocabulary Building',
-          className: 'B1-Afternoon-02',
-          room: 'Room 201',
-          status: 'completed',
-          totalStudents: 20,
-          attendanceCompleted: true
-        }
-      ];
-      setSchedules(mockData);
+      // Get date range based on current view mode
+      const { startDate, endDate } = getDateRangeForView();
+
+      // Call API to get teacher schedule
+      const response = await teacherService.getTeacherSchedule(user._id, {
+        startDate,
+        endDate
+      });
+
+      // Transform API response to component format
+      if (response && response.success && response.schedules) {
+        const transformedData = transformScheduleData(response.schedules);
+        setSchedules(transformedData);
+      } else {
+        // Handle empty response
+        setSchedules([]);
+      }
     } catch (error) {
       console.error('Error fetching schedules:', error);
+      setError(error.message || 'Không thể tải lịch dạy. Vui lòng thử lại sau.');
+      setSchedules([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -580,10 +653,34 @@ const TeacherSchedule = () => {
         </Card.Body>
       </Card>
 
+      {/* Error Message */}
+      {error && (
+        <Alert variant="danger" className="mb-24" onClose={() => setError(null)} dismissible>
+          <Alert.Heading>Lỗi</Alert.Heading>
+          <p className="mb-0">{error}</p>
+        </Alert>
+      )}
+
+      {/* Loading Spinner */}
+      {loading && (
+        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+          <Card.Body className="text-center py-40">
+            <Spinner animation="border" role="status" className="mb-16">
+              <span className="visually-hidden">Đang tải...</span>
+            </Spinner>
+            <p className="text-neutral-600 mb-0">Đang tải lịch dạy...</p>
+          </Card.Body>
+        </Card>
+      )}
+
       {/* Schedule View */}
-      {viewMode === 'week' && renderWeekView()}
-      {viewMode === 'month' && renderMonthView()}
-      {viewMode === 'list' && renderListView()}
+      {!loading && (
+        <>
+          {viewMode === 'week' && renderWeekView()}
+          {viewMode === 'month' && renderMonthView()}
+          {viewMode === 'list' && renderListView()}
+        </>
+      )}
     </Container>
   );
 };

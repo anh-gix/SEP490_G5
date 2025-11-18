@@ -30,6 +30,44 @@ const classScheduleSchema = new Schema({
         type: String,
         enum: ['draft', 'pending_approval', 'approved', 'rejected'],
         default: 'draft'
+    },
+    
+    // Bài tập về nhà
+    homework: [{
+        assignment: {
+            title: { type: String, required: true },
+            file: { type: String, required: true }
+        },
+        deadline: { type: Date, required: true },
+        answerFile: { type: String },
+        userstudy: [{ type: Schema.Types.ObjectId, ref: 'UserStudy' }]
+    }],
+    
+    // Tài liệu học tập
+    material: [{
+        title: { type: String, required: true },
+        file: { type: String, required: true }
+    }],
+    
+    // Ghi chú
+    note: { type: String },
+    
+    // Bài thi thử
+    mocktest: {
+        title: { type: String },
+        type: {
+            type: String,
+            enum: ['ielts', 'toeic', 'cam']
+        },
+        scores: [{
+            studentId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+            score: { type: Number, required: true },
+            skillType: {
+                type: String,
+                enum: ['reading', 'listening', 'writing', 'speaking'],
+                required: true
+            }
+        }]
     }
 }, { timestamps: true });
 

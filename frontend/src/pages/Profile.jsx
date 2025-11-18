@@ -7,13 +7,10 @@ import Profile from "../components/Authen/Profile";
 const ProfilePage = () => {
   return (
     <>
-      <HeaderOne />
-      <Preloader />
-      <Animation />
+      
 
       <Profile />
 
-      <FooterTwo />
     </>
   );
 };

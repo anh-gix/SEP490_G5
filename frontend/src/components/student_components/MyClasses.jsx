@@ -130,16 +130,10 @@ const MyClasses = () => {
 
                   {/* Stats */}
                   <Row className="g-2 mb-16">
-                    <Col xs={6}>
+                    <Col xs={12}>
                       <div className="bg-success-25 border border-success-100 rounded-8 p-12 text-center">
                         <div className="text-success-600 fw-bold text-16">{cls.attendanceRate}%</div>
                         <div className="text-neutral-600 text-11">Chuyên cần</div>
-                      </div>
-                    </Col>
-                    <Col xs={6}>
-                      <div className="bg-warning-25 border border-warning-100 rounded-8 p-12 text-center">
-                        <div className="text-warning-600 fw-bold text-16">{cls.averageScore}</div>
-                        <div className="text-neutral-600 text-11">Điểm TB</div>
                       </div>
                     </Col>
                   </Row>
@@ -274,10 +268,6 @@ const MyClasses = () => {
                         <div className="text-success-600 fw-bold text-14">{cls.attendanceRate}%</div>
                         <div className="text-neutral-600 text-11">Chuyên cần</div>
                       </div>
-                      <div className="flex-fill bg-warning-25 border border-warning-100 rounded-8 p-8 text-center">
-                        <div className="text-warning-600 fw-bold text-14">{cls.averageScore}</div>
-                        <div className="text-neutral-600 text-11">Điểm TB</div>
-                      </div>
                       {cls.pendingAssignments > 0 && (
                         <div className="flex-fill bg-danger-25 border border-danger-100 rounded-8 p-8 text-center">
                           <div className="text-danger-600 fw-bold text-14">{cls.pendingAssignments}</div>
@@ -407,7 +397,7 @@ const MyClasses = () => {
 
       {/* Summary Stats */}
       <Row className="g-3 mb-24">
-        <Col md={3}>
+        <Col md={4}>
           <Card className="bg-main-25 border border-main-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
@@ -425,7 +415,7 @@ const MyClasses = () => {
             </Card.Body>
           </Card>
         </Col>
-        <Col md={3}>
+        <Col md={4}>
           <Card className="bg-success-25 border border-success-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
@@ -443,7 +433,7 @@ const MyClasses = () => {
             </Card.Body>
           </Card>
         </Col>
-        <Col md={3}>
+        <Col md={4}>
           <Card className="bg-warning-25 border border-warning-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
@@ -456,24 +446,6 @@ const MyClasses = () => {
                 <div className="bg-warning-600 text-white rounded-circle d-flex align-items-center justify-content-center"
                      style={{ width: '48px', height: '48px' }}>
                   <i className="fas fa-tasks"></i>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={3}>
-          <Card className="bg-info-25 border border-info-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
-            <Card.Body className="p-20">
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <div className="text-info-500 text-24 fw-bold">
-                    {Math.round(classes.reduce((sum, c) => sum + c.averageScore, 0) / classes.length * 10) / 10 || 0}
-                  </div>
-                  <div className="text-neutral-700 text-13">Điểm TB chung</div>
-                </div>
-                <div className="bg-info-500 text-white rounded-circle d-flex align-items-center justify-content-center"
-                     style={{ width: '48px', height: '48px' }}>
-                  <i className="fas fa-star"></i>
                 </div>
               </div>
             </Card.Body>

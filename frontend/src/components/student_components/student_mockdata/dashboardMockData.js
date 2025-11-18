@@ -5,13 +5,7 @@
 export const studentInfoMock = {
   name: 'Nguyễn Văn A',
   studentId: 'SV001',
-  className: 'A2-Evening-01',
-  level: 'A2',
-  avatar: null,
-  attendanceRate: 92,
-  completedLessons: 18,
-  totalLessons: 30,
-  averageScore: 8.5
+  avatar: null
 };
 
 export const generateWeekScheduleMock = () => {
@@ -30,30 +24,63 @@ export const generateWeekScheduleMock = () => {
     });
   }
 
-  // Add some schedules
+  // Add some schedules from different classes
   weekDays[0].schedules.push({ time: '18:00', subject: 'Grammar', room: '102' });
+  weekDays[0].schedules.push({ time: '19:30', subject: 'TOEIC Reading', room: '205' });
   weekDays[2].schedules.push({ time: '18:00', subject: 'Reading', room: '102' });
+  weekDays[3].schedules.push({ time: '19:30', subject: 'TOEIC Listening', room: '205' });
   weekDays[4].schedules.push({ time: '18:00', subject: 'Listening', room: '102' });
 
   return weekDays;
 };
 
-export const assignmentsMock = [
+// Active classes that student is currently enrolled in
+// Format: Level - Program - Number (e.g., A2-TOEIC-01)
+export const activeClassesMock = [
+  {
+    id: 1,
+    className: 'A2-TOEIC-01',
+    level: 'A2',
+    program: 'TOEIC',
+    course: 'Fundamental English',
+    teacher: 'Nguyễn Thị Mai',
+    schedule: 'T2, T4, T6 (19:30-21:00)',
+    completedLessons: 15,
+    totalLessons: 30,
+    attendanceRate: 95
+  },
+  {
+    id: 2,
+    className: 'B1-IELTS-02',
+    level: 'B1',
+    program: 'IELTS',
+    course: 'General English',
+    teacher: 'Trần Văn Hùng',
+    schedule: 'T3, T5, T7 (18:00-19:30)',
+    completedLessons: 8,
+    totalLessons: 25,
+    attendanceRate: 88
+  }
+];
+
+export const dashboardAssignmentsMock = [
   {
     id: 1,
     title: 'Unit 6 - Grammar Exercise',
     dueDate: '2025-11-18',
     status: 'pending',
     subject: 'Grammar',
-    priority: 'high'
+    priority: 'high',
+    className: 'B1-IELTS-02'
   },
   {
     id: 2,
-    title: 'Reading Comprehension Test',
+    title: 'Reading Comprehension Part 5-6',
     dueDate: '2025-11-20',
     status: 'pending',
     subject: 'Reading',
-    priority: 'medium'
+    priority: 'medium',
+    className: 'A2-TOEIC-01'
   },
   {
     id: 3,
@@ -61,15 +88,17 @@ export const assignmentsMock = [
     dueDate: '2025-11-16',
     status: 'pending',
     subject: 'Listening',
-    priority: 'medium'
+    priority: 'medium',
+    className: 'B1-IELTS-02'
   },
   {
     id: 4,
-    title: 'Vocabulary Quiz - Unit 7',
+    title: 'TOEIC Vocabulary Quiz - Unit 7',
     dueDate: '2025-11-22',
     status: 'pending',
     subject: 'Vocabulary',
-    priority: 'low'
+    priority: 'low',
+    className: 'A2-TOEIC-01'
   },
   {
     id: 5,
@@ -77,7 +106,8 @@ export const assignmentsMock = [
     dueDate: '2025-11-12',
     status: 'overdue',
     subject: 'Speaking',
-    priority: 'high'
+    priority: 'high',
+    className: 'B1-IELTS-02'
   }
 ];
 

@@ -6,8 +6,9 @@
 export {
   studentInfoMock,
   generateWeekScheduleMock,
-  assignmentsMock as dashboardAssignmentsMock,
-  toeicResultsMock
+  dashboardAssignmentsMock,
+  toeicResultsMock,
+  activeClassesMock
 } from './dashboardMockData';
 
 // Schedule Mock Data

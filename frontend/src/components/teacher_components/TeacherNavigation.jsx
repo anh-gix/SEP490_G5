@@ -48,7 +48,8 @@ const TeacherNavigation = () => {
   const userInfo = {
     name: 'Trần Thị B',
     code: 'GV001',
-    avatar: null
+    avatar: null,
+    role: 'teacher'
   };
 
   return (

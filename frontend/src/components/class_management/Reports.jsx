@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Container, Row, Col, Card, Button, Form, Table, Badge, ProgressBar, Spinner, Alert } from 'react-bootstrap';
 import reportService from '../../services/reportService';
 
@@ -13,11 +13,7 @@ const Reports = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchReportData();
-  }, [reportType, dateRange]);
-
-  const fetchReportData = async () => {
+  const fetchReportData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -69,7 +65,11 @@ const Reports = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [reportType, dateRange]);
+
+  useEffect(() => {
+    fetchReportData();
+  }, [fetchReportData]);
 
   const getRatingStars = (rating) => {
     return [...Array(5)].map((_, i) => (
@@ -495,6 +495,8 @@ const Reports = () => {
             </Card.Body>
           </Card>
         </>
+      )}
+      </>
       )}
     </Container>
   );

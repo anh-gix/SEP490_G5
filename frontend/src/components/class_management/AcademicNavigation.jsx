@@ -54,7 +54,8 @@ const AcademicNavigation = () => {
   const userInfo = {
     name: 'Lê Văn C',
     code: 'GV001',
-    avatar: null
+    avatar: null,
+    role: 'academic'
   };
 
   return (

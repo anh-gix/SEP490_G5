@@ -6,6 +6,7 @@ import TeacherManagementPage from "../pages/AcademicStaff/TeacherManagementPage.
 import StudentManagementPage from "../pages/AcademicStaff/StudentManagementPage.jsx";
 import ReportsPage from "../pages/AcademicStaff/ReportsPage.jsx";
 import AcademicLessonDetailPage from "../pages/AcademicStaff/AcademicLessonDetailPage.jsx";
+import AcademicProfilePage from "../pages/AcademicStaff/AcademicProfilePage.jsx";
 
 /**
  * AcademicRoutes
@@ -15,6 +16,9 @@ import AcademicLessonDetailPage from "../pages/AcademicStaff/AcademicLessonDetai
 export const academicRoutes = [
   // Dashboard
   { path: '/academic/dashboard', element: <AcademicDashboardPage /> },
+
+  // Profile
+  { path: '/academic/profile', element: <AcademicProfilePage /> },
 
   // I. Schedule Management
   { path: 'academic/schedule-management', element: <ScheduleManagementPage /> },

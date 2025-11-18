@@ -5,7 +5,8 @@ import {
   studentInfoMock, 
   generateWeekScheduleMock, 
   dashboardAssignmentsMock, 
-  toeicResultsMock 
+  toeicResultsMock,
+  activeClassesMock 
 } from './student_mockdata';
 
 /**
@@ -18,6 +19,8 @@ const StudentDashboard = () => {
   const [assignments, setAssignments] = useState([]);
   const [assignmentFilter, setAssignmentFilter] = useState('all'); // all, pending, overdue
   const [toeicResults, setToeicResults] = useState([]);
+  const [activeClasses, setActiveClasses] = useState([]);
+  const [practiceTestFilter, setPracticeTestFilter] = useState('all'); // all, toeic, ielts
 
   useEffect(() => {
     fetchStudentData();
@@ -37,6 +40,7 @@ const StudentDashboard = () => {
       setWeekSchedule(generateWeekScheduleMock());
       setAssignments(dashboardAssignmentsMock);
       setToeicResults(toeicResultsMock);
+      setActiveClasses(activeClassesMock);
     } catch (error) {
       console.error('Error fetching student data:', error);
     }
@@ -59,6 +63,15 @@ const StudentDashboard = () => {
         if (a.priority !== 'high' && b.priority === 'high') return 1;
         return new Date(a.dueDate) - new Date(b.dueDate);
       });
+  };
+
+  const getFilteredPracticeTests = () => {
+    return toeicResults.filter(result => {
+      if (practiceTestFilter === 'all') return true;
+      if (practiceTestFilter === 'toeic') return result.type === 'toeic';
+      if (practiceTestFilter === 'ielts') return result.type === 'ielts';
+      return true;
+    });
   };
 
   return (
@@ -87,74 +100,9 @@ const StudentDashboard = () => {
                 </div>
               </div>
             </Col>
-            <Col lg={3} className="text-lg-end">
-              <Badge className="bg-white text-main-600 px-16 py-8 text-14 fw-semibold">
-                <i className="fas fa-book me-2"></i>
-                {studentInfo?.className}
-              </Badge>
-            </Col>
           </Row>
         </Card.Body>
       </Card>
-
-      {/* Compact Stats - Only 3 cards */}
-      <Row className="g-3 mb-24">
-        <Col md={4}>
-          <Card className="bg-white border-0 rounded-12 h-100" 
-                style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
-                <div className="bg-main-100 text-main-600 rounded-12 d-flex align-items-center justify-content-center"
-                     style={{ width: '48px', height: '48px', minWidth: '48px' }}>
-                  <i className="fas fa-calendar-check"></i>
-                </div>
-                <div>
-                  <h3 className="text-neutral-900 fw-bold mb-0" style={{ fontSize: '24px' }}>{studentInfo?.attendanceRate}%</h3>
-                  <p className="text-neutral-600 mb-0 text-13">Chuyên cần</p>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col md={4}>
-          <Card className="bg-white border-0 rounded-12 h-100" 
-                style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
-                <div className="bg-success-100 text-success-600 rounded-12 d-flex align-items-center justify-content-center"
-                     style={{ width: '48px', height: '48px', minWidth: '48px' }}>
-                  <i className="fas fa-book-reader"></i>
-                </div>
-                <div>
-                  <h3 className="text-neutral-900 fw-bold mb-0" style={{ fontSize: '24px' }}>
-                    {studentInfo?.completedLessons}/{studentInfo?.totalLessons}
-                  </h3>
-                  <p className="text-neutral-600 mb-0 text-13">Buổi học</p>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col md={4}>
-          <Card className="bg-white border-0 rounded-12 h-100" 
-                style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
-                <div className="bg-warning-100 text-warning-600 rounded-12 d-flex align-items-center justify-content-center"
-                     style={{ width: '48px', height: '48px', minWidth: '48px' }}>
-                  <i className="fas fa-star"></i>
-                </div>
-                <div>
-                  <h3 className="text-neutral-900 fw-bold mb-0" style={{ fontSize: '24px' }}>{studentInfo?.averageScore}</h3>
-                  <p className="text-neutral-600 mb-0 text-13">Điểm TB</p>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
 
       <Row className="g-3">
         {/* Main Content - Lịch học tuần */}
@@ -221,46 +169,19 @@ const StudentDashboard = () => {
                   ))}
                 </Row>
               </div>
-
-              {/* Progress Bar */}
-              <div className="p-24 border-top border-neutral-100">
-                <div className="d-flex justify-content-between align-items-center mb-12">
-                  <h6 className="text-neutral-900 fw-bold mb-0 text-14">Tiến độ học tập</h6>
-                  <span className="text-main-600 fw-bold text-16">
-                    {Math.round((studentInfo?.completedLessons / studentInfo?.totalLessons) * 100)}%
-                  </span>
-                </div>
-                <div className="bg-neutral-200 rounded-pill overflow-hidden" style={{ height: '12px' }}>
-                  <div 
-                    className="h-100 transition-2 rounded-pill"
-                    style={{ 
-                      width: `${(studentInfo?.completedLessons / studentInfo?.totalLessons) * 100}%`,
-                      background: 'linear-gradient(90deg, #0D74FF 0%, #00C9FF 100%)'
-                    }}
-                  />
-                </div>
-                <div className="d-flex justify-content-between mt-8">
-                  <span className="text-neutral-600 text-12">
-                    {studentInfo?.completedLessons} buổi đã học
-                  </span>
-                  <span className="text-neutral-600 text-12">
-                    {studentInfo?.totalLessons - studentInfo?.completedLessons} buổi còn lại
-                  </span>
-                </div>
-              </div>
             </Card.Body>
           </Card>
 
-          {/* TOEIC Practice Results */}
-          <Card className="bg-white border-0 rounded-16" 
+          {/* Active Classes */}
+          <Card className="bg-white border-0 rounded-16 mb-24" 
                 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
             <Card.Header className="bg-white border-bottom border-neutral-100 p-20">
               <div className="d-flex justify-content-between align-items-center">
                 <h6 className="text-neutral-900 fw-bold mb-0">
-                  <i className="fas fa-chart-line text-success-600 me-2"></i>
-                  Kết quả luyện đề TOEIC
+                  <i className="fas fa-graduation-cap text-main-600 me-2"></i>
+                  Các lớp đang học
                 </h6>
-                <Link to="/student/toeic">
+                <Link to="/student/courses">
                   <Button className="btn-sm btn-outline-main text-12 px-16 py-8">
                     Xem tất cả
                   </Button>
@@ -268,16 +189,140 @@ const StudentDashboard = () => {
               </div>
             </Card.Header>
             <Card.Body className="p-20">
-              {toeicResults.length > 0 ? (
+              {activeClasses.length > 0 ? (
+                <div className="d-flex flex-column gap-12">
+                  {activeClasses.map(cls => {
+                    const progress = Math.round((cls.completedLessons / cls.totalLessons) * 100);
+                    return (
+                      <Card key={cls.id} className="bg-gradient border-0"
+                            style={{ background: 'linear-gradient(135deg, #F8FAFE 0%, #F0F7FF 100%)' }}>
+                        <Card.Body className="p-16">
+                          <div className="d-flex justify-content-between align-items-start mb-12">
+                            <div>
+                              <h6 className="text-neutral-900 fw-bold text-14 mb-4">{cls.className}</h6>
+                              <div className="d-flex align-items-center gap-8">
+                                <Badge className="bg-main-100 text-main-600 text-11 fw-semibold">
+                                  {cls.program}
+                                </Badge>
+                                <Badge className="bg-success-100 text-success-600 text-11 fw-semibold">
+                                  {cls.course}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div className="text-end">
+                              <div className="text-success-600 fw-bold text-16">{cls.attendanceRate}%</div>
+                              <div className="text-neutral-600 text-11">Chuyên cần</div>
+                            </div>
+                          </div>
+
+                          {/* Progress Bar */}
+                          <div className="mb-12">
+                            <div className="d-flex justify-content-between align-items-center mb-6">
+                              <span className="text-neutral-700 text-12 fw-medium">Tiến độ học tập</span>
+                              <span className="text-main-600 fw-bold text-12">{progress}%</span>
+                            </div>
+                            <div className="bg-neutral-200 rounded-pill overflow-hidden" style={{ height: '8px' }}>
+                              <div 
+                                className="bg-main-600 h-100 transition-2"
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                            <div className="text-neutral-500 text-11 mt-4">
+                              {cls.completedLessons}/{cls.totalLessons} buổi học
+                            </div>
+                          </div>
+
+                          {/* Quick Info */}
+                          <Row className="g-2">
+                            <Col xs={6}>
+                              <div className="text-neutral-600 text-11">
+                                <i className="fas fa-user me-1"></i>
+                                {cls.teacher}
+                              </div>
+                            </Col>
+                            <Col xs={6}>
+                              <div className="text-neutral-600 text-11">
+                                <i className="fas fa-calendar-alt me-1"></i>
+                                {cls.schedule}
+                              </div>
+                            </Col>
+                          </Row>
+                        </Card.Body>
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-40">
+                  <i className="fas fa-book-open fa-3x text-neutral-300 mb-12"></i>
+                  <p className="text-neutral-500 mb-0">Chưa có lớp học nào</p>
+                </div>
+              )}
+            </Card.Body>
+          </Card>
+
+          {/* Practice Tests Results */}
+          <Card className="bg-white border-0 rounded-16" 
+                style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+            <Card.Header className="bg-white border-bottom border-neutral-100 p-20">
+              <div className="d-flex justify-content-between align-items-center mb-16">
+                <h6 className="text-neutral-900 fw-bold mb-0">
+                  <i className="fas fa-chart-line text-success-600 me-2"></i>
+                  Kết quả luyện đề
+                </h6>
+                <Link to="/student/toeic">
+                  <Button className="btn-sm btn-outline-main text-12 px-16 py-8">
+                    Xem tất cả
+                  </Button>
+                </Link>
+              </div>
+
+              {/* Filter Buttons */}
+              <div className="d-flex gap-2">
+                <Button
+                  size="sm"
+                  className={`flex-fill text-12 px-12 py-8 radius-8 ${practiceTestFilter === 'all' ? 'btn-main' : 'btn-outline-main'}`}
+                  onClick={() => setPracticeTestFilter('all')}
+                >
+                  Tất cả
+                </Button>
+                <Button
+                  size="sm"
+                  className={`flex-fill text-12 px-12 py-8 radius-8 ${practiceTestFilter === 'toeic' ? 'btn-main' : 'btn-outline-main'}`}
+                  onClick={() => setPracticeTestFilter('toeic')}
+                >
+                  TOEIC
+                </Button>
+                <Button
+                  size="sm"
+                  className={`flex-fill text-12 px-12 py-8 radius-8 ${practiceTestFilter === 'ielts' ? 'btn-main' : 'btn-outline-main'}`}
+                  onClick={() => setPracticeTestFilter('ielts')}
+                >
+                  IELTS
+                </Button>
+              </div>
+            </Card.Header>
+            <Card.Body className="p-20">
+              {getFilteredPracticeTests().length > 0 ? (
                 <Row className="g-3">
-                  {toeicResults.map(result => (
+                  {getFilteredPracticeTests().map(result => (
                     <Col md={6} key={result.id}>
-                      <Card className="bg-gradient border-0 h-100"
-                            style={{ background: 'linear-gradient(135deg, #F0F7FF 0%, #E6F2FF 100%)' }}>
+                      <Card className="border-0 h-100 overflow-hidden"
+                            style={{ 
+                              background: result.type === 'toeic' 
+                                ? 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%)' 
+                                : 'linear-gradient(135deg, #F3E5F5 0%, #E1BEE7 100%)',
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                            }}>
                         <Card.Body className="p-20">
                           <div className="d-flex justify-content-between align-items-start mb-16">
-                            <h6 className="text-neutral-900 fw-bold text-14 mb-0">{result.testName}</h6>
-                            <Badge className="bg-main-600 text-white text-11">
+                            <div>
+                              <h6 className="text-neutral-900 fw-bold text-14 mb-4">{result.testName}</h6>
+                              <Badge className={result.type === 'toeic' ? 'bg-main-600 text-white text-11' : 'bg-purple-600 text-white text-11'}>
+                                {result.type.toUpperCase()}
+                              </Badge>
+                            </div>
+                            <Badge className="bg-neutral-900 text-white text-11">
                               {new Date(result.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
                             </Badge>
                           </div>
@@ -285,31 +330,64 @@ const StudentDashboard = () => {
                           <div className="d-flex justify-content-center mb-16">
                             <div className="position-relative">
                               <div className="bg-white rounded-circle d-flex align-items-center justify-content-center"
-                                   style={{ width: '100px', height: '100px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                                   style={{ width: '100px', height: '100px', boxShadow: '0 6px 16px rgba(0,0,0,0.15)' }}>
                                 <div className="text-center">
-                                  <div className="text-main-600 fw-bold" style={{ fontSize: '28px' }}>{result.total}</div>
-                                  <div className="text-neutral-600 text-11">/ 990</div>
+                                  <div className={`fw-bold ${result.type === 'toeic' ? 'text-main-600' : 'text-purple-600'}`} style={{ fontSize: '28px' }}>
+                                    {result.type === 'toeic' ? result.total : result.overallBand}
+                                  </div>
+                                  <div className="text-neutral-600 text-11">
+                                    {result.type === 'toeic' ? '/ 990' : 'Band'}
+                                  </div>
                                 </div>
                               </div>
                             </div>
                           </div>
 
-                          <Row className="g-2">
-                            <Col xs={6}>
-                              <div className="bg-white rounded-8 p-12 text-center">
-                                <i className="fas fa-headphones text-info-500 mb-6"></i>
-                                <div className="text-neutral-900 fw-bold text-16">{result.listening}</div>
-                                <div className="text-neutral-600 text-11">Listening</div>
-                              </div>
-                            </Col>
-                            <Col xs={6}>
-                              <div className="bg-white rounded-8 p-12 text-center">
-                                <i className="fas fa-book-open text-warning-600 mb-6"></i>
-                                <div className="text-neutral-900 fw-bold text-16">{result.reading}</div>
-                                <div className="text-neutral-600 text-11">Reading</div>
-                              </div>
-                            </Col>
-                          </Row>
+                          {result.type === 'toeic' ? (
+                            <Row className="g-2">
+                              <Col xs={6}>
+                                <div className="bg-white rounded-8 p-12 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <i className="fas fa-headphones text-info-500 mb-6"></i>
+                                  <div className="text-neutral-900 fw-bold text-16">{result.listening}</div>
+                                  <div className="text-neutral-600 text-11">Listening</div>
+                                </div>
+                              </Col>
+                              <Col xs={6}>
+                                <div className="bg-white rounded-8 p-12 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <i className="fas fa-book-open text-warning-600 mb-6"></i>
+                                  <div className="text-neutral-900 fw-bold text-16">{result.reading}</div>
+                                  <div className="text-neutral-600 text-11">Reading</div>
+                                </div>
+                              </Col>
+                            </Row>
+                          ) : (
+                            <Row className="g-2">
+                              <Col xs={6}>
+                                <div className="bg-white rounded-8 p-10 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <div className="text-neutral-900 fw-bold text-14">{result.listening}</div>
+                                  <div className="text-neutral-600 text-10">Listening</div>
+                                </div>
+                              </Col>
+                              <Col xs={6}>
+                                <div className="bg-white rounded-8 p-10 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <div className="text-neutral-900 fw-bold text-14">{result.reading}</div>
+                                  <div className="text-neutral-600 text-10">Reading</div>
+                                </div>
+                              </Col>
+                              <Col xs={6}>
+                                <div className="bg-white rounded-8 p-10 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <div className="text-neutral-900 fw-bold text-14">{result.writing}</div>
+                                  <div className="text-neutral-600 text-10">Writing</div>
+                                </div>
+                              </Col>
+                              <Col xs={6}>
+                                <div className="bg-white rounded-8 p-10 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <div className="text-neutral-900 fw-bold text-14">{result.speaking}</div>
+                                  <div className="text-neutral-600 text-10">Speaking</div>
+                                </div>
+                              </Col>
+                            </Row>
+                          )}
                         </Card.Body>
                       </Card>
                     </Col>
@@ -318,7 +396,11 @@ const StudentDashboard = () => {
               ) : (
                 <div className="text-center py-40">
                   <i className="fas fa-clipboard-list fa-3x text-neutral-300 mb-12"></i>
-                  <p className="text-neutral-500 mb-0">Chưa có kết quả luyện đề</p>
+                  <p className="text-neutral-500 mb-0">
+                    {practiceTestFilter === 'all' ? 'Chưa có kết quả luyện đề' :
+                     practiceTestFilter === 'toeic' ? 'Chưa có kết quả TOEIC' :
+                     'Chưa có kết quả IELTS'}
+                  </p>
                 </div>
               )}
             </Card.Body>
@@ -402,11 +484,16 @@ const StudentDashboard = () => {
                             )}
                           </div>
 
-                          <h6 className="text-neutral-900 fw-semibold mb-10 text-13">
+                          <h6 className="text-neutral-900 fw-semibold mb-8 text-13">
                             {assignment.title}
                           </h6>
 
-                          <div className="d-flex justify-content-between align-items-center">
+                          <div className="text-neutral-500 text-11 mb-10">
+                            <i className="fas fa-book me-1"></i>
+                            {assignment.className}
+                          </div>
+
+                          <div className="d-flex justify-content-between align-items-center mb-12">
                             <span className="text-neutral-600 text-11">
                               <i className="fas fa-calendar-alt me-1"></i>
                               {new Date(assignment.dueDate).toLocaleDateString('vi-VN')}
@@ -431,9 +518,9 @@ const StudentDashboard = () => {
                           </div>
 
                           <Link to={`/student/assignments/${assignment.id}`}>
-                            <Button className="btn-sm btn-main w-100 text-12 mt-12 py-8">
-                              <i className="fas fa-paper-plane me-2"></i>
-                              Nộp bài
+                            <Button className="btn-sm btn-outline-main w-100 text-12 py-8">
+                              <i className="fas fa-eye me-2"></i>
+                              Chi tiết
                             </Button>
                           </Link>
                         </Card.Body>

@@ -100,7 +100,6 @@ const AcademicDashboard = () => {
 
       // Transform today's schedules
       const transformedTodaySchedule = todaySchedules.slice(0, 10).map((schedule, index) => {
-        const scheduleDate = new Date(schedule.date);
         const startTime = new Date(`${schedule.date}T${schedule.startTime}`);
         const endTime = new Date(`${schedule.date}T${schedule.endTime}`);
         const now = new Date();

@@ -163,7 +163,7 @@ const RoleNavigation = ({
             }}
           >
             <Dropdown.Item 
-              href="/profile" 
+              href={userInfo.role ? `/${userInfo.role}/profile` : '/'} 
               className="rounded-8 px-12 py-10 text-13 d-flex align-items-center gap-10 mb-2"
             >
               <i className="fas fa-user-circle text-main-600" style={{ width: '20px' }}></i>

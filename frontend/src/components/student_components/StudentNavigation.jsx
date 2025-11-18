@@ -60,7 +60,8 @@ const StudentNavigation = () => {
   const userInfo = {
     name: 'Nguyễn Văn A',
     code: 'SV001',
-    avatar: null
+    avatar: null,
+    role: 'student'
   };
 
   return (

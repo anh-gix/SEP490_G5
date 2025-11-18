@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Badge, Button } from 'react-bootstrap';
 import { Link, useParams } from 'react-router-dom';
+import teacherService from '../../services/teacherService';
 
 /**
  * Lesson Detail Component
@@ -9,37 +10,52 @@ import { Link, useParams } from 'react-router-dom';
 const LessonDetail = () => {
   const { lessonId } = useParams();
   const [lessonData, setLessonData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const fetchLessonData = async () => {
-    // Mock data
-    const mockData = {
-      id: lessonId,
-      date: '2025-11-14',
-      time: '10:30 - 12:30',
-      className: 'A2-Evening-01',
-      classId: '1',
-      topic: 'Present Perfect Tense',
-      room: 'Room 102',
-      students: 25,
-      attendedStudents: 23,
-      level: 'A2',
-      status: 'upcoming',
-      description: 'Học về thì hiện tại hoàn thành, cách sử dụng và các dạng bài tập thực hành',
-      objectives: [
-        'Hiểu và vận dụng được cấu trúc Present Perfect Tense',
-        'Phân biệt được Present Perfect và Past Simple',
-        'Làm bài tập thực hành về thì hiện tại hoàn thành'
-      ],
-      materials: [
-        'Unit 5 - Grammar Book',
-        'Exercise Worksheet',
-        'PowerPoint Presentation'
-      ],
-      homework: 'Complete Exercise 1-5 in Unit 5',
-      homeworkDeadline: '17/11/2025',
-      notes: 'Chuẩn bị bài giảng về Present Perfect. Nhớ mang theo tài liệu photocopied.'
-    };
-    setLessonData(mockData);
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await teacherService.getLessonDetail(lessonId);
+      
+      if (response.success) {
+        // Transform API data to component format
+        const lesson = response.lesson;
+        const transformedData = {
+          topic: lesson.sessionTitle || 'Chưa có tiêu đề',
+          date: lesson.date,
+          time: `${lesson.startTime} - ${lesson.endTime}`,
+          className: lesson.className,
+          level: lesson.className?.split('-')[0] || 'N/A',
+          room: lesson.roomName ? `${lesson.roomName}${lesson.roomLocation ? ` - ${lesson.roomLocation}` : ''}` : 'Chưa xác định',
+          students: lesson.totalStudents,
+          attendedStudents: 0, // TODO: Get from attendance data
+          description: lesson.sessionContent || lesson.courseDescription || 'Chưa có mô tả',
+          objectives: lesson.mocktest?.skills ? 
+            Object.keys(lesson.mocktest.skills).map(skill => `Luyện tập ${skill}`) : 
+            ['Hoàn thành các mục tiêu của buổi học'],
+          materials: lesson.material?.length > 0 ? 
+            lesson.material.map(m => m.title || m.url || 'Tài liệu') : 
+            ['Chưa có tài liệu'],
+          homework: lesson.homework?.length > 0 ? 
+            lesson.homework.map(h => h.title).join(', ') : 
+            'Chưa có bài tập',
+          homeworkDeadline: lesson.homework?.[0]?.dueDate ? 
+            new Date(lesson.homework[0].dueDate).toLocaleDateString('vi-VN') : 
+            'Chưa xác định',
+          notes: lesson.note || 'Chưa có ghi chú'
+        };
+        
+        setLessonData(transformedData);
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải chi tiết buổi học:', error);
+      setError(error.message || 'Không thể tải chi tiết buổi học');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -47,14 +63,47 @@ const LessonDetail = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId]);
 
+  if (loading) {
+    return (
+      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
+        <Card className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+          <Card.Body className="text-center py-40">
+            <div className="spinner-border text-main-600" role="status">
+              <span className="visually-hidden">Đang tải...</span>
+            </div>
+            <p className="text-neutral-600 mt-12 mb-0">Đang tải chi tiết buổi học...</p>
+          </Card.Body>
+        </Card>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
+        <Card className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+          <Card.Body className="text-center py-40">
+            <i className="fas fa-exclamation-circle text-danger-600 mb-12" style={{ fontSize: '48px' }}></i>
+            <p className="text-danger-600 mb-12">{error}</p>
+            <Button onClick={fetchLessonData} className="btn-main">
+              <i className="fas fa-redo me-2"></i>
+              Thử lại
+            </Button>
+          </Card.Body>
+        </Card>
+      </Container>
+    );
+  }
+
   if (!lessonData) {
     return (
       <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
-        <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-        </div>
+        <Card className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+          <Card.Body className="text-center py-40">
+            <i className="fas fa-calendar-times text-neutral-400 mb-12" style={{ fontSize: '48px' }}></i>
+            <p className="text-neutral-600 mb-0">Không tìm thấy buổi học</p>
+          </Card.Body>
+        </Card>
       </Container>
     );
   }

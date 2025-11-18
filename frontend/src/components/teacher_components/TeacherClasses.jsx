@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, Table, ProgressBar } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
+import { teacherClassesMock } from './teacher_mockdata';
 
 /**
  * Teacher Classes Component
@@ -19,49 +20,11 @@ const TeacherClasses = () => {
   const fetchClasses = async () => {
     try {
       // TODO: Replace with actual API call
-      const mockData = [
-        {
-          id: 1,
-          name: 'A2-Evening-01',
-          level: 'A2',
-          schedule: 'Thứ 2, 4, 6 | 18:00 - 20:00',
-          room: 'Room 102',
-          startDate: '2025-09-01',
-          endDate: '2025-11-30',
-          totalLessons: 30,
-          completedLessons: 18,
-          totalStudents: 25,
-          presentStudents: 23,
-          status: 'active',
-          pendingAssignments: 5,
-          ungradedSubmissions: 8,
-          nextLesson: {
-            date: '2025-11-13',
-            topic: 'Present Perfect Tense'
-          }
-        },
-        {
-          id: 2,
-          name: 'B1-Afternoon-02',
-          level: 'B1',
-          schedule: 'Thứ 3, 5, 7 | 14:00 - 16:00',
-          room: 'Room 201',
-          startDate: '2025-09-15',
-          endDate: '2025-12-15',
-          totalLessons: 30,
-          completedLessons: 12,
-          totalStudents: 20,
-          presentStudents: 18,
-          status: 'active',
-          pendingAssignments: 3,
-          ungradedSubmissions: 4,
-          nextLesson: {
-            date: '2025-11-12',
-            topic: 'Advanced Grammar'
-          }
-        }
-      ];
-      setClasses(mockData);
+      // const response = await teacherAPI.getClasses();
+      // setClasses(response.data);
+      
+      // Using mock data
+      setClasses(teacherClassesMock);
     } catch (error) {
       console.error('Error fetching classes:', error);
     }

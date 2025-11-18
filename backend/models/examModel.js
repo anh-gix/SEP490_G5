@@ -12,23 +12,12 @@ const sectionSchema = new mongoose.Schema({
   duration: Number,
   questionCount: Number,
   maxScore: Number,
-  // Điểm của section
-  score: {
-    type: Number,
-    default: 0
-  },
-  // Đề bài trong section (có thể là file hoặc text)
-  questionPaper: {
-    type: String // URL hoặc path đến file đề bài
-  },
-  questionPaperText: {
-    type: String // Nội dung đề bài dạng text
-  },
-  // Đáp án trong section
-  answers: [{
+  // Answer key for grading (correct answers)
+  answerKey: [{
     questionNumber: { type: Number, required: true },
-    answer: { type: String },
-    isCorrect: { type: Boolean, default: false }
+    correctAnswer: { type: String },
+    maxScore: { type: Number, default: 1 },
+    questionType: { type: String, enum: ["multiple_choice", "true_false", "input", "essay"] }
   }]
 });
 
@@ -37,11 +26,6 @@ const examSchema = new mongoose.Schema(
     title: { type: String, required: true },
     description: String,
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    // Người làm bài (user id)
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User"
-    },
     examType: { type: String, enum: ["practice", "real"], default: "practice" },
     level: { type: String, enum: ["Academic", "General"], required: true },
     totalDuration: Number,

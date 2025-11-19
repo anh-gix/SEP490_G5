@@ -34,13 +34,18 @@ const classScheduleSchema = new Schema({
     
     // Bài tập về nhà
     homework: [{
+        _id: {
+            type: Schema.Types.ObjectId,
+            auto: true,
+            // Unique ID cho homework để HomeworkSubmission tham chiếu
+        },
         assignment: {
             title: { type: String, required: true },
             file: { type: String, required: true }
         },
         deadline: { type: Date, required: true },
-        answerFile: { type: String },
-        userstudy: [{ type: Schema.Types.ObjectId, ref: 'UserStudy' }]
+        answerFile: { type: String }
+        // Removed: userstudy field (deprecated - use HomeworkSubmission model instead)
     }],
     
     // Tài liệu học tập
@@ -55,6 +60,7 @@ const classScheduleSchema = new Schema({
     // Bài thi thử
     mocktest: {
         title: { type: String },
+        order: { type: Number },
         type: {
             type: String,
             enum: ['ielts', 'toeic', 'cam']

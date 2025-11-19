@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Form, Table, Tabs, Tab, ProgressBar, Modal } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, Form, Table, Tabs, Tab, ProgressBar, Modal, Spinner, Alert } from 'react-bootstrap';
 import { useParams, Link } from 'react-router-dom';
-import { getClassDetailMock } from './teacher_mockdata';
+import teacherService from '../../services/teacherService';
 
 /**
  * Teacher Class Detail Component
@@ -15,6 +15,8 @@ const TeacherClassDetail = () => {
   const [materials, setMaterials] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [lessons, setLessons] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [showAssignmentDetail, setShowAssignmentDetail] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
@@ -29,21 +31,28 @@ const TeacherClassDetail = () => {
   }, [classId]);
 
   const fetchClassDetails = async () => {
-    // TODO: Replace with actual API call
-    // const response = await teacherAPI.getClassDetail(classId);
-    // setClassInfo(response.data.classInfo);
-    // setStudents(response.data.students);
-    // setMaterials(response.data.materials);
-    // setAssignments(response.data.assignments);
-    // setLessons(response.data.lessons);
-    
-    // Using mock data
-    const mockData = getClassDetailMock(classId);
-    setClassInfo(mockData.classInfo);
-    setStudents(mockData.students);
-    setMaterials(mockData.materials);
-    setAssignments(mockData.assignments);
-    setLessons(mockData.lessons);
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await teacherService.getMyClassDetail(classId);
+      const data = response.data;
+      
+      setClassInfo(data.classInfo);
+      setStudents(data.students);
+      setMaterials(data.materials);
+      setAssignments(data.assignments);
+      // Transform _id to id for lessons
+      setLessons(data.lessons.map(lesson => ({
+        ...lesson,
+        id: lesson._id
+      })));
+    } catch (error) {
+      console.error('Error fetching class details:', error);
+      setError(error.message || 'Không thể tải chi tiết lớp học');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getFileIcon = (type) => {
@@ -110,8 +119,65 @@ const TeacherClassDetail = () => {
     console.log('Downloading all submissions for assignment:', selectedAssignment.title);
   };
 
+  // Loading state
+  if (loading) {
+    return (
+      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
+        <div className="text-center py-5">
+          <Spinner animation="border" variant="primary" />
+          <p className="text-neutral-600 mt-3">Đang tải chi tiết lớp học...</p>
+        </div>
+      </Container>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
+        <Alert variant="danger">
+          <Alert.Heading>
+            <i className="fas fa-exclamation-triangle me-2"></i>
+            Có lỗi xảy ra
+          </Alert.Heading>
+          <p>{error}</p>
+          <hr />
+          <div className="d-flex gap-2">
+            <Button variant="outline-danger" onClick={fetchClassDetails}>
+              <i className="fas fa-redo me-2"></i>
+              Thử lại
+            </Button>
+            <Link to="/teacher/classes">
+              <Button variant="outline-secondary">
+                <i className="fas fa-arrow-left me-2"></i>
+                Quay lại danh sách
+              </Button>
+            </Link>
+          </div>
+        </Alert>
+      </Container>
+    );
+  }
+
+  // Empty state
   if (!classInfo) {
-    return <div>Loading...</div>;
+    return (
+      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
+        <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+          <Card.Body className="text-center py-5">
+            <i className="fas fa-inbox text-neutral-300" style={{ fontSize: '48px' }}></i>
+            <h5 className="text-neutral-700 mt-3 mb-2">Không tìm thấy lớp học</h5>
+            <p className="text-neutral-500 mb-3">Lớp học này không tồn tại hoặc bạn không có quyền truy cập</p>
+            <Link to="/teacher/classes">
+              <Button variant="primary">
+                <i className="fas fa-arrow-left me-2"></i>
+                Quay lại danh sách
+              </Button>
+            </Link>
+          </Card.Body>
+        </Card>
+      </Container>
+    );
   }
 
   return (

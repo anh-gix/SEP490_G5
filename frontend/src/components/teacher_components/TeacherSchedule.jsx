@@ -642,22 +642,23 @@ const TeacherSchedule = () => {
         </Card>
       )}
 
-      {/* Empty State */}
-      {!loading && !error && schedules.length === 0 && (
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
-          <Card.Body className="text-center py-40">
-            <i className="fas fa-calendar-times text-neutral-400 mb-12" style={{ fontSize: '48px' }}></i>
-            <p className="text-neutral-600 mb-0">Chưa có lịch dạy nào</p>
-          </Card.Body>
-        </Card>
-      )}
+
 
       {/* Schedule View */}
-      {!loading && !error && schedules.length > 0 && (
+      {!loading && !error && (
         <>
           {viewMode === 'week' && renderWeekView()}
           {viewMode === 'month' && renderMonthView()}
-          {viewMode === 'list' && renderListView()}
+          {viewMode === 'list' && schedules.length > 0 ? renderListView() : (
+            schedules.length === 0 && (
+              <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+                <Card.Body className="text-center py-40">
+                  <i className="fas fa-calendar-times text-neutral-400 mb-12" style={{ fontSize: '48px' }}></i>
+                  <p className="text-neutral-600 mb-0">Chưa có lịch dạy nào</p>
+                </Card.Body>
+              </Card>
+            )
+          )}
         </>
       )}
     </Container>

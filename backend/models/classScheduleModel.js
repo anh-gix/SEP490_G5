@@ -67,13 +67,12 @@ const classScheduleSchema = new Schema({
         },
         scores: [{
             studentId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-            score: { type: Number, required: true },
-            skillType: {
-                type: String,
-                enum: ['reading', 'listening', 'writing', 'speaking'],
-                required: true
-            }
-        }]
+            reading: { type: Number },
+            listening: { type: Number },
+            writing: { type: Number },
+            speaking: { type: Number }
+        }],
+        answerFile: { type: String }
     }
 }, { timestamps: true });
 

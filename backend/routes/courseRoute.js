@@ -14,6 +14,8 @@ router.get('/types', courseController.getTypesByLevel);
 router.get('/all-types', courseController.getAllCourseTypes);
 // Lấy tất cả levels từ course
 router.get('/all-levels', courseController.getAllCourseLevels);
+// Lấy courses theo program
+router.get('/by-program', courseController.getCoursesByProgram);
 
 //danh sachs chowf phee duyeejt
 router.get('/pending', courseController.getPendingCourses);

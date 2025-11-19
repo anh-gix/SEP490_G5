@@ -23,6 +23,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     level: '',
     program: '',
     band: '',
+    course: '',
     teacherId: '',
     roomId: '',
     maxStudents: 25,
@@ -31,6 +32,10 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     scheduleEntries: [createEmptyScheduleEntry()],
     selectedStudents: []
   });
+
+  const [courses, setCourses] = useState([]);
+  const [coursesLoading, setCoursesLoading] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState(null); // Store course details including numberOfSessions
 
   const [teachers, setTeachers] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -178,23 +183,14 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
-    // Validate dates when they change (use setTimeout to validate after state update)
-    if (name === 'startDate' || name === 'endDate') {
+    // Validate start date when it changes
+    if (name === 'startDate') {
       const today = getTodayDate();
       
-      // Get the updated values
-      const newStartDate = name === 'startDate' ? value : formData.startDate;
-      const newEndDate = name === 'endDate' ? value : formData.endDate;
-      
       // Validate start date is not in the past
-      if (name === 'startDate' && value && value < today) {
+      if (value && value < today) {
         setDateError('Ngày khai giảng không được là quá khứ!');
-      }
-      // Validate if both dates are filled
-      else if (newStartDate && newEndDate && newEndDate <= newStartDate) {
-        setDateError('Ngày kết thúc phải sau ngày khai giảng!');
-      }
-      else {
+      } else {
         setDateError('');
       }
     }
@@ -275,6 +271,92 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     fetchBand();
   }, [formData.program, formData.level]);
 
+  // Fetch courses when program is selected
+  useEffect(() => {
+    const fetchCourses = async () => {
+      if (!formData.program) {
+        setCourses([]);
+        setSelectedCourse(null);
+        setFormData(prev => ({ ...prev, course: '' }));
+        return;
+      }
+
+      try {
+        setCoursesLoading(true);
+        const response = await axios.get('http://localhost:8080/api/v1/courses/by-program', {
+          params: {
+            programName: formData.program,
+            level: formData.level // Gửi cả level để filter chính xác
+          }
+        });
+
+        if (response.data && response.data.success && response.data.courses) {
+          setCourses(response.data.courses);
+          // Clear course selection if current course is not in the new list
+          if (formData.course) {
+            const courseExists = response.data.courses.some(c => 
+              (c._id || c.id) === formData.course
+            );
+            if (!courseExists) {
+              setFormData(prev => ({ ...prev, course: '' }));
+              setSelectedCourse(null);
+            }
+          }
+        } else {
+          setCourses([]);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching courses:', error);
+        setCourses([]);
+      } finally {
+        setCoursesLoading(false);
+      }
+    };
+
+    fetchCourses();
+  }, [formData.program, formData.level]);
+
+  // Fetch course details when course is selected
+  useEffect(() => {
+    const fetchCourseDetails = async () => {
+      if (!formData.course) {
+        setSelectedCourse(null);
+        return;
+      }
+
+      // First, try to get course from the courses list (already fetched)
+      const courseFromList = courses.find(c => (c._id || c.id) === formData.course);
+      if (courseFromList && courseFromList.numberOfSessions) {
+        // Use course from list if it has numberOfSessions
+        setSelectedCourse(courseFromList);
+        return;
+      }
+
+      // If not found in list or missing numberOfSessions, fetch details
+      try {
+        const response = await axios.get(`http://localhost:8080/api/v1/courses/${formData.course}/details`);
+        if (response.data && response.data.success && response.data.data) {
+          setSelectedCourse(response.data.data);
+        } else {
+          // Fallback to course from list if available
+          if (courseFromList) {
+            setSelectedCourse(courseFromList);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error fetching course details:', error);
+        // Fallback to course from list if available
+        if (courseFromList) {
+          setSelectedCourse(courseFromList);
+        } else {
+          setSelectedCourse(null);
+        }
+      }
+    };
+
+    fetchCourseDetails();
+  }, [formData.course, courses]);
+
   const handleScheduleEntryChange = (id, field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -335,10 +417,9 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       return;
     }
 
-    // Validate date range
-    if (formData.startDate && formData.endDate && formData.endDate <= formData.startDate) {
-      alert('Ngày kết thúc phải sau ngày khai giảng!');
-      setDateError('Ngày kết thúc phải sau ngày khai giảng!');
+    // Validate course is selected
+    if (!formData.course) {
+      alert('Vui lòng chọn course!');
       return;
     }
 
@@ -691,6 +772,89 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     return startA <= endB && startB <= endA;
   };
 
+  // Convert day string to day of week number (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+  const getDayOfWeekNumber = (dayStr) => {
+    const dayMap = {
+      'CN': 0,
+      '2': 1,
+      '3': 2,
+      '4': 3,
+      '5': 4,
+      '6': 5,
+      '7': 6
+    };
+    return dayMap[dayStr] !== undefined ? dayMap[dayStr] : null;
+  };
+
+  // Find the next occurrence of a day of week from a start date
+  const findNextDayOfWeek = (startDate, targetDayOfWeek) => {
+    const start = new Date(startDate);
+    const currentDay = start.getDay();
+    let daysToAdd = (targetDayOfWeek - currentDay + 7) % 7;
+    if (daysToAdd === 0 && start.getTime() < new Date().getTime()) {
+      daysToAdd = 7; // If today is the target day but in the past, go to next week
+    }
+    const result = new Date(start);
+    result.setDate(start.getDate() + daysToAdd);
+    return result;
+  };
+
+  // Generate all sessions that will be created
+  const generateSessions = (startDate, scheduleEntries, numberOfSessions) => {
+    if (!startDate || !scheduleEntries.length || !numberOfSessions) {
+      return [];
+    }
+
+    const sessions = [];
+    const start = new Date(startDate);
+    
+    // Find first occurrence of each day of week from start date
+    const firstOccurrences = {};
+    scheduleEntries.forEach(entry => {
+      const dayOfWeek = getDayOfWeekNumber(entry.day);
+      if (dayOfWeek !== null && !firstOccurrences[dayOfWeek]) {
+        firstOccurrences[dayOfWeek] = findNextDayOfWeek(start, dayOfWeek);
+      }
+    });
+
+    // Generate sessions in round-robin fashion
+    let entryIndex = 0;
+    let weekOffset = 0;
+
+    for (let i = 0; i < numberOfSessions; i++) {
+      const entry = scheduleEntries[entryIndex % scheduleEntries.length];
+      const dayOfWeek = getDayOfWeekNumber(entry.day);
+      
+      if (dayOfWeek === null) {
+        entryIndex++;
+        continue;
+      }
+
+      // Get the first occurrence of this day
+      const firstOccurrence = firstOccurrences[dayOfWeek];
+      
+      // Calculate the date for this session
+      const sessionDate = new Date(firstOccurrence);
+      sessionDate.setDate(firstOccurrence.getDate() + (weekOffset * 7));
+
+      sessions.push({
+        date: sessionDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        dayOfWeek: dayOfWeek,
+        startTime: entry.startTime,
+        endTime: entry.endTime
+      });
+
+      // Move to next entry (round-robin)
+      entryIndex++;
+      // If we've gone through all entries, move to next week
+      if (entryIndex % scheduleEntries.length === 0) {
+        weekOffset++;
+      }
+    }
+
+    return sessions;
+  };
+
   const filledScheduleEntries = useMemo(
     () =>
       formData.scheduleEntries.filter(
@@ -699,17 +863,26 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     [formData.scheduleEntries]
   );
 
+  // Generate sessions that will be created
+  const generatedSessions = useMemo(() => {
+    if (!formData.startDate || !filledScheduleEntries.length || !selectedCourse?.numberOfSessions) {
+      return [];
+    }
+    return generateSessions(formData.startDate, filledScheduleEntries, selectedCourse.numberOfSessions);
+  }, [formData.startDate, filledScheduleEntries, selectedCourse?.numberOfSessions]);
+
   const conflictingRoomIds = useMemo(() => {
-    if (!filledScheduleEntries.length || !existingSchedules.length || !formData.startDate || !formData.endDate) {
+    if (!generatedSessions.length || !existingSchedules.length) {
       return new Set();
     }
 
     const conflicts = new Set();
 
-    filledScheduleEntries.forEach((entry) => {
-      const entryDay = normalizeDayValue(entry.day);
-      const entryStart = parseTime(entry.startTime);
-      const entryEnd = parseTime(entry.endTime);
+    // Check each generated session against existing schedules
+    generatedSessions.forEach((session) => {
+      const sessionDate = session.date;
+      const sessionStart = parseTime(session.startTime);
+      const sessionEnd = parseTime(session.endTime);
 
       existingSchedules.forEach((schedule) => {
         // API populate room với _id và room_name
@@ -728,24 +901,17 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           return;
         }
 
-        // Try to get day from various possible fields
-        let scheduleDayRaw = 
-          schedule.day ||
-          schedule.dayOfWeek ||
-          schedule.day_of_week ||
-          schedule.weekDay ||
-          schedule.date ||
-          schedule.scheduleDate ||
-          schedule.classDate;
-        
-        // If we have a date, try to parse it to day of week
-        if (!scheduleDayRaw && (schedule.date || schedule.scheduleDate || schedule.classDate)) {
-          scheduleDayRaw = schedule.date || schedule.scheduleDate || schedule.classDate;
+        // Get schedule date
+        const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+        if (!scheduleDate) {
+          return;
         }
-        
-        const scheduleDay = normalizeDayValue(scheduleDayRaw);
 
-        if (!scheduleDay || scheduleDay !== entryDay) {
+        // Format schedule date to YYYY-MM-DD for comparison
+        const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
+
+        // Check if dates match
+        if (scheduleDateStr !== sessionDate) {
           return;
         }
 
@@ -763,80 +929,17 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             schedule.endHour
         );
 
-        const hasTimeConflict = hasTimeOverlap(entryStart, entryEnd, scheduleStart, scheduleEnd);
+        // Check if times overlap
+        const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
 
-        // Kiểm tra date range overlap với class (API populate class với startDate và endDate)
-        const scheduleStartDate = 
-          schedule.class?.startDate ||
-          schedule.classStartDate ||
-          schedule.startDate ||
-          schedule.start_date;
-        const scheduleEndDate = 
-          schedule.class?.endDate ||
-          schedule.classEndDate ||
-          schedule.endDate ||
-          schedule.end_date;
-
-        const hasDateConflict = hasDateRangeOverlap(
-          formData.startDate,
-          formData.endDate,
-          scheduleStartDate,
-          scheduleEndDate
-        );
-
-        // Chỉ coi là conflict nếu có cả time overlap VÀ date range overlap
-        if (hasTimeConflict && hasDateConflict) {
-          // Lấy ngày cụ thể của schedule (nếu có)
-          const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
-          const scheduleDateStr = scheduleDate 
-            ? new Date(scheduleDate).toLocaleDateString('vi-VN', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: '2-digit', 
-                day: '2-digit' 
-              })
-            : 'N/A';
-          
-          // Format ngày tháng cho dễ đọc
-          const formatDate = (dateStr) => {
-            if (!dateStr) return 'N/A';
-            try {
-              const date = new Date(dateStr);
-              return date.toLocaleDateString('vi-VN', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: '2-digit', 
-                day: '2-digit' 
-              });
-            } catch {
-              return dateStr;
-            }
-          };
-
+        // Conflict if same date and overlapping time
+        if (hasTimeConflict) {
           console.log('🔴 CONFLICT Room:', {
             room: scheduleRoomName || `Room ID: ${scheduleRoomId}`,
-            conflictDetails: {
-              'Bạn chọn': {
-                'Ngày trong tuần': entryDay === '2' ? 'Thứ 2' : entryDay === '3' ? 'Thứ 3' : entryDay === '4' ? 'Thứ 4' : entryDay === '5' ? 'Thứ 5' : entryDay === '6' ? 'Thứ 6' : entryDay === '7' ? 'Thứ 7' : entryDay === 'CN' ? 'Chủ nhật' : entryDay,
-                'Giờ học': `${entryStart} - ${entryEnd}`,
-                'Khoảng thời gian lớp học': `${formatDate(formData.startDate)} đến ${formatDate(formData.endDate)}`
-              },
-              'Phòng đã bị đặt': {
-                'Ngày cụ thể': scheduleDateStr,
-                'Ngày trong tuần': scheduleDay === '2' ? 'Thứ 2' : scheduleDay === '3' ? 'Thứ 3' : scheduleDay === '4' ? 'Thứ 4' : scheduleDay === '5' ? 'Thứ 5' : scheduleDay === '6' ? 'Thứ 6' : scheduleDay === '7' ? 'Thứ 7' : scheduleDay === 'CN' ? 'Chủ nhật' : scheduleDay,
-                'Giờ học': `${scheduleStart} - ${scheduleEnd}`,
-                'Khoảng thời gian lớp học': `${formatDate(scheduleStartDate)} đến ${formatDate(scheduleEndDate)}`,
-                'Lớp học': schedule.class?.name || 'N/A'
-              },
-              'Lý do conflict': 'Trùng ngày trong tuần, trùng giờ học, và khoảng thời gian lớp học có overlap'
-            },
-            technical: {
-              scheduleId: schedule._id || schedule.id,
-              scheduleRoomId,
-              scheduleRoomName,
-              hasTimeConflict,
-              hasDateConflict
-            }
+            sessionDate: sessionDate,
+            sessionTime: `${sessionStart} - ${sessionEnd}`,
+            scheduleDate: scheduleDateStr,
+            scheduleTime: `${scheduleStart} - ${scheduleEnd}`
           });
           if (scheduleRoomId) {
             conflicts.add(String(scheduleRoomId));
@@ -849,16 +952,23 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     });
 
     return conflicts;
-  }, [filledScheduleEntries, existingSchedules, formData.startDate, formData.endDate]);
+  }, [generatedSessions, existingSchedules]);
 
-  // Fetch teacher schedules when date range is available
+  // Fetch teacher schedules - need to get all schedules for conflict checking
   useEffect(() => {
     const fetchTeacherSchedules = async () => {
-      if (!formData.startDate || !formData.endDate || teachers.length === 0) {
+      if (!teachers.length || !generatedSessions.length) {
         return;
       }
 
       const schedulesMap = {};
+      
+      // Get date range from generated sessions
+      if (generatedSessions.length === 0) return;
+      
+      const sessionDates = generatedSessions.map(s => s.date).sort();
+      const minDate = sessionDates[0];
+      const maxDate = sessionDates[sessionDates.length - 1];
       
       // Fetch schedules for each teacher
       await Promise.all(
@@ -868,8 +978,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
           try {
             const response = await teacherService.getTeacherSchedule(teacherId, {
-              startDate: formData.startDate,
-              endDate: formData.endDate
+              startDate: minDate,
+              endDate: maxDate
             });
             
             if (response && response.schedules) {
@@ -886,10 +996,10 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     };
 
     fetchTeacherSchedules();
-  }, [teachers, formData.startDate, formData.endDate]);
+  }, [teachers, generatedSessions]);
 
   const conflictingTeacherIds = useMemo(() => {
-    if (!filledScheduleEntries.length || !formData.startDate || !formData.endDate) {
+    if (!generatedSessions.length || Object.keys(teacherSchedules).length === 0) {
       return new Set();
     }
 
@@ -899,59 +1009,38 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     Object.entries(teacherSchedules).forEach(([teacherId, schedules]) => {
       if (!schedules || schedules.length === 0) return;
 
-    filledScheduleEntries.forEach((entry) => {
-      const entryDay = normalizeDayValue(entry.day);
-      const entryStart = parseTime(entry.startTime);
-      const entryEnd = parseTime(entry.endTime);
+      // Check each generated session against teacher's schedules
+      generatedSessions.forEach((session) => {
+        const sessionDate = session.date;
+        const sessionStart = parseTime(session.startTime);
+        const sessionEnd = parseTime(session.endTime);
 
         schedules.forEach((schedule) => {
-          // Get day of week from schedule date
+          // Get schedule date
           const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
-          const scheduleDay = scheduleDate ? parseDateToDayOfWeek(scheduleDate) : null;
+          if (!scheduleDate) return;
 
-          // Check if same day of week
-          if (!scheduleDay || scheduleDay !== entryDay) {
-          return;
-        }
+          // Format schedule date to YYYY-MM-DD for comparison
+          const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
+
+          // Check if dates match
+          if (scheduleDateStr !== sessionDate) {
+            return;
+          }
 
           // Check time overlap
           const scheduleStart = parseTime(schedule.startTime);
           const scheduleEnd = parseTime(schedule.endTime);
-          const hasTimeConflict = hasTimeOverlap(entryStart, entryEnd, scheduleStart, scheduleEnd);
+          const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
 
-          if (!hasTimeConflict) {
-          return;
-        }
-
-          // Check date range overlap with class (not just schedule date)
-          const scheduleClassStartDate = 
-          schedule.classStartDate ||
-            schedule.class?.startDate ||
-            schedule.startDate;
-          const scheduleClassEndDate = 
-          schedule.classEndDate ||
-            schedule.class?.endDate ||
-            schedule.endDate;
-
-          // Kiểm tra overlap giữa khoảng thời gian lớp học mới và lớp học cũ của giáo viên
-        const hasDateConflict = hasDateRangeOverlap(
-          formData.startDate,
-          formData.endDate,
-            scheduleClassStartDate,
-            scheduleClassEndDate
-        );
-
-          if (hasDateConflict) {
-          console.log('🔴 CONFLICT Teacher:', {
+          if (hasTimeConflict) {
+            console.log('🔴 CONFLICT Teacher:', {
               teacherId,
               scheduleId: schedule._id || schedule.id,
-            entryDay,
-            scheduleDay,
-            entryTime: `${entryStart}-${entryEnd}`,
-            scheduleTime: `${scheduleStart}-${scheduleEnd}`,
-              newClassDateRange: `${formData.startDate} - ${formData.endDate}`,
-              existingClassDateRange: `${scheduleClassStartDate} - ${scheduleClassEndDate}`,
-              scheduleDate: scheduleDate
+              sessionDate: sessionDate,
+              sessionTime: `${sessionStart} - ${sessionEnd}`,
+              scheduleDate: scheduleDateStr,
+              scheduleTime: `${scheduleStart} - ${scheduleEnd}`
             });
             conflicts.add(teacherId);
           }
@@ -961,10 +1050,10 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
     console.log('📋 Conflicting Teacher IDs:', Array.from(conflicts));
     return conflicts;
-  }, [filledScheduleEntries, teacherSchedules, formData.startDate, formData.endDate]);
+  }, [generatedSessions, teacherSchedules]);
 
   const filteredRooms = useMemo(() => {
-    if (!filledScheduleEntries.length || !existingSchedules.length || !formData.startDate || !formData.endDate) {
+    if (!generatedSessions.length || !existingSchedules.length) {
       return rooms;
     }
 
@@ -1007,11 +1096,11 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     });
     
     return filtered;
-  }, [filledScheduleEntries, existingSchedules, rooms, conflictingRoomIds, formData.startDate, formData.endDate]);
+  }, [generatedSessions, existingSchedules, rooms, conflictingRoomIds]);
 
   const filteredTeachers = useMemo(() => {
-    // Nếu chưa có đủ thông tin để filter (chưa chọn schedule hoặc date), hiển thị tất cả teachers
-    if (!filledScheduleEntries.length || !existingSchedules.length || !formData.startDate || !formData.endDate) {
+    // Nếu chưa có đủ thông tin để filter, hiển thị tất cả teachers
+    if (!generatedSessions.length || Object.keys(teacherSchedules).length === 0) {
       console.log('📋 Showing all teachers (no filter conditions):', teachers.length);
       return teachers;
     }
@@ -1037,7 +1126,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     });
     
     return filtered;
-  }, [filledScheduleEntries, existingSchedules, teachers, conflictingTeacherIds, formData.startDate, formData.endDate]);
+  }, [generatedSessions, teacherSchedules, teachers, conflictingTeacherIds]);
 
   const filteredStudentList = useMemo(() => {
     if (!studentSearchTerm) {
@@ -1115,6 +1204,128 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
       <Form onSubmit={handleSubmit}>
         <Modal.Body className="p-24" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+          {/* Basic Information - Moved to top */}
+          <div className="mb-24">
+            <h5 className="text-neutral-900 fw-semibold mb-16 pb-12 border-bottom border-neutral-100">
+              Thông tin cơ bản
+            </h5>
+            
+            <div className="row g-3 mb-16">
+              <div className="col-md-6">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">
+                    Tên lớp <span className="text-danger-600">*</span>
+                  </Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="VD: A1-Morning-01"
+                    required
+                    className="border-neutral-30 radius-8 px-16 py-10"
+                  />
+                </Form.Group>
+              </div>
+
+              <div className="col-md-6">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">
+                    Chương trình <span className="text-danger-600">*</span>
+                  </Form.Label>
+                  <Form.Select
+                    name="program"
+                    value={formData.program}
+                    onChange={handleInputChange}
+                    required
+                    className="border-neutral-30 radius-8 px-16 py-10"
+                  >
+                    <option value="">-- Chọn chương trình --</option>
+                    {availablePrograms.map(program => (
+                      <option key={program} value={program}>{program}</option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              </div>
+            </div>
+
+            <div className="row g-3 mb-16">
+              <div className="col-md-6">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">
+                    Cấp độ <span className="text-danger-600">*</span>
+                  </Form.Label>
+                  <Form.Select
+                    name="level"
+                    value={formData.level}
+                    onChange={handleInputChange}
+                    required
+                    className="border-neutral-30 radius-8 px-16 py-10"
+                  >
+                    <option value="">-- Chọn cấp độ --</option>
+                    {availableLevels.map(level => (
+                      <option key={level} value={level}>{level}</option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              </div>
+
+              <div className="col-md-6">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">Band</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="band"
+                    value={formData.band}
+                    onChange={handleInputChange}
+                    placeholder="VD: Band 1"
+                    className="border-neutral-30 radius-8 px-16 py-10"
+                    readOnly
+                  />
+                </Form.Group>
+              </div>
+            </div>
+
+            <div className="row g-3 mb-16">
+              <div className="col-md-12">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">
+                    Course <span className="text-danger-600">*</span>
+                  </Form.Label>
+                  <Form.Select
+                    name="course"
+                    value={formData.course}
+                    onChange={handleInputChange}
+                    required
+                    disabled={!formData.program || coursesLoading}
+                    className="border-neutral-30 radius-8 px-16 py-10"
+                  >
+                    <option value="">
+                      {!formData.program 
+                        ? '-- Chọn chương trình trước --'
+                        : coursesLoading 
+                        ? 'Đang tải danh sách course...'
+                        : '-- Chọn course --'}
+                    </option>
+                    {courses.map(course => {
+                      const courseId = course._id || course.id;
+                      return (
+                        <option key={courseId} value={courseId}>
+                          {course.name} {course.numberOfSessions ? `(${course.numberOfSessions} buổi)` : ''}
+                        </option>
+                      );
+                    })}
+                  </Form.Select>
+                  {selectedCourse && selectedCourse.numberOfSessions && (
+                    <Form.Text className="text-neutral-500 text-12 d-block mt-4">
+                      Course này có {selectedCourse.numberOfSessions} buổi học
+                    </Form.Text>
+                  )}
+                </Form.Group>
+              </div>
+            </div>
+          </div>
+
           {/* Schedule */}
           <div className="mb-24">
             <h5 className="text-neutral-900 fw-semibold mb-16 pb-12 border-bottom border-neutral-100">
@@ -1138,26 +1349,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     className={`border-neutral-30 radius-8 px-16 py-10 ${dateError ? 'border-danger' : ''}`}
                   />
                   {dateError && dateError.includes('quá khứ') && (
-                    <Form.Text className="text-danger-600 text-12 d-block mt-4">
-                      {dateError}
-                    </Form.Text>
-                  )}
-                </Form.Group>
-              </div>
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">
-                    Ngày kết thúc
-                  </Form.Label>
-                  <Form.Control
-                    type="date"
-                    name="endDate"
-                    value={formData.endDate}
-                    onChange={handleInputChange}
-                    min={formData.startDate || getTodayDate()}
-                    className={`border-neutral-30 radius-8 px-16 py-10 ${dateError ? 'border-danger' : ''}`}
-                  />
-                  {dateError && dateError.includes('kết thúc') && (
                     <Form.Text className="text-danger-600 text-12 d-block mt-4">
                       {dateError}
                     </Form.Text>
@@ -1289,7 +1480,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                       <option value="" disabled>
                         Đang tải danh sách giáo viên...
                       </option>
-                    ) : filteredTeachers.length === 0 && (filledScheduleEntries.length > 0 && formData.startDate && formData.endDate) ? (
+                    ) : filteredTeachers.length === 0 && generatedSessions.length > 0 ? (
                       <option value="" disabled>
                         Không còn giáo viên phù hợp (tất cả đều bị trùng lịch)
                       </option>
@@ -1316,11 +1507,11 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                   <Form.Text className="text-neutral-500 text-12">
                     {teachers.length === 0
                       ? 'Đang tải danh sách giáo viên...'
-                      : filteredTeachers.length === 0 && (filledScheduleEntries.length > 0 && formData.startDate && formData.endDate)
+                      : filteredTeachers.length === 0 && generatedSessions.length > 0
                       ? 'Không còn giáo viên phù hợp (tất cả đều bị trùng lịch)'
-                      : filledScheduleEntries.length > 0 && formData.startDate && formData.endDate
+                      : generatedSessions.length > 0
                       ? `Có ${filteredTeachers.length} giáo viên phù hợp (chưa bị trùng lịch)`
-                      : `Có ${teachers.length} giáo viên. Chọn lịch học để lọc giáo viên phù hợp.`}
+                      : `Có ${teachers.length} giáo viên. Chọn course và lịch học để lọc giáo viên phù hợp.`}
                   </Form.Text>
                 </Form.Group>
               </div>
@@ -1477,87 +1668,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             </div>
           </div>
 
-          {/* Basic Information */}
-          <div className="mb-24">
-            <h5 className="text-neutral-900 fw-semibold mb-16 pb-12 border-bottom border-neutral-100">
-              Thông tin cơ bản
-            </h5>
-            
-            <div className="row g-3 mb-16">
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">
-                    Tên lớp <span className="text-danger-600">*</span>
-                  </Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="VD: A1-Morning-01"
-                    required
-                    className="border-neutral-30 radius-8 px-16 py-10"
-                  />
-                </Form.Group>
-              </div>
-
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">
-                    Chương trình <span className="text-danger-600">*</span>
-                  </Form.Label>
-                  <Form.Select
-                    name="program"
-                    value={formData.program}
-                    onChange={handleInputChange}
-                    required
-                    className="border-neutral-30 radius-8 px-16 py-10"
-                  >
-                    <option value="">-- Chọn chương trình --</option>
-                    {availablePrograms.map(program => (
-                      <option key={program} value={program}>{program}</option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </div>
-            </div>
-
-            <div className="row g-3 mb-16">
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">
-                    Cấp độ <span className="text-danger-600">*</span>
-                  </Form.Label>
-                  <Form.Select
-                    name="level"
-                    value={formData.level}
-                    onChange={handleInputChange}
-                    required
-                    className="border-neutral-30 radius-8 px-16 py-10"
-                  >
-                    <option value="">-- Chọn cấp độ --</option>
-                    {availableLevels.map(level => (
-                      <option key={level} value={level}>{level}</option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </div>
-
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">Band</Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="band"
-                    value={formData.band}
-                    onChange={handleInputChange}
-                    placeholder="VD: Band 1"
-                    className="border-neutral-30 radius-8 px-16 py-10"
-                  />
-                </Form.Group>
-              </div>
-            </div>
-          </div>
 
 
         </Modal.Body>

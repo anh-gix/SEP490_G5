@@ -287,3 +287,87 @@ exports.getAllCourseLevels = async (req, res) => {
     }
 };
 
+// Lấy danh sách courses theo program
+exports.getCoursesByProgram = async (req, res) => {
+    try {
+        const { programName, programId, level } = req.query;
+        
+        let programIds = [];
+        
+        // Nếu có programId, tìm theo ID
+        if (programId) {
+            const program = await Program.findById(programId);
+            if (!program) {
+                return res.status(404).json({ 
+                    success: false, 
+                    message: 'Không tìm thấy chương trình' 
+                });
+            }
+            programIds = [program._id];
+        } 
+        // Nếu có programName, convert sang type và tìm program với type + level
+        else if (programName) {
+            const typeMap = {
+                'IELTS': 'ielts',
+                'TOEIC': 'toeic',
+                'Tiếng Anh Giao tiếp': 'cam'
+            };
+            const type = typeMap[programName];
+            if (!type) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Tên chương trình không hợp lệ' 
+                });
+            }
+            
+            // Nếu có level, tìm program cụ thể với type + level
+            if (level) {
+                const program = await Program.findOne({ type, level });
+                if (!program) {
+                    return res.status(404).json({ 
+                        success: false, 
+                        message: 'Không tìm thấy chương trình với type và level này' 
+                    });
+                }
+                programIds = [program._id];
+            } else {
+                // Nếu không có level, lấy tất cả programs với type này (fallback)
+                const programs = await Program.find({ type });
+                if (programs.length === 0) {
+                    return res.status(404).json({ 
+                        success: false, 
+                        message: 'Không tìm thấy chương trình' 
+                    });
+                }
+                programIds = programs.map(p => p._id);
+            }
+        } else {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Vui lòng cung cấp programName hoặc programId' 
+            });
+        }
+
+        // Lấy tất cả courses thuộc các programs này
+        const courses = await Course.find({ 
+            program: { $in: programIds },
+            status: 'approved' // Chỉ lấy courses đã được phê duyệt
+        })
+        .select('name numberOfSessions program')
+        .populate('program', 'program_name type level')
+        .sort({ name: 1 });
+
+        res.status(200).json({
+            success: true,
+            courses: courses
+        });
+    } catch (err) {
+        console.error('❌ Error in getCoursesByProgram:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Lỗi máy chủ', 
+            error: err.message 
+        });
+    }
+};
+

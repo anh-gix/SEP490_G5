@@ -273,7 +273,7 @@ exports.getClassStats = async (req, res) => {
 // =========================
 exports.createClass = async (req, res) => {
   try {
-    const { name, course, teacher, students, room, startDate, endDate, maxStudents, status } = req.body;
+    const { name, course, teacher, students, room, startDate, endDate, maxStudents, status, scheduleEntries } = req.body;
     
     if (!name || !teacher) {
       return res.status(400).json({
@@ -304,6 +304,125 @@ exports.createClass = async (req, res) => {
     });
     
     await newClass.save();
+    
+    // Generate ClassSchedule entries if scheduleEntries and course are provided
+    if (scheduleEntries && scheduleEntries.length > 0 && course && startDate) {
+      // Get course details including numberOfSessions and sessions
+      const courseData = await Course.findById(course)
+        .populate('sessions', 'order')
+        .select('numberOfSessions sessions');
+      
+      if (courseData && courseData.numberOfSessions) {
+        const numberOfSessions = courseData.numberOfSessions;
+        // Sort sessions by order to ensure correct mapping
+        const courseSessions = (courseData.sessions || []).sort((a, b) => (a.order || 0) - (b.order || 0));
+        
+        // Helper function to convert day string to day of week number
+        const getDayOfWeekNumber = (dayStr) => {
+          const dayMap = {
+            'CN': 0,
+            '2': 1,
+            '3': 2,
+            '4': 3,
+            '5': 4,
+            '6': 5,
+            '7': 6
+          };
+          return dayMap[dayStr] !== undefined ? dayMap[dayStr] : null;
+        };
+        
+        // Helper function to find next occurrence of day of week
+        const findNextDayOfWeek = (startDate, targetDayOfWeek) => {
+          const start = new Date(startDate);
+          const currentDay = start.getDay();
+          let daysToAdd = (targetDayOfWeek - currentDay + 7) % 7;
+          if (daysToAdd === 0 && start.getTime() < new Date().getTime()) {
+            daysToAdd = 7;
+          }
+          const result = new Date(start);
+          result.setDate(start.getDate() + daysToAdd);
+          return result;
+        };
+        
+        // Find first occurrence of each day of week
+        const firstOccurrences = {};
+        scheduleEntries.forEach(entry => {
+          const dayOfWeek = getDayOfWeekNumber(entry.day);
+          if (dayOfWeek !== null && !firstOccurrences[dayOfWeek]) {
+            firstOccurrences[dayOfWeek] = findNextDayOfWeek(startDate, dayOfWeek);
+          }
+        });
+        
+        // Generate ClassSchedule entries
+        const classSchedules = [];
+        let entryIndex = 0;
+        let weekOffset = 0;
+        
+        for (let i = 0; i < numberOfSessions; i++) {
+          const entry = scheduleEntries[entryIndex % scheduleEntries.length];
+          const dayOfWeek = getDayOfWeekNumber(entry.day);
+          
+          if (dayOfWeek === null) {
+            entryIndex++;
+            continue;
+          }
+          
+          // Get the first occurrence of this day
+          const firstOccurrence = firstOccurrences[dayOfWeek];
+          
+          // Calculate the date for this session
+          const sessionDate = new Date(firstOccurrence);
+          sessionDate.setDate(firstOccurrence.getDate() + (weekOffset * 7));
+          
+          // Get corresponding session from course (by order, starting from 0)
+          const sessionIndex = i < courseSessions.length ? i : i % courseSessions.length;
+          const sessionId = courseSessions[sessionIndex]?._id || null;
+          
+          classSchedules.push({
+            class: newClass._id,
+            session: sessionId,
+            date: sessionDate,
+            startTime: entry.startTime,
+            endTime: entry.endTime,
+            room: room,
+            teacher: teacher,
+            createdBy: req.user?._id || teacher, // Use logged in user or teacher as fallback
+            reason: `Buổi học ${i + 1}`,
+            status: 'approved'
+          });
+          
+          // Move to next entry (round-robin)
+          entryIndex++;
+          // If we've gone through all entries, move to next week
+          if (entryIndex % scheduleEntries.length === 0) {
+            weekOffset++;
+          }
+        }
+        
+        // Create all ClassSchedule entries
+        if (classSchedules.length > 0) {
+          const createdSchedules = await ClassSchedule.insertMany(classSchedules);
+          
+          // Create StudentSchedule entries for each ClassSchedule
+          if (students && students.length > 0) {
+            const studentSchedules = [];
+            createdSchedules.forEach(schedule => {
+              students.forEach(studentId => {
+                studentSchedules.push({
+                  student: studentId,
+                  classSchedule: schedule._id,
+                  attendance: { status: 'absent' }
+                });
+              });
+            });
+            
+            if (studentSchedules.length > 0) {
+              await StudentSchedule.insertMany(studentSchedules);
+            }
+          }
+        }
+      }
+    }
     
     const populatedClass = await Class.findById(newClass._id)
       .populate('teacher', 'username email phone')

@@ -10,5 +10,11 @@ module.exports = {
     User: require('./userModel'),
     Role: require('./roleModel'),
     Permission: require('./permissionModel'),
-    // Thêm các mô hình khác ở đây nếu cần
+    Class: require('./classModel'),
+    StudentSchedule: require('./studentScheduleModel'),
+    Room: require('./room'),
+    LevelBandMapping: require('./levelBandMappingModel'),
+    Exam: require('./examModel'),
+    Submission: require('./submissionModel'),
+    HomeworkSubmission: require('./homeworkSubmissionModel')
 };

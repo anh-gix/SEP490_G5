@@ -6,6 +6,8 @@ const { verifyToken, isTeacher } = require('../middlewares/verifyToken');
 // Teacher current user routes (require authentication)
 router.get('/me', verifyToken, isTeacher, teacherController.getCurrentTeacher);
 router.get('/me/schedule', verifyToken, isTeacher, teacherController.getCurrentTeacherSchedule);
+router.get('/me/classes', verifyToken, isTeacher, teacherController.getMyClasses);
+router.get('/me/classes/:classId', verifyToken, isTeacher, teacherController.getMyClassDetail);
 router.get('/me/lessons/:scheduleId', verifyToken, isTeacher, teacherController.getLessonDetail);
 
 // Teacher CRUD (admin routes)

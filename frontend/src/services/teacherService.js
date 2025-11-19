@@ -46,6 +46,31 @@ const teacherService = {
     }
   },
 
+  // Get current teacher's classes
+  getMyClasses: async (params = {}) => {
+    try {
+      const response = await axios.get(`${API_URL}/teachers/me/classes`, {
+        params,
+        headers: getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get current teacher's class detail
+  getMyClassDetail: async (classId) => {
+    try {
+      const response = await axios.get(`${API_URL}/teachers/me/classes/${classId}`, {
+        headers: getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
   // Get all teachers
   getAllTeachers: async (params = {}) => {
     try {

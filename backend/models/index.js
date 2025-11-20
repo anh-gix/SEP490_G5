@@ -13,7 +13,6 @@ module.exports = {
     Class: require('./classModel'),
     StudentSchedule: require('./studentScheduleModel'),
     Room: require('./room'),
-    LevelBandMapping: require('./levelBandMappingModel'),
     Exam: require('./examModel'),
     Submission: require('./submissionModel'),
     HomeworkSubmission: require('./homeworkSubmissionModel')

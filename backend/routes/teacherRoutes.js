@@ -9,6 +9,8 @@ router.get('/me/schedule', verifyToken, isTeacher, teacherController.getCurrentT
 router.get('/me/classes', verifyToken, isTeacher, teacherController.getMyClasses);
 router.get('/me/classes/:classId', verifyToken, isTeacher, teacherController.getMyClassDetail);
 router.get('/me/lessons/:scheduleId', verifyToken, isTeacher, teacherController.getLessonDetail);
+router.put('/me/mocktest/:scheduleId/student/:studentId', verifyToken, isTeacher, teacherController.updateMocktestScore);
+router.post('/me/attendance/:scheduleId', verifyToken, isTeacher, teacherController.saveAttendance);
 
 // Teacher CRUD (admin routes)
 router.get('/', teacherController.getAllTeachers);

@@ -35,11 +35,10 @@ const homeworkSubmissionSchema = new Schema({
     required: true
   },
   
-  assignmentFile: {
+  assignmentFiles: [{
     type: String,
-    required: true,
-    comment: 'File đề bài gốc từ teacher'
-  },
+    comment: 'File đề bài gốc từ teacher (multiple files supported)'
+  }],
   
   deadline: {
     type: Date,
@@ -132,7 +131,7 @@ homeworkSubmissionSchema.statics.createForClass = async function(classScheduleId
     homeworkId,
     student: studentId,
     assignmentTitle: assignmentData.title,
-    assignmentFile: assignmentData.file,
+    assignmentFiles: assignmentData.files || [],
     deadline: assignmentData.deadline,
     status: 'not_submitted'
   }));

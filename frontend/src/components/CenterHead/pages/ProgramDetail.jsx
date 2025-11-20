@@ -339,7 +339,7 @@ const ProgramDetail = () => {
           <Table
             columns={courseColumns}
             data={courses}
-            onRowClick={(row) => navigate(`/center-head/courses/${row._id}`)}
+            onRowClick={(row) => navigate(`/center-head/courses/${row._id}/details`)}
           />
         ) : (
           <div className="text-center py-5 text-neutral-600">

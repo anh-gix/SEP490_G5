@@ -142,7 +142,7 @@ const CourseDetails = () => {
           <div className="info-item mb-24">
             <label className="text-neutral-600 text-sm mb-8 d-block">Thuộc chương trình</label>
             <p className="text-neutral-900 mb-0">
-              {course.program?.program_name || 'N/A'} 
+              {course.program?.program_name || 'N/A'}
               {course.program?.code && ` (${course.program.code})`}
             </p>
           </div>
@@ -167,13 +167,73 @@ const CourseDetails = () => {
           </div>
         </div>
         <div className="col-12">
-          <div className="info-item">
+          <div className="info-item mb-24">
             <label className="text-neutral-600 text-sm mb-8 d-block">Mô tả</label>
             <div className="bg-neutral-20 p-16 radius-8">
               <p className="text-neutral-900 mb-0">
                 {course.description || 'Chưa có mô tả'}
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* Materials */}
+        <div className="col-12">
+          <div className="info-item mb-24">
+            <label className="text-neutral-600 text-sm mb-8 d-block">
+              <i className="ph ph-file-text me-2"></i>
+              Tài liệu khóa học
+            </label>
+            {course.materials && course.materials.length > 0 ? (
+              <div className="bg-neutral-20 p-16 radius-8">
+                {course.materials.map((material, index) => (
+                  <div key={index} className="d-flex align-items-center mb-2">
+                    <i className="ph ph-link text-main-600 me-2"></i>
+                    <a
+                      href={material}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-main-600 text-sm"
+                    >
+                      {material}
+                    </a>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-neutral-20 p-16 radius-8">
+                <p className="text-neutral-600 text-sm mb-0">Chưa có tài liệu</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Mocktest Session Orders */}
+        <div className="col-12">
+          <div className="info-item">
+            <label className="text-neutral-600 text-sm mb-8 d-block">
+              <i className="ph ph-exam me-2"></i>
+              Buổi học là bài thi thử (Mock Test)
+            </label>
+            {course.mocktestSessionOrders && course.mocktestSessionOrders.length > 0 ? (
+              <div className="bg-neutral-20 p-16 radius-8">
+                <div className="d-flex flex-wrap gap-2">
+                  {course.mocktestSessionOrders.map((order, index) => (
+                    <Badge key={index} variant="warning" size="md">
+                      <i className="ph ph-exam me-1"></i>
+                      Buổi {order}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="text-neutral-600 text-sm mt-2 mb-0">
+                  Các buổi học này sẽ được tổ chức dưới dạng bài thi thử (Mock Test)
+                </p>
+              </div>
+            ) : (
+              <div className="bg-neutral-20 p-16 radius-8">
+                <p className="text-neutral-600 text-sm mb-0">Không có buổi học nào được đánh dấu là Mock Test</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

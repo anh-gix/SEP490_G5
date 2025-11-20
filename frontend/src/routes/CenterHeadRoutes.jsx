@@ -32,8 +32,8 @@ export const centerHeadRoutes = [
   // II. Program & Course Management
   { path: '/center-head/programs', element: <ProgramListPage /> },
   { path: '/center-head/programs/:id', element: <ProgramDetailPage /> },
-  { path: '/courses/pending', element: <PendingCoursesPage /> },
-  { path: '/courses/:id/details', element: <CourseDetailPage /> },
+  { path: '/center-head/courses/pending', element: <PendingCoursesPage /> },
+  { path: '/center-head/courses/:id/details', element: <CourseDetailPage /> },
 
   // III. Class & Schedule Management
   { path: '/center-head/classes', element: <ClassListPage /> },

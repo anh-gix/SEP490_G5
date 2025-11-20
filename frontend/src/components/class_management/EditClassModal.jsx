@@ -5,6 +5,7 @@ import classService from '../../services/classService';
 import teacherService from '../../services/teacherService';
 import roomService from '../../services/roomService';
 import scheduleService from '../../services/scheduleService';
+import studentService from '../../services/studentService';
 
 const createEmptyScheduleEntry = () => ({
   id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -38,35 +39,88 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
   const [rooms, setRooms] = useState([]);
   const [dateError, setDateError] = useState('');
   const [teacherSchedules, setTeacherSchedules] = useState({}); // Map teacherId -> schedules
+  const [studentSchedules, setStudentSchedules] = useState({}); // Map studentId -> schedules
+  const [studentSchedulesLoading, setStudentSchedulesLoading] = useState(false); // Loading state for student schedules
   const [existingSchedules, setExistingSchedules] = useState([]);
   const [roomLoading, setRoomLoading] = useState(false);
   const [roomError, setRoomError] = useState(null);
+  const [fullClassData, setFullClassData] = useState(null); // Store full class data with schedules
+  const [loadingClassData, setLoadingClassData] = useState(false); // Loading state for class data
+
+  // Fetch full class data with schedules when modal opens
+  useEffect(() => {
+    const fetchFullClassData = async () => {
+      if (!classData || (!classData.id && !classData._id)) {
+        setFullClassData(null);
+        return;
+      }
+
+      const classId = classData.id || classData._id;
+      console.log('🔍 [EditClassModal] Fetching full class data with schedules for ID:', classId);
+
+      try {
+        setLoadingClassData(true);
+        const response = await classService.getClassById(classId);
+        
+        if (response && response.success && response.class) {
+          console.log('✅ [EditClassModal] Full class data fetched:', response.class);
+          console.log('✅ [EditClassModal] Schedules in response:', response.class.schedules);
+          setFullClassData(response.class);
+        } else {
+          console.warn('⚠️ [EditClassModal] API response does not have expected structure');
+          setFullClassData(classData); // Fallback to classData prop
+        }
+      } catch (error) {
+        console.error('❌ [EditClassModal] Error fetching full class data:', error);
+        setFullClassData(classData); // Fallback to classData prop on error
+      } finally {
+        setLoadingClassData(false);
+      }
+    };
+
+    fetchFullClassData();
+  }, [classData?.id, classData?._id]);
 
   useEffect(() => {
     // Reset studentsFetched when classData changes
     setStudentsFetched(false);
     
-    if (classData) {
-      console.log('🔍 [EditClassModal] Loading classData:', classData);
-      console.log('🔍 [EditClassModal] All classData keys:', Object.keys(classData));
+    // Use fullClassData if available (has schedules), otherwise use classData prop
+    const dataToUse = fullClassData || classData;
+    
+    if (dataToUse) {
+      console.log('🔍 [EditClassModal] Loading classData:', dataToUse);
+      console.log('🔍 [EditClassModal] All classData keys:', Object.keys(dataToUse));
       console.log('🔍 [EditClassModal] Checking course fields:', {
-        'classData.course': classData.course,
-        'classData.courseId': classData.courseId,
-        'classData.course_id': classData.course_id,
-        'classData.Course': classData.Course,
-        'classData.CourseId': classData.CourseId,
+        'dataToUse.course': dataToUse.course,
+        'dataToUse.courseId': dataToUse.courseId,
+        'dataToUse.course_id': dataToUse.course_id,
+        'dataToUse.Course': dataToUse.Course,
+        'dataToUse.CourseId': dataToUse.CourseId,
       });
       
       // Convert schedule to scheduleEntries format
       let scheduleEntries = [createEmptyScheduleEntry()];
       
       // Try to parse from schedules array first (more accurate)
-      if (classData.schedules && Array.isArray(classData.schedules) && classData.schedules.length > 0) {
+      if (dataToUse.schedules && Array.isArray(dataToUse.schedules) && dataToUse.schedules.length > 0) {
+        console.log('✅ [EditClassModal] Found schedules array with', dataToUse.schedules.length, 'entries');
         // Group schedules by day and time to create scheduleEntries
         const scheduleMap = new Map();
         
-        classData.schedules.forEach(schedule => {
-          const date = new Date(schedule.date || schedule.scheduleDate || schedule.classDate);
+        dataToUse.schedules.forEach(schedule => {
+          const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+          if (!scheduleDate) {
+            console.warn('⚠️ [EditClassModal] Schedule entry missing date:', schedule);
+            return;
+          }
+          
+          const date = new Date(scheduleDate);
+          if (isNaN(date.getTime())) {
+            console.warn('⚠️ [EditClassModal] Invalid date in schedule:', scheduleDate);
+            return;
+          }
+          
           const dayOfWeek = date.getDay();
           const dayMap = { 0: 'CN', 1: '2', 2: '3', 3: '4', 4: '5', 5: '6', 6: '7' };
           const day = dayMap[dayOfWeek];
@@ -77,6 +131,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           const key = `${day}-${startTime}-${endTime}`;
           if (!scheduleMap.has(key)) {
             scheduleMap.set(key, { day, startTime, endTime });
+            console.log('✅ [EditClassModal] Added schedule entry:', { day, startTime, endTime });
           }
         });
         
@@ -84,9 +139,12 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           ...createEmptyScheduleEntry(),
           ...entry
         }));
-      } else if (classData.schedule) {
+        
+        console.log('✅ [EditClassModal] Parsed', scheduleEntries.length, 'unique schedule entries from schedules');
+      } else if (dataToUse.schedule && typeof dataToUse.schedule === 'string') {
         // Fallback: Parse schedule string to extract days and time
-        const scheduleMatch = classData.schedule?.match(/T([2-7]|CN)-?([2-7]|CN)?-?([2-7]|CN)?, (\d{2}:\d{2})-(\d{2}:\d{2})/);
+        console.log('⚠️ [EditClassModal] No schedules array, trying to parse schedule string:', dataToUse.schedule);
+        const scheduleMatch = dataToUse.schedule.match(/T([2-7]|CN)-?([2-7]|CN)?-?([2-7]|CN)?, (\d{2}:\d{2})-(\d{2}:\d{2})/);
         
         if (scheduleMatch) {
           const days = scheduleMatch.slice(1, 4).filter(Boolean);
@@ -100,87 +158,160 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
             startTime,
             endTime
           }));
+          console.log('✅ [EditClassModal] Parsed schedule string to', scheduleEntries.length, 'entries');
+        } else {
+          console.warn('⚠️ [EditClassModal] Could not parse schedule string');
         }
+      } else {
+        console.warn('⚠️ [EditClassModal] No schedules found in dataToUse. schedules:', dataToUse.schedules, 'schedule:', dataToUse.schedule);
       }
       
       // Ensure at least one entry
       if (scheduleEntries.length === 0) {
+        console.warn('⚠️ [EditClassModal] No schedule entries parsed, using empty entry');
         scheduleEntries = [createEmptyScheduleEntry()];
       }
 
       // Handle course - check multiple possible field names
       const courseId = 
-        classData.course?._id || 
-        classData.course?.id || 
-        classData.course ||
-        classData.courseId ||
-        classData.course_id ||
-        classData.Course?._id ||
-        classData.Course?.id ||
-        classData.Course ||
-        classData.CourseId ||
+        dataToUse.course?._id || 
+        dataToUse.course?.id || 
+        dataToUse.course ||
+        dataToUse.courseId ||
+        dataToUse.course_id ||
+        dataToUse.Course?._id ||
+        dataToUse.Course?.id ||
+        dataToUse.Course ||
+        dataToUse.CourseId ||
         '';
       // Convert to string to ensure consistent comparison
       const courseIdStr = courseId ? String(courseId) : '';
 
       console.log('🔍 [EditClassModal] Course extraction:', {
-        'classData.course': classData.course,
-        'classData.courseId': classData.courseId,
-        'classData.Course': classData.Course,
+        'dataToUse.course': dataToUse.course,
+        'dataToUse.courseId': dataToUse.courseId,
+        'dataToUse.Course': dataToUse.Course,
         'courseId (raw)': courseId,
         'courseIdStr (final)': courseIdStr,
         'typeof courseId': typeof courseId,
         'typeof courseIdStr': typeof courseIdStr
       });
 
-      console.log('🔍 [EditClassModal] Band from classData:', classData.band);
+      console.log('🔍 [EditClassModal] Band from dataToUse:', dataToUse.band);
       console.log('🔍 [EditClassModal] ScheduleEntries:', scheduleEntries);
 
       // Debug students data
       console.log('🔍 [EditClassModal] ========== DEBUG STUDENTS ==========');
-      console.log('🔍 [EditClassModal] classData.students:', classData.students);
-      console.log('🔍 [EditClassModal] classData.students type:', typeof classData.students);
-      console.log('🔍 [EditClassModal] classData.students isArray:', Array.isArray(classData.students));
-      console.log('🔍 [EditClassModal] classData.students length:', classData.students?.length);
+      console.log('🔍 [EditClassModal] dataToUse.students:', dataToUse.students);
+      console.log('🔍 [EditClassModal] dataToUse.students type:', typeof dataToUse.students);
+      console.log('🔍 [EditClassModal] dataToUse.students isArray:', Array.isArray(dataToUse.students));
+      console.log('🔍 [EditClassModal] dataToUse.students length:', dataToUse.students?.length);
       
       // Check for alternative field names
       console.log('🔍 [EditClassModal] Checking alternative student fields:');
-      console.log('  - classData.Students:', classData.Students);
-      console.log('  - classData.studentList:', classData.studentList);
-      console.log('  - classData.student_list:', classData.student_list);
-      console.log('  - classData.members:', classData.members);
+      console.log('  - dataToUse.Students:', dataToUse.Students);
+      console.log('  - dataToUse.studentList:', dataToUse.studentList);
+      console.log('  - dataToUse.student_list:', dataToUse.student_list);
+      console.log('  - dataToUse.members:', dataToUse.members);
       
-      // Log full classData structure for students
-      if (classData.students) {
-        console.log('🔍 [EditClassModal] First student sample:', classData.students[0]);
-        console.log('🔍 [EditClassModal] All students:', JSON.stringify(classData.students, null, 2));
+      // Log full dataToUse structure for students
+      if (dataToUse.students) {
+        console.log('🔍 [EditClassModal] First student sample:', dataToUse.students[0]);
+        console.log('🔍 [EditClassModal] All students:', JSON.stringify(dataToUse.students, null, 2));
       }
       console.log('🔍 [EditClassModal] ====================================');
 
-      setFormData({
-        ...classData,
-        course: courseIdStr,
-        band: classData.band || '', // Ensure band is set from classData
-        scheduleEntries
+      // Format startDate and endDate to YYYY-MM-DD format if they exist
+      let formattedStartDate = '';
+      let formattedEndDate = '';
+      
+      if (dataToUse.startDate) {
+        const startDateObj = new Date(dataToUse.startDate);
+        if (!isNaN(startDateObj.getTime())) {
+          formattedStartDate = startDateObj.toISOString().split('T')[0];
+        }
+      }
+      
+      if (dataToUse.endDate) {
+        const endDateObj = new Date(dataToUse.endDate);
+        if (!isNaN(endDateObj.getTime())) {
+          formattedEndDate = endDateObj.toISOString().split('T')[0];
+        }
+      }
+
+      console.log('🔍 [EditClassModal] Date formatting:', {
+        'dataToUse.startDate': dataToUse.startDate,
+        'formattedStartDate': formattedStartDate,
+        'dataToUse.endDate': dataToUse.endDate,
+        'formattedEndDate': formattedEndDate
       });
 
-      // Load students from classData - check multiple possible field names
+      // Extract teacherId - handle both object and ID formats
+      const teacherId = 
+        dataToUse.teacherId ||
+        (dataToUse.teacher?._id ? String(dataToUse.teacher._id) : '') ||
+        (dataToUse.teacher?.id ? String(dataToUse.teacher.id) : '') ||
+        (typeof dataToUse.teacher === 'string' ? String(dataToUse.teacher) : '') ||
+        '';
+
+      // Extract roomId - handle both object and ID formats
+      const roomId = 
+        dataToUse.roomId ||
+        (dataToUse.room?._id ? String(dataToUse.room._id) : '') ||
+        (dataToUse.room?.id ? String(dataToUse.room.id) : '') ||
+        (typeof dataToUse.room === 'string' ? String(dataToUse.room) : '') ||
+        '';
+
+      // Extract program - handle multiple possible sources
+      const program = 
+        dataToUse.program ||
+        dataToUse.programName ||
+        dataToUse.course?.program?.program_name ||
+        dataToUse.course?.program?.name ||
+        '';
+
+      console.log('🔍 [EditClassModal] Extracted IDs and program:', {
+        'teacherId': teacherId,
+        'roomId': roomId,
+        'program': program,
+        'dataToUse.teacher': dataToUse.teacher,
+        'dataToUse.room': dataToUse.room,
+        'dataToUse.teacherId': dataToUse.teacherId,
+        'dataToUse.roomId': dataToUse.roomId,
+        'dataToUse.program': dataToUse.program,
+        'dataToUse.programName': dataToUse.programName,
+        'dataToUse.course?.program': dataToUse.course?.program
+      });
+
+      setFormData({
+        ...dataToUse,
+        course: courseIdStr,
+        program: program || dataToUse.program || '', // Ensure program is set
+        band: dataToUse.band || '', // Ensure band is set from dataToUse
+        startDate: formattedStartDate || dataToUse.startDate || '',
+        endDate: formattedEndDate || dataToUse.endDate || '',
+        scheduleEntries,
+        teacherId: teacherId, // Explicitly set teacherId
+        roomId: roomId // Explicitly set roomId
+      });
+
+      // Load students from dataToUse - check multiple possible field names
       let studentsData = null;
       
-      if (classData.students && Array.isArray(classData.students)) {
-        studentsData = classData.students;
-        console.log('✅ [EditClassModal] Found students in classData.students:', studentsData.length);
-      } else if (classData.Students && Array.isArray(classData.Students)) {
-        studentsData = classData.Students;
-        console.log('✅ [EditClassModal] Found students in classData.Students:', studentsData.length);
-      } else if (classData.studentList && Array.isArray(classData.studentList)) {
-        studentsData = classData.studentList;
-        console.log('✅ [EditClassModal] Found students in classData.studentList:', studentsData.length);
-      } else if (classData.members && Array.isArray(classData.members)) {
-        studentsData = classData.members;
-        console.log('✅ [EditClassModal] Found students in classData.members:', studentsData.length);
+      if (dataToUse.students && Array.isArray(dataToUse.students)) {
+        studentsData = dataToUse.students;
+        console.log('✅ [EditClassModal] Found students in dataToUse.students:', studentsData.length);
+      } else if (dataToUse.Students && Array.isArray(dataToUse.Students)) {
+        studentsData = dataToUse.Students;
+        console.log('✅ [EditClassModal] Found students in dataToUse.Students:', studentsData.length);
+      } else if (dataToUse.studentList && Array.isArray(dataToUse.studentList)) {
+        studentsData = dataToUse.studentList;
+        console.log('✅ [EditClassModal] Found students in dataToUse.studentList:', studentsData.length);
+      } else if (dataToUse.members && Array.isArray(dataToUse.members)) {
+        studentsData = dataToUse.members;
+        console.log('✅ [EditClassModal] Found students in dataToUse.members:', studentsData.length);
       } else {
-        console.warn('⚠️ [EditClassModal] No students found in classData, will fetch from API');
+        console.warn('⚠️ [EditClassModal] No students found in dataToUse, will fetch from API');
         studentsData = null; // Set to null to trigger API fetch
       }
       
@@ -192,10 +323,10 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
         // Reset flag to allow API fetch
         setStudentsFetched(false);
         setClassStudents([]); // Set empty array first
-        console.log('🌐 [EditClassModal] Will fetch students from API for class ID:', classData.id || classData._id);
+        console.log('🌐 [EditClassModal] Will fetch students from API for class ID:', dataToUse.id || dataToUse._id);
       }
     }
-  }, [classData]);
+  }, [classData, fullClassData]);
 
   // Fetch students from API if not found in classData
   useEffect(() => {
@@ -437,12 +568,63 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
   );
 
   // Generate sessions that will be created
+  // Priority: generated from scheduleEntries (when user edits) > fullClassData.schedules (initial load)
   const generatedSessions = useMemo(() => {
-    if (!formData.startDate || !filledScheduleEntries.length || !selectedCourse?.numberOfSessions) {
-      return [];
+    // PRIORITY 1: Generate from scheduleEntries if we have startDate and filled scheduleEntries
+    // This takes priority because user may have edited the schedule
+    if (formData.startDate && filledScheduleEntries.length > 0) {
+      // If numberOfSessions is available, use it
+      if (selectedCourse?.numberOfSessions) {
+        const generated = generateSessions(formData.startDate, filledScheduleEntries, selectedCourse.numberOfSessions);
+        if (generated.length > 0) {
+          console.log('✅ [EditClassModal] Generated sessions from scheduleEntries:', generated.length);
+          return generated;
+        }
+      }
+      
+      // Fallback: Estimate sessions (about 12 sessions = 3 months)
+      const estimatedSessions = 12;
+      const generated = generateSessions(formData.startDate, filledScheduleEntries, estimatedSessions);
+      if (generated.length > 0) {
+        console.log('✅ [EditClassModal] Generated sessions with estimated count:', generated.length);
+        return generated;
+      }
     }
-    return generateSessions(formData.startDate, filledScheduleEntries, selectedCourse.numberOfSessions);
-  }, [formData.startDate, filledScheduleEntries, selectedCourse?.numberOfSessions]);
+
+    // PRIORITY 2: Fallback to existing schedules from database if we can't generate yet
+    // Use fullClassData if available (has schedules), otherwise fallback to classData
+    const dataSource = fullClassData || classData;
+    
+    if (dataSource?.schedules && Array.isArray(dataSource.schedules) && dataSource.schedules.length > 0) {
+      const sessionsFromSchedules = dataSource.schedules
+        .filter(schedule => {
+          const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+          return scheduleDate && schedule.startTime && schedule.endTime;
+        })
+        .map(schedule => {
+          const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+          const date = new Date(scheduleDate);
+          if (isNaN(date.getTime())) return null;
+          return {
+            date: date.toISOString().split('T')[0], // Format as YYYY-MM-DD
+            dayOfWeek: date.getDay(),
+            startTime: schedule.startTime || schedule.start_time || '08:00',
+            endTime: schedule.endTime || schedule.end_time || '10:00'
+          };
+        })
+        .filter(Boolean) // Remove null entries
+        .sort((a, b) => a.date.localeCompare(b.date)); // Sort by date
+      
+      if (sessionsFromSchedules.length > 0) {
+        console.log('✅ [EditClassModal] Using sessions from database (fallback):', sessionsFromSchedules.length);
+        return sessionsFromSchedules;
+      }
+    }
+
+    // If we can't generate sessions yet, return empty array
+    console.log('⚠️ [EditClassModal] Cannot generate sessions yet - missing data');
+    return [];
+  }, [formData.startDate, filledScheduleEntries, selectedCourse?.numberOfSessions, fullClassData?.schedules, classData?.schedules]);
 
   // Check for room conflicts
   const conflictingRoomIds = useMemo(() => {
@@ -627,6 +809,383 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
 
     return conflicts;
   }, [generatedSessions, teacherSchedules]);
+
+  // Fetch student schedules - need to get all schedules for conflict checking
+  useEffect(() => {
+    const fetchStudentSchedules = async () => {
+      try {
+        console.log('🔄 [EditClassModal] useEffect triggered for fetchStudentSchedules:', {
+          classStudentsLength: classStudents.length,
+          generatedSessionsLength: generatedSessions.length,
+          hasStartDate: !!formData.startDate,
+          hasEndDate: !!formData.endDate
+        });
+        
+        if (!classStudents.length) {
+          console.log('⏭️ [EditClassModal] No students, skipping schedule fetch');
+          setStudentSchedules({});
+          setStudentSchedulesLoading(false);
+          return;
+        }
+
+        setStudentSchedulesLoading(true);
+
+        // Get current class ID - try both id and _id, convert to string for consistent comparison
+        const currentClassIdRaw = formData.id || formData._id || classData?.id || classData?._id;
+        const currentClassId = currentClassIdRaw ? String(currentClassIdRaw) : null;
+        
+        console.log('🔍 [EditClassModal] Fetching student schedules:', {
+          classStudentsCount: classStudents.length,
+          generatedSessionsCount: generatedSessions.length,
+          currentClassId,
+          formDataId: formData.id,
+          formData_id: formData._id,
+          classDataId: classData?.id,
+          classData_id: classData?._id,
+          hasStartDate: !!formData.startDate,
+          hasFilledScheduleEntries: filledScheduleEntries.length > 0,
+          hasSelectedCourse: !!selectedCourse
+        });
+
+        // Determine date range for fetching student schedules
+        // Priority: fullClassData.schedules (immediate) > generatedSessions > formData dates > estimated
+        let minDate = null;
+        let maxDate = null;
+        
+        // Use fullClassData if available (has schedules), otherwise fallback to classData
+        const dataSource = fullClassData || classData;
+        
+        // PRIORITY 1: Use dates from existing class schedules (most reliable, available immediately)
+        if (dataSource?.schedules && Array.isArray(dataSource.schedules) && dataSource.schedules.length > 0) {
+          const scheduleDates = dataSource.schedules
+            .map(schedule => {
+              const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+              if (!scheduleDate) return null;
+              const date = new Date(scheduleDate);
+              return !isNaN(date.getTime()) ? date.toISOString().split('T')[0] : null;
+            })
+            .filter(Boolean)
+            .sort();
+          
+          if (scheduleDates.length > 0) {
+            minDate = scheduleDates[0];
+            maxDate = scheduleDates[scheduleDates.length - 1];
+            console.log('✅ [EditClassModal] Using date range from schedules:', { minDate, maxDate });
+          }
+        } else if (generatedSessions.length > 0) {
+          // PRIORITY 2: Use dates from generated sessions
+          const sessionDates = generatedSessions.map(s => s.date).sort();
+          minDate = sessionDates[0];
+          maxDate = sessionDates[sessionDates.length - 1];
+          console.log('✅ [EditClassModal] Using date range from generatedSessions:', { minDate, maxDate });
+        } else if (formData.startDate && formData.endDate) {
+          // Use class date range if available
+          minDate = formData.startDate;
+          maxDate = formData.endDate;
+        } else if (formData.startDate) {
+          // Estimate end date based on available information
+          const start = new Date(formData.startDate);
+          let estimatedWeeks = 12; // Default: 12 weeks (about 3 months)
+          
+          if (selectedCourse?.numberOfSessions && filledScheduleEntries.length > 0) {
+            estimatedWeeks = Math.ceil(selectedCourse.numberOfSessions / filledScheduleEntries.length);
+          } else if (filledScheduleEntries.length > 0) {
+            // Estimate based on typical course duration
+            estimatedWeeks = 12;
+          }
+          
+          const end = new Date(start);
+          end.setDate(start.getDate() + (estimatedWeeks * 7));
+          minDate = formData.startDate;
+          maxDate = end.toISOString().split('T')[0];
+        }
+        
+        // If we still don't have dates, fetch without date filter (will get all schedules)
+        // This ensures we can still show conflicts even if date range is unclear
+
+        const schedulesMap = {};
+        
+        // Fetch schedules for each student in the class
+        await Promise.all(
+          classStudents.map(async (student) => {
+            const studentId = student._id || student.id;
+            if (!studentId) return;
+
+            try {
+              const params = {};
+              if (minDate && maxDate) {
+                params.startDate = minDate;
+                params.endDate = maxDate;
+              }
+              
+              console.log(`🔍 [EditClassModal] Fetching schedule for student ${studentId} with params:`, params);
+              
+              const response = await studentService.getStudentSchedule(studentId, params);
+              
+              if (response && response.schedules) {
+                // Filter out schedules from the current class being edited
+                const filteredSchedules = response.schedules.filter(schedule => {
+                  // Try multiple ways to get classId from schedule
+                  const scheduleClassId = 
+                    (schedule.class?._id && schedule.class._id.toString()) || 
+                    (schedule.class?._id?._id && schedule.class._id._id.toString()) ||
+                    (schedule.class?._id?.toString && schedule.class._id.toString()) ||
+                    (schedule.classId && schedule.classId.toString()) || 
+                    (schedule.class?.id && schedule.class.id.toString()) ||
+                    (schedule.classSchedule?.class?._id && schedule.classSchedule.class._id.toString()) ||
+                    (schedule.classSchedule?.class?._id?._id && schedule.classSchedule.class._id._id.toString());
+                  
+                  // Debug logging
+                  if (scheduleClassId && currentClassId) {
+                    console.log(`🔍 [EditClassModal] Comparing classIds for student ${studentId}:`, {
+                      scheduleClassId,
+                      currentClassId,
+                      match: String(scheduleClassId) === String(currentClassId),
+                      scheduleClassName: schedule.class?.name || schedule.className || 'N/A'
+                    });
+                  }
+                  
+                  // Skip schedules from current class
+                  if (scheduleClassId && currentClassId && String(scheduleClassId) === String(currentClassId)) {
+                    console.log(`⏭️ [EditClassModal] Skipping schedule from current class for student ${studentId}`);
+                    return false;
+                  }
+                  return true;
+                });
+                
+                console.log(`✅ [EditClassModal] Student ${studentId} schedules:`, {
+                  total: response.schedules.length,
+                  filtered: filteredSchedules.length,
+                  currentClassId
+                });
+                
+                schedulesMap[String(studentId)] = filteredSchedules;
+              } else if (response && response.data) {
+                const filteredSchedules = response.data.filter(schedule => {
+                  const scheduleClassId = 
+                    (schedule.class?._id && schedule.class._id.toString()) || 
+                    (schedule.class?._id?._id && schedule.class._id._id.toString()) ||
+                    (schedule.class?._id?.toString && schedule.class._id.toString()) ||
+                    (schedule.classId && schedule.classId.toString()) || 
+                    (schedule.class?.id && schedule.class.id.toString()) ||
+                    (schedule.classSchedule?.class?._id && schedule.classSchedule.class._id.toString()) ||
+                    (schedule.classSchedule?.class?._id?._id && schedule.classSchedule.class._id._id.toString());
+                  
+                  if (scheduleClassId && currentClassId && String(scheduleClassId) === String(currentClassId)) {
+                    return false;
+                  }
+                  return true;
+                });
+                
+                schedulesMap[String(studentId)] = filteredSchedules;
+              } else {
+                schedulesMap[String(studentId)] = [];
+              }
+            } catch (error) {
+              console.error(`Error fetching schedule for student ${studentId}:`, error);
+              schedulesMap[String(studentId)] = [];
+            }
+          })
+        );
+
+        setStudentSchedules(schedulesMap);
+        setStudentSchedulesLoading(false);
+      } catch (error) {
+        console.error('Error in fetchStudentSchedules:', error);
+        setStudentSchedules({});
+        setStudentSchedulesLoading(false);
+      }
+    };
+
+    fetchStudentSchedules();
+  }, [
+    classStudents, 
+    generatedSessions, 
+    formData.id, 
+    formData._id, 
+    formData.startDate, 
+    formData.endDate, 
+    filledScheduleEntries, 
+    selectedCourse, 
+    classData,
+    fullClassData,
+    fullClassData?.schedules,
+    classData?.schedules
+  ]);
+
+  // Check for student conflicts
+  const conflictingStudentIds = useMemo(() => {
+    // Get sessions to check - priority: generatedSessions (from edited scheduleEntries) > schedules from database
+    let sessionsToCheck = [];
+    
+    // PRIORITY 1: Use generatedSessions if available (user may have edited scheduleEntries)
+    // This ensures we check conflicts against the NEW schedule, not the old one
+    if (generatedSessions.length > 0) {
+      sessionsToCheck = generatedSessions.map(session => ({
+        date: session.date,
+        startTime: session.startTime,
+        endTime: session.endTime
+      }));
+      console.log('✅ [EditClassModal] Using generatedSessions for conflict detection (from edited scheduleEntries):', sessionsToCheck.length);
+    } else {
+      // PRIORITY 2: Fallback to schedules from database if generatedSessions not available yet
+      // Use fullClassData if available (has schedules), otherwise fallback to classData
+      const dataSource = fullClassData || classData;
+      
+      if (dataSource?.schedules && Array.isArray(dataSource.schedules) && dataSource.schedules.length > 0) {
+        sessionsToCheck = dataSource.schedules
+          .filter(schedule => {
+            const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+            return scheduleDate && schedule.startTime && schedule.endTime;
+          })
+          .map(schedule => {
+            const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+            const date = new Date(scheduleDate);
+            if (isNaN(date.getTime())) return null;
+            return {
+              date: date.toISOString().split('T')[0],
+              startTime: schedule.startTime || schedule.start_time || '08:00',
+              endTime: schedule.endTime || schedule.end_time || '10:00'
+            };
+          })
+          .filter(Boolean); // Remove null entries
+        
+        if (sessionsToCheck.length > 0) {
+          console.log('✅ [EditClassModal] Using schedules from database for conflict detection:', sessionsToCheck.length);
+        }
+      }
+    }
+    
+    if (!sessionsToCheck.length || Object.keys(studentSchedules).length === 0) {
+      return new Map();
+    }
+
+    const conflicts = new Map(); // Map<studentId, Array<conflictDetails>>
+    // Get current class ID - try both id and _id, convert to string for consistent comparison
+    const currentClassIdRaw = formData.id || formData._id || classData?.id || classData?._id;
+    const currentClassId = currentClassIdRaw ? String(currentClassIdRaw) : null;
+    
+    console.log('🔍 [EditClassModal] Checking student conflicts:', {
+      sessionsToCheckCount: sessionsToCheck.length,
+      generatedSessionsCount: generatedSessions.length,
+      studentSchedulesCount: Object.keys(studentSchedules).length,
+      currentClassId,
+      usingFallback: generatedSessions.length === 0 && sessionsToCheck.length > 0
+    });
+
+    // Check each student's schedules
+    Object.entries(studentSchedules).forEach(([studentId, schedules]) => {
+      if (!schedules || schedules.length === 0) return;
+
+      const studentConflicts = [];
+
+      // Check each session against student's schedules
+      sessionsToCheck.forEach((session) => {
+        const sessionDate = session.date;
+        const sessionStart = parseTime(session.startTime);
+        const sessionEnd = parseTime(session.endTime);
+
+        schedules.forEach((schedule) => {
+          // Skip schedules from the current class being edited
+          // Try multiple ways to get classId from schedule
+          const scheduleClassId = 
+            (schedule.class?._id && schedule.class._id.toString()) || 
+            (schedule.class?._id?._id && schedule.class._id._id.toString()) ||
+            (schedule.class?._id?.toString && schedule.class._id.toString()) ||
+            (schedule.classId && schedule.classId.toString()) || 
+            (schedule.class?.id && schedule.class.id.toString()) ||
+            (schedule.classSchedule?.class?._id && schedule.classSchedule.class._id.toString()) ||
+            (schedule.classSchedule?.class?._id?._id && schedule.classSchedule.class._id._id.toString());
+          
+          // Debug logging for conflicts
+          if (scheduleClassId && currentClassId) {
+            console.log(`🔍 [EditClassModal] Conflict check - scheduleClassId:`, scheduleClassId, `currentClassId:`, currentClassId, `match:`, String(scheduleClassId) === String(currentClassId));
+          }
+          
+          if (scheduleClassId && currentClassId && String(scheduleClassId) === String(currentClassId)) {
+            console.log(`⏭️ [EditClassModal] Skipping schedule from current class:`, schedule.class?.name || schedule.className);
+            return; // Skip current class schedules
+          }
+
+          // Get schedule date - handle different response formats
+          const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate || schedule.classSchedule?.date;
+          if (!scheduleDate) return;
+
+          // Format schedule date to YYYY-MM-DD for comparison
+          const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
+
+          // Check if dates match
+          if (scheduleDateStr !== sessionDate) {
+            return;
+          }
+
+          // Check time overlap - handle different response formats
+          const scheduleStart = parseTime(
+            schedule.startTime ||
+            schedule.start_time ||
+            schedule.time?.start ||
+            schedule.classSchedule?.startTime ||
+            schedule.startHour
+          );
+          const scheduleEnd = parseTime(
+            schedule.endTime ||
+            schedule.end_time ||
+            schedule.time?.end ||
+            schedule.classSchedule?.endTime ||
+            schedule.endHour
+          );
+
+          if (!scheduleStart || !scheduleEnd) return;
+
+          const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
+
+          if (hasTimeConflict) {
+            // Get class name - handle different response formats
+            const className = 
+              schedule.className || 
+              schedule.class?.name || 
+              schedule.classSchedule?.class?.name ||
+              'N/A';
+            
+            // Format date for display
+            const displayDate = new Date(scheduleDateStr).toLocaleDateString('vi-VN', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            });
+
+            const conflictDetail = {
+              className,
+              date: displayDate,
+              dateRaw: scheduleDateStr,
+              time: `${scheduleStart} - ${scheduleEnd}`,
+              newClassTime: `${sessionStart} - ${sessionEnd}`
+            };
+
+            studentConflicts.push(conflictDetail);
+
+            console.log('🔴 CONFLICT Student:', {
+              studentId,
+              scheduleId: schedule._id || schedule.id || schedule.classSchedule?._id,
+              className,
+              sessionDate: sessionDate,
+              sessionTime: `${sessionStart} - ${sessionEnd}`,
+              scheduleDate: scheduleDateStr,
+              scheduleTime: `${scheduleStart} - ${scheduleEnd}`
+            });
+          }
+        });
+      });
+
+      if (studentConflicts.length > 0) {
+        conflicts.set(studentId, studentConflicts);
+      }
+    });
+
+    console.log('📋 Conflicting Student IDs:', Array.from(conflicts.keys()));
+    return conflicts;
+  }, [generatedSessions, studentSchedules, formData.id, formData._id, classData, fullClassData, fullClassData?.schedules, classData?.schedules]);
 
   // Filter rooms based on conflicts
   const filteredRooms = useMemo(() => {
@@ -1075,9 +1634,16 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
               <Form.Label className="text-neutral-700 fw-medium mb-8">
                 Thời khóa biểu <span className="text-danger-600">*</span>
               </Form.Label>
-              <p className="text-neutral-500 text-13 mb-0">
-                Thêm nhiều buổi học với ngày và giờ khác nhau (ví dụ: Thứ 2: 08:00-10:00, Thứ 4: 18:00-20:00).
-              </p>
+              {loadingClassData ? (
+                <div className="text-neutral-500 text-13 mb-12 d-flex align-items-center gap-8">
+                  <i className="fas fa-spinner fa-spin"></i>
+                  Đang tải thời khóa biểu từ database...
+                </div>
+              ) : (
+                <p className="text-neutral-500 text-13 mb-0">
+                  Thêm nhiều buổi học với ngày và giờ khác nhau (ví dụ: Thứ 2: 08:00-10:00, Thứ 4: 18:00-20:00).
+                </p>
+              )}
             </Form.Group>
 
             <div className="d-flex flex-column gap-12">
@@ -1293,6 +1859,11 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                 <i className="fas fa-users me-2"></i>
                 Lớp học chưa có học viên nào
               </div>
+            ) : studentSchedulesLoading ? (
+              <div className="text-center text-neutral-500 py-20">
+                <i className="fas fa-spinner fa-spin me-2"></i>
+                Đang kiểm tra xung đột lịch học...
+              </div>
             ) : (
               <div 
                 className="border border-neutral-100 rounded-12 p-16"
@@ -1306,30 +1877,65 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                     const email = student.email || 'N/A';
                     const username = student.username || 'N/A';
                     const phone = student.phone || 'N/A';
+                    const studentConflicts = conflictingStudentIds.get(String(studentId));
+                    const hasConflict = !!studentConflicts;
                     
                     console.log(`🔍 [EditClassModal] RENDER - Student ${index} processed:`, {
                       studentId,
                       displayName,
                       email,
                       username,
-                      phone
+                      phone,
+                      hasConflict
                     });
                     
                     return (
                       <div
                         key={studentId || index}
-                        className="d-flex align-items-center p-12 rounded-8 border border-neutral-100 bg-white"
+                        className={`d-flex align-items-center p-12 rounded-8 border ${
+                          hasConflict 
+                            ? 'border-danger-600 bg-danger-50' 
+                            : 'border-neutral-100 bg-white'
+                        }`}
                       >
-                        <div className="d-flex align-items-center justify-content-center bg-main-100 text-main-600 rounded-circle me-12" 
+                        <div className={`d-flex align-items-center justify-content-center rounded-circle me-12 ${
+                          hasConflict 
+                            ? 'bg-danger-100 text-danger-600' 
+                            : 'bg-main-100 text-main-600'
+                        }`}
                              style={{ width: '40px', height: '40px', fontSize: '16px', fontWeight: 'bold' }}>
                           {index + 1}
                         </div>
                         <div className="flex-grow-1">
-                          <div className="fw-medium text-neutral-900 text-14">
-                            {displayName}
+                          <div className="d-flex align-items-center gap-8">
+                            <div className="fw-medium text-neutral-900 text-14">
+                              {displayName}
+                            </div>
+                            {hasConflict && (
+                              <span 
+                                className="badge bg-danger-600 text-white px-8 py-4 radius-4 text-11 fw-semibold"
+                                title="Học viên này có lịch học trùng giờ với lớp đang chỉnh sửa"
+                              >
+                                <i className="fas fa-exclamation-triangle me-1"></i>
+                                Trùng giờ
+                              </span>
+                            )}
                           </div>
-                          <div className="text-neutral-500 text-12">
+                          <div className={`text-12 ${hasConflict ? 'text-danger-700' : 'text-neutral-500'}`}>
                             {email} {username && `• ${username}`} {phone && phone !== 'N/A' && `• ${phone}`}
+                            {hasConflict && studentConflicts && (
+                              <div className="text-danger-600 text-11 mt-4">
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Trùng giờ với:</strong>
+                                <div className="mt-2 ms-12">
+                                  {studentConflicts.map((conflict, idx) => (
+                                    <div key={idx} className="mb-2">
+                                      • <strong>{conflict.className}</strong> - {conflict.date} ({conflict.time})
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1342,7 +1948,20 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
             <Form.Text className="text-neutral-500 text-12 mt-8">
               <i className="fas fa-info-circle me-1"></i>
               Tổng số học viên: {classStudents.length}
+              {!studentSchedulesLoading && conflictingStudentIds.size === 0 && classStudents.length > 0 && (
+                <span className="ms-2 text-success-600">
+                  <i className="fas fa-check-circle me-1"></i>
+                  Không có xung đột lịch học
+                </span>
+              )}
             </Form.Text>
+            {!studentSchedulesLoading && conflictingStudentIds.size > 0 && (
+              <Alert variant="warning" className="mt-12 mb-0">
+                <i className="fas fa-exclamation-triangle me-2"></i>
+                <strong>Cảnh báo:</strong> Có {conflictingStudentIds.size} học viên bị trùng giờ học với lớp đang chỉnh sửa. 
+                Vui lòng kiểm tra lại lịch học của các học viên này (xem chi tiết bên trên).
+              </Alert>
+            )}
           </div>
         </Modal.Body>
 

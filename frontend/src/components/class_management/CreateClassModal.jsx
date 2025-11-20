@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 import scheduleService from '../../services/scheduleService';
 import roomService from '../../services/roomService';
 import teacherService from '../../services/teacherService';
 import studentService from '../../services/studentService';
+import SelectStudentModal from './SelectStudentModal';
 
 const createEmptyScheduleEntry = () => ({
   id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -40,11 +42,16 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   const [teachers, setTeachers] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [students, setStudents] = useState([]);
-  const [studentSearchTerm, setStudentSearchTerm] = useState('');
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [studentsError, setStudentsError] = useState(null);
+  const [showSelectStudentModal, setShowSelectStudentModal] = useState(false);
+  const [importingExcel, setImportingExcel] = useState(false);
+  const [showImportResultModal, setShowImportResultModal] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const fileInputRef = useRef(null);
 
   const [teacherSchedules, setTeacherSchedules] = useState({}); // Map teacherId -> schedules
+  const [studentSchedules, setStudentSchedules] = useState({}); // Map studentId -> schedules
   const [existingSchedules, setExistingSchedules] = useState(() => {
     // Mock data để test conflict checking - CHỈ DÙNG KHI USE_MOCK_DATA = true
     // Trong production, dữ liệu sẽ được fetch từ API
@@ -217,6 +224,195 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         };
       }
     });
+  };
+
+  const handleRemoveStudent = (studentId) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedStudents: prev.selectedStudents.filter(id => id !== studentId)
+    }));
+  };
+
+  const handleStudentsConfirmed = (selectedStudentIds) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedStudents: selectedStudentIds
+    }));
+  };
+
+  // Normalize phone number for matching (remove spaces, +, -, etc.)
+  const normalizePhone = (phone) => {
+    if (!phone) return '';
+    return phone.toString().replace(/[\s\+\-\(\)]/g, '');
+  };
+
+  // Handle Excel import button click
+  const handleExcelImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Handle Excel file selection and processing
+  const handleExcelFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
+    const isValidType = validTypes.includes(file.type) || 
+                       file.name.endsWith('.xlsx') || 
+                       file.name.endsWith('.xls');
+
+    if (!isValidType) {
+      setImportResult({
+        success: 0,
+        notFound: [],
+        total: 0,
+        error: 'Vui lòng chọn file Excel (.xlsx hoặc .xls)'
+      });
+      setShowImportResultModal(true);
+      e.target.value = '';
+      return;
+    }
+
+    setImportingExcel(true);
+
+    try {
+      // Read file as array buffer
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+
+      // Get first sheet
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        setImportResult({
+          success: 0,
+          notFound: [],
+          total: 0,
+          error: 'File Excel không có sheet nào'
+        });
+        setShowImportResultModal(true);
+        e.target.value = '';
+        return;
+      }
+
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+
+      if (!worksheet) {
+        setImportResult({
+          success: 0,
+          notFound: [],
+          total: 0,
+          error: 'Sheet đầu tiên không có dữ liệu'
+        });
+        setShowImportResultModal(true);
+        e.target.value = '';
+        return;
+      }
+
+      // Convert to JSON (array of objects)
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+        header: 1, 
+        defval: '' 
+      });
+
+      if (!jsonData || jsonData.length === 0) {
+        setImportResult({
+          success: 0,
+          notFound: [],
+          total: 0,
+          error: 'File Excel không có dữ liệu'
+        });
+        setShowImportResultModal(true);
+        e.target.value = '';
+        return;
+      }
+
+      // Extract emails/phones from first column (skip header row)
+      const emailsOrPhones = [];
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        if (row && row[0]) {
+          const value = String(row[0]).trim();
+          if (value) {
+            emailsOrPhones.push(value);
+          }
+        }
+      }
+
+      if (emailsOrPhones.length === 0) {
+        setImportResult({
+          success: 0,
+          notFound: [],
+          total: 0,
+          error: 'Không tìm thấy email hoặc số điện thoại nào trong file Excel'
+        });
+        setShowImportResultModal(true);
+        e.target.value = '';
+        return;
+      }
+
+      // Match students by email or phone
+      const matchedStudentIds = [];
+      const notFound = [];
+
+      emailsOrPhones.forEach((value) => {
+        const normalizedValue = value.toLowerCase().trim();
+        const normalizedPhone = normalizePhone(value);
+
+        const foundStudent = students.find((student) => {
+          const studentEmail = (student.email || '').toLowerCase().trim();
+          const studentPhone = normalizePhone(student.phone || '');
+
+          return studentEmail === normalizedValue || 
+                 studentPhone === normalizedPhone;
+        });
+
+        if (foundStudent) {
+          const studentId = foundStudent._id || foundStudent.id;
+          if (studentId && !matchedStudentIds.includes(String(studentId))) {
+            matchedStudentIds.push(String(studentId));
+          }
+        } else {
+          notFound.push(value);
+        }
+      });
+
+      // Add matched students to selectedStudents (avoid duplicates)
+      if (matchedStudentIds.length > 0) {
+        setFormData(prev => {
+          const currentSelected = prev.selectedStudents || [];
+          const newSelected = [...new Set([...currentSelected, ...matchedStudentIds])];
+          return {
+            ...prev,
+            selectedStudents: newSelected
+          };
+        });
+      }
+
+      // Show results in modal
+      setImportResult({
+        success: matchedStudentIds.length,
+        notFound: notFound,
+        total: emailsOrPhones.length
+      });
+      setShowImportResultModal(true);
+
+    } catch (error) {
+      console.error('Error reading Excel file:', error);
+      setImportResult({
+        success: 0,
+        notFound: [],
+        total: 0,
+        error: 'Lỗi khi đọc file Excel: ' + (error.message || 'Vui lòng thử lại')
+      });
+      setShowImportResultModal(true);
+    } finally {
+      setImportingExcel(false);
+      e.target.value = ''; // Reset file input
+    }
   };
 
   // Auto-fetch band when program and level are selected
@@ -998,6 +1194,52 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     fetchTeacherSchedules();
   }, [teachers, generatedSessions]);
 
+  // Fetch student schedules - need to get all schedules for conflict checking
+  useEffect(() => {
+    const fetchStudentSchedules = async () => {
+      if (!formData.selectedStudents.length || !generatedSessions.length) {
+        setStudentSchedules({});
+        return;
+      }
+
+      const schedulesMap = {};
+      
+      // Get date range from generated sessions
+      const sessionDates = generatedSessions.map(s => s.date).sort();
+      const minDate = sessionDates[0];
+      const maxDate = sessionDates[sessionDates.length - 1];
+      
+      // Fetch schedules for each selected student
+      await Promise.all(
+        formData.selectedStudents.map(async (studentId) => {
+          if (!studentId) return;
+
+          try {
+            const response = await studentService.getStudentSchedule(studentId, {
+              startDate: minDate,
+              endDate: maxDate
+            });
+            
+            if (response && response.schedules) {
+              schedulesMap[String(studentId)] = response.schedules;
+            } else if (response && response.data) {
+              schedulesMap[String(studentId)] = response.data;
+            } else {
+              schedulesMap[String(studentId)] = [];
+            }
+          } catch (error) {
+            console.error(`Error fetching schedule for student ${studentId}:`, error);
+            schedulesMap[String(studentId)] = [];
+          }
+        })
+      );
+
+      setStudentSchedules(schedulesMap);
+    };
+
+    fetchStudentSchedules();
+  }, [formData.selectedStudents, generatedSessions]);
+
   const conflictingTeacherIds = useMemo(() => {
     if (!generatedSessions.length || Object.keys(teacherSchedules).length === 0) {
       return new Set();
@@ -1051,6 +1293,106 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     console.log('📋 Conflicting Teacher IDs:', Array.from(conflicts));
     return conflicts;
   }, [generatedSessions, teacherSchedules]);
+
+  const conflictingStudentIds = useMemo(() => {
+    if (!generatedSessions.length || Object.keys(studentSchedules).length === 0) {
+      return new Map();
+    }
+
+    const conflicts = new Map(); // Map<studentId, Array<conflictDetails>>
+
+    // Check each student's schedules
+    Object.entries(studentSchedules).forEach(([studentId, schedules]) => {
+      if (!schedules || schedules.length === 0) return;
+
+      const studentConflicts = [];
+
+      // Check each generated session against student's schedules
+      generatedSessions.forEach((session) => {
+        const sessionDate = session.date;
+        const sessionStart = parseTime(session.startTime);
+        const sessionEnd = parseTime(session.endTime);
+
+        schedules.forEach((schedule) => {
+          // Get schedule date - handle different response formats
+          const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate || schedule.classSchedule?.date;
+          if (!scheduleDate) return;
+
+          // Format schedule date to YYYY-MM-DD for comparison
+          const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
+
+          // Check if dates match
+          if (scheduleDateStr !== sessionDate) {
+            return;
+          }
+
+          // Check time overlap - handle different response formats
+          const scheduleStart = parseTime(
+            schedule.startTime ||
+            schedule.start_time ||
+            schedule.time?.start ||
+            schedule.classSchedule?.startTime ||
+            schedule.startHour
+          );
+          const scheduleEnd = parseTime(
+            schedule.endTime ||
+            schedule.end_time ||
+            schedule.time?.end ||
+            schedule.classSchedule?.endTime ||
+            schedule.endHour
+          );
+
+          if (!scheduleStart || !scheduleEnd) return;
+
+          const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
+
+          if (hasTimeConflict) {
+            // Get class name - handle different response formats
+            const className = 
+              schedule.className || 
+              schedule.class?.name || 
+              schedule.classSchedule?.class?.name ||
+              'N/A';
+            
+            // Format date for display
+            const displayDate = new Date(scheduleDateStr).toLocaleDateString('vi-VN', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            });
+
+            const conflictDetail = {
+              className,
+              date: displayDate,
+              dateRaw: scheduleDateStr,
+              time: `${scheduleStart} - ${scheduleEnd}`,
+              newClassTime: `${sessionStart} - ${sessionEnd}`
+            };
+
+            studentConflicts.push(conflictDetail);
+
+            console.log('🔴 CONFLICT Student:', {
+              studentId,
+              scheduleId: schedule._id || schedule.id || schedule.classSchedule?._id,
+              className,
+              sessionDate: sessionDate,
+              sessionTime: `${sessionStart} - ${sessionEnd}`,
+              scheduleDate: scheduleDateStr,
+              scheduleTime: `${scheduleStart} - ${scheduleEnd}`
+            });
+          }
+        });
+      });
+
+      if (studentConflicts.length > 0) {
+        conflicts.set(studentId, studentConflicts);
+      }
+    });
+
+    console.log('📋 Conflicting Student IDs:', Array.from(conflicts.keys()));
+    return conflicts;
+  }, [generatedSessions, studentSchedules]);
 
   const filteredRooms = useMemo(() => {
     if (!generatedSessions.length || !existingSchedules.length) {
@@ -1128,46 +1470,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     return filtered;
   }, [generatedSessions, teacherSchedules, teachers, conflictingTeacherIds]);
 
-  const filteredStudentList = useMemo(() => {
-    if (!studentSearchTerm) {
-      return students;
-    }
-
-    const searchLower = studentSearchTerm.toLowerCase();
-    return students.filter(student => {
-      const fullName = (student.fullName || '').toLowerCase();
-      const email = (student.email || '').toLowerCase();
-      const username = (student.username || '').toLowerCase();
-      
-      return fullName.includes(searchLower) || 
-             email.includes(searchLower) || 
-             username.includes(searchLower);
-    });
-  }, [students, studentSearchTerm]);
-
-  const handleSelectAllStudents = () => {
-    const filteredStudents = filteredStudentList;
-    const allSelected = filteredStudents.every(student => {
-      const studentId = student._id || student.id;
-      return formData.selectedStudents.includes(studentId);
-    });
-
-    if (allSelected) {
-      // Deselect all filtered students
-      const filteredIds = filteredStudents.map(student => student._id || student.id);
-      setFormData(prev => ({
-        ...prev,
-        selectedStudents: prev.selectedStudents.filter(id => !filteredIds.includes(id))
-      }));
-    } else {
-      // Select all filtered students
-      const filteredIds = filteredStudents.map(student => student._id || student.id);
-      setFormData(prev => ({
-        ...prev,
-        selectedStudents: [...new Set([...prev.selectedStudents, ...filteredIds])]
-      }));
-    }
-  };
 
   useEffect(() => {
     if (
@@ -1560,100 +1862,157 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
           {/* Students Selection */}
           <div className="mb-24">
-            <h5 className="text-neutral-900 fw-semibold mb-16 pb-12 border-bottom border-neutral-100">
-              Học viên
-            </h5>
+            <div className="d-flex justify-content-between align-items-center mb-16 pb-12 border-bottom border-neutral-100">
+              <h5 className="text-neutral-900 fw-semibold mb-0">
+                Học viên
+              </h5>
+              {formData.selectedStudents && formData.selectedStudents.length > 0 && (
+                <span className="badge bg-main-600 text-white px-16 py-8 radius-8 text-14 fw-semibold">
+                  Tổng cộng: {formData.selectedStudents.length} học viên
+                </span>
+              )}
+            </div>
             
             <div className="mb-16">
               <div className="d-flex justify-content-between align-items-center mb-12">
                 <Form.Label className="text-neutral-700 fw-medium mb-0">
-                  Chọn học viên cho lớp học
+                  Danh sách học viên đã chọn
                 </Form.Label>
-                <div className="d-flex align-items-center gap-12">
-                  {formData.selectedStudents && formData.selectedStudents.length > 0 && (
-                    <span className="badge bg-main-600 text-white px-12 py-6 radius-8">
-                      Đã chọn: {formData.selectedStudents.length}
-                    </span>
-                  )}
-                  {filteredStudentList.length > 0 && (
-                    <Button
-                      type="button"
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={handleSelectAllStudents}
-                      className="text-13 fw-medium px-12 py-6 radius-8"
-                    >
-                      {filteredStudentList.every(student => {
-                        const studentId = student._id || student.id;
-                        return formData.selectedStudents.includes(studentId);
-                      }) ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
-                    </Button>
-                  )}
+                <div className="d-flex gap-8">
+                  <Button
+                    type="button"
+                    variant="outline-success"
+                    size="sm"
+                    onClick={handleExcelImport}
+                    disabled={importingExcel}
+                    className="text-13 fw-medium px-16 py-8 radius-8"
+                  >
+                    <i className={`fas ${importingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'} me-2`}></i>
+                    {importingExcel ? 'Đang xử lý...' : 'Import từ Excel'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={() => setShowSelectStudentModal(true)}
+                    className="text-13 fw-medium px-16 py-8 radius-8"
+                  >
+                    <i className="fas fa-plus me-2"></i>
+                    Thêm học viên
+                  </Button>
                 </div>
               </div>
 
-              <Form.Control
-                type="text"
-                placeholder="Tìm kiếm học viên theo tên, email hoặc username..."
-                value={studentSearchTerm}
-                onChange={(e) => setStudentSearchTerm(e.target.value)}
-                className="border-neutral-30 radius-8 px-16 py-10 mb-12"
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                onChange={handleExcelFileChange}
+                style={{ display: 'none' }}
               />
 
               <div 
                 className="border border-neutral-100 rounded-12 p-16"
                 style={{ maxHeight: '300px', overflowY: 'auto' }}
               >
-                {studentsLoading ? (
-                  <div className="text-center text-neutral-500 py-20">
-                    <i className="fas fa-spinner fa-spin me-2"></i>
-                    Đang tải danh sách học viên...
-                  </div>
-                ) : studentsError ? (
-                  <div className="text-center py-20">
-                    <Alert variant="warning" className="mb-0">
-                      <i className="fas fa-exclamation-triangle me-2"></i>
-                      {studentsError}
-                    </Alert>
-                  </div>
-                ) : filteredStudentList.length === 0 ? (
-                  <div className="text-center text-neutral-500 py-20">
-                    {studentSearchTerm ? 'Không tìm thấy học viên nào phù hợp với từ khóa tìm kiếm' : 'Không có học viên nào trong hệ thống'}
+                {formData.selectedStudents.length === 0 ? (
+                  <div className="text-center text-neutral-500 py-40">
+                    <i className="fas fa-user-slash fa-2x mb-12 text-neutral-300"></i>
+                    <div className="text-14">Chưa có học viên nào được chọn</div>
+                    <div className="text-12 mt-4">Nhấn "Thêm học viên" để chọn học viên cho lớp học</div>
                   </div>
                 ) : (
                   <div className="d-flex flex-column gap-8">
-                    {filteredStudentList.map(student => {
-                      const studentId = student._id || student.id;
-                      const isSelected = formData.selectedStudents.includes(studentId);
-                      // User model không có fullName, sử dụng username hoặc email làm tên hiển thị
+                    {formData.selectedStudents.map(selectedStudentId => {
+                      // Find student details from the students list
+                      const student = students.find(s => {
+                        const studentId = s._id || s.id;
+                        return String(studentId) === String(selectedStudentId);
+                      });
+                      
+                      if (!student) {
+                        // If student not found in list, show placeholder
+                        return (
+                          <div
+                            key={selectedStudentId}
+                            className="d-flex align-items-center justify-content-between p-12 rounded-8 border border-neutral-100 bg-neutral-25"
+                          >
+                            <div className="flex-grow-1">
+                              <div className="fw-medium text-neutral-600 text-14">
+                                Đang tải thông tin...
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline-danger"
+                              size="sm"
+                              onClick={() => handleRemoveStudent(selectedStudentId)}
+                              className="text-12 fw-medium px-12 py-6 radius-8"
+                            >
+                              <i className="fas fa-times"></i>
+                            </Button>
+                          </div>
+                        );
+                      }
+                      
                       const displayName = student.fullName || student.name || student.username || student.email || 'N/A';
                       const email = student.email || 'N/A';
                       const username = student.username || 'N/A';
+                      const studentConflicts = conflictingStudentIds.get(String(selectedStudentId));
+                      const hasConflict = !!studentConflicts;
                       
                       return (
                         <div
-                          key={studentId}
-                          className={`d-flex align-items-center p-12 rounded-8 border border-neutral-100 cursor-pointer transition-2 ${
-                            isSelected ? 'bg-main-50 border-main-200' : 'bg-white hover:bg-neutral-25'
+                          key={selectedStudentId}
+                          className={`d-flex align-items-center justify-content-between p-12 rounded-8 border ${
+                            hasConflict 
+                              ? 'border-danger-600 bg-danger-50' 
+                              : 'border-main-200 bg-main-50'
                           }`}
-                          onClick={() => handleStudentToggle(studentId)}
-                          style={{ cursor: 'pointer' }}
                         >
-                          <Form.Check
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => handleStudentToggle(studentId)}
-                            className="me-12"
-                            onClick={(e) => e.stopPropagation()}
-                          />
                           <div className="flex-grow-1">
-                            <div className="fw-medium text-neutral-900 text-14">
-                              {displayName}
+                            <div className="d-flex align-items-center gap-8">
+                              <div className="fw-medium text-neutral-900 text-14">
+                                {displayName}
+                              </div>
+                              {hasConflict && (
+                                <span 
+                                  className="badge bg-danger-600 text-white px-8 py-4 radius-4 text-11 fw-semibold"
+                                  title="Học viên này có lịch học trùng giờ với lớp đang tạo"
+                                >
+                                  <i className="fas fa-exclamation-triangle me-1"></i>
+                                  Trùng giờ
+                                </span>
+                              )}
                             </div>
-                            <div className="text-neutral-500 text-12">
+                            <div className={`text-12 ${hasConflict ? 'text-danger-700' : 'text-neutral-500'}`}>
                               {email} • {username}
+                              {hasConflict && studentConflicts && (
+                                <div className="text-danger-600 text-11 mt-4">
+                                  <i className="fas fa-info-circle me-1"></i>
+                                  <strong>Trùng giờ với:</strong>
+                                  <div className="mt-2 ms-12">
+                                    {studentConflicts.map((conflict, idx) => (
+                                      <div key={idx} className="mb-2">
+                                        • <strong>{conflict.className}</strong> - {conflict.date} ({conflict.time})
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
+                          <Button
+                            type="button"
+                            variant="outline-danger"
+                            size="sm"
+                            onClick={() => handleRemoveStudent(selectedStudentId)}
+                            className="text-12 fw-medium px-12 py-6 radius-8"
+                            title="Xóa học viên khỏi danh sách"
+                          >
+                            <i className="fas fa-times"></i>
+                          </Button>
                         </div>
                       );
                     })}
@@ -1663,8 +2022,15 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
               <Form.Text className="text-neutral-500 text-12 mt-8">
                 <i className="fas fa-info-circle me-1"></i>
-                Chọn học viên để thêm vào lớp học. Có thể thêm học viên sau khi tạo lớp.
+                Có thể thêm học viên sau khi tạo lớp. File Excel cần có cột đầu tiên chứa Email hoặc Số điện thoại của học viên.
               </Form.Text>
+              {conflictingStudentIds.size > 0 && (
+                <Alert variant="warning" className="mt-12 mb-0">
+                  <i className="fas fa-exclamation-triangle me-2"></i>
+                  <strong>Cảnh báo:</strong> Có {conflictingStudentIds.size} học viên bị trùng giờ học với lớp đang tạo. 
+                  Vui lòng kiểm tra lại lịch học của các học viên này (xem chi tiết bên trên).
+                </Alert>
+              )}
             </div>
           </div>
 
@@ -1687,6 +2053,88 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           </Button>
         </Modal.Footer>
       </Form>
+
+      {/* Select Student Modal */}
+      <SelectStudentModal
+        show={showSelectStudentModal}
+        onClose={() => setShowSelectStudentModal(false)}
+        onConfirm={handleStudentsConfirmed}
+        initialSelectedStudents={formData.selectedStudents}
+        generatedSessions={generatedSessions}
+      />
+
+      {/* Import Result Modal */}
+      <Modal 
+        show={showImportResultModal} 
+        onHide={() => setShowImportResultModal(false)} 
+        centered
+        size="md"
+      >
+        <Modal.Header closeButton className="bg-main-600 text-white border-0 p-24">
+          <Modal.Title className="fw-bold">
+            <i className="fas fa-file-excel me-2"></i>
+            Kết quả Import Excel
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-24">
+          {importResult?.error ? (
+            <Alert variant="danger" className="mb-0">
+              <i className="fas fa-exclamation-circle me-2"></i>
+              {importResult.error}
+            </Alert>
+          ) : (
+            <>
+              {importResult?.success > 0 && (
+                <Alert variant="success" className="mb-16">
+                  <i className="fas fa-check-circle me-2"></i>
+                  <strong>Đã import thành công {importResult.success} học viên</strong>
+                </Alert>
+              )}
+              
+              {importResult?.success === 0 && importResult?.total > 0 && (
+                <Alert variant="warning" className="mb-16">
+                  <i className="fas fa-exclamation-triangle me-2"></i>
+                  <strong>Không tìm thấy học viên nào phù hợp trong hệ thống</strong>
+                </Alert>
+              )}
+
+              {importResult?.notFound && importResult.notFound.length > 0 && (
+                <div className="mb-0">
+                  <div className="text-neutral-700 fw-medium mb-8">
+                    <i className="fas fa-info-circle me-2"></i>
+                    Không tìm thấy {importResult.notFound.length} học viên:
+                  </div>
+                  <div 
+                    className="border border-neutral-100 rounded-8 p-12 bg-neutral-25"
+                    style={{ maxHeight: '200px', overflowY: 'auto' }}
+                  >
+                    <div className="d-flex flex-column gap-4">
+                      {importResult.notFound.slice(0, 20).map((item, index) => (
+                        <div key={index} className="text-neutral-600 text-13">
+                          • {item}
+                        </div>
+                      ))}
+                      {importResult.notFound.length > 20 && (
+                        <div className="text-neutral-500 text-12 mt-4">
+                          ... và {importResult.notFound.length - 20} học viên khác
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="bg-neutral-25 border-0 p-20">
+          <Button 
+            className="btn-main text-15 fw-semibold px-24 py-10 radius-8"
+            onClick={() => setShowImportResultModal(false)}
+          >
+            <i className="fas fa-check me-2"></i> OK
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Modal>
   );
 };

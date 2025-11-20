@@ -539,6 +539,16 @@ exports.deleteClass = async (req, res) => {
       });
     }
     
+    // Only allow deletion of classes with "pending" status
+    if (classData.status !== 'pending') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: `Chỉ có thể xóa lớp học ở trạng thái "Chờ khai giảng". Lớp học này đang ở trạng thái "${classData.status === 'active' ? 'Đang học' : classData.status === 'completed' ? 'Đã hoàn thành' : 'Đã hủy'}"`
+      });
+    }
+    
     // Find all ClassSchedules for this class
     const classSchedules = await ClassSchedule.find({ class: classId }).session(session).select('_id');
     const classScheduleIds = classSchedules.map(schedule => schedule._id);

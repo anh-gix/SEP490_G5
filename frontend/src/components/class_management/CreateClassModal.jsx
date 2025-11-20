@@ -51,6 +51,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   const [showImportResultModal, setShowImportResultModal] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [capacityWarning, setCapacityWarning] = useState(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const fileInputRef = useRef(null);
 
   const [teacherSchedules, setTeacherSchedules] = useState({}); // Map teacherId -> schedules
@@ -644,7 +646,15 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     
     // Validation
     if (!formData.name || !formData.level || !formData.program) {
-      alert('Vui lòng điền đầy đủ thông tin bắt buộc!');
+      setErrorMessage('Vui lòng điền đầy đủ thông tin bắt buộc (tên lớp, chương trình, cấp độ)!');
+      setShowErrorModal(true);
+      return;
+    }
+
+    // Validate teacher is selected
+    if (!formData.teacherId) {
+      setErrorMessage('Vui lòng chọn giáo viên!');
+      setShowErrorModal(true);
       return;
     }
 
@@ -652,7 +662,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       formData.scheduleEntries.length === 0 ||
       formData.scheduleEntries.some(entry => !entry.day)
     ) {
-      alert('Vui lòng chọn ít nhất 1 ngày học và điền đủ thời gian!');
+      setErrorMessage('Vui lòng chọn ít nhất 1 ngày học và điền đủ thời gian!');
+      setShowErrorModal(true);
       return;
     }
 
@@ -661,7 +672,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         entry => entry.startTime >= entry.endTime
       )
     ) {
-      alert('Giờ bắt đầu phải nhỏ hơn giờ kết thúc!');
+      setErrorMessage('Giờ bắt đầu phải nhỏ hơn giờ kết thúc!');
+      setShowErrorModal(true);
       return;
     }
 
@@ -669,7 +681,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     const duplicateIndices = checkDuplicateEntries(formData.scheduleEntries);
     if (duplicateIndices.length > 0) {
       setScheduleEntriesError('Có các buổi học trùng lặp. Vui lòng kiểm tra lại ngày và giờ học.');
-      alert('Có các buổi học trùng lặp. Vui lòng kiểm tra lại ngày và giờ học.');
+      setErrorMessage('Có các buổi học trùng lặp. Vui lòng kiểm tra lại ngày và giờ học.');
+      setShowErrorModal(true);
       return;
     }
     setScheduleEntriesError(null);
@@ -677,14 +690,16 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     // Validate start date is not in the past
     const today = getTodayDate();
     if (formData.startDate && formData.startDate < today) {
-      alert('Ngày khai giảng không được là quá khứ!');
       setDateError('Ngày khai giảng không được là quá khứ!');
+      setErrorMessage('Ngày khai giảng không được là quá khứ!');
+      setShowErrorModal(true);
       return;
     }
 
     // Validate course is selected
     if (!formData.course) {
-      alert('Vui lòng chọn course!');
+      setErrorMessage('Vui lòng chọn course!');
+      setShowErrorModal(true);
       return;
     }
 
@@ -696,7 +711,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         const studentCount = (formData.selectedStudents || []).length;
         
         if (roomCapacity && studentCount > roomCapacity) {
-          alert(`Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`);
+          setErrorMessage(`Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`);
+          setShowErrorModal(true);
           return;
         }
       }
@@ -1861,13 +1877,16 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             <div className="row g-3">
               <div className="col-md-6">
                 <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">Giáo viên</Form.Label>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">
+                    Giáo viên <span className="text-danger-600">*</span>
+                  </Form.Label>
                   <Form.Select
                     name="teacherId"
                     value={formData.teacherId}
                     onChange={handleInputChange}
                     className="border-neutral-30 radius-8 px-16 py-10"
                     disabled={teachers.length === 0}
+                    required
                   >
                     <option value="">-- Chọn giáo viên --</option>
                     {teachers.length === 0 ? (
@@ -2245,6 +2264,41 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             onClick={() => setShowImportResultModal(false)}
           >
             <i className="fas fa-check me-2"></i> OK
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Error Modal - Modal lỗi chung cho tạo class */}
+      <Modal 
+        show={showErrorModal} 
+        onHide={() => setShowErrorModal(false)} 
+        centered
+        size="md"
+      >
+        <Modal.Header closeButton className="bg-danger-600 text-white border-0 p-24">
+          <Modal.Title className="fw-bold">
+            <i className="fas fa-exclamation-triangle me-2"></i>
+            Lỗi tạo lớp học
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-24">
+          <Alert variant="danger" className="mb-0">
+            <div className="d-flex align-items-start">
+              <i className="fas fa-exclamation-circle me-3 mt-1" style={{ fontSize: '20px' }}></i>
+              <div className="flex-grow-1">
+                <p className="mb-0 fw-medium" style={{ fontSize: '15px' }}>
+                  {errorMessage}
+                </p>
+              </div>
+            </div>
+          </Alert>
+        </Modal.Body>
+        <Modal.Footer className="bg-neutral-25 border-0 p-20">
+          <Button 
+            className="btn-danger text-15 fw-semibold px-24 py-10 radius-8"
+            onClick={() => setShowErrorModal(false)}
+          >
+            <i className="fas fa-check me-2"></i> Đã hiểu
           </Button>
         </Modal.Footer>
       </Modal>

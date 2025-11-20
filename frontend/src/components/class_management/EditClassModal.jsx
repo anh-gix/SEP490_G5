@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
 import axios from 'axios';
 import classService from '../../services/classService';
+import teacherService from '../../services/teacherService';
+import roomService from '../../services/roomService';
+import scheduleService from '../../services/scheduleService';
 
 const createEmptyScheduleEntry = () => ({
   id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -31,6 +34,13 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [classStudents, setClassStudents] = useState([]);
   const [studentsFetched, setStudentsFetched] = useState(false);
+  const [teachers, setTeachers] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [dateError, setDateError] = useState('');
+  const [teacherSchedules, setTeacherSchedules] = useState({}); // Map teacherId -> schedules
+  const [existingSchedules, setExistingSchedules] = useState([]);
+  const [roomLoading, setRoomLoading] = useState(false);
+  const [roomError, setRoomError] = useState(null);
 
   useEffect(() => {
     // Reset studentsFetched when classData changes
@@ -241,17 +251,454 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
     fetchStudentsFromAPI();
   }, [classData?.id, classData?._id, studentsFetched]);
 
-  const teachers = [
-    { id: 1, name: 'Nguyễn Văn A' },
-    { id: 2, name: 'Trần Thị B' },
-    { id: 3, name: 'Lê Văn C' }
-  ];
+  // Fetch teachers from API
+  useEffect(() => {
+    const fetchTeachers = async () => {
+      try {
+        console.log('🔍 [EditClassModal] Fetching teachers...');
+        const response = await teacherService.getAllTeachers();
+        console.log('📋 [EditClassModal] Teachers API Response:', response);
+        
+        if (response && (response.teachers || response.data)) {
+          const fetchedTeachers = response.teachers || response.data || [];
+          console.log('📋 [EditClassModal] Fetched teachers count:', fetchedTeachers.length);
+          setTeachers(fetchedTeachers);
+        } else {
+          console.warn('⚠️ [EditClassModal] API response không có teachers hoặc data field:', response);
+          setTeachers([]);
+        }
+      } catch (error) {
+        console.error('❌ [EditClassModal] Lỗi khi fetch teachers:', error);
+        setTeachers([]);
+      }
+    };
 
-  const rooms = [
-    { id: 1, name: 'Room 101', capacity: 30 },
-    { id: 2, name: 'Room 102', capacity: 25 },
-    { id: 3, name: 'Room 201', capacity: 20 }
-  ];
+    fetchTeachers();
+  }, []);
+
+  // Fetch rooms from API
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        console.log('🔍 [EditClassModal] Fetching rooms...');
+        const response = await roomService.getAllRooms();
+        console.log('📋 [EditClassModal] Rooms API Response:', response);
+        
+        if (response && (response.rooms || response.data)) {
+          const fetchedRooms = response.rooms || response.data || [];
+          console.log('📋 [EditClassModal] Fetched rooms count:', fetchedRooms.length);
+          setRooms(fetchedRooms);
+        } else {
+          console.warn('⚠️ [EditClassModal] API response không có rooms hoặc data field:', response);
+          setRooms([]);
+        }
+      } catch (error) {
+        console.error('❌ [EditClassModal] Lỗi khi fetch rooms:', error);
+        setRooms([]);
+      }
+    };
+
+    fetchRooms();
+  }, []);
+
+  // Fetch existing schedules for conflict checking
+  useEffect(() => {
+    const fetchExistingSchedules = async () => {
+      try {
+        setRoomLoading(true);
+        setRoomError(null);
+        const response = await scheduleService.getAllSchedules();
+        
+        if (response) {
+          const fetched =
+            Array.isArray(response.schedules) && response.schedules.length > 0
+              ? response.schedules
+              : Array.isArray(response.data) && response.data.length > 0
+                ? response.data
+                : null;
+          
+          if (fetched) {
+            setExistingSchedules(fetched);
+          }
+        }
+      } catch (error) {
+        console.error('❌ [EditClassModal] Error fetching existing schedules:', error);
+        setExistingSchedules([]);
+      } finally {
+        setRoomLoading(false);
+      }
+    };
+
+    fetchExistingSchedules();
+  }, []);
+
+  // Helper functions for conflict checking (same as CreateClassModal)
+  // These must be defined before useMemo hooks that use them
+  const parseTime = (time) => {
+    if (!time) return null;
+    return time.length === 5 ? time : time.slice(0, 5);
+  };
+
+  const hasTimeOverlap = (startA, endA, startB, endB) => {
+    if (!startA || !endA || !startB || !endB) return false;
+    return startA < endB && startB < endA;
+  };
+
+  // Convert day string to day of week number (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+  const getDayOfWeekNumber = (dayStr) => {
+    const dayMap = {
+      'CN': 0,
+      '2': 1,
+      '3': 2,
+      '4': 3,
+      '5': 4,
+      '6': 5,
+      '7': 6
+    };
+    return dayMap[dayStr] !== undefined ? dayMap[dayStr] : null;
+  };
+
+  // Find the next occurrence of a day of week from a start date
+  const findNextDayOfWeek = (startDate, targetDayOfWeek) => {
+    const start = new Date(startDate);
+    const currentDay = start.getDay();
+    let daysToAdd = (targetDayOfWeek - currentDay + 7) % 7;
+    if (daysToAdd === 0 && start.getTime() < new Date().getTime()) {
+      daysToAdd = 7; // If today is the target day but in the past, go to next week
+    }
+    const result = new Date(start);
+    result.setDate(start.getDate() + daysToAdd);
+    return result;
+  };
+
+  // Generate all sessions that will be created
+  const generateSessions = (startDate, scheduleEntries, numberOfSessions) => {
+    if (!startDate || !scheduleEntries.length || !numberOfSessions) {
+      return [];
+    }
+
+    const sessions = [];
+    const start = new Date(startDate);
+    
+    // Find first occurrence of each day of week from start date
+    const firstOccurrences = {};
+    scheduleEntries.forEach(entry => {
+      const dayOfWeek = getDayOfWeekNumber(entry.day);
+      if (dayOfWeek !== null && !firstOccurrences[dayOfWeek]) {
+        firstOccurrences[dayOfWeek] = findNextDayOfWeek(start, dayOfWeek);
+      }
+    });
+
+    // Generate sessions in round-robin fashion
+    let entryIndex = 0;
+    let weekOffset = 0;
+
+    for (let i = 0; i < numberOfSessions; i++) {
+      const entry = scheduleEntries[entryIndex % scheduleEntries.length];
+      const dayOfWeek = getDayOfWeekNumber(entry.day);
+      
+      if (dayOfWeek === null) {
+        entryIndex++;
+        continue;
+      }
+
+      // Get the first occurrence of this day
+      const firstOccurrence = firstOccurrences[dayOfWeek];
+      
+      // Calculate the date for this session
+      const sessionDate = new Date(firstOccurrence);
+      sessionDate.setDate(firstOccurrence.getDate() + (weekOffset * 7));
+
+      sessions.push({
+        date: sessionDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        dayOfWeek: dayOfWeek,
+        startTime: entry.startTime,
+        endTime: entry.endTime
+      });
+
+      // Move to next entry (round-robin)
+      entryIndex++;
+      // If we've gone through all entries, move to next week
+      if (entryIndex % scheduleEntries.length === 0) {
+        weekOffset++;
+      }
+    }
+
+    return sessions;
+  };
+
+  // Filter filled schedule entries
+  const filledScheduleEntries = useMemo(
+    () =>
+      formData.scheduleEntries.filter(
+        (entry) => entry.day && entry.startTime && entry.endTime
+      ),
+    [formData.scheduleEntries]
+  );
+
+  // Generate sessions that will be created
+  const generatedSessions = useMemo(() => {
+    if (!formData.startDate || !filledScheduleEntries.length || !selectedCourse?.numberOfSessions) {
+      return [];
+    }
+    return generateSessions(formData.startDate, filledScheduleEntries, selectedCourse.numberOfSessions);
+  }, [formData.startDate, filledScheduleEntries, selectedCourse?.numberOfSessions]);
+
+  // Check for room conflicts
+  const conflictingRoomIds = useMemo(() => {
+    if (!generatedSessions.length || !existingSchedules.length) {
+      return new Set();
+    }
+
+    const conflicts = new Set();
+    const currentClassId = formData.id || formData._id;
+
+    // Check each generated session against existing schedules
+    generatedSessions.forEach((session) => {
+      const sessionDate = session.date;
+      const sessionStart = parseTime(session.startTime);
+      const sessionEnd = parseTime(session.endTime);
+
+      existingSchedules.forEach((schedule) => {
+        // Skip schedules from the current class being edited
+        const scheduleClassId = schedule.class?._id?.toString() || 
+                               schedule.classId?.toString() || 
+                               schedule.class?.id?.toString();
+        if (scheduleClassId && currentClassId && String(scheduleClassId) === String(currentClassId)) {
+          return; // Skip current class schedules
+        }
+
+        // API populate room với _id và room_name
+        const scheduleRoomId =
+          schedule.room?._id?.toString() ||
+          schedule.roomId ||
+          schedule.roomID ||
+          schedule.room?.id ||
+          schedule.room?.id?.toString();
+        const scheduleRoomName = 
+          schedule.room?.room_name ||
+          schedule.roomName || 
+          schedule.room?.name;
+
+        if (!scheduleRoomId && !scheduleRoomName) {
+          return;
+        }
+
+        // Get schedule date
+        const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+        if (!scheduleDate) {
+          return;
+        }
+
+        // Format schedule date to YYYY-MM-DD for comparison
+        const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
+
+        // Check if dates match
+        if (scheduleDateStr !== sessionDate) {
+          return;
+        }
+
+        const scheduleStart = parseTime(
+          schedule.startTime ||
+            schedule.start_time ||
+            schedule.time?.start ||
+            schedule.startHour
+        );
+
+        const scheduleEnd = parseTime(
+          schedule.endTime ||
+            schedule.end_time ||
+            schedule.time?.end ||
+            schedule.endHour
+        );
+
+        // Check if times overlap
+        const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
+
+        // Conflict if same date and overlapping time
+        if (hasTimeConflict) {
+          if (scheduleRoomId) {
+            conflicts.add(String(scheduleRoomId));
+          }
+          if (scheduleRoomName) {
+            conflicts.add(scheduleRoomName);
+          }
+        }
+      });
+    });
+
+    return conflicts;
+  }, [generatedSessions, existingSchedules, formData.id, formData._id]);
+
+  // Fetch teacher schedules - need to get all schedules for conflict checking
+  useEffect(() => {
+    const fetchTeacherSchedules = async () => {
+      if (!teachers.length || !generatedSessions.length) {
+        return;
+      }
+
+      const schedulesMap = {};
+      const currentClassId = formData.id || formData._id;
+      
+      // Get date range from generated sessions
+      if (generatedSessions.length === 0) return;
+      
+      const sessionDates = generatedSessions.map(s => s.date).sort();
+      const minDate = sessionDates[0];
+      const maxDate = sessionDates[sessionDates.length - 1];
+      
+      // Fetch schedules for each teacher
+      await Promise.all(
+        teachers.map(async (teacher) => {
+          const teacherId = teacher._id || teacher.id;
+          if (!teacherId) return;
+
+          try {
+            const response = await teacherService.getTeacherSchedule(teacherId, {
+              startDate: minDate,
+              endDate: maxDate
+            });
+            
+            if (response && response.schedules) {
+              // Filter out schedules from current class
+              const filteredSchedules = response.schedules.filter(schedule => {
+                const scheduleClassId = schedule.class?._id?.toString() || 
+                                       schedule.classId?.toString() || 
+                                       schedule.class?.id?.toString();
+                return !(scheduleClassId && currentClassId && String(scheduleClassId) === String(currentClassId));
+              });
+              schedulesMap[String(teacherId)] = filteredSchedules;
+            }
+          } catch (error) {
+            console.error(`Error fetching schedule for teacher ${teacherId}:`, error);
+            schedulesMap[String(teacherId)] = [];
+          }
+        })
+      );
+
+      setTeacherSchedules(schedulesMap);
+    };
+
+    fetchTeacherSchedules();
+  }, [teachers, generatedSessions, formData.id, formData._id]);
+
+  // Check for teacher conflicts
+  const conflictingTeacherIds = useMemo(() => {
+    if (!generatedSessions.length || Object.keys(teacherSchedules).length === 0) {
+      return new Set();
+    }
+
+    const conflicts = new Set();
+
+    // Check each teacher's schedules
+    Object.entries(teacherSchedules).forEach(([teacherId, schedules]) => {
+      if (!schedules || schedules.length === 0) return;
+
+      // Check each generated session against teacher's schedules
+      generatedSessions.forEach((session) => {
+        const sessionDate = session.date;
+        const sessionStart = parseTime(session.startTime);
+        const sessionEnd = parseTime(session.endTime);
+
+        schedules.forEach((schedule) => {
+          // Get schedule date
+          const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+          if (!scheduleDate) return;
+
+          // Format schedule date to YYYY-MM-DD for comparison
+          const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
+
+          // Check if dates match
+          if (scheduleDateStr !== sessionDate) {
+            return;
+          }
+
+          // Check time overlap
+          const scheduleStart = parseTime(schedule.startTime);
+          const scheduleEnd = parseTime(schedule.endTime);
+          const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
+
+          if (hasTimeConflict) {
+            conflicts.add(teacherId);
+          }
+        });
+      });
+    });
+
+    return conflicts;
+  }, [generatedSessions, teacherSchedules]);
+
+  // Filter rooms based on conflicts
+  const filteredRooms = useMemo(() => {
+    if (!generatedSessions.length || !existingSchedules.length) {
+      return rooms;
+    }
+
+    const filtered = rooms.filter(
+      (room) => {
+        const roomId = room._id || room.id;
+        const roomIdStr = String(roomId);
+        
+        const roomName = room.name || room.roomName || room.room_name || room.title || `Phòng ${roomId}`;
+        
+        const hasIdConflict = conflictingRoomIds.has(roomIdStr) || conflictingRoomIds.has(String(room.id));
+        const hasNameConflict = conflictingRoomIds.has(roomName) || 
+                                conflictingRoomIds.has(room.name) || 
+                                conflictingRoomIds.has(room.roomName) || 
+                                conflictingRoomIds.has(room.room_name);
+        
+        return !hasIdConflict && !hasNameConflict;
+      }
+    );
+    
+    return filtered;
+  }, [generatedSessions, existingSchedules, rooms, conflictingRoomIds]);
+
+  // Filter teachers based on conflicts
+  const filteredTeachers = useMemo(() => {
+    if (!generatedSessions.length || Object.keys(teacherSchedules).length === 0) {
+      return teachers;
+    }
+
+    const filtered = teachers.filter(
+      (teacher) => {
+        const teacherId = teacher._id || teacher.id;
+        const teacherIdStr = String(teacherId);
+        
+        const hasIdConflict = conflictingTeacherIds.has(teacherIdStr) || conflictingTeacherIds.has(String(teacher.id));
+        
+        return !hasIdConflict;
+      }
+    );
+    
+    return filtered;
+  }, [generatedSessions, teacherSchedules, teachers, conflictingTeacherIds]);
+
+  // Clear selected room if it becomes unavailable
+  useEffect(() => {
+    if (
+      formData.roomId &&
+      !filteredRooms.some(room => {
+        const roomId = room._id || room.id;
+        return String(roomId) === String(formData.roomId) || String(room.id) === String(formData.roomId);
+      })
+    ) {
+      setFormData(prev => ({ ...prev, roomId: '' }));
+    }
+  }, [filteredRooms, formData.roomId]);
+
+  // Clear selected teacher if they become unavailable
+  useEffect(() => {
+    if (
+      formData.teacherId &&
+      !filteredTeachers.some(teacher => {
+        const teacherId = teacher._id || teacher.id;
+        return String(teacherId) === String(formData.teacherId) || String(teacher.id) === String(formData.teacherId);
+      })
+    ) {
+      setFormData(prev => ({ ...prev, teacherId: '' }));
+    }
+  }, [filteredTeachers, formData.teacherId]);
 
   const daysOfWeek = [
     { value: '2', label: 'Thứ 2' },
@@ -275,8 +722,30 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
     return programTypeMap[programName] || null;
   };
 
+  // Get today's date in YYYY-MM-DD format
+  const getTodayDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    
+    // Validate start date when it changes
+    if (name === 'startDate') {
+      const today = getTodayDate();
+      
+      // Validate start date is not in the past
+      if (value && value < today) {
+        setDateError('Ngày khai giảng không được là quá khứ!');
+      } else {
+        setDateError('');
+      }
+    }
+    
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -438,6 +907,14 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
       return;
     }
 
+    // Validate start date is not in the past
+    const today = getTodayDate();
+    if (formData.startDate && formData.startDate < today) {
+      alert('Ngày khai giảng không được là quá khứ!');
+      setDateError('Ngày khai giảng không được là quá khứ!');
+      return;
+    }
+
     onSubmit(formData);
   };
 
@@ -582,8 +1059,14 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                     name="startDate"
                     value={formData.startDate}
                     onChange={handleInputChange}
-                    className="border-neutral-30 radius-8 px-16 py-10"
+                    min={getTodayDate()}
+                    className={`border-neutral-30 radius-8 px-16 py-10 ${dateError ? 'border-danger' : ''}`}
                   />
+                  {dateError && dateError.includes('quá khứ') && (
+                    <Form.Text className="text-danger-600 text-12 d-block mt-4">
+                      {dateError}
+                    </Form.Text>
+                  )}
                 </Form.Group>
               </div>
             </div>
@@ -704,12 +1187,46 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                     value={formData.teacherId}
                     onChange={handleInputChange}
                     className="border-neutral-30 radius-8 px-16 py-10"
+                    disabled={teachers.length === 0}
                   >
                     <option value="">-- Chọn giáo viên --</option>
-                    {teachers.map(t => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
+                    {teachers.length === 0 ? (
+                      <option value="" disabled>
+                        Đang tải danh sách giáo viên...
+                      </option>
+                    ) : filteredTeachers.length === 0 && generatedSessions.length > 0 ? (
+                      <option value="" disabled>
+                        Không còn giáo viên phù hợp (tất cả đều bị trùng lịch)
+                      </option>
+                    ) : null}
+                    {filteredTeachers.map(t => {
+                      const teacherId = t._id || t.id;
+                      // Hỗ trợ nhiều format tên từ API
+                      const teacherName = 
+                        t.name || 
+                        t.teacherName || 
+                        t.fullName ||
+                        (t.firstName && t.lastName ? `${t.firstName} ${t.lastName}` : null) ||
+                        (t.firstName || t.lastName) ||
+                        t.username ||
+                        t.email?.split('@')[0] ||
+                        `Giáo viên ${teacherId}`;
+                      return (
+                        <option key={teacherId} value={teacherId}>
+                          {teacherName}
+                        </option>
+                      );
+                    })}
                   </Form.Select>
+                  <Form.Text className="text-neutral-500 text-12">
+                    {teachers.length === 0
+                      ? 'Đang tải danh sách giáo viên...'
+                      : filteredTeachers.length === 0 && generatedSessions.length > 0
+                      ? 'Không còn giáo viên phù hợp (tất cả đều bị trùng lịch)'
+                      : generatedSessions.length > 0
+                      ? `Có ${filteredTeachers.length} giáo viên phù hợp (chưa bị trùng lịch)`
+                      : `Có ${teachers.length} giáo viên. Chọn lịch học để lọc giáo viên phù hợp.`}
+                  </Form.Text>
                 </Form.Group>
               </div>
 
@@ -721,14 +1238,35 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                     value={formData.roomId}
                     onChange={handleInputChange}
                     className="border-neutral-30 radius-8 px-16 py-10"
+                    disabled={roomLoading}
                   >
-                    <option value="">-- Chọn phòng học --</option>
-                    {rooms.map(r => (
-                      <option key={r.id} value={r.id}>
-                        {r.name} (Sức chứa: {r.capacity})
+                    <option value="">
+                      {roomLoading ? 'Đang kiểm tra phòng trống...' : '-- Chọn phòng học --'}
+                    </option>
+                    {!roomLoading && filteredRooms.length === 0 && (
+                      <option value="" disabled>
+                        Không còn phòng phù hợp
                       </option>
-                    ))}
+                    )}
+                    {!roomLoading && filteredRooms.map(r => {
+                      const roomId = r._id || r.id;
+                      const roomName = r.name || r.roomName || r.room_name || r.title || `Phòng ${roomId}`;
+                      const capacity = r.capacity || r.maxCapacity || r.maxStudents || 'N/A';
+                      return (
+                        <option key={roomId} value={roomId}>
+                          {roomName} (Sức chứa: {capacity})
+                        </option>
+                      );
+                    })}
                   </Form.Select>
+                  <Form.Text className="text-neutral-500 text-12">
+                    Chỉ hiển thị phòng chưa bị trùng với lịch đã chọn.
+                  </Form.Text>
+                  {roomError && (
+                    <Alert variant="warning" className="mt-12 mb-0">
+                      {roomError}
+                    </Alert>
+                  )}
                 </Form.Group>
               </div>
             </div>

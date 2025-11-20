@@ -2,8 +2,10 @@ const Class = require("../models/classModel");
 const User = require("../models/userModel");
 const ClassSchedule = require("../models/classScheduleModel");
 const StudentSchedule = require("../models/studentScheduleModel");
+const HomeworkSubmission = require("../models/homeworkSubmissionModel");
 const Course = require("../models/courseModel");
 const Program = require("../models/programModel");
+const mongoose = require("mongoose");
 
 // =========================
 // 📋 LẤY DANH SÁCH LỚP HỌC
@@ -517,34 +519,64 @@ exports.updateClass = async (req, res) => {
 };
 
 // =========================
-// 🗑️ XÓA LỚP HỌC
+// 🗑️ XÓA LỚP HỌC (CASCADE DELETE)
 // =========================
 exports.deleteClass = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
-    const classData = await Class.findById(req.params.id);
+    const classId = req.params.id;
+    
+    // Check if class exists
+    const classData = await Class.findById(classId).session(session);
     if (!classData) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy lớp học'
       });
     }
     
-    // Check schedules
-    const scheduleCount = await ClassSchedule.countDocuments({ class: req.params.id });
-    if (scheduleCount > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `Không thể xóa lớp học có ${scheduleCount} lịch học`
-      });
+    // Find all ClassSchedules for this class
+    const classSchedules = await ClassSchedule.find({ class: classId }).session(session).select('_id');
+    const classScheduleIds = classSchedules.map(schedule => schedule._id);
+    
+    // Delete in cascade order:
+    // 1. Delete HomeworkSubmissions (references ClassSchedule)
+    if (classScheduleIds.length > 0) {
+      const homeworkDeleteResult = await HomeworkSubmission.deleteMany(
+        { classSchedule: { $in: classScheduleIds } }
+      ).session(session);
+      
+      // 2. Delete StudentSchedules (references ClassSchedule)
+      const studentScheduleDeleteResult = await StudentSchedule.deleteMany(
+        { classSchedule: { $in: classScheduleIds } }
+      ).session(session);
+      
+      // 3. Delete ClassSchedules (references Class)
+      const scheduleDeleteResult = await ClassSchedule.deleteMany(
+        { class: classId }
+      ).session(session);
     }
     
-    await Class.findByIdAndDelete(req.params.id);
+    // 4. Finally, delete the Class
+    await Class.findByIdAndDelete(classId).session(session);
+    
+    // Commit transaction
+    await session.commitTransaction();
+    session.endSession();
     
     res.status(200).json({
       success: true,
-      message: 'Xóa lớp học thành công'
+      message: 'Xóa lớp học và tất cả dữ liệu liên quan thành công'
     });
   } catch (error) {
+    // Rollback transaction on error
+    await session.abortTransaction();
+    session.endSession();
+    
     console.error('Error in deleteClass:', error);
     res.status(500).json({
       success: false,

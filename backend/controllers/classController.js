@@ -5,6 +5,7 @@ const StudentSchedule = require("../models/studentScheduleModel");
 const HomeworkSubmission = require("../models/homeworkSubmissionModel");
 const Course = require("../models/courseModel");
 const Program = require("../models/programModel");
+const Room = require("../models/room");
 const mongoose = require("mongoose");
 
 // =========================
@@ -293,6 +294,25 @@ exports.createClass = async (req, res) => {
       });
     }
     
+    // Validate room capacity if room is provided
+    if (room) {
+      const roomData = await Room.findById(room);
+      if (!roomData) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy phòng học'
+        });
+      }
+      
+      const studentCount = (students || []).length;
+      if (studentCount > roomData.capacity) {
+        return res.status(400).json({
+          success: false,
+          message: `Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomData.capacity} học viên)`
+        });
+      }
+    }
+    
     const newClass = new Class({
       name,
       course,
@@ -476,6 +496,29 @@ exports.updateClass = async (req, res) => {
         return res.status(400).json({
           success: false,
           message: 'Tên lớp học đã tồn tại'
+        });
+      }
+    }
+    
+    // Determine final room and students for validation
+    const finalRoom = room !== undefined ? room : classData.room;
+    const finalStudents = students !== undefined ? students : classData.students;
+    
+    // Validate room capacity if room is provided
+    if (finalRoom) {
+      const roomData = await Room.findById(finalRoom);
+      if (!roomData) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy phòng học'
+        });
+      }
+      
+      const studentCount = (finalStudents || []).length;
+      if (studentCount > roomData.capacity) {
+        return res.status(400).json({
+          success: false,
+          message: `Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomData.capacity} học viên)`
         });
       }
     }

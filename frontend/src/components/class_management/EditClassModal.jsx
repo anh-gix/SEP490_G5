@@ -62,6 +62,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
   const [students, setStudents] = useState([]); // All students for Excel matching
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [studentsError, setStudentsError] = useState(null);
+  const [capacityWarning, setCapacityWarning] = useState(null);
   const fileInputRef = useRef(null);
 
   // Fetch full class data with schedules when modal opens
@@ -1494,6 +1495,30 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
     fetchBand();
   }, [formData.program, formData.level, formData.status]);
 
+  // Real-time capacity validation
+  useEffect(() => {
+    if (formData.roomId && selectedStudents && selectedStudents.length > 0) {
+      const selectedRoom = rooms.find(r => (r._id || r.id) === formData.roomId);
+      if (selectedRoom) {
+        const roomCapacity = selectedRoom.capacity || selectedRoom.maxCapacity || selectedRoom.maxStudents;
+        const studentCount = selectedStudents.length;
+        
+        if (roomCapacity && studentCount > roomCapacity) {
+          setCapacityWarning({
+            type: 'danger',
+            message: `⚠️ Cảnh báo: Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`
+          });
+        } else {
+          setCapacityWarning(null);
+        }
+      } else {
+        setCapacityWarning(null);
+      }
+    } else {
+      setCapacityWarning(null);
+    }
+  }, [formData.roomId, selectedStudents, rooms]);
+
   // Fetch programs and levels when status is pending (editable mode)
   useEffect(() => {
     const fetchProgramsAndLevels = async () => {
@@ -1794,6 +1819,20 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
       alert('Ngày khai giảng không được là quá khứ!');
       setDateError('Ngày khai giảng không được là quá khứ!');
       return;
+    }
+
+    // Validate room capacity if room is selected
+    if (formData.roomId) {
+      const selectedRoom = rooms.find(r => (r._id || r.id) === formData.roomId);
+      if (selectedRoom) {
+        const roomCapacity = selectedRoom.capacity || selectedRoom.maxCapacity || selectedRoom.maxStudents;
+        const studentCount = (selectedStudents || []).length;
+        
+        if (roomCapacity && studentCount > roomCapacity) {
+          alert(`Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`);
+          return;
+        }
+      }
     }
 
     // Transform formData to match backend API expectations
@@ -2238,11 +2277,32 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                 Học viên
               </h5>
               {selectedStudents && selectedStudents.length > 0 && (
-                <span className="badge bg-main-600 text-white px-16 py-8 radius-8 text-14 fw-semibold">
-                  Tổng cộng: {selectedStudents.length} học viên
-                </span>
+                <div className="d-flex align-items-center gap-12">
+                  <span className={`badge ${capacityWarning ? 'bg-danger' : 'bg-main-600'} text-white px-16 py-8 radius-8 text-14 fw-semibold`}>
+                    Tổng cộng: {selectedStudents.length} học viên
+                  </span>
+                  {formData.roomId && (() => {
+                    const selectedRoom = rooms.find(r => (r._id || r.id) === formData.roomId);
+                    if (selectedRoom) {
+                      const roomCapacity = selectedRoom.capacity || selectedRoom.maxCapacity || selectedRoom.maxStudents;
+                      return (
+                        <span className="badge bg-info text-white px-12 py-6 radius-6 text-12">
+                          Sức chứa phòng: {roomCapacity}
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
               )}
             </div>
+            
+            {capacityWarning && (
+              <Alert variant={capacityWarning.type} className="mb-16">
+                <i className="fas fa-exclamation-triangle me-2"></i>
+                {capacityWarning.message}
+              </Alert>
+            )}
             
             <div className="mb-16">
               <div className="d-flex justify-content-between align-items-center mb-12">

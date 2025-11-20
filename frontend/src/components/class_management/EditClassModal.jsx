@@ -1619,11 +1619,18 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                     value={formData.startDate}
                     onChange={handleInputChange}
                     min={getTodayDate()}
-                    className={`border-neutral-30 radius-8 px-16 py-10 ${dateError ? 'border-danger' : ''}`}
+                    disabled={formData.status !== 'pending'}
+                    className={`border-neutral-30 radius-8 px-16 py-10 ${dateError ? 'border-danger' : ''} ${formData.status !== 'pending' ? 'bg-neutral-50' : ''}`}
                   />
                   {dateError && dateError.includes('quá khứ') && (
                     <Form.Text className="text-danger-600 text-12 d-block mt-4">
                       {dateError}
+                    </Form.Text>
+                  )}
+                  {formData.status !== 'pending' && (
+                    <Form.Text className="text-neutral-500 text-12 d-block mt-4">
+                      <i className="fas fa-info-circle me-1"></i>
+                      Chỉ có thể chỉnh sửa ngày khai giảng khi trạng thái lớp học là "Chờ khai giảng"
                     </Form.Text>
                   )}
                 </Form.Group>

@@ -39,6 +39,7 @@ const ClassManagement = () => {
         program: cls.courseName || cls.course?.name || 'N/A',
         band: cls.band || cls.course?.band || 'N/A', // Band từ course
         courseType: cls.courseType || cls.course?.program?.type || 'N/A',
+        course: cls.course?._id || cls.course || null, // Keep course ID for EditClassModal
         status: cls.status,
         startDate: cls.startDate ? new Date(cls.startDate).toISOString().split('T')[0] : 'N/A',
         endDate: cls.endDate ? new Date(cls.endDate).toISOString().split('T')[0] : 'N/A',

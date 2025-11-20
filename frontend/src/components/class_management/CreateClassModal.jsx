@@ -44,6 +44,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   const [students, setStudents] = useState([]);
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [studentsError, setStudentsError] = useState(null);
+  const [scheduleEntriesError, setScheduleEntriesError] = useState(null);
+  const [duplicateEntryIndices, setDuplicateEntryIndices] = useState([]);
   const [showSelectStudentModal, setShowSelectStudentModal] = useState(false);
   const [importingExcel, setImportingExcel] = useState(false);
   const [showImportResultModal, setShowImportResultModal] = useState(false);
@@ -578,6 +580,27 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     }
   }, [formData.roomId, formData.selectedStudents, rooms]);
 
+  const checkDuplicateEntries = (entries) => {
+    const seen = new Set();
+    const duplicates = [];
+    
+    entries.forEach((entry, index) => {
+      // Chỉ kiểm tra entries đã điền đầy đủ
+      if (!entry.day || !entry.startTime || !entry.endTime) {
+        return;
+      }
+      
+      const key = `${entry.day}-${entry.startTime}-${entry.endTime}`;
+      if (seen.has(key)) {
+        duplicates.push(index);
+      } else {
+        seen.add(key);
+      }
+    });
+    
+    return duplicates;
+  };
+
   const handleScheduleEntryChange = (id, field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -586,6 +609,18 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       )
     }));
   };
+
+  // Real-time validation: Check for duplicates whenever scheduleEntries change
+  useEffect(() => {
+    const duplicates = checkDuplicateEntries(formData.scheduleEntries);
+    if (duplicates.length > 0) {
+      setScheduleEntriesError('Có các buổi học trùng lặp. Vui lòng kiểm tra lại ngày và giờ học.');
+      setDuplicateEntryIndices(duplicates);
+    } else {
+      setScheduleEntriesError(null);
+      setDuplicateEntryIndices([]);
+    }
+  }, [formData.scheduleEntries]);
 
   const addScheduleEntry = () => {
     setFormData(prev => ({
@@ -629,6 +664,15 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       alert('Giờ bắt đầu phải nhỏ hơn giờ kết thúc!');
       return;
     }
+
+    // Check for duplicate schedule entries
+    const duplicateIndices = checkDuplicateEntries(formData.scheduleEntries);
+    if (duplicateIndices.length > 0) {
+      setScheduleEntriesError('Có các buổi học trùng lặp. Vui lòng kiểm tra lại ngày và giờ học.');
+      alert('Có các buổi học trùng lặp. Vui lòng kiểm tra lại ngày và giờ học.');
+      return;
+    }
+    setScheduleEntriesError(null);
 
     // Validate start date is not in the past
     const today = getTodayDate();
@@ -1708,10 +1752,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             </Form.Group>
 
             <div className="d-flex flex-column gap-12">
-              {formData.scheduleEntries.map((entry, index) => (
+              {formData.scheduleEntries.map((entry, index) => {
+                const isDuplicate = duplicateEntryIndices.includes(index);
+                return (
                 <div
                   key={entry.id}
-                  className="border border-neutral-100 rounded-12 p-16"
+                  className={`border rounded-12 p-16 ${isDuplicate ? 'border-danger border-2' : 'border-neutral-100'}`}
                 >
                   <div className="d-flex justify-content-between align-items-center mb-12">
                     <div className="fw-semibold text-neutral-900">
@@ -1786,7 +1832,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             <Button
@@ -1797,6 +1844,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               <i className="fas fa-plus me-2"></i>
               Thêm buổi học
             </Button>
+
+            {scheduleEntriesError && (
+              <Alert variant="danger" className="mt-12 mb-0">
+                {scheduleEntriesError}
+              </Alert>
+            )}
           </div>
 
                     {/* Resources */}

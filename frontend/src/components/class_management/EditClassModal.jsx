@@ -46,6 +46,8 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
   const [existingSchedules, setExistingSchedules] = useState([]);
   const [roomLoading, setRoomLoading] = useState(false);
   const [roomError, setRoomError] = useState(null);
+  const [scheduleEntriesError, setScheduleEntriesError] = useState(null);
+  const [duplicateEntryIndices, setDuplicateEntryIndices] = useState([]);
   const [fullClassData, setFullClassData] = useState(null); // Store full class data with schedules
   const [loadingClassData, setLoadingClassData] = useState(false); // Loading state for class data
   const [availablePrograms, setAvailablePrograms] = useState([]); // Programs for dropdown
@@ -1426,6 +1428,27 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const checkDuplicateEntries = (entries) => {
+    const seen = new Set();
+    const duplicates = [];
+    
+    entries.forEach((entry, index) => {
+      // Chỉ kiểm tra entries đã điền đầy đủ
+      if (!entry.day || !entry.startTime || !entry.endTime) {
+        return;
+      }
+      
+      const key = `${entry.day}-${entry.startTime}-${entry.endTime}`;
+      if (seen.has(key)) {
+        duplicates.push(index);
+      } else {
+        seen.add(key);
+      }
+    });
+    
+    return duplicates;
+  };
+
   const handleScheduleEntryChange = (id, field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -1434,6 +1457,18 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
       )
     }));
   };
+
+  // Real-time validation: Check for duplicates whenever scheduleEntries change
+  useEffect(() => {
+    const duplicates = checkDuplicateEntries(formData.scheduleEntries);
+    if (duplicates.length > 0) {
+      setScheduleEntriesError('Có các buổi học trùng lặp. Vui lòng kiểm tra lại ngày và giờ học.');
+      setDuplicateEntryIndices(duplicates);
+    } else {
+      setScheduleEntriesError(null);
+      setDuplicateEntryIndices([]);
+    }
+  }, [formData.scheduleEntries]);
 
   const addScheduleEntry = () => {
     setFormData(prev => ({
@@ -1813,6 +1848,15 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
       return;
     }
 
+    // Check for duplicate schedule entries
+    const duplicateIndices = checkDuplicateEntries(formData.scheduleEntries);
+    if (duplicateIndices.length > 0) {
+      setScheduleEntriesError('Có các buổi học trùng lặp. Vui lòng kiểm tra lại ngày và giờ học.');
+      alert('Có các buổi học trùng lặp. Vui lòng kiểm tra lại ngày và giờ học.');
+      return;
+    }
+    setScheduleEntriesError(null);
+
     // Validate start date is not in the past
     const today = getTodayDate();
     if (formData.startDate && formData.startDate < today) {
@@ -2079,10 +2123,12 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
             </Form.Group>
 
             <div className="d-flex flex-column gap-12">
-              {formData.scheduleEntries.map((entry, index) => (
+              {formData.scheduleEntries.map((entry, index) => {
+                const isDuplicate = duplicateEntryIndices.includes(index);
+                return (
                 <div
                   key={entry.id}
-                  className="border border-neutral-100 rounded-12 p-16"
+                  className={`border rounded-12 p-16 ${isDuplicate ? 'border-danger border-2' : 'border-neutral-100'}`}
                 >
                   <div className="d-flex justify-content-between align-items-center mb-12">
                     <div className="fw-semibold text-neutral-900">
@@ -2157,7 +2203,8 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             <Button
@@ -2168,6 +2215,12 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
               <i className="fas fa-plus me-2"></i>
               Thêm buổi học
             </Button>
+
+            {scheduleEntriesError && (
+              <Alert variant="danger" className="mt-12 mb-0">
+                {scheduleEntriesError}
+              </Alert>
+            )}
           </div>
 
           {/* Resources */}

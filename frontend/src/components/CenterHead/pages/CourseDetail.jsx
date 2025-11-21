@@ -5,8 +5,7 @@ import Card from '../compo/Card';
 import Button from '../compo/Button';
 import Badge from '../compo/Badge';
 import Tabs from '../compo/Tabs';
-// import { courseAPI } from '../services/api';
-import { getCourseById, simulateApiDelay } from '../../../helper/mockdata';
+import { courseService } from '../../../services/courseService';
 import { formatDate } from '../../../helper/helper';
 
 const CourseDetails = () => {
@@ -26,22 +25,14 @@ const CourseDetails = () => {
   const fetchCourseDetails = async () => {
     try {
       setLoading(true);
-      // Simulate API call with delay
-      await simulateApiDelay(700);
-      
-      // Use mock data
-      const courseData = getCourseById(id);
-      if (!courseData) {
-        setError('Không tìm thấy giáo trình');
-      } else {
-        setCourse(courseData);
+      const response = await courseService.getCourseDetails(id);
+
+      if (response.success) {
+        setCourse(response.data);
         setError(null);
+      } else {
+        setError('Không tìm thấy giáo trình');
       }
-      
-      // Real API call (commented out)
-      // const response = await courseAPI.getCourseDetails(id);
-      // setCourse(response.data.course);
-      // setError(null);
     } catch (err) {
       console.error('Error fetching course details:', err);
       setError('Không thể tải chi tiết giáo trình. Vui lòng thử lại sau.');
@@ -57,12 +48,8 @@ const CourseDetails = () => {
 
     try {
       setActionLoading(true);
-      // Simulate API call
-      await simulateApiDelay(1000);
-      
-      // Real API call (commented out)
-      // await courseAPI.approveCourse(id);
-      
+      await courseService.approveCourse(id);
+
       alert('Đã phê duyệt giáo trình thành công!');
       navigate('/courses/pending');
     } catch (err) {
@@ -81,12 +68,8 @@ const CourseDetails = () => {
 
     try {
       setActionLoading(true);
-      // Simulate API call
-      await simulateApiDelay(1000);
-      
-      // Real API call (commented out)
-      // await courseAPI.requestRevision(id, { revisionNote });
-      
+      await courseService.requestRevision(id, { reason: revisionNote });
+
       alert('Đã gửi yêu cầu chỉnh sửa thành công!');
       navigate('/courses/pending');
     } catch (err) {

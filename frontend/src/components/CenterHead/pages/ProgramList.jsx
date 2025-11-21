@@ -8,7 +8,7 @@ import SearchBox from '../compo/SearchBox';
 import FilterBar from '../compo/FilterBar';
 import StatusBadge from '../compo/StatusBadge';
 import ActionMenu from '../compo/ActionMenu';
-import { mockPrograms, mockProgramStats, simulateApiDelay } from '../../../helper/mockdataExtended';
+import { programService } from '../../../services/programService';
 import { formatDate } from '../../../helper/helper';
 
 const ProgramList = () => {
@@ -18,6 +18,7 @@ const ProgramList = () => {
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [filterValues, setFilterValues] = useState({});
+  const [stats, setStats] = useState({ total: 0, active: 0, draft: 0, archived: 0 });
 
   useEffect(() => {
     fetchPrograms();
@@ -30,8 +31,14 @@ const ProgramList = () => {
   const fetchPrograms = async () => {
     try {
       setLoading(true);
-      await simulateApiDelay(500);
-      setPrograms(mockPrograms);
+      const response = await programService.getAllPrograms();
+
+      if (response.success) {
+        setPrograms(response.data || []);
+        if (response.stats) {
+          setStats(response.stats);
+        }
+      }
     } catch (err) {
       console.error('Error fetching programs:', err);
     } finally {
@@ -165,25 +172,25 @@ const ProgramList = () => {
         <div className="col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng Programs</h6>
-            <h4 className="text-neutral-900 fw-bold mb-0">{mockProgramStats.total}</h4>
+            <h4 className="text-neutral-900 fw-bold mb-0">{stats.total}</h4>
           </Card>
         </div>
         <div className="col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Đang hoạt động</h6>
-            <h4 className="text-success-600 fw-bold mb-0">{mockProgramStats.active}</h4>
+            <h4 className="text-success-600 fw-bold mb-0">{stats.active}</h4>
           </Card>
         </div>
         <div className="col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Bản nháp</h6>
-            <h4 className="text-warning-600 fw-bold mb-0">{mockProgramStats.draft}</h4>
+            <h4 className="text-warning-600 fw-bold mb-0">{stats.draft}</h4>
           </Card>
         </div>
         <div className="col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Đã lưu trữ</h6>
-            <h4 className="text-neutral-600 fw-bold mb-0">{mockProgramStats.archived}</h4>
+            <h4 className="text-neutral-600 fw-bold mb-0">{stats.archived}</h4>
           </Card>
         </div>
       </div>

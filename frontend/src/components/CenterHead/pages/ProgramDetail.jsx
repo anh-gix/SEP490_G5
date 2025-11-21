@@ -5,7 +5,7 @@ import Card from '../compo/Card';
 import Button from '../compo/Button';
 import StatusBadge from '../compo/StatusBadge';
 import Table from '../compo/Table';
-import { getProgramById, mockCourses, simulateApiDelay } from '../../../helper/mockdataExtended';
+import { programService } from '../../../services/programService';
 import { formatDate } from '../../../helper/helper';
 
 const ProgramDetail = () => {
@@ -23,33 +23,36 @@ const ProgramDetail = () => {
   const fetchProgramDetail = async () => {
     try {
       setLoading(true);
-      await simulateApiDelay(500);
 
-      // Fetch program data
-      const programData = getProgramById(id);
-      setProgram(programData);
+      // Fetch program data with courses
+      const response = await programService.getProgramById(id);
 
-      // Fetch courses belonging to this program
-      const programCourses = mockCourses.filter(
-        course => course.program._id === id
-      );
-      setCourses(programCourses);
+      if (response.success) {
+        const programData = response.data;
+        setProgram(programData);
 
-      // Build CLO → PLO mapping
-      const cloMappingData = [];
-      programCourses.forEach(course => {
-        course.cloDetails?.forEach(clo => {
-          cloMappingData.push({
-            _id: clo._id,
-            code: clo.code,
-            name: clo.name,
-            detail: clo.detail,
-            courseName: course.name,
-            mappedPLOs: clo.mappedPLOs || []
-          });
+        // Courses are included in the program response
+        const programCourses = programData.courses || [];
+        setCourses(programCourses);
+
+        // Build CLO → PLO mapping from courses
+        const cloMappingData = [];
+        programCourses.forEach(course => {
+          if (course.clos && Array.isArray(course.clos)) {
+            course.clos.forEach(clo => {
+              cloMappingData.push({
+                _id: clo._id,
+                code: clo.code,
+                name: clo.name || clo.description,
+                detail: clo.description || clo.detail,
+                courseName: course.name,
+                mappedPLOs: clo.mappedPLOs || []
+              });
+            });
+          }
         });
-      });
-      setCloMapping(cloMappingData);
+        setCloMapping(cloMappingData);
+      }
 
     } catch (err) {
       console.error('Error fetching program detail:', err);
@@ -196,26 +199,24 @@ const ProgramDetail = () => {
           <h5 className="mb-0 text-neutral-900 fw-bold">Program Learning Outcomes (PLOs)</h5>
         </div>
 
-        {program.ploDetails && program.ploDetails.length > 0 ? (
+        {program.plos && program.plos.length > 0 ? (
           <div className="table-responsive">
             <table className="table table-hover align-middle">
               <thead style={{ backgroundColor: '#F9FAFB' }}>
                 <tr>
                   <th className="text-neutral-900 fw-semibold border-0" style={{ padding: '12px 16px' }}>Mã PLO</th>
-                  <th className="text-neutral-900 fw-semibold border-0" style={{ padding: '12px 16px' }}>Tên PLO</th>
-                  <th className="text-neutral-900 fw-semibold border-0" style={{ padding: '12px 16px' }}>Chi tiết</th>
+                  <th className="text-neutral-900 fw-semibold border-0" style={{ padding: '12px 16px' }}>Mô tả</th>
                 </tr>
               </thead>
               <tbody>
-                {program.ploDetails.map((plo) => (
+                {program.plos.map((plo) => (
                   <tr key={plo._id}>
                     <td style={{ padding: '16px' }}>
                       <span className="badge bg-main-50 text-main-600 fw-semibold" style={{ padding: '8px 16px', fontSize: '13px', borderRadius: '20px' }}>
                         {plo.code}
                       </span>
                     </td>
-                    <td className="text-neutral-900 fw-semibold" style={{ padding: '16px' }}>{plo.name}</td>
-                    <td className="text-neutral-700" style={{ padding: '16px' }}>{plo.detail || 'N/A'}</td>
+                    <td className="text-neutral-700" style={{ padding: '16px' }}>{plo.description || 'N/A'}</td>
                   </tr>
                 ))}
               </tbody>

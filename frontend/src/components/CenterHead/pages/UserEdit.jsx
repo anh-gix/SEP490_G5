@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
-import { mockRoles, mockUsers, simulateApiDelay } from '../../../helper/mockdataExtended';
+import { userService } from '../../../services/userService';
+import { roleService } from '../../../services/roleService';
 
 const UserEdit = () => {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ const UserEdit = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [user, setUser] = useState(null);
+  const [roles, setRoles] = useState([]);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -25,15 +27,13 @@ const UserEdit = () => {
 
   useEffect(() => {
     fetchUser();
+    fetchRoles();
   }, [id]);
 
   const fetchUser = async () => {
     try {
       setLoading(true);
-      await simulateApiDelay(500);
-
-      // TODO: Replace with actual API call
-      const foundUser = mockUsers.find(u => u._id === id);
+      const foundUser = await userService.getUserById(id);
 
       if (!foundUser) {
         setErrors({ fetch: 'Không tìm thấy người dùng' });
@@ -46,16 +46,25 @@ const UserEdit = () => {
         email: foundUser.email || '',
         phone: foundUser.phone || '',
         address: foundUser.address || '',
-        roleId: foundUser.roleId || '',
+        roleId: foundUser.roleId?._id || foundUser.roleId || '',
         changePassword: false,
         newPassword: '',
         confirmPassword: '',
       });
     } catch (error) {
       console.error('Error fetching user:', error);
-      setErrors({ fetch: 'Có lỗi xảy ra khi tải thông tin người dùng' });
+      setErrors({ fetch: error.message || 'Có lỗi xảy ra khi tải thông tin người dùng' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRoles = async () => {
+    try {
+      const data = await roleService.getAllRoles();
+      setRoles(data);
+    } catch (err) {
+      console.error('Error fetching roles:', err);
     }
   };
 
@@ -131,17 +140,27 @@ const UserEdit = () => {
 
     try {
       setSaving(true);
-      // TODO: Call API to update user
-      console.log('Updating user:', { id, ...formData });
+      // Prepare data to send
+      const { confirmPassword, ...userData } = formData;
 
-      // Simulate API call
-      await simulateApiDelay(1000);
+      // Only include password if changePassword is true
+      if (!formData.changePassword) {
+        delete userData.newPassword;
+        delete userData.changePassword;
+      } else {
+        // Rename newPassword to password for API
+        userData.password = userData.newPassword;
+        delete userData.newPassword;
+        delete userData.changePassword;
+      }
+
+      await userService.updateUser(id, userData);
 
       // Success - redirect back to user list
       navigate('/center-head/users');
     } catch (error) {
       console.error('Error updating user:', error);
-      setErrors({ submit: 'Có lỗi xảy ra khi cập nhật người dùng. Vui lòng thử lại.' });
+      setErrors({ submit: error.message || 'Có lỗi xảy ra khi cập nhật người dùng. Vui lòng thử lại.' });
     } finally {
       setSaving(false);
     }
@@ -213,7 +232,7 @@ const UserEdit = () => {
                 {/* Username */}
                 <div className="col-12 col-md-6">
                   <label htmlFor="username" className="form-label">
-                    Tên đăng nhập <span className="text-danger">*</span>
+                    Tên người dùng <span className="text-danger">*</span>
                   </label>
                   <input
                     type="text"
@@ -222,7 +241,7 @@ const UserEdit = () => {
                     name="username"
                     value={formData.username}
                     onChange={handleInputChange}
-                    placeholder="Nhập tên đăng nhập"
+                    placeholder="Nhập tên người dùng"
                   />
                   {errors.username && <div className="invalid-feedback">{errors.username}</div>}
                 </div>
@@ -274,9 +293,9 @@ const UserEdit = () => {
                     onChange={handleInputChange}
                   >
                     <option value="">Chọn vai trò</option>
-                    {mockRoles.map(role => (
+                    {roles.map(role => (
                       <option key={role._id} value={role._id}>
-                        {role.name} - {role.description}
+                        {role.name} {role.description ? `- ${role.description}` : ''}
                       </option>
                     ))}
                   </select>

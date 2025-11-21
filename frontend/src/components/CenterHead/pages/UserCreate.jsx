@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
-import { mockRoles } from '../../../helper/mockdataExtended';
+import { userService } from '../../../services/userService';
+import { roleService } from '../../../services/roleService';
 
 const UserCreate = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [roles, setRoles] = useState([]);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -18,6 +20,20 @@ const UserCreate = () => {
     roleId: '',
   });
   const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    fetchRoles();
+  }, []);
+
+  const fetchRoles = async () => {
+    try {
+      const data = await roleService.getAllRoles();
+      setRoles(data);
+    } catch (err) {
+      console.error('Error fetching roles:', err);
+      setErrors({ submit: 'Không thể tải danh sách vai trò' });
+    }
+  };
 
   const breadcrumbItems = [
     { label: 'Dashboard', path: '/center-head/dashboard' },
@@ -86,17 +102,16 @@ const UserCreate = () => {
 
     try {
       setLoading(true);
-      // TODO: Call API to create user
-      console.log('Creating user:', formData);
+      // Prepare data to send (exclude confirmPassword)
+      const { confirmPassword, ...userData } = formData;
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await userService.createUser(userData);
 
       // Success - redirect back to user list
       navigate('/center-head/users');
     } catch (error) {
       console.error('Error creating user:', error);
-      setErrors({ submit: 'Có lỗi xảy ra khi tạo người dùng. Vui lòng thử lại.' });
+      setErrors({ submit: error.message || 'Có lỗi xảy ra khi tạo người dùng. Vui lòng thử lại.' });
     } finally {
       setLoading(false);
     }
@@ -142,7 +157,7 @@ const UserCreate = () => {
                 {/* Username */}
                 <div className="col-12 col-md-6">
                   <label htmlFor="username" className="form-label">
-                    Tên đăng nhập <span className="text-danger">*</span>
+                    Tên người dùng <span className="text-danger">*</span>
                   </label>
                   <input
                     type="text"
@@ -151,7 +166,7 @@ const UserCreate = () => {
                     name="username"
                     value={formData.username}
                     onChange={handleInputChange}
-                    placeholder="Nhập tên đăng nhập"
+                    placeholder="Nhập tên người dùng"
                   />
                   {errors.username && <div className="invalid-feedback">{errors.username}</div>}
                 </div>
@@ -237,9 +252,9 @@ const UserCreate = () => {
                     onChange={handleInputChange}
                   >
                     <option value="">Chọn vai trò</option>
-                    {mockRoles.map(role => (
+                    {roles.map(role => (
                       <option key={role._id} value={role._id}>
-                        {role.name} - {role.description}
+                        {role.name} {role.description ? `- ${role.description}` : ''}
                       </option>
                     ))}
                   </select>

@@ -8,12 +8,14 @@ import SearchBox from '../compo/SearchBox';
 import FilterBar from '../compo/FilterBar';
 import StatusBadge from '../compo/StatusBadge';
 import Modal from '../compo/Modal';
-import { mockUsers, mockRoles, simulateApiDelay } from '../../../helper/mockdataExtended';
+import { userService } from '../../../services/userService';
+import { roleService } from '../../../services/roleService';
 
 const UserList = () => {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -29,6 +31,7 @@ const UserList = () => {
 
   useEffect(() => {
     fetchUsers();
+    fetchRoles();
   }, []);
 
   useEffect(() => {
@@ -43,14 +46,23 @@ const UserList = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      await simulateApiDelay(600);
-      setUsers(mockUsers);
+      const data = await userService.getAllUsers();
+      setUsers(data);
       setError(null);
     } catch (err) {
       console.error('Error fetching users:', err);
-      setError('Không thể tải danh sách người dùng.');
+      setError(err.message || 'Không thể tải danh sách người dùng.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRoles = async () => {
+    try {
+      const data = await roleService.getAllRoles();
+      setRoles(data);
+    } catch (err) {
+      console.error('Error fetching roles:', err);
     }
   };
 
@@ -61,20 +73,14 @@ const UserList = () => {
     if (searchKeyword) {
       const keyword = searchKeyword.toLowerCase();
       filtered = filtered.filter(user =>
-        user.fullname?.toLowerCase().includes(keyword) ||
-        user.email?.toLowerCase().includes(keyword) ||
-        user.username?.toLowerCase().includes(keyword)
+        user.username?.toLowerCase().includes(keyword) ||
+        user.email?.toLowerCase().includes(keyword)
       );
     }
 
     // Role filter
     if (filterValues.role && filterValues.role !== "all") {
-      filtered = filtered.filter(user => user.roleId === filterValues.role);
-    }
-
-    // Status filter
-    if (filterValues.status && filterValues.status !== "all") {
-      filtered = filtered.filter(user => user.status === filterValues.status);
+      filtered = filtered.filter(user => user.roleId?._id === filterValues.role || user.roleId === filterValues.role);
     }
 
     setFilteredUsers(filtered);
@@ -106,13 +112,16 @@ const UserList = () => {
     navigate(`/center-head/users/${user._id}/edit`);
   };
 
-  const handleDeleteUser = (e, user) => {
+  const handleDeleteUser = async (e, user) => {
     e.stopPropagation(); // Prevent row click
-    if (window.confirm(`Bạn có chắc chắn muốn xóa người dùng "${user.fullname || user.username}"?\n\nHành động này không thể hoàn tác.`)) {
-      console.log('Delete user:', user._id);
-      // TODO: Implement API call to delete user
-      // After success, refresh the list
-      fetchUsers();
+    if (window.confirm(`Bạn có chắc chắn muốn xóa người dùng "${user.username}"?\n\nHành động này không thể hoàn tác.`)) {
+      try {
+        await userService.deleteUser(user._id);
+        fetchUsers(); // Refresh the list after successful delete
+      } catch (err) {
+        console.error('Error deleting user:', err);
+        alert(err.message || 'Có lỗi xảy ra khi xóa người dùng.');
+      }
     }
   };
 
@@ -130,30 +139,19 @@ const UserList = () => {
     {
       key: "role",
       label: "Vai trò",
-      options: mockRoles.map(role => ({
+      options: roles.map(role => ({
         value: role._id,
         label: role.name
       }))
-    },
-    {
-      key: "status",
-      label: "Trạng thái",
-      options: [
-        { value: "active", label: "Đang hoạt động" },
-        { value: "inactive", label: "Không hoạt động" },
-      ]
     }
   ];
 
   const columns = [
     {
-      header: 'Tên',
-      field: 'fullname',
+      header: 'Username',
+      field: 'username',
       render: (row) => (
-        <div>
-          <div className="fw-semibold text-neutral-900 mb-4">{row.fullname || 'N/A'}</div>
-          <div className="text-sm text-neutral-500">@{row.username}</div>
-        </div>
+        <div className="fw-semibold text-neutral-900">@{row.username}</div>
       ),
     },
     {
@@ -164,19 +162,19 @@ const UserList = () => {
       ),
     },
     {
+      header: 'Số điện thoại',
+      field: 'phone',
+      render: (row) => (
+        <span className="text-neutral-700">{row.phone || 'N/A'}</span>
+      ),
+    },
+    {
       header: 'Role',
       field: 'role',
       render: (row) => (
         <span className="badge bg-main-50 text-main-600 fw-medium">
-          {row.role?.name || 'N/A'}
+          {row.roleId?.name || 'N/A'}
         </span>
-      ),
-    },
-    {
-      header: 'Trạng thái',
-      field: 'status',
-      render: (row) => (
-        <StatusBadge status={row.status} size="sm" />
       ),
     },
     {
@@ -465,16 +463,15 @@ const UserList = () => {
       >
         {selectedUser && (
           <div className="row g-3">
-            {/* User Avatar & Status */}
+            {/* User Avatar */}
             <div className="col-12">
               <div className="d-flex align-items-center gap-3 p-3 bg-neutral-50 rounded">
                 <div className="avatar-circle bg-main-600 text-white d-flex align-items-center justify-content-center" style={{ width: '64px', height: '64px', borderRadius: '50%', fontSize: '24px', fontWeight: 'bold' }}>
-                  {selectedUser.fullname?.charAt(0)?.toUpperCase() || selectedUser.username?.charAt(0)?.toUpperCase() || 'U'}
+                  {selectedUser.username?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
                 <div className="flex-grow-1">
-                  <h5 className="mb-1 text-neutral-900 fw-bold">{selectedUser.fullname || 'N/A'}</h5>
-                  <p className="mb-1 text-neutral-600">@{selectedUser.username}</p>
-                  <StatusBadge status={selectedUser.status} size="sm" />
+                  <h5 className="mb-1 text-neutral-900 fw-bold">@{selectedUser.username}</h5>
+                  <p className="mb-0 text-neutral-600">{selectedUser.email}</p>
                 </div>
               </div>
             </div>
@@ -506,19 +503,7 @@ const UserList = () => {
                 <div className="d-flex align-items-center gap-2">
                   <i className="ph ph-user-circle text-neutral-500"></i>
                   <span className="badge bg-main-50 text-main-600 fw-medium">
-                    {selectedUser.role?.name || 'N/A'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="col-12 col-md-6">
-              <div className="info-item mb-3">
-                <label className="text-sm text-neutral-600 mb-1 d-block">Ngày tham gia</label>
-                <div className="d-flex align-items-center gap-2">
-                  <i className="ph ph-calendar text-neutral-500"></i>
-                  <span className="text-neutral-900">
-                    {selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString('vi-VN') : 'N/A'}
+                    {selectedUser.roleId?.name || 'N/A'}
                   </span>
                 </div>
               </div>
@@ -535,14 +520,14 @@ const UserList = () => {
             </div>
 
             {/* Role Description */}
-            {selectedUser.role?.description && (
+            {selectedUser.roleId?.description && (
               <div className="col-12">
                 <div className="alert alert-info mb-0">
                   <div className="d-flex align-items-start gap-2">
                     <i className="ph ph-info text-info text-xl"></i>
                     <div>
                       <strong>Mô tả vai trò:</strong>
-                      <p className="mb-0 mt-1">{selectedUser.role.description}</p>
+                      <p className="mb-0 mt-1">{selectedUser.roleId.description}</p>
                     </div>
                   </div>
                 </div>

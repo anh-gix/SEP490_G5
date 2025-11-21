@@ -14,6 +14,7 @@ const Button = ({
   const variantClasses = {
     primary: 'btn-main',
     secondary: 'btn-outline-main',
+    'outline-secondary': 'btn-outline-secondary',
     success: 'btn-success-600',
     danger: 'btn-danger-600',
     warning: 'btn-warning-600',

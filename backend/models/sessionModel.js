@@ -14,15 +14,10 @@ const sessionSchema = new Schema({
         type: String
 
     },
-    materials: [{
-        name: String,
-        url: String
-    }],
     learningType: {
         type: String
 
     },
-
     clos: [{
         type: Schema.Types.ObjectId,
         ref: 'CLO'

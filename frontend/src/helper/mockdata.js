@@ -25,6 +25,14 @@ export const mockPendingCourses = [
       fullname: "Nguyễn Văn A",
       email: "nguyenvana@example.com"
     },
+    submittedAt: "2025-10-20T10:00:00Z",
+    revisionReason: null,
+    materials: [
+      "https://example.com/materials/java-basic-textbook.pdf",
+      "https://example.com/materials/java-exercises.pdf",
+      "https://example.com/materials/java-oop-guide.pdf"
+    ],
+    mocktestSessionOrders: [10, 20],
     createdAt: "2025-10-15T08:30:00Z",
     updatedAt: "2025-10-20T10:45:00Z",
     sessions: [
@@ -111,6 +119,14 @@ export const mockPendingCourses = [
       fullname: "Trần Thị B",
       email: "tranthib@example.com"
     },
+    submittedAt: "2025-10-19T13:00:00Z",
+    revisionReason: null,
+    materials: [
+      "https://example.com/materials/english-b1-textbook.pdf",
+      "https://example.com/materials/listening-exercises.mp3",
+      "https://example.com/materials/speaking-topics.pdf"
+    ],
+    mocktestSessionOrders: [5, 10, 15],
     createdAt: "2025-10-18T09:00:00Z",
     updatedAt: "2025-10-19T14:30:00Z",
     sessions: [
@@ -168,6 +184,14 @@ export const mockPendingCourses = [
       fullname: "Lê Văn C",
       email: "levanc@example.com"
     },
+    submittedAt: "2025-10-21T08:00:00Z",
+    revisionReason: null,
+    materials: [
+      "https://example.com/materials/mysql-fundamentals.pdf",
+      "https://example.com/materials/sql-queries-guide.pdf",
+      "https://example.com/materials/database-design-templates.zip"
+    ],
+    mocktestSessionOrders: [8, 16],
     createdAt: "2025-10-16T11:20:00Z",
     updatedAt: "2025-10-21T09:15:00Z",
     sessions: [
@@ -241,6 +265,15 @@ export const mockPendingCourses = [
       fullname: "Phạm Thị D",
       email: "phamthid@example.com"
     },
+    submittedAt: "2025-10-22T15:00:00Z",
+    revisionReason: null,
+    materials: [
+      "https://example.com/materials/react-advanced-handbook.pdf",
+      "https://example.com/materials/react-hooks-examples.zip",
+      "https://example.com/materials/performance-optimization.pdf",
+      "https://example.com/materials/react-best-practices.pdf"
+    ],
+    mocktestSessionOrders: [6, 12],
     createdAt: "2025-10-17T13:45:00Z",
     updatedAt: "2025-10-22T16:20:00Z",
     sessions: [
@@ -297,6 +330,15 @@ export const mockPendingCourses = [
       fullname: "Hoàng Văn E",
       email: "hoangvane@example.com"
     },
+    submittedAt: "2025-10-23T10:00:00Z",
+    revisionReason: null,
+    materials: [
+      "https://example.com/materials/digital-marketing-handbook.pdf",
+      "https://example.com/materials/seo-guide.pdf",
+      "https://example.com/materials/content-marketing-strategy.pdf",
+      "https://example.com/materials/social-media-templates.zip"
+    ],
+    mocktestSessionOrders: [7, 14],
     createdAt: "2025-10-19T10:30:00Z",
     updatedAt: "2025-10-23T11:00:00Z",
     sessions: [

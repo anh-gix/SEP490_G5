@@ -29,12 +29,6 @@ const CenterHeadLayout = ({ children }) => {
       color: 'warning'
     },
     {
-      title: 'Giáo trình chờ duyệt',
-      icon: 'fa-clock',
-      path: '/courses/pending',
-      color: 'danger'
-    },
-    {
       title: 'Lớp học',
       icon: 'fa-chalkboard-teacher',
       path: '/center-head/classes',
@@ -45,12 +39,6 @@ const CenterHeadLayout = ({ children }) => {
       icon: 'fa-calendar-alt',
       path: '/schedules/pending',
       color: 'warning'
-    },
-    {
-      title: 'Phòng học',
-      icon: 'fa-door-open',
-      path: '/center-head/rooms',
-      color: 'success'
     },
     {
       title: 'Đề thi',

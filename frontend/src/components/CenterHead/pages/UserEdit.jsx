@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
-import { mockRoles, mockPermissionMatrix, mockUsers, simulateApiDelay } from '../../../helper/mockdataExtended';
+import { mockRoles, mockUsers, simulateApiDelay } from '../../../helper/mockdataExtended';
 
 const UserEdit = () => {
   const navigate = useNavigate();
@@ -22,27 +22,10 @@ const UserEdit = () => {
     confirmPassword: '',
   });
   const [errors, setErrors] = useState({});
-  const [expandedGroups, setExpandedGroups] = useState({});
-  const [selectedPermissions, setSelectedPermissions] = useState({});
 
   useEffect(() => {
     fetchUser();
   }, [id]);
-
-  useEffect(() => {
-    // Initialize selected permissions when role changes
-    if (formData.roleId) {
-      const allPerms = getRolePermissions();
-      const initialPerms = {};
-      allPerms.forEach(perm => {
-        const key = `${perm.category}-${perm.permission}`;
-        initialPerms[key] = true;
-      });
-      setSelectedPermissions(initialPerms);
-    } else {
-      setSelectedPermissions({});
-    }
-  }, [formData.roleId]);
 
   const fetchUser = async () => {
     try {
@@ -170,120 +153,6 @@ const UserEdit = () => {
     }
   };
 
-  // Get selected role
-  const selectedRole = mockRoles.find(role => role._id === formData.roleId);
-
-  // Get permissions for selected role
-  const getRolePermissions = () => {
-    if (!selectedRole) return [];
-
-    const permissions = [];
-    Object.entries(mockPermissionMatrix).forEach(([category, perms]) => {
-      Object.entries(perms).forEach(([permission, roles]) => {
-        if (roles.includes(selectedRole.name)) {
-          permissions.push({
-            category,
-            permission,
-            label: getPermissionLabel(permission),
-          });
-        }
-      });
-    });
-
-    return permissions;
-  };
-
-  const getPermissionLabel = (permission) => {
-    const labels = {
-      createUser: 'Tạo người dùng',
-      editUser: 'Sửa người dùng',
-      deleteUser: 'Xóa người dùng',
-      changeRole: 'Thay đổi vai trò',
-      importUsers: 'Import người dùng',
-      createProgram: 'Tạo chương trình',
-      approveProgram: 'Phê duyệt chương trình',
-      createPLO: 'Tạo PLO',
-      createCourse: 'Tạo khóa học',
-      approveCourse: 'Phê duyệt khóa học',
-      createCLO: 'Tạo CLO',
-      createSession: 'Tạo phiên học',
-      createClass: 'Tạo lớp học',
-      assignTeacher: 'Phân công giảng viên',
-      manageStudents: 'Quản lý học viên',
-      createSchedule: 'Tạo lịch học',
-      approveSchedule: 'Phê duyệt lịch học',
-      approveLeaveRequest: 'Phê duyệt đơn nghỉ',
-      takeAttendance: 'Điểm danh',
-      createRoom: 'Tạo phòng học',
-      editRoom: 'Sửa phòng học',
-    };
-    return labels[permission] || permission;
-  };
-
-  const getCategoryLabel = (category) => {
-    const labels = {
-      accountManagement: 'Quản lý tài khoản',
-      programManagement: 'Quản lý chương trình',
-      classManagement: 'Quản lý lớp học',
-      roomManagement: 'Quản lý phòng học',
-    };
-    return labels[category] || category;
-  };
-
-  // Group permissions by category
-  const groupedPermissions = getRolePermissions().reduce((acc, perm) => {
-    if (!acc[perm.category]) {
-      acc[perm.category] = [];
-    }
-    acc[perm.category].push(perm);
-    return acc;
-  }, {});
-
-  const toggleGroup = (category) => {
-    setExpandedGroups(prev => ({
-      ...prev,
-      [category]: !prev[category]
-    }));
-  };
-
-  const isCategoryExpanded = (category) => {
-    return expandedGroups[category] !== false; // Default to expanded
-  };
-
-  const selectAllInGroup = (category, checked) => {
-    const newPermissions = { ...selectedPermissions };
-    const permsInCategory = groupedPermissions[category] || [];
-
-    permsInCategory.forEach(perm => {
-      const key = `${perm.category}-${perm.permission}`;
-      newPermissions[key] = checked;
-    });
-
-    setSelectedPermissions(newPermissions);
-  };
-
-  const togglePermission = (category, permission) => {
-    const key = `${category}-${permission}`;
-    setSelectedPermissions(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-  };
-
-  const isCategoryAllChecked = (category) => {
-    const permsInCategory = groupedPermissions[category] || [];
-    if (permsInCategory.length === 0) return false;
-
-    return permsInCategory.every(perm => {
-      const key = `${perm.category}-${perm.permission}`;
-      return selectedPermissions[key] === true;
-    });
-  };
-
-  const isPermissionChecked = (category, permission) => {
-    const key = `${category}-${permission}`;
-    return selectedPermissions[key] === true;
-  };
 
   if (loading) {
     return (
@@ -315,7 +184,7 @@ const UserEdit = () => {
       <Breadcrumb items={breadcrumbItems} />
 
       {/* Header */}
-      <div className="d-flex justify-content-between align-items-center mb-24">
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-24 gap-3">
         <div>
           <h4 className="mb-8 text-neutral-900 fw-bold">Chỉnh sửa người dùng</h4>
           <p className="text-neutral-600 mb-0">
@@ -334,8 +203,8 @@ const UserEdit = () => {
         )}
 
         <div className="row">
-          {/* Left Column - Main Form */}
-          <div className="col-12 col-lg-8">
+          {/* Main Form */}
+          <div className="col-12">
             {/* Basic Information Section */}
             <Card className="mb-24">
               <h6 className="mb-16 text-neutral-900 fw-semibold">Thông tin cơ bản</h6>
@@ -437,20 +306,33 @@ const UserEdit = () => {
             <Card className="mb-24">
               <h6 className="mb-16 text-neutral-900 fw-semibold">Thay đổi mật khẩu</h6>
 
-              <p className="text-sm text-neutral-600 mb-16">
-                Bỏ chế độ đổi mật khẩu để cập nhật mật khẩu cho người dùng này
-              </p>
-
-              <button
-                type="button"
-                className="btn btn-outline-primary"
-                onClick={() => setFormData({ ...formData, changePassword: !formData.changePassword })}
-              >
-                Đổi mật khẩu
-              </button>
+              <div className="d-flex align-items-center justify-content-between mb-16">
+                <div>
+                  <p className="text-sm text-neutral-600 mb-1">
+                    Cho phép thay đổi mật khẩu
+                  </p>
+                  <p className="text-xs text-neutral-500 mb-0">
+                    Bật để cập nhật mật khẩu mới cho người dùng này
+                  </p>
+                </div>
+                <div className="form-check form-switch">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="changePasswordSwitch"
+                    checked={formData.changePassword}
+                    onChange={(e) => setFormData({ ...formData, changePassword: e.target.checked })}
+                    style={{ cursor: 'pointer', width: '48px', height: '24px' }}
+                  />
+                  <label className="form-check-label visually-hidden" htmlFor="changePasswordSwitch">
+                    Cho phép đổi mật khẩu
+                  </label>
+                </div>
+              </div>
 
               {formData.changePassword && (
-                <div className="row g-3 mt-3">
+                <div className="row g-3">
                   {/* New Password */}
                   <div className="col-12 col-md-6">
                     <label htmlFor="newPassword" className="form-label">
@@ -487,180 +369,28 @@ const UserEdit = () => {
                 </div>
               )}
             </Card>
-          </div>
-
-          {/* Right Column - Permissions Sidebar */}
-          <div className="col-12 col-lg-4">
-            <Card className="mb-24">
-              <h6 className="mb-16 text-neutral-900 fw-semibold">Quyền hạn</h6>
-
-              {!selectedRole ? (
-                <div className="text-center text-neutral-500 py-4">
-                  <i className="ph ph-info text-4xl mb-2"></i>
-                  <p className="mb-0 text-sm">Chọn vai trò để xem quyền hạn</p>
-                </div>
-              ) : (
-                <>
-                  {Object.keys(groupedPermissions).length === 0 ? (
-                    <div className="text-center text-neutral-500 py-3">
-                      <p className="mb-0 text-sm">Vai trò này chưa có quyền hạn nào</p>
-                    </div>
-                  ) : (
-                    <div
-                      className="permissions-accordion"
-                      style={{
-                        maxHeight: '400px',
-                        overflowY: 'auto',
-                        paddingRight: '4px'
-                      }}
-                    >
-                      {Object.entries(groupedPermissions).map(([category, perms]) => {
-                        const isExpanded = isCategoryExpanded(category);
-                        const allChecked = isCategoryAllChecked(category);
-
-                        return (
-                          <div
-                            key={category}
-                            className="mb-2"
-                            style={{
-                              border: '1px solid #e5e7eb',
-                              borderRadius: '6px',
-                              overflow: 'hidden',
-                              backgroundColor: '#ffffff'
-                            }}
-                          >
-                            {/* Group Header */}
-                            <div
-                              className="d-flex align-items-center justify-content-between"
-                              style={{
-                                padding: '10px 12px',
-                                backgroundColor: isExpanded ? '#f9fafb' : '#ffffff',
-                                borderBottom: isExpanded ? '1px solid #e5e7eb' : 'none',
-                                transition: 'all 0.2s ease'
-                              }}
-                            >
-                              <div className="d-flex align-items-center gap-2">
-                                <input
-                                  className="form-check-input"
-                                  type="checkbox"
-                                  checked={allChecked}
-                                  onChange={(e) => {
-                                    selectAllInGroup(category, e.target.checked);
-                                  }}
-                                  style={{
-                                    cursor: 'pointer',
-                                    marginTop: '0',
-                                    width: '16px',
-                                    height: '16px'
-                                  }}
-                                />
-                                <span
-                                  className="fw-semibold"
-                                  onClick={() => toggleGroup(category)}
-                                  style={{
-                                    fontSize: '13px',
-                                    color: '#374151',
-                                    cursor: 'pointer',
-                                    flex: 1
-                                  }}
-                                >
-                                  {getCategoryLabel(category)}
-                                </span>
-                              </div>
-                              <i
-                                className={`ph ${isExpanded ? 'ph-caret-up' : 'ph-caret-down'}`}
-                                onClick={() => toggleGroup(category)}
-                                style={{
-                                  fontSize: '14px',
-                                  color: '#9ca3af',
-                                  cursor: 'pointer'
-                                }}
-                              ></i>
-                            </div>
-
-                            {/* Permission Items */}
-                            {isExpanded && (
-                              <div
-                                style={{
-                                  padding: '8px 12px 8px 32px',
-                                  backgroundColor: '#fafbfc'
-                                }}
-                              >
-                                {perms.map((perm, index) => {
-                                  const isChecked = isPermissionChecked(perm.category, perm.permission);
-
-                                  return (
-                                    <div
-                                      key={index}
-                                      className="form-check"
-                                      style={{
-                                        marginBottom: index < perms.length - 1 ? '6px' : '0',
-                                        paddingLeft: '0'
-                                      }}
-                                    >
-                                      <input
-                                        className="form-check-input"
-                                        type="checkbox"
-                                        id={`perm-${category}-${index}`}
-                                        checked={isChecked}
-                                        onChange={() => togglePermission(perm.category, perm.permission)}
-                                        style={{
-                                          cursor: 'pointer',
-                                          marginRight: '8px',
-                                          width: '14px',
-                                          height: '14px',
-                                          float: 'left',
-                                          marginTop: '2px'
-                                        }}
-                                      />
-                                      <label
-                                        className="form-check-label"
-                                        htmlFor={`perm-${category}-${index}`}
-                                        style={{
-                                          cursor: 'pointer',
-                                          fontSize: '13px',
-                                          color: '#6b7280',
-                                          lineHeight: '1.4',
-                                          userSelect: 'none'
-                                        }}
-                                      >
-                                        {perm.label}
-                                      </label>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </>
-              )}
-            </Card>
 
             {/* Action Buttons */}
-            <Card className="position-relative" style={{ zIndex: 1 }}>
+            <div className="d-flex justify-content-end gap-3 mt-24">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleCancel}
+                disabled={saving}
+                style={{ minWidth: '150px' }}
+              >
+                Hủy
+              </Button>
               <Button
                 type="submit"
                 variant="primary"
                 icon="ph ph-check"
                 disabled={saving}
-                className="w-100 mb-2"
+                style={{ minWidth: '150px' }}
               >
                 {saving ? 'Đang lưu...' : 'Lưu Thay Đổi'}
               </Button>
-              <Button
-                type="button"
-                variant="outline-secondary"
-                onClick={handleCancel}
-                disabled={saving}
-                className="w-100"
-              >
-                Hủy
-              </Button>
-            </Card>
+            </div>
           </div>
         </div>
       </form>

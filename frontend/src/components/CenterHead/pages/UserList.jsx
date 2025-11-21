@@ -186,24 +186,24 @@ const UserList = () => {
         <div className="d-flex gap-2" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
-            className="btn btn-sm btn-outline-primary d-flex align-items-center justify-content-center"
-            style={{ width: '32px', height: '32px' }}
+            className="btn btn-sm btn-outline-main d-flex align-items-center justify-content-center"
+            style={{ width: '32px', height: '32px', padding: '0' }}
             onClick={(e) => {
               e.stopPropagation();
               handleEditUser(row);
             }}
             title="Chỉnh sửa"
           >
-            <i className="ph ph-pencil-simple"></i>
+            <i className="ph ph-pencil-simple" style={{ fontSize: '16px' }}></i>
           </button>
           <button
             type="button"
-            className="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center"
-            style={{ width: '32px', height: '32px' }}
+            className="btn btn-sm btn-danger d-flex align-items-center justify-content-center"
+            style={{ width: '32px', height: '32px', padding: '0' }}
             onClick={(e) => handleDeleteUser(e, row)}
             title="Xóa"
           >
-            <i className="ph ph-trash"></i>
+            <i className="ph ph-trash" style={{ fontSize: '16px' }}></i>
           </button>
         </div>
       ),
@@ -279,7 +279,7 @@ const UserList = () => {
       <Breadcrumb items={breadcrumbItems} />
 
       {/* Header */}
-      <div className="d-flex justify-content-between align-items-center mb-24">
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-24 gap-3">
         <div>
           <h4 className="mb-8 text-neutral-900 fw-bold">Quản lý tài khoản</h4>
           <p className="text-neutral-600 mb-0">
@@ -320,10 +320,10 @@ const UserList = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="col-12 col-md-4 d-flex gap-2 justify-content-md-end">
+          <div className="col-12 col-md-4 d-flex flex-column flex-sm-row gap-2 justify-content-md-end">
             <button
               type="button"
-              className="btn btn-success d-flex align-items-center gap-2"
+              className="btn btn-success d-flex align-items-center justify-content-center gap-2 w-100 w-sm-auto"
               onClick={handleExport}
             >
               <i className="ph ph-download-simple"></i>
@@ -333,6 +333,7 @@ const UserList = () => {
               variant="primary"
               icon="ph ph-plus"
               onClick={handleCreateUser}
+              className="w-100 w-sm-auto"
             >
               Thêm người dùng
             </Button>
@@ -356,11 +357,13 @@ const UserList = () => {
           </Button>
         </div>
 
-        <Table
-          columns={columns}
-          data={currentPageData}
-          onRowClick={handleViewUser}
-        />
+        <div className="table-responsive">
+          <Table
+            columns={columns}
+            data={currentPageData}
+            onRowClick={handleViewUser}
+          />
+        </div>
 
         {/* Pagination Controls */}
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-center mt-16 pt-16 border-top">

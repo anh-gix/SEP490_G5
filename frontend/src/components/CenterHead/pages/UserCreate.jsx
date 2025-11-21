@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
-import { mockRoles, mockPermissionMatrix } from '../../../helper/mockdataExtended';
+import { mockRoles } from '../../../helper/mockdataExtended';
 
 const UserCreate = () => {
   const navigate = useNavigate();
@@ -108,81 +108,13 @@ const UserCreate = () => {
     }
   };
 
-  // Get selected role
-  const selectedRole = mockRoles.find(role => role._id === formData.roleId);
-
-  // Get permissions for selected role
-  const getRolePermissions = () => {
-    if (!selectedRole) return [];
-
-    const permissions = [];
-    Object.entries(mockPermissionMatrix).forEach(([category, perms]) => {
-      Object.entries(perms).forEach(([permission, roles]) => {
-        if (roles.includes(selectedRole.name)) {
-          permissions.push({
-            category,
-            permission,
-            label: getPermissionLabel(permission),
-          });
-        }
-      });
-    });
-
-    return permissions;
-  };
-
-  const getPermissionLabel = (permission) => {
-    const labels = {
-      createUser: 'Tạo người dùng',
-      editUser: 'Sửa người dùng',
-      deleteUser: 'Xóa người dùng',
-      changeRole: 'Thay đổi vai trò',
-      importUsers: 'Import người dùng',
-      createProgram: 'Tạo chương trình',
-      approveProgram: 'Phê duyệt chương trình',
-      createPLO: 'Tạo PLO',
-      createCourse: 'Tạo khóa học',
-      approveCourse: 'Phê duyệt khóa học',
-      createCLO: 'Tạo CLO',
-      createSession: 'Tạo phiên học',
-      createClass: 'Tạo lớp học',
-      assignTeacher: 'Phân công giảng viên',
-      manageStudents: 'Quản lý học viên',
-      createSchedule: 'Tạo lịch học',
-      approveSchedule: 'Phê duyệt lịch học',
-      approveLeaveRequest: 'Phê duyệt đơn nghỉ',
-      takeAttendance: 'Điểm danh',
-      createRoom: 'Tạo phòng học',
-      editRoom: 'Sửa phòng học',
-    };
-    return labels[permission] || permission;
-  };
-
-  const getCategoryLabel = (category) => {
-    const labels = {
-      accountManagement: 'Quản lý tài khoản',
-      programManagement: 'Quản lý chương trình',
-      classManagement: 'Quản lý lớp học',
-      roomManagement: 'Quản lý phòng học',
-    };
-    return labels[category] || category;
-  };
-
-  // Group permissions by category
-  const groupedPermissions = getRolePermissions().reduce((acc, perm) => {
-    if (!acc[perm.category]) {
-      acc[perm.category] = [];
-    }
-    acc[perm.category].push(perm);
-    return acc;
-  }, {});
 
   return (
     <div className="user-create-container">
       <Breadcrumb items={breadcrumbItems} />
 
       {/* Header */}
-      <div className="d-flex justify-content-between align-items-center mb-24">
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-24 gap-3">
         <div>
           <h4 className="mb-8 text-neutral-900 fw-bold">Thêm người dùng mới</h4>
           <p className="text-neutral-600 mb-0">
@@ -193,8 +125,8 @@ const UserCreate = () => {
 
       <form onSubmit={handleSubmit}>
         <div className="row">
-          {/* Left Column - Form Fields */}
-          <div className="col-12 col-lg-8">
+          {/* Form Fields */}
+          <div className="col-12">
             <Card className="mb-24">
               <h6 className="mb-16 text-neutral-900 fw-semibold">Thông tin cơ bản</h6>
 
@@ -332,76 +264,29 @@ const UserCreate = () => {
                 </div>
               </div>
             </Card>
-          </div>
-
-          {/* Right Column - Role Permissions Preview */}
-          <div className="col-12 col-lg-4">
-            <Card className="mb-24">
-              <h6 className="mb-16 text-neutral-900 fw-semibold">Quyền hạn</h6>
-
-              {!selectedRole ? (
-                <div className="text-center text-neutral-500 py-4">
-                  <i className="ph ph-info text-4xl mb-2"></i>
-                  <p className="mb-0">Chọn vai trò để xem quyền hạn</p>
-                </div>
-              ) : (
-                <>
-                  <div className="mb-3 p-3 bg-main-50 rounded">
-                    <div className="fw-semibold text-main-600 mb-1">{selectedRole.name}</div>
-                    <div className="text-sm text-neutral-600">{selectedRole.description}</div>
-                  </div>
-
-                  {Object.keys(groupedPermissions).length === 0 ? (
-                    <div className="text-center text-neutral-500 py-3">
-                      <p className="mb-0">Vai trò này chưa có quyền hạn nào</p>
-                    </div>
-                  ) : (
-                    <div className="permissions-list">
-                      {Object.entries(groupedPermissions).map(([category, perms]) => (
-                        <div key={category} className="mb-3">
-                          <div className="text-sm fw-semibold text-neutral-700 mb-2">
-                            {getCategoryLabel(category)}
-                          </div>
-                          <ul className="list-unstyled mb-0">
-                            {perms.map((perm, index) => (
-                              <li key={index} className="d-flex align-items-start mb-2">
-                                <i className="ph ph-check-circle text-success me-2 mt-1"></i>
-                                <span className="text-sm text-neutral-600">{perm.label}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </Card>
 
             {/* Action Buttons */}
-            <Card>
-              <div className="d-flex flex-column gap-2">
-                <Button
-                  type="submit"
-                  variant="primary"
-                  icon="ph ph-check"
-                  disabled={loading}
-                  className="w-100"
-                >
-                  {loading ? 'Đang tạo...' : 'Tạo người dùng'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline-secondary"
-                  icon="ph ph-x"
-                  onClick={handleCancel}
-                  disabled={loading}
-                  className="w-100"
-                >
-                  Hủy
-                </Button>
-              </div>
-            </Card>
+            <div className="d-flex justify-content-end gap-3 mt-24">
+              <Button
+                type="button"
+                variant="secondary"
+                icon="ph ph-x"
+                onClick={handleCancel}
+                disabled={loading}
+                style={{ minWidth: '150px' }}
+              >
+                Hủy
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                icon="ph ph-check"
+                disabled={loading}
+                style={{ minWidth: '150px' }}
+              >
+                {loading ? 'Đang tạo...' : 'Tạo người dùng'}
+              </Button>
+            </div>
           </div>
         </div>
       </form>

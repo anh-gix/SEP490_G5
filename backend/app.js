@@ -46,6 +46,9 @@ app.use('/api/classes', require('./routes/classRoutes'));
 // Schedule Routes
 app.use('/api/schedules', require('./routes/scheduleRoute'));
 
+// Homework Routes
+app.use('/api/homework', require('./routes/homeworkRoutes'));
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -43,6 +43,11 @@ export const teacherRoutes = [
   // II. Classes
   { path: '/teacher/classes', element: <TeacherClassesPage /> },
   { path: '/teacher/classes/:classId', element: <TeacherClassDetailPage /> },
+  { path: '/teacher/classes/:classId/overview', element: <TeacherClassDetailPage /> },
+  { path: '/teacher/classes/:classId/students', element: <TeacherClassDetailPage /> },
+  { path: '/teacher/classes/:classId/lessons', element: <TeacherClassDetailPage /> },
+  { path: '/teacher/classes/:classId/materials', element: <TeacherClassDetailPage /> },
+  { path: '/teacher/classes/:classId/assignments', element: <TeacherClassDetailPage /> },
 
   // III. Assignments
   { path: '/teacher/assignments', element: <TeacherAssignmentsPage /> },

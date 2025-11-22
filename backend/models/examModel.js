@@ -2,8 +2,9 @@ const mongoose = require("mongoose");
 
 const answerKeySchema = new mongoose.Schema({
   questionNumber: { type: Number, required: true },
-  correctAnswer: { type: String, required: true },
+  correctAnswer: [{ type: String, required: true }],
   maxScore: { type: Number, default: 1 },
+  questionType: { type: String, enum: ["multiple_choice", "true_false", "input"] }
 });
 
 const sectionSchema = new mongoose.Schema({

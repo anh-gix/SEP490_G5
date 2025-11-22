@@ -5,8 +5,10 @@ import UserEditPage from "../pages/UserEditPage.jsx";
 import RoleManagementPage from "../pages/RoleManagementPage.jsx";
 import ProgramListPage from "../pages/ProgramListPage.jsx";
 import ProgramDetailPage from "../pages/ProgramDetailPage.jsx";
+import ProgramFormPage from "../pages/ProgramFormPage.jsx";
 import PendingCoursesPage from "../pages/PendingCoursesPage.jsx";
 import CourseDetailPage from "../pages/CourseDetailPage.jsx";
+import CourseFormPage from "../pages/CourseFormPage.jsx";
 import ClassListPage from "../pages/ClassListPage.jsx";
 import PendingSchedulesPage from "../pages/PendingSchedulesPage.jsx";
 import RoomListPage from "../pages/RoomListPage.jsx";
@@ -31,9 +33,13 @@ export const centerHeadRoutes = [
 
   // II. Program & Course Management
   { path: '/center-head/programs', element: <ProgramListPage /> },
+  { path: '/center-head/programs/create', element: <ProgramFormPage /> },
   { path: '/center-head/programs/:id', element: <ProgramDetailPage /> },
+  { path: '/center-head/programs/:id/edit', element: <ProgramFormPage /> },
+  { path: '/center-head/programs/:id/courses/create', element: <CourseFormPage /> },
   { path: '/center-head/courses/pending', element: <PendingCoursesPage /> },
   { path: '/center-head/courses/:id/details', element: <CourseDetailPage /> },
+  { path: '/center-head/courses/:id/edit', element: <CourseFormPage /> },
 
   // III. Class & Schedule Management
   { path: '/center-head/classes', element: <ClassListPage /> },

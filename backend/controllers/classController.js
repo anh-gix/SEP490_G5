@@ -44,12 +44,12 @@ exports.getAllClasses = async (req, res) => {
       classes.map(async (cls) => {
         const schedules = await ClassSchedule.countDocuments({ 
           class: cls._id,
-          status: 'approved'
+          status: { $in: ['temporary', 'fixed'] }
         });
         
         const completedSchedules = await ClassSchedule.countDocuments({
           class: cls._id,
-          status: 'approved',
+          status: { $in: ['temporary', 'fixed'] },
           date: { $lt: new Date() }
         });
         
@@ -135,8 +135,8 @@ exports.getClassById = async (req, res) => {
       .sort({ date: 1 });
 
     // compute some convenient stats for frontend
-    const totalSchedules = await ClassSchedule.countDocuments({ class: id, status: 'approved' });
-    const completedSchedules = await ClassSchedule.countDocuments({ class: id, status: 'approved', date: { $lt: new Date() } });
+    const totalSchedules = await ClassSchedule.countDocuments({ class: id, status: { $in: ['temporary', 'fixed'] } });
+    const completedSchedules = await ClassSchedule.countDocuments({ class: id, status: { $in: ['temporary', 'fixed'] }, date: { $lt: new Date() } });
     const totalStudents = classData.students?.length || 0;
     const completionRate = totalSchedules > 0 ? ((completedSchedules / totalSchedules) * 100).toFixed(2) : '0';
     
@@ -412,7 +412,7 @@ exports.createClass = async (req, res) => {
             teacher: teacher,
             createdBy: req.user?._id || teacher, // Use logged in user or teacher as fallback
             reason: `Buổi học ${i + 1}`,
-            status: 'approved'
+            status: 'fixed'
           });
           
           // Move to next entry (round-robin)
@@ -858,7 +858,7 @@ exports.updateClass = async (req, res) => {
               teacher: finalTeacher,
               createdBy: req.user?._id || finalTeacher,
               reason: `Buổi học ${pastSessionsCount + i + 1}`,
-              status: 'approved'
+              status: 'fixed'
             });
             
             // Move to next entry (round-robin)
@@ -1027,7 +1027,7 @@ exports.updateClass = async (req, res) => {
             teacher: finalTeacher,
             createdBy: req.user?._id || finalTeacher, // Use logged in user or teacher as fallback
             reason: `Buổi học ${i + 1}`,
-            status: 'approved'
+            status: 'fixed'
           });
           
           // Move to next entry (round-robin)

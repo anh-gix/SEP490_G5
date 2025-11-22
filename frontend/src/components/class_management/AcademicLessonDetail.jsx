@@ -67,7 +67,7 @@ const AcademicLessonDetail = () => {
         teacherName: schedule.teacher?.username || schedule.class?.teacher?.username || 'N/A',
         lessonNumber: schedule.session?.order || 0,
         lessonTopic: schedule.session?.title || schedule.topic || 'N/A',
-        status: schedule.status || 'draft',
+        status: schedule.status || 'fixed',
         type: schedule.type || 'regular',
         description: schedule.session?.description || schedule.session?.content || schedule.topic || 'Chưa có mô tả',
         objectives: schedule.session?.clos?.map(clo => clo.detail || clo.name) || [

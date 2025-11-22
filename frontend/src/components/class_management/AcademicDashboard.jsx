@@ -47,8 +47,8 @@ const AcademicDashboard = () => {
 
       // Fetch today's schedules
       const schedulesResponse = await scheduleService.getAllSchedules({ 
-        date: todayStr,
-        status: 'approved'
+        date: todayStr
+        // Không filter theo status cũ nữa, lấy tất cả schedules
       });
       const todaySchedules = schedulesResponse.schedules || schedulesResponse || [];
 

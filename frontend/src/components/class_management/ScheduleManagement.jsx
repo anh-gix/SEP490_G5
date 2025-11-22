@@ -75,7 +75,7 @@ const ScheduleManagement = () => {
           endTime: sch.endTime || 'N/A',
           lessonNumber: sch.session?.order || sch.session?.sessionNumber || 0,
           lessonTopic: sch.session?.title || sch.topic || 'N/A',
-          status: sch.status || 'draft',
+          status: sch.status || 'fixed',
           type: sch.type || 'regular'
         };
       });

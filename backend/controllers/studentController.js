@@ -333,7 +333,7 @@ exports.getStudentSchedule = async (req, res) => {
     
     const classIds = studentClasses.map(cls => cls._id);
     
-    let query = { class: { $in: classIds }, status: 'approved' };
+    let query = { class: { $in: classIds }, status: { $in: ['temporary', 'fixed'] } };
     
     // Filter by date range if provided
     if (startDate && endDate) {

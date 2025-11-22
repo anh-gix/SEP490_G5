@@ -52,6 +52,8 @@ export const getStatusLabel = (status) => {
     approved: 'Đã duyệt',
     rejected: 'Từ chối',
     needs_revision: 'Cần chỉnh sửa',
+    temporary: 'Buổi tạm',
+    fixed: 'Buổi cố định',
   };
   return statusMap[status] || status;
 };
@@ -67,6 +69,8 @@ export const getStatusVariant = (status) => {
     approved: 'success',
     rejected: 'danger',
     needs_revision: 'info',
+    temporary: 'warning',
+    fixed: 'success',
   };
   return variantMap[status] || 'secondary';
 };

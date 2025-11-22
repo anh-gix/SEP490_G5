@@ -914,7 +914,7 @@ async function seedClassSchedules() {
                     teacher: classItem.teacher,
                     createdBy: seedData.users[2]._id, // Academic Staff
                     reason: `Lịch học buổi ${scheduleCount + 1}`,
-                    status: 'approved'
+                    status: 'fixed'
                 });
                 
                 sessionIndex++;

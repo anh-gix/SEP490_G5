@@ -28,8 +28,8 @@ const classScheduleSchema = new Schema({
     
     status: {
         type: String,
-        enum: ['draft', 'pending_approval', 'approved', 'rejected'],
-        default: 'draft'
+        enum: ['temporary', 'fixed'],//temporary: buổi tạm, fixed: buổi cố định
+        default: 'fixed'
     },
     
     // Bài tập về nhà

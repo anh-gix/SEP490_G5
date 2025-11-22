@@ -368,7 +368,7 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
     
     const classIds = teacherClasses.map(cls => cls._id);
     
-    let query = { class: { $in: classIds }, status: 'approved' };
+    let query = { class: { $in: classIds }, status: { $in: ['temporary', 'fixed'] } };
     
     // Filter by date range if provided
     if (startDate && endDate) {
@@ -445,7 +445,7 @@ exports.getTeacherSchedule = async (req, res) => {
     
     const classIds = teacherClasses.map(cls => cls._id);
     
-    let query = { class: { $in: classIds }, status: 'approved' };
+    let query = { class: { $in: classIds }, status: { $in: ['temporary', 'fixed'] } };
     
     // Filter by date range if provided
     if (startDate && endDate) {
@@ -543,7 +543,7 @@ exports.getMyClasses = async (req, res) => {
         // Get all schedules for this class
         const allSchedules = await ClassSchedule.find({ 
           class: cls._id,
-          status: 'approved' 
+          status: { $in: ['temporary', 'fixed'] }
         })
           .populate('session', 'title order')
           .sort({ date: 1 })
@@ -674,7 +674,7 @@ exports.getMyClassDetail = async (req, res) => {
     // Get all schedules/lessons for this class
     const lessons = await ClassSchedule.find({ 
       class: classId,
-      status: 'approved' 
+      status: { $in: ['temporary', 'fixed'] }
     })
       .populate('session', 'title order content')
       .populate('room', 'room_name location')

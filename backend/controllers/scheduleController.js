@@ -67,9 +67,8 @@ exports.getAllSchedules = async (req, res) => {
 exports.getScheduleStats = async (req, res) => {
   try {
     const total = await ClassSchedule.countDocuments();
-    const pending = await ClassSchedule.countDocuments({ status: 'pending_approval' });
-    const approved = await ClassSchedule.countDocuments({ status: 'approved' });
-    const rejected = await ClassSchedule.countDocuments({ status: 'rejected' });
+    const temporary = await ClassSchedule.countDocuments({ status: 'temporary' });
+    const fixed = await ClassSchedule.countDocuments({ status: 'fixed' });
     
     // Today's schedules
     const today = new Date();
@@ -79,16 +78,15 @@ exports.getScheduleStats = async (req, res) => {
     
     const todaySchedules = await ClassSchedule.countDocuments({
       date: { $gte: today, $lt: tomorrow },
-      status: 'approved'
+      status: { $in: ['temporary', 'fixed'] }
     });
     
     res.status(200).json({
       success: true,
       stats: {
         total,
-        pending,
-        approved,
-        rejected,
+        temporary,
+        fixed,
         todaySchedules
       }
     });
@@ -170,7 +168,7 @@ exports.createSchedule = async (req, res) => {
       endTime,
       room,
       reason,
-      status = 'draft',
+      status = 'fixed',
       createdBy
     } = req.body;
     
@@ -186,7 +184,7 @@ exports.createSchedule = async (req, res) => {
     const conflict = await ClassSchedule.findOne({
       room,
       date: new Date(date),
-      status: { $in: ['approved', 'pending_approval'] },
+      status: { $in: ['temporary', 'fixed'] },
       $or: [
         { $and: [{ startTime: { $lte: startTime } }, { endTime: { $gt: startTime } }] },
         { $and: [{ startTime: { $lt: endTime } }, { endTime: { $gte: endTime } }] },
@@ -336,14 +334,11 @@ exports.deleteSchedule = async (req, res) => {
   }
 };
 
-//lấy danh sách lịch học chờ phê duyệt
+//lấy danh sách lịch học chờ phê duyệt (tạm thời giữ nguyên, sẽ điều chỉnh sau)
 exports.getPendingSchedules = async (req, res) => {
     try {
-        const pendingSchedules = await ClassSchedule.find({ status: 'pending_approval' })
-            .populate('class', 'name') 
-            .populate('createdBy', 'name')
-            .populate('room', 'name') 
-            .sort({ createdAt: 1 }); 
+        // Tạm thời trả về empty array vì không còn status 'pending_approval'
+        const pendingSchedules = [];
 
         res.status(200).json({
             success: true,
@@ -356,13 +351,13 @@ exports.getPendingSchedules = async (req, res) => {
     }
 };
 
-//duyệt lịch học
+//duyệt lịch học (tạm thời giữ nguyên, sẽ điều chỉnh sau)
 exports.approveSchedule = async (req, res) => {
     try {
         const schedule = await ClassSchedule.findByIdAndUpdate(
             req.params.id,
             { 
-                status: 'approved',
+                status: 'fixed', // Chuyển sang 'fixed' thay vì 'approved'
                 rejectionReason: null
             },
             { new: true }
@@ -383,6 +378,7 @@ exports.approveSchedule = async (req, res) => {
     }
 };
 
+//từ chối lịch học (tạm thời giữ nguyên, sẽ điều chỉnh sau)
 exports.rejectSchedule = async (req, res) => {
     const { reason } = req.body;
 
@@ -391,10 +387,10 @@ exports.rejectSchedule = async (req, res) => {
     }
 
     try {
+        // Tạm thời không thay đổi status vì không còn 'rejected', chỉ lưu rejectionReason
         const schedule = await ClassSchedule.findByIdAndUpdate(
             req.params.id,
             { 
-                status: 'rejected',
                 rejectionReason: reason
             },
             { new: true }

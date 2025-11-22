@@ -52,7 +52,7 @@ const MakeupClassModal = ({
           id: att._id || att.student?._id,
           studentName: att.student?.username || 'N/A',
           reason: att.attendance?.reason || (att.attendance?.status === 'excused' ? 'Có phép' : 'Vắng'),
-          status: att.attendance?.status === 'excused' ? 'approved' : 'pending'
+          status: att.attendance?.status === 'excused' ? 'fixed' : 'pending'
         }));
       
       setAbsenceRequests(absenceRequests);

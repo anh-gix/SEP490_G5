@@ -51,8 +51,8 @@ router.get("/:examId/submissions/:submissionId/writing/result", verifyToken, exa
 // 🎤 Lấy thông tin section Speaking (protected)
 router.get("/:examId/submissions/:submissionId/speaking", verifyToken, examController.getSpeakingSection);
 
-// 📝 Nộp đáp án Speaking (protected) - có thể upload recording
-router.post("/:examId/submissions/:submissionId/speaking/submit", verifyToken, upload.single("recording"), examController.submitSpeakingAnswers);
+// 📝 Nộp đáp án Speaking (protected) - có thể upload nhiều recording (mỗi câu một file)
+router.post("/:examId/submissions/:submissionId/speaking/submit", verifyToken, upload.any(), examController.submitSpeakingAnswers);
 
 // 📊 Xem kết quả Speaking (protected)
 router.get("/:examId/submissions/:submissionId/speaking/result", verifyToken, examController.getSpeakingResult);

@@ -273,7 +273,7 @@ exports.submitSectionAnswers = async (req, res) => {
 
     // Xử lý file upload cho Writing và Speaking
     // req.file: single file upload
-    // req.files: multiple files upload (nếu dùng upload.array hoặc upload.fields)
+    // req.files: multiple files upload (nếu dùng upload.array, upload.fields, hoặc upload.any)
     const uploadedFiles = {};
     if (req.file) {
       // Single file upload
@@ -281,11 +281,13 @@ exports.submitSectionAnswers = async (req, res) => {
     } else if (req.files) {
       // Multiple files upload
       if (Array.isArray(req.files)) {
-        req.files.forEach((file, index) => {
-          uploadedFiles[`file_${index}`] = `/uploads/${file.filename}`;
+        // upload.any() hoặc upload.array() trả về array
+        req.files.forEach((file) => {
+          // file.fieldname chứa tên field (ví dụ: "question_1")
+          uploadedFiles[file.fieldname] = `/uploads/${file.filename}`;
         });
       } else {
-        // req.files là object với các field names
+        // req.files là object với các field names (upload.fields())
         Object.keys(req.files).forEach((fieldName) => {
           const files = Array.isArray(req.files[fieldName]) 
             ? req.files[fieldName] 

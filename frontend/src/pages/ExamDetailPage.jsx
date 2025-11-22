@@ -114,8 +114,9 @@ const ExamDetailPage = () => {
       navigate(`/exams/${id}/submissions/${submission._id}/listening`);
     } else if (sectionType === "writing") {
       navigate(`/exams/${id}/submissions/${submission._id}/writing`);
+    } else if (sectionType === "speaking") {
+      navigate(`/exams/${id}/submissions/${submission._id}/speaking`);
     }
-    // Add speaking section later
   };
 
   const getSectionStatus = (sectionType) => {

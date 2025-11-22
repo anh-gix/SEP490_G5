@@ -91,7 +91,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           setFullClassData(classData); // Fallback to classData prop
         }
       } catch (error) {
-        console.error('❌ [EditClassModal] Error fetching full class data:', error);
         setFullClassData(classData); // Fallback to classData prop on error
       } finally {
         setLoadingClassData(false);
@@ -249,18 +248,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
         })() : '') ||
         '';
 
-      // Debug: Log program type information for the selected class
-      console.log('🔍 [EditClassModal] Class Program Type Debug:', {
-        'Class ID': dataToUse.id || dataToUse._id,
-        'Class Name': dataToUse.name,
-        'Program Type (final extracted)': programType,
-        'Source 1 - course.program.type': dataToUse.course?.program?.type,
-        'Source 2 - programName (converted to type)': dataToUse.programName,
-        'Source 3 - program (direct field)': dataToUse.program,
-        'Course Name': dataToUse.course?.name,
-        'Full course object': dataToUse.course,
-        'Full program object': dataToUse.course?.program
-      });
 
       // Ensure id is set correctly (use id or _id)
       const classId = dataToUse.id || dataToUse._id || '';
@@ -357,7 +344,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           setStudentsFetched(true); // Mark as fetched even if error
         }
       } catch (error) {
-        console.error('❌ [EditClassModal] Error fetching students from API:', error);
         setClassStudents([]);
         setStudentsFetched(true); // Mark as fetched even if error
       }
@@ -379,7 +365,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           setTeachers([]);
         }
       } catch (error) {
-        console.error('❌ [EditClassModal] Lỗi khi fetch teachers:', error);
         setTeachers([]);
       }
     };
@@ -393,25 +378,19 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
       try {
         setStudentsLoading(true);
         setStudentsError(null);
-        console.log('🔍 [EditClassModal] Fetching students for Excel import...');
         const response = await studentService.getAllStudents();
-        console.log('📋 [EditClassModal] Students API Response:', response);
         
         if (response && (response.students || response.data)) {
           const fetchedStudents = response.students || response.data || [];
-          console.log('📋 [EditClassModal] Fetched students count:', fetchedStudents.length);
           setStudents(fetchedStudents);
         } else {
-          console.warn('⚠️ [EditClassModal] API response không có students hoặc data field:', response);
           setStudents([]);
           setStudentsError('Không tìm thấy dữ liệu học viên');
         }
       } catch (error) {
-        console.error('❌ [EditClassModal] Lỗi khi fetch students:', error);
         setStudents([]);
         const errorMessage = error.message || 'Không thể tải danh sách học viên';
         setStudentsError(errorMessage);
-        console.error('❌ [EditClassModal] Error details:', error);
       } finally {
         setStudentsLoading(false);
       }
@@ -433,7 +412,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           setRooms([]);
         }
       } catch (error) {
-        console.error('❌ [EditClassModal] Lỗi khi fetch rooms:', error);
         setRooms([]);
       }
     };
@@ -462,7 +440,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           }
         }
       } catch (error) {
-        console.error('❌ [EditClassModal] Error fetching existing schedules:', error);
         setExistingSchedules([]);
       } finally {
         setRoomLoading(false);
@@ -757,7 +734,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
               schedulesMap[String(teacherId)] = filteredSchedules;
             }
           } catch (error) {
-            console.error(`Error fetching schedule for teacher ${teacherId}:`, error);
             schedulesMap[String(teacherId)] = [];
           }
         })
@@ -944,7 +920,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                 schedulesMap[String(studentId)] = [];
               }
             } catch (error) {
-              console.error(`Error fetching schedule for student ${studentId}:`, error);
               schedulesMap[String(studentId)] = [];
             }
           })
@@ -953,7 +928,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
         setStudentSchedules(schedulesMap);
         setStudentSchedulesLoading(false);
       } catch (error) {
-        console.error('Error in fetchStudentSchedules:', error);
         setStudentSchedules({});
         setStudentSchedulesLoading(false);
       }
@@ -1398,7 +1372,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
       setShowImportResultModal(true);
 
     } catch (error) {
-      console.error('Error reading Excel file:', error);
       setImportResult({
         success: 0,
         notFound: [],
@@ -1437,13 +1410,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
         
         // If the course doesn't match the new program/level, clear it
         if (newProgram && newLevel && (courseProgramType !== newProgram || courseLevel !== newLevel)) {
-          console.log('🔄 [EditClassModal] Clearing course due to program/level change:', {
-            oldCourse: formData.course,
-            oldProgram: courseProgramType,
-            oldLevel: courseLevel,
-            newProgram,
-            newLevel
-          });
           setFormData(prev => ({
             ...prev,
             [name]: value,
@@ -1454,7 +1420,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
         }
       } else if (formData.course && (newProgram !== formData.program || newLevel !== formData.level)) {
         // If we don't have selectedCourse but have a course ID, clear it when program/level changes
-        console.log('🔄 [EditClassModal] Clearing course ID due to program/level change');
         setFormData(prev => ({
           ...prev,
           [name]: value,
@@ -1574,7 +1539,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           setFormData(prev => ({ ...prev, band: '' }));
         }
       } catch (error) {
-        console.error('❌ [EditClassModal] Error fetching band:', error);
         setFormData(prev => ({ ...prev, band: '' }));
       }
     };
@@ -1653,7 +1617,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
         }
         setAvailableLevels(allLevels);
       } catch (error) {
-        console.error('❌ [EditClassModal] Error fetching programs and levels:', error);
         // Even on error, ensure current values are in the lists
         if (formData.program) {
           const currentProgramName = typeToProgramMap[formData.program];
@@ -1690,7 +1653,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
             setAvailableLevels(levels);
           }
         } catch (error) {
-          console.error('❌ [EditClassModal] Error fetching all levels:', error);
           // Keep current level in list even on error
           if (formData.level) {
             setAvailableLevels([formData.level]);
@@ -1729,7 +1691,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           }
         }
       } catch (error) {
-        console.error('❌ [EditClassModal] Error fetching levels by type:', error);
         // Keep current level in list even on error
         if (formData.level) {
           setAvailableLevels([formData.level]);
@@ -1764,15 +1725,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
       const type = formData.program;
       const programName = typeToProgramMap[type];
       
-      console.log('🔍 [EditClassModal] Fetching courses:', {
-        type,
-        programName,
-        level: formData.level,
-        hasProgramName: !!programName
-      });
-      
       if (!programName) {
-        console.warn('⚠️ [EditClassModal] No programName mapped for type:', type);
         setCourses([]);
         setCoursesLoading(false);
         return;
@@ -1785,12 +1738,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
             programName: programName,
             level: formData.level
           }
-        });
-
-        console.log('✅ [EditClassModal] Courses API response:', {
-          success: response.data?.success,
-          coursesCount: response.data?.courses?.length,
-          courses: response.data?.courses
         });
 
         if (response.data && response.data.success && response.data.courses) {
@@ -1807,31 +1754,15 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           
           // Check if current course exists in the new list
           if (formData.course) {
-            console.log('🔍 [EditClassModal] Checking if current course exists in list:', {
-              currentCourseId: formData.course,
-              coursesListIds: coursesList.map(c => String(c._id || c.id)),
-              selectedCourseId: selectedCourse ? String(selectedCourse._id || selectedCourse.id) : null,
-              programChanged,
-              levelChanged,
-              isInitialLoad
-            });
-            
             const courseExists = coursesList.some(c => {
               const courseId = c._id || c.id;
-              const matches = String(courseId) === String(formData.course);
-              if (matches) {
-                console.log('✅ [EditClassModal] Current course found in list:', courseId);
-              }
-              return matches;
+              return String(courseId) === String(formData.course);
             });
-            
-            console.log('📊 [EditClassModal] Course exists check result:', courseExists);
             
             // Only clear course if:
             // 1. Program or level actually changed (not initial load)
             // 2. AND course doesn't exist in the new list
             if ((programChanged || levelChanged) && !courseExists) {
-              console.log('🔄 [EditClassModal] Program/level changed and course does not belong to new program/level, clearing it');
               setFormData(prev => ({ ...prev, course: '' }));
               setSelectedCourse(null);
             } else if (!isInitialLoad && (programChanged || levelChanged) && selectedCourse) {
@@ -1840,23 +1771,19 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
               const courseLevel = selectedCourse.program?.level;
               
               if (courseProgramType !== formData.program || courseLevel !== formData.level) {
-                console.log('🔄 [EditClassModal] Selected course does not match new program/level, clearing it');
                 setFormData(prev => ({ ...prev, course: '' }));
                 setSelectedCourse(null);
               }
             } else if (!courseExists && !isInitialLoad) {
               // If course doesn't exist and it's not initial load, try to add it to list
               if (selectedCourse) {
-                console.log('➕ [EditClassModal] Adding selectedCourse to list (course not in new list but keeping it)');
                 coursesList.push(selectedCourse);
               }
             }
           }
           
-          console.log('📋 [EditClassModal] Final courses list:', coursesList);
           setCourses(coursesList);
         } else {
-          console.warn('⚠️ [EditClassModal] No courses in response:', response.data);
           // If no courses found but we have a current course, keep it in the list
           if (formData.course && selectedCourse) {
             setCourses([selectedCourse]);
@@ -1865,13 +1792,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           }
         }
       } catch (error) {
-        console.error('❌ [EditClassModal] Error fetching courses:', error);
-        console.error('❌ [EditClassModal] Error details:', error.response?.data);
-        console.error('❌ [EditClassModal] Request params:', {
-          programName,
-          level: formData.level,
-          url: 'http://localhost:8080/api/v1/courses/by-program'
-        });
         // On error, keep current course in list if available
         if (formData.course && selectedCourse) {
           setCourses([selectedCourse]);
@@ -1915,7 +1835,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           setSelectedCourse(null);
         }
       } catch (error) {
-        console.error('❌ [EditClassModal] Error fetching course details:', error);
         setSelectedCourse(null);
       }
     };
@@ -1988,7 +1907,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
 
     // Ensure id is present before submitting
     if (!formData.id) {
-      console.error('❌ [EditClassModal] Missing id in formData:', formData);
       alert('Lỗi: Không tìm thấy ID của lớp học. Vui lòng thử lại.');
       return;
     }
@@ -2006,14 +1924,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
     delete submitData.selectedStudents;
     delete submitData.teacherId;
     delete submitData.roomId;
-
-    console.log('✅ [EditClassModal] Submitting class data:', {
-      id: submitData.id,
-      name: submitData.name,
-      course: submitData.course,
-      program: submitData.program,
-      level: submitData.level
-    });
 
     onSubmit(submitData);
   };
@@ -2156,25 +2066,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                         {coursesLoading ? 'Đang tải...' : !formData.program || !formData.level ? '-- Chọn chương trình và cấp độ trước --' : '-- Chọn course --'}
                       </option>
                       {(() => {
-                        // Debug: Log courses state
-                        if (courses.length > 0) {
-                          console.log('📋 [EditClassModal] Rendering courses dropdown:', {
-                            coursesCount: courses.length,
-                            courses: courses.map(c => ({
-                              id: c._id || c.id,
-                              name: c.name,
-                              numberOfSessions: c.numberOfSessions
-                            })),
-                            currentCourse: formData.course
-                          });
-                        } else if (!coursesLoading && formData.program && formData.level) {
-                          console.warn('⚠️ [EditClassModal] No courses to render:', {
-                            courses: courses,
-                            program: formData.program,
-                            level: formData.level,
-                            coursesLoading
-                          });
-                        }
                         return courses.length > 0 ? (
                           courses.map(course => {
                             const courseId = course._id || course.id;

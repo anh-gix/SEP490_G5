@@ -13,8 +13,6 @@ const mongoose = require("mongoose");
 // =========================
 exports.getAllClasses = async (req, res) => {
   try {
-    console.log('🔍 Fetching classes...');
-    
     const { level, status, search, courseId } = req.query;
     let query = {};
     
@@ -81,15 +79,12 @@ exports.getAllClasses = async (req, res) => {
       })
     );
     
-  console.log('✅ Found classes:', classesWithStats.length);
-    
     res.status(200).json({
       success: true,
       count: classesWithStats.length,
       classes: classesWithStats
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy danh sách lớp học:", error);
     res.status(500).json({ 
       success: false,
       message: "Lỗi server khi lấy danh sách lớp học",
@@ -104,8 +99,6 @@ exports.getAllClasses = async (req, res) => {
 exports.getClassById = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    console.log('🔍 Fetching class:', id);
     
     const classData = await Class.findById(id)
       .populate('teacher', 'username email phone')
@@ -203,8 +196,6 @@ exports.getClassById = async (req, res) => {
       })
     );
     
-    console.log('✅ Found class:', classData.name);
-    
     res.status(200).json({
       success: true,
       class: {
@@ -227,7 +218,6 @@ exports.getClassById = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy thông tin lớp:", error);
     res.status(500).json({ 
       success: false,
       message: "Lỗi server khi lấy thông tin lớp",
@@ -262,7 +252,6 @@ exports.getClassStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy thống kê lớp:", error);
     res.status(500).json({ 
       success: false,
       message: "Lỗi server khi lấy thống kê lớp",
@@ -483,7 +472,6 @@ exports.createClass = async (req, res) => {
     await session.abortTransaction();
     session.endSession();
     
-    console.error('Error in createClass:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi khi tạo lớp học',
@@ -560,8 +548,30 @@ exports.updateClass = async (req, res) => {
     const newCourseId = course?.toString();
     const courseChanged = course && oldCourseId !== newCourseId;
     
-    // If course changed, delete old ClassSchedules and related data
-    if (courseChanged) {
+    // Check if other schedule-related fields have changed
+    const oldRoomId = classData.room?.toString();
+    const newRoomId = room?.toString();
+    const roomChanged = room !== undefined && oldRoomId !== newRoomId;
+    
+    const oldTeacherId = classData.teacher?.toString();
+    const newTeacherId = teacher?.toString();
+    const teacherChanged = teacher && oldTeacherId !== newTeacherId;
+    
+    const oldStartDate = classData.startDate ? new Date(classData.startDate).toISOString().split('T')[0] : null;
+    const newStartDate = startDate ? new Date(startDate).toISOString().split('T')[0] : null;
+    const startDateChanged = startDate && oldStartDate !== newStartDate;
+    
+    // Check if scheduleEntries have changed (if provided)
+    // Note: We'll regenerate schedules if scheduleEntries are provided and any schedule-related field changed
+    const scheduleEntriesChanged = scheduleEntries && scheduleEntries.length > 0;
+    
+    // Determine if we need to regenerate schedules
+    // Regenerate if: course changed, OR (scheduleEntries provided AND any schedule-related field changed)
+    const shouldRegenerateSchedules = courseChanged || 
+      (scheduleEntriesChanged && (roomChanged || teacherChanged || startDateChanged));
+    
+    // If schedules need to be regenerated, delete old ClassSchedules and related data
+    if (shouldRegenerateSchedules) {
       // Find all ClassSchedules for this class
       const classSchedules = await ClassSchedule.find({ class: req.params.id }).session(session).select('_id');
       const classScheduleIds = classSchedules.map(schedule => schedule._id);
@@ -601,16 +611,16 @@ exports.updateClass = async (req, res) => {
     
     await classData.save({ session });
     
-    // Generate ClassSchedule entries if course changed and scheduleEntries are provided
-    // Only create new schedules when course changed (old schedules already deleted above)
+    // Generate ClassSchedule entries if schedules need to be regenerated and scheduleEntries are provided
+    // Only create new schedules when shouldRegenerateSchedules is true (old schedules already deleted above)
     const finalCourse = course || classData.course;
     const finalStartDate = startDate || classData.startDate;
     const finalRoomId = room !== undefined ? room : classData.room;
     const finalTeacher = teacher || classData.teacher;
     const finalStudentsList = students !== undefined ? students : classData.students;
     
-    // Only create new ClassSchedules when course changed and scheduleEntries are provided
-    if (courseChanged && scheduleEntries && scheduleEntries.length > 0 && finalCourse && finalStartDate) {
+    // Create new ClassSchedules when schedules need to be regenerated and scheduleEntries are provided
+    if (shouldRegenerateSchedules && scheduleEntries && scheduleEntries.length > 0 && finalCourse && finalStartDate) {
       // Get course details including numberOfSessions and sessions
       const courseData = await Course.findById(finalCourse)
         .populate('sessions', 'order')
@@ -753,7 +763,6 @@ exports.updateClass = async (req, res) => {
     await session.abortTransaction();
     session.endSession();
     
-    console.error('Error in updateClass:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi khi cập nhật lớp học',
@@ -831,7 +840,6 @@ exports.deleteClass = async (req, res) => {
     await session.abortTransaction();
     session.endSession();
     
-    console.error('Error in deleteClass:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi khi xóa lớp học',

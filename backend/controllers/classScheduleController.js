@@ -2,7 +2,9 @@ const ClassSchedule = require("../models/classScheduleModel");
 const StudentSchedule = require("../models/studentScheduleModel");
 const Class = require("../models/classModel");
 const Room = require("../models/room");
+const Course = require("../models/courseModel");
 const mongoose = require("mongoose");
+const { getSchedulesToDeletePreview, cleanupSchedulesAfterAdding } = require("../helpers/scheduleCleanup");
 
 // =========================
 // 📘 LẤY DANH SÁCH LỚP CỦA GIÁO VIÊN
@@ -49,69 +51,839 @@ exports.getSchedulesByClass = async (req, res) => {
 };
 
 // =========================
-// 🆕 TẠO BUỔI HỌC MỚI
+// ✅ VALIDATE: KIỂM TRA CONFLICT TRƯỚC KHI THÊM BUỔI HỌC
 // =========================
-exports.createClassSchedule = async (req, res) => {
+exports.validateAddClassSchedule = async (req, res) => {
   try {
-    const { classId, sessionNumber, date, startTime, endTime, room } = req.body;
+    const { classId, date, startTime, endTime, room } = req.body;
+
+    if (!classId || !date || !startTime || !endTime || !room) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Thiếu thông tin bắt buộc." 
+      });
+    }
+
+    const conflicts = {
+      teacher: [],
+      room: [],
+      students: [],
+      hasConflict: false
+    };
+
+    // Lấy thông tin lớp học
+    const classData = await Class.findById(classId)
+      .select('teacher teacherId students room')
+      .populate('teacher', 'username email')
+      .populate('students', 'username email')
+      .lean();
+
+    if (!classData) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Không tìm thấy lớp học." 
+      });
+    }
+
+    const teacherId = classData.teacher || classData.teacherId;
+    const students = classData.students || [];
+    const scheduleDate = new Date(date);
+    scheduleDate.setHours(0, 0, 0, 0);
+
+    // Helper function để check time overlap
+    const hasTimeOverlap = (start1, end1, start2, end2) => {
+      return start1 < end2 && end1 > start2;
+    };
+
+    // Helper function để format date
+    const formatDateLocal = (dateInput) => {
+      if (!dateInput) return null;
+      const d = new Date(dateInput);
+      if (isNaN(d.getTime())) return null;
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const newDateStr = formatDateLocal(scheduleDate);
+
+    // 1. Kiểm tra conflict PHÒNG HỌC (bao gồm cả lớp hiện tại - một lớp không thể có 2 buổi cùng thứ cùng giờ)
+    const roomSchedules = await ClassSchedule.find({
+      room: new mongoose.Types.ObjectId(room),
+      date: scheduleDate,
+      status: { $in: ['temporary', 'fixed'] }
+    })
+      .populate('class', 'name')
+      .select('date startTime endTime class')
+      .lean();
+
+    roomSchedules.forEach(schedule => {
+      if (hasTimeOverlap(startTime, endTime, schedule.startTime, schedule.endTime)) {
+        // Kiểm tra xem có phải là lớp hiện tại không
+        const scheduleClassId = schedule.class?._id?.toString() || schedule.class?.toString() || null;
+        const isCurrentClass = scheduleClassId === classId.toString();
+        
+        conflicts.room.push({
+          roomId: room.toString(),
+          className: schedule.class?.name || 'N/A',
+          date: formatDateLocal(schedule.date),
+          time: `${schedule.startTime} - ${schedule.endTime}`,
+          conflictingTime: `${startTime} - ${endTime}`,
+          isCurrentClass: isCurrentClass // Đánh dấu để frontend có thể hiển thị khác
+        });
+        conflicts.hasConflict = true;
+      }
+    });
+
+    // 2. Kiểm tra conflict GIÁO VIÊN
+    if (teacherId) {
+      // Lấy tất cả lớp khác của giáo viên (trừ lớp hiện tại)
+      const teacherClasses = await Class.find({
+        $or: [
+          { teacher: teacherId },
+          { teacherId: teacherId }
+        ],
+        _id: { $ne: classId }
+      }).select('_id name').lean();
+
+      if (teacherClasses.length > 0) {
+        const teacherClassIds = teacherClasses.map(c => c._id);
+
+        // Lấy lịch học của giáo viên trong ngày đó
+        const teacherSchedules = await ClassSchedule.find({
+          class: { $in: teacherClassIds },
+          date: scheduleDate,
+          status: { $in: ['temporary', 'fixed'] }
+        })
+          .populate('class', 'name')
+          .select('date startTime endTime class')
+          .lean();
+
+        teacherSchedules.forEach(schedule => {
+          if (hasTimeOverlap(startTime, endTime, schedule.startTime, schedule.endTime)) {
+            conflicts.teacher.push({
+              teacherId: teacherId.toString(),
+              className: schedule.class?.name || 'N/A',
+              date: formatDateLocal(schedule.date),
+              time: `${schedule.startTime} - ${schedule.endTime}`,
+              conflictingTime: `${startTime} - ${endTime}`
+            });
+            conflicts.hasConflict = true;
+          }
+        });
+      }
+    }
+
+    // 3. Kiểm tra conflict SINH VIÊN
+    if (students.length > 0) {
+      // Lấy tất cả lớp khác của sinh viên (trừ lớp hiện tại)
+      const studentClasses = await Class.find({
+        students: { $in: students },
+        _id: { $ne: classId }
+      }).select('_id name students').lean();
+
+      if (studentClasses.length > 0) {
+        const studentClassIds = studentClasses.map(c => c._id);
+
+        // Lấy lịch học của sinh viên trong ngày đó
+        const studentSchedules = await ClassSchedule.find({
+          class: { $in: studentClassIds },
+          date: scheduleDate,
+          status: { $in: ['temporary', 'fixed'] }
+        })
+          .populate('class', 'name')
+          .select('date startTime endTime class')
+          .lean();
+
+        // Group conflicts by student
+        const studentConflictMap = new Map();
+
+        studentSchedules.forEach(schedule => {
+          if (hasTimeOverlap(startTime, endTime, schedule.startTime, schedule.endTime)) {
+            // Tìm lớp nào có schedule này
+            const scheduleClassId = schedule.class?._id?.toString() || schedule.class?.toString() || null;
+            if (!scheduleClassId) return;
+
+            // Tìm lớp trong studentClasses có ID trùng với scheduleClassId
+            const conflictingClass = studentClasses.find(cls => cls._id.toString() === scheduleClassId);
+            if (!conflictingClass) return;
+
+            // Tìm sinh viên nào trong lớp hiện tại cũng có trong lớp conflict
+            conflictingClass.students.forEach(studentIdInConflictClass => {
+              const studentIdInConflictClassStr = studentIdInConflictClass.toString();
+              
+              // Check if this student is also in the current class và lấy thông tin sinh viên
+              const studentInCurrentClass = students.find(s => {
+                const studentIdStr = s._id?.toString() || s.toString();
+                return studentIdStr === studentIdInConflictClassStr;
+              });
+
+              if (studentInCurrentClass) {
+                const studentName = studentInCurrentClass.username || studentInCurrentClass.fullName || `Sinh viên ${studentIdInConflictClassStr}`;
+                
+                if (!studentConflictMap.has(studentIdInConflictClassStr)) {
+                  studentConflictMap.set(studentIdInConflictClassStr, {
+                    studentId: studentIdInConflictClassStr,
+                    studentName: studentName,
+                    conflicts: []
+                  });
+                }
+                studentConflictMap.get(studentIdInConflictClassStr).conflicts.push({
+                  className: schedule.class?.name || conflictingClass.name || 'N/A',
+                  date: formatDateLocal(schedule.date),
+                  time: `${schedule.startTime} - ${schedule.endTime}`,
+                  conflictingTime: `${startTime} - ${endTime}`
+                });
+                conflicts.hasConflict = true;
+              }
+            });
+          }
+        });
+
+        // Convert map to array
+        studentConflictMap.forEach((studentConflict) => {
+          conflicts.students.push(studentConflict);
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      conflicts: conflicts,
+      message: conflicts.hasConflict 
+        ? "Có xung đột lịch học được phát hiện." 
+        : "Không có xung đột lịch học."
+    });
+
+  } catch (err) {
+    console.error("❌ Lỗi khi validate:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Lỗi server", 
+      error: err.message 
+    });
+  }
+};
+
+// =========================
+// 🔍 PREVIEW: XEM TRƯỚC KHI THÊM BUỔI HỌC
+// =========================
+exports.previewAddClassSchedule = async (req, res) => {
+  try {
+    const { classId, date, startTime, endTime, room, repeatWeekly, selectedDay } = req.body;
 
     if (!classId || !date || !startTime || !endTime || !room) {
       return res.status(400).json({ message: "Thiếu thông tin bắt buộc." });
     }
 
-    // ✅ 1. Kiểm tra trùng phòng theo ngày & giờ
-    const sameDaySchedules = await ClassSchedule.find({
-      room: new mongoose.Types.ObjectId(room),
-      date: new Date(date),
-    });
+    // Khai báo dayNames để dùng chung trong function
+    const dayNames = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
 
-    const isConflict = sameDaySchedules.some((schedule) => {
-      return startTime < schedule.endTime && endTime > schedule.startTime;
-    });
-
-    if (isConflict) {
+    // Lấy thông tin class và course
+    const classInfo = await Class.findById(classId).select("course teacher teacherId").lean();
+    if (!classInfo || !classInfo.course) {
       return res.status(400).json({
-        message: `Phòng học đã được sử dụng trong khung giờ này.`,
+        message: "Lớp học chưa có course được gán.",
       });
     }
 
-    // ✅ 2. Tạo buổi học mới
-    const newSchedule = await ClassSchedule.create({
-      class: classId,
-      sessionNumber,
-      date,
-      startTime,
-      endTime,
-      room,
-    });
+    // Lấy course để biết numberOfSessions
+    const courseData = await Course.findById(classInfo.course)
+      .select('numberOfSessions')
+      .lean();
+    
+    const courseNumberOfSessions = courseData?.numberOfSessions || 0;
 
-    // ✅ 3. Lấy danh sách sinh viên trong lớp
-    const classInfo = await Class.findById(classId).populate("students");
+    // Lấy room info
+    const roomData = await Room.findById(room).select("room_name location").lean();
 
-    if (!classInfo || !classInfo.students || classInfo.students.length === 0) {
+    // Tính toán các ngày sẽ tạo nếu repeatWeekly = true
+    const datesToCreate = [];
+    if (repeatWeekly) {
+      // Parse date từ string YYYY-MM-DD, tránh timezone issues
+      const dateParts = date.split('-');
+      const firstDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+      firstDate.setHours(0, 0, 0, 0);
+      
+      // Debug: Kiểm tra thứ của ngày đầu tiên
+      const dayNames = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+      console.log('[DEBUG Backend] Parse date:');
+      console.log('   - Date string nhận được:', date);
+      console.log('   - Date object:', firstDate.toLocaleDateString('vi-VN'));
+      console.log('   - Thứ của ngày:', dayNames[firstDate.getDay()]);
+      console.log('');
+      
+      // Lấy số buổi hiện tại
+      const currentSchedulesCount = await ClassSchedule.countDocuments({ class: classId });
+      
+      // Tính số buổi cần tạo để đạt numberOfSessions
+      // Logic: Tạo buổi học cho đến khi đạt numberOfSessions
+      // Nhưng cần kiểm tra xem có thể thêm không (dựa trên số buổi đã học)
+      const allSchedules = await ClassSchedule.find({ class: classId }).lean();
+      const allScheduleIds = allSchedules.map(s => s._id);
+      const studentSchedulesWithAttendance = await StudentSchedule.find({
+        classSchedule: { $in: allScheduleIds },
+        'attendance.status': { $ne: null }
+      }).select('classSchedule').lean();
+      const scheduleIdsWithAttendance = new Set(
+        studentSchedulesWithAttendance.map(s => s.classSchedule.toString())
+      );
+      const attendedCount = allSchedules.filter(
+        s => scheduleIdsWithAttendance.has(s._id.toString())
+      ).length;
+      
+      // Kiểm tra xem có thể thêm buổi không
+      if (attendedCount >= courseNumberOfSessions) {
+        // Đã đủ số buổi đã học, không thể thêm
+        datesToCreate.length = 0;
+      } else {
+        // Khi "Lặp lại vào các tuần", tạo số buổi bằng với numberOfSessions
+        // Cleanup sẽ tự động xóa các buổi thừa để giữ đúng numberOfSessions
+        const schedulesNeeded = courseNumberOfSessions;
+        
+        // Tạo các ngày cho các tuần tiếp theo (mỗi tuần 1 buổi)
+        for (let week = 0; week < schedulesNeeded; week++) {
+          const scheduleDate = new Date(firstDate);
+          scheduleDate.setDate(firstDate.getDate() + (week * 7));
+          
+          // Format date để tránh timezone issues (dùng local time, không dùng UTC)
+          const year = scheduleDate.getFullYear();
+          const month = String(scheduleDate.getMonth() + 1).padStart(2, '0');
+          const day = String(scheduleDate.getDate()).padStart(2, '0');
+          const dateString = `${year}-${month}-${day}`;
+          
+          datesToCreate.push(dateString);
+        }
+      }
+      
+    } else {
+      datesToCreate.push(date);
+    }
+
+    // ========== LOGGING: Preview ==========
+    console.log('📋 ========== PREVIEW: THÊM BUỔI HỌC ==========');
+    console.log('📅 Thông tin buổi học sẽ được thêm:');
+    console.log('   - Lớp học ID:', classId);
+    console.log('   - Lặp lại vào các tuần:', repeatWeekly ? 'Có' : 'Không');
+    console.log('   - Số buổi sẽ được tạo:', datesToCreate.length);
+    
+    // Parse và hiển thị thứ của ngày đầu tiên nhận được
+    // dayNames được khai báo ở đầu function để dùng chung
+    const dayMap = { 'CN': 'Chủ Nhật', '2': 'Thứ Hai', '3': 'Thứ Ba', '4': 'Thứ Tư', '5': 'Thứ Năm', '6': 'Thứ Sáu', '7': 'Thứ Bảy' };
+    const dateParts = date.split('-');
+    const receivedDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+    const receivedDayOfWeek = receivedDate.getDay();
+    
+    console.log('   - Thứ được chọn từ frontend:', selectedDay ? dayMap[selectedDay] || selectedDay : 'Không có');
+    console.log('   - Ngày đầu tiên nhận được từ frontend:', date, `(${dayNames[receivedDayOfWeek]})`);
+    if (selectedDay) {
+      const expectedDay = dayMap[selectedDay];
+      const actualDay = dayNames[receivedDayOfWeek];
+      if (expectedDay !== actualDay) {
+        console.log(`   - ⚠️ CẢNH BÁO: Thứ được chọn (${expectedDay}) KHÔNG KHỚP với thứ của ngày nhận được (${actualDay})!`);
+      } else {
+        console.log(`   - ✅ Thứ được chọn (${expectedDay}) KHỚP với thứ của ngày nhận được (${actualDay})`);
+      }
+    }
+    
+    if (datesToCreate.length > 0) {
+      const firstDateObj = new Date(datesToCreate[0]);
+      const firstDayOfWeek = firstDateObj.getDay();
+      console.log('   - Ngày đầu tiên sẽ được tạo:', datesToCreate[0], `(${dayNames[firstDayOfWeek]})`);
+      
+      if (datesToCreate.length > 1) {
+        const lastDateObj = new Date(datesToCreate[datesToCreate.length - 1]);
+        const lastDayOfWeek = lastDateObj.getDay();
+        console.log('   - Ngày cuối cùng sẽ được tạo:', datesToCreate[datesToCreate.length - 1], `(${dayNames[lastDayOfWeek]})`);
+      }
+    } else {
+      console.log('   - ⚠️ Không có buổi nào sẽ được tạo (lớp đã đủ số buổi)');
+    }
+    console.log('   - Giờ bắt đầu:', startTime);
+    console.log('   - Giờ kết thúc:', endTime);
+    console.log('   - Phòng học:', roomData?.room_name || room);
+    console.log('');
+    
+    if (datesToCreate.length > 1) {
+      console.log('📅 Danh sách các ngày sẽ được tạo:');
+      datesToCreate.forEach((d, idx) => {
+        const dateParts = d.split('-');
+        const dateObj = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+        const dayOfWeek = dateObj.getDay();
+        console.log(`   ${idx + 1}. ${dateObj.toLocaleDateString('vi-VN')} (${dayNames[dayOfWeek]})`);
+      });
+      console.log('');
+    }
+    
+    // Nếu không có buổi nào sẽ được tạo, return sớm
+    if (datesToCreate.length === 0) {
       return res.status(200).json({
-        message: "Buổi học được tạo, nhưng lớp chưa có sinh viên.",
-        schedule: newSchedule,
+        success: true,
+        message: "Lớp đã đủ số buổi học. Không cần thêm buổi học mới.",
+        preview: {
+          canAdd: false,
+          totalSchedules: await ClassSchedule.countDocuments({ class: classId }),
+          attendedCount: 0,
+          numberOfSessions: courseNumberOfSessions,
+          schedulesToDelete: []
+        }
       });
     }
 
-    // ✅ 4. Tạo StudentSchedule cho từng sinh viên (không set attendance - sẽ được điểm danh sau)
-    const studentSchedules = classInfo.students.map((stuId) => ({
-      student: stuId,
-      classSchedule: newSchedule._id,
-      // Không set attendance - để null cho đến khi giáo viên điểm danh
-    }));
+    // Tính toán preview cho tất cả buổi sẽ được tạo
+    const currentSchedulesCount = await ClassSchedule.countDocuments({ class: classId });
+    const finalTotalSchedules = currentSchedulesCount + datesToCreate.length;
+    
+    // Lấy preview với số buổi sẽ thêm
+    const basePreview = await getSchedulesToDeletePreview(classId, classInfo.course);
+    
+    // Tính toán lại với số buổi thực tế sẽ thêm
+    const attendedCount = basePreview.attendedCount || 0;
+    const numberOfSessions = basePreview.numberOfSessions || 0;
+    
+    console.log('🔍 Preview kết quả:');
+    console.log(`   - Số buổi hiện tại: ${currentSchedulesCount}`);
+    console.log(`   - Số buổi sẽ được tạo: ${datesToCreate.length}`);
+    console.log(`   - Tổng số buổi sau khi thêm: ${finalTotalSchedules}`);
+    console.log(`   - Số buổi đã học: ${attendedCount}`);
+    console.log(`   - numberOfSessions của course: ${numberOfSessions}`);
+    console.log('');
+    console.log('📋 THỨ TỰ THỰC HIỆN:');
+    console.log('   1️⃣  THÊM các buổi học mới trước');
+    console.log('   2️⃣  Sau đó CLEANUP sẽ xóa các buổi thừa (từ dưới lên - các buổi mới nhất)');
+    console.log('   3️⃣  Cuối cùng gán lại session cho tất cả buổi còn lại');
+    console.log('');
+    
+    // ========== TÍNH TOÁN PREVIEW: TẠO 3 BẢNG ==========
+    // 1. Bảng TRƯỚC KHI XÓA: Tất cả buổi hiện tại + buổi mới sẽ tạo
+    // 2. Bảng SẼ XÓA: Các buổi mới nhất sẽ bị xóa (từ dưới lên)
+    // 3. Bảng SAU KHI XÓA: Các buổi sẽ còn lại
+    
+    // Lấy tất cả schedules hiện tại
+    const allCurrentSchedules = await ClassSchedule.find({ class: classId })
+      .sort({ date: 1, startTime: 1 })
+      .lean();
+    
+    const allCurrentScheduleIds = allCurrentSchedules.map(s => s._id);
+    const studentSchedulesWithAttendance = await StudentSchedule.find({
+      classSchedule: { $in: allCurrentScheduleIds },
+      'attendance.status': { $ne: null }
+    }).select('classSchedule').lean();
+    
+    const scheduleIdsWithAttendance = new Set(
+      studentSchedulesWithAttendance.map(s => s.classSchedule.toString())
+    );
+    
+    // Tạo danh sách TẤT CẢ buổi (hiện tại + mới sẽ tạo)
+    const allSchedulesAfterAdd = [];
+    
+    // 1. Thêm tất cả buổi hiện tại
+    allCurrentSchedules.forEach(schedule => {
+      const hasAttendance = scheduleIdsWithAttendance.has(schedule._id.toString());
+      allSchedulesAfterAdd.push({
+        _id: schedule._id,
+        date: schedule.date,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        room: schedule.room,
+        isNew: false,
+        hasAttendance: hasAttendance
+      });
+    });
+    
+    // 2. Thêm tất cả buổi mới sẽ tạo
+    datesToCreate.forEach((dateStr, idx) => {
+      const dateParts = dateStr.split('-');
+      const newScheduleDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+      newScheduleDate.setHours(0, 0, 0, 0);
+      allSchedulesAfterAdd.push({
+        _id: `NEW_${idx}`,
+        date: newScheduleDate,
+        startTime: startTime,
+        endTime: endTime,
+        room: room,
+        isNew: true,
+        hasAttendance: false // Buổi mới chưa có attendance
+      });
+    });
+    
+    // 3. Sắp xếp tất cả buổi theo date (tăng dần)
+    allSchedulesAfterAdd.sort((a, b) => {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      if (dateA.getTime() !== dateB.getTime()) {
+        return dateA - dateB;
+      }
+      // Nếu cùng ngày, sắp xếp theo startTime
+      return (a.startTime || '').localeCompare(b.startTime || '');
+    });
+    
+    // Tính số buổi sẽ bị xóa
+    const totalToDelete = finalTotalSchedules > numberOfSessions ? finalTotalSchedules - numberOfSessions : 0;
+    
+    // Xác định các buổi sẽ bị xóa (các buổi mới nhất, không có attendance)
+    const schedulesToDelete = [];
+    if (totalToDelete > 0) {
+      // Lấy các buổi không có attendance (có thể xóa)
+      const deletableSchedules = allSchedulesAfterAdd.filter(s => !s.hasAttendance);
+      
+      // Sắp xếp theo date giảm dần (mới nhất trước) để xóa từ dưới lên
+      deletableSchedules.sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        if (dateA.getTime() !== dateB.getTime()) {
+          return dateB - dateA; // Giảm dần
+        }
+        return (b.startTime || '').localeCompare(a.startTime || '');
+      });
+      
+      // Lấy các buổi mới nhất để xóa
+      schedulesToDelete.push(...deletableSchedules.slice(0, totalToDelete));
+    }
+    
+    // Tạo danh sách các buổi sẽ còn lại (sau khi xóa)
+    const schedulesToDeleteIds = new Set(
+      schedulesToDelete.map(s => s._id.toString())
+    );
+    const schedulesAfterDelete = allSchedulesAfterAdd.filter(
+      s => !schedulesToDeleteIds.has(s._id.toString())
+    );
+    
+    // ========== HIỂN THỊ 3 BẢNG ==========
+    console.log('');
+    console.log('📊 ========== BẢNG 1: TRƯỚC KHI XÓA ==========');
+    console.log(`Tổng số buổi: ${allSchedulesAfterAdd.length} (${allCurrentSchedules.length} buổi hiện tại + ${datesToCreate.length} buổi mới sẽ tạo)`);
+    console.log('');
+    allSchedulesAfterAdd.forEach((schedule, index) => {
+      const scheduleDate = new Date(schedule.date);
+      const dateStr = scheduleDate.toLocaleDateString('vi-VN');
+      const dayOfWeek = dayNames[scheduleDate.getDay()];
+      const isNewMarker = schedule.isNew ? ' ⭐ MỚI' : '';
+      const hasAttendanceMarker = schedule.hasAttendance ? ' ✓ Đã học' : '';
+      const willDeleteMarker = schedulesToDeleteIds.has(schedule._id.toString()) ? ' ❌ SẼ XÓA' : '';
+      console.log(`   ${index + 1}. ${dateStr} (${dayOfWeek}) - ${schedule.startTime} đến ${schedule.endTime}${isNewMarker}${hasAttendanceMarker}${willDeleteMarker}`);
+    });
+    console.log('==========================================');
+    console.log('');
+    
+    if (schedulesToDelete.length > 0) {
+      console.log('🗑️  ========== BẢNG 2: CÁC BUỔI SẼ BỊ XÓA ==========');
+      console.log(`Tổng số buổi sẽ bị xóa: ${schedulesToDelete.length} (từ dưới lên - các buổi mới nhất)`);
+      console.log('');
+      schedulesToDelete.forEach((schedule, index) => {
+        const scheduleDate = new Date(schedule.date);
+        const dateStr = scheduleDate.toLocaleDateString('vi-VN');
+        const dayOfWeek = dayNames[scheduleDate.getDay()];
+        const isNewMarker = schedule.isNew ? ' ⭐ MỚI' : ' (Hiện tại)';
+        console.log(`   ${index + 1}. ${dateStr} (${dayOfWeek}) - ${schedule.startTime} đến ${schedule.endTime}${isNewMarker}`);
+      });
+      console.log('==========================================');
+      console.log('');
+    } else {
+      console.log('✅ Không có buổi nào sẽ bị xóa');
+      console.log('');
+    }
+    
+    console.log('✅ ========== BẢNG 3: SAU KHI XÓA ==========');
+    console.log(`Tổng số buổi sẽ còn lại: ${schedulesAfterDelete.length} (đúng với numberOfSessions = ${numberOfSessions})`);
+    console.log('');
+    
+    // Lấy course sessions để hiển thị session assignment
+    const courseDataForSessions = await Course.findById(classInfo.course)
+      .populate('sessions', 'order')
+      .select('sessions')
+      .lean();
+    
+    const courseSessions = courseDataForSessions && courseDataForSessions.sessions 
+      ? [...courseDataForSessions.sessions].sort((a, b) => (a.order || 0) - (b.order || 0))
+      : [];
+    
+    schedulesAfterDelete.forEach((schedule, index) => {
+      const scheduleDate = new Date(schedule.date);
+      const dateStr = scheduleDate.toLocaleDateString('vi-VN');
+      const dayOfWeek = dayNames[scheduleDate.getDay()];
+      const isNewMarker = schedule.isNew ? ' ⭐ MỚI' : '';
+      const hasAttendanceMarker = schedule.hasAttendance ? ' ✓ Đã học' : '';
+      const sessionIndex = index < courseSessions.length ? index : index % courseSessions.length;
+      const sessionOrder = courseSessions[sessionIndex]?.order || sessionIndex + 1;
+      console.log(`   ${index + 1}. ${dateStr} (${dayOfWeek}) - ${schedule.startTime} đến ${schedule.endTime} → Session ${sessionOrder}${isNewMarker}${hasAttendanceMarker}`);
+    });
+    console.log('==========================================');
+    console.log('');
+
+    // Kiểm tra xem có thể thêm buổi không
+    if (attendedCount >= numberOfSessions) {
+      return res.status(400).json({
+        success: false,
+        message: `Không thể thêm buổi học. Lớp đã có ${attendedCount} buổi đã học, đã đạt giới hạn ${numberOfSessions} buổi của khóa học.`,
+        preview: {
+          totalSchedules: currentSchedulesCount,
+          attendedCount: attendedCount,
+          numberOfSessions: numberOfSessions
+        }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Preview thành công",
+      preview: {
+        schedulesToAdd: datesToCreate.map(d => ({
+          date: d,
+          startTime,
+          endTime,
+          room: roomData?.room_name || room
+        })),
+        totalSchedules: finalTotalSchedules,
+        attendedCount: attendedCount,
+        numberOfSessions: numberOfSessions,
+        schedulesToDelete: schedulesToDelete || [],
+        deletedCount: schedulesToDelete.length || 0
+      }
+    });
+  } catch (err) {
+    console.error("❌ Lỗi khi preview:", err);
+    res.status(500).json({ message: "Lỗi server", error: err.message });
+  }
+};
+
+// =========================
+// 🆕 TẠO BUỔI HỌC MỚI
+// =========================
+exports.createClassSchedule = async (req, res) => {
+  try {
+    const { classId, sessionNumber, date, startTime, endTime, room, repeatWeekly, selectedDay } = req.body;
+
+    if (!classId || !date || !startTime || !endTime || !room) {
+      return res.status(400).json({ message: "Thiếu thông tin bắt buộc." });
+    }
+
+    // ✅ 1.5. Validation: Kiểm tra số buổi đã học và preview các buổi sẽ bị xóa
+    const classInfo = await Class.findById(classId).select("course").lean();
+    if (!classInfo || !classInfo.course) {
+      return res.status(400).json({
+        message: "Lớp học chưa có course được gán.",
+      });
+    }
+
+    // Lấy course để biết numberOfSessions
+    const courseData = await Course.findById(classInfo.course)
+      .select('numberOfSessions')
+      .lean();
+    const courseNumberOfSessions = courseData?.numberOfSessions || 0;
+
+    // Tính toán các ngày sẽ tạo nếu repeatWeekly = true
+    const datesToCreate = [];
+    if (repeatWeekly) {
+      // Parse date từ string YYYY-MM-DD, tránh timezone issues
+      const dateParts = date.split('-');
+      const firstDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+      firstDate.setHours(0, 0, 0, 0);
+      
+      // Khi "Lặp lại vào các tuần", tạo số buổi bằng với numberOfSessions
+      // Cleanup sẽ tự động xóa các buổi thừa để giữ đúng numberOfSessions
+      const schedulesNeeded = courseNumberOfSessions;
+      
+      // Tạo các ngày cho các tuần tiếp theo (mỗi tuần 1 buổi)
+      for (let week = 0; week < schedulesNeeded; week++) {
+        const scheduleDate = new Date(firstDate);
+        scheduleDate.setDate(firstDate.getDate() + (week * 7));
+        
+        // Format date để tránh timezone issues (dùng local time, không dùng UTC)
+        const year = scheduleDate.getFullYear();
+        const month = String(scheduleDate.getMonth() + 1).padStart(2, '0');
+        const day = String(scheduleDate.getDate()).padStart(2, '0');
+        const dateString = `${year}-${month}-${day}`;
+        
+        datesToCreate.push(dateString);
+      }
+    } else {
+      // Chỉ tạo 1 buổi
+      datesToCreate.push(date);
+    }
+
+    // ========== LOGGING: Preview trước khi thêm ==========
+    console.log('📋 ========== TẠO BUỔI HỌC ==========');
+    console.log('📅 Thông tin buổi học sẽ được thêm:');
+    console.log('   - Lớp học ID:', classId);
+    console.log('   - Lặp lại vào các tuần:', repeatWeekly ? 'Có' : 'Không');
+    console.log('   - Số buổi sẽ được tạo:', datesToCreate.length);
+    console.log('   - Ngày đầu tiên:', datesToCreate[0]);
+    if (datesToCreate.length > 1) {
+      console.log('   - Ngày cuối cùng:', datesToCreate[datesToCreate.length - 1]);
+    }
+    console.log('   - Giờ bắt đầu:', startTime);
+    console.log('   - Giờ kết thúc:', endTime);
+    console.log('   - Phòng học ID:', room);
+    console.log('');
+
+    // Validation: Kiểm tra xem có thể thêm không (dựa trên số buổi sẽ tạo)
+    // Lấy số buổi hiện tại
+    const currentSchedulesCount = await ClassSchedule.countDocuments({ class: classId });
+    const finalTotalSchedules = currentSchedulesCount + datesToCreate.length;
+    
+    // Lấy preview để kiểm tra
+    const allSchedules = await ClassSchedule.find({ class: classId }).lean();
+    const allScheduleIds = allSchedules.map(s => s._id);
+    const studentSchedulesWithAttendance = await StudentSchedule.find({
+      classSchedule: { $in: allScheduleIds },
+      'attendance.status': { $ne: null }
+    }).select('classSchedule').lean();
+    const scheduleIdsWithAttendance = new Set(
+      studentSchedulesWithAttendance.map(s => s.classSchedule.toString())
+    );
+    const attendedCount = allSchedules.filter(
+      s => scheduleIdsWithAttendance.has(s._id.toString())
+    ).length;
+
+    if (attendedCount >= courseNumberOfSessions) {
+      return res.status(400).json({
+        success: false,
+        message: `Không thể thêm buổi học. Lớp đã có ${attendedCount} buổi đã học, đã đạt giới hạn ${courseNumberOfSessions} buổi của khóa học.`,
+        cleanupInfo: {
+          totalSchedules: currentSchedulesCount,
+          attendedCount: attendedCount,
+          numberOfSessions: courseNumberOfSessions
+        }
+      });
+    }
+
+    const preview = await getSchedulesToDeletePreview(classId, classInfo.course);
+    
+    console.log('🔍 Preview kết quả:');
+    console.log('   - Có thể thêm:', preview.canAdd);
+    console.log('   - Tổng số buổi hiện tại:', preview.totalSchedules || 0);
+    console.log('   - Số buổi đã học:', preview.attendedCount || 0);
+    console.log('   - Số buổi chưa học:', (preview.totalSchedules || 0) - (preview.attendedCount || 0));
+    console.log('   - numberOfSessions của course:', preview.numberOfSessions || 0);
+    
+    if (preview.schedulesToDelete && preview.schedulesToDelete.length > 0) {
+      console.log('   - Sẽ xóa các buổi sau:');
+      preview.schedulesToDelete.forEach((schedule, index) => {
+        const scheduleDate = new Date(schedule.date);
+        console.log(`      ${index + 1}. ${scheduleDate.toLocaleDateString('vi-VN')} - ${schedule.startTime} đến ${schedule.endTime} (ID: ${schedule._id})`);
+      });
+    } else {
+      console.log('   - Không có buổi nào sẽ bị xóa');
+    }
+    console.log('==========================================');
+    
+    if (!preview.canAdd) {
+      console.log('❌ KHÔNG THỂ THÊM: Số buổi đã học >= numberOfSessions');
+      return res.status(400).json({
+        success: false,
+        message: preview.errorMessage || "Không thể thêm buổi học.",
+        cleanupInfo: {
+          totalSchedules: preview.totalSchedules,
+          attendedCount: preview.attendedCount,
+          numberOfSessions: preview.numberOfSessions
+        }
+      });
+    }
+
+    // ✅ 2. Lấy thông tin class để có teacher và createdBy
+    const classData = await Class.findById(classId).select("teacher teacherId").lean();
+    if (!classData) {
+      return res.status(404).json({ message: "Không tìm thấy lớp học." });
+    }
+
+    const teacherId = classData.teacher || classData.teacherId;
+    const createdById = req.user?._id || teacherId; // Ưu tiên user đang đăng nhập, nếu không có thì dùng teacher
+
+    // ✅ 3. Tạo các buổi học mới (có thể nhiều buổi nếu repeatWeekly = true)
+    const createdSchedules = [];
+    
+    for (const dateStr of datesToCreate) {
+      const newSchedule = await ClassSchedule.create({
+        class: classId,
+        sessionNumber,
+        date: dateStr,
+        startTime,
+        endTime,
+        room,
+        teacher: teacherId,
+        createdBy: createdById,
+        reason: `Buổi học thêm mới - ${new Date(dateStr).toLocaleDateString('vi-VN')}`,
+        status: 'fixed'
+      });
+      createdSchedules.push(newSchedule);
+    }
+
+    // ✅ 4. Lấy danh sách sinh viên trong lớp
+    const classInfoWithStudents = await Class.findById(classId).populate("students");
+
+    if (!classInfoWithStudents || !classInfoWithStudents.students || classInfoWithStudents.students.length === 0) {
+      // Vẫn cleanup ngay cả khi không có students
+      const cleanupResult = await cleanupSchedulesAfterAdding(classId, classInfo.course);
+      
+      return res.status(200).json({
+        message: `Đã tạo ${createdSchedules.length} buổi học, nhưng lớp chưa có sinh viên.`,
+        schedules: createdSchedules,
+        cleanupInfo: cleanupResult.success ? {
+          deletedCount: cleanupResult.deletedCount,
+          reassignedSessions: cleanupResult.reassignedSessions
+        } : null
+      });
+    }
+
+    // ✅ 5. Tạo StudentSchedule cho từng sinh viên cho TẤT CẢ các buổi mới
+    const studentSchedules = [];
+    for (const schedule of createdSchedules) {
+      for (const stuId of classInfoWithStudents.students) {
+        studentSchedules.push({
+          student: stuId,
+          classSchedule: schedule._id,
+          // Không set attendance - để null cho đến khi giáo viên điểm danh
+        });
+      }
+    }
 
     await StudentSchedule.insertMany(studentSchedules);
 
-    // ✅ 5. Populate thông tin phòng khi trả về
-    const populatedSchedule = await ClassSchedule.findById(newSchedule._id)
-      .populate("room", "room_name location status");
+    // ✅ 6. Cleanup: Xóa các buổi thừa và gán lại session
+    console.log('');
+    console.log('🧹 ========== BẮT ĐẦU CLEANUP ==========');
+    console.log('📊 Trước cleanup:');
+    console.log(`   - Đã tạo ${createdSchedules.length} buổi học mới`);
+    createdSchedules.forEach((schedule, index) => {
+      const scheduleDate = new Date(schedule.date);
+      console.log(`      ${index + 1}. ${scheduleDate.toLocaleDateString('vi-VN')} - ${schedule.startTime} đến ${schedule.endTime} (ID: ${schedule._id})`);
+    });
+    console.log('   - Đang kiểm tra và cleanup...');
+    console.log('');
+    
+    const cleanupResult = await cleanupSchedulesAfterAdding(classId, classInfo.course);
+    
+    console.log('');
+    console.log('✅ ========== KẾT QUẢ CLEANUP ==========');
+    console.log('   - Thành công:', cleanupResult.success);
+    console.log('   - Số buổi đã xóa:', cleanupResult.deletedCount || 0);
+    console.log('   - Số buổi đã gán lại session:', cleanupResult.reassignedSessions || 0);
+    console.log('   - Tổng số buổi sau cleanup:', cleanupResult.totalSchedules || 0);
+    console.log('==========================================');
+    console.log('');
+
+    // ✅ 7. Populate thông tin phòng khi trả về
+    const populatedSchedules = await ClassSchedule.find({
+      _id: { $in: createdSchedules.map(s => s._id) }
+    })
+      .populate("room", "room_name location status")
+      .sort({ date: 1 });
+
+    // Chuẩn bị cleanupInfo với thông tin về các buổi đã bị xóa
+    const cleanupInfo = cleanupResult.success ? {
+      deletedCount: cleanupResult.deletedCount || 0,
+      reassignedSessions: cleanupResult.reassignedSessions || 0,
+      totalSchedules: cleanupResult.totalSchedules || 0
+    } : null;
 
     return res.status(201).json({
-      message: "Tạo buổi học và lịch sinh viên thành công.",
-      schedule: populatedSchedule,
+      success: true,
+      message: `Đã tạo ${createdSchedules.length} buổi học và lịch sinh viên thành công.`,
+      schedules: populatedSchedules,
       generated: studentSchedules.length,
+      cleanupInfo
     });
   } catch (err) {
     console.error("❌ Lỗi khi tạo buổi học:", err);

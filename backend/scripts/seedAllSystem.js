@@ -888,9 +888,23 @@ async function seedClassSchedules() {
         
         // Tính ngày bắt đầu và kết thúc
         const startDate = new Date(classItem.startDate);
-        const endDate = new Date(classItem.endDate);
+        let endDate = new Date(classItem.endDate);
         startDate.setHours(0, 0, 0, 0);
         endDate.setHours(23, 59, 59, 999);
+        
+        // Tính toán số tuần cần thiết dựa trên numberOfSessions và sessionsPerWeek
+        const weeksNeeded = Math.ceil(numberOfSessions / sessionsPerWeek);
+        
+        // Tính endDate mới dựa trên số tuần cần thiết (đảm bảo đủ chỗ cho tất cả buổi học)
+        const calculatedEndDate = new Date(startDate);
+        calculatedEndDate.setDate(startDate.getDate() + (weeksNeeded * 7) + 6); // +6 để đảm bảo có đủ tuần
+        
+        // Sử dụng endDate lớn hơn (giữa endDate gốc và calculatedEndDate)
+        if (calculatedEndDate > endDate) {
+            console.log(`    ⚠️ endDate gốc (${endDate.toISOString().split('T')[0]}) không đủ cho ${numberOfSessions} buổi học`);
+            console.log(`    📅 Tự động mở rộng endDate đến ${calculatedEndDate.toISOString().split('T')[0]} để đủ ${weeksNeeded} tuần`);
+            endDate = calculatedEndDate;
+        }
         
         // Tìm ngày đầu tiên của pattern (tìm Thứ 2 đầu tiên từ startDate hoặc sau đó)
         const firstMonday = new Date(startDate);
@@ -920,9 +934,9 @@ async function seedClassSchedules() {
                 const scheduleDate = new Date(firstMonday);
                 scheduleDate.setDate(firstMonday.getDate() + (currentWeek * 7) + (patternItem.dayOfWeek - 1));
                 
-                // Kiểm tra nếu vượt quá endDate thì dừng
+                // Kiểm tra nếu vượt quá endDate thì dừng (nhưng đã tính toán endDate đủ rộng)
                 if (scheduleDate > endDate) {
-                    console.log(`    ⚠️ Reached endDate, stopping schedule creation`);
+                    console.log(`    ⚠️ Reached endDate, stopping schedule creation (đã tạo ${scheduleCount}/${numberOfSessions} buổi)`);
                     break;
                 }
                 
@@ -959,6 +973,11 @@ async function seedClassSchedules() {
             if (nextWeekStart > endDate) {
                 break;
             }
+        }
+        
+        // Cảnh báo nếu không tạo đủ số buổi
+        if (scheduleCount < numberOfSessions) {
+            console.log(`    ⚠️ CẢNH BÁO: Chỉ tạo được ${scheduleCount}/${numberOfSessions} buổi học do giới hạn thời gian`);
         }
         
         // Log thống kê về schedules (quá khứ/tương lai)

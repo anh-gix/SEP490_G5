@@ -47,6 +47,26 @@ export const classScheduleService = {
     }
   },
 
+  // Validate: Kiểm tra conflict trước khi thêm buổi học
+  validateAddClassSchedule: async (scheduleData) => {
+    try {
+      const response = await api.post('/validate', scheduleData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể validate buổi học' };
+    }
+  },
+
+  // Preview: Xem trước khi thêm buổi học (chỉ log, không tạo)
+  previewAddClassSchedule: async (scheduleData) => {
+    try {
+      const response = await api.post('/preview', scheduleData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể preview buổi học' };
+    }
+  },
+
   // Tạo buổi học mới
   createClassSchedule: async (scheduleData) => {
     try {

@@ -23,6 +23,10 @@ const courseSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'Session'
     }],
+    numberOfSessions: {
+        type: Number,
+        default: 0
+    },
     camSessions: [{
         type: Schema.Types.ObjectId,
         ref: 'CamSession'

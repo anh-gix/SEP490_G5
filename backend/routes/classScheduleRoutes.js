@@ -12,6 +12,12 @@ router.get("/teacher/:teacherId/schedule", classScheduleController.getTeacherSch
 // ✅ Lấy lịch học theo lớp
 router.get("/class/:classId/schedules", classScheduleController.getSchedulesByClass);
 
+// ✅ Validate: Kiểm tra conflict trước khi thêm buổi học
+router.post("/validate", classScheduleController.validateAddClassSchedule);
+
+// ✅ Preview: Xem trước khi thêm buổi học (chỉ log, không tạo)
+router.post("/preview", classScheduleController.previewAddClassSchedule);
+
 // ✅ Tạo buổi học mới (và generate StudentSchedule)
 router.post("/", classScheduleController.createClassSchedule);
 

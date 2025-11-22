@@ -200,6 +200,31 @@ exports.createSchedule = async (req, res) => {
       });
     }
     
+    // Validation: Kiểm tra số buổi đã học và preview các buổi sẽ bị xóa
+    const { getSchedulesToDeletePreview, cleanupSchedulesAfterAdding } = require('../helpers/scheduleCleanup');
+    const classData = await Class.findById(classId).select('course').lean();
+    
+    if (!classData || !classData.course) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lớp học chưa có course được gán.'
+      });
+    }
+
+    const preview = await getSchedulesToDeletePreview(classId, classData.course);
+    
+    if (!preview.canAdd) {
+      return res.status(400).json({
+        success: false,
+        message: preview.errorMessage || 'Không thể thêm buổi học.',
+        cleanupInfo: {
+          totalSchedules: preview.totalSchedules,
+          attendedCount: preview.attendedCount,
+          numberOfSessions: preview.numberOfSessions
+        }
+      });
+    }
+    
     const newSchedule = new ClassSchedule({
       class: classId,
       session,
@@ -214,6 +239,9 @@ exports.createSchedule = async (req, res) => {
     });
     
     await newSchedule.save();
+    
+    // Cleanup: Xóa các buổi thừa và gán lại session
+    const cleanupResult = await cleanupSchedulesAfterAdding(classId, classData.course);
     
     // Kiểm tra và cập nhật learningType nếu đến ngày test
     if (session) {
@@ -241,10 +269,18 @@ exports.createSchedule = async (req, res) => {
       .populate('class', 'name level')
       .populate('room', 'room_name location');
     
+    // Chuẩn bị cleanupInfo với thông tin về các buổi đã bị xóa
+    const cleanupInfo = cleanupResult.success && preview.schedulesToDelete && preview.schedulesToDelete.length > 0 ? {
+      deletedCount: cleanupResult.deletedCount || 0,
+      reassignedSessions: cleanupResult.reassignedSessions || 0,
+      schedulesToDelete: preview.schedulesToDelete // Sử dụng preview vì đây là danh sách buổi đã bị xóa
+    } : null;
+
     res.status(201).json({
       success: true,
       message: 'Tạo lịch học thành công',
-      schedule: populatedSchedule
+      schedule: populatedSchedule,
+      cleanupInfo
     });
   } catch (error) {
     console.error('Error in createSchedule:', error);

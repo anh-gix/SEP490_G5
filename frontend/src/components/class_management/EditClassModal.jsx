@@ -66,6 +66,8 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
   const [showScheduleDetailModal, setShowScheduleDetailModal] = useState(false); // Show/hide schedule detail modal
   const [editedSchedule, setEditedSchedule] = useState(null); // Edited schedule data
   const [showAddScheduleModal, setShowAddScheduleModal] = useState(false); // Show/hide add schedule modal
+  const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false); // Show/hide confirmation modal for deleting schedules
+  const [schedulesToDelete, setSchedulesToDelete] = useState([]); // Schedules that will be deleted
   const [newScheduleData, setNewScheduleData] = useState({
     day: '',
     startTime: '08:00',
@@ -73,6 +75,9 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
     repeatWeekly: false
   });
   const [savingSchedule, setSavingSchedule] = useState(false); // Loading state for saving schedule
+  const [validationResult, setValidationResult] = useState(null); // Validation result for new schedule
+  const [validatingSchedule, setValidatingSchedule] = useState(false); // Loading state for validation
+  const [pendingScheduleData, setPendingScheduleData] = useState(null); // Store schedule data while waiting for confirmation
   const [hasAttendance, setHasAttendance] = useState(false); // Check if schedule has attendance (buổi đã học)
   const [checkingAttendance, setCheckingAttendance] = useState(false); // Loading state for checking attendance
   const [showConfirmUpdateModal, setShowConfirmUpdateModal] = useState(false); // Show/hide confirm update modal
@@ -339,6 +344,69 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
       }
     }
   }, [classData, fullClassData]);
+
+  // Validate schedule conflicts when user changes schedule data
+  useEffect(() => {
+    const validateSchedule = async () => {
+      // Only validate if modal is open and all required fields are filled
+      if (!showAddScheduleModal || !newScheduleData.day || !newScheduleData.startTime || !newScheduleData.endTime) {
+        setValidationResult(null);
+        return;
+      }
+
+      const classId = formData.id || formData._id;
+      if (!classId) {
+        setValidationResult(null);
+        return;
+      }
+
+      const roomId = formData.roomId || fullClassData?.room?._id || fullClassData?.room?.id;
+      if (!roomId) {
+        setValidationResult(null);
+        return;
+      }
+
+      // Convert day to date
+      const today = new Date();
+      const dayMap = { 'CN': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6 };
+      const targetDay = dayMap[newScheduleData.day];
+      
+      let daysToAdd = (targetDay - today.getDay() + 7) % 7;
+      if (daysToAdd === 0) daysToAdd = 7;
+      const scheduleDate = new Date(today);
+      scheduleDate.setDate(today.getDate() + daysToAdd);
+      scheduleDate.setHours(0, 0, 0, 0);
+
+      try {
+        setValidatingSchedule(true);
+        const response = await classScheduleService.validateAddClassSchedule({
+          classId: classId,
+          date: scheduleDate.toISOString().split('T')[0],
+          startTime: newScheduleData.startTime,
+          endTime: newScheduleData.endTime,
+          room: roomId
+        });
+
+        setValidationResult(response);
+      } catch (error) {
+        console.error('Error validating schedule:', error);
+        setValidationResult({
+          success: false,
+          conflicts: { hasConflict: false },
+          message: 'Không thể kiểm tra xung đột lịch học'
+        });
+      } finally {
+        setValidatingSchedule(false);
+      }
+    };
+
+    // Debounce validation to avoid too many API calls
+    const timeoutId = setTimeout(() => {
+      validateSchedule();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [showAddScheduleModal, newScheduleData.day, newScheduleData.startTime, newScheduleData.endTime, formData.id, formData._id, formData.roomId, fullClassData?.room]);
 
   // Initialize selectedStudents from classStudents
   useEffect(() => {
@@ -3883,7 +3951,10 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
       {/* Add Schedule Modal */}
       <Modal 
         show={showAddScheduleModal} 
-        onHide={() => setShowAddScheduleModal(false)} 
+        onHide={() => {
+          setShowAddScheduleModal(false);
+          setValidationResult(null);
+        }} 
         centered
         size="md"
       >
@@ -3957,27 +4028,359 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
               />
             </Form.Group>
           </Form>
+
+          {/* Validation Result */}
+          {validatingSchedule && (
+            <div className="mt-16">
+              <div className="d-flex align-items-center text-neutral-600 text-14">
+                <i className="fas fa-spinner fa-spin me-2"></i>
+                Đang kiểm tra xung đột lịch học...
+              </div>
+            </div>
+          )}
+
+          {validationResult && !validatingSchedule && (
+            <div className="mt-16">
+              {validationResult.conflicts?.hasConflict ? (
+                <Alert variant="danger" className="mb-0">
+                  <div className="fw-semibold mb-8">
+                    <i className="fas fa-exclamation-triangle me-2"></i>
+                    Có xung đột lịch học được phát hiện:
+                  </div>
+                  
+                  {validationResult.conflicts.teacher && validationResult.conflicts.teacher.length > 0 && (
+                    <div className="mb-8">
+                      <div className="fw-medium mb-4">🔴 Xung đột Giáo viên:</div>
+                      <ul className="mb-0 ps-16">
+                        {validationResult.conflicts.teacher.map((conflict, idx) => (
+                          <li key={idx} className="text-13">
+                            Lớp <strong>{conflict.className}</strong> vào {conflict.date} từ {conflict.time}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {validationResult.conflicts.room && validationResult.conflicts.room.length > 0 && (
+                    <div className="mb-8">
+                      <div className="fw-medium mb-4">🔴 Xung đột Phòng học:</div>
+                      <ul className="mb-0 ps-16">
+                        {validationResult.conflicts.room.map((conflict, idx) => (
+                          <li key={idx} className="text-13">
+                            {conflict.isCurrentClass ? (
+                              <>
+                                <strong>Lớp này đã có buổi học</strong> vào {conflict.date} từ {conflict.time}. 
+                                Một lớp không thể có 2 buổi học cùng thứ cùng giờ.
+                              </>
+                            ) : (
+                              <>
+                                Lớp <strong>{conflict.className}</strong> vào {conflict.date} từ {conflict.time}
+                              </>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {validationResult.conflicts.students && validationResult.conflicts.students.length > 0 && (
+                    <div className="mb-8">
+                      <div className="fw-medium mb-4">🔴 Xung đột Sinh viên:</div>
+                      <ul className="mb-0 ps-16">
+                        {validationResult.conflicts.students.map((studentConflict, idx) => (
+                          <li key={idx} className="text-13 mb-4">
+                            <strong>{studentConflict.studentName || `Sinh viên ${studentConflict.studentId}`}</strong>
+                            <ul className="ps-16 mt-2 mb-0">
+                              {studentConflict.conflicts.map((conflict, cIdx) => (
+                                <li key={cIdx} className="text-12">
+                                  Lớp <strong>{conflict.className}</strong> vào {conflict.date} từ {conflict.time}
+                                </li>
+                              ))}
+                            </ul>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </Alert>
+              ) : (
+                <Alert variant="success" className="mb-0">
+                  <i className="fas fa-check-circle me-2"></i>
+                  Không có xung đột lịch học. Có thể thêm buổi học.
+                </Alert>
+              )}
+            </div>
+          )}
         </Modal.Body>
         <Modal.Footer className="bg-neutral-25 border-0 p-20">
           <Button
             variant="secondary"
             className="btn-outline-neutral-600 text-14 fw-medium px-20 py-10"
-            onClick={() => setShowAddScheduleModal(false)}
+            onClick={() => {
+              setShowAddScheduleModal(false);
+              setValidationResult(null);
+            }}
           >
             Hủy
           </Button>
           <Button
             variant="primary"
             className="btn-main text-14 fw-medium px-20 py-10"
-            onClick={() => {
-              // TODO: Implement save schedule functionality
-              console.log('New schedule data:', newScheduleData);
-              setShowAddScheduleModal(false);
+            disabled={savingSchedule || validatingSchedule || (validationResult?.conflicts?.hasConflict === true)}
+            onClick={async () => {
+              if (!newScheduleData.day || !newScheduleData.startTime || !newScheduleData.endTime) {
+                return;
+              }
+
+              try {
+                setSavingSchedule(true);
+                
+                // Lấy classId từ formData
+                const classId = formData.id || formData._id;
+                if (!classId) {
+                  alert('Không tìm thấy ID lớp học');
+                  return;
+                }
+
+                // Lấy room từ formData (hoặc từ fullClassData)
+                const roomId = formData.roomId || fullClassData?.room?._id || fullClassData?.room?.id;
+                if (!roomId) {
+                  alert('Lớp học chưa có phòng học được gán');
+                  return;
+                }
+
+                // Chuyển đổi day từ format 'CN', '2', '3'... sang date cụ thể
+                const today = new Date();
+                const dayMap = { 'CN': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6 };
+                const targetDay = dayMap[newScheduleData.day];
+                
+                console.log('[DEBUG] Tính toán ngày:');
+                console.log('   - Thứ được chọn:', newScheduleData.day);
+                console.log('   - targetDay (0=CN, 1=T2, ..., 6=T7):', targetDay);
+                console.log('   - Hôm nay là thứ:', today.getDay(), `(${['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][today.getDay()]})`);
+                
+                // Tìm ngày tiếp theo có thứ tương ứng
+                let daysToAdd = (targetDay - today.getDay() + 7) % 7;
+                if (daysToAdd === 0) daysToAdd = 7; // Nếu hôm nay là thứ đó, lấy tuần sau
+                
+                console.log('   - Số ngày cần cộng:', daysToAdd);
+                
+                const scheduleDate = new Date(today);
+                scheduleDate.setDate(today.getDate() + daysToAdd);
+                scheduleDate.setHours(0, 0, 0, 0);
+                
+                const calculatedDay = scheduleDate.getDay();
+                const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+                console.log('   - Ngày được tính:', scheduleDate.toLocaleDateString('vi-VN'), `(${dayNames[calculatedDay]})`);
+                console.log('   - Kiểm tra: Ngày tính có đúng thứ được chọn không?', calculatedDay === targetDay ? '✅ ĐÚNG' : '❌ SAI');
+                
+                // Format date để tránh timezone issues (dùng local time, không dùng UTC)
+                const year = scheduleDate.getFullYear();
+                const month = String(scheduleDate.getMonth() + 1).padStart(2, '0');
+                const day = String(scheduleDate.getDate()).padStart(2, '0');
+                const dateString = `${year}-${month}-${day}`;
+                
+                console.log('   - Date string sẽ gửi (tránh timezone):', dateString);
+                console.log('');
+
+                const scheduleData = {
+                  classId: classId,
+                  date: dateString, // Dùng dateString thay vì toISOString() để tránh timezone issues
+                  startTime: newScheduleData.startTime,
+                  endTime: newScheduleData.endTime,
+                  room: roomId,
+                  repeatWeekly: newScheduleData.repeatWeekly || false,
+                  selectedDay: newScheduleData.day // Thêm thông tin thứ được chọn để debug
+                };
+
+                // ========== LOGGING: Trước khi tạo ==========
+                console.log('📋 ========== TẠO BUỔI HỌC ==========');
+                console.log('📅 Thông tin buổi học sẽ được thêm:');
+                console.log('   - Lớp học ID:', classId);
+                console.log('   - Lặp lại vào các tuần:', newScheduleData.repeatWeekly ? 'Có' : 'Không');
+                console.log('   - Ngày đầu tiên:', scheduleData.date);
+                console.log('   - Thứ:', newScheduleData.day);
+                console.log('   - Giờ bắt đầu:', scheduleData.startTime);
+                console.log('   - Giờ kết thúc:', scheduleData.endTime);
+                console.log('   - Phòng học ID:', roomId);
+                console.log('   - Phòng học:', fullClassData?.room?.room_name || 'N/A');
+                console.log('');
+                console.log('⏳ Đang gọi API tạo buổi học...');
+                console.log('==========================================');
+
+                // Gọi API tạo buổi học
+                const response = await classScheduleService.createClassSchedule(scheduleData);
+
+                // ========== LOGGING: Kết quả từ API ==========
+                console.log('✅ ========== KẾT QUẢ TẠO BUỔI HỌC ==========');
+                console.log('📊 Response:', response);
+                console.log('');
+                
+                if (response.cleanupInfo) {
+                  console.log('🧹 Thông tin cleanup:');
+                  console.log('   - Số buổi đã xóa:', response.cleanupInfo.deletedCount || 0);
+                  console.log('   - Số buổi đã gán lại session:', response.cleanupInfo.reassignedSessions || 0);
+                  console.log('   - Tổng số buổi sau cleanup:', response.cleanupInfo.totalSchedules || 0);
+                }
+                console.log('==========================================');
+                
+                // Hiển thị thông báo thành công
+                const message = response.message || 'Đã tạo buổi học thành công!';
+                if (response.cleanupInfo && response.cleanupInfo.deletedCount > 0) {
+                  alert(`${message}\n\nĐã xóa ${response.cleanupInfo.deletedCount} buổi học thừa để đảm bảo số buổi đúng với numberOfSessions.`);
+                } else {
+                  alert(message);
+                }
+                
+                // Đóng modal
+                setShowAddScheduleModal(false);
+                
+                // Reset form
+                setNewScheduleData({
+                  day: '',
+                  startTime: '',
+                  endTime: '',
+                  repeatWeekly: false
+                });
+                
+                // Refresh lại class data để hiển thị các buổi học mới
+                if (classId) {
+                  try {
+                    const classResponse = await classService.getClassById(classId);
+                    let updatedClassData = null;
+                    if (classResponse && classResponse.success && classResponse.class) {
+                      updatedClassData = classResponse.class;
+                    } else if (classResponse && classResponse.data) {
+                      updatedClassData = classResponse.data;
+                    } else if (classResponse && classResponse.class) {
+                      updatedClassData = classResponse.class;
+                    }
+                    
+                    if (updatedClassData) {
+                      setFullClassData(updatedClassData);
+                      console.log('✅ Đã refresh lại class data với schedules mới');
+                    }
+                  } catch (refreshError) {
+                    console.error('Error refreshing class data:', refreshError);
+                    // Không hiển thị lỗi cho user vì đã tạo schedule thành công
+                  }
+                }
+              } catch (error) {
+                console.error('Error creating schedule:', error);
+                const errorMessage = error.message || error.response?.data?.message || 'Có lỗi xảy ra khi thêm buổi học';
+                alert(errorMessage);
+              } finally {
+                setSavingSchedule(false);
+              }
             }}
-            disabled={!newScheduleData.day || !newScheduleData.startTime || !newScheduleData.endTime}
+          >
+            {savingSchedule ? (
+              <>
+                <i className="fas fa-spinner fa-spin me-2"></i>
+                Đang xử lý...
+              </>
+            ) : (
+              <>
+                <i className="fas fa-check me-2"></i>
+                Thêm
+              </>
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Information Modal for Deleted Schedules */}
+      <Modal
+        show={showConfirmDeleteModal}
+        onHide={() => {
+          setShowConfirmDeleteModal(false);
+          setSchedulesToDelete([]);
+          setPendingScheduleData(null);
+        }}
+        centered
+        size="lg"
+      >
+        <Modal.Header closeButton className="bg-info text-white border-0 p-24">
+          <Modal.Title className="fw-bold">
+            <i className="fas fa-info-circle me-2"></i>
+            Thông báo
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-24">
+          <Alert variant="info" className="mb-16">
+            <i className="fas fa-check-circle me-2"></i>
+            Buổi học đã được thêm thành công! Các buổi học sau đã được xóa tự động để đảm bảo tổng số buổi không vượt quá số buổi quy định của khóa học:
+          </Alert>
+          
+          {schedulesToDelete.length > 0 && (
+            <div className="mb-16">
+              <h6 className="text-neutral-700 fw-semibold mb-12">Danh sách buổi học sẽ bị xóa:</h6>
+              <div className="table-responsive">
+                <table className="table table-bordered">
+                  <thead className="bg-neutral-100">
+                    <tr>
+                      <th className="text-13 fw-semibold">Ngày</th>
+                      <th className="text-13 fw-semibold">Giờ bắt đầu</th>
+                      <th className="text-13 fw-semibold">Giờ kết thúc</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {schedulesToDelete.map((schedule, index) => {
+                      const date = new Date(schedule.date);
+                      const formattedDate = date.toLocaleDateString('vi-VN', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      });
+                      
+                      return (
+                        <tr key={schedule._id || index}>
+                          <td className="text-13">{formattedDate}</td>
+                          <td className="text-13">{schedule.startTime}</td>
+                          <td className="text-13">{schedule.endTime}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          
+        </Modal.Body>
+        <Modal.Footer className="bg-neutral-25 border-0 p-20">
+          <Button
+            variant="primary"
+            className="btn-main text-14 fw-medium px-20 py-10"
+            onClick={async () => {
+              // Refresh data và đóng modal
+              const classId = formData.id || formData._id;
+              
+              if (classId) {
+                try {
+                  const classResponse = await classService.getClassById(classId);
+                  if (classResponse && classResponse.data) {
+                    setFullClassData(classResponse.data);
+                  }
+                } catch (error) {
+                  console.error('Error refreshing class data:', error);
+                }
+              }
+              
+              setShowConfirmDeleteModal(false);
+              setSchedulesToDelete([]);
+              setPendingScheduleData(null);
+              setNewScheduleData({
+                day: '',
+                startTime: '08:00',
+                endTime: '10:00',
+                repeatWeekly: false
+              });
+            }}
           >
             <i className="fas fa-check me-2"></i>
-            Thêm
+            Đã hiểu
           </Button>
         </Modal.Footer>
       </Modal>

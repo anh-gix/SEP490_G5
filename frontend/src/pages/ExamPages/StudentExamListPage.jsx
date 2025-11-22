@@ -34,7 +34,7 @@ const StudentExamListPage = () => {
       <Preloader />
       <Animation />
       <HeaderOne />
-      <Breadcrumb title={"Đề thi IELTS"} />
+      <Breadcrumb title={"Đề thi"} />
       
       <section className='course-grid-view py-120'>
         <div className='container'>

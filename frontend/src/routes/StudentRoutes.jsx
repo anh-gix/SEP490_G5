@@ -1,3 +1,4 @@
+
 import StudentDashboardPage from "../pages/StudentPages/StudentDashboardPage.jsx";
 import StudentSchedulePage from "../pages/StudentPages/StudentSchedulePage.jsx";
 import StudentCoursesPage from "../pages/StudentPages/StudentCoursesPage.jsx";
@@ -47,4 +48,6 @@ export const studentRoutes = [
 
   // VII. Leave Request (future)
   // { path: '/student/leave-request', element: <StudentLeaveRequestPage /> },
+
+ 
 ];

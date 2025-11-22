@@ -1,5 +1,12 @@
 const mongoose = require("mongoose");
 
+const answerKeySchema = new mongoose.Schema({
+  questionNumber: { type: Number, required: true },
+  correctAnswer: [{ type: String, required: true }],
+  maxScore: { type: Number, default: 1 },
+  questionType: { type: String, enum: ["multiple_choice", "true_false", "input","three_choice","four_choice","five_choice"] }
+});
+
 const sectionSchema = new mongoose.Schema({
   type: {
     type: String,
@@ -11,14 +18,8 @@ const sectionSchema = new mongoose.Schema({
   instructions: String,
   duration: Number,
   questionCount: Number,
+  answerKey: [answerKeySchema],
   maxScore: Number,
-  // Answer key for grading (correct answers)
-  answerKey: [{
-    questionNumber: { type: Number, required: true },
-    correctAnswer: { type: String },
-    maxScore: { type: Number, default: 1 },
-    questionType: { type: String, enum: ["multiple_choice", "true_false", "input", "essay"] }
-  }]
 });
 
 const examSchema = new mongoose.Schema(
@@ -31,6 +32,8 @@ const examSchema = new mongoose.Schema(
     totalDuration: Number,
     sections: [sectionSchema],
     isPublished: { type: Boolean, default: false },
+    publishedAt: { type: Date },
+    unpublishedAt: { type: Date },
   },
   { timestamps: true }
 );

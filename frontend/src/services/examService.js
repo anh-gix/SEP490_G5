@@ -85,6 +85,104 @@ export const examService = {
       throw error.response?.data || { message: 'Không thể lấy kết quả' };
     }
   },
+
+  // Lấy thông tin section Listening
+  getListeningSection: async (examId, submissionId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions/${submissionId}/listening`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy thông tin phần Listening' };
+    }
+  },
+
+  // Nộp đáp án Listening
+  submitListeningAnswers: async (examId, submissionId, answers) => {
+    try {
+      const response = await api.post(`/${examId}/submissions/${submissionId}/listening/submit`, {
+        answers,
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể nộp đáp án' };
+    }
+  },
+
+  // Xem kết quả Listening
+  getListeningResult: async (examId, submissionId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions/${submissionId}/listening/result`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy kết quả' };
+    }
+  },
+
+  // Lấy thông tin section Writing
+  getWritingSection: async (examId, submissionId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions/${submissionId}/writing`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy thông tin phần Writing' };
+    }
+  },
+
+  // Nộp đáp án Writing
+  submitWritingAnswers: async (examId, submissionId, answers) => {
+    try {
+      const response = await api.post(`/${examId}/submissions/${submissionId}/writing/submit`, {
+        answers,
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể nộp đáp án' };
+    }
+  },
+
+  // Xem kết quả Writing
+  getWritingResult: async (examId, submissionId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions/${submissionId}/writing/result`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy kết quả' };
+    }
+  },
+
+  // Lấy thông tin section Speaking
+  getSpeakingSection: async (examId, submissionId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions/${submissionId}/speaking`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy thông tin phần Speaking' };
+    }
+  },
+
+  // Nộp đáp án Speaking (với file upload)
+  submitSpeakingAnswers: async (examId, submissionId, formData) => {
+    try {
+      const response = await api.post(`/${examId}/submissions/${submissionId}/speaking/submit`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể nộp đáp án' };
+    }
+  },
+
+  // Xem kết quả Speaking
+  getSpeakingResult: async (examId, submissionId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions/${submissionId}/speaking/result`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy kết quả' };
+    }
+  },
 };
 
 export default examService;

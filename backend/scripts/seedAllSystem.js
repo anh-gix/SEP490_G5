@@ -536,7 +536,7 @@ async function seedCourses() {
             clos: [seedData.clos[0]._id, seedData.clos[1]._id],
             createdBy: seedData.users[1]._id, // Subject Leader
             status: 'approved',
-            numberOfSessions: 5
+            numberOfSessions: 12
         },
         {
             name: 'IELTS Foundation A1 - Nói',
@@ -545,7 +545,7 @@ async function seedCourses() {
             clos: [seedData.clos[0]._id, seedData.clos[1]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved',
-            numberOfSessions: 5
+            numberOfSessions: 12
         },
         {
             name: 'IELTS Intermediate B1 - Nghe',
@@ -554,7 +554,7 @@ async function seedCourses() {
             clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved',
-            numberOfSessions: 5
+            numberOfSessions: 12
         },
         {
             name: 'IELTS Intermediate B1 - Viết',
@@ -564,7 +564,7 @@ async function seedCourses() {
             clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved',
-            numberOfSessions: 5
+            numberOfSessions: 12
         },
         {
             name: 'IELTS Advanced C1 - Đọc',
@@ -573,7 +573,7 @@ async function seedCourses() {
             clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved',
-            numberOfSessions: 5
+            numberOfSessions: 12
         },
         {
             name: 'IELTS Elementary A2 - Nghe',
@@ -582,7 +582,7 @@ async function seedCourses() {
             clos: [seedData.clos[0]._id, seedData.clos[1]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved',
-            numberOfSessions: 5
+            numberOfSessions: 12
         },
         {
             name: 'IELTS Upper Intermediate B2 - Viết',
@@ -591,7 +591,7 @@ async function seedCourses() {
             clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved',
-            numberOfSessions: 5
+            numberOfSessions: 12
         },
         {
             name: 'IELTS Proficiency C2 - Nói',
@@ -600,7 +600,7 @@ async function seedCourses() {
             clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved',
-            numberOfSessions: 5
+            numberOfSessions: 12
         },
         // TOEIC courses
         {
@@ -610,7 +610,7 @@ async function seedCourses() {
             clos: [seedData.clos[3]._id, seedData.clos[4]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved',
-            numberOfSessions: 3
+            numberOfSessions: 10
         },
         {
             name: 'TOEIC Intermediate B1 - Đọc',
@@ -619,7 +619,7 @@ async function seedCourses() {
             clos: [seedData.clos[3]._id, seedData.clos[4]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved',
-            numberOfSessions: 3
+            numberOfSessions: 10
         },
         {
             name: 'TOEIC Elementary A2 - Nghe',
@@ -628,7 +628,7 @@ async function seedCourses() {
             clos: [seedData.clos[3]._id, seedData.clos[4]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved',
-            numberOfSessions: 3
+            numberOfSessions: 10
         },
         {
             name: 'TOEIC Upper Intermediate B2 - Đọc',
@@ -637,7 +637,7 @@ async function seedCourses() {
             clos: [seedData.clos[3]._id, seedData.clos[4]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved',
-            numberOfSessions: 3
+            numberOfSessions: 10
         },
         {
             name: 'TOEIC Advanced C1 - Nghe',
@@ -646,7 +646,7 @@ async function seedCourses() {
             clos: [seedData.clos[3]._id, seedData.clos[4]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved',
-            numberOfSessions: 3
+            numberOfSessions: 10
         },
         {
             name: 'TOEIC Proficiency C2 - Đọc',
@@ -655,7 +655,7 @@ async function seedCourses() {
             clos: [seedData.clos[3]._id, seedData.clos[4]._id],
             createdBy: seedData.users[1]._id,
             status: 'approved',
-            numberOfSessions: 3
+            numberOfSessions: 10
         },
         // CAM courses
         {
@@ -665,7 +665,7 @@ async function seedCourses() {
             clos: [seedData.clos[5]._id], // CLO006 - Giao tiếp cơ bản
             createdBy: seedData.users[1]._id,
             status: 'approved',
-            numberOfSessions: 3
+            numberOfSessions: 8
         },
         {
             name: 'CAM Mover A1 - Nghe nói',
@@ -674,7 +674,7 @@ async function seedCourses() {
             clos: [seedData.clos[5]._id, seedData.clos[6]._id], // CLO006 và CLO007
             createdBy: seedData.users[1]._id,
             status: 'approved',
-            numberOfSessions: 3
+            numberOfSessions: 8
         }
     ];
     

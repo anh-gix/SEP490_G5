@@ -649,26 +649,44 @@ exports.updateClass = async (req, res) => {
       .session(session)
       .lean();
     
+    console.log('🔍 [DEBUG] Existing schedules count:', existingClassSchedules.length);
+    
     const oldSchedulePattern = extractSchedulePatternFromClassSchedules(existingClassSchedules);
     const newSchedulePattern = scheduleEntries && scheduleEntries.length > 0 
       ? normalizeScheduleEntries(scheduleEntries) 
       : [];
     
+    console.log('🔍 [DEBUG] Old schedule pattern:', JSON.stringify(oldSchedulePattern, null, 2));
+    console.log('🔍 [DEBUG] New schedule pattern:', JSON.stringify(newSchedulePattern, null, 2));
+    
     // Check if only scheduleEntries changed (without changing room/teacher/startDate)
+    const scheduleEntriesChanged = compareScheduleEntries(oldSchedulePattern, newSchedulePattern);
     const scheduleEntriesOnlyChanged = newSchedulePattern.length > 0 && 
       !courseChanged && 
       !roomChanged && 
       !teacherChanged && 
       !startDateChanged &&
-      compareScheduleEntries(oldSchedulePattern, newSchedulePattern);
+      scheduleEntriesChanged;
     
-    const scheduleEntriesChanged = scheduleEntries && scheduleEntries.length > 0;
+    const scheduleEntriesProvided = scheduleEntries && scheduleEntries.length > 0;
+    
+    console.log('🔍 [DEBUG] Change flags:', {
+      courseChanged,
+      roomChanged,
+      teacherChanged,
+      startDateChanged,
+      scheduleEntriesChanged,
+      scheduleEntriesProvided,
+      scheduleEntriesOnlyChanged
+    });
     
     // Determine if we need to regenerate schedules
     // Regenerate if: course changed, OR (scheduleEntries provided AND any schedule-related field changed)
     // OR if only scheduleEntries changed (will use smart update)
     const shouldRegenerateSchedules = courseChanged || 
-      (scheduleEntriesChanged && (roomChanged || teacherChanged || startDateChanged));
+      (scheduleEntriesProvided && (roomChanged || teacherChanged || startDateChanged));
+    
+    console.log('🔍 [DEBUG] shouldRegenerateSchedules:', shouldRegenerateSchedules);
     
     // Determine final values for schedule generation
     const finalCourse = course || classData.course;
@@ -679,6 +697,7 @@ exports.updateClass = async (req, res) => {
     
     // Smart update: Only update future schedules when only scheduleEntries changed
     if (scheduleEntriesOnlyChanged && scheduleEntries && scheduleEntries.length > 0 && finalCourse && finalStartDate) {
+      console.log('🔍 [DEBUG] Entering SMART UPDATE block');
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Reset time to compare dates only
       
@@ -725,7 +744,28 @@ exports.updateClass = async (req, res) => {
       if (courseData && courseData.numberOfSessions) {
         const numberOfSessions = courseData.numberOfSessions;
         const pastSessionsCount = pastSchedules.length;
-        const remainingSessions = numberOfSessions - pastSessionsCount;
+        const totalExistingSchedules = existingClassSchedules.length; // Tổng số schedules trước khi xóa
+        const futureSchedulesCount = futureSchedules.length; // Số future schedules đã bị xóa
+        
+        // Chỉ tạo lại số lượng future schedules đã bị xóa
+        // Hoặc nếu tổng số schedules hiện tại < numberOfSessions, tạo thêm cho đủ
+        // Nhưng không tạo thêm nếu đã có đủ số schedules
+        let remainingSessions = 0;
+        if (totalExistingSchedules < numberOfSessions) {
+          // Chưa đủ số schedules, cần tạo thêm
+          remainingSessions = numberOfSessions - totalExistingSchedules;
+        } else if (futureSchedulesCount > 0) {
+          // Đã đủ số schedules nhưng có future schedules bị xóa, chỉ tạo lại số đó
+          remainingSessions = futureSchedulesCount;
+        }
+        
+        console.log('🔍 [DEBUG] Schedule counts:', {
+          numberOfSessions,
+          pastSessionsCount,
+          futureSchedulesCount,
+          totalExistingSchedules,
+          remainingSessions
+        });
         
         // Only create new schedules if there are remaining sessions
         if (remainingSessions > 0) {
@@ -831,6 +871,7 @@ exports.updateClass = async (req, res) => {
           
           // Create all new ClassSchedule entries
           if (classSchedules.length > 0) {
+            console.log('🔍 [DEBUG] Creating', classSchedules.length, 'new schedules in SMART UPDATE');
             const createdSchedules = await ClassSchedule.insertMany(classSchedules, { session });
             
             // Create StudentSchedule entries for each new ClassSchedule
@@ -850,12 +891,17 @@ exports.updateClass = async (req, res) => {
                 await StudentSchedule.insertMany(studentSchedules, { session });
               }
             }
+          } else {
+            console.log('🔍 [DEBUG] No new schedules to create in SMART UPDATE');
           }
+        } else {
+          console.log('🔍 [DEBUG] No remaining sessions to create in SMART UPDATE');
         }
       }
     }
     // If schedules need to be regenerated (full regeneration), delete old ClassSchedules and related data
     else if (shouldRegenerateSchedules) {
+      console.log('🔍 [DEBUG] Entering FULL REGENERATION block');
       // Find all ClassSchedules for this class
       const classSchedules = await ClassSchedule.find({ class: req.params.id }).session(session).select('_id');
       const classScheduleIds = classSchedules.map(schedule => schedule._id);
@@ -898,6 +944,7 @@ exports.updateClass = async (req, res) => {
     // Create new ClassSchedules when schedules need to be regenerated and scheduleEntries are provided
     // (Only if not already handled by smart update above)
     if (shouldRegenerateSchedules && !scheduleEntriesOnlyChanged && scheduleEntries && scheduleEntries.length > 0 && finalCourse && finalStartDate) {
+      console.log('🔍 [DEBUG] Entering CREATE NEW SCHEDULES block (full regeneration)');
       // Get course details including numberOfSessions and sessions
       const courseData = await Course.findById(finalCourse)
         .populate('sessions', 'order')
@@ -993,6 +1040,7 @@ exports.updateClass = async (req, res) => {
         
         // Create all ClassSchedule entries
         if (classSchedules.length > 0) {
+          console.log('🔍 [DEBUG] Creating', classSchedules.length, 'new schedules in FULL REGENERATION');
           const createdSchedules = await ClassSchedule.insertMany(classSchedules, { session });
           
           // Create StudentSchedule entries for each ClassSchedule
@@ -1012,8 +1060,14 @@ exports.updateClass = async (req, res) => {
               await StudentSchedule.insertMany(studentSchedules, { session });
             }
           }
+        } else {
+          console.log('🔍 [DEBUG] No new schedules to create in FULL REGENERATION');
         }
+      } else {
+        console.log('🔍 [DEBUG] Course data not found or no numberOfSessions');
       }
+    } else {
+      console.log('🔍 [DEBUG] Skipping schedule creation - conditions not met');
     }
     
     // Commit transaction before populating (populate doesn't need to be in transaction)

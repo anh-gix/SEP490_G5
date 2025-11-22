@@ -1,8 +1,7 @@
-
-import StudentExamListPage from "../pages/StudentExamListPage.jsx";
-import ExamDetailPage from "../pages/ExamDetailPage.jsx";
-import ReadingExamPage from "../pages/ReadingExamPage.jsx";
-import ReadingResultPage from "../pages/ReadingResultPage.jsx";
+import StudentExamListPage from "../pages/StudentPages/StudentExamListPage.jsx";
+import ExamDetailPage from "../pages/StudentPages/ExamDetailPage.jsx";
+import ReadingExamPage from "../pages/StudentPages/ReadingExamPage.jsx";
+import ReadingResultPage from "../pages/StudentPages/ReadingResultPage.jsx";
 import ListeningExamPage from "../pages/ListeningExamPage.jsx";
 import ListeningResultPage from "../pages/ListeningResultPage.jsx";
 import WritingExamPage from "../pages/WritingExamPage.jsx";

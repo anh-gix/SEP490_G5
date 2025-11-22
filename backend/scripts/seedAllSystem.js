@@ -726,84 +726,93 @@ async function seedSessions() {
 async function seedClasses() {
     console.log('📝 Seeding Classes...');
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day for consistent date comparison
     
-    // Thu ngắn thời gian xuống khoảng 1 tháng
-    const startDate1 = new Date(today);
-    startDate1.setDate(today.getDate() + 7); // Bắt đầu sau 1 tuần
-    const endDate1 = new Date(startDate1);
-    endDate1.setMonth(startDate1.getMonth() + 1); // Kết thúc sau 1 tháng
+    // Lớp đang học: startDate 2 tuần trước, endDate 2 tuần sau
+    // Đảm bảo có schedules cả trong quá khứ và tương lai
+    const activeClassStartDate = new Date(today);
+    activeClassStartDate.setDate(today.getDate() - 14); // 2 tuần trước
+    const activeClassEndDate = new Date(today);
+    activeClassEndDate.setDate(today.getDate() + 14); // 2 tuần sau
     
-    const startDate2 = new Date(today);
-    startDate2.setDate(today.getDate() + 14); // Bắt đầu sau 2 tuần
-    const endDate2 = new Date(startDate2);
-    endDate2.setMonth(startDate2.getMonth() + 1); // Kết thúc sau 1 tháng
-    
-    const startDate3 = new Date(today);
-    startDate3.setDate(today.getDate() + 3); // Bắt đầu sau 3 ngày
-    const endDate3 = new Date(startDate3);
-    endDate3.setMonth(startDate3.getMonth() + 1); // Kết thúc sau 1 tháng
+    // Lớp chưa học: startDate 1 tuần sau, endDate 5 tuần sau
+    // Tất cả schedules sẽ trong tương lai
+    const pendingClassStartDate = new Date(today);
+    pendingClassStartDate.setDate(today.getDate() + 7); // 1 tuần sau
+    const pendingClassEndDate = new Date(today);
+    pendingClassEndDate.setDate(today.getDate() + 35); // 5 tuần sau
     
     const classes = [
         {
-            name: 'IELTS Foundation A1 - Lớp 1',
-            course: seedData.courses[0]._id,
+            name: 'IELTS Foundation A1 - Lớp Đang Học',
+            course: seedData.courses[0]._id, // IELTS Foundation A1 - Nghe (5 sessions)
             teacher: seedData.users[3]._id, // Teacher 1
             students: [seedData.users[5]._id, seedData.users[6]._id, seedData.users[7]._id],
             room: seedData.rooms[0]._id,
-            startDate: startDate1,
-            endDate: endDate1,
+            startDate: activeClassStartDate,
+            endDate: activeClassEndDate,
             maxStudents: 25,
             status: 'active'
         },
         {
-            name: 'TOEIC Beginner A1 - Lớp 1',
-            course: seedData.courses[3]._id,
+            name: 'TOEIC Beginner A1 - Lớp Chưa Học',
+            course: seedData.courses[8]._id, // TOEIC Beginner A1 - Nghe (3 sessions)
             teacher: seedData.users[4]._id, // Teacher 2
             students: [seedData.users[8]._id, seedData.users[9]._id],
             room: seedData.rooms[1]._id,
-            startDate: startDate2,
-            endDate: endDate2,
+            startDate: pendingClassStartDate,
+            endDate: pendingClassEndDate,
             maxStudents: 20,
             status: 'pending'
-        },
-        {
-            name: 'CAM Starter Pre-A1 - Lớp 1',
-            course: seedData.courses[5]._id,
-            teacher: seedData.users[3]._id, // Teacher 1
-            students: [seedData.users[5]._id, seedData.users[6]._id, seedData.users[7]._id, seedData.users[8]._id],
-            room: seedData.rooms[2]._id,
-            startDate: startDate3,
-            endDate: endDate3,
-            maxStudents: 15,
-            status: 'active'
         }
     ];
     
     const created = await Class.insertMany(classes);
     seedData.classes = created;
-    console.log(`✅ Created ${created.length} classes\n`);
+    console.log(`✅ Created ${created.length} classes`);
+    console.log(`   - Lớp đang học: ${classes[0].name} (${activeClassStartDate.toISOString().split('T')[0]} - ${activeClassEndDate.toISOString().split('T')[0]})`);
+    console.log(`   - Lớp chưa học: ${classes[1].name} (${pendingClassStartDate.toISOString().split('T')[0]} - ${pendingClassEndDate.toISOString().split('T')[0]})\n`);
 }
 
 async function seedClassSchedules() {
     console.log('📝 Seeding Class Schedules...');
     const classSchedules = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time for date comparison
     
-    // Các khung giờ có thể chọn (tối đa 4 buổi/tuần)
-    const timeSlots = [
-        { startTime: '08:00', endTime: '10:00' },
-        { startTime: '10:30', endTime: '12:30' },
-        { startTime: '14:00', endTime: '16:00' },
-        { startTime: '18:00', endTime: '20:00' }
+    // Các pattern lịch học mẫu (mỗi lớp có thể chọn pattern khác nhau)
+    // dayOfWeek: 0 = Chủ nhật, 1 = Thứ 2, ..., 6 = Thứ 7
+    const schedulePatterns = [
+        // Pattern 1: Thứ 2, Thứ 3 (2 buổi/tuần)
+        [
+            { dayOfWeek: 1, startTime: '08:00', endTime: '10:00' }, // Thứ 2
+            { dayOfWeek: 2, startTime: '10:00', endTime: '12:00' }  // Thứ 3
+        ],
+        // Pattern 2: Thứ 2, Thứ 3, Thứ 5 (3 buổi/tuần)
+        [
+            { dayOfWeek: 1, startTime: '08:00', endTime: '10:00' }, // Thứ 2
+            { dayOfWeek: 2, startTime: '10:00', endTime: '12:00' }, // Thứ 3
+            { dayOfWeek: 4, startTime: '14:00', endTime: '16:00' }  // Thứ 5
+        ],
+        // Pattern 3: Thứ 2, Thứ 3, Thứ 6 (3 buổi/tuần)
+        [
+            { dayOfWeek: 1, startTime: '08:00', endTime: '10:00' }, // Thứ 2
+            { dayOfWeek: 2, startTime: '10:00', endTime: '12:00' }, // Thứ 3
+            { dayOfWeek: 5, startTime: '18:00', endTime: '20:00' }  // Thứ 6
+        ],
+        // Pattern 4: Thứ 2, Thứ 3, Thứ 4 (3 buổi/tuần)
+        [
+            { dayOfWeek: 1, startTime: '08:00', endTime: '10:00' }, // Thứ 2
+            { dayOfWeek: 2, startTime: '10:00', endTime: '12:00' }, // Thứ 3
+            { dayOfWeek: 3, startTime: '14:00', endTime: '16:00' }  // Thứ 4
+        ]
     ];
     
-    // Các ngày trong tuần (0 = Chủ nhật, 1 = Thứ 2, ..., 6 = Thứ 7)
-    const daysOfWeek = [1, 3, 5, 6]; // Thứ 2, 4, 6, 7 (tối đa 4 buổi/tuần)
-    
     // Reload courses từ database để có sessions đã được update
-    // (seedData.courses chưa có sessions vì sessions được update sau khi seedSessions)
     const coursesFromDB = await Course.find().lean();
     
-    for (const classItem of seedData.classes) {
+    for (let classIndex = 0; classIndex < seedData.classes.length; classIndex++) {
+        const classItem = seedData.classes[classIndex];
         console.log(`  📚 Creating schedules for class: ${classItem.name}`);
         
         // Tìm course từ database (có sessions đã được update)
@@ -813,10 +822,10 @@ async function seedClassSchedules() {
             continue;
         }
         
-        // Lấy sessions từ course (có thể là ObjectId hoặc đã populate)
+        // Lấy sessions từ course
         const courseSessionIds = course.sessions || [];
         if (!Array.isArray(courseSessionIds) || courseSessionIds.length === 0) {
-            console.log(`    ⚠️ Course ${course.name} has no sessions (sessions: ${JSON.stringify(courseSessionIds)})`);
+            console.log(`    ⚠️ Course ${course.name} has no sessions`);
             continue;
         }
         
@@ -830,85 +839,112 @@ async function seedClassSchedules() {
         );
         
         if (courseSessions.length === 0) {
-            console.log(`    ⚠️ No sessions found for course ${course.name} (course has ${courseSessionIds.length} session IDs, but none match)`);
+            console.log(`    ⚠️ No sessions found for course ${course.name}`);
             continue;
         }
         
         // Lấy số buổi học từ course.numberOfSessions
         const numberOfSessions = course.numberOfSessions || courseSessions.length;
         
-        // Tính số tuần từ startDate đến endDate
-        const startDate = new Date(classItem.startDate);
-        const endDate = new Date(classItem.endDate);
-        const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
-        const weeks = Math.ceil(daysDiff / 7);
+        // Chọn pattern lịch cho lớp này (mỗi lớp có thể khác nhau)
+        // Sử dụng classIndex để phân bổ pattern khác nhau cho các lớp
+        const selectedPattern = schedulePatterns[classIndex % schedulePatterns.length];
         
-        console.log(`    📅 Start: ${startDate.toISOString().split('T')[0]}, End: ${endDate.toISOString().split('T')[0]}, Days: ${daysDiff}, Weeks: ${weeks}`);
+        // Tính toán số buổi/tuần từ pattern
+        const sessionsPerWeek = selectedPattern.length;
+        
+        console.log(`    📅 Pattern: ${sessionsPerWeek} buổi/tuần (${selectedPattern.map(p => `Thứ ${p.dayOfWeek === 1 ? '2' : p.dayOfWeek === 2 ? '3' : p.dayOfWeek === 3 ? '4' : p.dayOfWeek === 4 ? '5' : p.dayOfWeek === 5 ? '6' : '7'}`).join(', ')})`);
         console.log(`    📚 Course has ${numberOfSessions} sessions, creating ${numberOfSessions} class schedules`);
         
-        // Tạo đúng số buổi học dựa trên course.numberOfSessions
-        // Phân bổ đều trong khoảng thời gian từ startDate đến endDate
+        // Tính ngày bắt đầu và kết thúc
+        const startDate = new Date(classItem.startDate);
+        const endDate = new Date(classItem.endDate);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+        
+        // Tìm ngày đầu tiên của pattern (tìm Thứ 2 đầu tiên từ startDate hoặc sau đó)
+        const firstMonday = new Date(startDate);
+        const dayOfWeek = firstMonday.getDay(); // 0 = Chủ nhật, 1 = Thứ 2, ...
+        let daysToAdd = 0;
+        if (dayOfWeek === 0) {
+            // Nếu là Chủ nhật, thêm 1 ngày để thành Thứ 2
+            daysToAdd = 1;
+        } else if (dayOfWeek > 1) {
+            // Nếu là Thứ 3 trở đi, tính số ngày để đến Thứ 2 tuần sau
+            daysToAdd = 8 - dayOfWeek;
+        }
+        // Nếu là Thứ 2 (dayOfWeek === 1), daysToAdd = 0, giữ nguyên
+        firstMonday.setDate(firstMonday.getDate() + daysToAdd);
+        
+        // Tạo lịch học
         let sessionIndex = 0;
         let scheduleCount = 0;
+        let currentWeek = 0;
         
-        // Tạo đúng numberOfSessions buổi học
-        for (let i = 0; i < numberOfSessions; i++) {
-            // Tính ngày cụ thể: phân bổ đều trong khoảng thời gian
-            let scheduleDate;
-            if (numberOfSessions === 1) {
-                // Nếu chỉ có 1 buổi, đặt ở giữa khoảng thời gian
-                scheduleDate = new Date(startDate.getTime() + (endDate.getTime() - startDate.getTime()) / 2);
-            } else {
-                // Phân bổ đều: buổi đầu gần startDate, buổi cuối gần endDate
-                const progress = i / (numberOfSessions - 1);
-                scheduleDate = new Date(startDate.getTime() + (endDate.getTime() - startDate.getTime()) * progress);
+        while (scheduleCount < numberOfSessions) {
+            // Tạo lịch cho mỗi buổi trong pattern của tuần hiện tại
+            for (const patternItem of selectedPattern) {
+                if (scheduleCount >= numberOfSessions) break;
+                
+                // Tính ngày cụ thể: Thứ X của tuần hiện tại
+                const scheduleDate = new Date(firstMonday);
+                scheduleDate.setDate(firstMonday.getDate() + (currentWeek * 7) + (patternItem.dayOfWeek - 1));
+                
+                // Kiểm tra nếu vượt quá endDate thì dừng
+                if (scheduleDate > endDate) {
+                    console.log(`    ⚠️ Reached endDate, stopping schedule creation`);
+                    break;
+                }
+                
+                // Kiểm tra nếu trước startDate thì bỏ qua
+                if (scheduleDate < startDate) {
+                    continue;
+                }
+                
+                // Lấy session tương ứng theo thứ tự
+                const session = courseSessions[sessionIndex % courseSessions.length];
+                
+                classSchedules.push({
+                    class: classItem._id,
+                    session: session._id,
+                    date: scheduleDate,
+                    startTime: patternItem.startTime,
+                    endTime: patternItem.endTime,
+                    room: classItem.room,
+                    teacher: classItem.teacher,
+                    createdBy: seedData.users[2]._id, // Academic Staff
+                    reason: `Lịch học buổi ${scheduleCount + 1}`,
+                    status: 'approved'
+                });
+                
+                sessionIndex++;
+                scheduleCount++;
             }
             
-            // Chọn ngày trong tuần và khung giờ
-            const dayIndex = i % daysOfWeek.length;
-            const dayOfWeek = daysOfWeek[dayIndex];
-            const timeSlot = timeSlots[dayIndex % timeSlots.length];
+            currentWeek++;
             
-            // Điều chỉnh để rơi vào ngày trong tuần phù hợp
-            const currentDayOfWeek = scheduleDate.getDay();
-            let dayOffset = dayOfWeek - currentDayOfWeek;
-            if (dayOffset < 0) dayOffset += 7;
-            if (dayOffset > 3) dayOffset -= 7; // Ưu tiên ngày gần nhất
-            
-            scheduleDate.setDate(scheduleDate.getDate() + dayOffset);
-            
-            // Đảm bảo không vượt quá endDate
-            if (scheduleDate > endDate) {
-                scheduleDate = new Date(endDate);
-                scheduleDate.setDate(scheduleDate.getDate() - 1); // Lùi 1 ngày nếu vượt quá
+            // Nếu đã vượt quá endDate, dừng lại
+            const nextWeekStart = new Date(firstMonday);
+            nextWeekStart.setDate(firstMonday.getDate() + (currentWeek * 7));
+            if (nextWeekStart > endDate) {
+                break;
             }
-            
-            // Đảm bảo không trước startDate
-            if (scheduleDate < startDate) {
-                scheduleDate = new Date(startDate);
-            }
-            
-            // Lấy session tương ứng theo thứ tự
-            const session = courseSessions[sessionIndex % courseSessions.length];
-            sessionIndex++;
-            
-            classSchedules.push({
-                class: classItem._id,
-                session: session._id,
-                date: scheduleDate,
-                startTime: timeSlot.startTime,
-                endTime: timeSlot.endTime,
-                room: classItem.room,
-                teacher: classItem.teacher,
-                createdBy: seedData.users[2]._id, // Academic Staff
-                reason: `Lịch học buổi ${i + 1}`,
-                status: 'approved'
-            });
-            
-            scheduleCount++;
         }
         
+        // Log thống kê về schedules (quá khứ/tương lai)
+        const pastSchedules = classSchedules.filter(s => {
+            const scheduleDate = new Date(s.date);
+            scheduleDate.setHours(0, 0, 0, 0);
+            return scheduleDate < today && s.class.toString() === classItem._id.toString();
+        }).length;
+        const futureSchedules = classSchedules.filter(s => {
+            const scheduleDate = new Date(s.date);
+            scheduleDate.setHours(0, 0, 0, 0);
+            return scheduleDate >= today && s.class.toString() === classItem._id.toString();
+        }).length;
+        
         console.log(`    ✅ Created ${scheduleCount} schedules for class ${classItem.name}`);
+        console.log(`       - Schedules quá khứ: ${pastSchedules}, Schedules tương lai: ${futureSchedules}`);
     }
     
     if (classSchedules.length === 0) {
@@ -925,32 +961,43 @@ async function seedClassSchedules() {
 async function seedStudentSchedules() {
     console.log('📝 Seeding Student Schedules...');
     const studentSchedules = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
-    // Tạo student schedules cho một số học viên
-    for (const classSchedule of seedData.classSchedules.slice(0, 5)) {
+    // Tạo student schedules cho TẤT CẢ ClassSchedules của cả 2 lớp
+    for (const classSchedule of seedData.classSchedules) {
         const classItem = seedData.classes.find(c => 
             c._id.toString() === classSchedule.class.toString()
         );
         if (!classItem) continue;
         
-        // Mỗi class schedule có 2-3 học viên tham gia
-        const students = classItem.students.slice(0, Math.min(3, classItem.students.length));
-        
-        for (const studentId of students) {
+        // Tạo StudentSchedule cho tất cả học viên trong lớp
+        for (const studentId of classItem.students) {
+            // Xác định attendance status dựa trên ngày của schedule
+            const scheduleDate = new Date(classSchedule.date);
+            scheduleDate.setHours(0, 0, 0, 0);
+            const isPastSchedule = scheduleDate < today;
+            
+            // Với schedules quá khứ, có thể có attendance
+            // Với schedules tương lai, mặc định là absent
+            const attendanceStatus = isPastSchedule 
+                ? (Math.random() > 0.3 ? 'present' : 'absent')
+                : 'absent';
+            
             studentSchedules.push({
                 student: studentId,
                 classSchedule: classSchedule._id,
                 attendance: {
-                    status: Math.random() > 0.3 ? 'present' : 'absent',
-                    checkInTime: classSchedule.date,
-                    markedBy: classItem.teacher
+                    status: attendanceStatus,
+                    checkInTime: isPastSchedule && attendanceStatus === 'present' ? classSchedule.date : null,
+                    markedBy: isPastSchedule && attendanceStatus === 'present' ? classItem.teacher : null
                 }
             });
         }
     }
     
     const created = await StudentSchedule.insertMany(studentSchedules);
-    console.log(`✅ Created ${created.length} student schedules\n`);
+    console.log(`✅ Created ${created.length} student schedules for ${seedData.classSchedules.length} class schedules\n`);
 }
 
 async function seedExams() {

@@ -560,62 +560,6 @@ const compareScheduleEntries = (oldEntries, newEntries) => {
   return false;
 };
 
-/**
- * Identify which days changed between old and new schedule patterns
- * Returns: { deleted: [], added: [], changed: [], unchanged: [] }
- */
-const identifyChangedDays = (oldPattern, newPattern) => {
-  const normalizedOld = normalizeScheduleEntries(oldPattern);
-  const normalizedNew = normalizeScheduleEntries(newPattern);
-  
-  const deleted = [];
-  const added = [];
-  const changed = [];
-  const unchanged = [];
-  
-  // Create maps for easier lookup: key = "day-startTime-endTime"
-  const oldMap = new Map();
-  normalizedOld.forEach(entry => {
-    const key = `${entry.day}-${entry.startTime}-${entry.endTime}`;
-    oldMap.set(key, entry);
-  });
-  
-  const newMap = new Map();
-  normalizedNew.forEach(entry => {
-    const key = `${entry.day}-${entry.startTime}-${entry.endTime}`;
-    newMap.set(key, entry);
-  });
-  
-  // Find deleted: in old but not in new (by exact match)
-  normalizedOld.forEach(oldEntry => {
-    const key = `${oldEntry.day}-${oldEntry.startTime}-${oldEntry.endTime}`;
-    if (!newMap.has(key)) {
-      deleted.push(oldEntry);
-    }
-  });
-  
-  // Find added and changed: in new
-  normalizedNew.forEach(newEntry => {
-    const key = `${newEntry.day}-${newEntry.startTime}-${newEntry.endTime}`;
-    
-    if (oldMap.has(key)) {
-      // Exact match - unchanged
-      unchanged.push(newEntry);
-    } else {
-      // Check if same day but different time (changed)
-      const sameDayOld = normalizedOld.find(o => o.day === newEntry.day);
-      if (sameDayOld) {
-        changed.push(newEntry);
-      } else {
-        // New day - added
-        added.push(newEntry);
-      }
-    }
-  });
-  
-  return { deleted, added, changed, unchanged };
-};
-
 // =========================
 // ✏️ CẬP NHẬT LỚP HỌC
 // =========================
@@ -734,16 +678,59 @@ exports.updateClass = async (req, res) => {
     const finalStudentsList = students !== undefined ? students : classData.students;
     
     // Smart update: Only update future schedules when only scheduleEntries changed
-    // Chỉ áp dụng khi số buổi học không thay đổi (chỉ đổi thứ/giờ)
     if (scheduleEntriesOnlyChanged && scheduleEntries && scheduleEntries.length > 0 && finalCourse && finalStartDate) {
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Reset time to compare dates only
       
-      // Helper function to get day name from day of week number
-      const getDayName = (dayOfWeek) => {
-        const dayNames = ['CN', '2', '3', '4', '5', '6', '7'];
-        return dayNames[dayOfWeek] || null;
-      };
+      // Separate past and future schedules
+      const pastSchedules = existingClassSchedules.filter(schedule => {
+        const scheduleDate = new Date(schedule.date);
+        scheduleDate.setHours(0, 0, 0, 0);
+        return scheduleDate < today;
+      });
+      
+      const futureSchedules = existingClassSchedules.filter(schedule => {
+        const scheduleDate = new Date(schedule.date);
+        scheduleDate.setHours(0, 0, 0, 0);
+        return scheduleDate >= today;
+      });
+      
+      // Get future schedule IDs for deletion
+      const futureScheduleIds = futureSchedules.map(s => s._id);
+      
+      // Delete future schedules and related data
+      if (futureScheduleIds.length > 0) {
+        // 1. Delete HomeworkSubmissions for future schedules
+        await HomeworkSubmission.deleteMany(
+          { classSchedule: { $in: futureScheduleIds } }
+        ).session(session);
+        
+        // 2. Delete StudentSchedules for future schedules
+        await StudentSchedule.deleteMany(
+          { classSchedule: { $in: futureScheduleIds } }
+        ).session(session);
+        
+        // 3. Delete future ClassSchedules
+        await ClassSchedule.deleteMany(
+          { _id: { $in: futureScheduleIds } }
+        ).session(session);
+      }
+      
+      // Get course details to determine how many sessions to create
+      const courseData = await Course.findById(finalCourse)
+        .populate('sessions', 'order')
+        .select('numberOfSessions sessions')
+        .session(session);
+      
+      if (courseData && courseData.numberOfSessions) {
+        const numberOfSessions = courseData.numberOfSessions;
+        const pastSessionsCount = pastSchedules.length;
+        const remainingSessions = numberOfSessions - pastSessionsCount;
+        
+        // Only create new schedules if there are remaining sessions
+        if (remainingSessions > 0) {
+          // Sort sessions by order
+          const courseSessions = (courseData.sessions || []).sort((a, b) => (a.order || 0) - (b.order || 0));
       
       // Helper function to convert day string to day of week number
       const getDayOfWeekNumber = (dayStr) => {
@@ -759,63 +746,109 @@ exports.updateClass = async (req, res) => {
         return dayMap[dayStr] !== undefined ? dayMap[dayStr] : null;
       };
       
-      // Normalize old and new schedule patterns
-      const normalizedOld = normalizeScheduleEntries(oldSchedulePattern);
-      const normalizedNew = normalizeScheduleEntries(newSchedulePattern);
-      
-      // Chỉ áp dụng logic đơn giản khi số buổi học không thay đổi
-      if (normalizedOld.length === normalizedNew.length) {
-        // Tạo mapping: oldDay + startTime + endTime -> newDay
-        // Chỉ map khi giờ giữ nguyên, chỉ đổi thứ
-        const dayTimeMapping = {};
-        normalizedOld.forEach(oldEntry => {
-          const key = `${oldEntry.day}-${oldEntry.startTime}-${oldEntry.endTime}`;
-          // Tìm entry mới có cùng giờ nhưng khác thứ
-          const matchingNew = normalizedNew.find(newEntry => 
-            newEntry.startTime === oldEntry.startTime && 
-            newEntry.endTime === oldEntry.endTime &&
-            newEntry.day !== oldEntry.day
-          );
-          if (matchingNew) {
-            dayTimeMapping[key] = matchingNew.day;
+          // Helper function to find next occurrence of day of week
+          const findNextDayOfWeek = (startDate, targetDayOfWeek) => {
+            const start = new Date(startDate);
+            const currentDay = start.getDay();
+            let daysToAdd = (targetDayOfWeek - currentDay + 7) % 7;
+            if (daysToAdd === 0 && start.getTime() < new Date().getTime()) {
+              daysToAdd = 7;
+            }
+            const result = new Date(start);
+            result.setDate(start.getDate() + daysToAdd);
+            return result;
+          };
+          
+          // Find the latest past schedule date to determine where to start
+          let startDateForNewSchedules = finalStartDate;
+          if (pastSchedules.length > 0) {
+            const latestPastDate = new Date(Math.max(...pastSchedules.map(s => new Date(s.date).getTime())));
+            // Start from the day after the latest past schedule
+            startDateForNewSchedules = new Date(latestPastDate);
+            startDateForNewSchedules.setDate(latestPastDate.getDate() + 1);
           }
-        });
-        
-        // Tìm các buổi học chưa học (ngày >= hiện tại)
-        const futureSchedules = existingClassSchedules.filter(schedule => {
-          const scheduleDate = new Date(schedule.date);
-          scheduleDate.setHours(0, 0, 0, 0);
-          return scheduleDate >= today;
-        });
-        
-        // Cập nhật các buổi học chưa học theo mapping
-        for (const schedule of futureSchedules) {
-          const scheduleDate = new Date(schedule.date);
-          const dayOfWeek = scheduleDate.getDay();
-          const currentDayName = getDayName(dayOfWeek);
+          // Ensure we don't start before today
+          if (startDateForNewSchedules < today) {
+            startDateForNewSchedules = new Date(today);
+          }
           
-          // Tạo key để tìm trong mapping: day-startTime-endTime
-          const key = `${currentDayName}-${schedule.startTime}-${schedule.endTime}`;
+          // Find first occurrence of each day of week from start date
+          const firstOccurrences = {};
+          scheduleEntries.forEach(entry => {
+            const dayOfWeek = getDayOfWeekNumber(entry.day);
+            if (dayOfWeek !== null && !firstOccurrences[dayOfWeek]) {
+              firstOccurrences[dayOfWeek] = findNextDayOfWeek(startDateForNewSchedules, dayOfWeek);
+            }
+          });
           
-          // Nếu có mapping sang thứ mới, cập nhật ngày
-          if (dayTimeMapping.hasOwnProperty(key)) {
-            const newDayName = dayTimeMapping[key];
-            const newDayOfWeek = getDayOfWeekNumber(newDayName);
+          // Generate ClassSchedule entries for remaining sessions
+          const classSchedules = [];
+          let entryIndex = 0;
+          let weekOffset = 0;
+          
+          for (let i = 0; i < remainingSessions; i++) {
+            const entry = scheduleEntries[entryIndex % scheduleEntries.length];
+            const dayOfWeek = getDayOfWeekNumber(entry.day);
             
-            if (newDayOfWeek !== null) {
-              // Tính số ngày cần thêm để đổi sang thứ mới
-              let daysToAdd = (newDayOfWeek - dayOfWeek + 7) % 7;
-              if (daysToAdd === 0) daysToAdd = 7; // Nếu cùng thứ, chuyển sang tuần sau
+            if (dayOfWeek === null) {
+              entryIndex++;
+              continue;
+            }
+            
+            // Get the first occurrence of this day
+            const firstOccurrence = firstOccurrences[dayOfWeek];
+            
+            // Calculate the date for this session
+            const sessionDate = new Date(firstOccurrence);
+            sessionDate.setDate(firstOccurrence.getDate() + (weekOffset * 7));
+            
+            // Get corresponding session from course (continue from where we left off)
+            const sessionIndex = (pastSessionsCount + i) < courseSessions.length 
+              ? (pastSessionsCount + i) 
+              : (pastSessionsCount + i) % courseSessions.length;
+            const sessionId = courseSessions[sessionIndex]?._id || null;
+            
+            classSchedules.push({
+              class: classData._id,
+              session: sessionId,
+              date: sessionDate,
+              startTime: entry.startTime,
+              endTime: entry.endTime,
+              room: finalRoomId,
+              teacher: finalTeacher,
+              createdBy: req.user?._id || finalTeacher,
+              reason: `Buổi học ${pastSessionsCount + i + 1}`,
+              status: 'approved'
+            });
+            
+            // Move to next entry (round-robin)
+            entryIndex++;
+            // If we've gone through all entries, move to next week
+            if (entryIndex % scheduleEntries.length === 0) {
+              weekOffset++;
+            }
+          }
+          
+          // Create all new ClassSchedule entries
+          if (classSchedules.length > 0) {
+            const createdSchedules = await ClassSchedule.insertMany(classSchedules, { session });
+            
+            // Create StudentSchedule entries for each new ClassSchedule
+            if (finalStudentsList && finalStudentsList.length > 0) {
+              const studentSchedules = [];
+              createdSchedules.forEach(schedule => {
+                finalStudentsList.forEach(studentId => {
+                  studentSchedules.push({
+                    student: studentId,
+                    classSchedule: schedule._id,
+                    attendance: { status: 'absent' }
+                  });
+                });
+              });
               
-              const newDate = new Date(scheduleDate);
-              newDate.setDate(scheduleDate.getDate() + daysToAdd);
-              
-              // Chỉ cập nhật ngày, giữ nguyên tất cả dữ liệu khác (session, homework, material, etc.)
-              await ClassSchedule.findByIdAndUpdate(
-                schedule._id,
-                { date: newDate },
-                { session }
-              );
+              if (studentSchedules.length > 0) {
+                await StudentSchedule.insertMany(studentSchedules, { session });
+              }
             }
           }
         }
@@ -957,16 +990,6 @@ exports.updateClass = async (req, res) => {
             weekOffset++;
           }
         }
-        
-        // Sort classSchedules by date to ensure correct chronological order
-        classSchedules.sort((a, b) => new Date(a.date) - new Date(b.date));
-        
-        // Re-assign session order based on sorted dates to ensure correct session mapping
-        classSchedules.forEach((schedule, index) => {
-          const sessionIndex = index < courseSessions.length ? index : index % courseSessions.length;
-          schedule.session = courseSessions[sessionIndex]?._id || null;
-          schedule.reason = `Buổi học ${index + 1}`;
-        });
         
         // Create all ClassSchedule entries
         if (classSchedules.length > 0) {

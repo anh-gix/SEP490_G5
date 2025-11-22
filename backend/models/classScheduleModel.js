@@ -44,7 +44,7 @@ const classScheduleSchema = new Schema({
             files: [{ type: String }] // Changed from 'file' to 'files' array
         },
         deadline: { type: Date, required: true },
-        answerFiles: [{ type: String }] // Changed from 'answerFile' to 'answerFiles' array
+        answerFiles: [{ type: String }], // Changed from 'answerFile' to 'answerFiles' array
         // Removed: userstudy field (deprecated - use HomeworkSubmission model instead)
     }],
     

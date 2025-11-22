@@ -328,6 +328,7 @@ exports.createClass = async (req, res) => {
       name,
       course,
       teacher,
+      teacherId: teacher, // Set teacherId to match teacher for consistency
       students: students || [],
       room,
       startDate,
@@ -495,11 +496,16 @@ exports.createClass = async (req, res) => {
 // ✏️ CẬP NHẬT LỚP HỌC
 // =========================
 exports.updateClass = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
-    const { name, course, teacher, students, room, startDate, endDate, maxStudents, status } = req.body;
+    const { name, course, teacher, students, room, startDate, endDate, maxStudents, status, scheduleEntries } = req.body;
     
-    const classData = await Class.findById(req.params.id);
+    const classData = await Class.findById(req.params.id).session(session);
     if (!classData) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy lớp học'
@@ -511,8 +517,10 @@ exports.updateClass = async (req, res) => {
       const existingClass = await Class.findOne({ 
         name, 
         _id: { $ne: req.params.id } 
-      });
+      }).session(session);
       if (existingClass) {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(400).json({
           success: false,
           message: 'Tên lớp học đã tồn tại'
@@ -526,8 +534,10 @@ exports.updateClass = async (req, res) => {
     
     // Validate room capacity if room is provided
     if (finalRoom) {
-      const roomData = await Room.findById(finalRoom);
+      const roomData = await Room.findById(finalRoom).session(session);
       if (!roomData) {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(404).json({
           success: false,
           message: 'Không tìm thấy phòng học'
@@ -536,6 +546,8 @@ exports.updateClass = async (req, res) => {
       
       const studentCount = (finalStudents || []).length;
       if (studentCount > roomData.capacity) {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(400).json({
           success: false,
           message: `Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomData.capacity} học viên)`
@@ -543,10 +555,43 @@ exports.updateClass = async (req, res) => {
       }
     }
     
+    // Check if course has changed
+    const oldCourseId = classData.course?.toString();
+    const newCourseId = course?.toString();
+    const courseChanged = course && oldCourseId !== newCourseId;
+    
+    // If course changed, delete old ClassSchedules and related data
+    if (courseChanged) {
+      // Find all ClassSchedules for this class
+      const classSchedules = await ClassSchedule.find({ class: req.params.id }).session(session).select('_id');
+      const classScheduleIds = classSchedules.map(schedule => schedule._id);
+      
+      // Delete in cascade order:
+      // 1. Delete HomeworkSubmissions (references ClassSchedule)
+      if (classScheduleIds.length > 0) {
+        await HomeworkSubmission.deleteMany(
+          { classSchedule: { $in: classScheduleIds } }
+        ).session(session);
+        
+        // 2. Delete StudentSchedules (references ClassSchedule)
+        await StudentSchedule.deleteMany(
+          { classSchedule: { $in: classScheduleIds } }
+        ).session(session);
+        
+        // 3. Delete ClassSchedules (references Class)
+        await ClassSchedule.deleteMany(
+          { class: req.params.id }
+        ).session(session);
+      }
+    }
+    
     // Update fields
     if (name) classData.name = name;
     if (course) classData.course = course;
-    if (teacher) classData.teacher = teacher;
+    if (teacher) {
+      classData.teacher = teacher;
+      classData.teacherId = teacher; // Set teacherId to match teacher for consistency
+    }
     if (room !== undefined) classData.room = room;
     if (students !== undefined) classData.students = students;
     if (startDate) classData.startDate = startDate;
@@ -554,7 +599,139 @@ exports.updateClass = async (req, res) => {
     if (maxStudents) classData.maxStudents = maxStudents;
     if (status) classData.status = status;
     
-    await classData.save();
+    await classData.save({ session });
+    
+    // Generate ClassSchedule entries if course changed and scheduleEntries are provided
+    // Only create new schedules when course changed (old schedules already deleted above)
+    const finalCourse = course || classData.course;
+    const finalStartDate = startDate || classData.startDate;
+    const finalRoomId = room !== undefined ? room : classData.room;
+    const finalTeacher = teacher || classData.teacher;
+    const finalStudentsList = students !== undefined ? students : classData.students;
+    
+    // Only create new ClassSchedules when course changed and scheduleEntries are provided
+    if (courseChanged && scheduleEntries && scheduleEntries.length > 0 && finalCourse && finalStartDate) {
+      // Get course details including numberOfSessions and sessions
+      const courseData = await Course.findById(finalCourse)
+        .populate('sessions', 'order')
+        .select('numberOfSessions sessions')
+        .session(session);
+      
+      if (courseData && courseData.numberOfSessions) {
+        const numberOfSessions = courseData.numberOfSessions;
+        // Sort sessions by order to ensure correct mapping
+        const courseSessions = (courseData.sessions || []).sort((a, b) => (a.order || 0) - (b.order || 0));
+        
+        // Helper function to convert day string to day of week number
+        const getDayOfWeekNumber = (dayStr) => {
+          const dayMap = {
+            'CN': 0,
+            '2': 1,
+            '3': 2,
+            '4': 3,
+            '5': 4,
+            '6': 5,
+            '7': 6
+          };
+          return dayMap[dayStr] !== undefined ? dayMap[dayStr] : null;
+        };
+        
+        // Helper function to find next occurrence of day of week
+        const findNextDayOfWeek = (startDate, targetDayOfWeek) => {
+          const start = new Date(startDate);
+          const currentDay = start.getDay();
+          let daysToAdd = (targetDayOfWeek - currentDay + 7) % 7;
+          if (daysToAdd === 0 && start.getTime() < new Date().getTime()) {
+            daysToAdd = 7;
+          }
+          const result = new Date(start);
+          result.setDate(start.getDate() + daysToAdd);
+          return result;
+        };
+        
+        // Find first occurrence of each day of week
+        const firstOccurrences = {};
+        scheduleEntries.forEach(entry => {
+          const dayOfWeek = getDayOfWeekNumber(entry.day);
+          if (dayOfWeek !== null && !firstOccurrences[dayOfWeek]) {
+            firstOccurrences[dayOfWeek] = findNextDayOfWeek(finalStartDate, dayOfWeek);
+          }
+        });
+        
+        // Generate ClassSchedule entries
+        const classSchedules = [];
+        let entryIndex = 0;
+        let weekOffset = 0;
+        
+        for (let i = 0; i < numberOfSessions; i++) {
+          const entry = scheduleEntries[entryIndex % scheduleEntries.length];
+          const dayOfWeek = getDayOfWeekNumber(entry.day);
+          
+          if (dayOfWeek === null) {
+            entryIndex++;
+            continue;
+          }
+          
+          // Get the first occurrence of this day
+          const firstOccurrence = firstOccurrences[dayOfWeek];
+          
+          // Calculate the date for this session
+          const sessionDate = new Date(firstOccurrence);
+          sessionDate.setDate(firstOccurrence.getDate() + (weekOffset * 7));
+          
+          // Get corresponding session from course (by order, starting from 0)
+          const sessionIndex = i < courseSessions.length ? i : i % courseSessions.length;
+          const sessionId = courseSessions[sessionIndex]?._id || null;
+          
+          classSchedules.push({
+            class: classData._id,
+            session: sessionId,
+            date: sessionDate,
+            startTime: entry.startTime,
+            endTime: entry.endTime,
+            room: finalRoomId,
+            teacher: finalTeacher,
+            createdBy: req.user?._id || finalTeacher, // Use logged in user or teacher as fallback
+            reason: `Buổi học ${i + 1}`,
+            status: 'approved'
+          });
+          
+          // Move to next entry (round-robin)
+          entryIndex++;
+          // If we've gone through all entries, move to next week
+          if (entryIndex % scheduleEntries.length === 0) {
+            weekOffset++;
+          }
+        }
+        
+        // Create all ClassSchedule entries
+        if (classSchedules.length > 0) {
+          const createdSchedules = await ClassSchedule.insertMany(classSchedules, { session });
+          
+          // Create StudentSchedule entries for each ClassSchedule
+          if (finalStudentsList && finalStudentsList.length > 0) {
+            const studentSchedules = [];
+            createdSchedules.forEach(schedule => {
+              finalStudentsList.forEach(studentId => {
+                studentSchedules.push({
+                  student: studentId,
+                  classSchedule: schedule._id,
+                  attendance: { status: 'absent' }
+                });
+              });
+            });
+            
+            if (studentSchedules.length > 0) {
+              await StudentSchedule.insertMany(studentSchedules, { session });
+            }
+          }
+        }
+      }
+    }
+    
+    // Commit transaction before populating (populate doesn't need to be in transaction)
+    await session.commitTransaction();
+    session.endSession();
     
     const updatedClass = await Class.findById(classData._id)
       .populate('teacher', 'username email phone')
@@ -572,6 +749,10 @@ exports.updateClass = async (req, res) => {
       class: updatedClass
     });
   } catch (error) {
+    // Rollback transaction on error
+    await session.abortTransaction();
+    session.endSession();
+    
     console.error('Error in updateClass:', error);
     res.status(500).json({
       success: false,

@@ -1,143 +1,196 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, ProgressBar, Table } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, ProgressBar, Table, Spinner, Alert } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
+import classService from '../../services/classService';
+import scheduleService from '../../services/scheduleService';
+import roomService from '../../services/roomService';
+import axios from 'axios';
 
 /**
  * Academic Dashboard Component
  * Trang tổng quan cho module Giáo vụ
  */
 const AcademicDashboard = () => {
-  const [stats, setStats] = useState({
-    totalClasses: 0,
-    activeClasses: 0,
-    totalStudents: 0,
-    totalTeachers: 0,
+
+  const [todayOverview, setTodayOverview] = useState({
     todaySchedules: 0,
-    upcomingEvents: 0
+    absentStudents: 0,
+    lateStudents: 0,
+    pendingLeaveRequests: 0,
+    pendingMakeupClasses: 0,
+    newClassRequests: 0
   });
 
+  const [absentStudentsList, setAbsentStudentsList] = useState([]);
+  const [roomSchedule, setRoomSchedule] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
   const [todaySchedule, setTodaySchedule] = useState([]);
   const [classProgress, setClassProgress] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, []); 
 
   const fetchDashboardData = async () => {
     try {
-      // TODO: Replace with actual API calls
-      // Mock data for demonstration
-      setStats({
-        totalClasses: 45,
-        activeClasses: 38,
-        totalStudents: 856,
-        totalTeachers: 24,
-        todaySchedules: 12,
-        upcomingEvents: 5
+      setLoading(true);
+      setError(null);
+
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      const startOfDay = new Date(today);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(today);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      // Fetch today's schedules
+      const schedulesResponse = await scheduleService.getAllSchedules({ 
+        date: todayStr,
+        status: 'approved'
+      });
+      const todaySchedules = schedulesResponse.schedules || schedulesResponse || [];
+
+      // Fetch all classes for progress
+      const classesResponse = await classService.getAllClasses();
+      const classes = classesResponse.classes || [];
+
+      // Fetch rooms
+      const roomsResponse = await roomService.getAllRooms();
+      const rooms = roomsResponse.rooms || roomsResponse || [];
+
+      // Fetch absent/late students from today's schedules
+      const absentStudents = [];
+      const lateStudents = [];
+      
+      for (const schedule of todaySchedules) {
+        try {
+          const attendanceResponse = await axios.get(
+            `http://localhost:8080/api/class-schedules/${schedule._id || schedule.id}/attendance`
+          );
+          const attendances = attendanceResponse.data.attendances || attendanceResponse.data || [];
+          
+          for (const att of attendances) {
+            if (att.attendance?.status === 'absent') {
+              absentStudents.push({
+                id: att.student?._id || att.student,
+                name: att.student?.username || 'N/A',
+                studentId: att.student?._id || att.student,
+                class: schedule.class?.name || schedule.className || 'N/A',
+                time: schedule.startTime || 'N/A',
+                status: 'absent'
+              });
+            } else if (att.attendance?.status === 'late') {
+              lateStudents.push({
+                id: att.student?._id || att.student,
+                name: att.student?.username || 'N/A',
+                studentId: att.student?._id || att.student,
+                class: schedule.class?.name || schedule.className || 'N/A',
+                time: schedule.startTime || 'N/A',
+                status: 'late'
+              });
+            }
+          }
+        } catch (err) {
+          // Skip if attendance endpoint doesn't exist or fails
+          console.warn(`Could not fetch attendance for schedule ${schedule._id}:`, err);
+        }
+      }
+
+      // Transform today's schedules
+      const transformedTodaySchedule = todaySchedules.slice(0, 10).map((schedule, index) => {
+        const startTime = new Date(`${schedule.date}T${schedule.startTime}`);
+        const endTime = new Date(`${schedule.date}T${schedule.endTime}`);
+        const now = new Date();
+        
+        let status = 'upcoming';
+        if (startTime <= now && now <= endTime) {
+          status = 'ongoing';
+        } else if (endTime < now) {
+          status = 'completed';
+        }
+
+        return {
+          id: schedule._id || schedule.id || index,
+          time: `${schedule.startTime || 'N/A'} - ${schedule.endTime || 'N/A'}`,
+          className: schedule.class?.name || schedule.className || 'N/A',
+          teacher: schedule.teacher?.username || schedule.teacherName || 'N/A',
+          room: schedule.room?.room_name || schedule.roomName || 'N/A',
+          status
+        };
       });
 
-      setRecentActivities([
-        {
-          id: 1,
-          type: 'class_created',
-          message: 'Lớp A1-Morning-05 đã được tạo',
-          time: '10 phút trước',
-          icon: 'fa-plus-circle',
-          color: 'success'
-        },
-        {
-          id: 2,
-          type: 'schedule_updated',
-          message: 'Lịch học lớp B1-Evening-02 đã được cập nhật',
-          time: '25 phút trước',
-          icon: 'fa-calendar-edit',
-          color: 'info'
-        },
-        {
-          id: 3,
-          type: 'teacher_assigned',
-          message: 'GV Nguyễn Văn A được phân công lớp A2-Weekend-01',
-          time: '1 giờ trước',
-          icon: 'fa-user-check',
-          color: 'primary'
-        },
-        {
-          id: 4,
-          type: 'class_completed',
-          message: 'Lớp C1-Morning-01 đã hoàn thành khóa học',
-          time: '2 giờ trước',
-          icon: 'fa-check-circle',
-          color: 'success'
-        }
-      ]);
+      // Build room schedule
+      const timeSlots = ['08:00-10:00', '10:30-12:30', '14:00-16:00', '18:00-20:00'];
+      const roomScheduleData = rooms.slice(0, 4).map(room => {
+        const schedules = timeSlots.map(timeSlot => {
+          const [startTime, endTime] = timeSlot.split('-');
+          const matchingSchedule = todaySchedules.find(s => 
+            s.room?._id?.toString() === room._id?.toString() &&
+            s.startTime === startTime &&
+            s.endTime === endTime
+          );
+          
+          if (matchingSchedule) {
+            return {
+              time: timeSlot,
+              class: matchingSchedule.class?.name || matchingSchedule.className || 'N/A',
+              status: 'occupied'
+            };
+          }
+          return {
+            time: timeSlot,
+            class: 'Free',
+            status: 'available'
+          };
+        });
 
-      setTodaySchedule([
-        {
-          id: 1,
-          time: '08:00 - 10:00',
-          className: 'A1-Morning-01',
-          teacher: 'Nguyễn Văn A',
-          room: 'Room 101',
-          status: 'ongoing'
-        },
-        {
-          id: 2,
-          time: '10:30 - 12:30',
-          className: 'A2-Morning-02',
-          teacher: 'Trần Thị B',
-          room: 'Room 102',
-          status: 'upcoming'
-        },
-        {
-          id: 3,
-          time: '14:00 - 16:00',
-          className: 'B1-Afternoon-01',
-          teacher: 'Lê Văn C',
-          room: 'Room 201',
-          status: 'upcoming'
-        },
-        {
-          id: 4,
-          time: '18:00 - 20:00',
-          className: 'A2-Evening-01',
-          teacher: 'Phạm Thị D',
-          room: 'Room 103',
-          status: 'upcoming'
-        }
-      ]);
+        return {
+          room: room.room_name || room.name || 'N/A',
+          location: room.location || 'N/A',
+          schedules
+        };
+      });
 
-      setClassProgress([
-        {
-          id: 1,
-          name: 'A1-Morning-01',
-          level: 'A1',
-          progress: 75,
-          students: 20,
-          completedLessons: 22,
-          totalLessons: 30
-        },
-        {
-          id: 2,
-          name: 'A2-Evening-01',
-          level: 'A2',
-          progress: 60,
-          students: 18,
-          completedLessons: 18,
-          totalLessons: 30
-        },
-        {
-          id: 3,
-          name: 'B1-Weekend-01',
-          level: 'B1',
-          progress: 45,
-          students: 15,
-          completedLessons: 13,
-          totalLessons: 30
-        }
-      ]);
+      // Calculate class progress
+      const classProgressData = classes.slice(0, 3).map(cls => {
+        const totalSchedules = cls.totalSchedules || 0;
+        const completedSchedules = cls.completedSchedules || 0;
+        const progress = totalSchedules > 0 ? Math.round((completedSchedules / totalSchedules) * 100) : 0;
+
+        return {
+          id: cls._id || cls.id,
+          name: cls.name || 'N/A',
+          level: cls.level || cls.course?.level || 'N/A',
+          progress,
+          students: cls.totalStudents || cls.students?.length || 0,
+          completedLessons: completedSchedules,
+          totalLessons: totalSchedules
+        };
+      });
+
+      // Set overview stats
+      setTodayOverview({
+        todaySchedules: todaySchedules.length,
+        absentStudents: absentStudents.length,
+        lateStudents: lateStudents.length,
+        pendingLeaveRequests: 0, // TODO: Implement when leave request feature is added
+        pendingMakeupClasses: 0, // TODO: Implement when makeup class feature is added
+        newClassRequests: 0 // TODO: Implement when class request feature is added
+      });
+
+      setAbsentStudentsList([...absentStudents, ...lateStudents].slice(0, 10));
+      setRoomSchedule(roomScheduleData);
+      setRecentActivities([]); // TODO: Implement activity log endpoint
+      setTodaySchedule(transformedTodaySchedule);
+      setClassProgress(classProgressData);
+
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      setError('Không thể tải dữ liệu dashboard. Vui lòng thử lại sau.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -178,177 +231,348 @@ const AcademicDashboard = () => {
     );
   };
 
+  if (loading) {
+    return (
+      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
+        <div className="text-center py-5">
+          <Spinner animation="border" variant="primary" />
+          <p className="mt-3 text-neutral-500">Đang tải dữ liệu...</p>
+        </div>
+      </Container>
+    );
+  }
+
   return (
-    <Container fluid className="py-24 px-24">
+    <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
       {/* Header */}
       <div className="mb-24">
         <h2 className="text-neutral-900 fw-bold mb-8">Dashboard Giáo Vụ</h2>
-        <p className="text-neutral-500 mb-0">Tổng quan hoạt động và thống kê hệ thống</p>
+        <p className="text-neutral-500 mb-0">
+          {new Date().toLocaleDateString('vi-VN', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          })}
+        </p>
       </div>
 
-      {/* Stats Cards */}
-      <Row className="g-3 mb-24">
-        <Col md={6} lg={4} xl={2}>
-          <Card className="bg-white border border-main-200 rounded-12 box-shadow-sm transition-2 item-hover h-100">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center justify-content-between mb-12">
-                <div className="bg-main-600 text-white rounded-circle d-flex align-items-center justify-content-center"
-                     style={{ width: '48px', height: '48px' }}>
-                  <i className="fas fa-chalkboard-teacher"></i>
-                </div>
-                <Badge className="bg-main-50 text-main-600 px-10 py-4">+5%</Badge>
-              </div>
-              <h3 className="text-neutral-900 fw-bold mb-4">{stats.totalClasses}</h3>
-              <p className="text-neutral-500 mb-0 text-13">Tổng số lớp</p>
-            </Card.Body>
-          </Card>
-        </Col>
+      {error && (
+        <Alert variant="danger" dismissible onClose={() => setError(null)} className="mb-24">
+          <Alert.Heading>Lỗi!</Alert.Heading>
+          <p>{error}</p>
+        </Alert>
+      )}
 
-        <Col md={6} lg={4} xl={2}>
-          <Card className="bg-white border border-success-200 rounded-12 box-shadow-sm transition-2 item-hover h-100">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center justify-content-between mb-12">
-                <div className="bg-success-600 text-white rounded-circle d-flex align-items-center justify-content-center"
-                     style={{ width: '48px', height: '48px' }}>
-                  <i className="fas fa-play-circle"></i>
-                </div>
-                <Badge className="bg-success-50 text-success-600 px-10 py-4">Active</Badge>
-              </div>
-              <h3 className="text-neutral-900 fw-bold mb-4">{stats.activeClasses}</h3>
-              <p className="text-neutral-500 mb-0 text-13">Lớp đang học</p>
-            </Card.Body>
-          </Card>
-        </Col>
+      {/* Today Overview - Priority Section */}
+      <Card className="bg-white border-0 rounded-12 mb-20" 
+            style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+        <Card.Body className="p-20">
+          <div className="mb-16">
+            <h6 className="text-neutral-900 fw-bold mb-0">
+              <i className="fas fa-calendar-day text-main-600 me-2"></i>
+              Tổng quan hôm nay
+            </h6>
+          </div>
 
-        <Col md={6} lg={4} xl={2}>
-          <Card className="bg-white border border-info-200 rounded-12 box-shadow-sm transition-2 item-hover h-100">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center justify-content-between mb-12">
-                <div className="bg-info-500 text-white rounded-circle d-flex align-items-center justify-content-center"
-                     style={{ width: '48px', height: '48px' }}>
-                  <i className="fas fa-user-graduate"></i>
-                </div>
-                <Badge className="bg-info-50 text-info-600 px-10 py-4">+12</Badge>
-              </div>
-              <h3 className="text-neutral-900 fw-bold mb-4">{stats.totalStudents}</h3>
-              <p className="text-neutral-500 mb-0 text-13">Học viên</p>
-            </Card.Body>
-          </Card>
-        </Col>
+          <Row className="g-2">
+            {/* Học viên vắng */}
+            <Col md={6} lg>
+              <Card className="bg-danger-50 border border-danger-200 rounded-8 h-100 cursor-pointer transition-2 item-hover">
+                <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
+                  <div className="d-flex justify-content-between align-items-start">
+                    <div className="text-danger-700 fw-bold" style={{ fontSize: '14px' }}>
+                      Học viên vắng
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <h1 className="text-danger-600 fw-bold mb-2" style={{ fontSize: '36px', lineHeight: '1' }}>
+                      {todayOverview.absentStudents}
+                    </h1>
+                    <div className="text-danger-600" style={{ fontSize: '12px' }}>
+                      <i className="fas fa-user-times me-1"></i>
+                      +{todayOverview.lateStudents} đi muộn
+                    </div>
+                  </div>
+                  <div className="text-end">
+                    <Link to="/academic/class-management" className="text-decoration-none">
+                    <span className="text-danger-700 text-11 fw-medium cursor-pointer">
+                      Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
+                    </span>
+                    </Link>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
 
-        <Col md={6} lg={4} xl={2}>
-          <Card className="bg-white border border-warning-200 rounded-12 box-shadow-sm transition-2 item-hover h-100">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center justify-content-between mb-12">
-                <div className="bg-warning-600 text-white rounded-circle d-flex align-items-center justify-content-center"
-                     style={{ width: '48px', height: '48px' }}>
-                  <i className="fas fa-user-tie"></i>
-                </div>
-                <Badge className="bg-warning-50 text-warning-600 px-10 py-4">24</Badge>
-              </div>
-              <h3 className="text-neutral-900 fw-bold mb-4">{stats.totalTeachers}</h3>
-              <p className="text-neutral-500 mb-0 text-13">Giảng viên</p>
-            </Card.Body>
-          </Card>
-        </Col>
+            {/* Yêu cầu xếp lớp mới */}
+            <Col md={6} lg>
+                <Card className="bg-purple-50 border border-purple-200 rounded-8 h-100 transition-2 item-hover">
+                  <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
+                    <div className="d-flex justify-content-between align-items-start">
+                      <div className="text-purple-700 fw-bold" style={{ fontSize: '14px' }}>
+                        Yêu cầu xếp lớp
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <h1 className="text-purple-600 fw-bold mb-2" style={{ fontSize: '36px', lineHeight: '1' }}>
+                        {todayOverview.newClassRequests}
+                      </h1>
+                      <div className="text-purple-600" style={{ fontSize: '12px' }}>
+                        <i className="fas fa-users-cog me-1"></i>
+                        Chờ xử lý
+                      </div>
+                    </div>
+                    <div className="text-end">
+                    <Link to="/academic/class-management" className="text-decoration-none">
+                      <span className="text-purple-700 text-11 fw-medium">
+                        Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
+                      </span>
+                    </Link>
+                    </div>
+                  </Card.Body>
+                </Card>
+            </Col>
 
-        <Col md={6} lg={4} xl={2}>
-          <Card className="bg-white border border-neutral-200 rounded-12 box-shadow-sm transition-2 item-hover h-100">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center justify-content-between mb-12">
-                <div className="bg-neutral-700 text-white rounded-circle d-flex align-items-center justify-content-center"
-                     style={{ width: '48px', height: '48px' }}>
-                  <i className="fas fa-calendar-day"></i>
-                </div>
-                <Badge className="bg-neutral-100 text-neutral-700 px-10 py-4">Hôm nay</Badge>
-              </div>
-              <h3 className="text-neutral-900 fw-bold mb-4">{stats.todaySchedules}</h3>
-              <p className="text-neutral-500 mb-0 text-13">Lịch học hôm nay</p>
-            </Card.Body>
-          </Card>
-        </Col>
+            {/* Yêu cầu xin nghỉ */}
+            <Col md={6} lg>
+              <Card className="bg-warning-50 border border-warning-200 rounded-8 h-100 cursor-pointer transition-2 item-hover">
+                <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
+                  <div className="d-flex justify-content-between align-items-start">
+                    <div className="text-warning-700 fw-bold" style={{ fontSize: '14px' }}>
+                      Yêu cầu xin nghỉ
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <h1 className="text-warning-600 fw-bold mb-2" style={{ fontSize: '36px', lineHeight: '1' }}>
+                      {todayOverview.pendingLeaveRequests}
+                    </h1>
+                    <div className="text-warning-600" style={{ fontSize: '12px' }}>
+                      <i className="fas fa-clock me-1"></i>
+                      Chờ duyệt
+                    </div>
+                  </div>
+                  <div className="text-end">
+                    <Link to="/academic/class-management" className="text-decoration-none">
+                    <span className="text-warning-700 text-11 fw-medium cursor-pointer">
+                      Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
+                    </span>
+                    </Link>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
 
-        <Col md={6} lg={4} xl={2}>
-          <Card className="bg-white border border-danger-200 rounded-12 box-shadow-sm transition-2 item-hover h-100">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center justify-content-between mb-12">
-                <div className="bg-danger-600 text-white rounded-circle d-flex align-items-center justify-content-center"
-                     style={{ width: '48px', height: '48px' }}>
-                  <i className="fas fa-bell"></i>
-                </div>
-                <Badge className="bg-danger-50 text-danger-600 px-10 py-4">New</Badge>
-              </div>
-              <h3 className="text-neutral-900 fw-bold mb-4">{stats.upcomingEvents}</h3>
-              <p className="text-neutral-500 mb-0 text-13">Sự kiện sắp tới</p>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+            {/* Buổi học bù chờ xếp */}
+            <Col md={6} lg>
+              <Card className="bg-info-50 border border-info-200 rounded-8 h-100 cursor-pointer transition-2 item-hover">
+                <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
+                  <div className="d-flex justify-content-between align-items-start">
+                    <div className="text-info-700 fw-bold" style={{ fontSize: '14px' }}>
+                      Học bù chờ xếp
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <h1 className="text-info-600 fw-bold mb-2" style={{ fontSize: '36px', lineHeight: '1' }}>
+                      {todayOverview.pendingMakeupClasses}
+                    </h1>
+                    <div className="text-info-600" style={{ fontSize: '12px' }}>
+                      <i className="fas fa-calendar-plus me-1"></i>
+                      Cần xếp lịch
+                    </div>
+                  </div>
+                  <div className="text-end">
+                    <Link to="/academic/class-management" className="text-decoration-none">
+                    <span className="text-info-700 text-11 fw-medium cursor-pointer">
+                      Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
+                    </span>
+                    </Link>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        </Card.Body>
+      </Card>
+
 
       <Row className="g-3">
-        {/* Today's Schedule */}
+        {/* Left Column - Schedule & Room Usage */}
         <Col lg={8}>
-          <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24 h-100">
-            <Card.Header className="bg-main-25 border-0 d-flex justify-content-between align-items-center p-20">
-              <div>
-                <h5 className="text-neutral-900 fw-semibold mb-4">Lịch học hôm nay</h5>
-                <p className="text-neutral-500 mb-0 text-13">
-                  {new Date().toLocaleDateString('vi-VN', { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}
-                </p>
+          {/* Today's Schedule - Compact */}
+          <Card className="bg-white border-0 rounded-12 mb-24" 
+                style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+            <Card.Header className="bg-main-25 border-0 p-20">
+              <div className="d-flex justify-content-between align-items-center">
+                <h6 className="text-neutral-900 fw-bold mb-0">
+                  <i className="fas fa-calendar-check text-main-600 me-2"></i>
+                  Lịch học hôm nay ({todaySchedule.length} buổi)
+                </h6>
+                <Link to="/academic/schedule-management">
+                  <Button className="btn-outline-main text-12 fw-medium px-12 py-6 radius-8">
+                    Xem tất cả
+                  </Button>
+                </Link>
               </div>
-              <Link to="/schedule-management">
-                <Button className="btn-outline-main text-13 fw-medium px-16 py-8 radius-8">
-                  Xem tất cả <i className="fas fa-arrow-right ms-2"></i>
-                </Button>
-              </Link>
+            </Card.Header>
+            <Card.Body className="p-20">
+              <Row className="g-2">
+                {todaySchedule.map(schedule => (
+                  <Col md={6} key={schedule.id}>
+                    <Card className={`border-0 rounded-8 ${
+                      schedule.status === 'ongoing' ? 'bg-success-50 border-success-200' : 'bg-white border-neutral-200'
+                    }`} style={{ border: '1px solid' }}>
+                      <Card.Body className="p-12">
+                        <div className="d-flex justify-content-between align-items-start mb-8">
+                          <div>
+                            <h6 className="text-neutral-900 fw-bold mb-4 text-13">
+                              {schedule.className}
+                            </h6>
+                            <p className="text-neutral-600 mb-0 text-11">
+                              <i className="fas fa-user-tie me-1"></i>
+                              {schedule.teacher}
+                            </p>
+                          </div>
+                          {getStatusBadge(schedule.status)}
+                        </div>
+                        <div className="d-flex justify-content-between text-11 text-neutral-500">
+                          <span>
+                            <i className="fas fa-clock me-1"></i>
+                            {schedule.time}
+                          </span>
+                          <span>
+                            <i className="fas fa-door-open me-1"></i>
+                            {schedule.room}
+                          </span>
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            </Card.Body>
+          </Card>
+
+          {/* Room Schedule */}
+          <Card className="bg-white border-0 rounded-12 mb-24" 
+                style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+            <Card.Header className="bg-main-25 border-0 p-20">
+              <div className="d-flex justify-content-between align-items-center">
+                <h6 className="text-neutral-900 fw-bold mb-0">
+                  <i className="fas fa-door-open text-warning-600 me-2"></i>
+                  Lịch sử dụng phòng học
+                </h6>
+                <Link to="/academic/room-management">
+                  <Button className="btn-outline-main text-12 fw-medium px-12 py-6 radius-8">
+                    Quản lý phòng
+                  </Button>
+                </Link>
+              </div>
             </Card.Header>
             <Card.Body className="p-0">
-              <Table className="mb-0" hover>
+              <Table className="mb-0" hover size="sm">
                 <thead style={{ backgroundColor: 'var(--neutral-50)' }}>
                   <tr>
-                    <th className="text-neutral-700 fw-medium text-13 px-20 py-12">Thời gian</th>
-                    <th className="text-neutral-700 fw-medium text-13 px-20 py-12">Lớp học</th>
-                    <th className="text-neutral-700 fw-medium text-13 px-20 py-12">Giảng viên</th>
-                    <th className="text-neutral-700 fw-medium text-13 px-20 py-12">Phòng</th>
-                    <th className="text-neutral-700 fw-medium text-13 px-20 py-12">Trạng thái</th>
+                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Phòng</th>
+                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">08:00-10:00</th>
+                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">10:30-12:30</th>
+                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">14:00-16:00</th>
+                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">18:00-20:00</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {todaySchedule.map(schedule => (
-                    <tr key={schedule.id}>
-                      <td className="text-neutral-700 px-20 py-16">
-                        <i className="fas fa-clock me-2 text-neutral-400"></i>
-                        {schedule.time}
+                  {roomSchedule.map((room, idx) => (
+                    <tr key={idx}>
+                      <td className="px-16 py-12">
+                        <div className="text-neutral-900 fw-semibold text-13">{room.room}</div>
+                        <div className="text-neutral-500 text-11">{room.location}</div>
                       </td>
-                      <td className="px-20 py-16">
-                        <strong className="text-neutral-900">{schedule.className}</strong>
-                      </td>
-                      <td className="text-neutral-700 px-20 py-16">{schedule.teacher}</td>
-                      <td className="text-neutral-700 px-20 py-16">
-                        <i className="fas fa-door-open me-2 text-neutral-400"></i>
-                        {schedule.room}
-                      </td>
-                      <td className="px-20 py-16">{getStatusBadge(schedule.status)}</td>
+                      {room.schedules.map((schedule, sIdx) => (
+                        <td key={sIdx} className="px-16 py-12">
+                          {schedule.status === 'occupied' ? (
+                            <Badge className="bg-success-100 text-success-700 px-8 py-4 text-11 fw-medium">
+                              <i className="fas fa-users me-1"></i>
+                              {schedule.class}
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-neutral-100 text-neutral-500 px-8 py-4 text-11">
+                              <i className="fas fa-check-circle me-1"></i>
+                              Trống
+                            </Badge>
+                          )}
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
               </Table>
             </Card.Body>
           </Card>
+
+          {/* Absent Students List */}
+          {absentStudentsList.length > 0 && (
+            <Card className="bg-white border-0 rounded-12" 
+                  style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+              <Card.Header className="bg-danger-25 border-0 p-20">
+                <h6 className="text-neutral-900 fw-bold mb-0">
+                  <i className="fas fa-exclamation-triangle text-danger-600 me-2"></i>
+                  Danh sách học viên vắng/muộn hôm nay
+                </h6>
+              </Card.Header>
+              <Card.Body className="p-0">
+                <Table className="mb-0" hover size="sm">
+                  <thead style={{ backgroundColor: 'var(--neutral-50)' }}>
+                    <tr>
+                      <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Mã SV</th>
+                      <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Họ tên</th>
+                      <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Lớp</th>
+                      <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Thời gian</th>
+                      <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {absentStudentsList.map(student => (
+                      <tr key={student.id}>
+                        <td className="px-16 py-12 text-neutral-700 text-12">{student.studentId}</td>
+                        <td className="px-16 py-12 text-neutral-900 fw-medium text-13">{student.name}</td>
+                        <td className="px-16 py-12 text-neutral-700 text-12">{student.class}</td>
+                        <td className="px-16 py-12 text-neutral-600 text-12">
+                          <i className="fas fa-clock me-1"></i>
+                          {student.time}
+                        </td>
+                        <td className="px-16 py-12">
+                          {student.status === 'absent' ? (
+                            <Badge className="bg-danger-100 text-danger-700 px-8 py-4 text-11">
+                              <i className="fas fa-times me-1"></i>
+                              Vắng
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-warning-100 text-warning-700 px-8 py-4 text-11">
+                              <i className="fas fa-clock me-1"></i>
+                              Muộn
+                            </Badge>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </Card.Body>
+            </Card>
+          )}
         </Col>
 
-        {/* Recent Activities */}
+        {/* Right Column - Activities */}
         <Col lg={4}>
-          <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24 h-100">
+          <Card className="bg-white border-0 rounded-12 mb-24" 
+                style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
             <Card.Header className="bg-main-25 border-0 p-20">
-              <h5 className="text-neutral-900 fw-semibold mb-0">Hoạt động gần đây</h5>
+              <h6 className="text-neutral-900 fw-bold mb-0">
+                <i className="fas fa-history text-main-600 me-2"></i>
+                Hoạt động gần đây
+              </h6>
             </Card.Header>
-            <Card.Body className="p-20">
+            <Card.Body className="p-20" style={{ maxHeight: '600px', overflowY: 'auto' }}>
               <div className="d-flex flex-column gap-16">
                 {recentActivities.map(activity => (
                   <div key={activity.id} className="d-flex gap-12 pb-16 border-bottom border-neutral-100">
@@ -368,39 +592,42 @@ const AcademicDashboard = () => {
         </Col>
       </Row>
 
-      {/* Class Progress */}
+      {/* Class Progress - Compact */}
       <Row>
         <Col>
-          <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+          <Card className="bg-white border-0 rounded-12" 
+                style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
             <Card.Header className="bg-main-25 border-0 d-flex justify-content-between align-items-center p-20">
               <div>
-                <h5 className="text-neutral-900 fw-semibold mb-4">Tiến độ các lớp học</h5>
-                <p className="text-neutral-500 mb-0 text-13">Theo dõi tiến độ học tập của các lớp</p>
+                <h6 className="text-neutral-900 fw-bold mb-0">
+                  <i className="fas fa-chart-line text-main-600 me-2"></i>
+                  Tiến độ các lớp học
+                </h6>
               </div>
-              <Link to="/class-management">
-                <Button className="btn-outline-main text-13 fw-medium px-16 py-8 radius-8">
-                  Xem chi tiết <i className="fas fa-arrow-right ms-2"></i>
+              <Link to="/academic/class-management">
+                <Button className="btn-outline-main text-12 fw-medium px-12 py-6 radius-8">
+                  Xem chi tiết
                 </Button>
               </Link>
             </Card.Header>
-            <Card.Body className="p-24">
-              <Row className="g-3">
+            <Card.Body className="p-20">
+              <Row className="g-2">
                 {classProgress.map(classItem => (
                   <Col key={classItem.id} md={6} lg={4}>
-                    <Card className="bg-neutral-25 border border-neutral-100 rounded-12 h-100">
-                      <Card.Body className="p-20">
-                        <div className="d-flex justify-content-between align-items-start mb-12">
+                    <Card className="bg-neutral-25 border-0 rounded-8">
+                      <Card.Body className="p-16">
+                        <div className="d-flex justify-content-between align-items-start mb-10">
                           <div>
-                            <h6 className="text-neutral-900 fw-semibold mb-4">{classItem.name}</h6>
-                            <Badge className="bg-main-600 text-white px-10 py-4 text-12">{classItem.level}</Badge>
+                            <h6 className="text-neutral-900 fw-semibold mb-4 text-14">{classItem.name}</h6>
+                            <Badge className="bg-main-600 text-white px-8 py-4 text-11">{classItem.level}</Badge>
                           </div>
-                          <span className="text-main-600 fw-bold text-18">{classItem.progress}%</span>
+                          <span className="text-main-600 fw-bold text-16">{classItem.progress}%</span>
                         </div>
                         
-                        <div className="mb-16">
+                        <div className="mb-12">
                           <div 
                             className="bg-neutral-200 rounded-pill overflow-hidden"
-                            style={{ height: '8px' }}
+                            style={{ height: '6px' }}
                           >
                             <div 
                               className="bg-main-600 h-100 transition-2"
@@ -409,10 +636,10 @@ const AcademicDashboard = () => {
                           </div>
                         </div>
 
-                        <div className="d-flex justify-content-between text-13">
+                        <div className="d-flex justify-content-between text-12">
                           <span className="text-neutral-500">
                             <i className="fas fa-book me-1"></i>
-                            {classItem.completedLessons}/{classItem.totalLessons} buổi
+                            {classItem.completedLessons}/{classItem.totalLessons}
                           </span>
                           <span className="text-neutral-500">
                             <i className="fas fa-users me-1"></i>
@@ -430,28 +657,31 @@ const AcademicDashboard = () => {
       </Row>
 
       {/* Quick Actions */}
-      <Row className="mt-24">
+      <Row className="mt-20">
         <Col>
-          <Card className="bg-gradient border-0 rounded-12 box-shadow-sm" 
-                style={{ background: 'linear-gradient(135deg, var(--main-600) 0%, var(--main-700) 100%)' }}>
-            <Card.Body className="p-24">
+          <Card className="bg-gradient border-0 rounded-12" 
+                style={{ 
+                  background: 'linear-gradient(135deg, var(--main-600) 0%, var(--main-700) 100%)',
+                  boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)'
+                }}>
+            <Card.Body className="p-20">
               <Row className="align-items-center">
                 <Col lg={8}>
-                  <h4 className="text-white fw-bold mb-12">Thao tác nhanh</h4>
-                  <p className="text-white mb-0" style={{ opacity: 0.9 }}>
-                    Truy cập nhanh các chức năng thường dùng của module Giáo vụ
+                  <h5 className="text-white fw-bold mb-8">Thao tác nhanh</h5>
+                  <p className="text-white mb-0 text-14" style={{ opacity: 0.9 }}>
+                    Truy cập nhanh các chức năng thường dùng
                   </p>
                 </Col>
                 <Col lg={4}>
-                  <div className="d-flex gap-12 flex-wrap justify-content-lg-end">
-                    <Link to="/class-management">
-                      <Button className="bg-white text-main-600 fw-medium px-20 py-10 radius-8 border-0 hover-shadow">
+                  <div className="d-flex gap-8 flex-wrap justify-content-lg-end">
+                    <Link to="/academic/class-management">
+                      <Button className="bg-white text-main-600 fw-medium px-16 py-8 radius-8 border-0 text-13">
                         <i className="fas fa-plus me-2"></i>
-                        Tạo lớp mới
+                        Tạo lớp
                       </Button>
                     </Link>
-                    <Link to="/schedule-management">
-                      <Button className="bg-white text-main-600 fw-medium px-20 py-10 radius-8 border-0 hover-shadow">
+                    <Link to="/academic/schedule-management">
+                      <Button className="bg-white text-main-600 fw-medium px-16 py-8 radius-8 border-0 text-13">
                         <i className="fas fa-calendar-plus me-2"></i>
                         Tạo lịch học
                       </Button>

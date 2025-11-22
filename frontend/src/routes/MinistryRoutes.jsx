@@ -1,6 +1,6 @@
-import AcademicDashboardPage from "../pages/AcademicDashboardPage.jsx";
-import ScheduleManagementPage from "../pages/ScheduleManagementPage.jsx";
-import ClassManagementPage from "../pages/ClassManagementPage.jsx";
+import AcademicDashboardPage from "../pages/AcademicStaff/AcademicDashboardPage.jsx";
+import ScheduleManagementPage from "../pages/AcademicStaff/ScheduleManagementPage.jsx";
+import ClassManagementPage from "../pages/AcademicStaff/ClassManagementPage.jsx";
 import BulkUserUploadPage from "../pages/BulkUserUploadPage.jsx";
 
 /**

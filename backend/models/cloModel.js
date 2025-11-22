@@ -18,6 +18,14 @@ const cloSchema = new Schema({
         required: [true, 'Chi tiết CLO là bắt buộc'] 
     }, 
 
+    // Nơi lưu tài liệu
+    documentUrl: {
+        type: String
+    },
+    documentPath: {
+        type: String
+    },
+
     // Ma trận ánh xạ (Mapping) sang PLO
     // Tương ứng với bảng Mapping_PLO-CLO
     // Một CLO có thể liên kết (ánh xạ) với một hoặc nhiều PLO

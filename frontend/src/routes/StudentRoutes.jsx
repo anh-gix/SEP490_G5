@@ -1,8 +1,4 @@
-import StudentDashboardPage from "../pages/StudentDashboardPage.jsx";
-import StudentSchedulePage from "../pages/StudentSchedulePage.jsx";
-import StudentCoursesPage from "../pages/StudentCoursesPage.jsx";
-import StudentClassDetailPage from "../pages/StudentClassDetailPage.jsx";
-import StudentAssignmentsPage from "../pages/StudentAssignmentsPage.jsx";
+
 import StudentExamListPage from "../pages/StudentExamListPage.jsx";
 import ExamDetailPage from "../pages/ExamDetailPage.jsx";
 import ReadingExamPage from "../pages/ReadingExamPage.jsx";
@@ -13,6 +9,18 @@ import WritingExamPage from "../pages/WritingExamPage.jsx";
 import WritingResultPage from "../pages/WritingResultPage.jsx";
 import SpeakingExamPage from "../pages/SpeakingExamPage.jsx";
 import SpeakingResultPage from "../pages/SpeakingResultPage.jsx";
+//routes phía trên là cho phần thi
+import StudentDashboardPage from "../pages/StudentPages/StudentDashboardPage.jsx";
+import StudentSchedulePage from "../pages/StudentPages/StudentSchedulePage.jsx";
+import StudentCoursesPage from "../pages/StudentPages/StudentCoursesPage.jsx";
+import StudentClassDetailPage from "../pages/StudentPages/StudentClassDetailPage.jsx";
+import StudentAssignmentsPage from "../pages/StudentPages/StudentAssignmentsPage.jsx";
+import StudentLessonDetailPage from "../pages/StudentPages/StudentLessonDetailPage.jsx";
+import StudentProfilePage from "../pages/StudentPages/StudentProfilePage.jsx";
+import ToeicPractice from "../components/student_components/ToeicPractice.jsx";
+import ToeicTestTaking from "../components/student_components/ToeicTestTaking.jsx";
+import ToeicTestResult from "../components/student_components/ToeicTestResult.jsx";
+import ToeicTestHistory from "../components/student_components/ToeicTestHistory.jsx";
 
 /**
  * StudentRoutes
@@ -23,8 +31,12 @@ export const studentRoutes = [
   // Dashboard
   { path: '/student/dashboard', element: <StudentDashboardPage /> },
 
+  // Profile
+  { path: '/student/profile', element: <StudentProfilePage /> },
+
   // I. Schedule
   { path: '/student/schedule', element: <StudentSchedulePage /> },
+  { path: '/student/lessons/:lessonId', element: <StudentLessonDetailPage /> },
 
   // II. My Classes
   { path: '/student/courses', element: <StudentCoursesPage /> },
@@ -33,14 +45,21 @@ export const studentRoutes = [
   // III. Assignments
   { path: '/student/assignments', element: <StudentAssignmentsPage /> },
 
-  // IV. Materials (future)
+  // IV. TOEIC Practice
+  { path: '/student/toeic', element: <ToeicPractice /> },
+  { path: '/student/toeic/test/:testId', element: <ToeicTestTaking /> },
+  { path: '/student/toeic/result/:testId', element: <ToeicTestResult /> },
+  { path: '/student/toeic/history', element: <ToeicTestHistory /> },
+
+  // V. Materials (future)
   // { path: '/student/materials', element: <StudentMaterialsPage /> },
 
-  // V. Grades (future)
+  // VI. Grades (future)
   // { path: '/student/grades', element: <StudentGradesPage /> },
 
-  // VI. Leave Request (future)
+  // VII. Leave Request (future)
   // { path: '/student/leave-request', element: <StudentLeaveRequestPage /> },
+
   { path: '/exams', element: <StudentExamListPage /> },
   { path: '/exams/:id', element: <ExamDetailPage /> },
   { path: '/exams/:examId/submissions/:submissionId/reading', element: <ReadingExamPage /> },

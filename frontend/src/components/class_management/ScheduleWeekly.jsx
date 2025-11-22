@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, Button, Badge } from 'react-bootstrap';
 
-const ScheduleWeekly = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateMakeup }) => {
+const ScheduleWeekly = ({ schedules }) => {
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     const today = new Date();
     const dayOfWeek = today.getDay();
@@ -12,21 +13,14 @@ const ScheduleWeekly = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateM
     return monday;
   });
 
-  // Time slots configuration - each slot is 1.5 hours (90 minutes)
+  // Time slots configuration - each slot is 2 hours from 8:00 to 20:00
   const timeSlots = useMemo(() => {
     const slots = [];
-    let hour = 8;
-    let minute = 0;
     
-    // From 8:00 to 20:30 (13 slots)
-    while (hour < 21) {
-      const startTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-      minute += 90;
-      if (minute >= 60) {
-        hour += Math.floor(minute / 60);
-        minute = minute % 60;
-      }
-      const endTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+    // 6 slots of 2 hours each: 8-10, 10-12, 12-14, 14-16, 16-18, 18-20
+    for (let hour = 8; hour < 20; hour += 2) {
+      const startTime = `${hour.toString().padStart(2, '0')}:00`;
+      const endTime = `${(hour + 2).toString().padStart(2, '0')}:00`;
       
       slots.push({
         startTime,
@@ -155,187 +149,149 @@ const ScheduleWeekly = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateM
       <Card.Body className="p-0">
         {/* Weekly Grid */}
         <div style={{ overflowX: 'auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)', minWidth: '900px' }}>
-            {/* Time column */}
-            <div style={{ borderRight: '1px solid #dee2e6' }}>
-              <div style={{ padding: '12px', fontWeight: 'bold', borderBottom: '2px solid #dee2e6', background: '#f8f9fa' }}>
-                Giờ
-              </div>
-              {timeSlots.map((slot, index) => (
-                <div 
-                  key={index} 
-                  style={{ 
-                    padding: '8px', 
-                    borderBottom: '1px solid #dee2e6',
-                    height: '80px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    fontSize: '12px',
-                    color: '#6c757d'
-                  }}
-                >
-                  {slot.startTime}
-                </div>
-              ))}
+          {/* Header Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '80px repeat(7, 1fr)', minWidth: '900px', borderBottom: '2px solid #dee2e6' }}>
+            <div style={{ padding: '12px', fontWeight: 'bold', background: '#f8f9fa', borderRight: '1px solid #dee2e6' }}>
+              Giờ
             </div>
-
-            {/* Day columns */}
             {weekDays.map((day, dayIndex) => (
-              <div key={dayIndex} style={{ borderRight: dayIndex < 6 ? '1px solid #dee2e6' : 'none' }}>
+              <div 
+                key={dayIndex}
+                style={{ 
+                  padding: '8px', 
+                  textAlign: 'center', 
+                  background: isToday(day) ? '#e7f3ff' : '#f8f9fa',
+                  borderRight: dayIndex < 6 ? '1px solid #dee2e6' : 'none'
+                }}
+              >
+                <div style={{ fontSize: '12px', color: '#6c757d' }}>
+                  {day.toLocaleDateString('vi-VN', { weekday: 'short' })}
+                </div>
                 <div 
                   style={{ 
-                    padding: '8px', 
-                    textAlign: 'center', 
-                    borderBottom: '2px solid #dee2e6',
-                    background: isToday(day) ? '#e7f3ff' : '#f8f9fa'
+                    fontSize: '18px', 
+                    fontWeight: 'bold',
+                    color: isToday(day) ? '#0d6efd' : '#212529',
+                    marginTop: '4px'
                   }}
                 >
-                  <div style={{ fontSize: '12px', color: '#6c757d' }}>
-                    {day.toLocaleDateString('vi-VN', { weekday: 'short' })}
-                  </div>
+                  {day.getDate()}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Time Slots Rows */}
+          {timeSlots.map((slot, slotIndex) => (
+            <div 
+              key={slotIndex}
+              style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '80px repeat(7, 1fr)', 
+                minWidth: '900px',
+                minHeight: '100px'
+              }}
+            >
+              {/* Time cell */}
+              <div 
+                style={{ 
+                  padding: '8px', 
+                  borderBottom: '1px solid #dee2e6',
+                  borderRight: '1px solid #dee2e6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontSize: '12px',
+                  color: '#6c757d',
+                  fontWeight: '500',
+                  background: '#fafafa'
+                }}
+              >
+                {slot.startTime}
+              </div>
+
+              {/* Day cells */}
+              {weekDays.map((day, dayIndex) => {
+                const slotSchedules = getSchedulesForSlot(day, slot);
+                
+                return (
                   <div 
+                    key={dayIndex}
                     style={{ 
-                      fontSize: '18px', 
-                      fontWeight: 'bold',
-                      color: isToday(day) ? '#0d6efd' : '#212529',
-                      marginTop: '4px'
+                      borderBottom: '1px solid #dee2e6',
+                      borderRight: dayIndex < 6 ? '1px solid #dee2e6' : 'none',
+                      padding: '4px',
+                      position: 'relative',
+                      background: isToday(day) ? '#f8fbff' : 'white',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
                     }}
                   >
-                    {day.getDate()}
-                  </div>
-                </div>
-                
-                {timeSlots.map((slot, slotIndex) => {
-                  const slotSchedules = getSchedulesForSlot(day, slot);
-                  
-                  return (
-                    <div 
-                      key={slotIndex} 
-                      style={{ 
-                        borderBottom: '1px solid #dee2e6',
-                        height: '80px',
-                        padding: '4px',
-                        position: 'relative',
-                        background: isToday(day) ? '#f8fbff' : 'white'
-                      }}
-                    >
-                      {slotSchedules.length > 0 ? (
-                        slotSchedules.map(schedule => (
+                    {slotSchedules.length > 0 ? (
+                      slotSchedules.map(schedule => (
+                        <Link
+                          key={schedule.id}
+                          to={`/academic/lessons/${schedule.id}`}
+                          className="text-decoration-none"
+                        >
                           <Card
-                            key={schedule.id}
-                            className="h-100 mb-0"
+                            className="mb-0"
                             style={{ 
                               borderLeft: `4px solid ${getStatusColor(schedule.status)}`,
                               cursor: 'pointer',
                               fontSize: '11px',
-                              transition: 'all 0.2s'
+                              transition: 'all 0.2s',
+                              flex: '0 0 auto',
+                              minHeight: slotSchedules.length > 1 ? '60px' : '92px'
                             }}
-                            onClick={() => onEditSchedule(schedule)}
                             onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)'}
                             onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
                           >
-                            <Card.Body className="p-1" style={{ fontSize: '10px' }}>
+                            <Card.Body className="p-2" style={{ fontSize: '10px', position: 'relative' }}>
                               <div className="fw-bold text-primary mb-1" style={{ fontSize: '9px' }}>
                                 {schedule.startTime} - {schedule.endTime}
                               </div>
-                              <div className="fw-bold mb-1" style={{ fontSize: '11px' }}>{schedule.className}</div>
-                              <div className="text-muted" style={{ fontSize: '9px' }}>
-                                <i className="fas fa-user" style={{ fontSize: '8px' }}></i> {schedule.teacherName}
+                              <div className="fw-bold mb-1" style={{ fontSize: '11px', lineHeight: '1.2' }}>
+                                {schedule.className}
                               </div>
-                              <div className="text-muted" style={{ fontSize: '9px' }}>
-                                <i className="fas fa-door-open" style={{ fontSize: '8px' }}></i> {schedule.roomName}
+                              <div className="text-muted mb-1" style={{ fontSize: '9px', lineHeight: '1.2' }}>
+                                <i className="fas fa-user me-1" style={{ fontSize: '8px' }}></i>
+                                {schedule.teacherName}
+                              </div>
+                              <div className="text-muted" style={{ fontSize: '9px', lineHeight: '1.2' }}>
+                                <i className="fas fa-door-open me-1" style={{ fontSize: '8px' }}></i>
+                                {schedule.roomName}
                               </div>
                               
                               <div 
-                                className="position-absolute bottom-0 end-0 d-flex gap-1"
-                                style={{ padding: '2px' }}
+                                className="position-absolute d-flex gap-1"
+                                style={{ bottom: '4px', right: '4px' }}
                               >
-                                <Button
-                                  className="bg-main-600 text-white border-0"
-                                  size="sm"
+                                <div
+                                  className="bg-main-600 text-white border-0 d-flex align-items-center justify-content-center"
                                   style={{ 
-                                    padding: '0', 
-                                    fontSize: '10px',
+                                    padding: '4px 8px',
+                                    fontSize: '9px',
                                     lineHeight: 1,
-                                    width: '13px',
-                                    height: '13px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    borderRadius: '2px',
-                                    opacity: 0.9
+                                    borderRadius: '4px',
+                                    opacity: 0.95
                                   }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onEditSchedule(schedule);
-                                  }}
-                                  title="Sửa"
-                                  onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                                  onMouseLeave={(e) => e.currentTarget.style.opacity = '0.9'}
+                                  title="Xem chi tiết"
                                 >
-                                  <i className="fas fa-edit" style={{ fontSize: '9px' }}></i>
-                                </Button>
-                                <Button
-                                  className="bg-warning-600 text-white border-0"
-                                  size="sm"
-                                  style={{ 
-                                    padding: '0', 
-                                    fontSize: '10px',
-                                    lineHeight: 1,
-                                    width: '13px',
-                                    height: '13px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    borderRadius: '2px',
-                                    opacity: 0.9
-                                  }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onCreateMakeup(schedule);
-                                  }}
-                                  title="Học bù"
-                                  onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                                  onMouseLeave={(e) => e.currentTarget.style.opacity = '0.9'}
-                                >
-                                  <i className="fas fa-calendar-plus" style={{ fontSize: '9px' }}></i>
-                                </Button>
-                                <Button
-                                  className="bg-danger-600 text-white border-0"
-                                  size="sm"
-                                  style={{ 
-                                    padding: '0', 
-                                    fontSize: '10px',
-                                    lineHeight: 1,
-                                    width: '13px',
-                                    height: '13px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    borderRadius: '2px',
-                                    opacity: 0.9
-                                  }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDeleteSchedule(schedule.id);
-                                  }}
-                                  title="Xóa"
-                                  onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                                  onMouseLeave={(e) => e.currentTarget.style.opacity = '0.9'}
-                                >
-                                  <i className="fas fa-trash" style={{ fontSize: '8px' }}></i>
-                                </Button>
+                                  <i className="fas fa-eye me-1" style={{ fontSize: '8px' }}></i>
+                                  <span>Chi tiết</span>
+                                </div>
                               </div>
                             </Card.Body>
                           </Card>
-                        ))
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
+                        </Link>
+                      ))
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </Card.Body>
 

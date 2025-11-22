@@ -564,10 +564,10 @@ dashbord settimgs end
 .btn {
   position: relative;
   border-radius: 5px;
-  border: 1px solid transparent;
+  /* border: 1px solid transparent; */
   font-weight: 500;
   font-family: var(--body-font);
-  color: hsl(var(--white)) !important;
+  /* color: hsl(var(--white)) !important; */
   z-index: 1;
   line-height: 1;
   text-transform: capitalize;
@@ -14811,4 +14811,3 @@ table.dataTable.display > tbody > tr > * {
   background-color: #487FFF !important;
   color: #fff !important;
 }
-

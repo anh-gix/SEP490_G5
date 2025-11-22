@@ -1,6 +1,7 @@
 const Class = require("../models/classModel");
 const User = require("../models/userModel");
 const ClassSchedule = require("../models/classScheduleModel");
+const StudentSchedule = require("../models/studentScheduleModel");
 const Course = require("../models/courseModel");
 
 // =========================
@@ -13,7 +14,11 @@ exports.getAllClasses = async (req, res) => {
     const { level, status, search, courseId } = req.query;
     let query = {};
     
-    if (level) query.level = level;
+    // Level filter: tìm trong course.level vì Class không còn level field
+    if (level) {
+      const coursesWithLevel = await Course.find({ level }).select('_id');
+      query.course = { $in: coursesWithLevel.map(c => c._id) };
+    }
     if (status) query.status = status;
     if (courseId) query.course = courseId;
     if (search) query.name = { $regex: search, $options: 'i' };
@@ -22,7 +27,12 @@ exports.getAllClasses = async (req, res) => {
       // user model uses 'username' rather than firstName/lastName/fullName
       .populate('teacher', 'username email phone')
       .populate('students', 'username email')
-      .populate({ path: 'course', populate: { path: 'program', select: 'name' } })
+      .populate('room', 'room_name location capacity')
+      .populate({ 
+        path: 'course', 
+        select: 'name type level band tuitionFee',
+        populate: { path: 'program', select: 'program_name name' } 
+      })
       .sort({ createdAt: -1 })
       .lean();
     
@@ -54,7 +64,14 @@ exports.getAllClasses = async (req, res) => {
             // normalize teacher/course display fields expected by frontend
             teacherName: cls.teacher?.username || 'N/A',
             courseName: cls.course?.name || 'N/A',
-            programName: cls.course?.program?.name || 'N/A'
+            programName: cls.course?.program?.program_name || cls.course?.program?.name || 'N/A',
+            // Add level and band from course
+            level: cls.course?.level || 'N/A',
+            band: cls.course?.band || 'N/A',
+            courseType: cls.course?.type || 'N/A',
+            // Add room info
+            roomName: cls.room?.room_name || 'N/A',
+            roomLocation: cls.room?.location || 'N/A'
           };
       })
     );
@@ -88,7 +105,22 @@ exports.getClassById = async (req, res) => {
     const classData = await Class.findById(id)
       .populate('teacher', 'username email phone')
       .populate('students', 'username email phone')
-      .populate({ path: 'course', populate: { path: 'program', select: 'name' } })
+      .populate('room', 'room_name location capacity')
+      .populate({ 
+        path: 'course', 
+        select: 'name type level band tuitionFee',
+        populate: [
+          { path: 'program', select: 'program_name name' },
+          {
+            path: 'clos',
+            select: 'code name detail mappedPLOs',
+            populate: {
+              path: 'mappedPLOs',
+              select: 'code name'
+            }
+          }
+        ]
+      })
       .lean();
     
     if (!classData) {
@@ -110,6 +142,62 @@ exports.getClassById = async (req, res) => {
     const totalStudents = classData.students?.length || 0;
     const completionRate = totalSchedules > 0 ? ((completedSchedules / totalSchedules) * 100).toFixed(2) : '0';
     
+    // Tạo chuỗi thời gian học từ schedules
+    let scheduleTimeString = 'N/A';
+    if (schedules.length > 0) {
+      // Lấy các khung giờ và ngày trong tuần từ schedules
+      const timeSlots = new Set();
+      const daysOfWeek = new Set();
+      const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+      
+      schedules.forEach(schedule => {
+        if (schedule.startTime && schedule.endTime) {
+          timeSlots.add(`${schedule.startTime}-${schedule.endTime}`);
+        }
+        if (schedule.date) {
+          const date = new Date(schedule.date);
+          daysOfWeek.add(dayNames[date.getDay()]);
+        }
+      });
+      
+      if (timeSlots.size > 0 && daysOfWeek.size > 0) {
+        const daysArray = Array.from(daysOfWeek).sort();
+        const timeArray = Array.from(timeSlots);
+        scheduleTimeString = `${daysArray.join(', ')}: ${timeArray.join(', ')}`;
+      }
+    }
+    
+    // Get class schedule IDs for this class
+    const classScheduleIds = schedules.map(s => s._id);
+    
+    // Calculate attendance for each student
+    const studentsWithAttendance = await Promise.all(
+      (classData.students || []).map(async (student) => {
+        // Get all student schedules for this class
+        const studentSchedules = await StudentSchedule.find({
+          student: student._id,
+          classSchedule: { $in: classScheduleIds }
+        });
+        
+        // Calculate attendance percentage
+        let attendanceRate = 0;
+        if (studentSchedules.length > 0) {
+          const presentCount = studentSchedules.filter(
+            s => s.attendance && s.attendance.status === 'present'
+          ).length;
+          attendanceRate = Math.round((presentCount / studentSchedules.length) * 100);
+        }
+        
+        return {
+          _id: student._id,
+          username: student.username,
+          email: student.email,
+          phone: student.phone,
+          attendance: attendanceRate
+        };
+      })
+    );
+    
     console.log('✅ Found class:', classData.name);
     
     res.status(200).json({
@@ -117,13 +205,20 @@ exports.getClassById = async (req, res) => {
       class: {
         ...classData,
         schedules,
+        students: studentsWithAttendance,
         totalStudents,
         totalSchedules,
         completedSchedules,
         completionRate: parseFloat(completionRate),
+        schedule: scheduleTimeString, // Thêm field schedule để frontend hiển thị
         teacherName: classData.teacher?.username || 'N/A',
         courseName: classData.course?.name || 'N/A',
-        programName: classData.course?.program?.name || 'N/A'
+        programName: classData.course?.program?.program_name || classData.course?.program?.name || 'N/A',
+        level: classData.course?.level || 'N/A',
+        band: classData.course?.band || 'N/A',
+        courseType: classData.course?.type || 'N/A',
+        roomName: classData.room?.room_name || 'N/A',
+        roomLocation: classData.room?.location || 'N/A'
       }
     });
   } catch (error) {
@@ -176,12 +271,12 @@ exports.getClassStats = async (req, res) => {
 // =========================
 exports.createClass = async (req, res) => {
   try {
-    const { name, level, course, teacher, students, startDate, endDate, maxStudents, status } = req.body;
+    const { name, course, teacher, students, room, startDate, endDate, maxStudents, status } = req.body;
     
-    if (!name || !level || !teacher) {
+    if (!name || !teacher) {
       return res.status(400).json({
         success: false,
-        message: 'Vui lòng điền đầy đủ thông tin bắt buộc'
+        message: 'Vui lòng điền đầy đủ thông tin bắt buộc (tên lớp, giáo viên)'
       });
     }
     
@@ -196,10 +291,10 @@ exports.createClass = async (req, res) => {
     
     const newClass = new Class({
       name,
-      level,
       course,
       teacher,
       students: students || [],
+      room,
       startDate,
       endDate,
       maxStudents: maxStudents || 25,
@@ -211,7 +306,12 @@ exports.createClass = async (req, res) => {
     const populatedClass = await Class.findById(newClass._id)
       .populate('teacher', 'username email phone')
       .populate('students', 'username email')
-      .populate({ path: 'course', populate: { path: 'program', select: 'name' } });
+      .populate('room', 'room_name location capacity')
+      .populate({ 
+        path: 'course', 
+        select: 'name type level band tuitionFee',
+        populate: { path: 'program', select: 'program_name name' } 
+      });
     
     res.status(201).json({
       success: true,
@@ -233,7 +333,7 @@ exports.createClass = async (req, res) => {
 // =========================
 exports.updateClass = async (req, res) => {
   try {
-    const { name, level, course, teacher, students, startDate, endDate, maxStudents, status } = req.body;
+    const { name, course, teacher, students, room, startDate, endDate, maxStudents, status } = req.body;
     
     const classData = await Class.findById(req.params.id);
     if (!classData) {
@@ -259,9 +359,9 @@ exports.updateClass = async (req, res) => {
     
     // Update fields
     if (name) classData.name = name;
-    if (level) classData.level = level;
     if (course) classData.course = course;
     if (teacher) classData.teacher = teacher;
+    if (room !== undefined) classData.room = room;
     if (students !== undefined) classData.students = students;
     if (startDate) classData.startDate = startDate;
     if (endDate) classData.endDate = endDate;
@@ -273,7 +373,12 @@ exports.updateClass = async (req, res) => {
     const updatedClass = await Class.findById(classData._id)
       .populate('teacher', 'username email phone')
       .populate('students', 'username email')
-      .populate({ path: 'course', populate: { path: 'program', select: 'name' } });
+      .populate('room', 'room_name location capacity')
+      .populate({ 
+        path: 'course', 
+        select: 'name type level band tuitionFee',
+        populate: { path: 'program', select: 'program_name name' } 
+      });
     
     res.status(200).json({
       success: true,

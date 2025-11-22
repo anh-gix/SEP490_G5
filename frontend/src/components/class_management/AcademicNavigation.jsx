@@ -10,37 +10,37 @@ const AcademicNavigation = () => {
     {
       title: 'Dashboard',
       icon: 'fa-home',
-      path: '/academic-dashboard',
+      path: '/academic/dashboard',
       color: 'main'
     },
     {
       title: 'Quản lý Lịch học',
       icon: 'fa-calendar-alt',
-      path: '/schedule-management',
+      path: '/academic/schedule-management',
       color: 'info'
     },
     {
       title: 'Quản lý Lớp học',
       icon: 'fa-chalkboard-teacher',
-      path: '/class-management',
+      path: '/academic/class-management',
       color: 'success'
     },
     {
       title: 'Quản lý Phòng học',
       icon: 'fa-door-open',
-      path: '/room-management',
+      path: '/academic/room-management',
       color: 'warning'
     },
     {
       title: 'Giảng viên',
       icon: 'fa-user-tie',
-      path: '/teacher-management',
+      path: '/academic/teacher-management',
       color: 'main'
     },
     {
       title: 'Báo cáo',
       icon: 'fa-chart-bar',
-      path: '/reports',
+      path: '/academic/reports',
       color: 'info'
     }
   ];
@@ -48,7 +48,8 @@ const AcademicNavigation = () => {
   const userInfo = {
     name: 'Lê Văn C',
     code: 'GV001',
-    avatar: null
+    avatar: null,
+    role: 'academic'
   };
 
   return (

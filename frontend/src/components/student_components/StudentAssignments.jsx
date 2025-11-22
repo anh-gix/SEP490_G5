@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, ButtonGroup, Table } from 'react-bootstrap';
+import { assignmentsMock } from './student_mockdata';
 
 /**
  * Student Assignments Component
@@ -19,64 +20,11 @@ const StudentAssignments = () => {
   const fetchAssignments = async () => {
     try {
       // TODO: Replace with actual API call
-      const mockData = [
-        {
-          id: 1,
-          title: 'Unit 6 - Grammar Exercise',
-          description: 'Complete exercises 1-10 on page 45',
-          className: 'A2-Evening-01',
-          dueDate: '2025-11-05',
-          status: 'pending',
-          priority: 'high',
-          score: null,
-          submittedDate: null
-        },
-        {
-          id: 2,
-          title: 'Reading Comprehension Test',
-          description: 'Read the passage and answer questions',
-          className: 'A2-Evening-01',
-          dueDate: '2025-11-07',
-          status: 'pending',
-          priority: 'medium',
-          score: null,
-          submittedDate: null
-        },
-        {
-          id: 3,
-          title: 'IELTS Writing Task 2',
-          description: 'Write an essay about education',
-          className: 'IELTS-Writing-03',
-          dueDate: '2025-11-06',
-          status: 'pending',
-          priority: 'high',
-          score: null,
-          submittedDate: null
-        },
-        {
-          id: 4,
-          title: 'Unit 5 - Writing Assignment',
-          description: 'Write a short paragraph about your daily routine',
-          className: 'A2-Evening-01',
-          dueDate: '2025-10-30',
-          status: 'graded',
-          priority: 'medium',
-          score: 9,
-          submittedDate: '2025-10-29'
-        },
-        {
-          id: 5,
-          title: 'Listening Practice Exercise',
-          description: 'Listen and complete the exercises',
-          className: 'A2-Evening-01',
-          dueDate: '2025-10-28',
-          status: 'submitted',
-          priority: 'low',
-          score: null,
-          submittedDate: '2025-10-27'
-        }
-      ];
-      setAssignments(mockData);
+      // const response = await assignmentApi.getMyAssignments();
+      // setAssignments(response.data);
+      
+      // Using mock data
+      setAssignments(assignmentsMock);
     } catch (error) {
       console.error('Error fetching assignments:', error);
     }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, ProgressBar, ButtonGroup } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
+import { classesMock } from './student_mockdata';
 
 /**
  * My Classes Component
@@ -19,67 +20,11 @@ const MyClasses = () => {
   const fetchMyClasses = async () => {
     try {
       // TODO: Replace with actual API call
-      // Mock data
-      const mockData = [
-        {
-          id: 1,
-          name: 'A2-Evening-01',
-          level: 'A2',
-          teacher: 'Trần Thị B',
-          schedule: 'Thứ 2, 4, 6 | 18:00 - 20:00',
-          startDate: '2025-09-01',
-          endDate: '2025-11-30',
-          totalLessons: 30,
-          completedLessons: 18,
-          nextLesson: {
-            date: '2025-11-03',
-            topic: 'Present Perfect Tense'
-          },
-          pendingAssignments: 2,
-          attendanceRate: 92,
-          averageScore: 8.5,
-          status: 'active',
-          thumbnail: null
-        },
-        {
-          id: 2,
-          name: 'IELTS-Writing-03',
-          level: 'IELTS',
-          teacher: 'Nguyễn Văn C',
-          schedule: 'Thứ 3, 5 | 19:00 - 21:00',
-          startDate: '2025-10-01',
-          endDate: '2025-12-20',
-          totalLessons: 20,
-          completedLessons: 8,
-          nextLesson: {
-            date: '2025-11-05',
-            topic: 'Task 2 Essay Structure'
-          },
-          pendingAssignments: 1,
-          attendanceRate: 100,
-          averageScore: 7.8,
-          status: 'active',
-          thumbnail: null
-        },
-        {
-          id: 3,
-          name: 'A1-Morning-02',
-          level: 'A1',
-          teacher: 'Lê Thị D',
-          schedule: 'Thứ 2, 4 | 09:00 - 11:00',
-          startDate: '2025-06-01',
-          endDate: '2025-08-30',
-          totalLessons: 24,
-          completedLessons: 24,
-          nextLesson: null,
-          pendingAssignments: 0,
-          attendanceRate: 95,
-          averageScore: 8.2,
-          status: 'completed',
-          thumbnail: null
-        }
-      ];
-      setClasses(mockData);
+      // const response = await classApi.getMyClasses();
+      // setClasses(response.data);
+      
+      // Using mock data
+      setClasses(classesMock);
     } catch (error) {
       console.error('Error fetching classes:', error);
     }
@@ -185,16 +130,10 @@ const MyClasses = () => {
 
                   {/* Stats */}
                   <Row className="g-2 mb-16">
-                    <Col xs={6}>
+                    <Col xs={12}>
                       <div className="bg-success-25 border border-success-100 rounded-8 p-12 text-center">
                         <div className="text-success-600 fw-bold text-16">{cls.attendanceRate}%</div>
                         <div className="text-neutral-600 text-11">Chuyên cần</div>
-                      </div>
-                    </Col>
-                    <Col xs={6}>
-                      <div className="bg-warning-25 border border-warning-100 rounded-8 p-12 text-center">
-                        <div className="text-warning-600 fw-bold text-16">{cls.averageScore}</div>
-                        <div className="text-neutral-600 text-11">Điểm TB</div>
                       </div>
                     </Col>
                   </Row>
@@ -329,10 +268,6 @@ const MyClasses = () => {
                         <div className="text-success-600 fw-bold text-14">{cls.attendanceRate}%</div>
                         <div className="text-neutral-600 text-11">Chuyên cần</div>
                       </div>
-                      <div className="flex-fill bg-warning-25 border border-warning-100 rounded-8 p-8 text-center">
-                        <div className="text-warning-600 fw-bold text-14">{cls.averageScore}</div>
-                        <div className="text-neutral-600 text-11">Điểm TB</div>
-                      </div>
                       {cls.pendingAssignments > 0 && (
                         <div className="flex-fill bg-danger-25 border border-danger-100 rounded-8 p-8 text-center">
                           <div className="text-danger-600 fw-bold text-14">{cls.pendingAssignments}</div>
@@ -462,7 +397,7 @@ const MyClasses = () => {
 
       {/* Summary Stats */}
       <Row className="g-3 mb-24">
-        <Col md={3}>
+        <Col md={4}>
           <Card className="bg-main-25 border border-main-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
@@ -480,7 +415,7 @@ const MyClasses = () => {
             </Card.Body>
           </Card>
         </Col>
-        <Col md={3}>
+        <Col md={4}>
           <Card className="bg-success-25 border border-success-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
@@ -498,7 +433,7 @@ const MyClasses = () => {
             </Card.Body>
           </Card>
         </Col>
-        <Col md={3}>
+        <Col md={4}>
           <Card className="bg-warning-25 border border-warning-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
@@ -511,24 +446,6 @@ const MyClasses = () => {
                 <div className="bg-warning-600 text-white rounded-circle d-flex align-items-center justify-content-center"
                      style={{ width: '48px', height: '48px' }}>
                   <i className="fas fa-tasks"></i>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={3}>
-          <Card className="bg-info-25 border border-info-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
-            <Card.Body className="p-20">
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <div className="text-info-500 text-24 fw-bold">
-                    {Math.round(classes.reduce((sum, c) => sum + c.averageScore, 0) / classes.length * 10) / 10 || 0}
-                  </div>
-                  <div className="text-neutral-700 text-13">Điểm TB chung</div>
-                </div>
-                <div className="bg-info-500 text-white rounded-circle d-flex align-items-center justify-content-center"
-                     style={{ width: '48px', height: '48px' }}>
-                  <i className="fas fa-star"></i>
                 </div>
               </div>
             </Card.Body>

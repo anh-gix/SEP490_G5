@@ -1,13 +1,15 @@
 import Attendance from "../pages/Attendance.jsx";
 import ClassSchedulePage from "../pages/ClassSchedulePage.jsx";
 import AttendanceDetailPage from "../pages/AttendanceDetailPage.jsx";
-import TeacherDashboardPage from "../pages/TeacherDashboardPage.jsx";
-import TeacherSchedulePage from "../pages/TeacherSchedulePage.jsx";
-import TeacherClassesPage from "../pages/TeacherClassesPage.jsx";
-import TeacherAssignmentsPage from "../pages/TeacherAssignmentsPage.jsx";
-import TeacherAttendancePage from "../pages/TeacherAttendancePage.jsx";
-import TeacherGradingPage from "../pages/TeacherGradingPage.jsx";
-import TeacherClassDetailPage from "../pages/TeacherClassDetailPage.jsx";
+import TeacherDashboardPage from "../pages/TeacherPages/TeacherDashboardPage.jsx";
+import TeacherSchedulePage from "../pages/TeacherPages/TeacherSchedulePage.jsx";
+import TeacherClassesPage from "../pages/TeacherPages/TeacherClassesPage.jsx";
+import TeacherAssignmentsPage from "../pages/TeacherPages/TeacherAssignmentsPage.jsx";
+import TeacherAttendancePage from "../pages/TeacherPages/TeacherAttendancePage.jsx";
+import TeacherGradingPage from "../pages/TeacherPages/TeacherGradingPage.jsx";
+import TeacherClassDetailPage from "../pages/TeacherPages/TeacherClassDetailPage.jsx";
+import LessonDetailPage from "../pages/TeacherPages/LessonDetailPage.jsx";
+import TeacherProfilePage from "../pages/TeacherPages/TeacherProfilePage.jsx";
 
 /**
  * TeacherRoutes
@@ -31,12 +33,21 @@ export const teacherRoutes = [
   
   { path: '/teacher/dashboard', element: <TeacherDashboardPage /> },
 
+  // Profile
+  { path: '/teacher/profile', element: <TeacherProfilePage /> },
+
   // I. Schedule
   { path: '/teacher/schedule', element: <TeacherSchedulePage /> },
+  { path: '/teacher/lessons/:lessonId', element: <LessonDetailPage /> },
 
   // II. Classes
   { path: '/teacher/classes', element: <TeacherClassesPage /> },
-  { path: '/teacher/class/:classId', element: <TeacherClassDetailPage /> },
+  { path: '/teacher/classes/:classId', element: <TeacherClassDetailPage /> },
+  { path: '/teacher/classes/:classId/overview', element: <TeacherClassDetailPage /> },
+  { path: '/teacher/classes/:classId/students', element: <TeacherClassDetailPage /> },
+  { path: '/teacher/classes/:classId/lessons', element: <TeacherClassDetailPage /> },
+  { path: '/teacher/classes/:classId/materials', element: <TeacherClassDetailPage /> },
+  { path: '/teacher/classes/:classId/assignments', element: <TeacherClassDetailPage /> },
 
   // III. Assignments
   { path: '/teacher/assignments', element: <TeacherAssignmentsPage /> },

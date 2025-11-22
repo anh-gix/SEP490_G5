@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Form, Table, ProgressBar } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, Form, Table, ProgressBar, Spinner, Alert } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
+import teacherService from '../../services/teacherService';
 
 /**
  * Teacher Classes Component
@@ -11,59 +12,44 @@ const TeacherClasses = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchClasses();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterStatus]);
 
   const fetchClasses = async () => {
     try {
-      // TODO: Replace with actual API call
-      const mockData = [
-        {
-          id: 1,
-          name: 'A2-Evening-01',
-          level: 'A2',
-          schedule: 'Thứ 2, 4, 6 | 18:00 - 20:00',
-          room: 'Room 102',
-          startDate: '2025-09-01',
-          endDate: '2025-11-30',
-          totalLessons: 30,
-          completedLessons: 18,
-          totalStudents: 25,
-          presentStudents: 23,
-          status: 'active',
-          pendingAssignments: 5,
-          ungradedSubmissions: 8,
-          nextLesson: {
-            date: '2025-11-13',
-            topic: 'Present Perfect Tense'
-          }
-        },
-        {
-          id: 2,
-          name: 'B1-Afternoon-02',
-          level: 'B1',
-          schedule: 'Thứ 3, 5, 7 | 14:00 - 16:00',
-          room: 'Room 201',
-          startDate: '2025-09-15',
-          endDate: '2025-12-15',
-          totalLessons: 30,
-          completedLessons: 12,
-          totalStudents: 20,
-          presentStudents: 18,
-          status: 'active',
-          pendingAssignments: 3,
-          ungradedSubmissions: 4,
-          nextLesson: {
-            date: '2025-11-12',
-            topic: 'Advanced Grammar'
-          }
-        }
-      ];
-      setClasses(mockData);
+      setLoading(true);
+      setError(null);
+      
+      const response = await teacherService.getMyClasses({ status: filterStatus });
+      
+      // Transform API data to component format
+      const transformedClasses = response.classes.map(cls => ({
+        id: cls._id,
+        name: cls.name,
+        level: cls.level,
+        schedule: cls.schedule,
+        room: cls.room,
+        totalStudents: cls.totalStudents,
+        activeStudents: cls.activeStudents,
+        presentStudents: cls.presentStudents,
+        completedLessons: cls.completedLessons,
+        totalLessons: cls.totalLessons,
+        ungradedSubmissions: cls.ungradedSubmissions,
+        status: cls.status,
+        nextLesson: cls.nextLesson
+      }));
+      
+      setClasses(transformedClasses);
     } catch (error) {
       console.error('Error fetching classes:', error);
+      setError(error.message || 'Không thể tải danh sách lớp học');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -92,6 +78,39 @@ const TeacherClasses = () => {
         <p className="text-neutral-600 mb-0">Quản lý các lớp học bạn đang giảng dạy</p>
       </div>
 
+      {/* Loading State */}
+      {loading && (
+        <div className="text-center py-5">
+          <Spinner animation="border" variant="primary" />
+          <p className="text-neutral-600 mt-3">Đang tải danh sách lớp học...</p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <Alert variant="danger" dismissible onClose={() => setError(null)}>
+          <i className="fas fa-exclamation-circle me-2"></i>
+          {error}
+          <Button variant="link" className="ms-3" onClick={fetchClasses}>
+            Thử lại
+          </Button>
+        </Alert>
+      )}
+
+      {/* Empty State */}
+      {!loading && !error && classes.length === 0 && (
+        <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+          <Card.Body className="text-center py-5">
+            <i className="fas fa-chalkboard-teacher text-neutral-300" style={{ fontSize: '48px' }}></i>
+            <h5 className="text-neutral-700 mt-3 mb-2">Chưa có lớp học nào</h5>
+            <p className="text-neutral-500">Hiện tại bạn chưa được phân công giảng dạy lớp học nào</p>
+          </Card.Body>
+        </Card>
+      )}
+
+      {/* Content - Only show when not loading and no error */}
+      {!loading && !error && classes.length > 0 && (
+      <>
       {/* Summary Stats */}
       <Row className="g-3 mb-24">
         <Col md={3}>
@@ -324,7 +343,7 @@ const TeacherClasses = () => {
 
                   {/* Card Footer */}
                   <Card.Footer className="bg-neutral-25 border-0 p-16">
-                    <Link to={`/teacher/class/${cls.id}`} className="text-decoration-none">
+                    <Link to={`/teacher/classes/${cls.id}`} className="text-decoration-none">
                       <Button className="btn-main text-13 fw-semibold w-100 py-10 radius-8">
                         <i className="fas fa-arrow-right me-2"></i>
                         Quản lý lớp học
@@ -375,7 +394,7 @@ const TeacherClasses = () => {
                     </td>
                     <td className="px-20 py-16">{getStatusBadge(cls.status)}</td>
                     <td className="px-20 py-16 text-center">
-                      <Link to={`/teacher/class/${cls.id}`}>
+                      <Link to={`/teacher/classes/${cls.id}`}>
                         <Button className="btn-outline-main text-13 px-12 py-6 radius-6">
                           Quản lý
                         </Button>
@@ -387,6 +406,8 @@ const TeacherClasses = () => {
             </Table>
           </Card.Body>
         </Card>
+      )}
+      </>
       )}
     </Container>
   );

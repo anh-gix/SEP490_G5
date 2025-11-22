@@ -17,13 +17,13 @@ exports.getOverviewReport = async (req, res) => {
     const activeClasses = activeClassIds.length;
     
     // Total students
-    const studentRole = await Role.findOne({ name: 'student' });
+    const studentRole = await Role.findOne({ name: 'Student' });
     const totalStudents = studentRole 
       ? await User.countDocuments({ roleId: studentRole._id })
       : 0;
     
     // Total teachers
-    const teacherRole = await Role.findOne({ name: 'teacher' });
+    const teacherRole = await Role.findOne({ name: 'Teacher' });
     const totalTeachers = teacherRole
       ? await User.countDocuments({ roleId: teacherRole._id })
       : 0;
@@ -143,7 +143,7 @@ exports.getClassReport = async (req, res) => {
 // =========================
 exports.getStudentReport = async (req, res) => {
   try {
-    const studentRole = await Role.findOne({ name: 'student' });
+    const studentRole = await Role.findOne({ name: 'Student' });
     if (!studentRole) {
       return res.status(404).json({ message: "Không tìm thấy role học viên" });
     }
@@ -203,7 +203,7 @@ exports.getStudentReport = async (req, res) => {
 // =========================
 exports.getTeacherReport = async (req, res) => {
   try {
-    const teacherRole = await Role.findOne({ name: 'teacher' });
+    const teacherRole = await Role.findOne({ name: 'Teacher' });
     if (!teacherRole) {
       return res.status(404).json({ message: "Không tìm thấy role giảng viên" });
     }

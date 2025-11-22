@@ -1,5 +1,5 @@
 import React from 'react';
-import RoleNavigation from '../common/RoleNavigation';
+import RoleNavigation from '../common/RoleNavigation.jsx';
 
 /**
  * Student Navigation Component
@@ -37,30 +37,31 @@ const StudentNavigation = () => {
       path: '/student/toeic',
       color: 'main'
     },
-    {
-      title: 'Tài liệu học tập',
-      icon: 'fa-file-alt',
-      path: '/student/materials',
-      color: 'main'
-    },
-    {
-      title: 'Điểm số',
-      icon: 'fa-star',
-      path: '/student/grades',
-      color: 'warning'
-    },
-    {
-      title: 'Xin nghỉ học',
-      icon: 'fa-hand-paper',
-      path: '/student/leave-request',
-      color: 'danger'
-    }
+    // {
+    //   title: 'Tài liệu học tập',
+    //   icon: 'fa-file-alt',
+    //   path: '/student/materials',
+    //   color: 'main'
+    // },
+    // {
+    //   title: 'Điểm số',
+    //   icon: 'fa-star',
+    //   path: '/student/grades',
+    //   color: 'warning'
+    // },
+    // {
+    //   title: 'Xin nghỉ học',
+    //   icon: 'fa-hand-paper',
+    //   path: '/student/leave-request',
+    //   color: 'danger'
+    // }
   ];
 
   const userInfo = {
     name: 'Nguyễn Văn A',
     code: 'SV001',
-    avatar: null
+    avatar: null,
+    role: 'student'
   };
 
   return (

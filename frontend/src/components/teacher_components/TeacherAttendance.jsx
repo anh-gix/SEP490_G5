@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal } from 'react-bootstrap';
-import { useParams } from 'react-router-dom';
+import { Container, Row, Col, Card, Table, Badge, Button, Form, Modal } from 'react-bootstrap';
+import { useParams, useNavigate } from 'react-router-dom';
+import teacherService from '../../services/teacherService';
 
 /**
  * Teacher Attendance Component
@@ -8,102 +9,134 @@ import { useParams } from 'react-router-dom';
  */
 const TeacherAttendance = () => {
   const { scheduleId } = useParams();
+  const navigate = useNavigate();
   const [scheduleInfo, setScheduleInfo] = useState(null);
   const [students, setStudents] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [todaySchedules, setTodaySchedules] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [countdown, setCountdown] = useState('');
+  const [canAttendance, setCanAttendance] = useState(false);
+
+  useEffect(() => {
+    fetchTodaySchedules();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (scheduleId) {
       fetchScheduleAttendance(scheduleId);
-    } else {
-      fetchUpcomingSchedules();
     }
   }, [scheduleId]);
 
-  const fetchScheduleAttendance = async (id) => {
-    // Mock data - dựa trên studentScheduleModel
-    const mockSchedule = {
-      id: id,
-      className: 'A2-Evening-01',
-      date: '2025-11-12',
-      startTime: '18:00',
-      endTime: '20:00',
-      topic: 'Present Perfect Tense',
-      lessonNumber: 18,
-      room: 'Room 102'
-    };
+  // Countdown timer
+  useEffect(() => {
+    if (!scheduleInfo) return;
 
-    const mockStudents = [
-      {
-        id: 1,
-        name: 'Nguyễn Văn A',
-        email: 'nguyenvana@example.com',
-        studentCode: 'SV001',
-        attendance: {
-          status: 'present', // present, absent, late, excused
-          checkInTime: '2025-11-12T18:05:00',
-          markedBy: null
-        }
-      },
-      {
-        id: 2,
-        name: 'Trần Thị B',
-        email: 'tranthib@example.com',
-        studentCode: 'SV002',
-        attendance: {
-          status: 'absent',
-          checkInTime: null,
-          markedBy: null
-        }
-      },
-      {
-        id: 3,
-        name: 'Lê Văn C',
-        email: 'levanc@example.com',
-        studentCode: 'SV003',
-        attendance: {
-          status: 'late',
-          checkInTime: '2025-11-12T18:25:00',
-          markedBy: null
-        }
-      },
-      {
-        id: 4,
-        name: 'Phạm Thị D',
-        email: 'phamthid@example.com',
-        studentCode: 'SV004',
-        attendance: {
-          status: 'excused',
-          checkInTime: null,
-          markedBy: null
-        }
-      }
-    ];
+    const timer = setInterval(() => {
+      updateCountdown();
+    }, 1000);
 
-    setScheduleInfo(mockSchedule);
-    setStudents(mockStudents);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scheduleInfo]);
+
+  const updateCountdown = () => {
+    if (!scheduleInfo) return;
+
+    const now = new Date();
+    const scheduleDate = new Date(scheduleInfo.date);
+    const [hours, minutes] = scheduleInfo.startTime.split(':');
+    scheduleDate.setHours(parseInt(hours), parseInt(minutes), 0);
+
+    const diff = scheduleDate - now;
+
+    // TODO: Tạm thời cho phép điểm danh trước giờ để test
+    setCanAttendance(true);
+    
+    if (diff <= 0) {
+      setCountdown('');
+    } else {
+      const hoursLeft = Math.floor(diff / (1000 * 60 * 60));
+      const minutesLeft = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      setCountdown(`${hoursLeft}h ${minutesLeft}m`);
+    }
   };
 
-  const fetchUpcomingSchedules = async () => {
-    // Mock data for schedule selection
-    const mockSchedule = {
-      id: 1,
-      className: 'A2-Evening-01',
-      date: '2025-11-13',
-      startTime: '18:00',
-      endTime: '20:00',
-      topic: 'Present Perfect Tense',
-      lessonNumber: 19,
-      room: 'Room 102'
-    };
-    setScheduleInfo(mockSchedule);
+  const fetchTodaySchedules = async () => {
+    try {
+      setLoading(true);
+      const today = new Date().toISOString().split('T')[0];
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      const response = await teacherService.getCurrentTeacherSchedule({
+        startDate: today,
+        endDate: tomorrow.toISOString().split('T')[0]
+      });
+
+      if (response.success) {
+        setTodaySchedules(response.schedules || []);
+        
+        // If no scheduleId in URL, auto-select first schedule
+        if (!scheduleId && response.schedules.length > 0) {
+          const firstSchedule = response.schedules[0];
+          fetchScheduleAttendance(firstSchedule._id);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching today schedules:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchScheduleAttendance = async (id) => {
+    try {
+      const response = await teacherService.getLessonDetail(id);
+      
+      if (response.success && response.lesson) {
+        // Map lesson data to scheduleInfo format
+        const scheduleInfo = {
+          _id: response.lesson._id,
+          date: response.lesson.date,
+          startTime: response.lesson.startTime,
+          endTime: response.lesson.endTime,
+          className: response.lesson.className,
+          lessonNumber: response.lesson.sessionOrder,
+          room: response.lesson.roomName,
+          topic: response.lesson.sessionTitle
+        };
+        
+        setScheduleInfo(scheduleInfo);
+        
+        // Ensure each student has an attendance object
+        const studentsWithAttendance = (response.lesson.students || []).map(student => ({
+          ...student,
+          attendance: student.attendance || {
+            status: 'absent',
+            checkInTime: null,
+            markedBy: null
+          }
+        }));
+        setStudents(studentsWithAttendance);
+      }
+    } catch (error) {
+      console.error('Error fetching schedule attendance:', error);
+      alert(error.message || 'Không thể tải thông tin điểm danh');
+    }
+  };
+
+  const handleSelectSchedule = (schedule) => {
+    navigate(`/teacher/attendance/${schedule._id}`);
+    fetchScheduleAttendance(schedule._id);
   };
 
   const updateAttendance = (studentId, status) => {
     setStudents(students.map(student => 
-      student.id === studentId 
+      student._id === studentId 
         ? {
             ...student,
             attendance: {
@@ -128,10 +161,27 @@ const TeacherAttendance = () => {
   };
 
   const saveAttendance = async () => {
-    // TODO: API call to save attendance
-    console.log('Saving attendance:', students);
-    setShowConfirmModal(false);
-    alert('Đã lưu điểm danh thành công!');
+    try {
+      // Prepare attendance data
+      const attendanceData = students.map(student => ({
+        studentId: student._id,
+        status: student.attendance.status,
+        checkInTime: student.attendance.checkInTime
+      }));
+
+      // Call API to save attendance
+      const response = await teacherService.saveAttendance(scheduleId, attendanceData);
+      
+      if (response.success) {
+        setShowConfirmModal(false);
+        alert('Đã lưu điểm danh thành công!');
+      } else {
+        throw new Error(response.message || 'Không thể lưu điểm danh');
+      }
+    } catch (error) {
+      console.error('Error saving attendance:', error);
+      alert(error.message || 'Lỗi khi lưu điểm danh. Vui lòng thử lại.');
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -151,24 +201,34 @@ const TeacherAttendance = () => {
   };
 
   const getAttendanceStats = () => {
-    const present = students.filter(s => s.attendance.status === 'present').length;
-    const absent = students.filter(s => s.attendance.status === 'absent').length;
-    const late = students.filter(s => s.attendance.status === 'late').length;
-    const excused = students.filter(s => s.attendance.status === 'excused').length;
+    const present = students.filter(s => s.attendance?.status === 'present').length;
+    const absent = students.filter(s => s.attendance?.status === 'absent').length;
+    const late = students.filter(s => s.attendance?.status === 'late').length;
+    const excused = students.filter(s => s.attendance?.status === 'excused').length;
     return { present, absent, late, excused, total: students.length };
   };
 
   const stats = getAttendanceStats();
 
   const filteredStudents = students.filter(s => {
-    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         s.studentCode.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = selectedStatus === 'all' || s.attendance.status === selectedStatus;
+    const matchesSearch = s.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         s.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         s.username?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = selectedStatus === 'all' || s.attendance?.status === selectedStatus;
     return matchesSearch && matchesStatus;
   });
 
-  if (!scheduleInfo) {
-    return <div>Loading...</div>;
+  if (!scheduleInfo && loading) {
+    return (
+      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#f8f9fa' }}>
+        <div className="text-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="text-neutral-600 mt-3">Đang tải thông tin điểm danh...</p>
+        </div>
+      </Container>
+    );
   }
 
   return (
@@ -179,40 +239,104 @@ const TeacherAttendance = () => {
         <p className="text-neutral-600 mb-0">Quản lý điểm danh cho buổi học</p>
       </div>
 
-      {/* Schedule Info */}
-      <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24" 
-            style={{ background: 'linear-gradient(135deg, #0D74FF 0%, #0A5FD9 100%)' }}>
-        <Card.Body className="p-24">
-          <Row className="align-items-center">
-            <Col lg={8}>
-              <div className="text-white mb-8">
-                <i className="fas fa-calendar-alt me-2"></i>
-                {new Date(scheduleInfo.date).toLocaleDateString('vi-VN', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}
-              </div>
-              <h5 className="text-white fw-bold mb-8">{scheduleInfo.className} - Buổi {scheduleInfo.lessonNumber}</h5>
-              <div className="text-white d-flex gap-20" style={{ opacity: 0.9 }}>
-                <span><i className="fas fa-clock me-2"></i>{scheduleInfo.startTime} - {scheduleInfo.endTime}</span>
-                <span><i className="fas fa-door-open me-2"></i>{scheduleInfo.room}</span>
-                <span><i className="fas fa-book me-2"></i>{scheduleInfo.topic}</span>
-              </div>
-            </Col>
-            <Col lg={4} className="text-lg-end">
-              <Button 
-                className="btn-outline-light px-20 py-10 radius-8"
-                onClick={() => setShowConfirmModal(true)}
-              >
-                <i className="fas fa-save me-2"></i>
-                Lưu điểm danh
-              </Button>
-            </Col>
-          </Row>
-        </Card.Body>
-      </Card>
+      {/* Today's Schedules */}
+      {todaySchedules.length > 0 && (
+        <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24">
+          <Card.Body className="p-20">
+            <h6 className="text-neutral-900 fw-semibold mb-16">
+              <i className="fas fa-calendar-day me-2 text-main-600"></i>
+              Các lớp hôm nay ({todaySchedules.length})
+            </h6>
+            <Row className="g-3">
+              {todaySchedules.map((schedule) => (
+                <Col md={6} lg={4} key={schedule._id}>
+                  <Card 
+                    className={`border rounded-8 cursor-pointer ${
+                      scheduleInfo?._id === schedule._id 
+                        ? 'border-main-600 bg-main-50' 
+                        : 'border-neutral-200 hover-shadow'
+                    }`}
+                    style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+                    onClick={() => handleSelectSchedule(schedule)}
+                  >
+                    <Card.Body className="p-16">
+                      <div className="d-flex justify-content-between align-items-start mb-8">
+                        <div className="text-neutral-900 fw-semibold text-14">
+                          {schedule.className}
+                        </div>
+                        <Badge className="bg-main-600 text-white px-8 py-4 text-11">
+                          Buổi {schedule.sessionOrder}
+                        </Badge>
+                      </div>
+                      <div className="text-neutral-600 text-12 mb-4">
+                        <i className="fas fa-clock me-1"></i>
+                        {schedule.startTime} - {schedule.endTime}
+                      </div>
+                      <div className="text-neutral-600 text-12">
+                        <i className="fas fa-door-open me-1"></i>
+                        {schedule.roomName}
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          </Card.Body>
+        </Card>
+      )}
+
+      {/* Schedule Info with Countdown */}
+      {scheduleInfo && (
+        <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24" 
+              style={{ background: 'linear-gradient(135deg, #0D74FF 0%, #0A5FD9 100%)' }}>
+          <Card.Body className="p-24">
+            <Row className="align-items-center">
+              <Col lg={8}>
+                <div className="text-white mb-8">
+                  <i className="fas fa-calendar-alt me-2"></i>
+                  {new Date(scheduleInfo.date).toLocaleDateString('vi-VN', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </div>
+                <h5 className="text-white fw-bold mb-8">
+                  {scheduleInfo.className} - Buổi {scheduleInfo.lessonNumber}
+                </h5>
+                <div className="text-white d-flex gap-20" style={{ opacity: 0.9 }}>
+                  <span><i className="fas fa-clock me-2"></i>{scheduleInfo.startTime} - {scheduleInfo.endTime}</span>
+                  <span><i className="fas fa-door-open me-2"></i>{scheduleInfo.room}</span>
+                  <span><i className="fas fa-book me-2"></i>{scheduleInfo.topic}</span>
+                </div>
+                {countdown && (
+                  <div className="mt-12">
+                    <Badge className="bg-warning-600 text-white px-12 py-6 text-14">
+                      <i className="fas fa-hourglass-half me-2"></i>
+                      Bắt đầu sau: {countdown}
+                    </Badge>
+                  </div>
+                )}
+              </Col>
+              <Col lg={4} className="text-lg-end">
+                <Button 
+                  className="btn-outline-light px-20 py-10 radius-8"
+                  onClick={() => setShowConfirmModal(true)}
+                  disabled={!canAttendance}
+                >
+                  <i className="fas fa-save me-2"></i>
+                  Lưu điểm danh
+                </Button>
+                {!canAttendance && (
+                  <div className="text-white text-12 mt-8" style={{ opacity: 0.8 }}>
+                    Chưa đến giờ học
+                  </div>
+                )}
+              </Col>
+            </Row>
+          </Card.Body>
+        </Card>
+      )}
 
       {/* Attendance Stats */}
       <Row className="g-3 mb-24">
@@ -308,7 +432,11 @@ const TeacherAttendance = () => {
               </Form.Select>
             </Col>
             <Col md={5} className="text-end">
-              <Button className="btn-success px-16 py-8 radius-8" onClick={markAllPresent}>
+              <Button 
+                className="btn-success px-16 py-8 radius-8" 
+                onClick={markAllPresent}
+                disabled={!canAttendance}
+              >
                 <i className="fas fa-check-double me-2"></i>
                 Điểm tất cả có mặt
               </Button>
@@ -334,13 +462,13 @@ const TeacherAttendance = () => {
             </thead>
             <tbody>
               {filteredStudents.map((student, index) => (
-                <tr key={student.id}>
+                <tr key={student._id}>
                   <td className="px-20 py-16 text-neutral-700 text-13">{index + 1}</td>
-                  <td className="px-20 py-16 text-neutral-900 fw-medium text-13">{student.studentCode}</td>
-                  <td className="px-20 py-16 text-neutral-900 text-14">{student.name}</td>
+                  <td className="px-20 py-16 text-neutral-900 fw-medium text-13">{student.username || '-'}</td>
+                  <td className="px-20 py-16 text-neutral-900 text-14">{student.fullName || student.username}</td>
                   <td className="px-20 py-16 text-neutral-600 text-13">{student.email}</td>
                   <td className="px-20 py-16 text-neutral-700 text-13">
-                    {student.attendance.checkInTime 
+                    {student.attendance?.checkInTime 
                       ? new Date(student.attendance.checkInTime).toLocaleTimeString('vi-VN', { 
                           hour: '2-digit', 
                           minute: '2-digit' 
@@ -348,38 +476,42 @@ const TeacherAttendance = () => {
                       : '-'
                     }
                   </td>
-                  <td className="px-20 py-16">{getStatusBadge(student.attendance.status)}</td>
+                  <td className="px-20 py-16">{getStatusBadge(student.attendance?.status || 'absent')}</td>
                   <td className="px-20 py-16">
                     <div className="d-flex gap-4 justify-content-center">
                       <Button
                         size="sm"
-                        className={student.attendance.status === 'present' ? 'btn-success' : 'btn-outline-success'}
+                        className={student.attendance?.status === 'present' ? 'btn-success' : 'btn-outline-success'}
                         style={{ width: '36px', height: '36px', padding: 0 }}
-                        onClick={() => updateAttendance(student.id, 'present')}
+                        onClick={() => updateAttendance(student._id, 'present')}
+                        disabled={!canAttendance}
                       >
                         <i className="fas fa-check"></i>
                       </Button>
                       <Button
                         size="sm"
-                        className={student.attendance.status === 'absent' ? 'btn-danger' : 'btn-outline-danger'}
+                        className={student.attendance?.status === 'absent' ? 'btn-danger' : 'btn-outline-danger'}
                         style={{ width: '36px', height: '36px', padding: 0 }}
-                        onClick={() => updateAttendance(student.id, 'absent')}
+                        onClick={() => updateAttendance(student._id, 'absent')}
+                        disabled={!canAttendance}
                       >
                         <i className="fas fa-times"></i>
                       </Button>
                       <Button
                         size="sm"
-                        className={student.attendance.status === 'late' ? 'btn-warning' : 'btn-outline-warning'}
+                        className={student.attendance?.status === 'late' ? 'btn-warning' : 'btn-outline-warning'}
                         style={{ width: '36px', height: '36px', padding: 0 }}
-                        onClick={() => updateAttendance(student.id, 'late')}
+                        onClick={() => updateAttendance(student._id, 'late')}
+                        disabled={!canAttendance}
                       >
                         <i className="fas fa-clock"></i>
                       </Button>
                       <Button
                         size="sm"
-                        className={student.attendance.status === 'excused' ? 'btn-info' : 'btn-outline-info'}
+                        className={student.attendance?.status === 'excused' ? 'btn-info' : 'btn-outline-info'}
                         style={{ width: '36px', height: '36px', padding: 0 }}
-                        onClick={() => updateAttendance(student.id, 'excused')}
+                        onClick={() => updateAttendance(student._id, 'excused')}
+                        disabled={!canAttendance}
                       >
                         <i className="fas fa-hand-paper"></i>
                       </Button>

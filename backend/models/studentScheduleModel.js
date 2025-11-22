@@ -31,6 +31,16 @@ const studentScheduleSchema = new mongoose.Schema({
       ref: "User",
     },
   },
+  // Trạng thái lịch học
+  scheduleStatus: {
+    type: String,
+    enum: ["scheduled", "cancelled", "rescheduled", "completed", "pending"],
+    default: "scheduled",
+  },
+  // Lý do (cho cancelled, rescheduled, etc.)
+  reason: {
+    type: String,
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model("StudentSchedule", studentScheduleSchema);

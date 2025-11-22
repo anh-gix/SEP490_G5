@@ -275,10 +275,15 @@ exports.getClassStats = async (req, res) => {
 // ➕ TẠO LỚP HỌC MỚI
 // =========================
 exports.createClass = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
     const { name, course, teacher, students, room, startDate, endDate, maxStudents, status, scheduleEntries } = req.body;
     
     if (!name || !teacher) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({
         success: false,
         message: 'Vui lòng điền đầy đủ thông tin bắt buộc (tên lớp, giáo viên)'
@@ -286,8 +291,10 @@ exports.createClass = async (req, res) => {
     }
     
     // Check if class name exists
-    const existingClass = await Class.findOne({ name });
+    const existingClass = await Class.findOne({ name }).session(session);
     if (existingClass) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({
         success: false,
         message: 'Tên lớp học đã tồn tại'
@@ -296,8 +303,10 @@ exports.createClass = async (req, res) => {
     
     // Validate room capacity if room is provided
     if (room) {
-      const roomData = await Room.findById(room);
+      const roomData = await Room.findById(room).session(session);
       if (!roomData) {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(404).json({
           success: false,
           message: 'Không tìm thấy phòng học'
@@ -306,6 +315,8 @@ exports.createClass = async (req, res) => {
       
       const studentCount = (students || []).length;
       if (studentCount > roomData.capacity) {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(400).json({
           success: false,
           message: `Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomData.capacity} học viên)`
@@ -325,14 +336,15 @@ exports.createClass = async (req, res) => {
       status: status || 'pending'
     });
     
-    await newClass.save();
+    await newClass.save({ session });
     
     // Generate ClassSchedule entries if scheduleEntries and course are provided
     if (scheduleEntries && scheduleEntries.length > 0 && course && startDate) {
       // Get course details including numberOfSessions and sessions
       const courseData = await Course.findById(course)
         .populate('sessions', 'order')
-        .select('numberOfSessions sessions');
+        .select('numberOfSessions sessions')
+        .session(session);
       
       if (courseData && courseData.numberOfSessions) {
         const numberOfSessions = courseData.numberOfSessions;
@@ -423,7 +435,7 @@ exports.createClass = async (req, res) => {
         
         // Create all ClassSchedule entries
         if (classSchedules.length > 0) {
-          const createdSchedules = await ClassSchedule.insertMany(classSchedules);
+          const createdSchedules = await ClassSchedule.insertMany(classSchedules, { session });
           
           // Create StudentSchedule entries for each ClassSchedule
           if (students && students.length > 0) {
@@ -439,12 +451,16 @@ exports.createClass = async (req, res) => {
             });
             
             if (studentSchedules.length > 0) {
-              await StudentSchedule.insertMany(studentSchedules);
+              await StudentSchedule.insertMany(studentSchedules, { session });
             }
           }
         }
       }
     }
+    
+    // Commit transaction before populating (populate doesn't need to be in transaction)
+    await session.commitTransaction();
+    session.endSession();
     
     const populatedClass = await Class.findById(newClass._id)
       .populate('teacher', 'username email phone')
@@ -462,6 +478,10 @@ exports.createClass = async (req, res) => {
       class: populatedClass
     });
   } catch (error) {
+    // Rollback transaction on error
+    await session.abortTransaction();
+    session.endSession();
+    
     console.error('Error in createClass:', error);
     res.status(500).json({
       success: false,

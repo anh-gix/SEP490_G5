@@ -87,7 +87,9 @@ const getProgramById = async (req, res) => {
     // Get courses belong to this program
     const courses = await Course.find({ program: id })
       .populate('createdBy', 'username email')
-      .select('name description status createdAt');
+      .populate('clos', 'code name description')
+      .populate('sessions', 'title order')
+      .select('name description status createdAt updatedAt clos sessions');
 
     res.status(200).json({
       success: true,

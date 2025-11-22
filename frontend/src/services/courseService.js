@@ -93,6 +93,26 @@ export const courseService = {
       throw error.response?.data || { message: 'Gửi yêu cầu chỉnh sửa thất bại' };
     }
   },
+
+  // Accept course to program (Program Head)
+  acceptCourseToProgram: async (id, data) => {
+    try {
+      const response = await axios.patch(`${API_BASE_URL}/${id}/accept`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Chấp nhận giáo trình thất bại' };
+    }
+  },
+
+  // Reject course from program (Program Head)
+  rejectCourseFromProgram: async (id, data) => {
+    try {
+      const response = await axios.patch(`${API_BASE_URL}/${id}/reject`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Từ chối giáo trình thất bại' };
+    }
+  },
 };
 
 export default courseService;

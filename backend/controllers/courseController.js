@@ -322,3 +322,110 @@ exports.requestRevision = async (req, res) => {
     }
 };
 
+// =========================
+// PROGRAM HEAD: ACCEPT/REJECT COURSE
+// =========================
+
+/**
+ * Accept course to add to program (Center Head)
+ * PATCH /api/courses/:id/accept
+ */
+exports.acceptCourseToProgram = async (req, res) => {
+    const { approvalNote } = req.body;
+
+    try {
+        const course = await Course.findById(req.params.id);
+
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy giáo trình'
+            });
+        }
+
+        // Only accept courses that are pending approval
+        if (course.status !== 'pending_approval') {
+            return res.status(400).json({
+                success: false,
+                message: 'Chỉ có thể chấp nhận giáo trình đang chờ phê duyệt'
+            });
+        }
+
+        // Update course status to approved
+        course.status = 'approved';
+        course.approvedAt = new Date();
+        course.approvalNote = approvalNote || '';
+        // course.approvedBy = req.user?._id; // Uncomment when auth is enabled
+
+        await course.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Đã chấp nhận giáo trình vào chương trình thành công',
+            data: course
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Reject course from program (Center Head)
+ * PATCH /api/courses/:id/reject
+ */
+exports.rejectCourseFromProgram = async (req, res) => {
+    const { rejectionReason } = req.body;
+
+    if (!rejectionReason) {
+        return res.status(400).json({
+            success: false,
+            message: 'Vui lòng cung cấp lý do từ chối'
+        });
+    }
+
+    try {
+        const course = await Course.findById(req.params.id);
+
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy giáo trình'
+            });
+        }
+
+        // Only reject courses that are pending approval
+        if (course.status !== 'pending_approval') {
+            return res.status(400).json({
+                success: false,
+                message: 'Chỉ có thể từ chối giáo trình đang chờ phê duyệt'
+            });
+        }
+
+        // Update course status to needs_revision
+        course.status = 'needs_revision';
+        course.rejectedAt = new Date();
+        course.rejectionReason = rejectionReason;
+        // course.rejectedBy = req.user?._id; // Uncomment when auth is enabled
+
+        await course.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Đã từ chối giáo trình thành công',
+            data: course
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+

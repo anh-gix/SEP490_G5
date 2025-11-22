@@ -8,6 +8,10 @@ router.get('/:id/details', courseController.getCourseDetails);
 router.patch('/:id/approve', courseController.approveCourse);
 router.patch('/:id/revise', courseController.requestRevision);
 
+// PROGRAM HEAD: ACCEPT/REJECT COURSE TO PROGRAM
+router.patch('/:id/accept', courseController.acceptCourseToProgram);
+router.patch('/:id/reject', courseController.rejectCourseFromProgram);
+
 // COURSE CRUD ROUTES (dynamic routes come after)
 router.get('/', courseController.getAllCourses);
 router.get('/:id', courseController.getCourseById);

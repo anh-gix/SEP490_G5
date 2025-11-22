@@ -51,6 +51,9 @@ const courseSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'User'
     },
+    rejectionReason: {
+        type: String
+    },
     status: {
         type: String,
         enum: ['draft', 'pending_approval', 'approved', 'needs_revision', 'archived'],

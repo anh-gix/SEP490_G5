@@ -6,6 +6,7 @@ import Button from '../compo/Button';
 import StatusBadge from '../compo/StatusBadge';
 import Table from '../compo/Table';
 import { programService } from '../../../services/programService';
+import { courseService } from '../../../services/courseService';
 import { formatDate } from '../../../helper/helper';
 
 const ProgramDetail = () => {
@@ -15,6 +16,10 @@ const ProgramDetail = () => {
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState([]);
   const [cloMapping, setCloMapping] = useState([]);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [selectedCourseId, setSelectedCourseId] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   useEffect(() => {
     fetchProgramDetail();
@@ -29,6 +34,8 @@ const ProgramDetail = () => {
 
       if (response.success) {
         const programData = response.data;
+        // console.log(programData);
+        
         setProgram(programData);
 
         // Courses are included in the program response
@@ -58,6 +65,57 @@ const ProgramDetail = () => {
       console.error('Error fetching program detail:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAcceptCourse = async (courseId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn chấp nhận giáo trình này vào chương trình?')) {
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await courseService.acceptCourseToProgram(courseId, {
+        approvalNote: 'Đã được chấp nhận bởi Program Head'
+      });
+
+      alert('Đã chấp nhận giáo trình thành công!');
+      fetchProgramDetail(); // Refresh data
+    } catch (err) {
+      console.error('Error accepting course:', err);
+      alert(err.message || 'Có lỗi xảy ra khi chấp nhận giáo trình');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectCourse = (courseId) => {
+    setSelectedCourseId(courseId);
+    setShowRejectModal(true);
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectionReason.trim()) {
+      alert('Vui lòng nhập lý do từ chối');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await courseService.rejectCourseFromProgram(selectedCourseId, {
+        rejectionReason
+      });
+
+      alert('Đã từ chối giáo trình thành công!');
+      setShowRejectModal(false);
+      setRejectionReason('');
+      setSelectedCourseId(null);
+      fetchProgramDetail(); // Refresh data
+    } catch (err) {
+      console.error('Error rejecting course:', err);
+      alert(err.message || 'Có lỗi xảy ra khi từ chối giáo trình');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -99,13 +157,14 @@ const ProgramDetail = () => {
       render: (row) => (
         <div>
           <div className="fw-semibold text-neutral-900 mb-1">{row.name}</div>
-          <div className="text-sm text-neutral-600">{row.description}</div>
+          <div className="text-sm text-neutral-600 d-none d-md-block">{row.description}</div>
         </div>
       ),
     },
     {
       header: 'CLOs',
       field: 'clos',
+      hideOnMobile: true,
       render: (row) => (
         <span className="text-neutral-700">{row.clos?.length || 0} CLOs</span>
       ),
@@ -113,6 +172,7 @@ const ProgramDetail = () => {
     {
       header: 'Sessions',
       field: 'sessions',
+      hideOnMobile: true,
       render: (row) => (
         <span className="text-neutral-700">{row.sessions?.length || 0} buổi học</span>
       ),
@@ -125,8 +185,59 @@ const ProgramDetail = () => {
     {
       header: 'Cập nhật',
       field: 'updatedAt',
+      hideOnMobile: true,
       render: (row) => (
         <span className="text-neutral-700">{formatDate(row.updatedAt)}</span>
+      ),
+    },
+    {
+      header: 'Hành động',
+      field: 'actions',
+      render: (row) => (
+        <div className="d-flex flex-wrap gap-2">
+          {row.status === 'pending_approval' ? (
+            <>
+              <Button
+                variant="success"
+                size="sm"
+                icon="ph ph-check"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAcceptCourse(row._id);
+                }}
+                disabled={actionLoading}
+              >
+                <span className="d-none d-md-inline">Chấp nhận</span>
+                <span className="d-inline d-md-none">OK</span>
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                icon="ph ph-x"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRejectCourse(row._id);
+                }}
+                disabled={actionLoading}
+              >
+                <span className="d-none d-md-inline">Từ chối</span>
+                <span className="d-inline d-md-none">X</span>
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              icon="ph ph-eye"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/center-head/courses/${row._id}/details`);
+              }}
+            >
+              Xem
+            </Button>
+          )}
+        </div>
       ),
     },
   ];
@@ -136,7 +247,7 @@ const ProgramDetail = () => {
       <Breadcrumb items={breadcrumbItems} />
 
       {/* Header Section */}
-      <div className="d-flex justify-content-between align-items-start mb-24">
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start mb-24 gap-3">
         <div className="flex-grow-1">
           <div className="d-flex align-items-center gap-3 mb-12">
             <Button
@@ -149,7 +260,7 @@ const ProgramDetail = () => {
           </div>
           <h4 className="mb-8 text-neutral-900 fw-bold">{program.program_name}</h4>
           <p className="text-neutral-600 mb-12">{program.description}</p>
-          <div className="d-flex align-items-center gap-3">
+          <div className="d-flex flex-wrap align-items-center gap-3">
             <StatusBadge status={program.status} />
             <span className="text-neutral-600">Mã: <strong>{program.code}</strong></span>
           </div>
@@ -166,26 +277,26 @@ const ProgramDetail = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="row g-4 mb-24">
-        <div className="col-md-3">
+      <div className="row g-3 g-md-4 mb-24">
+        <div className="col-6 col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng PLOs</h6>
             <h4 className="text-main-600 fw-bold mb-0">{program.plos?.length || 0}</h4>
           </Card>
         </div>
-        <div className="col-md-3">
+        <div className="col-6 col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng Courses</h6>
             <h4 className="text-success-600 fw-bold mb-0">{courses.length}</h4>
           </Card>
         </div>
-        <div className="col-md-3">
+        <div className="col-6 col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng CLOs</h6>
             <h4 className="text-warning-600 fw-bold mb-0">{cloMapping.length}</h4>
           </Card>
         </div>
-        <div className="col-md-3">
+        <div className="col-6 col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Cập nhật lần cuối</h6>
             <h6 className="text-neutral-700 fw-semibold mb-0">{formatDate(program.updatedAt)}</h6>
@@ -349,6 +460,60 @@ const ProgramDetail = () => {
           </div>
         )}
       </Card>
+
+      {/* Reject Modal */}
+      {showRejectModal && (
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Từ chối giáo trình</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowRejectModal(false);
+                    setRejectionReason('');
+                    setSelectedCourseId(null);
+                  }}
+                  disabled={actionLoading}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <label className="form-label">Lý do từ chối *</label>
+                <textarea
+                  className="form-control"
+                  rows="4"
+                  placeholder="Nhập lý do từ chối giáo trình..."
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  disabled={actionLoading}
+                ></textarea>
+              </div>
+              <div className="modal-footer">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowRejectModal(false);
+                    setRejectionReason('');
+                    setSelectedCourseId(null);
+                  }}
+                  disabled={actionLoading}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={handleConfirmReject}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

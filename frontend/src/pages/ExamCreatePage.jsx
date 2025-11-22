@@ -1,11 +1,11 @@
 import React from 'react';
 import CenterHeadLayout from '../components/CenterHead/layout/CenterHeadLayout';
-import ExamCreate from '../components/CenterHead/pages/ExamCreate';
+import ExamCreateWizard from '../components/CenterHead/pages/ExamCreateWizard';
 
 const ExamCreatePage = () => {
   return (
     <CenterHeadLayout>
-      <ExamCreate />
+      <ExamCreateWizard />
     </CenterHeadLayout>
   );
 };

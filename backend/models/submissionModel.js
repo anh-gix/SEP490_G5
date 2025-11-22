@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const answerSchema = new mongoose.Schema({
   questionNumber: Number,
   answerText: String,
-  selectedOption: String,
+  selectedOption: [String],
   recordingUrl: String,
   score: { type: Number, default: 0 },
 });

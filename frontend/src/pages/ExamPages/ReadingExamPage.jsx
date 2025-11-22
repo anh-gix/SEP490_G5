@@ -30,7 +30,9 @@ const ReadingExamPage = () => {
     },
     [sectionData]
   );
-
+  const isMultipleChoiceType = (questionType) => {
+    return ["three_choice", "four_choice", "five_choice"].includes(questionType);
+  };
   const handleSubmit = useCallback(
     async (force = false) => {
       // Stop timer (if any)
@@ -48,7 +50,15 @@ const ReadingExamPage = () => {
           const questionType = getQuestionType(parseInt(qNum));
           const answerValue = answers[qNum];
 
-          if (questionType === "multiple_choice" || questionType === "true_false") {
+          // Nếu là multiple choice type (three_choice, four_choice, five_choice)
+          if (isMultipleChoiceType(questionType)) {
+            // Gửi array cho các loại câu hỏi cho phép chọn nhiều
+            const answerArray = Array.isArray(answerValue) ? answerValue : [answerValue].filter(Boolean);
+            return {
+              questionNumber: parseInt(qNum),
+              selectedOption: answerArray,
+            };
+          } else if (questionType === "multiple_choice" || questionType === "true_false") {
             return {
               questionNumber: parseInt(qNum),
               selectedOption: answerValue,
@@ -70,7 +80,7 @@ const ReadingExamPage = () => {
         setSubmitting(false);
       }
     },
-    [submitting, answers, examId, submissionId, navigate, getQuestionType]
+    [submitting, answers, examId, submissionId, navigate, getQuestionType, isMultipleChoiceType]
   );
 
   // Fetch section + initialize state
@@ -99,7 +109,11 @@ const ReadingExamPage = () => {
         if (data.submission?.answers?.length > 0) {
           const existingAnswers = {};
           data.submission.answers.forEach((ans) => {
-            existingAnswers[ans.questionNumber] = ans.selectedOption ?? ans.answerText ?? "";
+            // Nếu là array, giữ nguyên; nếu không, chuyển thành string
+            const answerValue = ans.selectedOption ?? ans.answerText ?? "";
+            existingAnswers[ans.questionNumber] = Array.isArray(answerValue) 
+              ? answerValue 
+              : answerValue;
           });
           setAnswers(existingAnswers);
         } else {
@@ -178,11 +192,44 @@ const ReadingExamPage = () => {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const handleAnswerChange = (questionNumber, value) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionNumber]: value,
-    }));
+  const getOptionsForQuestionType = (questionType) => {
+    switch (questionType) {
+      case "three_choice":
+        return ["A", "B", "C"];
+      case "four_choice":
+        return ["A", "B", "C", "D"];
+      case "five_choice":
+        return ["A", "B", "C", "D", "E"];
+      case "multiple_choice":
+      default:
+        return ["A", "B", "C", "D"];
+    }
+  };
+
+  const handleAnswerChange = (questionNumber, value, questionType) => {
+    const isMultiple = isMultipleChoiceType(questionType);
+    
+    if (isMultiple) {
+      // Xử lý multiple choice: toggle giá trị trong array
+      setAnswers((prev) => {
+        const currentAnswer = prev[questionNumber] || [];
+        const answerArray = Array.isArray(currentAnswer) ? currentAnswer : [];
+        const newAnswer = answerArray.includes(value)
+          ? answerArray.filter((item) => item !== value)
+          : [...answerArray, value].sort();
+        
+        return {
+          ...prev,
+          [questionNumber]: newAnswer,
+        };
+      });
+    } else {
+      // Xử lý single choice: lưu giá trị đơn
+      setAnswers((prev) => ({
+        ...prev,
+        [questionNumber]: value,
+      }));
+    }
   };
 
   const getPDFUrl = () => {
@@ -291,14 +338,20 @@ const ReadingExamPage = () => {
                         <div key={qNum} className="bg-white rounded-12 p-16 mb-16 border border-neutral-30">
                           <div className="flex-between gap-16 mb-12">
                             <label className="fw-semibold text-neutral-700">Câu {qNum}</label>
-                            {answers[qNum] && (
-                              <span className="badge bg-main-600 text-white px-12 py-4 rounded-pill">
-                                Đã trả lời
-                              </span>
-                            )}
+                            {(() => {
+                              const answerValue = answers[qNum];
+                              const hasAnswer = Array.isArray(answerValue) 
+                                ? answerValue.length > 0 
+                                : answerValue && answerValue !== "";
+                              return hasAnswer && (
+                                <span className="badge bg-main-600 text-white px-12 py-4 rounded-pill">
+                                  Đã trả lời
+                                </span>
+                              );
+                            })()}
                           </div>
 
-                          {/* Multiple Choice */}
+                          {/* Multiple Choice (Single) */}
                           {questionType === "multiple_choice" && (
                             <div className="d-flex flex-column gap-8">
                               {["A", "B", "C", "D"].map((option) => (
@@ -315,12 +368,99 @@ const ReadingExamPage = () => {
                                     name={`question-${qNum}`}
                                     value={option}
                                     checked={answers[qNum] === option}
-                                    onChange={() => handleAnswerChange(qNum, option)}
+                                    onChange={() => handleAnswerChange(qNum, option, questionType)}
                                     className="form-check-input"
                                   />
                                   <span className="text-neutral-700">{option}</span>
                                 </label>
                               ))}
+                            </div>
+                          )}
+
+                          {/* Three Choice (Multiple) */}
+                          {questionType === "three_choice" && (
+                            <div className="d-flex flex-column gap-8">
+                              {getOptionsForQuestionType(questionType).map((option) => {
+                                const answerArray = Array.isArray(answers[qNum]) ? answers[qNum] : [];
+                                const isChecked = answerArray.includes(option);
+                                return (
+                                  <label
+                                    key={option}
+                                    className={`d-flex align-items-center gap-12 p-12 rounded-8 border cursor-pointer transition-2 ${
+                                      isChecked
+                                        ? "border-main-600 bg-main-25"
+                                        : "border-neutral-30 hover-border-main-300"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      value={option}
+                                      checked={isChecked}
+                                      onChange={() => handleAnswerChange(qNum, option, questionType)}
+                                      className="form-check-input"
+                                    />
+                                    <span className="text-neutral-700">{option}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Four Choice (Multiple) */}
+                          {questionType === "four_choice" && (
+                            <div className="d-flex flex-column gap-8">
+                              {getOptionsForQuestionType(questionType).map((option) => {
+                                const answerArray = Array.isArray(answers[qNum]) ? answers[qNum] : [];
+                                const isChecked = answerArray.includes(option);
+                                return (
+                                  <label
+                                    key={option}
+                                    className={`d-flex align-items-center gap-12 p-12 rounded-8 border cursor-pointer transition-2 ${
+                                      isChecked
+                                        ? "border-main-600 bg-main-25"
+                                        : "border-neutral-30 hover-border-main-300"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      value={option}
+                                      checked={isChecked}
+                                      onChange={() => handleAnswerChange(qNum, option, questionType)}
+                                      className="form-check-input"
+                                    />
+                                    <span className="text-neutral-700">{option}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Five Choice (Multiple) */}
+                          {questionType === "five_choice" && (
+                            <div className="d-flex flex-column gap-8">
+                              {getOptionsForQuestionType(questionType).map((option) => {
+                                const answerArray = Array.isArray(answers[qNum]) ? answers[qNum] : [];
+                                const isChecked = answerArray.includes(option);
+                                return (
+                                  <label
+                                    key={option}
+                                    className={`d-flex align-items-center gap-12 p-12 rounded-8 border cursor-pointer transition-2 ${
+                                      isChecked
+                                        ? "border-main-600 bg-main-25"
+                                        : "border-neutral-30 hover-border-main-300"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      value={option}
+                                      checked={isChecked}
+                                      onChange={() => handleAnswerChange(qNum, option, questionType)}
+                                      className="form-check-input"
+                                    />
+                                    <span className="text-neutral-700">{option}</span>
+                                  </label>
+                                );
+                              })}
                             </div>
                           )}
 
@@ -354,7 +494,7 @@ const ReadingExamPage = () => {
                                     name={`question-${qNum}`}
                                     value={option}
                                     checked={answers[qNum] === option}
-                                    onChange={() => handleAnswerChange(qNum, option)}
+                                    onChange={() => handleAnswerChange(qNum, option, questionType)}
                                     className="form-check-input"
                                   />
                                   <span className="text-neutral-700">{option}</span>

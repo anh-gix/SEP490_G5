@@ -481,6 +481,142 @@ exports.createClass = async (req, res) => {
 };
 
 // =========================
+// 🔧 HELPER FUNCTIONS FOR SCHEDULE COMPARISON
+// =========================
+
+/**
+ * Normalize schedule entries for comparison
+ * Sorts by day and time, normalizes time format
+ */
+const normalizeScheduleEntries = (scheduleEntries) => {
+  if (!scheduleEntries || scheduleEntries.length === 0) return [];
+  
+  return scheduleEntries
+    .filter(entry => entry.day && entry.startTime && entry.endTime)
+    .map(entry => ({
+      day: entry.day,
+      startTime: entry.startTime.trim(),
+      endTime: entry.endTime.trim()
+    }))
+    .sort((a, b) => {
+      // Sort by day first (CN=0, 2=1, ..., 7=6)
+      const dayMap = { 'CN': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6 };
+      const dayA = dayMap[a.day] !== undefined ? dayMap[a.day] : 99;
+      const dayB = dayMap[b.day] !== undefined ? dayMap[b.day] : 99;
+      if (dayA !== dayB) return dayA - dayB;
+      // Then by startTime
+      return a.startTime.localeCompare(b.startTime);
+    });
+};
+
+/**
+ * Extract schedule pattern from existing ClassSchedule entries
+ * Groups by day of week and time slot
+ */
+const extractSchedulePatternFromClassSchedules = (classSchedules) => {
+  if (!classSchedules || classSchedules.length === 0) return [];
+  
+  const scheduleMap = new Map();
+  const dayNames = ['CN', '2', '3', '4', '5', '6', '7'];
+  
+  classSchedules.forEach(schedule => {
+    if (!schedule.date || !schedule.startTime || !schedule.endTime) return;
+    
+    const date = new Date(schedule.date);
+    if (isNaN(date.getTime())) return;
+    
+    const dayOfWeek = date.getDay();
+    const day = dayNames[dayOfWeek];
+    const startTime = schedule.startTime.trim();
+    const endTime = schedule.endTime.trim();
+    
+    const key = `${day}-${startTime}-${endTime}`;
+    if (!scheduleMap.has(key)) {
+      scheduleMap.set(key, { day, startTime, endTime });
+    }
+  });
+  
+  return normalizeScheduleEntries(Array.from(scheduleMap.values()));
+};
+
+/**
+ * Compare two schedule entry arrays
+ * Returns true if they are different
+ */
+const compareScheduleEntries = (oldEntries, newEntries) => {
+  const normalizedOld = normalizeScheduleEntries(oldEntries);
+  const normalizedNew = normalizeScheduleEntries(newEntries);
+  
+  if (normalizedOld.length !== normalizedNew.length) return true;
+  
+  for (let i = 0; i < normalizedOld.length; i++) {
+    const old = normalizedOld[i];
+    const new_ = normalizedNew[i];
+    if (old.day !== new_.day || old.startTime !== new_.startTime || old.endTime !== new_.endTime) {
+      return true;
+    }
+  }
+  
+  return false;
+};
+
+/**
+ * Identify which days changed between old and new schedule patterns
+ * Returns: { deleted: [], added: [], changed: [], unchanged: [] }
+ */
+const identifyChangedDays = (oldPattern, newPattern) => {
+  const normalizedOld = normalizeScheduleEntries(oldPattern);
+  const normalizedNew = normalizeScheduleEntries(newPattern);
+  
+  const deleted = [];
+  const added = [];
+  const changed = [];
+  const unchanged = [];
+  
+  // Create maps for easier lookup: key = "day-startTime-endTime"
+  const oldMap = new Map();
+  normalizedOld.forEach(entry => {
+    const key = `${entry.day}-${entry.startTime}-${entry.endTime}`;
+    oldMap.set(key, entry);
+  });
+  
+  const newMap = new Map();
+  normalizedNew.forEach(entry => {
+    const key = `${entry.day}-${entry.startTime}-${entry.endTime}`;
+    newMap.set(key, entry);
+  });
+  
+  // Find deleted: in old but not in new (by exact match)
+  normalizedOld.forEach(oldEntry => {
+    const key = `${oldEntry.day}-${oldEntry.startTime}-${oldEntry.endTime}`;
+    if (!newMap.has(key)) {
+      deleted.push(oldEntry);
+    }
+  });
+  
+  // Find added and changed: in new
+  normalizedNew.forEach(newEntry => {
+    const key = `${newEntry.day}-${newEntry.startTime}-${newEntry.endTime}`;
+    
+    if (oldMap.has(key)) {
+      // Exact match - unchanged
+      unchanged.push(newEntry);
+    } else {
+      // Check if same day but different time (changed)
+      const sameDayOld = normalizedOld.find(o => o.day === newEntry.day);
+      if (sameDayOld) {
+        changed.push(newEntry);
+      } else {
+        // New day - added
+        added.push(newEntry);
+      }
+    }
+  });
+  
+  return { deleted, added, changed, unchanged };
+};
+
+// =========================
 // ✏️ CẬP NHẬT LỚP HỌC
 // =========================
 exports.updateClass = async (req, res) => {
@@ -562,16 +698,131 @@ exports.updateClass = async (req, res) => {
     const startDateChanged = startDate && oldStartDate !== newStartDate;
     
     // Check if scheduleEntries have changed (if provided)
-    // Note: We'll regenerate schedules if scheduleEntries are provided and any schedule-related field changed
+    // First, get existing ClassSchedules to extract current schedule pattern
+    const existingClassSchedules = await ClassSchedule.find({ class: req.params.id })
+      .select('_id date startTime endTime')
+      .sort({ date: 1 })
+      .session(session)
+      .lean();
+    
+    const oldSchedulePattern = extractSchedulePatternFromClassSchedules(existingClassSchedules);
+    const newSchedulePattern = scheduleEntries && scheduleEntries.length > 0 
+      ? normalizeScheduleEntries(scheduleEntries) 
+      : [];
+    
+    // Check if only scheduleEntries changed (without changing room/teacher/startDate)
+    const scheduleEntriesOnlyChanged = newSchedulePattern.length > 0 && 
+      !courseChanged && 
+      !roomChanged && 
+      !teacherChanged && 
+      !startDateChanged &&
+      compareScheduleEntries(oldSchedulePattern, newSchedulePattern);
+    
     const scheduleEntriesChanged = scheduleEntries && scheduleEntries.length > 0;
     
     // Determine if we need to regenerate schedules
     // Regenerate if: course changed, OR (scheduleEntries provided AND any schedule-related field changed)
+    // OR if only scheduleEntries changed (will use smart update)
     const shouldRegenerateSchedules = courseChanged || 
       (scheduleEntriesChanged && (roomChanged || teacherChanged || startDateChanged));
     
-    // If schedules need to be regenerated, delete old ClassSchedules and related data
-    if (shouldRegenerateSchedules) {
+    // Determine final values for schedule generation
+    const finalCourse = course || classData.course;
+    const finalStartDate = startDate || classData.startDate;
+    const finalRoomId = room !== undefined ? room : classData.room;
+    const finalTeacher = teacher || classData.teacher;
+    const finalStudentsList = students !== undefined ? students : classData.students;
+    
+    // Smart update: Only update future schedules when only scheduleEntries changed
+    // Chỉ áp dụng khi số buổi học không thay đổi (chỉ đổi thứ/giờ)
+    if (scheduleEntriesOnlyChanged && scheduleEntries && scheduleEntries.length > 0 && finalCourse && finalStartDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Reset time to compare dates only
+      
+      // Helper function to get day name from day of week number
+      const getDayName = (dayOfWeek) => {
+        const dayNames = ['CN', '2', '3', '4', '5', '6', '7'];
+        return dayNames[dayOfWeek] || null;
+      };
+      
+      // Helper function to convert day string to day of week number
+      const getDayOfWeekNumber = (dayStr) => {
+        const dayMap = {
+          'CN': 0,
+          '2': 1,
+          '3': 2,
+          '4': 3,
+          '5': 4,
+          '6': 5,
+          '7': 6
+        };
+        return dayMap[dayStr] !== undefined ? dayMap[dayStr] : null;
+      };
+      
+      // Normalize old and new schedule patterns
+      const normalizedOld = normalizeScheduleEntries(oldSchedulePattern);
+      const normalizedNew = normalizeScheduleEntries(newSchedulePattern);
+      
+      // Chỉ áp dụng logic đơn giản khi số buổi học không thay đổi
+      if (normalizedOld.length === normalizedNew.length) {
+        // Tạo mapping: oldDay + startTime + endTime -> newDay
+        // Chỉ map khi giờ giữ nguyên, chỉ đổi thứ
+        const dayTimeMapping = {};
+        normalizedOld.forEach(oldEntry => {
+          const key = `${oldEntry.day}-${oldEntry.startTime}-${oldEntry.endTime}`;
+          // Tìm entry mới có cùng giờ nhưng khác thứ
+          const matchingNew = normalizedNew.find(newEntry => 
+            newEntry.startTime === oldEntry.startTime && 
+            newEntry.endTime === oldEntry.endTime &&
+            newEntry.day !== oldEntry.day
+          );
+          if (matchingNew) {
+            dayTimeMapping[key] = matchingNew.day;
+          }
+        });
+        
+        // Tìm các buổi học chưa học (ngày >= hiện tại)
+        const futureSchedules = existingClassSchedules.filter(schedule => {
+          const scheduleDate = new Date(schedule.date);
+          scheduleDate.setHours(0, 0, 0, 0);
+          return scheduleDate >= today;
+        });
+        
+        // Cập nhật các buổi học chưa học theo mapping
+        for (const schedule of futureSchedules) {
+          const scheduleDate = new Date(schedule.date);
+          const dayOfWeek = scheduleDate.getDay();
+          const currentDayName = getDayName(dayOfWeek);
+          
+          // Tạo key để tìm trong mapping: day-startTime-endTime
+          const key = `${currentDayName}-${schedule.startTime}-${schedule.endTime}`;
+          
+          // Nếu có mapping sang thứ mới, cập nhật ngày
+          if (dayTimeMapping.hasOwnProperty(key)) {
+            const newDayName = dayTimeMapping[key];
+            const newDayOfWeek = getDayOfWeekNumber(newDayName);
+            
+            if (newDayOfWeek !== null) {
+              // Tính số ngày cần thêm để đổi sang thứ mới
+              let daysToAdd = (newDayOfWeek - dayOfWeek + 7) % 7;
+              if (daysToAdd === 0) daysToAdd = 7; // Nếu cùng thứ, chuyển sang tuần sau
+              
+              const newDate = new Date(scheduleDate);
+              newDate.setDate(scheduleDate.getDate() + daysToAdd);
+              
+              // Chỉ cập nhật ngày, giữ nguyên tất cả dữ liệu khác (session, homework, material, etc.)
+              await ClassSchedule.findByIdAndUpdate(
+                schedule._id,
+                { date: newDate },
+                { session }
+              );
+            }
+          }
+        }
+      }
+    }
+    // If schedules need to be regenerated (full regeneration), delete old ClassSchedules and related data
+    else if (shouldRegenerateSchedules) {
       // Find all ClassSchedules for this class
       const classSchedules = await ClassSchedule.find({ class: req.params.id }).session(session).select('_id');
       const classScheduleIds = classSchedules.map(schedule => schedule._id);
@@ -611,16 +862,9 @@ exports.updateClass = async (req, res) => {
     
     await classData.save({ session });
     
-    // Generate ClassSchedule entries if schedules need to be regenerated and scheduleEntries are provided
-    // Only create new schedules when shouldRegenerateSchedules is true (old schedules already deleted above)
-    const finalCourse = course || classData.course;
-    const finalStartDate = startDate || classData.startDate;
-    const finalRoomId = room !== undefined ? room : classData.room;
-    const finalTeacher = teacher || classData.teacher;
-    const finalStudentsList = students !== undefined ? students : classData.students;
-    
     // Create new ClassSchedules when schedules need to be regenerated and scheduleEntries are provided
-    if (shouldRegenerateSchedules && scheduleEntries && scheduleEntries.length > 0 && finalCourse && finalStartDate) {
+    // (Only if not already handled by smart update above)
+    if (shouldRegenerateSchedules && !scheduleEntriesOnlyChanged && scheduleEntries && scheduleEntries.length > 0 && finalCourse && finalStartDate) {
       // Get course details including numberOfSessions and sessions
       const courseData = await Course.findById(finalCourse)
         .populate('sessions', 'order')
@@ -713,6 +957,16 @@ exports.updateClass = async (req, res) => {
             weekOffset++;
           }
         }
+        
+        // Sort classSchedules by date to ensure correct chronological order
+        classSchedules.sort((a, b) => new Date(a.date) - new Date(b.date));
+        
+        // Re-assign session order based on sorted dates to ensure correct session mapping
+        classSchedules.forEach((schedule, index) => {
+          const sessionIndex = index < courseSessions.length ? index : index % courseSessions.length;
+          schedule.session = courseSessions[sessionIndex]?._id || null;
+          schedule.reason = `Buổi học ${index + 1}`;
+        });
         
         // Create all ClassSchedule entries
         if (classSchedules.length > 0) {

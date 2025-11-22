@@ -1431,11 +1431,12 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
     }
     
     // Validate start date when it changes
+    // Only validate for pending classes - active/completed classes can have past start dates
     if (name === 'startDate') {
       const today = getTodayDate();
       
-      // Validate start date is not in the past
-      if (value && value < today) {
+      // Only validate start date is not in the past for pending classes
+      if (formData.status === 'pending' && value && value < today) {
         setDateError('Ngày khai giảng không được là quá khứ!');
       } else {
         setDateError('');
@@ -1884,11 +1885,14 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
     setScheduleEntriesError(null);
 
     // Validate start date is not in the past
-    const today = getTodayDate();
-    if (formData.startDate && formData.startDate < today) {
-      alert('Ngày khai giảng không được là quá khứ!');
-      setDateError('Ngày khai giảng không được là quá khứ!');
-      return;
+    // Only validate for pending classes - active/completed classes can have past start dates
+    if (formData.status === 'pending') {
+      const today = getTodayDate();
+      if (formData.startDate && formData.startDate < today) {
+        alert('Ngày khai giảng không được là quá khứ!');
+        setDateError('Ngày khai giảng không được là quá khứ!');
+        return;
+      }
     }
 
     // Validate room capacity if room is selected

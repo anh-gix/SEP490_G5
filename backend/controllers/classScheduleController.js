@@ -189,6 +189,61 @@ exports.getAttendanceByClassSchedule = async (req, res) => {
 };
 
 // =========================
+// 📚 LẤY STUDENTSCHEDULE THEO CLASS SCHEDULE IDs
+// =========================
+exports.getStudentSchedulesByClassSchedules = async (req, res) => {
+  try {
+    const { classScheduleIds } = req.body;
+    
+    if (!classScheduleIds || !Array.isArray(classScheduleIds) || classScheduleIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp danh sách classScheduleIds'
+      });
+    }
+
+    // Tìm tất cả StudentSchedule có classSchedule trong danh sách
+    const studentSchedules = await StudentSchedule.find({
+      classSchedule: { $in: classScheduleIds }
+    })
+      .populate('student', 'username email phone')
+      .populate({
+        path: 'classSchedule',
+        select: 'date startTime endTime room class session status',
+        populate: [
+          {
+            path: 'class',
+            select: 'name'
+          },
+          {
+            path: 'room',
+            select: 'room_name location capacity'
+          },
+          {
+            path: 'session',
+            select: 'title order'
+          }
+        ]
+      })
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      message: 'Lấy StudentSchedule thành công',
+      total: studentSchedules.length,
+      studentSchedules
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi lấy StudentSchedule:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy StudentSchedule',
+      error: error.message
+    });
+  }
+};
+
+// =========================
 // 📚 LẤY LỊCH HỌC CỦA HỌC SINH
 // =========================
 exports.getStudentSchedule = async (req, res) => {

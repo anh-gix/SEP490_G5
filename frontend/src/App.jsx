@@ -47,6 +47,7 @@ import StudentExamListPage from "./pages/StudentPages/StudentExamListPage.jsx";
 import ExamDetailPage from "./pages/StudentPages/ExamDetailPage.jsx";
 import ReadingExamPage from "./pages/StudentPages/ReadingExamPage.jsx";
 import ReadingResultPage from "./pages/StudentPages/ReadingResultPage.jsx";
+import TestClassEditPage from "./pages/TestClassEditPage.jsx";
 
 import { Navigate } from "react-router-dom";
 import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";
@@ -175,6 +176,9 @@ function App() {
             path="/exams/:examId/submissions/:submissionId/reading/result"
             element={<ReadingResultPage />}
           />
+
+          {/* Test Routes - No authentication required */}
+          <Route exact path="/test/class-edit" element={<TestClassEditPage />} />
 
         </Routes>
       </BrowserRouter>

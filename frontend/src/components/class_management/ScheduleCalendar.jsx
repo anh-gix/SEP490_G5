@@ -77,14 +77,32 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
     return date.toDateString() === today.toDateString();
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      scheduled: '#4CAF50',
-      completed: '#2196F3',
-      cancelled: '#f44336',
-      makeup: '#FF9800'
-    };
-    return colors[status] || '#757575';
+  const getStatusColor = (schedule) => {
+    // Ưu tiên kiểm tra timeStatus (cho EditClassModal)
+    const timeStatus = schedule.timeStatus;
+    
+    if (timeStatus === 'completed') {
+      return '#4CAF50'; // Màu xanh lá cho buổi đã kết thúc
+    } else if (timeStatus === 'upcoming') {
+      return '#757575'; // Màu xám cho buổi chưa bắt đầu
+    }
+    
+    // Nếu không có timeStatus, kiểm tra attendance status (cho Student/Teacher management)
+    const attendanceStatus = schedule.attendanceStatus;
+    
+    // Nếu đã điểm danh
+    if (attendanceStatus) {
+      if (attendanceStatus === 'present' || attendanceStatus === 'late') {
+        return '#4CAF50'; // Màu xanh lá cho đi học
+      } else if (attendanceStatus === 'absent') {
+        return '#f44336'; // Màu đỏ cho vắng mặt
+      } else if (attendanceStatus === 'excused') {
+        return '#FF9800'; // Màu cam cho có phép
+      }
+    }
+    
+    // Chưa điểm danh (chưa học) - màu xám
+    return '#757575';
   };
 
   return (
@@ -147,25 +165,97 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                   
                   {daySchedules.length > 0 && (
                     <div className="mt-1 d-flex flex-column gap-1">
-                      {daySchedules.slice(0, 3).map(schedule => (
-                        <div
-                          key={schedule.id}
-                          className="p-1 rounded"
-                          style={{ 
-                            borderLeft: `3px solid ${getStatusColor(schedule.status)}`,
-                            background: 'rgba(0,0,0,0.02)',
-                            fontSize: '10px',
-                            cursor: 'pointer'
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEditSchedule(schedule);
-                          }}
-                        >
-                          <div className="fw-bold">{schedule.startTime}</div>
-                          <div className="text-truncate">{schedule.className}</div>
-                        </div>
-                      ))}
+                      {daySchedules.slice(0, 3).map(schedule => {
+                        const attendanceStatus = schedule.attendanceStatus;
+                        const timeStatus = schedule.timeStatus;
+                        const statusColor = getStatusColor(schedule);
+                        const hasAttendance = !!attendanceStatus;
+                        
+                        // Màu nền khác nhau theo trạng thái
+                        let backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt mặc định
+                        
+                        // Ưu tiên timeStatus (cho EditClassModal)
+                        if (timeStatus === 'completed') {
+                          backgroundColor = 'rgba(76, 175, 80, 0.1)'; // Xanh lá nhạt cho buổi đã kết thúc
+                        } else if (timeStatus === 'upcoming') {
+                          backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt cho buổi chưa bắt đầu
+                        } else if (timeStatus === 'ongoing') {
+                          // Buổi đang diễn ra, kiểm tra attendance
+                          if (attendanceStatus === 'present' || attendanceStatus === 'late') {
+                            backgroundColor = 'rgba(76, 175, 80, 0.1)'; // Xanh lá nhạt cho đi học
+                          } else if (attendanceStatus === 'absent') {
+                            backgroundColor = 'rgba(244, 67, 54, 0.1)'; // Đỏ nhạt cho vắng mặt
+                          } else if (attendanceStatus === 'excused') {
+                            backgroundColor = 'rgba(255, 152, 0, 0.1)'; // Cam nhạt cho có phép
+                          }
+                        } else {
+                          // Không có timeStatus, kiểm tra attendance (cho Student/Teacher management)
+                          if (attendanceStatus === 'present' || attendanceStatus === 'late') {
+                            backgroundColor = 'rgba(76, 175, 80, 0.1)'; // Xanh lá nhạt cho đi học
+                          } else if (attendanceStatus === 'absent') {
+                            backgroundColor = 'rgba(244, 67, 54, 0.1)'; // Đỏ nhạt cho vắng mặt
+                          } else if (attendanceStatus === 'excused') {
+                            backgroundColor = 'rgba(255, 152, 0, 0.1)'; // Cam nhạt cho có phép
+                          }
+                        }
+                        
+                        // Tooltip text
+                        let tooltipText = 'Buổi chưa học';
+                        if (timeStatus === 'completed') {
+                          tooltipText = 'Buổi đã kết thúc';
+                        } else if (timeStatus === 'upcoming') {
+                          tooltipText = 'Buổi chưa bắt đầu';
+                        } else if (timeStatus === 'ongoing') {
+                          tooltipText = 'Buổi đang diễn ra';
+                        } else if (attendanceStatus === 'present') {
+                          tooltipText = 'Đã đi học';
+                        } else if (attendanceStatus === 'absent') {
+                          tooltipText = 'Vắng mặt';
+                        } else if (attendanceStatus === 'late') {
+                          tooltipText = 'Đi muộn';
+                        } else if (attendanceStatus === 'excused') {
+                          tooltipText = 'Có phép';
+                        }
+                        
+                        return (
+                          <div
+                            key={schedule.id}
+                            className="p-1 rounded"
+                            style={{ 
+                              borderLeft: `3px solid ${statusColor}`,
+                              background: backgroundColor,
+                              fontSize: '10px',
+                              cursor: 'pointer',
+                              position: 'relative'
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditSchedule(schedule);
+                            }}
+                            title={tooltipText}
+                          >
+                            <div className="fw-bold d-flex align-items-center justify-content-between">
+                              <span>{schedule.startTime}</span>
+                              {(timeStatus || hasAttendance) && (
+                                <i 
+                                  className={`fas ${
+                                    timeStatus === 'completed' ? 'fa-check-circle' :
+                                    timeStatus === 'upcoming' ? 'fa-clock' :
+                                    timeStatus === 'ongoing' ? 'fa-play-circle' :
+                                    attendanceStatus === 'present' ? 'fa-check-circle' :
+                                    attendanceStatus === 'absent' ? 'fa-times-circle' :
+                                    attendanceStatus === 'late' ? 'fa-clock' :
+                                    attendanceStatus === 'excused' ? 'fa-file-text' :
+                                    'fa-clock'
+                                  }`} 
+                                  style={{ color: statusColor, fontSize: '8px' }}
+                                ></i>
+                              )}
+                            </div>
+                            <div className="text-truncate">{schedule.className}</div>
+                          </div>
+                        );
+                      })}
                       {daySchedules.length > 3 && (
                         <div className="text-muted small">
                           +{daySchedules.length - 3} lịch khác
@@ -226,19 +316,52 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                         </div>
                         <div className="col-md-6">
                           <small className="text-muted">Trạng thái:</small>
-                          <div>
-                            <Badge 
-                              bg={
-                                schedule.status === 'scheduled' ? 'success' :
-                                schedule.status === 'completed' ? 'primary' :
-                                schedule.status === 'cancelled' ? 'danger' : 'warning'
-                              }
-                            >
-                              {schedule.status === 'scheduled' && 'Đã lên lịch'}
-                              {schedule.status === 'completed' && 'Đã hoàn thành'}
-                              {schedule.status === 'cancelled' && 'Đã hủy'}
-                              {schedule.status === 'makeup' && 'Học bù'}
-                            </Badge>
+                          <div className="d-flex gap-2 align-items-center">
+                            {schedule.timeStatus ? (
+                              // Hiển thị theo timeStatus (cho EditClassModal)
+                              <Badge 
+                                bg={
+                                  schedule.timeStatus === 'completed' ? 'success' :
+                                  schedule.timeStatus === 'upcoming' ? 'secondary' :
+                                  'info'
+                                }
+                              >
+                                <i className={`fas ${
+                                  schedule.timeStatus === 'completed' ? 'fa-check-circle' :
+                                  schedule.timeStatus === 'upcoming' ? 'fa-clock' :
+                                  'fa-play-circle'
+                                } me-1`}></i>
+                                {schedule.timeStatus === 'completed' && 'Đã kết thúc'}
+                                {schedule.timeStatus === 'upcoming' && 'Chưa bắt đầu'}
+                                {schedule.timeStatus === 'ongoing' && 'Đang diễn ra'}
+                              </Badge>
+                            ) : schedule.attendanceStatus ? (
+                              // Hiển thị theo attendanceStatus (cho Student/Teacher management)
+                              <Badge 
+                                bg={
+                                  schedule.attendanceStatus === 'present' ? 'success' :
+                                  schedule.attendanceStatus === 'absent' ? 'danger' :
+                                  schedule.attendanceStatus === 'late' ? 'warning' :
+                                  'info'
+                                }
+                              >
+                                <i className={`fas ${
+                                  schedule.attendanceStatus === 'present' ? 'fa-check-circle' :
+                                  schedule.attendanceStatus === 'absent' ? 'fa-times-circle' :
+                                  schedule.attendanceStatus === 'late' ? 'fa-clock' :
+                                  'fa-file-text'
+                                } me-1`}></i>
+                                {schedule.attendanceStatus === 'present' && 'Có mặt'}
+                                {schedule.attendanceStatus === 'absent' && 'Vắng mặt'}
+                                {schedule.attendanceStatus === 'late' && 'Đi muộn'}
+                                {schedule.attendanceStatus === 'excused' && 'Có phép'}
+                              </Badge>
+                            ) : (
+                              <Badge bg="secondary">
+                                <i className="fas fa-clock me-1"></i>
+                                Chưa điểm danh
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </div>

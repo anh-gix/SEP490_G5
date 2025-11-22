@@ -350,13 +350,29 @@ exports.getStudentSchedule = async (req, res) => {
       .sort({ date: 1, startTime: 1 })
       .lean();
     
-    // Add class date range info to each schedule
+    // Get StudentSchedule to fetch attendance data
+    const scheduleIds = schedules.map(s => s._id);
+    const studentSchedules = await StudentSchedule.find({
+      student: id,
+      classSchedule: { $in: scheduleIds }
+    }).lean();
+    
+    // Create a map of classScheduleId -> attendance
+    const attendanceMap = {};
+    studentSchedules.forEach(ss => {
+      if (ss.classSchedule) {
+        attendanceMap[ss.classSchedule.toString()] = ss.attendance;
+      }
+    });
+    
+    // Add class date range info and attendance to each schedule
     const schedulesWithClassInfo = schedules.map(schedule => {
       const classInfo = studentClasses.find(c => c._id.toString() === schedule.class._id.toString());
       return {
         ...schedule,
         classStartDate: classInfo?.startDate,
-        classEndDate: classInfo?.endDate
+        classEndDate: classInfo?.endDate,
+        attendance: attendanceMap[schedule._id.toString()] || null
       };
     });
     

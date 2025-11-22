@@ -65,11 +65,19 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
   const [selectedScheduleDetail, setSelectedScheduleDetail] = useState(null); // Selected schedule for detail modal
   const [showScheduleDetailModal, setShowScheduleDetailModal] = useState(false); // Show/hide schedule detail modal
   const [editedSchedule, setEditedSchedule] = useState(null); // Edited schedule data
+  const [showAddScheduleModal, setShowAddScheduleModal] = useState(false); // Show/hide add schedule modal
+  const [newScheduleData, setNewScheduleData] = useState({
+    day: '',
+    startTime: '08:00',
+    endTime: '10:00',
+    repeatWeekly: false
+  });
   const [savingSchedule, setSavingSchedule] = useState(false); // Loading state for saving schedule
   const [hasAttendance, setHasAttendance] = useState(false); // Check if schedule has attendance (buổi đã học)
   const [checkingAttendance, setCheckingAttendance] = useState(false); // Loading state for checking attendance
   const [showConfirmUpdateModal, setShowConfirmUpdateModal] = useState(false); // Show/hide confirm update modal
   const [updateScope, setUpdateScope] = useState('single'); // 'single' or 'future' - scope of update
+  const [schedulesAttendanceMap, setSchedulesAttendanceMap] = useState(new Map()); // Map<scheduleId, hasAttendance>
   
   // Student selection and Excel import states
   const [selectedStudents, setSelectedStudents] = useState([]); // Array of student IDs
@@ -1351,6 +1359,76 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
     return () => clearTimeout(timeoutId);
   }, [formData.id, formData._id, formData.roomId, formData.startDate, filledScheduleEntries, generatedSessions.length, fullClassData]);
 
+  // Check attendance for all schedules to determine which sessions have been taught
+  useEffect(() => {
+    const checkSchedulesAttendance = async () => {
+      const dataSource = fullClassData || classData;
+      if (!dataSource?.schedules || !Array.isArray(dataSource.schedules) || dataSource.schedules.length === 0) {
+        setSchedulesAttendanceMap(new Map());
+        return;
+      }
+
+      // Get all schedule IDs (only real schedules from database, not generated ones)
+      const scheduleIds = dataSource.schedules
+        .filter(s => s._id && !s._id.toString().startsWith('generated-'))
+        .map(s => s._id.toString());
+
+      if (scheduleIds.length === 0) {
+        setSchedulesAttendanceMap(new Map());
+        return;
+      }
+
+      // Limit to 50 schedules for performance
+      if (scheduleIds.length > 50) {
+        console.warn('Too many schedules to check attendance, skipping attendance check for performance');
+        setSchedulesAttendanceMap(new Map());
+        return;
+      }
+
+      try {
+        // Check attendance for all schedules in parallel with timeout
+        const attendanceChecks = await Promise.allSettled(
+          scheduleIds.map(async (scheduleId) => {
+            try {
+              // Add timeout to prevent hanging
+              const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Timeout')), 3000)
+              );
+              
+              const responsePromise = classScheduleService.getAttendanceByClassSchedule(scheduleId);
+              const response = await Promise.race([responsePromise, timeoutPromise]);
+              
+              const attendances = response?.list || response?.attendances || (Array.isArray(response) ? response : []) || [];
+              // Check if any student has attendance (status is not null/undefined)
+              const hasAnyAttendance = attendances.some(att => att?.attendance?.status != null);
+              return { scheduleId, hasAttendance: hasAnyAttendance };
+            } catch (error) {
+              // If error checking, assume no attendance
+              console.warn(`Warning: Could not check attendance for schedule ${scheduleId}:`, error.message);
+              return { scheduleId, hasAttendance: false };
+            }
+          })
+        );
+        
+        // Build map of scheduleId -> hasAttendance
+        const attendanceMap = new Map();
+        attendanceChecks
+          .filter(result => result.status === 'fulfilled')
+          .forEach(result => {
+            const { scheduleId, hasAttendance } = result.value;
+            attendanceMap.set(scheduleId, hasAttendance);
+          });
+        
+        setSchedulesAttendanceMap(attendanceMap);
+      } catch (error) {
+        console.error('Error checking attendance for schedules:', error);
+        setSchedulesAttendanceMap(new Map());
+      }
+    };
+
+    checkSchedulesAttendance();
+  }, [fullClassData, classData]);
+
   // Don't filter rooms - show all but mark conflicts
   // This allows users to see and select conflicted rooms with warnings
   const filteredRooms = useMemo(() => {
@@ -2419,20 +2497,51 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                       })?.name ||
                       'Chưa có';
       
+      const scheduleId = schedule._id || schedule.id || `schedule-${index}`;
+      const hasAttendance = schedulesAttendanceMap.get(String(scheduleId)) || false;
+      
+      // Check if session has ended or not started
+      const now = new Date();
+      const scheduleDateTime = new Date(date);
+      const startTime = schedule.startTime || schedule.start_time || '08:00';
+      const endTime = schedule.endTime || schedule.end_time || '10:00';
+      
+      // Parse time strings (HH:MM format)
+      const [startHour, startMinute] = startTime.split(':').map(Number);
+      const [endHour, endMinute] = endTime.split(':').map(Number);
+      
+      const sessionStartDateTime = new Date(scheduleDateTime);
+      sessionStartDateTime.setHours(startHour, startMinute, 0, 0);
+      
+      const sessionEndDateTime = new Date(scheduleDateTime);
+      sessionEndDateTime.setHours(endHour, endMinute, 0, 0);
+      
+      // Determine time status
+      let timeStatus = 'upcoming'; // 'upcoming', 'ongoing', 'completed'
+      if (now > sessionEndDateTime) {
+        timeStatus = 'completed'; // Buổi đã kết thúc
+      } else if (now >= sessionStartDateTime && now <= sessionEndDateTime) {
+        timeStatus = 'ongoing'; // Buổi đang diễn ra
+      } else {
+        timeStatus = 'upcoming'; // Buổi chưa bắt đầu
+      }
+      
       return {
-        id: schedule._id || schedule.id || `schedule-${index}`,
+        id: scheduleId,
         date: date.toISOString().split('T')[0], // Format as YYYY-MM-DD
-        startTime: schedule.startTime || schedule.start_time || '08:00',
-        endTime: schedule.endTime || schedule.end_time || '10:00',
+        startTime: startTime,
+        endTime: endTime,
         className: formData.name || 'Chưa có tên lớp',
         teacherName: teacherName,
         roomName: roomName,
         status: schedule.status || 'scheduled',
         lessonNumber: schedule.session?.order || schedule.lessonNumber || null,
-        lessonTopic: schedule.session?.title || schedule.lessonTopic || null
+        lessonTopic: schedule.session?.title || schedule.lessonTopic || null,
+        hasAttendance: hasAttendance, // Thêm property để phân biệt buổi đã học/chưa học
+        timeStatus: timeStatus // 'upcoming', 'ongoing', 'completed'
       };
     }).filter(Boolean); // Remove null entries
-  }, [fullClassData, classData, generatedSessions, formData.name, teachers, rooms]);
+  }, [fullClassData, classData, generatedSessions, formData.name, teachers, rooms, schedulesAttendanceMap]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -2774,28 +2883,47 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                 Thời khóa biểu
               </h5>
               
-              {calendarSchedules.length > 0 && (
-                <ButtonGroup>
-                  <Button
-                    className={calendarViewMode === 'month' 
-                      ? 'btn-main text-14 fw-medium px-16 py-8' 
-                      : 'btn-outline-main text-14 fw-medium px-16 py-8'}
-                    onClick={() => setCalendarViewMode('month')}
-                  >
-                    <i className="fas fa-calendar me-2"></i>
-                    Tháng
-                  </Button>
-                  <Button
-                    className={calendarViewMode === 'week' 
-                      ? 'btn-main text-14 fw-medium px-16 py-8' 
-                      : 'btn-outline-main text-14 fw-medium px-16 py-8'}
-                    onClick={() => setCalendarViewMode('week')}
-                  >
-                    <i className="fas fa-calendar-week me-2"></i>
-                    Tuần
-                  </Button>
-                </ButtonGroup>
-              )}
+              <div className="d-flex align-items-center gap-2">
+                <Button
+                  className="btn-main text-14 fw-medium px-16 py-8"
+                  onClick={() => {
+                    setShowAddScheduleModal(true);
+                    // Reset form data
+                    setNewScheduleData({
+                      day: '',
+                      startTime: '08:00',
+                      endTime: '10:00',
+                      repeatWeekly: false
+                    });
+                  }}
+                >
+                  <i className="fas fa-plus me-2"></i>
+                  Thêm buổi học
+                </Button>
+                
+                {calendarSchedules.length > 0 && (
+                  <ButtonGroup>
+                    <Button
+                      className={calendarViewMode === 'month' 
+                        ? 'btn-main text-14 fw-medium px-16 py-8' 
+                        : 'btn-outline-main text-14 fw-medium px-16 py-8'}
+                      onClick={() => setCalendarViewMode('month')}
+                    >
+                      <i className="fas fa-calendar me-2"></i>
+                      Tháng
+                    </Button>
+                    <Button
+                      className={calendarViewMode === 'week' 
+                        ? 'btn-main text-14 fw-medium px-16 py-8' 
+                        : 'btn-outline-main text-14 fw-medium px-16 py-8'}
+                      onClick={() => setCalendarViewMode('week')}
+                    >
+                      <i className="fas fa-calendar-week me-2"></i>
+                      Tuần
+                    </Button>
+                  </ButtonGroup>
+                )}
+              </div>
             </div>
             
             {calendarSchedules.length > 0 ? (
@@ -3429,7 +3557,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
               {hasAttendance && (
                 <Alert variant="warning" className="mb-0">
                   <i className="fas fa-exclamation-triangle me-2"></i>
-                  <strong>Buổi học đã diễn ra:</strong> Buổi học này đã có học sinh được điểm danh, không thể chỉnh sửa thông tin.
+  Buổi học đã diễn ra, không thể chỉnh sửa thông tin.
                 </Alert>
               )}
               <div className="row g-3">
@@ -3748,6 +3876,108 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                 Xác nhận
               </>
             )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Add Schedule Modal */}
+      <Modal 
+        show={showAddScheduleModal} 
+        onHide={() => setShowAddScheduleModal(false)} 
+        centered
+        size="md"
+      >
+        <Modal.Header closeButton className="bg-main-600 text-white border-0 p-24">
+          <Modal.Title className="fw-bold">
+            <i className="fas fa-plus me-2"></i>
+            Thêm buổi học
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-24">
+          <Form>
+            <Form.Group className="mb-16">
+              <Form.Label className="text-neutral-700 fw-medium mb-8">
+                Chọn thứ <span className="text-danger-600">*</span>
+              </Form.Label>
+              <Form.Select
+                value={newScheduleData.day}
+                onChange={(e) => setNewScheduleData({ ...newScheduleData, day: e.target.value })}
+                className="border-neutral-30 radius-8 px-16 py-10"
+                required
+              >
+                <option value="">-- Chọn thứ --</option>
+                {daysOfWeek.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+
+            <div className="row g-3 mb-16">
+              <div className="col-md-6">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">
+                    Giờ bắt đầu <span className="text-danger-600">*</span>
+                  </Form.Label>
+                  <Form.Control
+                    type="time"
+                    value={newScheduleData.startTime}
+                    onChange={(e) => setNewScheduleData({ ...newScheduleData, startTime: e.target.value })}
+                    className="border-neutral-30 radius-8 px-16 py-10"
+                    required
+                  />
+                </Form.Group>
+              </div>
+
+              <div className="col-md-6">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">
+                    Giờ kết thúc <span className="text-danger-600">*</span>
+                  </Form.Label>
+                  <Form.Control
+                    type="time"
+                    value={newScheduleData.endTime}
+                    onChange={(e) => setNewScheduleData({ ...newScheduleData, endTime: e.target.value })}
+                    className="border-neutral-30 radius-8 px-16 py-10"
+                    required
+                  />
+                </Form.Group>
+              </div>
+            </div>
+
+            <Form.Group className="mb-0">
+              <Form.Check
+                type="checkbox"
+                id="repeatWeekly"
+                label="Lặp lại vào các tuần"
+                checked={newScheduleData.repeatWeekly}
+                onChange={(e) => setNewScheduleData({ ...newScheduleData, repeatWeekly: e.target.checked })}
+                className="text-neutral-700"
+              />
+            </Form.Group>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer className="bg-neutral-25 border-0 p-20">
+          <Button
+            variant="secondary"
+            className="btn-outline-neutral-600 text-14 fw-medium px-20 py-10"
+            onClick={() => setShowAddScheduleModal(false)}
+          >
+            Hủy
+          </Button>
+          <Button
+            variant="primary"
+            className="btn-main text-14 fw-medium px-20 py-10"
+            onClick={() => {
+              // TODO: Implement save schedule functionality
+              console.log('New schedule data:', newScheduleData);
+              setShowAddScheduleModal(false);
+            }}
+            disabled={!newScheduleData.day || !newScheduleData.startTime || !newScheduleData.endTime}
+          >
+            <i className="fas fa-check me-2"></i>
+            Thêm
           </Button>
         </Modal.Footer>
       </Modal>

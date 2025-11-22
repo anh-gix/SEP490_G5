@@ -10,9 +10,6 @@ const courseSchema = new Schema({
     description: {
         type: String
     },
-    numberOfSessions: {
-        type: Number,
-    },
     program: {
         type: Schema.Types.ObjectId,
         ref: 'Program',
@@ -25,6 +22,10 @@ const courseSchema = new Schema({
     sessions: [{
         type: Schema.Types.ObjectId,
         ref: 'Session'
+    }],
+    camSessions: [{
+        type: Schema.Types.ObjectId,
+        ref: 'CamSession'
     }],
     createdBy: {
         type: Schema.Types.ObjectId,
@@ -41,16 +42,7 @@ const courseSchema = new Schema({
         type: String,
         enum: ['draft', 'pending_approval', 'approved', 'needs_revision', 'archived'],
         default: 'draft'
-    },
-    // Tài liệu cho course (mảng các URL)
-    materials: [{
-        type: String
-    }],
-    // Session nào là mocktest (theo order)
-    // VD: [5, 10] nghĩa là session order 5 và 10 là mocktest
-    mocktestSessionOrders: [{
-        type: Number
-    }]
+    }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Course', courseSchema);

@@ -44,10 +44,10 @@ import HomePageFive from "./pages/HomePageFive.jsx";
 import HomePageSix from "./pages/HomePageSix.jsx";
 
 
-import StudentExamListPage from "./pages/StudentPages/StudentExamListPage.jsx";
-import ExamDetailPage from "./pages/StudentPages/ExamDetailPage.jsx";
-import ReadingExamPage from "./pages/StudentPages/ReadingExamPage.jsx";
-import ReadingResultPage from "./pages/StudentPages/ReadingResultPage.jsx";
+import StudentExamListPage from "./pages/ExamPages/StudentExamListPage.jsx";
+import ExamDetailPage from "./pages/ExamPages/ExamDetailPage.jsx";
+import ReadingExamPage from "./pages/ExamPages/ReadingExamPage.jsx";
+import ReadingResultPage from "./pages/ExamPages/ReadingResultPage.jsx";
 
 import { Navigate } from "react-router-dom";
 import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";
@@ -56,6 +56,7 @@ import Profile from "./pages/Profile.jsx";
 import { teacherRoutes } from "./routes/TeacherRoutes.jsx";
 import { studentRoutes } from "./routes/StudentRoutes.jsx";
 import { ministryRoutes } from "./routes/MinistryRoutes.jsx";
+import { examRoutes } from "./routes/ExamRoutes.jsx";
 function App() {
   return (
     <AuthProvider>
@@ -89,7 +90,9 @@ function App() {
 
           {/* Dashboard */}
           {/* <Route path="/" element={<Dashboard />} /> */}
-
+          {examRoutes.map((route, index) => (
+            <Route key={`exam-${index}`} path={route.path} element={route.element} />
+          ))}
 
 
           {/* Redirect unknown routes to dashboard */}

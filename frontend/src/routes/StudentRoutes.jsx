@@ -1,14 +1,4 @@
-import StudentExamListPage from "../pages/StudentPages/StudentExamListPage.jsx";
-import ExamDetailPage from "../pages/StudentPages/ExamDetailPage.jsx";
-import ReadingExamPage from "../pages/StudentPages/ReadingExamPage.jsx";
-import ReadingResultPage from "../pages/StudentPages/ReadingResultPage.jsx";
-import ListeningExamPage from "../pages/ListeningExamPage.jsx";
-import ListeningResultPage from "../pages/ListeningResultPage.jsx";
-import WritingExamPage from "../pages/WritingExamPage.jsx";
-import WritingResultPage from "../pages/WritingResultPage.jsx";
-import SpeakingExamPage from "../pages/SpeakingExamPage.jsx";
-import SpeakingResultPage from "../pages/SpeakingResultPage.jsx";
-//routes phía trên là cho phần thi
+
 import StudentDashboardPage from "../pages/StudentPages/StudentDashboardPage.jsx";
 import StudentSchedulePage from "../pages/StudentPages/StudentSchedulePage.jsx";
 import StudentCoursesPage from "../pages/StudentPages/StudentCoursesPage.jsx";
@@ -59,14 +49,5 @@ export const studentRoutes = [
   // VII. Leave Request (future)
   // { path: '/student/leave-request', element: <StudentLeaveRequestPage /> },
 
-  { path: '/exams', element: <StudentExamListPage /> },
-  { path: '/exams/:id', element: <ExamDetailPage /> },
-  { path: '/exams/:examId/submissions/:submissionId/reading', element: <ReadingExamPage /> },
-  { path: '/exams/:examId/submissions/:submissionId/reading/result', element: <ReadingResultPage /> },
-  { path: '/exams/:examId/submissions/:submissionId/listening', element: <ListeningExamPage /> },
-  { path: '/exams/:examId/submissions/:submissionId/listening/result', element: <ListeningResultPage /> },
-  { path: '/exams/:examId/submissions/:submissionId/writing', element: <WritingExamPage /> },
-  { path: '/exams/:examId/submissions/:submissionId/writing/result', element: <WritingResultPage /> },
-  { path: '/exams/:examId/submissions/:submissionId/speaking', element: <SpeakingExamPage /> },
-  { path: '/exams/:examId/submissions/:submissionId/speaking/result', element: <SpeakingResultPage /> },
+ 
 ];

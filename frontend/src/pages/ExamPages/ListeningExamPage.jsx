@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import Breadcrumb from "../components/Breadcrumb";
-import FooterOne from "../components/FooterOne";
-import HeaderOne from "../components/HomePageforStudent/HeaderOne";
-import Animation from "../helper/Animation";
-import Preloader from "../helper/Preloader";
-import { examService } from "../services/examService";
-import { useAuth } from "../contexts/AuthContext";
+import Breadcrumb from "../../components/Breadcrumb";
+import FooterOne from "../../components/FooterOne";
+import HeaderOne from "../../components/HomePageforStudent/HeaderOne";
+import Animation from "../../helper/Animation";
+import Preloader from "../../helper/Preloader";
+import { examService } from "../../services/examService";
+import { useAuth } from "../../contexts/AuthContext";
 
 const ListeningExamPage = () => {
   const { examId, submissionId } = useParams();

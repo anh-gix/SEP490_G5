@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import Breadcrumb from "../components/Breadcrumb";
-import FooterOne from "../components/FooterOne";
-import HeaderOne from "../components/HomePageforStudent/HeaderOne";
-import Animation from "../helper/Animation";
-import Preloader from "../helper/Preloader";
-import { examService } from "../services/examService";
-import { useAuth } from "../contexts/AuthContext";
+import Breadcrumb from "../../components/Breadcrumb";
+import FooterOne from "../../components/FooterOne";
+import HeaderOne from "../../components/HomePageforStudent/HeaderOne";
+import Animation from "../../helper/Animation";
+import Preloader from "../../helper/Preloader";
+import { examService } from "../../services/examService";
+import { useAuth } from "../../contexts/AuthContext";
 
 const WritingResultPage = () => {
   const { examId, submissionId } = useParams();

@@ -435,7 +435,7 @@ exports.createClass = async (req, res) => {
                 studentSchedules.push({
                   student: studentId,
                   classSchedule: schedule._id,
-                  attendance: { status: 'absent' }
+                  // Không set attendance - để null cho đến khi giáo viên điểm danh
                 });
               });
             });
@@ -882,7 +882,7 @@ exports.updateClass = async (req, res) => {
                   studentSchedules.push({
                     student: studentId,
                     classSchedule: schedule._id,
-                    attendance: { status: 'absent' }
+                    // Không set attendance - để null cho đến khi giáo viên điểm danh
                   });
                 });
               });
@@ -1051,7 +1051,7 @@ exports.updateClass = async (req, res) => {
                 studentSchedules.push({
                   student: studentId,
                   classSchedule: schedule._id,
-                  attendance: { status: 'absent' }
+                  // Không set attendance - để null cho đến khi giáo viên điểm danh
                 });
               });
             });
@@ -1174,6 +1174,562 @@ exports.deleteClass = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Lỗi khi xóa lớp học',
+      error: error.message
+    });
+  }
+};
+
+// =========================
+// 🔍 KIỂM TRA XUNG ĐỘT HỌC SINH KHI CHỈNH SỬA LỚP
+// =========================
+exports.checkStudentConflicts = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { students, scheduleEntries, startDate, endDate } = req.body;
+
+    if (!students || !Array.isArray(students) || students.length === 0) {
+      return res.status(200).json({
+        success: true,
+        conflicts: []
+      });
+    }
+
+    // Get current class data
+    const classData = await Class.findById(id).lean();
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy lớp học'
+      });
+    }
+
+    // Get course to determine numberOfSessions
+    const courseData = await Course.findById(classData.course || req.body.course)
+      .populate('sessions', 'order')
+      .select('numberOfSessions sessions')
+      .lean();
+
+    if (!courseData || !courseData.numberOfSessions) {
+      return res.status(200).json({
+        success: true,
+        conflicts: []
+      });
+    }
+
+    const numberOfSessions = courseData.numberOfSessions;
+    const conflicts = [];
+
+    // Generate sessions from scheduleEntries if provided
+    let generatedSessions = [];
+    if (scheduleEntries && scheduleEntries.length > 0 && startDate) {
+      const getDayOfWeekNumber = (dayStr) => {
+        const dayMap = { 'CN': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6 };
+        return dayMap[dayStr] !== undefined ? dayMap[dayStr] : null;
+      };
+
+      const findNextDayOfWeek = (startDate, targetDayOfWeek) => {
+        const start = new Date(startDate);
+        const currentDay = start.getDay();
+        let daysToAdd = (targetDayOfWeek - currentDay + 7) % 7;
+        if (daysToAdd === 0 && start.getTime() < new Date().getTime()) {
+          daysToAdd = 7;
+        }
+        const result = new Date(start);
+        result.setDate(start.getDate() + daysToAdd);
+        return result;
+      };
+
+      const firstOccurrences = {};
+      scheduleEntries.forEach(entry => {
+        const dayOfWeek = getDayOfWeekNumber(entry.day);
+        if (dayOfWeek !== null && !firstOccurrences[dayOfWeek]) {
+          firstOccurrences[dayOfWeek] = findNextDayOfWeek(startDate, dayOfWeek);
+        }
+      });
+
+      let entryIndex = 0;
+      let weekOffset = 0;
+
+      for (let i = 0; i < numberOfSessions; i++) {
+        const entry = scheduleEntries[entryIndex % scheduleEntries.length];
+        const dayOfWeek = getDayOfWeekNumber(entry.day);
+
+        if (dayOfWeek === null) {
+          entryIndex++;
+          continue;
+        }
+
+        const firstOccurrence = firstOccurrences[dayOfWeek];
+        const sessionDate = new Date(firstOccurrence);
+        sessionDate.setDate(firstOccurrence.getDate() + (weekOffset * 7));
+
+        generatedSessions.push({
+          date: sessionDate.toISOString().split('T')[0],
+          startTime: entry.startTime,
+          endTime: entry.endTime
+        });
+
+        entryIndex++;
+        if (entryIndex % scheduleEntries.length === 0) {
+          weekOffset++;
+        }
+      }
+    } else {
+      // Use existing schedules from database
+      const existingSchedules = await ClassSchedule.find({ class: id })
+        .select('date startTime endTime')
+        .sort({ date: 1 })
+        .lean();
+
+      generatedSessions = existingSchedules
+        .filter(s => s.date && s.startTime && s.endTime)
+        .map(s => ({
+          date: new Date(s.date).toISOString().split('T')[0],
+          startTime: s.startTime,
+          endTime: s.endTime
+        }));
+    }
+
+    if (generatedSessions.length === 0) {
+      return res.status(200).json({
+        success: true,
+        conflicts: []
+      });
+    }
+
+    // Get date range
+    const dates = generatedSessions.map(s => new Date(s.date)).sort((a, b) => a - b);
+    const minDate = dates[0];
+    const maxDate = dates[dates.length - 1];
+
+    // Check conflicts for each student
+    for (const studentId of students) {
+      // Get all classes where student is enrolled (excluding current class)
+      const studentClasses = await Class.find({
+        students: studentId,
+        _id: { $ne: id }
+      }).select('_id name').lean();
+
+      if (studentClasses.length === 0) continue;
+
+      const classIds = studentClasses.map(cls => cls._id);
+
+      // Get student's schedules in date range
+      const studentSchedules = await ClassSchedule.find({
+        class: { $in: classIds },
+        date: {
+          $gte: minDate,
+          $lte: maxDate
+        },
+        status: { $in: ['temporary', 'fixed'] }
+      })
+        .populate('class', 'name')
+        .select('date startTime endTime class')
+        .lean();
+
+      // Check for conflicts
+      generatedSessions.forEach(newSession => {
+        const newDate = new Date(newSession.date);
+        const newStart = newSession.startTime;
+        const newEnd = newSession.endTime;
+
+        studentSchedules.forEach(studentSchedule => {
+          const studentDate = new Date(studentSchedule.date);
+          const studentDateStr = studentDate.toISOString().split('T')[0];
+          const newDateStr = newDate.toISOString().split('T')[0];
+
+          // Check if same date
+          if (studentDateStr !== newDateStr) return;
+
+          // Check time overlap
+          const hasOverlap = newStart < studentSchedule.endTime && newEnd > studentSchedule.startTime;
+
+          if (hasOverlap) {
+            conflicts.push({
+              studentId: studentId.toString(),
+              className: studentSchedule.class?.name || 'N/A',
+              date: studentDateStr,
+              time: `${studentSchedule.startTime} - ${studentSchedule.endTime}`,
+              newClassTime: `${newStart} - ${newEnd}`
+            });
+          }
+        });
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      conflicts: conflicts,
+      conflictCount: conflicts.length,
+      studentCount: new Set(conflicts.map(c => c.studentId)).size
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi kiểm tra xung đột học sinh',
+      error: error.message
+    });
+  }
+};
+
+// =========================
+// 🔍 KIỂM TRA XUNG ĐỘT GIÁO VIÊN VÀ PHÒNG HỌC KHI CHỈNH SỬA LỚP
+// =========================
+exports.checkTeacherRoomConflicts = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { teacherId, roomId, scheduleEntries, startDate, endDate } = req.body;
+
+    // Get current class data
+    const classData = await Class.findById(id).lean();
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy lớp học'
+      });
+    }
+
+    // Use provided teacherId/roomId or fallback to class data
+    const finalTeacherId = teacherId || classData.teacher;
+    const finalRoomId = roomId || classData.room;
+
+    // Get course to determine numberOfSessions
+    const courseData = await Course.findById(classData.course || req.body.course)
+      .populate('sessions', 'order')
+      .select('numberOfSessions sessions')
+      .lean();
+
+    if (!courseData || !courseData.numberOfSessions) {
+      return res.status(200).json({
+        success: true,
+        teacherConflicts: [],
+        roomConflicts: [],
+        conflictingTeacherIds: [],
+        conflictingRoomIds: []
+      });
+    }
+
+    const numberOfSessions = courseData.numberOfSessions;
+    const teacherConflicts = [];
+    const roomConflicts = [];
+
+    // Generate sessions from scheduleEntries if provided
+    let generatedSessions = [];
+    if (scheduleEntries && scheduleEntries.length > 0 && startDate) {
+      const getDayOfWeekNumber = (dayStr) => {
+        const dayMap = { 'CN': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6 };
+        return dayMap[dayStr] !== undefined ? dayMap[dayStr] : null;
+      };
+
+      const findNextDayOfWeek = (startDate, targetDayOfWeek) => {
+        const start = new Date(startDate);
+        const currentDay = start.getDay();
+        let daysToAdd = (targetDayOfWeek - currentDay + 7) % 7;
+        if (daysToAdd === 0 && start.getTime() < new Date().getTime()) {
+          daysToAdd = 7;
+        }
+        const result = new Date(start);
+        result.setDate(start.getDate() + daysToAdd);
+        return result;
+      };
+
+      const firstOccurrences = {};
+      scheduleEntries.forEach(entry => {
+        const dayOfWeek = getDayOfWeekNumber(entry.day);
+        if (dayOfWeek !== null && !firstOccurrences[dayOfWeek]) {
+          firstOccurrences[dayOfWeek] = findNextDayOfWeek(startDate, dayOfWeek);
+        }
+      });
+
+      let entryIndex = 0;
+      let weekOffset = 0;
+
+      for (let i = 0; i < numberOfSessions; i++) {
+        const entry = scheduleEntries[entryIndex % scheduleEntries.length];
+        const dayOfWeek = getDayOfWeekNumber(entry.day);
+
+        if (dayOfWeek === null) {
+          entryIndex++;
+          continue;
+        }
+
+        const firstOccurrence = firstOccurrences[dayOfWeek];
+        const sessionDate = new Date(firstOccurrence);
+        sessionDate.setDate(firstOccurrence.getDate() + (weekOffset * 7));
+
+        generatedSessions.push({
+          date: sessionDate.toISOString().split('T')[0],
+          startTime: entry.startTime,
+          endTime: entry.endTime
+        });
+
+        entryIndex++;
+        if (entryIndex % scheduleEntries.length === 0) {
+          weekOffset++;
+        }
+      }
+    } else {
+      // Use existing schedules from database
+      const existingSchedules = await ClassSchedule.find({ class: id })
+        .select('date startTime endTime')
+        .sort({ date: 1 })
+        .lean();
+
+      // Helper function to format date to YYYY-MM-DD using local timezone (not UTC)
+      const formatDateLocal = (dateInput) => {
+        if (!dateInput) return null;
+        const date = new Date(dateInput);
+        if (isNaN(date.getTime())) return null;
+        
+        // Use local timezone, not UTC
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      generatedSessions = existingSchedules
+        .filter(s => s.date && s.startTime && s.endTime)
+        .map(s => ({
+          date: formatDateLocal(s.date),
+          startTime: s.startTime,
+          endTime: s.endTime
+        }))
+        .filter(s => s.date); // Remove invalid dates
+    }
+
+    if (generatedSessions.length === 0) {
+      return res.status(200).json({
+        success: true,
+        teacherConflicts: [],
+        roomConflicts: [],
+        conflictingTeacherIds: [],
+        conflictingRoomIds: []
+      });
+    }
+
+    // Get date range (use Date objects for comparison, but format for display)
+    const dates = generatedSessions
+      .map(s => {
+        // Parse date string back to Date object for comparison
+        const dateParts = s.date.split('-');
+        if (dateParts.length === 3) {
+          return new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+        }
+        return new Date(s.date);
+      })
+      .filter(d => !isNaN(d.getTime()))
+      .sort((a, b) => a - b);
+    
+    if (dates.length === 0) {
+      return res.status(200).json({
+        success: true,
+        teacherConflicts: [],
+        roomConflicts: [],
+        conflictingTeacherIds: [],
+        conflictingRoomIds: []
+      });
+    }
+    
+    const minDate = dates[0];
+    const maxDate = dates[dates.length - 1];
+
+    // Check teacher conflicts if teacherId is provided
+    if (finalTeacherId) {
+      // Get all classes where teacher is assigned (excluding current class)
+      const teacherClasses = await Class.find({
+        teacher: finalTeacherId,
+        _id: { $ne: id }
+      }).select('_id name').lean();
+
+      if (teacherClasses.length > 0) {
+        const classIds = teacherClasses.map(cls => cls._id);
+
+        // Get teacher's schedules in date range
+        const teacherSchedules = await ClassSchedule.find({
+          class: { $in: classIds },
+          date: {
+            $gte: minDate,
+            $lte: maxDate
+          },
+          status: { $in: ['temporary', 'fixed'] }
+        })
+          .populate('class', 'name')
+          .select('_id date startTime endTime class')
+          .lean();
+
+        // Get schedule IDs to check attendance
+        const teacherScheduleIds = teacherSchedules.map(s => s._id);
+        
+        // Check which schedules have attendance (already taught)
+        const schedulesWithAttendance = await StudentSchedule.find({
+          classSchedule: { $in: teacherScheduleIds },
+          'attendance.status': { $exists: true, $ne: null }
+        })
+          .select('classSchedule')
+          .lean();
+        
+        const scheduleIdsWithAttendance = new Set(
+          schedulesWithAttendance.map(s => s.classSchedule.toString())
+        );
+
+        // Helper function to format date to YYYY-MM-DD using local timezone (not UTC)
+        const formatDateLocal = (dateInput) => {
+          if (!dateInput) return null;
+          const date = new Date(dateInput);
+          if (isNaN(date.getTime())) return null;
+          
+          // Use local timezone, not UTC
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+
+        // Check for conflicts (exclude schedules that already have attendance)
+        generatedSessions.forEach(newSession => {
+          const newDate = new Date(newSession.date);
+          const newStart = newSession.startTime;
+          const newEnd = newSession.endTime;
+          
+          // Format date using local timezone
+          const newDateStr = formatDateLocal(newDate);
+
+          teacherSchedules.forEach(teacherSchedule => {
+            // Skip if this schedule already has attendance (already taught)
+            const scheduleIdStr = teacherSchedule._id.toString();
+            if (scheduleIdsWithAttendance.has(scheduleIdStr)) {
+              return; // Skip schedules that already have attendance
+            }
+
+            const teacherDate = new Date(teacherSchedule.date);
+            // Format date using local timezone
+            const teacherDateStr = formatDateLocal(teacherDate);
+
+            // Check if same date
+            if (!teacherDateStr || !newDateStr || teacherDateStr !== newDateStr) return;
+
+            // Check time overlap
+            const hasOverlap = newStart < teacherSchedule.endTime && newEnd > teacherSchedule.startTime;
+
+            if (hasOverlap) {
+              teacherConflicts.push({
+                teacherId: finalTeacherId.toString(),
+                className: teacherSchedule.class?.name || 'N/A',
+                date: teacherDateStr, // Already formatted with local timezone
+                time: `${teacherSchedule.startTime} - ${teacherSchedule.endTime}`,
+                conflictingClassTime: `${newStart} - ${newEnd}`
+              });
+            }
+          });
+        });
+      }
+    }
+
+    // Check room conflicts if roomId is provided
+    if (finalRoomId) {
+      // Get all schedules using this room (excluding current class)
+      const roomSchedules = await ClassSchedule.find({
+        room: finalRoomId,
+        class: { $ne: id },
+        date: {
+          $gte: minDate,
+          $lte: maxDate
+        },
+        status: { $in: ['temporary', 'fixed'] }
+      })
+        .populate('class', 'name')
+        .select('_id date startTime endTime class')
+        .lean();
+
+      // Get schedule IDs to check attendance
+      const roomScheduleIds = roomSchedules.map(s => s._id);
+      
+      // Check which schedules have attendance (already taught)
+      const roomSchedulesWithAttendance = await StudentSchedule.find({
+        classSchedule: { $in: roomScheduleIds },
+        'attendance.status': { $exists: true, $ne: null }
+      })
+        .select('classSchedule')
+        .lean();
+      
+      const roomScheduleIdsWithAttendance = new Set(
+        roomSchedulesWithAttendance.map(s => s.classSchedule.toString())
+      );
+
+      // Helper function to format date to YYYY-MM-DD using local timezone (not UTC)
+      const formatDateLocal = (dateInput) => {
+        if (!dateInput) return null;
+        const date = new Date(dateInput);
+        if (isNaN(date.getTime())) return null;
+        
+        // Use local timezone, not UTC
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      // Check for conflicts (exclude schedules that already have attendance)
+      generatedSessions.forEach(newSession => {
+        const newDate = new Date(newSession.date);
+        const newStart = newSession.startTime;
+        const newEnd = newSession.endTime;
+        
+        // Format date using local timezone
+        const newDateStr = formatDateLocal(newDate);
+
+        roomSchedules.forEach(roomSchedule => {
+          // Skip if this schedule already has attendance (already taught)
+          const scheduleIdStr = roomSchedule._id.toString();
+          if (roomScheduleIdsWithAttendance.has(scheduleIdStr)) {
+            return; // Skip schedules that already have attendance
+          }
+
+          const roomDate = new Date(roomSchedule.date);
+          // Format date using local timezone
+          const roomDateStr = formatDateLocal(roomDate);
+
+          // Check if same date
+          if (!roomDateStr || !newDateStr || roomDateStr !== newDateStr) return;
+
+          // Check time overlap
+          const hasOverlap = newStart < roomSchedule.endTime && newEnd > roomSchedule.startTime;
+
+          if (hasOverlap) {
+            roomConflicts.push({
+              roomId: finalRoomId.toString(),
+              className: roomSchedule.class?.name || 'N/A',
+              date: roomDateStr,
+              time: `${roomSchedule.startTime} - ${roomSchedule.endTime}`,
+              conflictingClassTime: `${newStart} - ${newEnd}`
+            });
+          }
+        });
+      });
+    }
+
+    // Extract unique IDs for filtering
+    const conflictingTeacherIds = finalTeacherId && teacherConflicts.length > 0 
+      ? [finalTeacherId.toString()] 
+      : [];
+    const conflictingRoomIds = finalRoomId && roomConflicts.length > 0 
+      ? [finalRoomId.toString()] 
+      : [];
+
+    res.status(200).json({
+      success: true,
+      teacherConflicts: teacherConflicts,
+      roomConflicts: roomConflicts,
+      conflictingTeacherIds: conflictingTeacherIds,
+      conflictingRoomIds: conflictingRoomIds,
+      teacherConflictCount: teacherConflicts.length,
+      roomConflictCount: roomConflicts.length
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi kiểm tra xung đột giáo viên và phòng học',
       error: error.message
     });
   }

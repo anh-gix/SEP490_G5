@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Modal, Button, Form, Alert } from 'react-bootstrap';
+import { Modal, Button, Form, Alert, ButtonGroup } from 'react-bootstrap';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import classService from '../../services/classService';
@@ -7,7 +7,10 @@ import teacherService from '../../services/teacherService';
 import roomService from '../../services/roomService';
 import scheduleService from '../../services/scheduleService';
 import studentService from '../../services/studentService';
+import classScheduleService from '../../services/classScheduleService';
 import SelectStudentModal from './SelectStudentModal';
+import ScheduleCalendar from './ScheduleCalendar';
+import ScheduleWeekly from './ScheduleWeekly';
 
 const createEmptyScheduleEntry = () => ({
   id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -40,10 +43,14 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
   const [teachers, setTeachers] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [dateError, setDateError] = useState('');
-  const [teacherSchedules, setTeacherSchedules] = useState({}); // Map teacherId -> schedules
-  const [studentSchedules, setStudentSchedules] = useState({}); // Map studentId -> schedules
-  const [studentSchedulesLoading, setStudentSchedulesLoading] = useState(false); // Loading state for student schedules
-  const [existingSchedules, setExistingSchedules] = useState([]);
+  // Teacher and room conflict checking states (from backend)
+  const [teacherRoomConflicts, setTeacherRoomConflicts] = useState({
+    teacherConflicts: [],
+    roomConflicts: [],
+    conflictingTeacherIds: [],
+    conflictingRoomIds: []
+  });
+  const [checkingTeacherRoomConflicts, setCheckingTeacherRoomConflicts] = useState(false);
   const [roomLoading, setRoomLoading] = useState(false);
   const [roomError, setRoomError] = useState(null);
   const [scheduleEntriesError, setScheduleEntriesError] = useState(null);
@@ -54,6 +61,15 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
   const [availableLevels, setAvailableLevels] = useState([]); // Levels for dropdown
   const [courses, setCourses] = useState([]); // Courses for dropdown
   const [coursesLoading, setCoursesLoading] = useState(false); // Loading state for courses
+  const [calendarViewMode, setCalendarViewMode] = useState('month'); // 'month' or 'week'
+  const [selectedScheduleDetail, setSelectedScheduleDetail] = useState(null); // Selected schedule for detail modal
+  const [showScheduleDetailModal, setShowScheduleDetailModal] = useState(false); // Show/hide schedule detail modal
+  const [editedSchedule, setEditedSchedule] = useState(null); // Edited schedule data
+  const [savingSchedule, setSavingSchedule] = useState(false); // Loading state for saving schedule
+  const [hasAttendance, setHasAttendance] = useState(false); // Check if schedule has attendance (buổi đã học)
+  const [checkingAttendance, setCheckingAttendance] = useState(false); // Loading state for checking attendance
+  const [showConfirmUpdateModal, setShowConfirmUpdateModal] = useState(false); // Show/hide confirm update modal
+  const [updateScope, setUpdateScope] = useState('single'); // 'single' or 'future' - scope of update
   
   // Student selection and Excel import states
   const [selectedStudents, setSelectedStudents] = useState([]); // Array of student IDs
@@ -66,6 +82,11 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
   const [studentsError, setStudentsError] = useState(null);
   const [capacityWarning, setCapacityWarning] = useState(null);
   const fileInputRef = useRef(null);
+  
+  // Student conflict checking states
+  const [studentSchedules, setStudentSchedules] = useState({}); // Map<studentId, schedules[]>
+  const [studentConflicts, setStudentConflicts] = useState(new Map()); // Map<studentId, conflictDetails[]>
+  const [checkingStudentConflicts, setCheckingStudentConflicts] = useState(false);
   
   // Track previous program and level to detect actual changes
   const prevProgramRef = useRef(null);
@@ -85,12 +106,28 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
         setLoadingClassData(true);
         const response = await classService.getClassById(classId);
         
+        // Handle different response formats
+        let classDataWithSchedules = null;
         if (response && response.success && response.class) {
-          setFullClassData(response.class);
+          classDataWithSchedules = response.class;
+        } else if (response && response.data) {
+          classDataWithSchedules = response.data;
+        } else if (response && response.class) {
+          classDataWithSchedules = response.class;
         } else {
-          setFullClassData(classData); // Fallback to classData prop
+          classDataWithSchedules = classData; // Fallback to classData prop
+        }
+        
+        setFullClassData(classDataWithSchedules);
+        
+        // Debug log to check if schedules are present
+        if (classDataWithSchedules && classDataWithSchedules.schedules) {
+          console.log('✅ Full class data loaded with schedules:', classDataWithSchedules.schedules.length);
+        } else {
+          console.log('⚠️ Full class data loaded but no schedules found');
         }
       } catch (error) {
+        console.error('Error fetching full class data:', error);
         setFullClassData(classData); // Fallback to classData prop on error
       } finally {
         setLoadingClassData(false);
@@ -419,35 +456,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
     fetchRooms();
   }, []);
 
-  // Fetch existing schedules for conflict checking
-  useEffect(() => {
-    const fetchExistingSchedules = async () => {
-      try {
-        setRoomLoading(true);
-        setRoomError(null);
-        const response = await scheduleService.getAllSchedules();
-        
-        if (response) {
-          const fetched =
-            Array.isArray(response.schedules) && response.schedules.length > 0
-              ? response.schedules
-              : Array.isArray(response.data) && response.data.length > 0
-                ? response.data
-                : null;
-          
-          if (fetched) {
-            setExistingSchedules(fetched);
-          }
-        }
-      } catch (error) {
-        setExistingSchedules([]);
-      } finally {
-        setRoomLoading(false);
-      }
-    };
-
-    fetchExistingSchedules();
-  }, []);
 
   // Helper functions for conflict checking (same as CreateClassModal)
   // These must be defined before useMemo hooks that use them
@@ -608,537 +616,956 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
     return [];
   }, [formData.startDate, filledScheduleEntries, selectedCourse?.numberOfSessions, fullClassData?.schedules, classData?.schedules]);
 
-  // Check for room conflicts
-  const conflictingRoomIds = useMemo(() => {
-    if (!generatedSessions.length || !existingSchedules.length) {
-      return new Set();
-    }
-
-    const conflicts = new Set();
-    const currentClassId = formData.id || formData._id;
-
-    // Check each generated session against existing schedules
-    generatedSessions.forEach((session) => {
-      const sessionDate = session.date;
-      const sessionStart = parseTime(session.startTime);
-      const sessionEnd = parseTime(session.endTime);
-
-      existingSchedules.forEach((schedule) => {
-        // Skip schedules from the current class being edited
-        const scheduleClassId = schedule.class?._id?.toString() || 
-                               schedule.classId?.toString() || 
-                               schedule.class?.id?.toString();
-        if (scheduleClassId && currentClassId && String(scheduleClassId) === String(currentClassId)) {
-          return; // Skip current class schedules
-        }
-
-        // API populate room với _id và room_name
-        const scheduleRoomId =
-          schedule.room?._id?.toString() ||
-          schedule.roomId ||
-          schedule.roomID ||
-          schedule.room?.id ||
-          schedule.room?.id?.toString();
-        const scheduleRoomName = 
-          schedule.room?.room_name ||
-          schedule.roomName || 
-          schedule.room?.name;
-
-        if (!scheduleRoomId && !scheduleRoomName) {
-          return;
-        }
-
-        // Get schedule date
-        const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
-        if (!scheduleDate) {
-          return;
-        }
-
-        // Format schedule date to YYYY-MM-DD for comparison
-        const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
-
-        // Check if dates match
-        if (scheduleDateStr !== sessionDate) {
-          return;
-        }
-
-        const scheduleStart = parseTime(
-          schedule.startTime ||
-            schedule.start_time ||
-            schedule.time?.start ||
-            schedule.startHour
-        );
-
-        const scheduleEnd = parseTime(
-          schedule.endTime ||
-            schedule.end_time ||
-            schedule.time?.end ||
-            schedule.endHour
-        );
-
-        // Check if times overlap
-        const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
-
-        // Conflict if same date and overlapping time
-        if (hasTimeConflict) {
-          if (scheduleRoomId) {
-            conflicts.add(String(scheduleRoomId));
-          }
-          if (scheduleRoomName) {
-            conflicts.add(scheduleRoomName);
-          }
-        }
-      });
-    });
-
-    return conflicts;
-  }, [generatedSessions, existingSchedules, formData.id, formData._id]);
-
-  // Fetch teacher schedules - need to get all schedules for conflict checking
+  // Log teacher schedule and compare with current class schedule when teacher is selected
   useEffect(() => {
-    const fetchTeacherSchedules = async () => {
-      if (!teachers.length || !generatedSessions.length) {
+    const logAndCompareSchedules = async () => {
+      const teacherId = formData.teacherId || (fullClassData?.teacher?._id || fullClassData?.teacher?.id);
+      const classId = formData.id || formData._id;
+      
+      // Clear teacher conflicts immediately when teacher changes (before checking new teacher)
+      setTeacherRoomConflicts(prev => ({
+        ...prev,
+        teacherConflicts: [],
+        conflictingTeacherIds: []
+      }));
+
+      if (!teacherId || !classId) {
         return;
       }
 
-      const schedulesMap = {};
-      const currentClassId = formData.id || formData._id;
-      
-      // Get date range from generated sessions
-      if (generatedSessions.length === 0) return;
-      
-      const sessionDates = generatedSessions.map(s => s.date).sort();
-      const minDate = sessionDates[0];
-      const maxDate = sessionDates[sessionDates.length - 1];
-      
-      // Fetch schedules for each teacher
-      await Promise.all(
-        teachers.map(async (teacher) => {
-          const teacherId = teacher._id || teacher.id;
-          if (!teacherId) return;
+      try {
+        // Get date range from generated sessions if available
+        let params = {};
+        if (generatedSessions.length > 0) {
+          const sessionDates = generatedSessions.map(s => s.date).sort();
+          params = {
+            startDate: sessionDates[0],
+            endDate: sessionDates[sessionDates.length - 1]
+          };
+        }
 
-          try {
-            const response = await teacherService.getTeacherSchedule(teacherId, {
-              startDate: minDate,
-              endDate: maxDate
-            });
+        // Get teacher schedule
+        const teacherResponse = await teacherService.getTeacherSchedule(teacherId, params);
+        
+        // Helper function to format date to YYYY-MM-DD using local timezone (not UTC)
+        const formatDateLocal = (dateInput) => {
+          if (!dateInput) return null;
+          const date = new Date(dateInput);
+          if (isNaN(date.getTime())) return null;
+          
+          // Use local timezone, not UTC
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+
+        // Get current class schedules
+        const classSchedules = fullClassData?.schedules || [];
+        const currentClassSchedules = classSchedules
+          .filter(s => s.date && s.startTime && s.endTime)
+          .map(s => {
+            const scheduleDate = s.date || s.scheduleDate || s.classDate;
+            return {
+              date: formatDateLocal(scheduleDate),
+              startTime: s.startTime || s.start_time,
+              endTime: s.endTime || s.end_time,
+              className: fullClassData?.name || 'Lớp hiện tại',
+              room: s.room?.room_name || s.room?.name || 'N/A',
+              status: s.status || 'fixed'
+            };
+          })
+          .filter(s => s.date); // Remove invalid dates
+
+        // Log teacher schedule
+        if (teacherResponse && teacherResponse.schedules) {
+          // Helper function to format date to YYYY-MM-DD using local timezone (not UTC)
+          const formatDateLocal = (dateInput) => {
+            if (!dateInput) return null;
+            const date = new Date(dateInput);
+            if (isNaN(date.getTime())) return null;
             
-            if (response && response.schedules) {
-              // Filter out schedules from current class
-              const filteredSchedules = response.schedules.filter(schedule => {
-                const scheduleClassId = schedule.class?._id?.toString() || 
-                                       schedule.classId?.toString() || 
-                                       schedule.class?.id?.toString();
-                return !(scheduleClassId && currentClassId && String(scheduleClassId) === String(currentClassId));
+            // Use local timezone, not UTC
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          };
+
+          // Get class IDs from teacher schedules to filter out current class
+          const teacherSchedules = teacherResponse.schedules.map(schedule => {
+            // Try to get classId from various possible fields
+            const scheduleClassId = schedule.class?._id?.toString() || 
+                                   schedule.classId?.toString() || 
+                                   schedule.class?.id?.toString() ||
+                                   schedule._id?.toString(); // Fallback to schedule ID if class info not available
+            
+            return {
+              date: formatDateLocal(schedule.date),
+              startTime: schedule.startTime,
+              endTime: schedule.endTime,
+              className: schedule.className || schedule.class?.name || 'N/A',
+              classId: scheduleClassId,
+              room: schedule.room?.room_name || schedule.room?.name || 'N/A',
+              status: schedule.status,
+              _id: schedule._id
+            };
+          }).filter(s => s.date);
+
+          console.log('📅 Lịch dạy hiện tại của giáo viên được chọn:', {
+            teacherId: teacherId,
+            totalSchedules: teacherSchedules.length,
+            schedules: teacherSchedules.map(s => ({
+              date: s.date,
+              startTime: s.startTime,
+              endTime: s.endTime,
+              className: s.className,
+              classId: s.classId,
+              room: s.room,
+              status: s.status
+            }))
+          });
+
+          // Log current class schedule with detailed info
+          console.log('📚 Lịch học của lớp hiện tại:', {
+            classId: classId,
+            className: fullClassData?.name || 'N/A',
+            totalSchedules: currentClassSchedules.length,
+            schedules: currentClassSchedules.map(s => ({
+              date: s.date,
+              startTime: s.startTime,
+              endTime: s.endTime,
+              timeRange: `${s.startTime} - ${s.endTime}`,
+              room: s.room,
+              status: s.status
+            }))
+          });
+          
+          // Log which dates have schedules
+          const classScheduleDates = currentClassSchedules.map(s => s.date);
+          console.log('📅 Các ngày có lịch học của lớp hiện tại:', classScheduleDates);
+
+          // Check which teacher schedules have attendance (already taught)
+          // Get schedule IDs from teacher schedules
+          const teacherScheduleIds = teacherSchedules
+            .filter(s => s._id && !s._id.toString().startsWith('generated-'))
+            .map(s => s._id.toString());
+          
+          let scheduleIdsWithAttendance = new Set();
+          // Skip attendance check if too many schedules (performance optimization)
+          // Backend already filters attendance, so this is just for frontend display
+          if (teacherScheduleIds.length > 0 && teacherScheduleIds.length <= 50) {
+            try {
+              // Check attendance for all teacher schedules in parallel with timeout
+              const attendanceChecks = await Promise.allSettled(
+                teacherScheduleIds.map(async (scheduleId) => {
+                  try {
+                    // Add timeout to prevent hanging
+                    const timeoutPromise = new Promise((_, reject) => 
+                      setTimeout(() => reject(new Error('Timeout')), 3000)
+                    );
+                    
+                    const responsePromise = classScheduleService.getAttendanceByClassSchedule(scheduleId);
+                    const response = await Promise.race([responsePromise, timeoutPromise]);
+                    
+                    const attendances = response?.list || response?.attendances || (Array.isArray(response) ? response : []) || [];
+                    // Check if any student has attendance (status is not null/undefined)
+                    const hasAnyAttendance = attendances.some(att => att?.attendance?.status != null);
+                    return hasAnyAttendance ? scheduleId : null;
+                  } catch (error) {
+                    // If error checking, assume no attendance (safer to show conflict)
+                    console.warn(`Warning: Could not check attendance for schedule ${scheduleId}:`, error.message);
+                    return null;
+                  }
+                })
+              );
+              
+              scheduleIdsWithAttendance = new Set(
+                attendanceChecks
+                  .filter(result => result.status === 'fulfilled' && result.value !== null)
+                  .map(result => result.value)
+              );
+            } catch (error) {
+              console.error('Error checking attendance for teacher schedules:', error);
+              // If error, assume no attendance (safer to show conflict)
+            }
+          } else if (teacherScheduleIds.length > 50) {
+            console.warn('Too many schedules to check attendance, skipping attendance check for performance');
+          }
+
+          // Compare and find conflicts
+          const conflicts = [];
+          const parseTime = (time) => {
+            if (!time) return null;
+            return time.length === 5 ? time : time.slice(0, 5);
+          };
+
+          const hasTimeOverlap = (startA, endA, startB, endB) => {
+            if (!startA || !endA || !startB || !endB) return false;
+            return startA < endB && startB < endA;
+          };
+
+          // Get current class ID as string for comparison
+          const currentClassIdStr = String(classId);
+
+          currentClassSchedules.forEach(classSchedule => {
+            teacherSchedules.forEach(teacherSchedule => {
+              // Skip if it's from the same class (compare by classId)
+              const teacherClassIdStr = teacherSchedule.classId ? String(teacherSchedule.classId) : null;
+              
+              // Also check by className as fallback
+              const isSameClass = teacherClassIdStr && teacherClassIdStr === currentClassIdStr;
+              const isSameClassByName = teacherSchedule.className === (fullClassData?.name || 'Lớp hiện tại');
+              
+              if (isSameClass || isSameClassByName) {
+                return; // Skip schedules from the same class
+              }
+
+              // Skip if this schedule already has attendance (already taught)
+              const scheduleIdStr = teacherSchedule._id?.toString();
+              if (scheduleIdStr && scheduleIdsWithAttendance.has(scheduleIdStr)) {
+                return; // Skip schedules that already have attendance
+              }
+
+              // Check if same date
+              if (classSchedule.date === teacherSchedule.date) {
+                const classStart = parseTime(classSchedule.startTime);
+                const classEnd = parseTime(classSchedule.endTime);
+                const teacherStart = parseTime(teacherSchedule.startTime);
+                const teacherEnd = parseTime(teacherSchedule.endTime);
+
+                // Check time overlap
+                if (hasTimeOverlap(classStart, classEnd, teacherStart, teacherEnd)) {
+                  conflicts.push({
+                    date: classSchedule.date,
+                    classTime: `${classStart} - ${classEnd}`,
+                    teacherTime: `${teacherStart} - ${teacherEnd}`,
+                    conflictingClass: teacherSchedule.className || 'N/A',
+                    conflictingClassId: teacherSchedule.classId || 'N/A',
+                    conflictingRoom: teacherSchedule.room,
+                    currentClassTime: `${classStart} - ${classEnd}` // Thêm thông tin lịch lớp hiện tại
+                  });
+                }
+              }
+            });
+          });
+
+          // Log comparison results and update state for filtering
+          try {
+            if (conflicts.length > 0) {
+              console.warn('⚠️ PHÁT HIỆN XUNG ĐỘT LỊCH:', {
+                totalConflicts: conflicts.length,
+                conflicts: conflicts.map(c => {
+                  try {
+                    const currentSchedule = currentClassSchedules.find(s => s.date === c.date);
+                    return {
+                      ...c,
+                      currentClassSchedule: currentSchedule ? {
+                        date: currentSchedule.date,
+                        time: `${currentSchedule.startTime} - ${currentSchedule.endTime}`,
+                        room: currentSchedule.room
+                      } : null,
+                      explanation: currentSchedule 
+                        ? `Lớp hiện tại "${fullClassData?.name || 'N/A'}" học vào ${currentSchedule.date} (${currentSchedule.startTime} - ${currentSchedule.endTime}) trùng với lớp "${c.conflictingClass}" (${c.teacherTime})`
+                        : `Không tìm thấy lịch lớp hiện tại vào ngày ${c.date} - có thể là lỗi logic`
+                    };
+                  } catch (err) {
+                    console.error('Error processing conflict:', err, c);
+                    return c;
+                  }
+                }),
+                summary: conflicts.map(c => {
+                  try {
+                    const currentSchedule = currentClassSchedules.find(s => s.date === c.date);
+                    const currentTime = currentSchedule 
+                      ? `${currentSchedule.startTime} - ${currentSchedule.endTime}`
+                      : c.classTime;
+                    return `Ngày ${c.date}: Lớp hiện tại "${fullClassData?.name || 'N/A'}" (${currentTime}) trùng với lớp "${c.conflictingClass}" (${c.teacherTime}) tại ${c.conflictingRoom}`;
+                  } catch (err) {
+                    return `Ngày ${c.date}: Conflict với lớp "${c.conflictingClass}"`;
+                  }
+                }),
+                note: 'Các buổi học của chính lớp hiện tại đã được loại trừ khỏi danh sách xung đột'
               });
-              schedulesMap[String(teacherId)] = filteredSchedules;
+
+              // Update teacherRoomConflicts state to filter out this teacher
+              setTeacherRoomConflicts(prev => ({
+                ...prev,
+                teacherConflicts: conflicts.map(c => ({
+                  teacherId: teacherId.toString(),
+                  className: c.conflictingClass || 'N/A',
+                  date: c.date || '',
+                  time: c.teacherTime || '',
+                  conflictingClassTime: c.classTime || ''
+                })),
+                conflictingTeacherIds: [teacherId.toString()],
+                // Keep existing room conflicts
+                roomConflicts: prev.roomConflicts || [],
+                conflictingRoomIds: prev.conflictingRoomIds || []
+              }));
+            } else {
+              console.log('✅ KHÔNG CÓ XUNG ĐỘT: Lịch giáo viên và lịch lớp hiện tại không trùng nhau (đã loại trừ các buổi của chính lớp hiện tại)');
+              
+              // Clear teacher conflicts for this teacher if no conflicts found
+              setTeacherRoomConflicts(prev => {
+                const updatedTeacherConflicts = (prev.teacherConflicts || []).filter(
+                  c => c.teacherId !== teacherId.toString()
+                );
+                const updatedConflictingTeacherIds = (prev.conflictingTeacherIds || []).filter(
+                  id => id !== teacherId.toString()
+                );
+                
+                return {
+                  ...prev,
+                  teacherConflicts: updatedTeacherConflicts,
+                  conflictingTeacherIds: updatedConflictingTeacherIds
+                };
+              });
             }
           } catch (error) {
-            schedulesMap[String(teacherId)] = [];
+            console.error('❌ Lỗi khi xử lý conflicts:', error);
+            // Don't update state on error to prevent breaking the UI
           }
-        })
-      );
-
-      setTeacherSchedules(schedulesMap);
+        } else {
+          console.log('📅 Giáo viên được chọn chưa có lịch dạy nào:', teacherId);
+          if (currentClassSchedules.length > 0) {
+            console.log('📚 Lịch học của lớp hiện tại:', {
+              classId: classId,
+              className: fullClassData?.name || 'N/A',
+              totalSchedules: currentClassSchedules.length,
+              schedules: currentClassSchedules
+            });
+          }
+        }
+      } catch (error) {
+        console.error('❌ Lỗi khi lấy và so sánh lịch:', error);
+      }
     };
 
-    fetchTeacherSchedules();
-  }, [teachers, generatedSessions, formData.id, formData._id]);
+    // Only log when teacher is actually selected and class exists
+    if ((formData.teacherId || (fullClassData?.teacher?._id || fullClassData?.teacher?.id)) && 
+        (formData.id || formData._id)) {
+      logAndCompareSchedules();
+    }
+  }, [formData.teacherId, formData.id, formData._id, fullClassData, generatedSessions]);
 
-  // Check for teacher conflicts
-  const conflictingTeacherIds = useMemo(() => {
-    if (!generatedSessions.length || Object.keys(teacherSchedules).length === 0) {
-      return new Set();
+  // Check room conflicts when roomId changes (similar to teacher conflict check)
+  useEffect(() => {
+    const logAndCompareRoomSchedules = async () => {
+      const roomId = formData.roomId || (fullClassData?.room?._id || fullClassData?.room?.id);
+      const classId = formData.id || formData._id;
+      
+      // Clear room conflicts immediately when room changes (before checking new room)
+      setTeacherRoomConflicts(prev => ({
+        ...prev,
+        roomConflicts: [],
+        conflictingRoomIds: []
+      }));
+
+      if (!roomId || !classId) {
+        return;
+      }
+
+      try {
+        // Get date range from generated sessions if available
+        let params = {};
+        if (generatedSessions.length > 0) {
+          const sessionDates = generatedSessions.map(s => s.date).sort();
+          params = {
+            startDate: sessionDates[0],
+            endDate: sessionDates[sessionDates.length - 1]
+          };
+        }
+
+        // Get room schedule
+        const roomResponse = await roomService.getRoomSchedule(roomId, params);
+        
+        // Helper function to format date to YYYY-MM-DD using local timezone (not UTC)
+        const formatDateLocal = (dateInput) => {
+          if (!dateInput) return null;
+          const date = new Date(dateInput);
+          if (isNaN(date.getTime())) return null;
+          
+          // Use local timezone, not UTC
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+
+        // Get current class schedules
+        const classSchedules = fullClassData?.schedules || [];
+        const currentClassSchedules = classSchedules
+          .filter(s => s.date && s.startTime && s.endTime)
+          .map(s => {
+            const scheduleDate = s.date || s.scheduleDate || s.classDate;
+            return {
+              date: formatDateLocal(scheduleDate),
+              startTime: s.startTime || s.start_time,
+              endTime: s.endTime || s.end_time,
+              className: fullClassData?.name || 'Lớp hiện tại',
+              room: s.room?.room_name || s.room?.name || 'N/A',
+              status: s.status || 'fixed'
+            };
+          })
+          .filter(s => s.date); // Remove invalid dates
+
+        // Log room schedule
+        if (roomResponse && roomResponse.schedules) {
+          // Get room name from response (since room is not populated in schedules)
+          const roomName = roomResponse.room?.room_name || roomResponse.room?.name || 'N/A';
+          
+          // Get class IDs from room schedules to filter out current class
+          const roomSchedules = roomResponse.schedules.map(schedule => {
+            // Try to get classId from various possible fields
+            const scheduleClassId = schedule.class?._id?.toString() || 
+                                   schedule.classId?.toString() || 
+                                   schedule.class?.id?.toString() ||
+                                   schedule._id?.toString(); // Fallback to schedule ID if class info not available
+            
+            return {
+              date: formatDateLocal(schedule.date),
+              startTime: schedule.startTime,
+              endTime: schedule.endTime,
+              className: schedule.className || schedule.class?.name || 'N/A',
+              classId: scheduleClassId,
+              room: roomName, // Use room name from response
+              status: schedule.status,
+              _id: schedule._id
+            };
+          }).filter(s => s.date);
+
+          console.log('📅 Lịch sử dụng hiện tại của phòng được chọn:', {
+            roomId: roomId,
+            totalSchedules: roomSchedules.length,
+            schedules: roomSchedules.map(s => ({
+              date: s.date,
+              startTime: s.startTime,
+              endTime: s.endTime,
+              className: s.className,
+              classId: s.classId,
+              room: s.room,
+              status: s.status
+            }))
+          });
+
+          // Log current class schedule with detailed info
+          console.log('📚 Lịch học của lớp hiện tại:', {
+            classId: classId,
+            className: fullClassData?.name || 'N/A',
+            totalSchedules: currentClassSchedules.length,
+            schedules: currentClassSchedules.map(s => ({
+              date: s.date,
+              startTime: s.startTime,
+              endTime: s.endTime,
+              timeRange: `${s.startTime} - ${s.endTime}`,
+              room: s.room,
+              status: s.status
+            }))
+          });
+          
+          // Log which dates have schedules
+          const classScheduleDates = currentClassSchedules.map(s => s.date);
+          console.log('📅 Các ngày có lịch học của lớp hiện tại:', classScheduleDates);
+
+          // Check which room schedules have attendance (already taught)
+          // Get schedule IDs from room schedules
+          const roomScheduleIds = roomSchedules
+            .filter(s => s._id && !s._id.toString().startsWith('generated-'))
+            .map(s => s._id.toString());
+          
+          let scheduleIdsWithAttendance = new Set();
+          // Skip attendance check if too many schedules (performance optimization)
+          // Backend already filters attendance, so this is just for frontend display
+          if (roomScheduleIds.length > 0 && roomScheduleIds.length <= 50) {
+            try {
+              // Check attendance for all room schedules in parallel with timeout
+              const attendanceChecks = await Promise.allSettled(
+                roomScheduleIds.map(async (scheduleId) => {
+                  try {
+                    // Add timeout to prevent hanging
+                    const timeoutPromise = new Promise((_, reject) => 
+                      setTimeout(() => reject(new Error('Timeout')), 3000)
+                    );
+                    
+                    const responsePromise = classScheduleService.getAttendanceByClassSchedule(scheduleId);
+                    const response = await Promise.race([responsePromise, timeoutPromise]);
+                    
+                    const attendances = response?.list || response?.attendances || (Array.isArray(response) ? response : []) || [];
+                    // Check if any student has attendance (status is not null/undefined)
+                    const hasAnyAttendance = attendances.some(att => att?.attendance?.status != null);
+                    return hasAnyAttendance ? scheduleId : null;
+                  } catch (error) {
+                    // If error checking, assume no attendance (safer to show conflict)
+                    console.warn(`Warning: Could not check attendance for schedule ${scheduleId}:`, error.message);
+                    return null;
+                  }
+                })
+              );
+              
+              scheduleIdsWithAttendance = new Set(
+                attendanceChecks
+                  .filter(result => result.status === 'fulfilled' && result.value !== null)
+                  .map(result => result.value)
+              );
+            } catch (error) {
+              console.error('Error checking attendance for room schedules:', error);
+              // If error, assume no attendance (safer to show conflict)
+            }
+          } else if (roomScheduleIds.length > 50) {
+            console.warn('Too many schedules to check attendance, skipping attendance check for performance');
+          }
+
+          // Compare and find conflicts
+          const conflicts = [];
+          const parseTime = (time) => {
+            if (!time) return null;
+            return time.length === 5 ? time : time.slice(0, 5);
+          };
+
+          const hasTimeOverlap = (startA, endA, startB, endB) => {
+            if (!startA || !endA || !startB || !endB) return false;
+            return startA < endB && startB < endA;
+          };
+
+          // Get current class ID as string for comparison
+          const currentClassIdStr = String(classId);
+
+          currentClassSchedules.forEach(classSchedule => {
+            roomSchedules.forEach(roomSchedule => {
+              // Skip if it's from the same class (compare by classId)
+              const roomClassIdStr = roomSchedule.classId ? String(roomSchedule.classId) : null;
+              
+              // Also check by className as fallback
+              const isSameClass = roomClassIdStr && roomClassIdStr === currentClassIdStr;
+              const isSameClassByName = roomSchedule.className === (fullClassData?.name || 'Lớp hiện tại');
+              
+              if (isSameClass || isSameClassByName) {
+                return; // Skip schedules from the same class
+              }
+
+              // Skip if this schedule already has attendance (already taught)
+              const scheduleIdStr = roomSchedule._id?.toString();
+              if (scheduleIdStr && scheduleIdsWithAttendance.has(scheduleIdStr)) {
+                return; // Skip schedules that already have attendance
+              }
+
+              // Check if same date
+              if (classSchedule.date === roomSchedule.date) {
+                const classStart = parseTime(classSchedule.startTime);
+                const classEnd = parseTime(classSchedule.endTime);
+                const roomStart = parseTime(roomSchedule.startTime);
+                const roomEnd = parseTime(roomSchedule.endTime);
+
+                // Check time overlap
+                if (hasTimeOverlap(classStart, classEnd, roomStart, roomEnd)) {
+                  conflicts.push({
+                    date: classSchedule.date,
+                    classTime: `${classStart} - ${classEnd}`,
+                    roomTime: `${roomStart} - ${roomEnd}`,
+                    conflictingClass: roomSchedule.className || 'N/A',
+                    conflictingClassId: roomSchedule.classId || 'N/A',
+                    conflictingRoom: roomSchedule.room,
+                    currentClassTime: `${classStart} - ${classEnd}` // Thêm thông tin lịch lớp hiện tại
+                  });
+                }
+              }
+            });
+          });
+
+          // Log comparison results and update state for filtering
+          try {
+            if (conflicts.length > 0) {
+              console.warn('⚠️ PHÁT HIỆN XUNG ĐỘT PHÒNG HỌC:', {
+                totalConflicts: conflicts.length,
+                conflicts: conflicts.map(c => {
+                  try {
+                    const currentSchedule = currentClassSchedules.find(s => s.date === c.date);
+                    return {
+                      ...c,
+                      currentClassSchedule: currentSchedule ? {
+                        date: currentSchedule.date,
+                        time: `${currentSchedule.startTime} - ${currentSchedule.endTime}`,
+                        room: currentSchedule.room
+                      } : null,
+                      explanation: currentSchedule 
+                        ? `Lớp hiện tại "${fullClassData?.name || 'N/A'}" học vào ${currentSchedule.date} (${currentSchedule.startTime} - ${currentSchedule.endTime}) trùng với lớp "${c.conflictingClass}" (${c.roomTime})`
+                        : `Không tìm thấy lịch lớp hiện tại vào ngày ${c.date} - có thể là lỗi logic`
+                    };
+                  } catch (err) {
+                    console.error('Error processing conflict:', err, c);
+                    return c;
+                  }
+                }),
+                summary: conflicts.map(c => {
+                  try {
+                    const currentSchedule = currentClassSchedules.find(s => s.date === c.date);
+                    const currentTime = currentSchedule 
+                      ? `${currentSchedule.startTime} - ${currentSchedule.endTime}`
+                      : c.classTime;
+                    return `Ngày ${c.date}: Lớp hiện tại "${fullClassData?.name || 'N/A'}" (${currentTime}) trùng với lớp "${c.conflictingClass}" (${c.roomTime}) tại phòng ${c.conflictingRoom}`;
+                  } catch (err) {
+                    return `Ngày ${c.date}: Conflict với lớp "${c.conflictingClass}"`;
+                  }
+                }),
+                note: 'Các buổi học của chính lớp hiện tại đã được loại trừ khỏi danh sách xung đột'
+              });
+
+              // Update teacherRoomConflicts state to filter out this room
+              setTeacherRoomConflicts(prev => ({
+                ...prev,
+                roomConflicts: conflicts.map(c => ({
+                  roomId: roomId.toString(),
+                  className: c.conflictingClass || 'N/A',
+                  date: c.date || '',
+                  time: c.roomTime || '',
+                  conflictingClassTime: c.classTime || ''
+                })),
+                conflictingRoomIds: [roomId.toString()],
+                // Keep existing teacher conflicts
+                teacherConflicts: prev.teacherConflicts || [],
+                conflictingTeacherIds: prev.conflictingTeacherIds || []
+              }));
+            } else {
+              console.log('✅ KHÔNG CÓ XUNG ĐỘT PHÒNG: Lịch phòng và lịch lớp hiện tại không trùng nhau (đã loại trừ các buổi của chính lớp hiện tại)');
+              
+              // Clear room conflicts for this room if no conflicts found
+              setTeacherRoomConflicts(prev => {
+                const updatedRoomConflicts = (prev.roomConflicts || []).filter(
+                  c => c.roomId !== roomId.toString()
+                );
+                const updatedConflictingRoomIds = (prev.conflictingRoomIds || []).filter(
+                  id => id !== roomId.toString()
+                );
+                
+                return {
+                  ...prev,
+                  roomConflicts: updatedRoomConflicts,
+                  conflictingRoomIds: updatedConflictingRoomIds
+                };
+              });
+            }
+          } catch (error) {
+            console.error('❌ Lỗi khi xử lý conflicts phòng học:', error);
+            // Don't update state on error to prevent breaking the UI
+          }
+        } else {
+          console.log('📅 Phòng được chọn chưa có lịch sử dụng nào:', roomId);
+          if (currentClassSchedules.length > 0) {
+            console.log('📚 Lịch học của lớp hiện tại:', {
+              classId: classId,
+              className: fullClassData?.name || 'N/A',
+              totalSchedules: currentClassSchedules.length,
+              schedules: currentClassSchedules
+            });
+          }
+        }
+      } catch (error) {
+        console.error('❌ Lỗi khi lấy và so sánh lịch phòng:', error);
+      }
+    };
+
+    // Only log when room is actually selected and class exists
+    if ((formData.roomId || (fullClassData?.room?._id || fullClassData?.room?.id)) && 
+        (formData.id || formData._id)) {
+      logAndCompareRoomSchedules();
+    }
+  }, [formData.roomId, formData.id, formData._id, fullClassData, generatedSessions]);
+
+  // Check teacher and room conflicts using backend API (only when scheduleEntries change)
+  // Teacher conflicts are handled by logAndCompareSchedules above
+  // Room conflicts when roomId changes are handled by logAndCompareRoomSchedules above
+  // This useEffect only runs when scheduleEntries change to check conflicts with new schedule pattern
+  useEffect(() => {
+    const checkConflicts = async () => {
+      const classId = formData.id || formData._id;
+      if (!classId) {
+        // Only clear room conflicts, keep teacher conflicts from logAndCompareSchedules
+        setTeacherRoomConflicts(prev => ({
+          ...prev,
+          roomConflicts: [],
+          conflictingRoomIds: []
+        }));
+        return;
+      }
+
+      // Only check room conflicts here when scheduleEntries change
+      // Room conflicts when roomId changes are handled by logAndCompareRoomSchedules above
+      const roomId = formData.roomId || (fullClassData?.room?._id || fullClassData?.room?.id);
+
+      if (!roomId) {
+        // Only clear room conflicts, keep teacher conflicts
+        setTeacherRoomConflicts(prev => ({
+          ...prev,
+          roomConflicts: [],
+          conflictingRoomIds: []
+        }));
+        return;
+      }
+
+      try {
+        setCheckingTeacherRoomConflicts(true);
+        const conflictData = {
+          teacherId: undefined, // Don't check teacher here, handled by logAndCompareSchedules
+          roomId: roomId,
+          scheduleEntries: filledScheduleEntries.length > 0 ? filledScheduleEntries : undefined,
+          startDate: formData.startDate || (fullClassData?.startDate ? new Date(fullClassData.startDate).toISOString().split('T')[0] : undefined)
+        };
+
+        const response = await classService.checkTeacherRoomConflicts(classId, conflictData);
+        
+        if (response && response.success) {
+          // Merge room conflicts with existing teacher conflicts
+          setTeacherRoomConflicts(prev => ({
+            ...prev,
+            roomConflicts: response.roomConflicts || [],
+            conflictingRoomIds: response.conflictingRoomIds || []
+            // Keep existing teacherConflicts and conflictingTeacherIds from logAndCompareSchedules
+          }));
+        } else {
+          // Only clear room conflicts, keep teacher conflicts
+          setTeacherRoomConflicts(prev => ({
+            ...prev,
+            roomConflicts: [],
+            conflictingRoomIds: []
+          }));
+        }
+      } catch (error) {
+        console.error('Error checking room conflicts:', error);
+        // Only clear room conflicts on error, keep teacher conflicts
+        setTeacherRoomConflicts(prev => ({
+          ...prev,
+          roomConflicts: [],
+          conflictingRoomIds: []
+        }));
+      } finally {
+        setCheckingTeacherRoomConflicts(false);
+      }
+    };
+
+    // Debounce the conflict check
+    const timeoutId = setTimeout(() => {
+      checkConflicts();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.id, formData._id, formData.roomId, formData.startDate, filledScheduleEntries, generatedSessions.length, fullClassData]);
+
+  // Don't filter rooms - show all but mark conflicts
+  // This allows users to see and select conflicted rooms with warnings
+  const filteredRooms = useMemo(() => {
+    // Return all rooms (no filtering)
+    return rooms;
+  }, [rooms]);
+
+  // Don't filter teachers - show all but mark conflicts
+  // This allows users to see and select conflicted teachers with warnings
+  const filteredTeachers = useMemo(() => {
+    // Return all teachers (no filtering)
+    return teachers;
+  }, [teachers]);
+
+  // Get current class schedules for use in render
+  const currentClassSchedulesForRender = useMemo(() => {
+    const classSchedules = fullClassData?.schedules || [];
+    return classSchedules
+      .filter(s => s.date && s.startTime && s.endTime)
+      .map(s => {
+        const scheduleDate = s.date || s.scheduleDate || s.classDate;
+        return {
+          date: scheduleDate ? new Date(scheduleDate).toISOString().split('T')[0] : null,
+          startTime: s.startTime || s.start_time,
+          endTime: s.endTime || s.end_time,
+          className: fullClassData?.name || 'Lớp hiện tại',
+          room: s.room?.room_name || s.room?.name || 'N/A',
+          status: s.status || 'fixed'
+        };
+      })
+      .filter(s => s.date); // Remove invalid dates
+  }, [fullClassData]);
+
+  // Calculate student conflicts based on actual schedules
+  const studentConflictsMap = useMemo(() => {
+    const conflicts = new Map();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (!selectedStudents || selectedStudents.length === 0) {
+      return conflicts;
     }
 
-    const conflicts = new Set();
+    // Get current class schedules (only future ones)
+    const currentClassSchedules = fullClassData?.schedules || [];
+    const futureClassSchedules = currentClassSchedules.filter(schedule => {
+      const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+      if (!scheduleDate) return false;
+      const date = new Date(scheduleDate);
+      date.setHours(0, 0, 0, 0);
+      return date >= today;
+    });
 
-    // Check each teacher's schedules
-    Object.entries(teacherSchedules).forEach(([teacherId, schedules]) => {
-      if (!schedules || schedules.length === 0) return;
+    // Check conflicts with current class schedules
+    selectedStudents.forEach(studentId => {
+      const studentIdStr = String(studentId);
+      const studentScheduleList = studentSchedules[studentIdStr] || [];
+      const studentConflictsList = [];
 
-      // Check each generated session against teacher's schedules
-      generatedSessions.forEach((session) => {
-        const sessionDate = session.date;
-        const sessionStart = parseTime(session.startTime);
-        const sessionEnd = parseTime(session.endTime);
+      futureClassSchedules.forEach(classSchedule => {
+        const classScheduleDate = classSchedule.date || classSchedule.scheduleDate || classSchedule.classDate;
+        if (!classScheduleDate) return;
 
-        schedules.forEach((schedule) => {
-          // Get schedule date
-          const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
-          if (!scheduleDate) return;
+        const classDate = new Date(classScheduleDate);
+        classDate.setHours(0, 0, 0, 0);
+        const classDateStr = classDate.toISOString().split('T')[0];
+        const classStartTime = parseTime(classSchedule.startTime || classSchedule.start_time);
+        const classEndTime = parseTime(classSchedule.endTime || classSchedule.end_time);
 
-          // Format schedule date to YYYY-MM-DD for comparison
-          const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
+        if (!classStartTime || !classEndTime) return;
 
-          // Check if dates match
-          if (scheduleDateStr !== sessionDate) {
-            return;
-          }
+        // Check against student's schedules
+        studentScheduleList.forEach(studentSchedule => {
+          const studentScheduleDate = studentSchedule.date || studentSchedule.scheduleDate || studentSchedule.classDate || studentSchedule.classSchedule?.date;
+          if (!studentScheduleDate) return;
+
+          const studentDate = new Date(studentScheduleDate);
+          studentDate.setHours(0, 0, 0, 0);
+          const studentDateStr = studentDate.toISOString().split('T')[0];
+
+          // Skip if different dates
+          if (studentDateStr !== classDateStr) return;
+
+          // Get student schedule time
+          const studentStartTime = parseTime(
+            studentSchedule.startTime ||
+            studentSchedule.start_time ||
+            studentSchedule.time?.start ||
+            studentSchedule.classSchedule?.startTime
+          );
+          const studentEndTime = parseTime(
+            studentSchedule.endTime ||
+            studentSchedule.end_time ||
+            studentSchedule.time?.end ||
+            studentSchedule.classSchedule?.endTime
+          );
+
+          if (!studentStartTime || !studentEndTime) return;
 
           // Check time overlap
-          const scheduleStart = parseTime(schedule.startTime);
-          const scheduleEnd = parseTime(schedule.endTime);
-          const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
+          const hasTimeConflict = hasTimeOverlap(classStartTime, classEndTime, studentStartTime, studentEndTime);
 
           if (hasTimeConflict) {
-            conflicts.add(teacherId);
-          }
-        });
-      });
-    });
-
-    return conflicts;
-  }, [generatedSessions, teacherSchedules]);
-
-  // Fetch student schedules - need to get all schedules for conflict checking
-  useEffect(() => {
-    const fetchStudentSchedules = async () => {
-      try {
-        if (!selectedStudents.length) {
-          setStudentSchedules({});
-          setStudentSchedulesLoading(false);
-          return;
-        }
-
-        setStudentSchedulesLoading(true);
-
-        // Get current class ID - try both id and _id, convert to string for consistent comparison
-        const currentClassIdRaw = formData.id || formData._id || classData?.id || classData?._id;
-        const currentClassId = currentClassIdRaw ? String(currentClassIdRaw) : null;
-
-        // Determine date range for fetching student schedules
-        // Priority: fullClassData.schedules (immediate) > generatedSessions > formData dates > estimated
-        let minDate = null;
-        let maxDate = null;
-        
-        // Use fullClassData if available (has schedules), otherwise fallback to classData
-        const dataSource = fullClassData || classData;
-        
-        // PRIORITY 1: Use dates from existing class schedules (most reliable, available immediately)
-        if (dataSource?.schedules && Array.isArray(dataSource.schedules) && dataSource.schedules.length > 0) {
-          const scheduleDates = dataSource.schedules
-            .map(schedule => {
-              const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
-              if (!scheduleDate) return null;
-              const date = new Date(scheduleDate);
-              return !isNaN(date.getTime()) ? date.toISOString().split('T')[0] : null;
-            })
-            .filter(Boolean)
-            .sort();
-          
-          if (scheduleDates.length > 0) {
-            minDate = scheduleDates[0];
-            maxDate = scheduleDates[scheduleDates.length - 1];
-          }
-        } else if (generatedSessions.length > 0) {
-          // PRIORITY 2: Use dates from generated sessions
-          const sessionDates = generatedSessions.map(s => s.date).sort();
-          minDate = sessionDates[0];
-          maxDate = sessionDates[sessionDates.length - 1];
-        } else if (formData.startDate && formData.endDate) {
-          // Use class date range if available
-          minDate = formData.startDate;
-          maxDate = formData.endDate;
-        } else if (formData.startDate) {
-          // Estimate end date based on available information
-          const start = new Date(formData.startDate);
-          let estimatedWeeks = 12; // Default: 12 weeks (about 3 months)
-          
-          if (selectedCourse?.numberOfSessions && filledScheduleEntries.length > 0) {
-            estimatedWeeks = Math.ceil(selectedCourse.numberOfSessions / filledScheduleEntries.length);
-          } else if (filledScheduleEntries.length > 0) {
-            // Estimate based on typical course duration
-            estimatedWeeks = 12;
-          }
-          
-          const end = new Date(start);
-          end.setDate(start.getDate() + (estimatedWeeks * 7));
-          minDate = formData.startDate;
-          maxDate = end.toISOString().split('T')[0];
-        }
-        
-        // If we still don't have dates, fetch without date filter (will get all schedules)
-        // This ensures we can still show conflicts even if date range is unclear
-
-        const schedulesMap = {};
-        
-        // Fetch schedules for each selected student
-        await Promise.all(
-          selectedStudents.map(async (studentId) => {
-            if (!studentId) return;
-
-            try {
-              const params = {};
-              if (minDate && maxDate) {
-                params.startDate = minDate;
-                params.endDate = maxDate;
-              }
-              
-              const response = await studentService.getStudentSchedule(studentId, params);
-              
-              if (response && response.schedules) {
-                // Filter out schedules from the current class being edited
-                const filteredSchedules = response.schedules.filter(schedule => {
-                  // Try multiple ways to get classId from schedule
-                  const scheduleClassId = 
-                    (schedule.class?._id && schedule.class._id.toString()) || 
-                    (schedule.class?._id?._id && schedule.class._id._id.toString()) ||
-                    (schedule.class?._id?.toString && schedule.class._id.toString()) ||
-                    (schedule.classId && schedule.classId.toString()) || 
-                    (schedule.class?.id && schedule.class.id.toString()) ||
-                    (schedule.classSchedule?.class?._id && schedule.classSchedule.class._id.toString()) ||
-                    (schedule.classSchedule?.class?._id?._id && schedule.classSchedule.class._id._id.toString());
-                  
-                  // Skip schedules from current class
-                  if (scheduleClassId && currentClassId && String(scheduleClassId) === String(currentClassId)) {
-                    return false;
-                  }
-                  return true;
-                });
-                
-                schedulesMap[String(studentId)] = filteredSchedules;
-              } else if (response && response.data) {
-                const filteredSchedules = response.data.filter(schedule => {
-                  const scheduleClassId = 
-                    (schedule.class?._id && schedule.class._id.toString()) || 
-                    (schedule.class?._id?._id && schedule.class._id._id.toString()) ||
-                    (schedule.class?._id?.toString && schedule.class._id.toString()) ||
-                    (schedule.classId && schedule.classId.toString()) || 
-                    (schedule.class?.id && schedule.class.id.toString()) ||
-                    (schedule.classSchedule?.class?._id && schedule.classSchedule.class._id.toString()) ||
-                    (schedule.classSchedule?.class?._id?._id && schedule.classSchedule.class._id._id.toString());
-                  
-                  if (scheduleClassId && currentClassId && String(scheduleClassId) === String(currentClassId)) {
-                    return false;
-                  }
-                  return true;
-                });
-                
-                schedulesMap[String(studentId)] = filteredSchedules;
-              } else {
-                schedulesMap[String(studentId)] = [];
-              }
-            } catch (error) {
-              schedulesMap[String(studentId)] = [];
-            }
-          })
-        );
-
-        setStudentSchedules(schedulesMap);
-        setStudentSchedulesLoading(false);
-      } catch (error) {
-        setStudentSchedules({});
-        setStudentSchedulesLoading(false);
-      }
-    };
-
-    fetchStudentSchedules();
-  }, [
-    selectedStudents, 
-    generatedSessions, 
-    formData.id, 
-    formData._id, 
-    formData.startDate, 
-    formData.endDate, 
-    filledScheduleEntries, 
-    selectedCourse, 
-    classData,
-    fullClassData,
-    fullClassData?.schedules,
-    classData?.schedules
-  ]);
-
-  // Check for student conflicts
-  const conflictingStudentIds = useMemo(() => {
-    // Get sessions to check - priority: generatedSessions (from edited scheduleEntries) > schedules from database
-    let sessionsToCheck = [];
-    
-    // PRIORITY 1: Use generatedSessions if available (user may have edited scheduleEntries)
-    // This ensures we check conflicts against the NEW schedule, not the old one
-    if (generatedSessions.length > 0) {
-      sessionsToCheck = generatedSessions.map(session => ({
-        date: session.date,
-        startTime: session.startTime,
-        endTime: session.endTime
-      }));
-    } else {
-      // PRIORITY 2: Fallback to schedules from database if generatedSessions not available yet
-      // Use fullClassData if available (has schedules), otherwise fallback to classData
-      const dataSource = fullClassData || classData;
-      
-      if (dataSource?.schedules && Array.isArray(dataSource.schedules) && dataSource.schedules.length > 0) {
-        sessionsToCheck = dataSource.schedules
-          .filter(schedule => {
-            const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
-            return scheduleDate && schedule.startTime && schedule.endTime;
-          })
-          .map(schedule => {
-            const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
-            const date = new Date(scheduleDate);
-            if (isNaN(date.getTime())) return null;
-            return {
-              date: date.toISOString().split('T')[0],
-              startTime: schedule.startTime || schedule.start_time || '08:00',
-              endTime: schedule.endTime || schedule.end_time || '10:00'
-            };
-          })
-          .filter(Boolean); // Remove null entries
-        
-      }
-    }
-    
-    if (!sessionsToCheck.length || Object.keys(studentSchedules).length === 0) {
-      return new Map();
-    }
-
-    const conflicts = new Map(); // Map<studentId, Array<conflictDetails>>
-    // Get current class ID - try both id and _id, convert to string for consistent comparison
-    const currentClassIdRaw = formData.id || formData._id || classData?.id || classData?._id;
-    const currentClassId = currentClassIdRaw ? String(currentClassIdRaw) : null;
-
-    // Check each student's schedules
-    Object.entries(studentSchedules).forEach(([studentId, schedules]) => {
-      if (!schedules || schedules.length === 0) return;
-
-      const studentConflicts = [];
-
-      // Check each session against student's schedules
-      sessionsToCheck.forEach((session) => {
-        const sessionDate = session.date;
-        const sessionStart = parseTime(session.startTime);
-        const sessionEnd = parseTime(session.endTime);
-
-        schedules.forEach((schedule) => {
-          // Skip schedules from the current class being edited
-          // Try multiple ways to get classId from schedule
-          const scheduleClassId = 
-            (schedule.class?._id && schedule.class._id.toString()) || 
-            (schedule.class?._id?._id && schedule.class._id._id.toString()) ||
-            (schedule.class?._id?.toString && schedule.class._id.toString()) ||
-            (schedule.classId && schedule.classId.toString()) || 
-            (schedule.class?.id && schedule.class.id.toString()) ||
-            (schedule.classSchedule?.class?._id && schedule.classSchedule.class._id.toString()) ||
-            (schedule.classSchedule?.class?._id?._id && schedule.classSchedule.class._id._id.toString());
-          
-          if (scheduleClassId && currentClassId && String(scheduleClassId) === String(currentClassId)) {
-            return; // Skip current class schedules
-          }
-
-          // Get schedule date - handle different response formats
-          const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate || schedule.classSchedule?.date;
-          if (!scheduleDate) return;
-
-          // Format schedule date to YYYY-MM-DD for comparison
-          const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
-
-          // Check if dates match
-          if (scheduleDateStr !== sessionDate) {
-            return;
-          }
-
-          // Check time overlap - handle different response formats
-          const scheduleStart = parseTime(
-            schedule.startTime ||
-            schedule.start_time ||
-            schedule.time?.start ||
-            schedule.classSchedule?.startTime ||
-            schedule.startHour
-          );
-          const scheduleEnd = parseTime(
-            schedule.endTime ||
-            schedule.end_time ||
-            schedule.time?.end ||
-            schedule.classSchedule?.endTime ||
-            schedule.endHour
-          );
-
-          if (!scheduleStart || !scheduleEnd) return;
-
-          const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
-
-          if (hasTimeConflict) {
-            // Get class name - handle different response formats
-            const className = 
-              schedule.className || 
-              schedule.class?.name || 
-              schedule.classSchedule?.class?.name ||
+            // Get class name from student schedule
+            const conflictingClassName = 
+              studentSchedule.className ||
+              studentSchedule.class?.name ||
+              studentSchedule.classSchedule?.class?.name ||
               'N/A';
-            
-            // Format date for display
-            const displayDate = new Date(scheduleDateStr).toLocaleDateString('vi-VN', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            });
 
             const conflictDetail = {
-              className,
-              date: displayDate,
-              dateRaw: scheduleDateStr,
-              time: `${scheduleStart} - ${scheduleEnd}`,
-              newClassTime: `${sessionStart} - ${sessionEnd}`
+              className: conflictingClassName,
+              date: classDateStr,
+              dateDisplay: classDate.toLocaleDateString('vi-VN', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              }),
+              time: `${studentStartTime} - ${studentEndTime}`,
+              newClassTime: `${classStartTime} - ${classEndTime}`,
+              type: 'existing_schedule' // Conflict with existing class schedule
             };
 
-            studentConflicts.push(conflictDetail);
+            studentConflictsList.push(conflictDetail);
           }
         });
       });
 
-      if (studentConflicts.length > 0) {
-        conflicts.set(studentId, studentConflicts);
+      // Check conflicts with new schedule pattern (if scheduleEntries changed)
+      if (filledScheduleEntries.length > 0 && formData.startDate) {
+        filledScheduleEntries.forEach(entry => {
+          const dayOfWeek = getDayOfWeekNumber(entry.day);
+          if (dayOfWeek === null) return;
+
+          const entryStartTime = parseTime(entry.startTime);
+          const entryEndTime = parseTime(entry.endTime);
+          if (!entryStartTime || !entryEndTime) return;
+
+          // Check against student's schedules
+          studentScheduleList.forEach(studentSchedule => {
+            const studentScheduleDate = studentSchedule.date || studentSchedule.scheduleDate || studentSchedule.classDate || studentSchedule.classSchedule?.date;
+            if (!studentScheduleDate) return;
+
+            const studentDate = new Date(studentScheduleDate);
+            const studentDayOfWeek = studentDate.getDay();
+
+            // Check if same day of week
+            if (studentDayOfWeek !== dayOfWeek) return;
+
+            // Get student schedule time
+            const studentStartTime = parseTime(
+              studentSchedule.startTime ||
+              studentSchedule.start_time ||
+              studentSchedule.time?.start ||
+              studentSchedule.classSchedule?.startTime
+            );
+            const studentEndTime = parseTime(
+              studentSchedule.endTime ||
+              studentSchedule.end_time ||
+              studentSchedule.time?.end ||
+              studentSchedule.classSchedule?.endTime
+            );
+
+            if (!studentStartTime || !studentEndTime) return;
+
+            // Check time overlap
+            const hasTimeConflict = hasTimeOverlap(entryStartTime, entryEndTime, studentStartTime, studentEndTime);
+
+            if (hasTimeConflict) {
+              // Check if this conflict is already in the list (avoid duplicates)
+              const studentDateStr = studentDate.toISOString().split('T')[0];
+              const isDuplicate = studentConflictsList.some(c => c.date === studentDateStr);
+
+              if (!isDuplicate) {
+                const conflictingClassName = 
+                  studentSchedule.className ||
+                  studentSchedule.class?.name ||
+                  studentSchedule.classSchedule?.class?.name ||
+                  'N/A';
+
+                const conflictDetail = {
+                  className: conflictingClassName,
+                  date: studentDateStr,
+                  dateDisplay: studentDate.toLocaleDateString('vi-VN', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  }),
+                  time: `${studentStartTime} - ${studentEndTime}`,
+                  newClassTime: `${entryStartTime} - ${entryEndTime}`,
+                  dayOfWeek: dayOfWeek,
+                  type: 'schedule_pattern' // Conflict with new schedule pattern
+                };
+
+                studentConflictsList.push(conflictDetail);
+              }
+            }
+          });
+        });
+      }
+
+      if (studentConflictsList.length > 0) {
+        conflicts.set(studentIdStr, studentConflictsList);
       }
     });
 
     return conflicts;
-  }, [generatedSessions, studentSchedules, formData.id, formData._id, classData, fullClassData, fullClassData?.schedules, classData?.schedules]);
+  }, [selectedStudents, fullClassData?.schedules, studentSchedules, filledScheduleEntries, formData.startDate, formData.id, formData._id]);
 
-  // Filter rooms based on conflicts
-  const filteredRooms = useMemo(() => {
-    if (!generatedSessions.length || !existingSchedules.length) {
-      return rooms;
-    }
-
-    const filtered = rooms.filter(
-      (room) => {
-        const roomId = room._id || room.id;
-        const roomIdStr = String(roomId);
-        
-        const roomName = room.name || room.roomName || room.room_name || room.title || `Phòng ${roomId}`;
-        
-        const hasIdConflict = conflictingRoomIds.has(roomIdStr) || conflictingRoomIds.has(String(room.id));
-        const hasNameConflict = conflictingRoomIds.has(roomName) || 
-                                conflictingRoomIds.has(room.name) || 
-                                conflictingRoomIds.has(room.roomName) || 
-                                conflictingRoomIds.has(room.room_name);
-        
-        return !hasIdConflict && !hasNameConflict;
-      }
-    );
-    
-    return filtered;
-  }, [generatedSessions, existingSchedules, rooms, conflictingRoomIds]);
-
-  // Filter teachers based on conflicts
-  const filteredTeachers = useMemo(() => {
-    if (!generatedSessions.length || Object.keys(teacherSchedules).length === 0) {
-      return teachers;
-    }
-
-    const filtered = teachers.filter(
-      (teacher) => {
-        const teacherId = teacher._id || teacher.id;
-        const teacherIdStr = String(teacherId);
-        
-        const hasIdConflict = conflictingTeacherIds.has(teacherIdStr) || conflictingTeacherIds.has(String(teacher.id));
-        
-        return !hasIdConflict;
-      }
-    );
-    
-    return filtered;
-  }, [generatedSessions, teacherSchedules, teachers, conflictingTeacherIds]);
+  // Update studentConflicts state
+  useEffect(() => {
+    setStudentConflicts(studentConflictsMap);
+  }, [studentConflictsMap]);
 
   // Clear selected room if it becomes unavailable
   useEffect(() => {
@@ -1571,6 +1998,88 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
     }
   }, [formData.roomId, selectedStudents, rooms]);
 
+  // Fetch student schedules when students are selected
+  useEffect(() => {
+    const fetchStudentSchedules = async () => {
+      if (!selectedStudents || selectedStudents.length === 0) {
+        setStudentSchedules({});
+        setStudentConflicts(new Map());
+        return;
+      }
+
+      // Get date range from fullClassData.schedules or formData dates
+      let startDate = null;
+      let endDate = null;
+
+      if (fullClassData?.schedules && Array.isArray(fullClassData.schedules) && fullClassData.schedules.length > 0) {
+        const dates = fullClassData.schedules
+          .map(s => s.date || s.scheduleDate || s.classDate)
+          .filter(Boolean)
+          .map(d => new Date(d))
+          .filter(d => !isNaN(d.getTime()));
+        
+        if (dates.length > 0) {
+          startDate = new Date(Math.min(...dates.map(d => d.getTime())));
+          endDate = new Date(Math.max(...dates.map(d => d.getTime())));
+        }
+      }
+
+      // Fallback to formData dates
+      if (!startDate && formData.startDate) {
+        startDate = new Date(formData.startDate);
+      }
+      if (!endDate && formData.endDate) {
+        endDate = new Date(formData.endDate);
+      }
+
+      // If still no dates, use today + 3 months as default
+      if (!startDate) {
+        startDate = new Date();
+        endDate = new Date();
+        endDate.setMonth(endDate.getMonth() + 3);
+      }
+
+      try {
+        setCheckingStudentConflicts(true);
+        const schedulesMap = {};
+
+        // Fetch schedules for each selected student
+        await Promise.all(
+          selectedStudents.map(async (studentId) => {
+            if (!studentId) return;
+
+            try {
+              const response = await studentService.getStudentSchedule(studentId, {
+                startDate: startDate.toISOString().split('T')[0],
+                endDate: endDate.toISOString().split('T')[0]
+              });
+
+              if (response && response.schedules) {
+                schedulesMap[String(studentId)] = response.schedules;
+              } else if (response && response.data) {
+                schedulesMap[String(studentId)] = response.data;
+              } else {
+                schedulesMap[String(studentId)] = [];
+              }
+            } catch (error) {
+              console.error(`Error fetching schedule for student ${studentId}:`, error);
+              schedulesMap[String(studentId)] = [];
+            }
+          })
+        );
+
+        setStudentSchedules(schedulesMap);
+      } catch (error) {
+        console.error('Error fetching student schedules:', error);
+        setStudentSchedules({});
+      } finally {
+        setCheckingStudentConflicts(false);
+      }
+    };
+
+    fetchStudentSchedules();
+  }, [selectedStudents, fullClassData?.schedules, formData.startDate, formData.endDate]);
+
   // Fetch programs and levels when status is pending (editable mode)
   useEffect(() => {
     const fetchProgramsAndLevels = async () => {
@@ -1843,6 +2352,87 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
     updateSelectedCourse();
   }, [formData.course, formData.status, courses]);
 
+  // Transform schedules data for ScheduleCalendar component
+  const calendarSchedules = useMemo(() => {
+    const dataSource = fullClassData || classData;
+    const schedulesToTransform = [];
+    
+    // Priority 1: Use fullClassData.schedules if available (actual schedules from database)
+    if (dataSource?.schedules && Array.isArray(dataSource.schedules) && dataSource.schedules.length > 0) {
+      schedulesToTransform.push(...dataSource.schedules);
+    } 
+    // Priority 2: Fallback to generatedSessions (computed from scheduleEntries)
+    else if (generatedSessions && generatedSessions.length > 0) {
+      // Convert generatedSessions to schedule-like format
+      generatedSessions.forEach((session, index) => {
+        schedulesToTransform.push({
+          date: session.date,
+          startTime: session.startTime,
+          endTime: session.endTime,
+          _id: `generated-${index}`,
+          status: 'scheduled'
+        });
+      });
+    }
+    
+    // Transform to ScheduleCalendar format
+    return schedulesToTransform.map((schedule, index) => {
+      const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+      const date = scheduleDate ? new Date(scheduleDate) : null;
+      
+      if (!date || isNaN(date.getTime())) {
+        return null;
+      }
+      
+      // Get teacher name
+      const teacherName = schedule.teacher?.fullName || 
+                         schedule.teacher?.name || 
+                         schedule.teacherName ||
+                         (schedule.teacher?.firstName && schedule.teacher?.lastName 
+                           ? `${schedule.teacher.firstName} ${schedule.teacher.lastName}` 
+                           : null) ||
+                         teachers.find(t => {
+                           const teacherId = t._id || t.id;
+                           const scheduleTeacherId = schedule.teacher?._id || schedule.teacher?.id || schedule.teacher;
+                           return String(teacherId) === String(scheduleTeacherId);
+                         })?.fullName || 
+                         teachers.find(t => {
+                           const teacherId = t._id || t.id;
+                           const scheduleTeacherId = schedule.teacher?._id || schedule.teacher?.id || schedule.teacher;
+                           return String(teacherId) === String(scheduleTeacherId);
+                         })?.name ||
+                         'Chưa có';
+      
+      // Get room name
+      const roomName = schedule.room?.room_name || 
+                      schedule.room?.name || 
+                      schedule.roomName ||
+                      rooms.find(r => {
+                        const roomId = r._id || r.id;
+                        const scheduleRoomId = schedule.room?._id || schedule.room?.id || schedule.room;
+                        return String(roomId) === String(scheduleRoomId);
+                      })?.room_name ||
+                      rooms.find(r => {
+                        const roomId = r._id || r.id;
+                        const scheduleRoomId = schedule.room?._id || schedule.room?.id || schedule.room;
+                        return String(roomId) === String(scheduleRoomId);
+                      })?.name ||
+                      'Chưa có';
+      
+      return {
+        id: schedule._id || schedule.id || `schedule-${index}`,
+        date: date.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        startTime: schedule.startTime || schedule.start_time || '08:00',
+        endTime: schedule.endTime || schedule.end_time || '10:00',
+        className: formData.name || 'Chưa có tên lớp',
+        teacherName: teacherName,
+        roomName: roomName,
+        status: schedule.status || 'scheduled',
+        lessonNumber: schedule.session?.order || schedule.lessonNumber || null,
+        lessonTopic: schedule.session?.title || schedule.lessonTopic || null
+      };
+    }).filter(Boolean); // Remove null entries
+  }, [fullClassData, classData, generatedSessions, formData.name, teachers, rooms]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -1906,6 +2496,37 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           alert(`Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`);
           return;
         }
+      }
+    }
+
+    // Check for teacher conflicts before submitting
+    if (teacherRoomConflicts.teacherConflicts.length > 0) {
+      const conflictCount = teacherRoomConflicts.teacherConflicts.length;
+      const confirmMessage = `Cảnh báo: Giáo viên đã chọn có ${conflictCount} xung đột lịch học.\n\nBạn có chắc chắn muốn tiếp tục cập nhật lớp học không?`;
+      
+      if (!window.confirm(confirmMessage)) {
+        return;
+      }
+    }
+
+    // Check for room conflicts before submitting
+    if (teacherRoomConflicts.roomConflicts.length > 0) {
+      const conflictCount = teacherRoomConflicts.roomConflicts.length;
+      const confirmMessage = `Cảnh báo: Phòng học đã chọn có ${conflictCount} xung đột lịch học.\n\nBạn có chắc chắn muốn tiếp tục cập nhật lớp học không?`;
+      
+      if (!window.confirm(confirmMessage)) {
+        return;
+      }
+    }
+
+    // Check for student conflicts before submitting
+    if (studentConflicts.size > 0) {
+      const conflictCount = Array.from(studentConflicts.values()).reduce((sum, conflicts) => sum + conflicts.length, 0);
+      const studentCount = studentConflicts.size;
+      const confirmMessage = `Cảnh báo: Có ${studentCount} học viên với tổng cộng ${conflictCount} xung đột lịch học.\n\nBạn có chắc chắn muốn tiếp tục cập nhật lớp học không?`;
+      
+      if (!window.confirm(confirmMessage)) {
+        return;
       }
     }
 
@@ -2144,121 +2765,68 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                 </Form.Group>
               </div>
             </div>
+          </div>
 
-            <Form.Group className="mb-12">
-              <Form.Label className="text-neutral-700 fw-medium mb-8">
-                Thời khóa biểu <span className="text-danger-600">*</span>
-              </Form.Label>
-              {loadingClassData ? (
-                <div className="text-neutral-500 text-13 mb-12 d-flex align-items-center gap-8">
-                  <i className="fas fa-spinner fa-spin"></i>
-                  Đang tải thời khóa biểu từ database...
-                </div>
-              ) : (
-                <p className="text-neutral-500 text-13 mb-0">
-                  Thêm nhiều buổi học với ngày và giờ khác nhau (ví dụ: Thứ 2: 08:00-10:00, Thứ 4: 18:00-20:00).
-                </p>
+          {/* Calendar View */}
+          <div className="mb-24">
+            <div className="d-flex justify-content-between align-items-center mb-16 pb-12 border-bottom border-neutral-100">
+              <h5 className="text-neutral-900 fw-semibold mb-0">
+                Thời khóa biểu
+              </h5>
+              
+              {calendarSchedules.length > 0 && (
+                <ButtonGroup>
+                  <Button
+                    className={calendarViewMode === 'month' 
+                      ? 'btn-main text-14 fw-medium px-16 py-8' 
+                      : 'btn-outline-main text-14 fw-medium px-16 py-8'}
+                    onClick={() => setCalendarViewMode('month')}
+                  >
+                    <i className="fas fa-calendar me-2"></i>
+                    Tháng
+                  </Button>
+                  <Button
+                    className={calendarViewMode === 'week' 
+                      ? 'btn-main text-14 fw-medium px-16 py-8' 
+                      : 'btn-outline-main text-14 fw-medium px-16 py-8'}
+                    onClick={() => setCalendarViewMode('week')}
+                  >
+                    <i className="fas fa-calendar-week me-2"></i>
+                    Tuần
+                  </Button>
+                </ButtonGroup>
               )}
-            </Form.Group>
-
-            <div className="d-flex flex-column gap-12">
-              {formData.scheduleEntries.map((entry, index) => {
-                const isDuplicate = duplicateEntryIndices.includes(index);
-                return (
-                <div
-                  key={entry.id}
-                  className={`border rounded-12 p-16 ${isDuplicate ? 'border-danger border-2' : 'border-neutral-100'}`}
-                >
-                  <div className="d-flex justify-content-between align-items-center mb-12">
-                    <div className="fw-semibold text-neutral-900">
-                      Buổi {index + 1}
-                    </div>
-                    {formData.scheduleEntries.length > 1 && (
-                      <Button
-                        type="button"
-                        className="btn-outline-danger text-13 fw-medium px-14 py-6 radius-8"
-                        onClick={() => removeScheduleEntry(entry.id)}
-                      >
-                        <i className="fas fa-trash-alt me-2"></i>
-                        Xóa
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="row g-3">
-                    <div className="col-md-4">
-                      <Form.Group>
-                        <Form.Label className="text-neutral-700 fw-medium mb-8">
-                          Ngày học
-                        </Form.Label>
-                        <Form.Select
-                          value={entry.day}
-                          onChange={(e) =>
-                            handleScheduleEntryChange(entry.id, 'day', e.target.value)
-                          }
-                          className="border-neutral-30 radius-8 px-16 py-10"
-                          required
-                        >
-                          <option value="">-- Chọn ngày --</option>
-                          {daysOfWeek.map(day => (
-                            <option key={day.value} value={day.value}>
-                              {day.label}
-                            </option>
-                          ))}
-                        </Form.Select>
-                      </Form.Group>
-                    </div>
-                    <div className="col-md-4">
-                      <Form.Group>
-                        <Form.Label className="text-neutral-700 fw-medium mb-8">
-                          Giờ bắt đầu
-                        </Form.Label>
-                        <Form.Control
-                          type="time"
-                          value={entry.startTime}
-                          onChange={(e) =>
-                            handleScheduleEntryChange(entry.id, 'startTime', e.target.value)
-                          }
-                          className="border-neutral-30 radius-8 px-16 py-10"
-                          required
-                        />
-                      </Form.Group>
-                    </div>
-                    <div className="col-md-4">
-                      <Form.Group>
-                        <Form.Label className="text-neutral-700 fw-medium mb-8">
-                          Giờ kết thúc
-                        </Form.Label>
-                        <Form.Control
-                          type="time"
-                          value={entry.endTime}
-                          onChange={(e) =>
-                            handleScheduleEntryChange(entry.id, 'endTime', e.target.value)
-                          }
-                          className="border-neutral-30 radius-8 px-16 py-10"
-                          required
-                        />
-                      </Form.Group>
-                    </div>
-                  </div>
-                </div>
-                );
-              })}
             </div>
-
-            <Button
-              type="button"
-              onClick={addScheduleEntry}
-              className="btn-outline-main text-14 fw-medium px-16 py-8 radius-8 mt-16"
-            >
-              <i className="fas fa-plus me-2"></i>
-              Thêm buổi học
-            </Button>
-
-            {scheduleEntriesError && (
-              <Alert variant="danger" className="mt-12 mb-0">
-                {scheduleEntriesError}
-              </Alert>
+            
+            {calendarSchedules.length > 0 ? (
+              <div className="border border-neutral-100 rounded-12 p-16 bg-white">
+                {calendarViewMode === 'month' ? (
+                  <ScheduleCalendar
+                    schedules={calendarSchedules}
+                    onEditSchedule={(schedule) => {
+                      setSelectedScheduleDetail(schedule);
+                      setShowScheduleDetailModal(true);
+                    }}
+                    onDeleteSchedule={() => {}} // Read-only in this context
+                    onCreateMakeup={() => {}} // Read-only in this context
+                  />
+                ) : (
+                  <ScheduleWeekly
+                    schedules={calendarSchedules}
+                    onScheduleClick={(schedule) => {
+                      setSelectedScheduleDetail(schedule);
+                      setShowScheduleDetailModal(true);
+                    }}
+                  />
+                )}
+              </div>
+            ) : (
+              <div className="border border-neutral-100 rounded-12 p-24 bg-neutral-25 text-center">
+                <i className="fas fa-calendar-times fa-2x mb-12 text-neutral-300"></i>
+                <div className="text-neutral-600 text-14">
+                  Chưa có lịch học nào. Vui lòng thiết lập thời khóa biểu ở trên để xem lịch học trên calendar.
+                </div>
+              </div>
             )}
           </div>
 
@@ -2309,14 +2877,79 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                     })}
                   </Form.Select>
                   <Form.Text className="text-neutral-500 text-12">
-                    {teachers.length === 0
+                    {checkingTeacherRoomConflicts
+                      ? 'Đang kiểm tra xung đột...'
+                      : teachers.length === 0
                       ? 'Đang tải danh sách giáo viên...'
-                      : filteredTeachers.length === 0 && generatedSessions.length > 0
-                      ? 'Không còn giáo viên phù hợp (tất cả đều bị trùng lịch)'
-                      : generatedSessions.length > 0
-                      ? `Có ${filteredTeachers.length} giáo viên phù hợp (chưa bị trùng lịch)`
-                      : `Có ${teachers.length} giáo viên. Chọn lịch học để lọc giáo viên phù hợp.`}
+                      : `Có ${teachers.length} giáo viên. ${generatedSessions.length > 0 ? 'Chọn giáo viên để kiểm tra xung đột lịch học.' : 'Chọn lịch học để kiểm tra xung đột.'}`}
                   </Form.Text>
+                  {teacherRoomConflicts.teacherConflicts.length > 0 && formData.teacherId && 
+                   teacherRoomConflicts.teacherConflicts.some(c => c.teacherId === (formData.teacherId?.toString() || String(formData.teacherId))) && (
+                    <Alert variant="warning" className="mt-12 mb-0">
+                      <i className="fas fa-exclamation-triangle me-2"></i>
+                      <strong>⚠️ CẢNH BÁO XUNG ĐỘT LỊCH HỌC:</strong> Giáo viên đã chọn có <strong>{teacherRoomConflicts.teacherConflicts.filter(c => c.teacherId === (formData.teacherId?.toString() || String(formData.teacherId))).length} xung đột</strong> với các lớp khác.
+                      <div className="mt-8">
+                        <details>
+                          <summary className="cursor-pointer fw-medium text-13 mb-8">
+                            <i className="fas fa-info-circle me-2"></i>
+                            Xem chi tiết {teacherRoomConflicts.teacherConflicts.length} xung đột
+                          </summary>
+                          <div className="mt-8 p-12 bg-warning-25 rounded-8 border border-warning-200">
+                            <div className="text-12 fw-semibold mb-8 text-warning-900">
+                              Giáo viên này đang dạy các lớp khác vào cùng thời gian:
+                            </div>
+                            <ul className="mb-0 ms-16 text-12">
+                              {teacherRoomConflicts.teacherConflicts
+                                .filter(c => {
+                                  try {
+                                    return c.teacherId === (formData.teacherId?.toString() || String(formData.teacherId));
+                                  } catch (err) {
+                                    console.error('Error filtering conflicts:', err);
+                                    return false;
+                                  }
+                                })
+                                .map((conflict, idx) => {
+                                  try {
+                                    // Get current class schedule for this date to show what's conflicting
+                                    const currentSchedule = currentClassSchedulesForRender?.find(s => s?.date === conflict?.date);
+                                    const currentClassTime = currentSchedule 
+                                      ? `${currentSchedule.startTime || ''} - ${currentSchedule.endTime || ''}`
+                                      : conflict.conflictingClassTime || conflict.currentClassTime || conflict.classTime || 'N/A';
+                                    
+                                    return (
+                                      <li key={idx || `conflict-${idx}`} className="mb-6">
+                                        <strong>Ngày {conflict.date || 'N/A'}:</strong> Lớp hiện tại <strong className="text-warning-800">"{fullClassData?.name || 'N/A'}"</strong> 
+                                        {' '}(<strong>{currentClassTime}</strong>) trùng với lớp <strong className="text-warning-800">"{conflict.className || 'N/A'}"</strong> 
+                                        {' '}({conflict.time || conflict.teacherTime || 'N/A'})
+                                      </li>
+                                    );
+                                  } catch (err) {
+                                    console.error('Error rendering conflict item:', err, conflict);
+                                    return (
+                                      <li key={idx || `conflict-error-${idx}`} className="mb-6 text-danger">
+                                        Lỗi hiển thị thông tin conflict
+                                      </li>
+                                    );
+                                  }
+                                })}
+                            </ul>
+                            <div className="mt-12 pt-12 border-top border-warning-300 text-11 text-warning-800">
+                              <i className="fas fa-lightbulb me-2"></i>
+                              <strong>Lưu ý:</strong> Bạn vẫn có thể chọn giáo viên này, nhưng sẽ có xung đột lịch học. Vui lòng xem xét kỹ trước khi lưu.
+                            </div>
+                          </div>
+                        </details>
+                      </div>
+                    </Alert>
+                  )}
+                  {!checkingTeacherRoomConflicts && formData.teacherId && 
+                   teacherRoomConflicts.teacherConflicts.filter(c => c.teacherId === (formData.teacherId?.toString() || String(formData.teacherId))).length === 0 && 
+                   generatedSessions.length > 0 && (
+                    <Alert variant="success" className="mt-12 mb-0">
+                      <i className="fas fa-check-circle me-2"></i>
+                      <strong>✓ Không có xung đột:</strong> Giáo viên đã chọn không có lịch trùng với lớp hiện tại.
+                    </Alert>
+                  )}
                 </Form.Group>
               </div>
 
@@ -2333,11 +2966,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                     <option value="">
                       {roomLoading ? 'Đang kiểm tra phòng trống...' : '-- Chọn phòng học --'}
                     </option>
-                    {!roomLoading && filteredRooms.length === 0 && (
-                      <option value="" disabled>
-                        Không còn phòng phù hợp
-                      </option>
-                    )}
                     {!roomLoading && filteredRooms.map(r => {
                       const roomId = r._id || r.id;
                       const roomName = r.name || r.roomName || r.room_name || r.title || `Phòng ${roomId}`;
@@ -2350,8 +2978,78 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                     })}
                   </Form.Select>
                   <Form.Text className="text-neutral-500 text-12">
-                    Chỉ hiển thị phòng chưa bị trùng với lịch đã chọn.
+                    {checkingTeacherRoomConflicts
+                      ? 'Đang kiểm tra xung đột...'
+                      : rooms.length === 0
+                      ? 'Đang tải danh sách phòng học...'
+                      : `Có ${rooms.length} phòng học. ${generatedSessions.length > 0 ? 'Chọn phòng học để kiểm tra xung đột lịch học.' : 'Chọn lịch học để kiểm tra xung đột.'}`}
                   </Form.Text>
+                  {teacherRoomConflicts.roomConflicts.length > 0 && formData.roomId && 
+                   teacherRoomConflicts.roomConflicts.some(c => c.roomId === (formData.roomId?.toString() || String(formData.roomId))) && (
+                    <Alert variant="warning" className="mt-12 mb-0">
+                      <i className="fas fa-exclamation-triangle me-2"></i>
+                      <strong>⚠️ CẢNH BÁO XUNG ĐỘT LỊCH HỌC:</strong> Phòng học đã chọn có <strong>{teacherRoomConflicts.roomConflicts.filter(c => c.roomId === (formData.roomId?.toString() || String(formData.roomId))).length} xung đột</strong> với các lớp khác.
+                      <div className="mt-8">
+                        <details>
+                          <summary className="cursor-pointer fw-medium text-13 mb-8">
+                            <i className="fas fa-info-circle me-2"></i>
+                            Xem chi tiết {teacherRoomConflicts.roomConflicts.filter(c => c.roomId === (formData.roomId?.toString() || String(formData.roomId))).length} xung đột
+                          </summary>
+                          <div className="mt-8 p-12 bg-warning-25 rounded-8 border border-warning-200">
+                            <div className="text-12 fw-semibold mb-8 text-warning-900">
+                              Phòng học này đang được sử dụng bởi các lớp khác vào cùng thời gian:
+                            </div>
+                            <ul className="mb-0 ms-16 text-12">
+                              {teacherRoomConflicts.roomConflicts
+                                .filter(c => {
+                                  try {
+                                    return c.roomId === (formData.roomId?.toString() || String(formData.roomId));
+                                  } catch (err) {
+                                    console.error('Error filtering room conflicts:', err);
+                                    return false;
+                                  }
+                                })
+                                .map((conflict, idx) => {
+                                  try {
+                                    const currentClassTime = conflict.conflictingClassTime || 
+                                      conflict.currentClassTime || 
+                                      conflict.classTime || 
+                                      conflict.time || 'N/A';
+                                    
+                                    return (
+                                      <li key={idx || `conflict-${idx}`} className="mb-6">
+                                        <strong>Ngày {conflict.date || 'N/A'}:</strong> Lớp hiện tại <strong className="text-warning-800">"{fullClassData?.name || 'N/A'}"</strong> 
+                                        {' '}(<strong>{currentClassTime}</strong>) trùng với lớp <strong className="text-warning-800">"{conflict.className || 'N/A'}"</strong> 
+                                        {' '}({conflict.time || 'N/A'})
+                                      </li>
+                                    );
+                                  } catch (err) {
+                                    console.error('Error rendering conflict item:', err, conflict);
+                                    return (
+                                      <li key={idx || `conflict-error-${idx}`} className="mb-6 text-danger">
+                                        Lỗi hiển thị thông tin conflict
+                                      </li>
+                                    );
+                                  }
+                                })}
+                            </ul>
+                            <div className="mt-12 pt-12 border-top border-warning-300 text-11 text-warning-800">
+                              <i className="fas fa-lightbulb me-2"></i>
+                              <strong>Lưu ý:</strong> Bạn vẫn có thể chọn phòng học này, nhưng sẽ có xung đột lịch học. Vui lòng xem xét kỹ trước khi lưu.
+                            </div>
+                          </div>
+                        </details>
+                      </div>
+                    </Alert>
+                  )}
+                  {!checkingTeacherRoomConflicts && formData.roomId && 
+                   teacherRoomConflicts.roomConflicts.filter(c => c.roomId === (formData.roomId?.toString() || String(formData.roomId))).length === 0 && 
+                   generatedSessions.length > 0 && (
+                    <Alert variant="success" className="mt-12 mb-0">
+                      <i className="fas fa-check-circle me-2"></i>
+                      <strong>✓ Không có xung đột:</strong> Phòng học đã chọn không có lịch trùng với lớp hiện tại.
+                    </Alert>
+                  )}
                   {roomError && (
                     <Alert variant="warning" className="mt-12 mb-0">
                       {roomError}
@@ -2395,6 +3093,13 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                 {capacityWarning.message}
               </Alert>
             )}
+
+            {checkingStudentConflicts && (
+              <Alert variant="info" className="mb-16">
+                <i className="fas fa-spinner fa-spin me-2"></i>
+                Đang kiểm tra xung đột lịch học của học viên...
+              </Alert>
+            )}
             
             <div className="mb-16">
               <div className="d-flex justify-content-between align-items-center mb-12">
@@ -2435,12 +3140,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                 style={{ display: 'none' }}
               />
 
-              {studentSchedulesLoading ? (
-                <div className="text-center text-neutral-500 py-20">
-                  <i className="fas fa-spinner fa-spin me-2"></i>
-                  Đang kiểm tra xung đột lịch học...
-                </div>
-              ) : (
                 <div 
                   className="border border-neutral-100 rounded-12 p-16"
                   style={{ maxHeight: '300px', overflowY: 'auto' }}
@@ -2492,16 +3191,15 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                         const email = student.email || 'N/A';
                         const username = student.username || 'N/A';
                         const phone = student.phone || 'N/A';
-                        const studentConflicts = conflictingStudentIds.get(String(selectedStudentId));
-                        const hasConflict = !!studentConflicts;
+                        const studentIdStr = String(selectedStudentId);
+                        const hasConflict = studentConflicts.has(studentIdStr);
+                        const conflicts = hasConflict ? studentConflicts.get(studentIdStr) : [];
                         
                         return (
                           <div
                             key={selectedStudentId}
                             className={`d-flex align-items-center justify-content-between p-12 rounded-8 border ${
-                              hasConflict 
-                                ? 'border-danger-600 bg-danger-50' 
-                                : 'border-main-200 bg-main-50'
+                              hasConflict ? 'border-warning bg-warning-50' : 'border-main-200 bg-main-50'
                             }`}
                           >
                             <div className="flex-grow-1">
@@ -2511,30 +3209,34 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                                 </div>
                                 {hasConflict && (
                                   <span 
-                                    className="badge bg-danger-600 text-white px-8 py-4 radius-4 text-11 fw-semibold"
-                                    title="Học viên này có lịch học trùng giờ với lớp đang chỉnh sửa"
+                                    className="badge bg-warning text-dark px-8 py-4 radius-6 text-11"
+                                    title={`Có ${conflicts.length} xung đột lịch học`}
                                   >
                                     <i className="fas fa-exclamation-triangle me-1"></i>
-                                    Trùng giờ
+                                    {conflicts.length} xung đột
                                   </span>
                                 )}
                               </div>
-                              <div className={`text-12 ${hasConflict ? 'text-danger-700' : 'text-neutral-500'}`}>
+                              <div className="text-12 text-neutral-500">
                                 {email} {username && `• ${username}`} {phone && phone !== 'N/A' && `• ${phone}`}
-                                {hasConflict && studentConflicts && (
-                                  <div className="text-danger-600 text-11 mt-4">
-                                    <i className="fas fa-info-circle me-1"></i>
-                                    <strong>Trùng giờ với:</strong>
-                                    <div className="mt-2 ms-12">
-                                      {studentConflicts.map((conflict, idx) => (
-                                        <div key={idx} className="mb-2">
-                                          • <strong>{conflict.className}</strong> - {conflict.date} ({conflict.time})
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
                               </div>
+                              {hasConflict && conflicts.length > 0 && (
+                                <div className="mt-8 text-12 text-warning-800">
+                                  <details>
+                                    <summary className="cursor-pointer fw-medium">
+                                      Xem chi tiết xung đột ({conflicts.length})
+                                    </summary>
+                                    <ul className="mt-8 mb-0 ms-16">
+                                      {conflicts.map((conflict, idx) => (
+                                        <li key={idx} className="mb-4">
+                                          Lớp <strong>{conflict.className}</strong> vào {conflict.dateDisplay} 
+                                          ({conflict.time}) trùng với lịch mới ({conflict.newClassTime})
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </details>
+                                </div>
+                              )}
                             </div>
                             <Button
                               type="button"
@@ -2552,19 +3254,11 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                     </div>
                   )}
                 </div>
-              )}
 
               <Form.Text className="text-neutral-500 text-12 mt-8">
                 <i className="fas fa-info-circle me-1"></i>
                 Có thể thêm học viên sau khi chỉnh sửa lớp. File Excel cần có cột đầu tiên chứa Email hoặc Số điện thoại của học viên.
               </Form.Text>
-              {!studentSchedulesLoading && conflictingStudentIds.size > 0 && (
-                <Alert variant="warning" className="mt-12 mb-0">
-                  <i className="fas fa-exclamation-triangle me-2"></i>
-                  <strong>Cảnh báo:</strong> Có {conflictingStudentIds.size} học viên bị trùng giờ học với lớp đang chỉnh sửa. 
-                  Vui lòng kiểm tra lại lịch học của các học viên này (xem chi tiết bên trên).
-                </Alert>
-              )}
             </div>
           </div>
         </Modal.Body>
@@ -2668,8 +3362,398 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Schedule Detail Modal */}
+      <Modal 
+        show={showScheduleDetailModal} 
+        onHide={() => {
+          setShowScheduleDetailModal(false);
+          setSelectedScheduleDetail(null);
+          setEditedSchedule(null);
+          setHasAttendance(false);
+          setCheckingAttendance(false);
+        }} 
+        centered
+        size="md"
+        onShow={async () => {
+          // Initialize editedSchedule when modal opens
+          if (selectedScheduleDetail) {
+            setEditedSchedule({
+              date: selectedScheduleDetail.date,
+              startTime: selectedScheduleDetail.startTime,
+              endTime: selectedScheduleDetail.endTime
+            });
+            
+            // Check if schedule has attendance (buổi đã học)
+            const scheduleId = selectedScheduleDetail.id || selectedScheduleDetail._id;
+            if (scheduleId && !scheduleId.startsWith('generated-') && !scheduleId.startsWith('schedule-')) {
+              try {
+                setCheckingAttendance(true);
+                const response = await classScheduleService.getAttendanceByClassSchedule(scheduleId);
+                const attendances = response.list || response.attendances || response || [];
+                
+                // Check if any student has attendance (status is not null/undefined)
+                const hasAnyAttendance = attendances.some(att => att.attendance?.status != null);
+                setHasAttendance(hasAnyAttendance);
+              } catch (error) {
+                console.error('Error checking attendance:', error);
+                // If error, assume no attendance (allow editing)
+                setHasAttendance(false);
+              } finally {
+                setCheckingAttendance(false);
+              }
+            } else {
+              // Generated schedule, no attendance yet
+              setHasAttendance(false);
+            }
+          }
+        }}
+      >
+        <Modal.Header closeButton className="bg-main-600 text-white border-0 p-24">
+          <Modal.Title className="fw-bold">
+            <i className="fas fa-calendar-day me-2"></i>
+            Thông tin buổi học
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-24">
+          {checkingAttendance && (
+            <div className="text-center py-20">
+              <div className="spinner-border text-main-600" role="status">
+                <span className="visually-hidden">Đang kiểm tra...</span>
+              </div>
+              <p className="text-neutral-600 mt-3">Đang kiểm tra trạng thái buổi học...</p>
+            </div>
+          )}
+          {!checkingAttendance && selectedScheduleDetail && editedSchedule && (
+            <div className="d-flex flex-column gap-16">
+              {hasAttendance && (
+                <Alert variant="warning" className="mb-0">
+                  <i className="fas fa-exclamation-triangle me-2"></i>
+                  <strong>Buổi học đã diễn ra:</strong> Buổi học này đã có học sinh được điểm danh, không thể chỉnh sửa thông tin.
+                </Alert>
+              )}
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <Form.Group>
+                    <Form.Label className="text-neutral-700 fw-medium mb-8">
+                      Ngày học
+                    </Form.Label>
+                    <Form.Control
+                      type="date"
+                      value={editedSchedule.date}
+                      onChange={(e) => setEditedSchedule({
+                        ...editedSchedule,
+                        date: e.target.value
+                      })}
+                      className="border-neutral-30 radius-8 px-16 py-10"
+                      disabled={hasAttendance || checkingAttendance}
+                    />
+                  </Form.Group>
+                </div>
+                <div className="col-md-6">
+                  <div className="text-neutral-600 text-13 fw-medium mb-8">
+                    Thứ
+                  </div>
+                  <div className="text-neutral-900 fw-semibold text-15">
+                    {(() => {
+                      const date = new Date(editedSchedule.date);
+                      const dayOfWeek = date.getDay();
+                      const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+                      return dayNames[dayOfWeek];
+                    })()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <Form.Group>
+                    <Form.Label className="text-neutral-700 fw-medium mb-8">
+                      Giờ bắt đầu
+                    </Form.Label>
+                    <Form.Control
+                      type="time"
+                      value={editedSchedule.startTime}
+                      onChange={(e) => setEditedSchedule({
+                        ...editedSchedule,
+                        startTime: e.target.value
+                      })}
+                      className="border-neutral-30 radius-8 px-16 py-10"
+                      disabled={hasAttendance || checkingAttendance}
+                    />
+                  </Form.Group>
+                </div>
+                <div className="col-md-6">
+                  <Form.Group>
+                    <Form.Label className="text-neutral-700 fw-medium mb-8">
+                      Giờ kết thúc
+                    </Form.Label>
+                    <Form.Control
+                      type="time"
+                      value={editedSchedule.endTime}
+                      onChange={(e) => setEditedSchedule({
+                        ...editedSchedule,
+                        endTime: e.target.value
+                      })}
+                      className="border-neutral-30 radius-8 px-16 py-10"
+                      disabled={hasAttendance || checkingAttendance}
+                    />
+                  </Form.Group>
+                </div>
+              </div>
+
+              {selectedScheduleDetail.className && (
+                <div>
+                  <div className="text-neutral-600 text-13 fw-medium mb-8">
+                    Lớp học
+                  </div>
+                  <div className="text-neutral-900 fw-semibold text-15">
+                    {selectedScheduleDetail.className}
+                  </div>
+                </div>
+              )}
+
+              {selectedScheduleDetail.teacherName && selectedScheduleDetail.teacherName !== 'Chưa có' && (
+                <div>
+                  <div className="text-neutral-600 text-13 fw-medium mb-8">
+                    Giáo viên
+                  </div>
+                  <div className="text-neutral-900 text-15">
+                    {selectedScheduleDetail.teacherName}
+                  </div>
+                </div>
+              )}
+
+              {selectedScheduleDetail.roomName && selectedScheduleDetail.roomName !== 'Chưa có' && (
+                <div>
+                  <div className="text-neutral-600 text-13 fw-medium mb-8">
+                    Phòng học
+                  </div>
+                  <div className="text-neutral-900 text-15">
+                    {selectedScheduleDetail.roomName}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="bg-neutral-25 border-0 p-20">
+          <Button 
+            className="btn-outline-neutral text-15 fw-medium px-20 py-10 radius-8"
+            onClick={() => {
+              setShowScheduleDetailModal(false);
+              setSelectedScheduleDetail(null);
+              setEditedSchedule(null);
+            }}
+            disabled={savingSchedule}
+          >
+            <i className="fas fa-times me-2"></i> Hủy
+          </Button>
+          <Button 
+            className="btn-main text-15 fw-semibold px-24 py-10 radius-8"
+            disabled={hasAttendance || checkingAttendance || savingSchedule}
+            onClick={() => {
+              if (!editedSchedule || !selectedScheduleDetail) return;
+              
+              // Prevent saving if has attendance
+              if (hasAttendance) {
+                alert('Buổi học đã diễn ra, không thể chỉnh sửa!');
+                return;
+              }
+              
+              // Validate
+              if (!editedSchedule.date || !editedSchedule.startTime || !editedSchedule.endTime) {
+                alert('Vui lòng điền đầy đủ thông tin!');
+                return;
+              }
+              
+              if (editedSchedule.startTime >= editedSchedule.endTime) {
+                alert('Giờ bắt đầu phải nhỏ hơn giờ kết thúc!');
+                return;
+              }
+
+              // Check if schedule has real ID (from database)
+              const scheduleId = selectedScheduleDetail.id;
+              if (!scheduleId || scheduleId.startsWith('generated-') || scheduleId.startsWith('schedule-')) {
+                alert('Buổi học này chưa được lưu vào hệ thống. Vui lòng lưu lớp học trước khi chỉnh sửa buổi học.');
+                return;
+              }
+
+              // Show confirmation modal
+              setShowConfirmUpdateModal(true);
+            }}
+          >
+            {savingSchedule ? (
+              <>
+                <i className="fas fa-spinner fa-spin me-2"></i>
+                Đang lưu...
+              </>
+            ) : (
+              <>
+                <i className="fas fa-save me-2"></i>
+                Lưu thay đổi
+              </>
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Confirm Update Scope Modal */}
+      <Modal 
+        show={showConfirmUpdateModal} 
+        onHide={() => {
+          setShowConfirmUpdateModal(false);
+          setUpdateScope('single');
+        }} 
+        centered
+        size="md"
+      >
+        <Modal.Header closeButton className="bg-warning-50 border-0 p-24">
+          <Modal.Title className="fw-bold text-neutral-900">
+            <i className="fas fa-exclamation-triangle text-warning-600 me-2"></i>
+            Xác nhận chỉnh sửa
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-24">
+          <div className="mb-20">
+            <h5 className="text-neutral-900 fw-semibold mb-12">Bạn muốn chỉnh sửa buổi học này</h5>
+            <p className="text-neutral-600 text-14 mb-0">
+              Vui lòng chọn phạm vi áp dụng thay đổi:
+            </p>
+          </div>
+
+          <div className="d-flex flex-column gap-12">
+            <div 
+              className={`border rounded-12 p-16 cursor-pointer transition-all ${
+                updateScope === 'single' 
+                  ? 'border-main-500 bg-main-50' 
+                  : 'border-neutral-200 bg-white hover-border-neutral-300'
+              }`}
+              onClick={() => setUpdateScope('single')}
+              style={{ cursor: 'pointer' }}
+            >
+              <div className="d-flex align-items-center gap-12">
+                <div 
+                  className={`rounded-circle d-flex align-items-center justify-content-center ${
+                    updateScope === 'single' ? 'bg-main-600' : 'border border-neutral-300 bg-white'
+                  }`}
+                  style={{ width: '20px', height: '20px', flexShrink: 0 }}
+                >
+                  {updateScope === 'single' && (
+                    <i className="fas fa-check text-white" style={{ fontSize: '10px' }}></i>
+                  )}
+                </div>
+                <div className="flex-grow-1">
+                  <div className="text-neutral-900 fw-semibold text-15 mb-4">Chỉ buổi học này</div>
+                </div>
+              </div>
+            </div>
+
+            <div 
+              className={`border rounded-12 p-16 cursor-pointer transition-all ${
+                updateScope === 'future' 
+                  ? 'border-main-500 bg-main-50' 
+                  : 'border-neutral-200 bg-white hover-border-neutral-300'
+              }`}
+              onClick={() => setUpdateScope('future')}
+              style={{ cursor: 'pointer' }}
+            >
+              <div className="d-flex align-items-center gap-12">
+                <div 
+                  className={`rounded-circle d-flex align-items-center justify-content-center ${
+                    updateScope === 'future' ? 'bg-main-600' : 'border border-neutral-300 bg-white'
+                  }`}
+                  style={{ width: '20px', height: '20px', flexShrink: 0 }}
+                >
+                  {updateScope === 'future' && (
+                    <i className="fas fa-check text-white" style={{ fontSize: '10px' }}></i>
+                  )}
+                </div>
+                <div className="flex-grow-1">
+                  <div className="text-neutral-900 fw-semibold text-15 mb-4">Buổi học này và các buổi học sau</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Modal.Body>
+        <Modal.Footer className="bg-neutral-25 border-0 p-20">
+          <Button 
+            className="btn-outline-neutral text-15 fw-medium px-20 py-10 radius-8"
+            onClick={() => {
+              setShowConfirmUpdateModal(false);
+              setUpdateScope('single');
+            }}
+            disabled={savingSchedule}
+          >
+            <i className="fas fa-times me-2"></i> Hủy
+          </Button>
+          <Button 
+            className="btn-main text-15 fw-semibold px-24 py-10 radius-8"
+            disabled={savingSchedule}
+            onClick={async () => {
+              if (!editedSchedule || !selectedScheduleDetail) return;
+
+              try {
+                setSavingSchedule(true);
+                
+                // Prepare update data
+                const updateData = {
+                  date: editedSchedule.date,
+                  startTime: editedSchedule.startTime,
+                  endTime: editedSchedule.endTime,
+                  updateScope: updateScope // 'single' or 'future'
+                };
+
+                // Check if schedule has real ID (from database)
+                const scheduleId = selectedScheduleDetail.id;
+
+                // Call API to update schedule
+                await scheduleService.updateSchedule(scheduleId, updateData);
+                
+                // Refresh class data to get updated schedules
+                if (formData.id || formData._id) {
+                  const classId = formData.id || formData._id;
+                  try {
+                    const response = await classService.getClassById(classId);
+                    if (response && response.data) {
+                      setFullClassData(response.data);
+                    }
+                  } catch (error) {
+                    console.error('Error refreshing class data:', error);
+                  }
+                }
+
+                alert('Cập nhật buổi học thành công!');
+                setShowConfirmUpdateModal(false);
+                setShowScheduleDetailModal(false);
+                setSelectedScheduleDetail(null);
+                setEditedSchedule(null);
+                setUpdateScope('single');
+              } catch (error) {
+                console.error('Error updating schedule:', error);
+                alert(error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật buổi học. Vui lòng thử lại.');
+              } finally {
+                setSavingSchedule(false);
+              }
+            }}
+          >
+            {savingSchedule ? (
+              <>
+                <i className="fas fa-spinner fa-spin me-2"></i>
+                Đang lưu...
+              </>
+            ) : (
+              <>
+                <i className="fas fa-check me-2"></i>
+                Xác nhận
+              </>
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Modal>
   );
 };
 
 export default EditClassModal;
+

@@ -764,6 +764,21 @@ async function seedClasses() {
             endDate: pendingClassEndDate,
             maxStudents: 20,
             status: 'pending'
+        },
+        {
+            name: 'IELTS Elementary A2 - Lớp Có Conflict',
+            course: seedData.courses[5]._id, // IELTS Elementary A2 - Nghe (12 sessions)
+            teacher: seedData.users[4]._id, // Teacher 2 (khác teacher để tránh conflict teacher)
+            students: [
+                seedData.users[5]._id, // Học viên chung với lớp đang học (sẽ bị conflict)
+                seedData.users[6]._id, // Học viên chung với lớp đang học (sẽ bị conflict)
+                seedData.users[8]._id  // Học viên mới
+            ],
+            room: seedData.rooms[2]._id, // Phòng khác để tránh conflict room
+            startDate: activeClassStartDate, // Cùng thời gian với lớp đang học
+            endDate: activeClassEndDate,
+            maxStudents: 25,
+            status: 'active'
         }
     ];
     
@@ -771,7 +786,9 @@ async function seedClasses() {
     seedData.classes = created;
     console.log(`✅ Created ${created.length} classes`);
     console.log(`   - Lớp đang học: ${classes[0].name} (${activeClassStartDate.toISOString().split('T')[0]} - ${activeClassEndDate.toISOString().split('T')[0]})`);
-    console.log(`   - Lớp chưa học: ${classes[1].name} (${pendingClassStartDate.toISOString().split('T')[0]} - ${pendingClassEndDate.toISOString().split('T')[0]})\n`);
+    console.log(`   - Lớp chưa học: ${classes[1].name} (${pendingClassStartDate.toISOString().split('T')[0]} - ${pendingClassEndDate.toISOString().split('T')[0]})`);
+    console.log(`   - Lớp có conflict: ${classes[2].name} (${activeClassStartDate.toISOString().split('T')[0]} - ${activeClassEndDate.toISOString().split('T')[0]})`);
+    console.log(`     ⚠️ Lớp này có học viên chung với lớp đang học và sẽ có lịch trùng thời gian\n`);
 }
 
 async function seedClassSchedules() {
@@ -783,7 +800,7 @@ async function seedClassSchedules() {
     // Các pattern lịch học mẫu (mỗi lớp có thể chọn pattern khác nhau)
     // dayOfWeek: 0 = Chủ nhật, 1 = Thứ 2, ..., 6 = Thứ 7
     const schedulePatterns = [
-        // Pattern 1: Thứ 2, Thứ 3 (2 buổi/tuần)
+        // Pattern 1: Thứ 2, Thứ 3 (2 buổi/tuần) - Dùng cho lớp đang học
         [
             { dayOfWeek: 1, startTime: '08:00', endTime: '10:00' }, // Thứ 2
             { dayOfWeek: 2, startTime: '10:00', endTime: '12:00' }  // Thứ 3
@@ -805,6 +822,12 @@ async function seedClassSchedules() {
             { dayOfWeek: 1, startTime: '08:00', endTime: '10:00' }, // Thứ 2
             { dayOfWeek: 2, startTime: '10:00', endTime: '12:00' }, // Thứ 3
             { dayOfWeek: 3, startTime: '14:00', endTime: '16:00' }  // Thứ 4
+        ],
+        // Pattern 5: Thứ 2, Thứ 3 (2 buổi/tuần) - TRÙNG với Pattern 1 để tạo conflict
+        // Lớp conflict sẽ dùng pattern này để có lịch trùng thời gian với lớp đang học
+        [
+            { dayOfWeek: 1, startTime: '08:00', endTime: '10:00' }, // Thứ 2 - TRÙNG với lớp đang học
+            { dayOfWeek: 2, startTime: '10:00', endTime: '12:00' }  // Thứ 3 - TRÙNG với lớp đang học
         ]
     ];
     
@@ -847,8 +870,15 @@ async function seedClassSchedules() {
         const numberOfSessions = course.numberOfSessions || courseSessions.length;
         
         // Chọn pattern lịch cho lớp này (mỗi lớp có thể khác nhau)
-        // Sử dụng classIndex để phân bổ pattern khác nhau cho các lớp
-        const selectedPattern = schedulePatterns[classIndex % schedulePatterns.length];
+        // Lớp conflict (index 2) sẽ dùng pattern 5 (index 4, trùng với pattern 0) để tạo conflict
+        let selectedPattern;
+        if (classIndex === 2) {
+            // Lớp conflict: dùng pattern 5 (index 4, trùng thời gian với pattern 0 - lớp đang học)
+            selectedPattern = schedulePatterns[4];
+        } else {
+            // Các lớp khác: dùng pattern theo index
+            selectedPattern = schedulePatterns[classIndex % schedulePatterns.length];
+        }
         
         // Tính toán số buổi/tuần từ pattern
         const sessionsPerWeek = selectedPattern.length;
@@ -978,21 +1008,38 @@ async function seedStudentSchedules() {
             scheduleDate.setHours(0, 0, 0, 0);
             const isPastSchedule = scheduleDate < today;
             
-            // Với schedules quá khứ, có thể có attendance
-            // Với schedules tương lai, mặc định là absent
-            const attendanceStatus = isPastSchedule 
-                ? (Math.random() > 0.3 ? 'present' : 'absent')
-                : 'absent';
-            
-            studentSchedules.push({
+            // Tạo StudentSchedule object
+            const studentScheduleData = {
                 student: studentId,
                 classSchedule: classSchedule._id,
-                attendance: {
-                    status: attendanceStatus,
-                    checkInTime: isPastSchedule && attendanceStatus === 'present' ? classSchedule.date : null,
-                    markedBy: isPastSchedule && attendanceStatus === 'present' ? classItem.teacher : null
+                // Không set attendance cho schedules tương lai (để null cho đến khi điểm danh)
+            };
+            
+            // Chỉ set attendance cho schedules quá khứ (để có dữ liệu test)
+            if (isPastSchedule) {
+                // 70% present, 20% absent, 10% late để có dữ liệu đa dạng
+                const rand = Math.random();
+                let attendanceStatus;
+                if (rand < 0.7) {
+                    attendanceStatus = 'present';
+                } else if (rand < 0.9) {
+                    attendanceStatus = 'absent';
+                } else {
+                    attendanceStatus = 'late';
                 }
-            });
+                
+                const scheduleDateObj = new Date(classSchedule.date);
+                studentScheduleData.attendance = {
+                    status: attendanceStatus,
+                    checkInTime: attendanceStatus === 'present' || attendanceStatus === 'late' 
+                        ? new Date(scheduleDateObj.getTime() + (attendanceStatus === 'late' ? 15 * 60000 : 0)) // Late: thêm 15 phút
+                        : null,
+                    markedBy: classItem.teacher
+                };
+            }
+            // Nếu là schedule tương lai, không set attendance (để null)
+            
+            studentSchedules.push(studentScheduleData);
         }
     }
     

@@ -50,6 +50,11 @@ const AttendanceDetailPage = () => {
   };
   const formatTime = (timeString) => timeString.substring(0, 5);
   const getStatusBadge = (status) => {
+    // Nếu chưa điểm danh (null/undefined), hiển thị "Chưa điểm danh"
+    if (!status) {
+      return <span className="badge bg-secondary text-white"><i className="ph ph-minus me-1"></i>Chưa điểm danh</span>;
+    }
+    
     const statusConfig = {
       'present': { class: 'bg-success', text: 'Có mặt', icon: 'ph-check-circle' },
       'absent': { class: 'bg-danger', text: 'Vắng mặt', icon: 'ph-x-circle' },
@@ -176,7 +181,7 @@ const AttendanceDetailPage = () => {
                                   </div>
                                 </div>
                               </td>
-                              <td className='py-16 px-20'>{getStatusBadge(item.attendance?.status || 'absent')}</td>
+                              <td className='py-16 px-20'>{getStatusBadge(item.attendance?.status)}</td>
                               <td className='py-16 px-20'>
                                 {item.attendance?.markedAt ? (
                                   <div>

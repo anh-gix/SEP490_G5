@@ -80,6 +80,17 @@ const classService = {
       console.error('Error fetching class schedules:', error);
       throw error.response?.data || error;
     }
+  },
+
+  // Check teacher and room conflicts
+  checkTeacherRoomConflicts: async (classId, conflictData) => {
+    try {
+      const response = await axios.post(`${API_URL}/${classId}/check-teacher-room-conflicts`, conflictData);
+      return response.data;
+    } catch (error) {
+      console.error('Error checking teacher/room conflicts:', error);
+      throw error.response?.data || error;
+    }
   }
 };
 

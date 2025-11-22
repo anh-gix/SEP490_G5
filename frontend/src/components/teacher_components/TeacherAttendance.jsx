@@ -112,14 +112,10 @@ const TeacherAttendance = () => {
         
         setScheduleInfo(scheduleInfo);
         
-        // Ensure each student has an attendance object
+        // Giữ nguyên attendance - không set default 'absent' khi chưa điểm danh
         const studentsWithAttendance = (response.lesson.students || []).map(student => ({
           ...student,
-          attendance: student.attendance || {
-            status: 'absent',
-            checkInTime: null,
-            markedBy: null
-          }
+          attendance: student.attendance || null // Để null khi chưa điểm danh
         }));
         setStudents(studentsWithAttendance);
       }
@@ -185,6 +181,16 @@ const TeacherAttendance = () => {
   };
 
   const getStatusBadge = (status) => {
+    // Nếu chưa điểm danh (null/undefined), hiển thị "Chưa điểm danh"
+    if (!status) {
+      return (
+        <Badge className="bg-secondary text-white px-12 py-6">
+          <i className="fas fa-minus me-1"></i>
+          Chưa điểm danh
+        </Badge>
+      );
+    }
+    
     const config = {
       present: { bg: 'bg-success-600', icon: 'fa-check', text: 'Có mặt' },
       absent: { bg: 'bg-danger-600', icon: 'fa-times', text: 'Vắng' },
@@ -476,7 +482,7 @@ const TeacherAttendance = () => {
                       : '-'
                     }
                   </td>
-                  <td className="px-20 py-16">{getStatusBadge(student.attendance?.status || 'absent')}</td>
+                  <td className="px-20 py-16">{getStatusBadge(student.attendance?.status)}</td>
                   <td className="px-20 py-16">
                     <div className="d-flex gap-4 justify-content-center">
                       <Button

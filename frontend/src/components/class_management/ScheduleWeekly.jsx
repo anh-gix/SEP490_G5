@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, Button, Badge } from 'react-bootstrap';
 
-const ScheduleWeekly = ({ schedules }) => {
+const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     const today = new Date();
     const dayOfWeek = today.getDay();
@@ -228,13 +228,10 @@ const ScheduleWeekly = ({ schedules }) => {
                     }}
                   >
                     {slotSchedules.length > 0 ? (
-                      slotSchedules.map(schedule => (
-                        <Link
-                          key={schedule.id}
-                          to={`/academic/lessons/${schedule.id}`}
-                          className="text-decoration-none"
-                        >
+                      slotSchedules.map(schedule => {
+                        const ScheduleCard = (
                           <Card
+                            key={schedule.id}
                             className="mb-0"
                             style={{ 
                               borderLeft: `4px solid ${getStatusColor(schedule.status)}`,
@@ -246,6 +243,7 @@ const ScheduleWeekly = ({ schedules }) => {
                             }}
                             onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)'}
                             onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
+                            onClick={() => onScheduleClick && onScheduleClick(schedule)}
                           >
                             <Card.Body className="p-2" style={{ fontSize: '10px', position: 'relative' }}>
                               <div className="fw-bold text-primary mb-1" style={{ fontSize: '9px' }}>
@@ -262,30 +260,29 @@ const ScheduleWeekly = ({ schedules }) => {
                                 <i className="fas fa-door-open me-1" style={{ fontSize: '8px' }}></i>
                                 {schedule.roomName}
                               </div>
-                              
-                              <div 
-                                className="position-absolute d-flex gap-1"
-                                style={{ bottom: '4px', right: '4px' }}
-                              >
-                                <div
-                                  className="bg-main-600 text-white border-0 d-flex align-items-center justify-content-center"
-                                  style={{ 
-                                    padding: '4px 8px',
-                                    fontSize: '9px',
-                                    lineHeight: 1,
-                                    borderRadius: '4px',
-                                    opacity: 0.95
-                                  }}
-                                  title="Xem chi tiết"
-                                >
-                                  <i className="fas fa-eye me-1" style={{ fontSize: '8px' }}></i>
-                                  <span>Chi tiết</span>
-                                </div>
-                              </div>
                             </Card.Body>
                           </Card>
-                        </Link>
-                      ))
+                        );
+
+                        // If onScheduleClick is provided, use div wrapper, otherwise use Link
+                        if (onScheduleClick) {
+                          return (
+                            <div key={schedule.id} className="text-decoration-none">
+                              {ScheduleCard}
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <Link
+                            key={schedule.id}
+                            to={`/academic/lessons/${schedule.id}`}
+                            className="text-decoration-none"
+                          >
+                            {ScheduleCard}
+                          </Link>
+                        );
+                      })
                     ) : null}
                   </div>
                 );

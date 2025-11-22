@@ -95,11 +95,11 @@ exports.createClassSchedule = async (req, res) => {
       });
     }
 
-    // ✅ 4. Tạo StudentSchedule cho từng sinh viên
+    // ✅ 4. Tạo StudentSchedule cho từng sinh viên (không set attendance - sẽ được điểm danh sau)
     const studentSchedules = classInfo.students.map((stuId) => ({
       student: stuId,
       classSchedule: newSchedule._id,
-      attendance: { status: "absent" },
+      // Không set attendance - để null cho đến khi giáo viên điểm danh
     }));
 
     await StudentSchedule.insertMany(studentSchedules);
@@ -405,6 +405,7 @@ exports.getTeacherSchedule = async (req, res) => {
         startTime: schedule.startTime,
         endTime: schedule.endTime,
         className: classInfo?.name || "N/A",
+        classId: schedule.class?._id?.toString() || schedule.class?.toString() || null,
         subject: classInfo?.subject || "N/A",
         room: room
           ? {

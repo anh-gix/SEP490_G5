@@ -270,30 +270,73 @@ exports.updateSchedule = async (req, res) => {
       });
     }
     
-    const { class: classId, session, topic, date, startTime, endTime, room, reason, status } = req.body;
+    const { class: classId, session, topic, date, startTime, endTime, room, reason, status, updateScope } = req.body;
     
-    // Update fields
-    if (classId) schedule.class = classId;
-    if (session) schedule.session = session;
-    if (topic) schedule.topic = topic;
-    if (date) schedule.date = date;
-    if (startTime) schedule.startTime = startTime;
-    if (endTime) schedule.endTime = endTime;
-    if (room) schedule.room = room;
-    if (reason) schedule.reason = reason;
-    if (status) schedule.status = status;
+    // Determine update scope: 'single' (default) or 'future'
+    const scope = updateScope || 'single';
     
-    await schedule.save();
-    
-    const updatedSchedule = await ClassSchedule.findById(schedule._id)
-      .populate('class', 'name level')
-      .populate('room', 'room_name location');
-    
-    res.status(200).json({
-      success: true,
-      message: 'Cập nhật lịch học thành công',
-      schedule: updatedSchedule
-    });
+    if (scope === 'future') {
+      // Update this schedule and all future schedules in the same class
+      const scheduleDate = new Date(date || schedule.date);
+      scheduleDate.setHours(0, 0, 0, 0);
+      
+      // Find all schedules in the same class with date >= current schedule date
+      const futureSchedules = await ClassSchedule.find({
+        class: schedule.class,
+        date: { $gte: scheduleDate }
+      }).sort({ date: 1, startTime: 1 });
+      
+      // Update all future schedules
+      const updatePromises = futureSchedules.map(async (futureSchedule) => {
+        if (startTime) futureSchedule.startTime = startTime;
+        if (endTime) futureSchedule.endTime = endTime;
+        // Only update date if it's the first schedule or if date is provided
+        if (date && futureSchedule._id.toString() === schedule._id.toString()) {
+          futureSchedule.date = date;
+        }
+        if (room) futureSchedule.room = room;
+        if (reason) futureSchedule.reason = reason;
+        if (status) futureSchedule.status = status;
+        
+        return futureSchedule.save();
+      });
+      
+      await Promise.all(updatePromises);
+      
+      const updatedSchedule = await ClassSchedule.findById(schedule._id)
+        .populate('class', 'name level')
+        .populate('room', 'room_name location');
+      
+      res.status(200).json({
+        success: true,
+        message: `Cập nhật ${futureSchedules.length} buổi học thành công (buổi này và các buổi sau)`,
+        schedule: updatedSchedule,
+        updatedCount: futureSchedules.length
+      });
+    } else {
+      // Update only this schedule (default behavior)
+      if (classId) schedule.class = classId;
+      if (session) schedule.session = session;
+      if (topic) schedule.topic = topic;
+      if (date) schedule.date = date;
+      if (startTime) schedule.startTime = startTime;
+      if (endTime) schedule.endTime = endTime;
+      if (room) schedule.room = room;
+      if (reason) schedule.reason = reason;
+      if (status) schedule.status = status;
+      
+      await schedule.save();
+      
+      const updatedSchedule = await ClassSchedule.findById(schedule._id)
+        .populate('class', 'name level')
+        .populate('room', 'room_name location');
+      
+      res.status(200).json({
+        success: true,
+        message: 'Cập nhật lịch học thành công',
+        schedule: updatedSchedule
+      });
+    }
   } catch (error) {
     console.error('Error in updateSchedule:', error);
     res.status(500).json({

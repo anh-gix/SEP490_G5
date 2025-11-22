@@ -1,6 +1,6 @@
 import Breadcrumb from "../components/Breadcrumb";
 import CertificateOne from "../components/CertificateOne";
-import CourseDetails from "../components/CourseDetails";
+import CourseDetails from "../components/CourseDetail/CourseDetails";
 import FooterOne from "../components/FooterOne";
 import HeaderOne from "../components/HeaderOne";
 import Animation from "../helper/Animation";

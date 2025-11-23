@@ -7,6 +7,7 @@ import scheduleService from '../../services/scheduleService';
 import classService from '../../services/classService';
 import teacherService from '../../services/teacherService';
 import roomService from '../../services/roomService';
+import { formatDateToYYYYMMDD } from '../../helper/helper';
 
 /**
  * Academic Lesson Detail Component
@@ -38,13 +39,14 @@ const AcademicLessonDetail = () => {
         return;
       }
 
-      // Format date to YYYY-MM-DD
+      // Format date to YYYY-MM-DD (using helper to avoid timezone issues)
       let dateStr = 'N/A';
       if (schedule.date) {
-        if (schedule.date instanceof Date) {
-          dateStr = schedule.date.toISOString().split('T')[0];
-        } else if (typeof schedule.date === 'string') {
+        if (typeof schedule.date === 'string') {
           dateStr = schedule.date.split('T')[0];
+        } else {
+          // Use helper function to format date correctly
+          dateStr = formatDateToYYYYMMDD(schedule.date);
         }
       }
 

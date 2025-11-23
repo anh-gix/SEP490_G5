@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Card, Button, Badge, Dropdown } from 'react-bootstrap';
+import { formatDateToYYYYMMDD } from '../../helper/helper';
 
 const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateMakeup }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -49,7 +50,8 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
 
   // Get schedules for a specific date
   const getSchedulesForDate = (date) => {
-    const dateStr = date.toISOString().split('T')[0];
+    // Use helper to format date correctly (avoid timezone issues)
+    const dateStr = formatDateToYYYYMMDD(date);
     return schedules.filter(s => s.date === dateStr);
   };
 

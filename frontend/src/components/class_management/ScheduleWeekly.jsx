@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, Button, Badge } from 'react-bootstrap';
+import { formatDateToYYYYMMDD } from '../../helper/helper';
 
 const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
@@ -45,7 +46,8 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
 
   // Get schedules for a specific date and time slot
   const getSchedulesForSlot = (date, timeSlot) => {
-    const dateStr = date.toISOString().split('T')[0];
+    // Use helper to format date correctly (avoid timezone issues)
+    const dateStr = formatDateToYYYYMMDD(date);
     
     return schedules.filter(schedule => {
       if (schedule.date !== dateStr) return false;

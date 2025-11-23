@@ -341,6 +341,432 @@ exports.getClassStats = async (req, res) => {
 };
 
 // =========================
+// 🔧 HELPER FUNCTION: KIỂM TRA CONFLICT CHO NHIỀU SCHEDULES
+// =========================
+/**
+ * Validate conflicts for multiple class schedules before creation
+ * @param {Array} classSchedules - Array of schedule objects { date, startTime, endTime, room, teacher }
+ * @param {Object} classData - Class data { _id, teacher, students }
+ * @returns {Object} { hasConflict: boolean, conflicts: { teacher: [], room: [], students: [] } }
+ */
+const validateClassSchedulesConflicts = async (classSchedules, classData) => {
+  const conflicts = {
+    teacher: [],
+    room: [],
+    students: [],
+    hasConflict: false
+  };
+
+  if (!classSchedules || classSchedules.length === 0) {
+    return conflicts;
+  }
+
+  const teacherId = classData.teacher || classData.teacherId;
+  const students = classData.students || [];
+  const classId = classData._id;
+
+  // Helper function để check time overlap
+  const hasTimeOverlap = (start1, end1, start2, end2) => {
+    return start1 < end2 && end1 > start2;
+  };
+
+  // Helper function để format date
+  const formatDateLocal = (dateInput) => {
+    if (!dateInput) return null;
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return null;
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Get all unique dates from schedules to batch query
+  const uniqueDates = [...new Set(classSchedules.map(s => {
+    const d = new Date(s.date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }))];
+
+  // 1. Kiểm tra conflict PHÒNG HỌC
+  // Get room from first schedule (all schedules should have same room)
+  const roomId = classSchedules[0]?.room;
+  if (roomId) {
+    // Query all room schedules for all dates
+    const roomSchedules = await ClassSchedule.find({
+      room: new mongoose.Types.ObjectId(roomId),
+      date: { $in: uniqueDates },
+      status: { $in: ['temporary', 'fixed'] }
+    })
+      .populate('class', 'name')
+      .select('date startTime endTime class')
+      .lean();
+
+    classSchedules.forEach(newSchedule => {
+      const scheduleDate = new Date(newSchedule.date);
+      scheduleDate.setHours(0, 0, 0, 0);
+
+      roomSchedules.forEach(existingSchedule => {
+        const existingDate = new Date(existingSchedule.date);
+        existingDate.setHours(0, 0, 0, 0);
+
+        // Check if same date and overlapping time
+        if (scheduleDate.getTime() === existingDate.getTime() &&
+            hasTimeOverlap(newSchedule.startTime, newSchedule.endTime, existingSchedule.startTime, existingSchedule.endTime)) {
+          conflicts.room.push({
+            roomId: roomId.toString(),
+            className: existingSchedule.class?.name || 'N/A',
+            date: formatDateLocal(existingSchedule.date),
+            time: `${existingSchedule.startTime} - ${existingSchedule.endTime}`,
+            conflictingTime: `${newSchedule.startTime} - ${newSchedule.endTime}`,
+            newScheduleDate: formatDateLocal(newSchedule.date)
+          });
+          conflicts.hasConflict = true;
+        }
+      });
+    });
+  }
+
+  // 2. Kiểm tra conflict GIÁO VIÊN
+  if (teacherId) {
+    // Find all classes taught by this teacher (excluding current class if classId is provided)
+    const teacherQuery = {
+      $or: [
+        { teacher: teacherId },
+        { teacherId: teacherId }
+      ]
+    };
+    if (classId) {
+      teacherQuery._id = { $ne: classId };
+    }
+    const teacherClasses = await Class.find(teacherQuery).select('_id name').lean();
+
+    if (teacherClasses.length > 0) {
+      const teacherClassIds = teacherClasses.map(c => c._id);
+
+      // Query all teacher schedules for all dates
+      const teacherSchedules = await ClassSchedule.find({
+        class: { $in: teacherClassIds },
+        date: { $in: uniqueDates },
+        status: { $in: ['temporary', 'fixed'] }
+      })
+        .populate('class', 'name')
+        .select('date startTime endTime class')
+        .lean();
+
+      classSchedules.forEach(newSchedule => {
+        const scheduleDate = new Date(newSchedule.date);
+        scheduleDate.setHours(0, 0, 0, 0);
+
+        teacherSchedules.forEach(existingSchedule => {
+          const existingDate = new Date(existingSchedule.date);
+          existingDate.setHours(0, 0, 0, 0);
+
+          // Check if same date and overlapping time
+          if (scheduleDate.getTime() === existingDate.getTime() &&
+              hasTimeOverlap(newSchedule.startTime, newSchedule.endTime, existingSchedule.startTime, existingSchedule.endTime)) {
+            conflicts.teacher.push({
+              teacherId: teacherId.toString(),
+              className: existingSchedule.class?.name || 'N/A',
+              date: formatDateLocal(existingSchedule.date),
+              time: `${existingSchedule.startTime} - ${existingSchedule.endTime}`,
+              conflictingTime: `${newSchedule.startTime} - ${newSchedule.endTime}`,
+              newScheduleDate: formatDateLocal(newSchedule.date)
+            });
+            conflicts.hasConflict = true;
+          }
+        });
+      });
+    }
+  }
+
+  // 3. Kiểm tra conflict SINH VIÊN
+  if (students && students.length > 0) {
+    // Convert students to ObjectIds if they're strings
+    const studentIds = students.map(s => {
+      if (typeof s === 'string') {
+        return new mongoose.Types.ObjectId(s);
+      } else if (s._id) {
+        return new mongoose.Types.ObjectId(s._id);
+      } else {
+        return new mongoose.Types.ObjectId(s);
+      }
+    });
+
+    // Fetch student information from database to get names
+    const studentInfo = await User.find({
+      _id: { $in: studentIds }
+    }).select('_id username fullName name email').lean();
+
+    // Create a map of studentId -> student info for quick lookup
+    const studentInfoMap = new Map();
+    studentInfo.forEach(student => {
+      const studentIdStr = student._id.toString();
+      const studentName = student.fullName || student.name || student.username || student.email?.split('@')[0] || `Học viên ${studentIdStr}`;
+      studentInfoMap.set(studentIdStr, {
+        studentId: studentIdStr,
+        studentName: studentName
+      });
+    });
+
+    // Find all classes that have any of these students (excluding current class if classId is provided)
+    const studentQuery = {
+      students: { $in: studentIds }
+    };
+    if (classId) {
+      studentQuery._id = { $ne: classId };
+    }
+    const studentClasses = await Class.find(studentQuery).select('_id name students').lean();
+
+    if (studentClasses.length > 0) {
+      const studentClassIds = studentClasses.map(c => c._id);
+
+      // Query all student schedules for all dates
+      const studentSchedules = await ClassSchedule.find({
+        class: { $in: studentClassIds },
+        date: { $in: uniqueDates },
+        status: { $in: ['temporary', 'fixed'] }
+      })
+        .populate('class', 'name')
+        .select('date startTime endTime class')
+        .lean();
+
+      const studentConflictMap = new Map();
+
+      classSchedules.forEach(newSchedule => {
+        const scheduleDate = new Date(newSchedule.date);
+        scheduleDate.setHours(0, 0, 0, 0);
+
+        studentSchedules.forEach(existingSchedule => {
+          const existingDate = new Date(existingSchedule.date);
+          existingDate.setHours(0, 0, 0, 0);
+
+          // Check if same date and overlapping time
+          if (scheduleDate.getTime() === existingDate.getTime() &&
+              hasTimeOverlap(newSchedule.startTime, newSchedule.endTime, existingSchedule.startTime, existingSchedule.endTime)) {
+            const scheduleClassId = existingSchedule.class?._id?.toString() || existingSchedule.class?.toString() || null;
+            if (!scheduleClassId) return;
+
+            const conflictingClass = studentClasses.find(cls => cls._id.toString() === scheduleClassId);
+            if (!conflictingClass) return;
+
+            conflictingClass.students.forEach(studentIdInConflictClass => {
+              const studentIdInConflictClassStr = studentIdInConflictClass.toString();
+              
+              // Check if this student is in the current class's student list
+              const isInCurrentClass = studentIds.some(sid => sid.toString() === studentIdInConflictClassStr);
+              
+              if (isInCurrentClass) {
+                // Get student name from the map we created earlier
+                const studentInfo = studentInfoMap.get(studentIdInConflictClassStr);
+                const studentName = studentInfo ? studentInfo.studentName : `Học viên ${studentIdInConflictClassStr}`;
+                
+                if (!studentConflictMap.has(studentIdInConflictClassStr)) {
+                  studentConflictMap.set(studentIdInConflictClassStr, {
+                    studentId: studentIdInConflictClassStr,
+                    studentName: studentName,
+                    conflicts: []
+                  });
+                }
+                studentConflictMap.get(studentIdInConflictClassStr).conflicts.push({
+                  className: existingSchedule.class?.name || conflictingClass.name || 'N/A',
+                  date: formatDateLocal(existingSchedule.date),
+                  time: `${existingSchedule.startTime} - ${existingSchedule.endTime}`,
+                  conflictingTime: `${newSchedule.startTime} - ${newSchedule.endTime}`,
+                  newScheduleDate: formatDateLocal(newSchedule.date)
+                });
+                conflicts.hasConflict = true;
+              }
+            });
+          }
+        });
+      });
+
+      studentConflictMap.forEach((studentConflict) => {
+        conflicts.students.push(studentConflict);
+      });
+    }
+  }
+
+  return conflicts;
+};
+
+// =========================
+// 🔍 KIỂM TRA CONFLICT TRƯỚC KHI TẠO LỚP (KHÔNG TẠO LỚP)
+// =========================
+exports.validateClassConflicts = async (req, res) => {
+  try {
+    const { course, teacher, students, room, startDate, scheduleEntries } = req.body;
+    
+    // Validate required fields for conflict checking
+    if (!teacher || !startDate || !scheduleEntries || scheduleEntries.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp đầy đủ thông tin: giáo viên, ngày khai giảng, và lịch học'
+      });
+    }
+
+    if (!course) {
+      return res.status(200).json({
+        success: true,
+        hasConflict: false,
+        conflicts: {
+          teacher: [],
+          room: [],
+          students: []
+        },
+        message: 'Chưa chọn course, không thể kiểm tra conflict'
+      });
+    }
+
+    // Get course details to generate schedules
+    const courseData = await Course.findById(course)
+      .populate('sessions', 'order')
+      .select('numberOfSessions sessions')
+      .lean();
+    
+    if (!courseData || !courseData.numberOfSessions) {
+      return res.status(200).json({
+        success: true,
+        hasConflict: false,
+        conflicts: {
+          teacher: [],
+          room: [],
+          students: []
+        },
+        message: 'Course không hợp lệ hoặc chưa có số buổi học'
+      });
+    }
+
+    const numberOfSessions = courseData.numberOfSessions;
+    const courseSessions = (courseData.sessions || []).sort((a, b) => (a.order || 0) - (b.order || 0));
+    
+    // Helper function to convert day string to day of week number
+    const getDayOfWeekNumber = (dayStr) => {
+      const dayMap = {
+        'CN': 0,
+        '2': 1,
+        '3': 2,
+        '4': 3,
+        '5': 4,
+        '6': 5,
+        '7': 6
+      };
+      return dayMap[dayStr] !== undefined ? dayMap[dayStr] : null;
+    };
+    
+    // Helper function to find next occurrence of day of week
+    const findNextDayOfWeek = (startDate, targetDayOfWeek) => {
+      const start = new Date(startDate);
+      const currentDay = start.getDay();
+      let daysToAdd = (targetDayOfWeek - currentDay + 7) % 7;
+      if (daysToAdd === 0 && start.getTime() < new Date().getTime()) {
+        daysToAdd = 7;
+      }
+      const result = new Date(start);
+      result.setDate(start.getDate() + daysToAdd);
+      return result;
+    };
+    
+    // Find first occurrence of each day of week
+    const firstOccurrences = {};
+    scheduleEntries.forEach(entry => {
+      const dayOfWeek = getDayOfWeekNumber(entry.day);
+      if (dayOfWeek !== null && !firstOccurrences[dayOfWeek]) {
+        firstOccurrences[dayOfWeek] = findNextDayOfWeek(startDate, dayOfWeek);
+      }
+    });
+    
+    // Generate ClassSchedule entries (same logic as createClass)
+    const classSchedules = [];
+    let entryIndex = 0;
+    let weekOffset = 0;
+    
+    for (let i = 0; i < numberOfSessions; i++) {
+      const entry = scheduleEntries[entryIndex % scheduleEntries.length];
+      const dayOfWeek = getDayOfWeekNumber(entry.day);
+      
+      if (dayOfWeek === null) {
+        entryIndex++;
+        continue;
+      }
+      
+      // Get the first occurrence of this day
+      const firstOccurrence = firstOccurrences[dayOfWeek];
+      
+      // Calculate the date for this session
+      const sessionDate = new Date(firstOccurrence);
+      sessionDate.setDate(firstOccurrence.getDate() + (weekOffset * 7));
+      
+      // Get corresponding session from course (by order, starting from 0)
+      const sessionIndex = i < courseSessions.length ? i : i % courseSessions.length;
+      const sessionId = courseSessions[sessionIndex]?._id || null;
+      
+      classSchedules.push({
+        class: null, // No class ID yet since we're not creating the class
+        session: sessionId,
+        date: sessionDate,
+        startTime: entry.startTime,
+        endTime: entry.endTime,
+        room: room,
+        teacher: teacher,
+        reason: `Buổi học ${i + 1}`,
+        status: 'fixed'
+      });
+      
+      // Move to next entry (round-robin)
+      entryIndex++;
+      // If we've gone through all entries, move to next week
+      if (entryIndex % scheduleEntries.length === 0) {
+        weekOffset++;
+      }
+    }
+    
+    // Validate conflicts
+    if (classSchedules.length > 0) {
+      const classDataForValidation = {
+        _id: null, // No class ID yet
+        teacher: teacher,
+        teacherId: teacher,
+        students: students || []
+      };
+      
+      const conflictResult = await validateClassSchedulesConflicts(classSchedules, classDataForValidation);
+      
+      return res.status(200).json({
+        success: true,
+        hasConflict: conflictResult.hasConflict,
+        conflicts: {
+          teacher: conflictResult.teacher || [],
+          room: conflictResult.room || [],
+          students: conflictResult.students || []
+        },
+        message: conflictResult.hasConflict 
+          ? 'Có xung đột lịch học được phát hiện' 
+          : 'Không có xung đột lịch học'
+      });
+    }
+    
+    return res.status(200).json({
+      success: true,
+      hasConflict: false,
+      conflicts: {
+        teacher: [],
+        room: [],
+        students: []
+      },
+      message: 'Không có schedules để kiểm tra'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi kiểm tra xung đột',
+      error: error.message
+    });
+  }
+};
+
+// =========================
 // ➕ TẠO LỚP HỌC MỚI
 // =========================
 exports.createClass = async (req, res) => {
@@ -503,8 +929,61 @@ exports.createClass = async (req, res) => {
           }
         }
         
-        // Create all ClassSchedule entries
+        // Validate conflicts before creating schedules
         if (classSchedules.length > 0) {
+          const classDataForValidation = {
+            _id: newClass._id,
+            teacher: teacher,
+            teacherId: teacher,
+            students: students || []
+          };
+          
+          const conflictResult = await validateClassSchedulesConflicts(classSchedules, classDataForValidation);
+          
+          if (conflictResult.hasConflict) {
+            await session.abortTransaction();
+            session.endSession();
+            
+            // Format detailed error message
+            let errorMessages = [];
+            
+            if (conflictResult.teacher && conflictResult.teacher.length > 0) {
+              const teacherConflicts = conflictResult.teacher.map(c => 
+                `  - Ngày ${c.date}: Giáo viên đã có lớp "${c.className}" học từ ${c.time}, trùng với lịch mới ${c.conflictingTime}`
+              ).join('\n');
+              errorMessages.push(`Xung đột lịch giáo viên:\n${teacherConflicts}`);
+            }
+            
+            if (conflictResult.room && conflictResult.room.length > 0) {
+              const roomConflicts = conflictResult.room.map(c => 
+                `  - Ngày ${c.date}: Phòng học đã được lớp "${c.className}" sử dụng từ ${c.time}, trùng với lịch mới ${c.conflictingTime}`
+              ).join('\n');
+              errorMessages.push(`Xung đột phòng học:\n${roomConflicts}`);
+            }
+            
+            if (conflictResult.students && conflictResult.students.length > 0) {
+              const studentConflicts = conflictResult.students.map(studentConflict => {
+                const conflicts = studentConflict.conflicts.map(c => 
+                  `    + Ngày ${c.date}: Lớp "${c.className}" từ ${c.time}, trùng với lịch mới ${c.conflictingTime}`
+                ).join('\n');
+                return `  - Học viên "${studentConflict.studentName}":\n${conflicts}`;
+              }).join('\n');
+              errorMessages.push(`Xung đột lịch học viên:\n${studentConflicts}`);
+            }
+            
+            return res.status(400).json({
+              success: false,
+              message: 'Không thể tạo lớp học do có xung đột lịch học',
+              conflicts: {
+                teacher: conflictResult.teacher,
+                room: conflictResult.room,
+                students: conflictResult.students
+              },
+              details: errorMessages.join('\n\n')
+            });
+          }
+          
+          // Create all ClassSchedule entries
           const createdSchedules = await ClassSchedule.insertMany(classSchedules, { session });
           
           // Create StudentSchedule entries for each ClassSchedule

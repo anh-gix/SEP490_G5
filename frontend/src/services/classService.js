@@ -91,6 +91,17 @@ const classService = {
       console.error('Error checking teacher/room conflicts:', error);
       throw error.response?.data || error;
     }
+  },
+
+  // Validate conflicts before creating class (does not create the class)
+  validateConflicts: async (classData) => {
+    try {
+      const response = await axios.post(`${API_URL}/validate-conflicts`, classData);
+      return response.data;
+    } catch (error) {
+      console.error('Error validating conflicts:', error);
+      throw error.response?.data || error;
+    }
   }
 };
 

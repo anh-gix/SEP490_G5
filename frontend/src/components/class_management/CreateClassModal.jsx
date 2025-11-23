@@ -6,6 +6,7 @@ import scheduleService from '../../services/scheduleService';
 import roomService from '../../services/roomService';
 import teacherService from '../../services/teacherService';
 import studentService from '../../services/studentService';
+import classService from '../../services/classService';
 import SelectStudentModal from './SelectStudentModal';
 
 const createEmptyScheduleEntry = () => ({
@@ -54,6 +55,15 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const fileInputRef = useRef(null);
+  
+  // Conflict checking states
+  const [conflicts, setConflicts] = useState({
+    hasConflict: false,
+    teacher: [],
+    room: [],
+    students: []
+  });
+  const [checkingConflicts, setCheckingConflicts] = useState(false);
 
   const [teacherSchedules, setTeacherSchedules] = useState({}); // Map teacherId -> schedules
   const [studentSchedules, setStudentSchedules] = useState({}); // Map studentId -> schedules
@@ -623,6 +633,70 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       setDuplicateEntryIndices([]);
     }
   }, [formData.scheduleEntries]);
+
+  // Real-time conflict checking: Check conflicts when relevant fields change
+  useEffect(() => {
+    const checkConflicts = async () => {
+      // Only check if we have minimum required fields
+      if (!formData.teacherId || !formData.startDate || !formData.course || 
+          !formData.scheduleEntries || formData.scheduleEntries.length === 0 ||
+          formData.scheduleEntries.some(entry => !entry.day || !entry.startTime || !entry.endTime)) {
+        setConflicts({
+          hasConflict: false,
+          teacher: [],
+          room: [],
+          students: []
+        });
+        return;
+      }
+
+      setCheckingConflicts(true);
+      try {
+        const conflictData = {
+          course: formData.course,
+          teacher: formData.teacherId,
+          students: formData.selectedStudents || [],
+          room: formData.roomId || null,
+          startDate: formData.startDate,
+          scheduleEntries: formData.scheduleEntries.map(entry => ({
+            day: entry.day,
+            startTime: entry.startTime,
+            endTime: entry.endTime
+          }))
+        };
+
+        const response = await classService.validateConflicts(conflictData);
+        
+        if (response.success) {
+          setConflicts({
+            hasConflict: response.hasConflict,
+            teacher: response.conflicts?.teacher || [],
+            room: response.conflicts?.room || [],
+            students: response.conflicts?.students || []
+          });
+        }
+      } catch (error) {
+        console.error('Error checking conflicts:', error);
+        // Don't show error to user, just silently fail
+        setConflicts({
+          hasConflict: false,
+          teacher: [],
+          room: [],
+          students: []
+        });
+      } finally {
+        setCheckingConflicts(false);
+      }
+    };
+
+    // Debounce the conflict check to avoid too many API calls
+    const timeoutId = setTimeout(() => {
+      checkConflicts();
+    }, 500); // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.teacherId, formData.startDate, formData.course, formData.roomId, 
+      formData.selectedStudents, formData.scheduleEntries]);
 
   const addScheduleEntry = () => {
     setFormData(prev => ({
@@ -1926,6 +2000,32 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                       ? `Có ${filteredTeachers.length} giáo viên phù hợp (chưa bị trùng lịch)`
                       : `Có ${teachers.length} giáo viên. Chọn course và lịch học để lọc giáo viên phù hợp.`}
                   </Form.Text>
+                  {checkingConflicts && formData.teacherId && (
+                    <div className="mt-8">
+                      <Form.Text className="text-info text-12">
+                        <i className="fas fa-spinner fa-spin me-1"></i>
+                        Đang kiểm tra xung đột...
+                      </Form.Text>
+                    </div>
+                  )}
+                  {!checkingConflicts && conflicts.teacher && conflicts.teacher.length > 0 && (
+                    <Alert variant="warning" className="mt-12 mb-0">
+                      <div className="d-flex align-items-start">
+                        <i className="fas fa-exclamation-triangle me-2 mt-1 text-warning"></i>
+                        <div className="flex-grow-1">
+                          <strong className="text-danger">⚠️ Xung đột lịch giáo viên:</strong>
+                          <ul className="mb-0 mt-2" style={{ fontSize: '13px' }}>
+                            {conflicts.teacher.map((c, idx) => (
+                              <li key={idx}>
+                              Ngày <strong>{c.date}</strong>: Giáo viên đã có lớp "<strong>{c.className}</strong>" 
+                              học từ <strong>{c.time}</strong>, trùng với lịch mới <strong>{c.conflictingTime}</strong>
+                            </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </Alert>
+                  )}
                 </Form.Group>
               </div>
 
@@ -1961,6 +2061,32 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                   <Form.Text className="text-neutral-500 text-12">
                     Chỉ hiển thị phòng chưa bị trùng với lịch đã chọn.
                   </Form.Text>
+                  {checkingConflicts && formData.roomId && (
+                    <div className="mt-8">
+                      <Form.Text className="text-info text-12">
+                        <i className="fas fa-spinner fa-spin me-1"></i>
+                        Đang kiểm tra xung đột...
+                      </Form.Text>
+                    </div>
+                  )}
+                  {!checkingConflicts && conflicts.room && conflicts.room.length > 0 && (
+                    <Alert variant="warning" className="mt-12 mb-0">
+                      <div className="d-flex align-items-start">
+                        <i className="fas fa-exclamation-triangle me-2 mt-1 text-warning"></i>
+                        <div className="flex-grow-1">
+                          <strong className="text-danger">⚠️ Xung đột phòng học:</strong>
+                          <ul className="mb-0 mt-2" style={{ fontSize: '13px' }}>
+                            {conflicts.room.map((c, idx) => (
+                              <li key={idx}>
+                              Ngày <strong>{c.date}</strong>: Phòng học đã được lớp "<strong>{c.className}</strong>" 
+                              sử dụng từ <strong>{c.time}</strong>, trùng với lịch mới <strong>{c.conflictingTime}</strong>
+                            </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </Alert>
+                  )}
                   {roomError && (
                     <Alert variant="warning" className="mt-12 mb-0">
                       {roomError}
@@ -2156,7 +2282,40 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                 <i className="fas fa-info-circle me-1"></i>
                 Có thể thêm học viên sau khi tạo lớp. File Excel cần có cột đầu tiên chứa Email hoặc Số điện thoại của học viên.
               </Form.Text>
-              {conflictingStudentIds.size > 0 && (
+              {checkingConflicts && formData.selectedStudents && formData.selectedStudents.length > 0 && (
+                <div className="mt-12">
+                  <Form.Text className="text-info text-12">
+                    <i className="fas fa-spinner fa-spin me-1"></i>
+                    Đang kiểm tra xung đột lịch học viên...
+                  </Form.Text>
+                </div>
+              )}
+              {!checkingConflicts && conflicts.students && conflicts.students.length > 0 && (
+                <Alert variant="warning" className="mt-12 mb-0">
+                  <div className="d-flex align-items-start">
+                    <i className="fas fa-exclamation-triangle me-2 mt-1 text-warning"></i>
+                    <div className="flex-grow-1">
+                      <strong className="text-danger">⚠️ Xung đột lịch học viên:</strong>
+                      <div className="mt-2" style={{ fontSize: '13px' }}>
+                        {conflicts.students.map((studentConflict, idx) => (
+                          <div key={idx} className="mb-2">
+                            <strong>Học viên "{studentConflict.studentName}":</strong>
+                            <ul className="mb-0 mt-1 ms-3">
+                              {studentConflict.conflicts.map((c, cIdx) => (
+                                <li key={cIdx}>
+                                  Ngày <strong>{c.date}</strong>: Lớp "<strong>{c.className}</strong>" 
+                                  từ <strong>{c.time}</strong>, trùng với lịch mới <strong>{c.conflictingTime}</strong>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </Alert>
+              )}
+              {conflictingStudentIds.size > 0 && (!conflicts.students || conflicts.students.length === 0) && (
                 <Alert variant="warning" className="mt-12 mb-0">
                   <i className="fas fa-exclamation-triangle me-2"></i>
                   <strong>Cảnh báo:</strong> Có {conflictingStudentIds.size} học viên bị trùng giờ học với lớp đang tạo. 
@@ -2180,8 +2339,15 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           <Button 
             type="submit" 
             className="btn-main text-15 fw-semibold px-24 py-10 radius-8"
+            disabled={conflicts.hasConflict || checkingConflicts}
+            title={conflicts.hasConflict ? 'Vui lòng giải quyết các xung đột lịch học trước khi tạo lớp' : ''}
           >
             <i className="fas fa-check me-2"></i> Tạo lớp học
+            {conflicts.hasConflict && (
+              <span className="ms-2">
+                <i className="fas fa-exclamation-triangle"></i>
+              </span>
+            )}
           </Button>
         </Modal.Footer>
       </Form>

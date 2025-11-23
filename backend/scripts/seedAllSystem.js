@@ -823,11 +823,11 @@ async function seedClassSchedules() {
             { dayOfWeek: 2, startTime: '10:00', endTime: '12:00' }, // Thứ 3
             { dayOfWeek: 3, startTime: '14:00', endTime: '16:00' }  // Thứ 4
         ],
-        // Pattern 5: Thứ 2, Thứ 3 (2 buổi/tuần) - TRÙNG với Pattern 1 để tạo conflict
-        // Lớp conflict sẽ dùng pattern này để có lịch trùng thời gian với lớp đang học
+        // Pattern 5: Thứ 5, Thứ 6 (2 buổi/tuần) - Dùng cho lớp conflict để test khi đổi lịch
+        // Lớp conflict sẽ dùng pattern này để có lịch Thứ 5, Thứ 6 (khác với lớp đang học Thứ 2, Thứ 3)
         [
-            { dayOfWeek: 1, startTime: '08:00', endTime: '10:00' }, // Thứ 2 - TRÙNG với lớp đang học
-            { dayOfWeek: 2, startTime: '10:00', endTime: '12:00' }  // Thứ 3 - TRÙNG với lớp đang học
+            { dayOfWeek: 4, startTime: '08:00', endTime: '10:00' }, // Thứ 5 - Lịch conflict
+            { dayOfWeek: 5, startTime: '10:00', endTime: '12:00' }  // Thứ 6 - Lịch conflict
         ]
     ];
     

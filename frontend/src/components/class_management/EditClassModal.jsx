@@ -1710,10 +1710,36 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
       return date >= today;
     });
 
+    // Get current class ID to exclude its schedules from student schedules
+    const currentClassId = formData.id || formData._id;
+    const currentClassIdStr = currentClassId ? String(currentClassId) : null;
+
     // Check conflicts with current class schedules
     selectedStudents.forEach(studentId => {
       const studentIdStr = String(studentId);
-      const studentScheduleList = studentSchedules[studentIdStr] || [];
+      const allStudentSchedules = studentSchedules[studentIdStr] || [];
+      
+      // Loại trừ các schedules của lớp hiện tại khỏi lịch học của học sinh
+      // để tránh báo conflict với chính lớp đang chỉnh sửa
+      const studentScheduleList = allStudentSchedules.filter(studentSchedule => {
+        // Kiểm tra xem schedule này có thuộc về lớp hiện tại không
+        const scheduleClassId = 
+          studentSchedule.classId ||
+          studentSchedule.class?._id ||
+          studentSchedule.class?.id ||
+          studentSchedule.classSchedule?.class?._id ||
+          studentSchedule.classSchedule?.class?.id;
+        
+        const scheduleClassIdStr = scheduleClassId ? String(scheduleClassId) : null;
+        
+        // Loại trừ nếu là lớp hiện tại
+        if (currentClassIdStr && scheduleClassIdStr && scheduleClassIdStr === currentClassIdStr) {
+          return false; // Loại trừ schedule của lớp hiện tại
+        }
+        
+        return true; // Giữ lại schedule của lớp khác
+      });
+      
       const studentConflictsList = [];
 
       futureClassSchedules.forEach(classSchedule => {
@@ -1787,6 +1813,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
       });
 
       // Check conflicts with new schedule pattern (if scheduleEntries changed)
+      // Sử dụng studentScheduleList đã được lọc (đã loại trừ schedules của lớp hiện tại)
       if (filledScheduleEntries.length > 0 && formData.startDate) {
         filledScheduleEntries.forEach(entry => {
           const dayOfWeek = getDayOfWeekNumber(entry.day);
@@ -1796,7 +1823,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           const entryEndTime = parseTime(entry.endTime);
           if (!entryStartTime || !entryEndTime) return;
 
-          // Check against student's schedules
+          // Check against student's schedules (đã loại trừ schedules của lớp hiện tại)
           studentScheduleList.forEach(studentSchedule => {
             const studentScheduleDate = studentSchedule.date || studentSchedule.scheduleDate || studentSchedule.classDate || studentSchedule.classSchedule?.date;
             if (!studentScheduleDate) return;

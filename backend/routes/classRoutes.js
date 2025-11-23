@@ -7,8 +7,6 @@ router.get('/stats', classController.getClassStats);
 router.get('/', classController.getAllClasses);
 router.get('/:id', classController.getClassById);
 router.post('/', classController.createClass);
-router.post('/:id/check-student-conflicts', classController.checkStudentConflicts);
-router.post('/:id/check-teacher-room-conflicts', classController.checkTeacherRoomConflicts);
 router.put('/:id', classController.updateClass);
 router.delete('/:id', classController.deleteClass);
 

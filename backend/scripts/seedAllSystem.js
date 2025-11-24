@@ -17,6 +17,7 @@ const ClassSchedule = require('../models/classScheduleModel');
 const StudentSchedule = require('../models/studentScheduleModel');
 const Exam = require('../models/examModel');
 const Submission = require('../models/submissionModel');
+const ChangeRequest = require('../models/changeRequestModel');
 
 // Store created IDs for linking
 const seedData = {
@@ -36,6 +37,7 @@ const seedData = {
 
 async function clearDatabase() {
     console.log('\n🗑️  Clearing existing data...');
+    await ChangeRequest.deleteMany({});
     await Submission.deleteMany({});
     await StudentSchedule.deleteMany({});
     await ClassSchedule.deleteMany({});
@@ -1066,6 +1068,97 @@ async function seedStudentSchedules() {
     console.log(`✅ Created ${created.length} student schedules for ${seedData.classSchedules.length} class schedules\n`);
 }
 
+async function seedChangeRequests() {
+    console.log('📝 Seeding Change Requests...');
+    
+    // Lấy danh sách học sinh và giáo viên
+    const teacherRoleId = seedData.roles[3]._id; // Teacher role
+    const studentRoleId = seedData.roles[4]._id; // Student role
+    
+    const teachers = seedData.users.filter(user => 
+        user.roleId.toString() === teacherRoleId.toString()
+    );
+    const students = seedData.users.filter(user => 
+        user.roleId.toString() === studentRoleId.toString()
+    );
+    
+    console.log(`  - Found ${teachers.length} teachers and ${students.length} students`);
+    
+    // Mảng mẫu nội dung đơn
+    const contentTemplates = [
+        'Xin phép đổi buổi học vì lý do cá nhân',
+        'Xin chuyển sang lớp khác do xung đột lịch học',
+        'Xin đổi buổi học do có việc đột xuất',
+        'Xin phép đổi lịch học vì lý do sức khỏe',
+        'Xin chuyển lớp do không phù hợp với trình độ hiện tại',
+        'Xin đổi buổi học để phù hợp với lịch làm việc',
+        'Xin phép đổi lịch dạy vì có việc gia đình',
+        'Xin đổi buổi dạy do xung đột lịch cá nhân',
+        'Xin chuyển sang lớp khác có thời gian phù hợp hơn',
+        'Xin đổi buổi học để tránh trùng với lịch thi'
+    ];
+    
+    const changeRequests = [];
+    const today = new Date();
+    
+    // Tạo đơn cho mỗi học sinh (ít nhất 1 đơn)
+    for (const student of students) {
+        const requestCount = Math.random() < 0.3 ? 2 : 1; // 30% có 2 đơn, 70% có 1 đơn
+        
+        for (let i = 0; i < requestCount; i++) {
+            const randomContent = contentTemplates[Math.floor(Math.random() * contentTemplates.length)];
+            const daysAgo = Math.floor(Math.random() * 30); // Đơn gửi trong vòng 30 ngày qua
+            const createdAt = new Date(today);
+            createdAt.setDate(createdAt.getDate() - daysAgo);
+            createdAt.setHours(Math.floor(Math.random() * 12) + 8, Math.floor(Math.random() * 60), 0, 0);
+            
+            changeRequests.push({
+                sender: student._id,
+                content: randomContent,
+                status: 'pending',
+                approver: null,
+                approvedDate: null,
+                responseContent: null,
+                createdAt: createdAt,
+                updatedAt: createdAt
+            });
+        }
+    }
+    
+    // Tạo đơn cho mỗi giáo viên (ít nhất 1 đơn)
+    for (const teacher of teachers) {
+        const requestCount = Math.random() < 0.3 ? 2 : 1; // 30% có 2 đơn, 70% có 1 đơn
+        
+        for (let i = 0; i < requestCount; i++) {
+            const randomContent = contentTemplates[Math.floor(Math.random() * contentTemplates.length)];
+            const daysAgo = Math.floor(Math.random() * 30); // Đơn gửi trong vòng 30 ngày qua
+            const createdAt = new Date(today);
+            createdAt.setDate(createdAt.getDate() - daysAgo);
+            createdAt.setHours(Math.floor(Math.random() * 12) + 8, Math.floor(Math.random() * 60), 0, 0);
+            
+            changeRequests.push({
+                sender: teacher._id,
+                content: randomContent,
+                status: 'pending',
+                approver: null,
+                approvedDate: null,
+                responseContent: null,
+                createdAt: createdAt,
+                updatedAt: createdAt
+            });
+        }
+    }
+    
+    if (changeRequests.length === 0) {
+        console.log('⚠️  No change requests to create!');
+        return;
+    }
+    
+    const created = await ChangeRequest.insertMany(changeRequests);
+    console.log(`✅ Created ${created.length} change requests`);
+    console.log(`   - From ${students.length} students and ${teachers.length} teachers\n`);
+}
+
 async function seedExams() {
     console.log('📝 Seeding Exams...');
     const exams = [
@@ -1131,6 +1224,7 @@ async function seed() {
         await seedClasses();
         await seedClassSchedules();
         await seedStudentSchedules();
+        await seedChangeRequests();
         await seedExams();
 
         console.log('\n✨ Seed completed successfully!');
@@ -1146,6 +1240,10 @@ async function seed() {
         console.log(`  - Sessions: ${seedData.sessions.length}`);
         console.log(`  - Classes: ${seedData.classes.length}`);
         console.log(`  - Class Schedules: ${seedData.classSchedules.length}`);
+        
+        // Count change requests
+        const changeRequestCount = await ChangeRequest.countDocuments();
+        console.log(`  - Change Requests: ${changeRequestCount}`);
 
         process.exit(0);
     } catch (error) {

@@ -32,6 +32,12 @@ const AcademicNavigation = () => {
       color: 'warning'
     },
     {
+      title: 'Quản lý đơn',
+      icon: 'fa-file-alt',
+      path: '/academic/request-management',
+      color: 'info'
+    },
+    {
       title: 'Quản lý giảng viên',
       icon: 'fa-user-tie',
       path: '/academic/teacher-management',

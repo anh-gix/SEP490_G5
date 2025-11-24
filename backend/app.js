@@ -49,6 +49,9 @@ app.use('/api/schedules', require('./routes/scheduleRoute'));
 // Homework Routes
 app.use('/api/homework', require('./routes/homeworkRoutes'));
 
+// Change Request Routes
+app.use('/api/change-requests', require('./routes/changeRequestRoutes'));
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {

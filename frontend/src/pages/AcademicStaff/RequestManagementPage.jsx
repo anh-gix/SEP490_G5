@@ -6,6 +6,7 @@ import changeRequestService from '../../services/changeRequestService';
 import classService from '../../services/classService';
 import { classScheduleService } from '../../services/classScheduleService';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
+import RequestDetailPage from './RequestDetailPage';
 
 /**
  * Request Management Page for Academic Staff
@@ -877,6 +878,35 @@ const RequestManagementPage = () => {
     }
   };
 
+  // Nếu đang hiển thị chi tiết đơn, render component RequestDetailPage
+  if (showDetailModal && selectedRequest) {
+    return (
+      <RequestDetailPage
+        selectedRequest={selectedRequest}
+        senderSchedule={senderSchedule}
+        loadingSchedule={loadingSchedule}
+        pendingClassChange={pendingClassChange}
+        onBack={() => {
+          setShowDetailModal(false);
+          setRejectReason('');
+          setSelectedRequest(null);
+          setSenderSchedule([]);
+          setPendingClassChange(null);
+        }}
+        onApprove={handleApprove}
+        onReject={() => handleRejectClick(selectedRequest)}
+        onChangeClass={handleChangeClassClick}
+        onAddMakeupClass={() => {
+          setShowMakeupClassModal(true);
+          setMakeupClassOption(null);
+        }}
+        processing={processing}
+        formatDate={formatDate}
+        renderClassInfo={renderClassInfo}
+      />
+    );
+  }
+
   return (
     <div className="d-flex" style={{ minHeight: '100vh' }}>
       <AcademicNavigation />
@@ -1123,166 +1153,6 @@ const RequestManagementPage = () => {
             </Card>
           )}
 
-          {/* Detail Modal - Chỉ hiển thị khi chấp nhận */}
-          <Modal show={showDetailModal} onHide={() => {
-            setShowDetailModal(false);
-            setRejectReason('');
-            setSelectedRequest(null);
-            setSenderSchedule([]);
-            setPendingClassChange(null); // Xóa thông tin lớp muốn đổi khi đóng modal
-          }} size="xl">
-            <Modal.Header closeButton>
-              <Modal.Title>Chi tiết đơn - Lịch học/dạy</Modal.Title>
-            </Modal.Header>
-            <Modal.Body>
-                  {selectedRequest && (
-                    <div className="mb-16">
-                      <p className="text-neutral-700 mb-8">
-                        <strong>Người gửi:</strong> {selectedRequest.sender?.username} ({selectedRequest.sender?.email})
-                      </p>
-                      <p className="text-neutral-700 mb-8">
-                        <strong>Ngày gửi:</strong> {formatDate(selectedRequest.createdAt)}
-                      </p>
-                      <p className="text-neutral-700 mb-16">
-                        <strong>Nội dung đơn:</strong> {selectedRequest.content}
-                      </p>
-                      
-                      {/* Danh sách lớp học viên đang học */}
-                      {studentClasses.length > 0 && (
-                        <div className="mb-16">
-                          <h6 className="text-neutral-900 fw-bold mb-12">Các lớp học viên đang học:</h6>
-                          <div className="border border-neutral-200 rounded-8 p-12 bg-neutral-25">
-                            <div className="d-flex flex-column gap-8">
-                              {studentClasses.map((classItem, index) => {
-                                // Kiểm tra xem lớp này có đang pending đổi không
-                                const isPendingChange = pendingClassChange && 
-                                  pendingClassChange.oldClassId === classItem.classId;
-                                
-                                if (isPendingChange) {
-                                  // Hiển thị layout 2 cột cho lớp đang pending đổi
-                                  return (
-                                    <div key={index} className="row g-3">
-                                      <div className="col-md-6">
-                                        {renderClassInfo(pendingClassChange.oldClassInfo, true)}
-                                      </div>
-                                      <div className="col-md-6">
-                                        {renderClassInfo(pendingClassChange.newClassInfo, false)}
-                                      </div>
-                                    </div>
-                                  );
-                                } else {
-                                  // Hiển thị bình thường cho các lớp khác
-                                  return (
-                                    <div 
-                                      key={index}
-                                      className="d-flex align-items-start justify-content-between gap-12 p-12 bg-white rounded-8 border border-neutral-100"
-                                    >
-                                      <div className="flex-grow-1">
-                                        <div className="d-flex align-items-center gap-8 mb-4">
-                                          <i className="fas fa-book text-main-600"></i>
-                                          <span className="text-neutral-900 fw-semibold text-14">{classItem.className}</span>
-                                        </div>
-                                        <div className="ps-20 mb-4">
-                                          <span className="text-neutral-600 text-13">Khóa học: </span>
-                                          <span className="text-neutral-700 text-13">{classItem.courseName}</span>
-                                        </div>
-                                        <div className="ps-20">
-                                          <span className="text-neutral-600 text-13">Session đang học: </span>
-                                          <span className="text-neutral-700 text-13 fw-medium">
-                                            {classItem.currentSessionTitle}
-                                            {classItem.currentSessionOrder !== null && (
-                                              <span className="text-neutral-500 ms-4">(Số thứ tự: {classItem.currentSessionOrder})</span>
-                                            )}
-                                          </span>
-                                        </div>
-                                      </div>
-                                      <div className="d-flex align-items-center">
-                                        <Button
-                                          variant="outline-primary"
-                                          size="sm"
-                                          onClick={() => handleChangeClassClick(classItem)}
-                                          className="d-flex align-items-center gap-2"
-                                        >
-                                          <i className="fas fa-exchange-alt"></i>
-                                          Đổi lớp
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  );
-                                }
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  <div className="d-flex align-items-center justify-content-between mb-12">
-                    <h6 className="text-neutral-900 fw-bold mb-0">Lịch học/dạy:</h6>
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={() => {
-                        setShowMakeupClassModal(true);
-                        setMakeupClassOption(null);
-                      }}
-                      className="d-flex align-items-center gap-2"
-                    >
-                      <i className="fas fa-plus"></i>
-                      Thêm buổi học bù
-                    </Button>
-                  </div>
-                  
-                  {loadingSchedule ? (
-                    <div className="text-center py-20">
-                      <Spinner animation="border" size="sm" />
-                      <p className="text-neutral-600 mt-8">Đang tải lịch...</p>
-                    </div>
-                  ) : calendarSchedules.length === 0 ? (
-                    <p className="text-neutral-500 text-center py-20">Không có lịch học/dạy</p>
-                  ) : (
-                    <div className="border border-neutral-100 rounded-12 p-16 bg-white mb-16">
-                      <ScheduleCalendar
-                        schedules={calendarSchedules}
-                        onEditSchedule={() => {}} // Read-only
-                        onDeleteSchedule={() => {}} // Read-only
-                        onCreateMakeup={() => {}} // Read-only
-                        classService={classService}
-                        studentSchedule={senderSchedule.map(sch => {
-                          const scheduleDate = new Date(sch.date);
-                          const dateStr = formatDateToYYYYMMDD(scheduleDate);
-                          return {
-                            date: dateStr,
-                            startTime: sch.startTime || '',
-                            endTime: sch.endTime || ''
-                          };
-                        })}
-                      />
-                    </div>
-                  )}
-            </Modal.Body>
-            <Modal.Footer>
-              <Button 
-                variant="secondary" 
-                onClick={() => {
-                  setShowDetailModal(false);
-                  setRejectReason('');
-                  setSelectedRequest(null);
-                  setSenderSchedule([]);
-                }}
-              >
-                Đóng
-              </Button>
-              <Button 
-                variant="success" 
-                onClick={handleApprove} 
-                disabled={processing}
-              >
-                {processing ? 'Đang xử lý...' : 'Xác nhận chấp nhận'}
-              </Button>
-            </Modal.Footer>
-          </Modal>
 
           {/* Reject Modal */}
           <Modal show={showRejectModal} onHide={() => {

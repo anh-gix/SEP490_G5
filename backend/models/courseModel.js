@@ -10,6 +10,9 @@ const courseSchema = new Schema({
     description: {
         type: String
     },
+        numberOfSessions: {
+        type: Number,
+    },
     program: {
         type: Schema.Types.ObjectId,
         ref: 'Program',
@@ -23,10 +26,6 @@ const courseSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'Session'
     }],
-    numberOfSessions: {
-        type: Number,
-        default: 0
-    },
     camSessions: [{
         type: Schema.Types.ObjectId,
         ref: 'CamSession'
@@ -36,6 +35,16 @@ const courseSchema = new Schema({
         ref: 'User',
         required: true
     },
+        // Tài liệu cho course (mảng các URL)
+    materials: [{
+        type: String
+    }],
+    // Session nào là mocktest (theo order)
+    // VD: [5, 10] nghĩa là session order 5 và 10 là mocktest
+    mocktestSessionOrders: [{
+        type: Number
+    }],
+
     submittedAt: {
         type: Date
     },

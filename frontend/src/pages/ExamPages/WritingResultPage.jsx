@@ -162,6 +162,28 @@ const WritingResultPage = () => {
                               )}
                             </div>
                           </div>
+
+                          {/* Question Title */}
+                          {item.questionTitle && (
+                            <div className="mb-16">
+                              <p className="text-neutral-700 fw-semibold mb-0">{item.questionTitle}</p>
+                            </div>
+                          )}
+
+                          {/* Question Answers (if any) */}
+                          {item.questionAnswer && item.questionAnswer.length > 0 && (
+                            <div className="mb-16">
+                              <p className="text-neutral-600 text-sm mb-8">Các đáp án:</p>
+                              <div className="d-flex flex-column gap-4">
+                                {item.questionAnswer.map((option, idx) => (
+                                  <div key={idx} className="text-neutral-600 text-sm">
+                                    <span className="fw-semibold">{option.key}.</span> {option.text}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
                           <div className="mb-16">
                             <p className="text-neutral-600 text-sm mb-8 fw-semibold">
                               Bài làm của bạn:
@@ -225,8 +247,6 @@ const WritingResultPage = () => {
           ) : null}
         </div>
       </section>
-
-      <FooterOne />
     </>
   );
 };

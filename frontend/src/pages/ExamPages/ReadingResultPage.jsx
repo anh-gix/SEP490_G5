@@ -50,6 +50,24 @@ const ReadingResultPage = () => {
     return "danger";
   };
 
+  const getAnswerText = (answerKey, questionAnswer) => {
+    if (!answerKey || !questionAnswer || questionAnswer.length === 0) {
+      return answerKey || "";
+    }
+    
+    // Nếu answerKey là array, xử lý từng phần tử
+    if (Array.isArray(answerKey)) {
+      return answerKey.map(key => {
+        const option = questionAnswer.find(opt => opt.key === key);
+        return option ? `${option.key}. ${option.text}` : key;
+      }).join(", ");
+    }
+    
+    // Nếu answerKey là string, tìm text tương ứng
+    const option = questionAnswer.find(opt => opt.key === answerKey);
+    return option ? `${option.key}. ${option.text}` : answerKey;
+  };
+
   if (loading) {
     return (
       <>
@@ -143,6 +161,27 @@ const ReadingResultPage = () => {
                             </span>
                           )}
                         </div>
+                        {/* Question Title */}
+                        {item.questionTitle && (
+                          <div className='mb-12'>
+                            <p className='text-neutral-700 fw-semibold mb-0'>{item.questionTitle}</p>
+                          </div>
+                        )}
+
+                        {/* Question Answers (for multiple choice) */}
+                        {item.questionAnswer && item.questionAnswer.length > 0 && (
+                          <div className='mb-12'>
+                            <p className='text-neutral-600 text-sm mb-8'>Các đáp án:</p>
+                            <div className='d-flex flex-column gap-4'>
+                              {item.questionAnswer.map((option, idx) => (
+                                <div key={idx} className='text-neutral-600 text-sm'>
+                                  <span className='fw-semibold'>{option.key}.</span> {option.text}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         <div className='mb-8'>
                           <p className='text-neutral-600 text-sm mb-4'>
                             Đáp án của bạn:{" "}
@@ -151,14 +190,16 @@ const ReadingResultPage = () => {
                                 item.isCorrect ? "text-success" : "text-danger"
                               }`}
                             >
-                              {item.studentAnswer || "Chưa trả lời"}
+                              {item.studentAnswer 
+                                ? getAnswerText(item.studentAnswer, item.questionAnswer)
+                                : "Chưa trả lời"}
                             </span>
                           </p>
-                          {!item.isCorrect && (
+                          {!item.isCorrect && item.correctAnswer && (
                             <p className='text-neutral-600 text-sm mb-0'>
                               Đáp án đúng:{" "}
                               <span className='fw-semibold text-success'>
-                                {item.correctAnswer}
+                                {getAnswerText(item.correctAnswer, item.questionAnswer)}
                               </span>
                             </p>
                           )}
@@ -203,8 +244,6 @@ const ReadingResultPage = () => {
           ) : null}
         </div>
       </section>
-
-      <FooterOne />
     </>
   );
 };

@@ -1,20 +1,20 @@
-import CenterHeadDashboardPage from "../pages/CenterHeadDashboardPage.jsx";
-import UserListPage from "../pages/UserListPage.jsx";
-import UserCreatePage from "../pages/UserCreatePage.jsx";
-import UserEditPage from "../pages/UserEditPage.jsx";
-import RoleManagementPage from "../pages/RoleManagementPage.jsx";
-import ProgramListPage from "../pages/ProgramListPage.jsx";
-import ProgramDetailPage from "../pages/ProgramDetailPage.jsx";
-import ProgramFormPage from "../pages/ProgramFormPage.jsx";
-import PendingCoursesPage from "../pages/PendingCoursesPage.jsx";
-import CourseDetailPage from "../pages/CourseDetailPage.jsx";
-import CourseFormPage from "../pages/CourseFormPage.jsx";
-import ClassListPage from "../pages/ClassListPage.jsx";
-import PendingSchedulesPage from "../pages/PendingSchedulesPage.jsx";
-import RoomListPage from "../pages/RoomListPage.jsx";
-import ExamListPage from "../pages/ExamListPage.jsx";
-import ExamCreatePage from "../pages/ExamCreatePage.jsx";
-import ReportsOverviewPage from "../pages/ReportsOverviewPage.jsx";
+import CenterHeadDashboardPage from "../pages/CenterHead/CenterHeadDashboardPage.jsx";
+import UserListPage from "../pages/CenterHead/UserListPage.jsx";
+import UserCreatePage from "../pages/CenterHead/UserCreatePage.jsx";
+import UserEditPage from "../pages/CenterHead/UserEditPage.jsx";
+import RoleManagementPage from "../pages/CenterHead/RoleManagementPage.jsx";
+import ProgramListPage from "../pages/CenterHead/ProgramListPage.jsx";
+import ProgramDetailPage from "../pages/CenterHead/ProgramDetailPage.jsx";
+import ProgramFormPage from "../pages/CenterHead/ProgramFormPage.jsx";
+import PendingCoursesPage from "../pages/CenterHead/PendingCoursesPage.jsx";
+import CourseDetailPage from "../pages/CenterHead/CourseDetailPage.jsx";
+import CourseFormPage from "../pages/CenterHead/CourseFormPage.jsx";
+import ClassListPage from "../pages/CenterHead/ClassListPage.jsx";
+import PendingSchedulesPage from "../pages/CenterHead/PendingSchedulesPage.jsx";
+import RoomListPage from "../pages/CenterHead/RoomListPage.jsx";
+import ExamListPage from "../pages/CenterHead/ExamListPage.jsx";
+import ExamCreatePage from "../pages/CenterHead/ExamCreatePage.jsx";
+import ReportsOverviewPage from "../pages/CenterHead/ReportsOverviewPage.jsx";
 
 /**
  * CenterHeadRoutes

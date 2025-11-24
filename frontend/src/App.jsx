@@ -16,7 +16,7 @@ import CartPage from "./pages/CartPage.jsx";
 import CheckoutPage from "./pages/CheckoutPage.jsx";
 import ContactPage from "./pages/ContactPage.jsx";
 import CoursePage from "./pages/CoursePage.jsx";
-import CourseDetailsPage from "./pages/CourseDetailsPage.jsx";
+import CourseDetailsPage from "./pages/CenterHead/CourseDetailsPage.jsx";
 import CourseListViewPage from "./pages/CourseListViewPage.jsx";
 import EventDetailsPage from "./pages/EventDetailsPage.jsx";
 import EventsPage from "./pages/EventsPage.jsx";

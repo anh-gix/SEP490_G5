@@ -1,5 +1,5 @@
-import CenterHeadLayout from '../components/CenterHead/layout/CenterHeadLayout';
-import CenterHeadDashboard from '../components/CenterHead/pages/CenterHeadDashboard';
+import CenterHeadLayout from '../../components/CenterHead/layout/CenterHeadLayout';
+import CenterHeadDashboard from '../../components/CenterHead/pages/CenterHeadDashboard';
 
 const CenterHeadDashboardPage = () => {
   return (

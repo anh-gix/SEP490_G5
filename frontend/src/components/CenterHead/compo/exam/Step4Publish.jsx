@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Button from '../Button';
 
 const Step4Publish = ({ examData, totalDuration, totalQuestions, totalScore }) => {
   const navigate = useNavigate();
@@ -57,15 +58,15 @@ const Step4Publish = ({ examData, totalDuration, totalQuestions, totalScore }) =
 
       alert(
         publishStatus === 'publish'
-          ? 'Exam has been published successfully!'
-          : 'Exam has been saved as draft successfully!'
+          ? 'Đề thi đã được xuất bản thành công!'
+          : 'Đề thi đã được lưu nháp thành công!'
       );
 
       // Navigate back to exam list
       navigate('/center-head/exams');
     } catch (error) {
       console.error('Error saving exam:', error);
-      alert('An error occurred while saving the exam!');
+      alert('Có lỗi xảy ra khi lưu đề thi!');
     } finally {
       setIsSubmitting(false);
     }
@@ -74,36 +75,37 @@ const Step4Publish = ({ examData, totalDuration, totalQuestions, totalScore }) =
   const readyToPublish = isReadyToPublish();
 
   return (
-    <div>
+    <div className="row g-3">
       {/* Publication Status */}
-      <div className="mb-32">
-        <h5 className="text-neutral-900 fw-semibold mb-16">Publication Status</h5>
-        <p className="text-neutral-600 text-sm mb-20">
-          Choose how to publish your exam to learners
+      <div className="col-12">
+        <h6 className="text-neutral-900 fw-semibold mb-3">Trạng thái xuất bản</h6>
+        <p className="text-neutral-600 text-sm mb-3">
+          Chọn cách xuất bản đề thi của bạn
         </p>
 
-        <div className="d-flex flex-column gap-12">
+        <div className="d-flex flex-column gap-2">
           {/* Save as Draft */}
           <label
-            className={`border rounded-12 p-20 cursor-pointer transition-all ${
+            className={`border rounded p-3 ${
               publishStatus === 'draft'
                 ? 'border-main-600 bg-main-50'
-                : 'border-neutral-200 bg-white hover-bg-neutral-50'
+                : 'border-neutral-200 bg-white'
             }`}
+            style={{ cursor: 'pointer' }}
           >
-            <div className="d-flex align-items-start gap-12">
+            <div className="d-flex align-items-start gap-3">
               <input
                 type="radio"
                 name="publishStatus"
                 value="draft"
                 checked={publishStatus === 'draft'}
                 onChange={(e) => setPublishStatus(e.target.value)}
-                className="form-check-input mt-4"
+                className="form-check-input mt-1"
               />
               <div className="flex-grow-1">
-                <div className="fw-semibold text-neutral-900 mb-4">Save as Draft</div>
+                <div className="fw-semibold text-neutral-900 mb-1">Lưu nháp</div>
                 <div className="text-neutral-600 text-sm">
-                  Exam will be saved but not visible to learners yet
+                  Đề thi sẽ được lưu nhưng chưa hiển thị cho học viên
                 </div>
               </div>
             </div>
@@ -111,25 +113,26 @@ const Step4Publish = ({ examData, totalDuration, totalQuestions, totalScore }) =
 
           {/* Publish Now */}
           <label
-            className={`border rounded-12 p-20 cursor-pointer transition-all ${
+            className={`border rounded p-3 ${
               publishStatus === 'publish'
                 ? 'border-main-600 bg-main-50'
-                : 'border-neutral-200 bg-white hover-bg-neutral-50'
+                : 'border-neutral-200 bg-white'
             }`}
+            style={{ cursor: 'pointer' }}
           >
-            <div className="d-flex align-items-start gap-12">
+            <div className="d-flex align-items-start gap-3">
               <input
                 type="radio"
                 name="publishStatus"
                 value="publish"
                 checked={publishStatus === 'publish'}
                 onChange={(e) => setPublishStatus(e.target.value)}
-                className="form-check-input mt-4"
+                className="form-check-input mt-1"
               />
               <div className="flex-grow-1">
-                <div className="fw-semibold text-neutral-900 mb-4">Publish Now</div>
+                <div className="fw-semibold text-neutral-900 mb-1">Xuất bản ngay</div>
                 <div className="text-neutral-600 text-sm">
-                  Exam will be immediately available to learners
+                  Đề thi sẽ được xuất bản ngay lập tức cho học viên
                 </div>
               </div>
             </div>
@@ -138,40 +141,42 @@ const Step4Publish = ({ examData, totalDuration, totalQuestions, totalScore }) =
       </div>
 
       {/* Exam Verification */}
-      <div className="mb-32">
-        <h5 className="text-neutral-900 fw-semibold mb-16">Exam Verification</h5>
+      <div className="col-12">
+        <h6 className="text-neutral-900 fw-semibold mb-3">Kiểm tra đề thi</h6>
 
-        <div className="d-flex flex-column gap-12">
+        <div className="d-flex flex-column gap-2">
           {/* Basic Information */}
-          <div className="d-flex align-items-center gap-12">
+          <div className="d-flex align-items-center gap-3">
             <div
-              className={`w-24 h-24 rounded-circle d-flex align-items-center justify-content-center ${
+              className={`d-flex align-items-center justify-content-center rounded-circle ${
                 examData.title ? 'bg-success-600' : 'bg-neutral-300'
               }`}
+              style={{ width: '24px', height: '24px', minWidth: '24px' }}
             >
-              {examData.title && <i className="fas fa-check text-white text-xs"></i>}
+              {examData.title && <i className="ph ph-check text-white" style={{ fontSize: '14px' }}></i>}
             </div>
-            <span className="text-sm text-neutral-700">Basic information complete</span>
+            <span className="text-sm text-neutral-700">Thông tin cơ bản đã hoàn thành</span>
           </div>
 
           {/* Sections Added */}
-          <div className="d-flex align-items-center gap-12">
+          <div className="d-flex align-items-center gap-3">
             <div
-              className={`w-24 h-24 rounded-circle d-flex align-items-center justify-content-center ${
+              className={`d-flex align-items-center justify-content-center rounded-circle ${
                 examData.sections.length > 0 ? 'bg-success-600' : 'bg-neutral-300'
               }`}
+              style={{ width: '24px', height: '24px', minWidth: '24px' }}
             >
-              {examData.sections.length > 0 && <i className="fas fa-check text-white text-xs"></i>}
+              {examData.sections.length > 0 && <i className="ph ph-check text-white" style={{ fontSize: '14px' }}></i>}
             </div>
             <span className="text-sm text-neutral-700">
-              Sections added: {examData.sections.length} section(s)
+              Đã thêm sections: {examData.sections.length} section(s)
             </span>
           </div>
 
           {/* Answer Keys */}
-          <div className="d-flex align-items-center gap-12">
+          <div className="d-flex align-items-center gap-3">
             <div
-              className={`w-24 h-24 rounded-circle d-flex align-items-center justify-content-center ${
+              className={`d-flex align-items-center justify-content-center rounded-circle ${
                 examData.sections.every(s =>
                   s.type === 'reading' || s.type === 'listening'
                     ? s.answerKey && s.answerKey.length > 0
@@ -180,15 +185,16 @@ const Step4Publish = ({ examData, totalDuration, totalQuestions, totalScore }) =
                   ? 'bg-success-600'
                   : 'bg-neutral-300'
               }`}
+              style={{ width: '24px', height: '24px', minWidth: '24px' }}
             >
               {examData.sections.every(s =>
                 s.type === 'reading' || s.type === 'listening'
                   ? s.answerKey && s.answerKey.length > 0
                   : true
-              ) && <i className="fas fa-check text-white text-xs"></i>}
+              ) && <i className="ph ph-check text-white" style={{ fontSize: '14px' }}></i>}
             </div>
             <span className="text-sm text-neutral-700">
-              Answer keys uploaded:{' '}
+              Đã upload đáp án:{' '}
               {examData.sections.filter(s =>
                 (s.type === 'reading' || s.type === 'listening') && s.answerKey && s.answerKey.length > 0
               ).length}{' '}
@@ -199,129 +205,137 @@ const Step4Publish = ({ examData, totalDuration, totalQuestions, totalScore }) =
       </div>
 
       {/* Ready to Publish Message */}
-      {readyToPublish ? (
-        <div className="bg-success-50 border border-success-200 rounded-12 p-20 mb-32">
-          <div className="d-flex align-items-start gap-12">
-            <i className="fas fa-check-circle text-success-600 text-xl mt-2"></i>
-            <div>
-              <p className="text-success-900 fw-semibold mb-8">Ready to Publish</p>
-              <p className="text-success-700 text-sm mb-0">
-                Your exam has been configured with all required sections and answer keys. Click "Save & Publish"
-                to complete the exam creation.
-              </p>
+      <div className="col-12">
+        {readyToPublish ? (
+          <div className="alert alert-success mb-0">
+            <div className="d-flex align-items-start gap-2">
+              <i className="ph ph-check-circle text-success-600 mt-1" style={{ fontSize: '20px' }}></i>
+              <div>
+                <p className="fw-semibold mb-2">Sẵn sàng xuất bản</p>
+                <p className="text-sm mb-0">
+                  Đề thi của bạn đã được cấu hình đầy đủ các sections và đáp án. Nhấn "Lưu & Xuất bản"
+                  để hoàn tất tạo đề thi.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="bg-warning-50 border border-warning-200 rounded-12 p-20 mb-32">
-          <div className="d-flex align-items-start gap-12">
-            <i className="fas fa-exclamation-triangle text-warning-600 text-xl mt-2"></i>
-            <div>
-              <p className="text-warning-900 fw-semibold mb-8">Incomplete Information</p>
-              <p className="text-warning-700 text-sm mb-0">
-                Please complete all required fields and add answer keys to publish the exam.
-              </p>
+        ) : (
+          <div className="alert alert-warning mb-0">
+            <div className="d-flex align-items-start gap-2">
+              <i className="ph ph-warning text-warning-600 mt-1" style={{ fontSize: '20px' }}></i>
+              <div>
+                <p className="fw-semibold mb-2">Thông tin chưa đầy đủ</p>
+                <p className="text-sm mb-0">
+                  Vui lòng hoàn thành tất cả các trường bắt buộc và thêm đáp án để xuất bản đề thi.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Exam Summary Detail */}
-      <div className="border border-neutral-200 rounded-12 p-24 mb-32">
-        <h6 className="text-neutral-900 fw-semibold mb-20">Exam Details</h6>
+      <div className="col-12">
+        <div className="border border-neutral-200 rounded p-3">
+          <h6 className="text-neutral-900 fw-semibold mb-3">Chi tiết đề thi</h6>
 
-        {/* Title and Description */}
-        <div className="mb-20 pb-20 border-bottom border-neutral-200">
-          <div className="mb-12">
-            <span className="text-neutral-500 text-xs d-block mb-4">Exam Title</span>
-            <span className="text-neutral-900 fw-medium">
-              {examData.title || <span className="text-neutral-400 fst-italic">Not set</span>}
-            </span>
-          </div>
-          {examData.description && (
-            <div>
-              <span className="text-neutral-500 text-xs d-block mb-4">Description</span>
-              <span className="text-neutral-700 text-sm">{examData.description}</span>
+          {/* Title and Description */}
+          <div className="mb-3 pb-3 border-bottom border-neutral-200">
+            <div className="mb-2">
+              <span className="text-neutral-500 text-xs d-block mb-1">Tên đề thi</span>
+              <span className="text-neutral-900 fw-medium">
+                {examData.title || <span className="text-neutral-400 fst-italic">Chưa đặt tên</span>}
+              </span>
             </div>
-          )}
-        </div>
-
-        {/* Stats Grid */}
-        <div className="row g-3 mb-20 pb-20 border-bottom border-neutral-200">
-          <div className="col-6">
-            <span className="text-neutral-500 text-xs d-block mb-4">Exam Type</span>
-            <span className="text-neutral-900 fw-medium">
-              {examData.examType === 'practice' ? 'Practice' : 'Real Exam'}
-            </span>
-          </div>
-          <div className="col-6">
-            <span className="text-neutral-500 text-xs d-block mb-4">Level</span>
-            <span className="text-neutral-900 fw-medium">{examData.level}</span>
-          </div>
-          <div className="col-6">
-            <span className="text-neutral-500 text-xs d-block mb-4">Sections</span>
-            <span className="text-neutral-900 fw-bold text-lg">{examData.sections.length}</span>
-          </div>
-          <div className="col-6">
-            <span className="text-neutral-500 text-xs d-block mb-4">Total Questions</span>
-            <span className="text-neutral-900 fw-bold text-lg">{totalQuestions}</span>
-          </div>
-          <div className="col-6">
-            <span className="text-neutral-500 text-xs d-block mb-4">Duration</span>
-            <span className="text-neutral-900 fw-bold text-lg">
-              {totalDuration || examData.totalDuration} <span className="text-xs fw-normal">minutes</span>
-            </span>
-          </div>
-          <div className="col-6">
-            <span className="text-neutral-500 text-xs d-block mb-4">Total Score</span>
-            <span className="text-neutral-900 fw-bold text-lg">
-              {totalScore} <span className="text-xs fw-normal">points</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Sections Detail */}
-        <div>
-          <span className="text-neutral-700 fw-semibold text-sm d-block mb-12">Sections Breakdown</span>
-          <div className="d-flex flex-column gap-8">
-            {examData.sections.map((section, index) => (
-              <div
-                key={section.id}
-                className="d-flex justify-content-between align-items-center p-12 bg-neutral-50 rounded-8"
-              >
-                <div className="d-flex align-items-center gap-12">
-                  <span className="text-neutral-900 fw-medium text-sm">
-                    Section {index + 1}: {getSectionLabel(section.type)}
-                  </span>
-                </div>
-                <div className="d-flex gap-16 text-xs text-neutral-600">
-                  <span>{section.duration} min</span>
-                  <span>{section.answerKey?.length || 0} questions</span>
-                </div>
+            {examData.description && (
+              <div>
+                <span className="text-neutral-500 text-xs d-block mb-1">Mô tả</span>
+                <span className="text-neutral-700 text-sm">{examData.description}</span>
               </div>
-            ))}
+            )}
+          </div>
+
+          {/* Stats Grid */}
+          <div className="row g-2 mb-3 pb-3 border-bottom border-neutral-200">
+            <div className="col-6">
+              <span className="text-neutral-500 text-xs d-block mb-1">Loại đề thi</span>
+              <span className="text-neutral-900 fw-medium text-sm">
+                {examData.examType === 'practice' ? 'Luyện tập' : 'Chính thức'}
+              </span>
+            </div>
+            <div className="col-6">
+              <span className="text-neutral-500 text-xs d-block mb-1">Cấp độ</span>
+              <span className="text-neutral-900 fw-medium text-sm">{examData.level}</span>
+            </div>
+            <div className="col-6">
+              <span className="text-neutral-500 text-xs d-block mb-1">Sections</span>
+              <span className="text-neutral-900 fw-bold">{examData.sections.length}</span>
+            </div>
+            <div className="col-6">
+              <span className="text-neutral-500 text-xs d-block mb-1">Tổng câu hỏi</span>
+              <span className="text-neutral-900 fw-bold">{totalQuestions}</span>
+            </div>
+            <div className="col-6">
+              <span className="text-neutral-500 text-xs d-block mb-1">Thời gian</span>
+              <span className="text-neutral-900 fw-bold">
+                {totalDuration || examData.totalDuration} <span className="fw-normal">phút</span>
+              </span>
+            </div>
+            <div className="col-6">
+              <span className="text-neutral-500 text-xs d-block mb-1">Tổng điểm</span>
+              <span className="text-neutral-900 fw-bold">
+                {totalScore} <span className="fw-normal">điểm</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Sections Detail */}
+          <div>
+            <span className="text-neutral-700 fw-semibold text-sm d-block mb-2">Chi tiết Sections</span>
+            <div className="d-flex flex-column gap-2">
+              {examData.sections.map((section, index) => (
+                <div
+                  key={section.id}
+                  className="d-flex justify-content-between align-items-center p-2 bg-neutral-50 rounded"
+                >
+                  <div>
+                    <span className="text-neutral-900 fw-medium text-sm">
+                      Section {index + 1}: {getSectionLabel(section.type)}
+                    </span>
+                  </div>
+                  <div className="d-flex gap-3 text-xs text-neutral-600">
+                    <span>{section.duration} phút</span>
+                    <span>{section.answerKey?.length || 0} câu hỏi</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Action Button */}
-      <button
-        className="btn btn-main w-100 py-14 radius-8 fw-semibold"
-        onClick={handleSaveAndPublish}
-        disabled={isSubmitting || (publishStatus === 'publish' && !readyToPublish)}
-      >
-        {isSubmitting ? (
-          <>
-            <span className="spinner-border spinner-border-sm me-8"></span>
-            Saving...
-          </>
-        ) : (
-          <>
-            <i className="fas fa-check-circle me-8"></i>
-            {publishStatus === 'publish' ? 'Save & Publish' : 'Save as Draft'}
-          </>
-        )}
-      </button>
+      <div className="col-12">
+        <Button
+          variant="primary"
+          size="lg"
+          icon={isSubmitting ? null : 'ph ph-check-circle'}
+          onClick={handleSaveAndPublish}
+          disabled={isSubmitting || (publishStatus === 'publish' && !readyToPublish)}
+          className="w-100"
+        >
+          {isSubmitting ? (
+            <>
+              <span className="spinner-border spinner-border-sm me-2"></span>
+              Đang lưu...
+            </>
+          ) : (
+            <>
+              {publishStatus === 'publish' ? 'Lưu & Xuất bản' : 'Lưu nháp'}
+            </>
+          )}
+        </Button>
+      </div>
     </div>
   );
 };

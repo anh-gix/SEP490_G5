@@ -6,113 +6,83 @@ const Step1BasicInfo = ({ examData, updateExamData }) => {
   };
 
   return (
-    <div>
+    <div className="row g-3">
       {/* Exam Title */}
-      <div className="mb-24">
-        <label className="text-neutral-900 fw-semibold mb-12 d-block">
-          Exam Title <span className="text-danger-600">*</span>
+      <div className="col-12">
+        <label className="form-label fw-semibold text-neutral-900">
+          Tên đề thi <span className="text-danger">*</span>
         </label>
         <input
           type="text"
-          className="form-control radius-8 bg-neutral-50 border-neutral-200 px-16 py-14 text-sm"
-          placeholder="e.g., IELTS Practice Test 1"
+          className="form-control"
+          placeholder="VD: IELTS Practice Test 1"
           value={examData.title}
           onChange={(e) => handleChange('title', e.target.value)}
+          required
         />
       </div>
 
       {/* Exam Description */}
-      <div className="mb-24">
-        <label className="text-neutral-900 fw-semibold mb-12 d-block">
-          Exam Description
+      <div className="col-12">
+        <label className="form-label fw-semibold text-neutral-900">
+          Mô tả đề thi
         </label>
         <textarea
-          className="form-control radius-8 bg-neutral-50 border-neutral-200 px-16 py-14 text-sm"
-          rows="5"
-          placeholder="Describe your exam..."
+          className="form-control"
+          rows="4"
+          placeholder="Mô tả chi tiết về đề thi..."
           value={examData.description}
           onChange={(e) => handleChange('description', e.target.value)}
         />
       </div>
 
       {/* Exam Type */}
-      <div className="mb-24">
-        <label className="text-neutral-900 fw-semibold mb-12 d-block">
-          Exam Type <span className="text-danger-600">*</span>
+      <div className="col-md-6">
+        <label className="form-label fw-semibold text-neutral-900">
+          Loại đề thi <span className="text-danger">*</span>
         </label>
-        <div className="d-flex gap-16">
-          <label className="d-flex align-items-center gap-8 cursor-pointer">
-            <input
-              type="radio"
-              name="examType"
-              value="practice"
-              checked={examData.examType === 'practice'}
-              onChange={(e) => handleChange('examType', e.target.value)}
-              className="form-check-input m-0"
-            />
-            <span className="text-sm">Practice Exam</span>
-          </label>
-          <label className="d-flex align-items-center gap-8 cursor-pointer">
-            <input
-              type="radio"
-              name="examType"
-              value="real"
-              checked={examData.examType === 'real'}
-              onChange={(e) => handleChange('examType', e.target.value)}
-              className="form-check-input m-0"
-            />
-            <span className="text-sm">Real Exam</span>
-          </label>
-        </div>
+        <select
+          className="form-select"
+          value={examData.examType}
+          onChange={(e) => handleChange('examType', e.target.value)}
+        >
+          <option value="practice">Luyện tập</option>
+          <option value="real">Chính thức</option>
+        </select>
       </div>
 
       {/* Level */}
-      <div className="mb-24">
-        <label className="text-neutral-900 fw-semibold mb-12 d-block">
-          Level <span className="text-danger-600">*</span>
+      <div className="col-md-6">
+        <label className="form-label fw-semibold text-neutral-900">
+          Cấp độ <span className="text-danger">*</span>
         </label>
-        <div className="d-flex gap-16">
-          <label className="d-flex align-items-center gap-8 cursor-pointer">
-            <input
-              type="radio"
-              name="level"
-              value="Academic"
-              checked={examData.level === 'Academic'}
-              onChange={(e) => handleChange('level', e.target.value)}
-              className="form-check-input m-0"
-            />
-            <span className="text-sm">Academic</span>
-          </label>
-          <label className="d-flex align-items-center gap-8 cursor-pointer">
-            <input
-              type="radio"
-              name="level"
-              value="General"
-              checked={examData.level === 'General'}
-              onChange={(e) => handleChange('level', e.target.value)}
-              className="form-check-input m-0"
-            />
-            <span className="text-sm">General</span>
-          </label>
-        </div>
+        <select
+          className="form-select"
+          value={examData.level}
+          onChange={(e) => handleChange('level', e.target.value)}
+        >
+          <option value="Academic">Academic</option>
+          <option value="General">General</option>
+        </select>
       </div>
 
       {/* Total Duration */}
-      <div className="mb-24">
-        <label className="text-neutral-900 fw-semibold mb-12 d-block">
-          Total Duration (minutes) <span className="text-danger-600">*</span>
+      <div className="col-12">
+        <label className="form-label fw-semibold text-neutral-900">
+          Tổng thời gian làm bài (phút) <span className="text-danger">*</span>
         </label>
         <input
           type="number"
-          className="form-control radius-8 bg-neutral-50 border-neutral-200 px-16 py-14 text-sm"
+          className="form-control"
           placeholder="180"
           min="0"
           value={examData.totalDuration}
           onChange={(e) => handleChange('totalDuration', parseInt(e.target.value) || 0)}
+          required
         />
-        <div className="text-neutral-500 text-xs mt-8">
-          <i className="fas fa-info-circle me-4"></i>
-          This will be the total duration for the entire exam
+        <div className="text-sm text-neutral-600 mt-2">
+          <i className="ph ph-info me-1"></i>
+          Tổng thời gian làm bài cho toàn bộ đề thi
         </div>
       </div>
     </div>

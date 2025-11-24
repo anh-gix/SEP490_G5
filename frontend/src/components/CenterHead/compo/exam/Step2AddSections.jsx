@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
+import Button from '../Button';
 import PDFUploader from './PDFUploader';
 
 const Step2AddSections = ({ examData, updateExamData }) => {
   const [expandedSections, setExpandedSections] = useState([]);
 
   const sectionTypes = [
-    { value: 'reading', label: 'Reading', icon: 'fa-book-open' },
-    { value: 'listening', label: 'Listening', icon: 'fa-headphones' },
-    { value: 'writing', label: 'Writing', icon: 'fa-pen' },
-    { value: 'speaking', label: 'Speaking', icon: 'fa-microphone' }
+    { value: 'reading', label: 'Reading', icon: 'ph-book-open' },
+    { value: 'listening', label: 'Listening', icon: 'ph-headphones' },
+    { value: 'writing', label: 'Writing', icon: 'ph-pencil-simple' },
+    { value: 'speaking', label: 'Speaking', icon: 'ph-microphone' }
   ];
 
   const addSection = () => {
@@ -16,6 +17,7 @@ const Step2AddSections = ({ examData, updateExamData }) => {
       id: Date.now(),
       type: 'reading',
       fileUrl: '',
+      audioUrls: [],
       instructions: '',
       duration: 0,
       questionCount: 0,
@@ -65,110 +67,110 @@ const Step2AddSections = ({ examData, updateExamData }) => {
   return (
     <div>
       {/* Section Header */}
-      <div className="d-flex justify-content-between align-items-center mb-24">
-        <h5 className="text-neutral-900 fw-semibold mb-0">Create Exam Sections</h5>
-        <button
-          className="btn btn-main px-20 py-10 radius-8 text-sm fw-medium d-flex align-items-center gap-8"
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h6 className="text-neutral-900 fw-semibold mb-0">Sections của đề thi</h6>
+        <Button
+          variant="primary"
+          size="sm"
+          icon="ph ph-plus"
           onClick={addSection}
         >
-          <i className="fas fa-plus"></i>
-          Add Section
-        </button>
+          Thêm Section
+        </Button>
       </div>
 
       {/* Sections List */}
       {examData.sections.length === 0 ? (
-        <div className="bg-neutral-50 border border-neutral-200 border-dashed rounded-12 p-48 text-center">
-          <div className="text-neutral-400 mb-16">
-            <i className="fas fa-inbox" style={{ fontSize: '48px' }}></i>
-          </div>
-          <h6 className="text-neutral-700 fw-semibold mb-12">No sections yet</h6>
-          <p className="text-neutral-500 text-sm mb-24">
-            Start by adding the first section for your exam
-          </p>
-          <button
-            className="btn btn-outline-main px-24 py-12 radius-8 text-sm fw-medium"
+        <div className="text-center py-5">
+          <i className="ph ph-clipboard-text text-neutral-300" style={{ fontSize: '48px' }}></i>
+          <p className="text-neutral-600 mt-3 mb-2">Chưa có section nào</p>
+          <p className="text-sm text-neutral-500 mb-3">Nhấn "Thêm Section" để bắt đầu</p>
+          <Button
+            variant="outline"
+            icon="ph ph-plus"
             onClick={addSection}
           >
-            <i className="fas fa-plus me-8"></i>
-            Add First Section
-          </button>
+            Thêm Section đầu tiên
+          </Button>
         </div>
       ) : (
-        <div className="d-flex flex-column gap-16">
+        <div className="d-flex flex-column gap-3">
           {examData.sections.map((section, index) => {
             const isExpanded = expandedSections.includes(section.id);
 
             return (
               <div
                 key={section.id}
-                className="border border-neutral-200 rounded-12 overflow-hidden bg-white"
+                className="border border-neutral-200 rounded overflow-hidden"
               >
                 {/* Section Header */}
                 <div
-                  className="d-flex align-items-center justify-content-between p-20 bg-neutral-50 cursor-pointer"
+                  className="d-flex align-items-center justify-content-between p-3 bg-neutral-50 cursor-pointer"
                   onClick={() => toggleExpand(section.id)}
+                  style={{ cursor: 'pointer' }}
                 >
-                  <div className="d-flex align-items-center gap-12">
-                    <div className="w-40 h-40 d-flex align-items-center justify-content-center rounded-8 bg-main-600 text-white">
-                      <i className={`fas ${getSectionIcon(section.type)}`}></i>
+                  <div className="d-flex align-items-center gap-3">
+                    <div className="d-flex align-items-center justify-content-center rounded bg-main-600 text-white" style={{ width: '40px', height: '40px' }}>
+                      <i className={`ph ${getSectionIcon(section.type)}`} style={{ fontSize: '20px' }}></i>
                     </div>
                     <div>
-                      <h6 className="text-neutral-900 fw-semibold mb-4 text-sm">
+                      <h6 className="text-neutral-900 fw-semibold mb-1 text-sm">
                         Section {index + 1}
                       </h6>
                       <p className="text-neutral-500 text-xs mb-0">
                         {getSectionLabel(section.type)}
-                        {section.duration > 0 && ` • ${section.duration} minutes`}
-                        {section.questionCount > 0 && ` • ${section.questionCount} questions`}
+                        {section.duration > 0 && ` • ${section.duration} phút`}
+                        {section.questionCount > 0 && ` • ${section.questionCount} câu hỏi`}
                       </p>
                     </div>
                   </div>
 
-                  <div className="d-flex align-items-center gap-8">
+                  <div className="d-flex align-items-center gap-2">
                     <button
-                      className="btn btn-sm bg-transparent border-0 text-danger-600 hover-text-danger-700"
+                      className="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center"
+                      style={{ width: '32px', height: '32px', padding: '0' }}
                       onClick={(e) => {
                         e.stopPropagation();
                         deleteSection(section.id);
                       }}
+                      title="Xóa section"
                     >
-                      <i className="fas fa-trash"></i>
+                      <i className="ph ph-trash" style={{ fontSize: '16px' }}></i>
                     </button>
-                    <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'} text-neutral-500`}></i>
+                    <i className={`ph ph-caret-${isExpanded ? 'up' : 'down'} text-neutral-500`}></i>
                   </div>
                 </div>
 
                 {/* Section Content */}
                 {isExpanded && (
-                  <div className="p-24 border-top border-neutral-200">
-                    {/* Section Type */}
-                    <div className="mb-24">
-                      <label className="text-neutral-900 fw-semibold mb-12 d-block text-sm">
-                        Section Type <span className="text-danger-600">*</span>
-                      </label>
-                      <select
-                        className="form-select radius-8 bg-neutral-50 border-neutral-200 px-16 py-12 text-sm"
-                        value={section.type}
-                        onChange={(e) => updateSection(section.id, 'type', e.target.value)}
-                      >
-                        {sectionTypes.map(type => (
-                          <option key={type.value} value={type.value}>
-                            {type.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div className="p-3 border-top border-neutral-200">
+                    <div className="row g-3">
+                      {/* Section Type */}
+                      <div className="col-12">
+                        <label className="form-label fw-semibold text-neutral-900">
+                          Loại section <span className="text-danger">*</span>
+                        </label>
+                        <select
+                          className="form-select"
+                          value={section.type}
+                          onChange={(e) => updateSection(section.id, 'type', e.target.value)}
+                        >
+                          {sectionTypes.map(type => (
+                            <option key={type.value} value={type.value}>
+                              {type.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                    {/* Duration and Question Count */}
-                    <div className="row g-3 mb-24">
+                      {/* Duration and Question Count */}
                       <div className="col-md-6">
-                        <label className="text-neutral-900 fw-semibold mb-12 d-block text-sm">
-                          Duration (minutes) <span className="text-danger-600">*</span>
+                        <label className="form-label fw-semibold text-neutral-900">
+                          Thời gian (phút) <span className="text-danger">*</span>
                         </label>
                         <input
                           type="number"
-                          className="form-control radius-8 bg-neutral-50 border-neutral-200 px-16 py-12 text-sm"
+                          className="form-control"
                           placeholder="30"
                           min="0"
                           value={section.duration}
@@ -176,44 +178,98 @@ const Step2AddSections = ({ examData, updateExamData }) => {
                         />
                       </div>
                       <div className="col-md-6">
-                        <label className="text-neutral-900 fw-semibold mb-12 d-block text-sm">
-                          Number of Questions <span className="text-danger-600">*</span>
+                        <label className="form-label fw-semibold text-neutral-900">
+                          Số câu hỏi <span className="text-danger">*</span>
                         </label>
                         <input
                           type="number"
-                          className="form-control radius-8 bg-neutral-50 border-neutral-200 px-16 py-12 text-sm"
+                          className="form-control"
                           placeholder="10"
                           min="0"
                           value={section.questionCount}
                           onChange={(e) => updateSection(section.id, 'questionCount', parseInt(e.target.value) || 0)}
                         />
                       </div>
-                    </div>
 
-                    {/* Section Instructions */}
-                    <div className="mb-24">
-                      <label className="text-neutral-900 fw-semibold mb-12 d-block text-sm">
-                        Section Instructions
-                      </label>
-                      <textarea
-                        className="form-control radius-8 bg-neutral-50 border-neutral-200 px-16 py-12 text-sm"
-                        rows="3"
-                        placeholder="Instructions for this section..."
-                        value={section.instructions}
-                        onChange={(e) => updateSection(section.id, 'instructions', e.target.value)}
-                      />
-                    </div>
+                      {/* Section Instructions */}
+                      <div className="col-12">
+                        <label className="form-label fw-semibold text-neutral-900">
+                          Hướng dẫn
+                        </label>
+                        <textarea
+                          className="form-control"
+                          rows="3"
+                          placeholder="Hướng dẫn cho section này..."
+                          value={section.instructions}
+                          onChange={(e) => updateSection(section.id, 'instructions', e.target.value)}
+                        />
+                      </div>
 
-                    {/* Upload Section PDF */}
-                    <div className="mb-24">
-                      <label className="text-neutral-900 fw-semibold mb-12 d-block text-sm">
-                        Upload Section PDF <span className="text-danger-600">*</span>
-                      </label>
-                      <PDFUploader
-                        currentFileUrl={section.fileUrl}
-                        onUpload={(url) => updateSection(section.id, 'fileUrl', url)}
-                        sectionType={section.type}
-                      />
+                      {/* Upload Files based on section type */}
+                      <div className="col-12">
+                        <label className="form-label fw-semibold text-neutral-900">
+                          Tải lên file đề bài PDF <span className="text-danger">*</span>
+                        </label>
+                        <PDFUploader
+                          currentFileUrl={section.fileUrl}
+                          onUpload={(url) => updateSection(section.id, 'fileUrl', url)}
+                          sectionType={section.type}
+                        />
+                      </div>
+
+                      {/* Upload Audio File for Listening Section */}
+                      {section.type === 'listening' && (
+                        <div className="col-12">
+                          <label className="form-label fw-semibold text-neutral-900">
+                            Tải lên file đề nghe (Audio) <span className="text-danger">*</span>
+                          </label>
+                          <div className="border border-neutral-200 rounded p-3">
+                            <input
+                              type="file"
+                              className="form-control"
+                              accept="audio/*,.mp3,.wav,.m4a"
+                              onChange={(e) => {
+                                const file = e.target.files[0];
+                                if (file) {
+                                  // TODO: Upload file to server and get URL
+                                  // For now, we'll just store the file name
+                                  const audioUrl = URL.createObjectURL(file);
+                                  updateSection(section.id, 'audioUrls', [audioUrl]);
+                                }
+                              }}
+                            />
+                            <p className="text-xs text-neutral-500 mt-2 mb-0">
+                              <i className="ph ph-info me-1"></i>
+                              Hỗ trợ các định dạng: MP3, WAV, M4A
+                            </p>
+                            {section.audioUrls && section.audioUrls.length > 0 && (
+                              <div className="mt-3">
+                                <p className="text-sm text-neutral-700 mb-2 fw-semibold">File audio đã tải lên:</p>
+                                {section.audioUrls.map((audioUrl, idx) => (
+                                  <div key={idx} className="d-flex align-items-center gap-2 p-2 bg-neutral-50 rounded">
+                                    <i className="ph ph-file-audio text-main-600"></i>
+                                    <span className="text-sm flex-grow-1">Audio file {idx + 1}</span>
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-outline-danger"
+                                      onClick={() => {
+                                        const newAudioUrls = section.audioUrls.filter((_, i) => i !== idx);
+                                        updateSection(section.id, 'audioUrls', newAudioUrls);
+                                      }}
+                                    >
+                                      <i className="ph ph-trash"></i>
+                                    </button>
+                                  </div>
+                                ))}
+                                <audio controls className="w-100 mt-2">
+                                  <source src={section.audioUrls[0]} />
+                                  Trình duyệt không hỗ trợ phát audio.
+                                </audio>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

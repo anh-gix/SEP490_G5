@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Button from '../Button';
 
 const Step3AnswerKeys = ({ examData, updateExamData }) => {
   const [selectedSectionIndex, setSelectedSectionIndex] = useState(0);
@@ -20,13 +21,12 @@ const Step3AnswerKeys = ({ examData, updateExamData }) => {
     const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
 
     if (!validTypes.includes(fileExt)) {
-      alert('Please upload CSV or Excel file only');
+      alert('Chỉ chấp nhận file CSV hoặc Excel');
       return;
     }
 
     // TODO: Parse CSV/Excel file and extract answer keys
-    // For now, just show a message
-    alert('File upload functionality will be implemented with backend integration');
+    alert('Tính năng upload file sẽ được thêm sau khi tích hợp backend');
   };
 
   const addAnswer = () => {
@@ -34,7 +34,9 @@ const Step3AnswerKeys = ({ examData, updateExamData }) => {
 
     const newAnswer = {
       questionNumber: (currentSection.answerKey?.length || 0) + 1,
-      correctAnswer: '',
+      questionType: 'multiple_choice',
+      numberOfChoices: 4, // Default to 4 choices
+      correctAnswer: [''],
       maxScore: 1
     };
 
@@ -46,6 +48,16 @@ const Step3AnswerKeys = ({ examData, updateExamData }) => {
 
     const updatedAnswers = currentSection.answerKey.map((answer, index) =>
       index === answerIndex ? { ...answer, [field]: value } : answer
+    );
+
+    updateSectionAnswers(updatedAnswers);
+  };
+
+  const updateAnswerMultipleFields = (answerIndex, updates) => {
+    if (!currentSection) return;
+
+    const updatedAnswers = currentSection.answerKey.map((answer, index) =>
+      index === answerIndex ? { ...answer, ...updates } : answer
     );
 
     updateSectionAnswers(updatedAnswers);
@@ -75,8 +87,8 @@ const Step3AnswerKeys = ({ examData, updateExamData }) => {
   };
 
   const downloadTemplate = () => {
-    // Create CSV template
-    const csvContent = 'Question#,Answer,Score\n1,A,1\n2,B,1\n3,C,1';
+    // Create CSV template with numberOfChoices field
+    const csvContent = 'Question#,QuestionType,NumberOfChoices,Answers,Score\n1,multiple_choice,4,A,1\n2,multiple_choice,4,"A|B",1\n3,true_false,2,True,1\n4,input,,"answer1|answer2",1\n5,multiple_choice,5,C,1';
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -88,35 +100,25 @@ const Step3AnswerKeys = ({ examData, updateExamData }) => {
 
   if (sectionsNeedingAnswers.length === 0) {
     return (
-      <div className="bg-neutral-50 border border-neutral-200 border-dashed rounded-12 p-48 text-center">
-        <div className="text-neutral-400 mb-16">
-          <i className="fas fa-info-circle" style={{ fontSize: '48px' }}></i>
-        </div>
-        <h6 className="text-neutral-700 fw-semibold mb-12">No sections require answer keys</h6>
-        <p className="text-neutral-500 text-sm mb-0">
-          Only Reading and Listening sections require answer keys. Writing and Speaking sections are manually graded.
+      <div className="text-center py-5">
+        <i className="ph ph-info text-neutral-300" style={{ fontSize: '48px' }}></i>
+        <p className="text-neutral-600 mt-3 mb-2">Không có section nào cần đáp án</p>
+        <p className="text-sm text-neutral-500 mb-0">
+          Chỉ có Reading và Listening sections cần đáp án. Writing và Speaking sẽ được chấm thủ công.
         </p>
       </div>
     );
   }
 
   return (
-    <div>
-      {/* Upload Answer Keys Header */}
-      <div className="mb-24">
-        <h5 className="text-neutral-900 fw-semibold mb-8">Upload Answer Keys</h5>
-        <p className="text-neutral-600 text-sm mb-0">
-          Upload CSV or Excel file with answer keys for each section
-        </p>
-      </div>
-
+    <div className="row g-3">
       {/* Section Selector */}
-      <div className="mb-24">
-        <label className="text-neutral-900 fw-semibold mb-12 d-block text-sm">
-          Select Section
+      <div className="col-12">
+        <label className="form-label fw-semibold text-neutral-900">
+          Chọn Section
         </label>
         <select
-          className="form-select radius-8 bg-neutral-50 border-neutral-200 px-16 py-12 text-sm"
+          className="form-select"
           value={selectedSectionIndex}
           onChange={(e) => setSelectedSectionIndex(parseInt(e.target.value))}
         >
@@ -124,7 +126,7 @@ const Step3AnswerKeys = ({ examData, updateExamData }) => {
             const sectionNumber = examData.sections.indexOf(section) + 1;
             return (
               <option key={section.id} value={index}>
-                {section.type.charAt(0).toUpperCase() + section.type.slice(1)} ({section.answerKey?.length || 0} questions)
+                Section {sectionNumber} - {section.type.charAt(0).toUpperCase() + section.type.slice(1)} ({section.answerKey?.length || 0} câu hỏi)
               </option>
             );
           })}
@@ -132,52 +134,53 @@ const Step3AnswerKeys = ({ examData, updateExamData }) => {
       </div>
 
       {/* Upload Method Toggle */}
-      <div className="mb-24">
-        <div className="d-flex gap-12 p-4 bg-neutral-100 rounded-8">
+      <div className="col-12">
+        <div className="d-flex gap-2 p-2 bg-neutral-100 rounded">
           <button
-            className={`flex-grow-1 px-16 py-10 radius-6 text-sm fw-medium border-0 ${
+            className={`flex-grow-1 px-3 py-2 rounded text-sm fw-medium border-0 ${
               uploadMethod === 'file'
                 ? 'bg-white text-neutral-900 shadow-sm'
                 : 'bg-transparent text-neutral-600'
             }`}
             onClick={() => setUploadMethod('file')}
           >
-            <i className="fas fa-upload me-8"></i>
+            <i className="ph ph-upload me-2"></i>
             Upload File
           </button>
           <button
-            className={`flex-grow-1 px-16 py-10 radius-6 text-sm fw-medium border-0 ${
+            className={`flex-grow-1 px-3 py-2 rounded text-sm fw-medium border-0 ${
               uploadMethod === 'manual'
                 ? 'bg-white text-neutral-900 shadow-sm'
                 : 'bg-transparent text-neutral-600'
             }`}
             onClick={() => setUploadMethod('manual')}
           >
-            <i className="fas fa-edit me-8"></i>
-            Manual Entry
+            <i className="ph ph-pencil-simple me-2"></i>
+            Nhập thủ công
           </button>
         </div>
       </div>
 
       {/* File Upload Method */}
       {uploadMethod === 'file' && (
-        <div className="mb-24">
-          <div className="border border-neutral-200 rounded-12 p-24 bg-white">
+        <div className="col-12">
+          <div className="border border-neutral-200 rounded p-3">
             {/* Upload Area */}
-            <div className="mb-20">
+            <div className="mb-3">
               <label
                 htmlFor={`file-upload-${currentSection.id}`}
-                className="d-block border border-neutral-300 border-dashed rounded-12 p-32 text-center cursor-pointer bg-neutral-50 hover-bg-neutral-100 transition-all"
+                className="d-block border border-neutral-300 border-dashed rounded p-4 text-center cursor-pointer bg-neutral-50"
+                style={{ cursor: 'pointer' }}
               >
                 <div className="d-flex flex-column align-items-center">
-                  <div className="w-64 h-64 d-flex align-items-center justify-content-center rounded-circle bg-main-50 mb-16">
-                    <i className="fas fa-cloud-upload-alt text-main-600 text-28"></i>
+                  <div className="d-flex align-items-center justify-content-center rounded-circle bg-main-50 mb-3" style={{ width: '64px', height: '64px' }}>
+                    <i className="ph ph-cloud-arrow-up text-main-600" style={{ fontSize: '28px' }}></i>
                   </div>
-                  <p className="text-neutral-900 fw-medium mb-8 text-sm">
-                    Choose Excel or CSV file
+                  <p className="text-neutral-900 fw-medium mb-2 text-sm">
+                    Chọn file Excel hoặc CSV
                   </p>
                   <p className="text-neutral-500 text-xs mb-0">
-                    Format: Question# | Answer | Score
+                    Định dạng: Câu hỏi | Đáp án | Điểm
                   </p>
                 </div>
                 <input
@@ -191,27 +194,39 @@ const Step3AnswerKeys = ({ examData, updateExamData }) => {
             </div>
 
             {/* Download Template */}
-            <div className="text-center">
-              <button
-                className="btn btn-outline-main px-20 py-10 radius-8 text-sm fw-medium d-inline-flex align-items-center gap-8"
+            <div className="text-center mb-3">
+              <Button
+                variant="outline"
+                size="sm"
+                icon="ph ph-download"
                 onClick={downloadTemplate}
               >
-                <i className="fas fa-download"></i>
-                Download Answer Key Template (CSV)
-              </button>
+                Tải Template CSV
+              </Button>
             </div>
 
             {/* Answer Key Format Info */}
-            <div className="mt-20 bg-info-50 border border-info-200 rounded-12 p-16">
-              <div className="d-flex gap-12">
-                <i className="fas fa-info-circle text-info-600 mt-2"></i>
+            <div className="alert alert-info mb-0">
+              <div className="d-flex gap-2">
+                <i className="ph ph-info mt-1"></i>
                 <div>
-                  <p className="text-info-900 fw-medium mb-8 text-sm">Answer Key Format</p>
-                  <ul className="text-info-700 text-xs mb-0 ps-16">
-                    <li><strong>Question Number:</strong> The sequence number of the question (1, 2, 3, etc.)</li>
-                    <li><strong>Correct Answer:</strong> The correct answer option (A, B, C, or D)</li>
-                    <li><strong>Max Score:</strong> Points assigned to this question (usually 1)</li>
+                  <p className="fw-semibold mb-2 text-sm">Định dạng file đáp án</p>
+                  <ul className="text-sm mb-0 ps-3">
+                    <li><strong>Câu hỏi:</strong> Số thứ tự (1, 2, 3...)</li>
+                    <li><strong>Loại câu hỏi:</strong> multiple_choice (trắc nghiệm), true_false (đúng/sai), input (điền từ)</li>
+                    <li><strong>Số lựa chọn:</strong> 2-10 (bắt buộc cho multiple_choice, để trống cho các loại khác)</li>
+                    <li><strong>Đáp án đúng:</strong> Một đáp án (A) hoặc nhiều đáp án cách nhau bởi | (A|B|C)</li>
+                    <li><strong>Điểm:</strong> Điểm cho câu hỏi (VD: 1, 0.5, 2)</li>
                   </ul>
+                  <div className="text-sm mb-0 mt-2">
+                    <strong>Ví dụ:</strong>
+                    <ul className="ps-3 mb-0 mt-1">
+                      <li>1,multiple_choice,4,A,1 (câu trắc nghiệm 4 đáp án, đáp án đúng là A)</li>
+                      <li>2,multiple_choice,4,"A|B",1 (câu trắc nghiệm 4 đáp án, đáp án đúng là A và B)</li>
+                      <li>3,true_false,2,True,1 (câu đúng/sai, đáp án là True)</li>
+                      <li>4,input,,"answer",1 (câu điền từ, đáp án là "answer")</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
@@ -221,95 +236,225 @@ const Step3AnswerKeys = ({ examData, updateExamData }) => {
 
       {/* Manual Entry Method */}
       {uploadMethod === 'manual' && (
-        <div>
+        <div className="col-12">
           {/* Answer List */}
           {currentSection.answerKey && currentSection.answerKey.length > 0 ? (
-            <div className="mb-20">
+            <div className="mb-3">
               {currentSection.answerKey.map((answer, index) => (
                 <div
                   key={index}
-                  className="bg-white border border-neutral-200 rounded-12 p-20 mb-12"
+                  className="border border-neutral-200 rounded p-3 mb-2"
                 >
-                  <div className="d-flex align-items-start gap-16">
+                  <div className="d-flex align-items-start gap-3">
                     {/* Question Number */}
-                    <div className="w-48 h-48 d-flex align-items-center justify-content-center rounded-8 bg-main-50 text-main-600 fw-bold flex-shrink-0">
+                    <div className="d-flex align-items-center justify-content-center rounded bg-main-50 text-main-600 fw-bold flex-shrink-0" style={{ width: '48px', height: '48px' }}>
                       {answer.questionNumber}
                     </div>
 
                     {/* Answer Fields */}
-                    <div className="flex-grow-1 row g-3">
-                      <div className="col-md-8">
-                        <label className="text-neutral-700 fw-medium mb-8 d-block text-xs">
-                          Correct Answer <span className="text-danger-600">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          className="form-control radius-8 bg-neutral-50 border-neutral-200 px-12 py-10 text-sm"
-                          placeholder="e.g., A, B, C, D or text answer"
-                          value={answer.correctAnswer}
-                          onChange={(e) => updateAnswer(index, 'correctAnswer', e.target.value)}
-                        />
+                    <div className="flex-grow-1">
+                      <div className="row g-2 mb-2">
+                        <div className="col-md-5">
+                          <label className="form-label text-neutral-700 fw-medium text-xs mb-1">
+                            Loại câu hỏi <span className="text-danger">*</span>
+                          </label>
+                          <select
+                            className="form-select form-select-sm"
+                            value={answer.questionType || 'multiple_choice'}
+                            onChange={(e) => {
+                              const newType = e.target.value;
+
+                              // Update questionType and numberOfChoices together
+                              const updates = { questionType: newType };
+
+                              if (newType === 'true_false') {
+                                updates.numberOfChoices = 2;
+                              } else if (newType === 'input') {
+                                updates.numberOfChoices = null;
+                              } else if (newType === 'multiple_choice') {
+                                updates.numberOfChoices = answer.numberOfChoices || 4;
+                              }
+
+                              updateAnswerMultipleFields(index, updates);
+                            }}
+                          >
+                            <option value="multiple_choice">Trắc nghiệm</option>
+                            <option value="true_false">Đúng/Sai</option>
+                            <option value="input">Điền từ</option>
+                          </select>
+                        </div>
+
+                        {/* Number of Choices - Only show for multiple_choice */}
+                        {answer.questionType === 'multiple_choice' && (
+                          <div className="col-md-3">
+                            <label className="form-label text-neutral-700 fw-medium text-xs mb-1">
+                              Số đáp án <span className="text-danger">*</span>
+                            </label>
+                            <input
+                              type="number"
+                              className="form-control form-control-sm"
+                              placeholder="4"
+                              min="2"
+                              max="10"
+                              value={answer.numberOfChoices || 4}
+                              onChange={(e) => updateAnswer(index, 'numberOfChoices', parseInt(e.target.value) || 4)}
+                            />
+                          </div>
+                        )}
+
+                        {/* Show numberOfChoices as read-only for true_false */}
+                        {answer.questionType === 'true_false' && (
+                          <div className="col-md-3">
+                            <label className="form-label text-neutral-700 fw-medium text-xs mb-1">
+                              Số đáp án
+                            </label>
+                            <input
+                              type="text"
+                              className="form-control form-control-sm"
+                              value="2 (True/False)"
+                              disabled
+                            />
+                          </div>
+                        )}
+
+                        <div className={answer.questionType === 'input' ? 'col-md-7' : 'col-md-4'}>
+                          <label className="form-label text-neutral-700 fw-medium text-xs mb-1">
+                            Điểm <span className="text-danger">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            className="form-control form-control-sm"
+                            placeholder="1"
+                            min="0"
+                            step="0.5"
+                            value={answer.maxScore}
+                            onChange={(e) => updateAnswer(index, 'maxScore', parseFloat(e.target.value) || 0)}
+                          />
+                        </div>
                       </div>
-                      <div className="col-md-4">
-                        <label className="text-neutral-700 fw-medium mb-8 d-block text-xs">
-                          Score <span className="text-danger-600">*</span>
+
+                      {/* Multiple Correct Answers */}
+                      <div className="mb-2">
+                        <label className="form-label text-neutral-700 fw-medium text-xs mb-1">
+                          Đáp án đúng <span className="text-danger">*</span>
+                          <span className="text-neutral-500 fw-normal ms-1">
+                            {answer.questionType === 'multiple_choice' &&
+                              `(Nhập A, B, C, D... tùy theo số đáp án. Có thể có nhiều đáp án đúng)`}
+                            {answer.questionType === 'true_false' &&
+                              `(Nhập True hoặc False)`}
+                            {answer.questionType === 'input' &&
+                              `(Nhập từ/cụm từ đúng. Có thể có nhiều cách trả lời)`}
+                          </span>
                         </label>
-                        <input
-                          type="number"
-                          className="form-control radius-8 bg-neutral-50 border-neutral-200 px-12 py-10 text-sm"
-                          placeholder="1"
-                          min="0"
-                          step="0.5"
-                          value={answer.maxScore}
-                          onChange={(e) => updateAnswer(index, 'maxScore', parseFloat(e.target.value) || 0)}
-                        />
+
+                        {/* Helper text for number of choices */}
+                        {answer.questionType === 'multiple_choice' && answer.numberOfChoices && (
+                          <div className="alert alert-light p-2 mb-2 text-xs">
+                            <i className="ph ph-info me-1"></i>
+                            Câu hỏi có {answer.numberOfChoices} đáp án (
+                            {Array.from({ length: answer.numberOfChoices }, (_, i) =>
+                              String.fromCharCode(65 + i) // A, B, C, D, E...
+                            ).join(', ')})
+                          </div>
+                        )}
+
+                        {Array.isArray(answer.correctAnswer) && answer.correctAnswer.map((ans, ansIdx) => (
+                          <div key={ansIdx} className="d-flex gap-2 mb-2">
+                            <input
+                              type="text"
+                              className="form-control form-control-sm"
+                              placeholder={
+                                answer.questionType === 'multiple_choice'
+                                  ? 'A, B, C, D...'
+                                  : answer.questionType === 'true_false'
+                                  ? 'True hoặc False'
+                                  : 'Nhập từ/cụm từ đúng'
+                              }
+                              value={ans}
+                              onChange={(e) => {
+                                const newAnswers = [...answer.correctAnswer];
+                                newAnswers[ansIdx] = e.target.value;
+                                updateAnswer(index, 'correctAnswer', newAnswers);
+                              }}
+                            />
+                            {answer.correctAnswer.length > 1 && (
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-danger"
+                                onClick={() => {
+                                  const newAnswers = answer.correctAnswer.filter((_, i) => i !== ansIdx);
+                                  updateAnswer(index, 'correctAnswer', newAnswers);
+                                }}
+                                title="Xóa đáp án này"
+                              >
+                                <i className="ph ph-x"></i>
+                              </button>
+                            )}
+                          </div>
+                        ))}
+
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          onClick={() => {
+                            const newAnswers = [...(answer.correctAnswer || ['']), ''];
+                            updateAnswer(index, 'correctAnswer', newAnswers);
+                          }}
+                        >
+                          <i className="ph ph-plus me-1"></i>
+                          Thêm đáp án đúng khác
+                        </button>
                       </div>
                     </div>
 
                     {/* Delete Button */}
                     <button
-                      className="w-40 h-40 d-flex align-items-center justify-content-center border border-danger-600 text-danger-600 rounded-8 hover-bg-danger-50 flex-shrink-0 bg-transparent"
+                      className="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center flex-shrink-0"
+                      style={{ width: '40px', height: '40px', padding: '0' }}
                       onClick={() => deleteAnswer(index)}
-                      title="Delete answer"
+                      title="Xóa đáp án"
                     >
-                      <i className="fas fa-trash text-sm"></i>
+                      <i className="ph ph-trash"></i>
                     </button>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="bg-neutral-50 border border-neutral-200 border-dashed rounded-12 p-32 mb-20 text-center">
-              <i className="fas fa-clipboard-list text-neutral-400 mb-12" style={{ fontSize: '32px' }}></i>
-              <p className="text-neutral-500 text-sm mb-0">
-                No answers added yet. Click the button below to add answers.
+            <div className="text-center py-4 mb-3">
+              <i className="ph ph-clipboard-text text-neutral-400" style={{ fontSize: '32px' }}></i>
+              <p className="text-neutral-500 text-sm mt-2 mb-0">
+                Chưa có đáp án nào. Nhấn nút bên dưới để thêm.
               </p>
             </div>
           )}
 
           {/* Add Answer Button */}
-          <button
-            className="btn btn-outline-main w-100 d-flex align-items-center justify-content-center gap-8 py-12 radius-8 text-sm fw-medium"
+          <Button
+            variant="outline"
+            icon="ph ph-plus"
             onClick={addAnswer}
+            className="w-100"
           >
-            <i className="fas fa-plus-circle"></i>
-            Add Answer
-          </button>
+            Thêm đáp án
+          </Button>
         </div>
       )}
 
       {/* Display current answers summary */}
       {currentSection.answerKey && currentSection.answerKey.length > 0 && (
-        <div className="mt-24 bg-success-50 border border-success-200 rounded-12 p-16">
-          <div className="d-flex align-items-center gap-12">
-            <i className="fas fa-check-circle text-success-600"></i>
-            <div>
-              <p className="text-success-900 fw-medium mb-4 text-sm">
-                Answer keys uploaded: {currentSection.answerKey.length} section(s)
-              </p>
-              <p className="text-success-700 text-xs mb-0">
-                Total answers for this section: {currentSection.answerKey.length}
-              </p>
+        <div className="col-12">
+          <div className="alert alert-success mb-0">
+            <div className="d-flex align-items-center gap-2">
+              <i className="ph ph-check-circle"></i>
+              <div>
+                <p className="fw-semibold mb-1 text-sm">
+                  Đã tải lên đáp án: {currentSection.answerKey.length} section(s)
+                </p>
+                <p className="text-xs mb-0">
+                  Tổng số đáp án cho section này: {currentSection.answerKey.length}
+                </p>
+              </div>
             </div>
           </div>
         </div>

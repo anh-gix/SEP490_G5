@@ -212,6 +212,167 @@ async function seedUsers() {
             phone: '0900000010',
             address: '132 Đường ABC, Quận 1, TP.HCM',
             roleId: seedData.roles[4]._id
+        },
+        // Thêm 20 students mới cho 5 lớp cùng course
+        {
+            email: 'student6@example.com',
+            username: 'student6',
+            password: hashedPassword,
+            phone: '0900000011',
+            address: '133 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student7@example.com',
+            username: 'student7',
+            password: hashedPassword,
+            phone: '0900000012',
+            address: '134 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student8@example.com',
+            username: 'student8',
+            password: hashedPassword,
+            phone: '0900000013',
+            address: '135 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student9@example.com',
+            username: 'student9',
+            password: hashedPassword,
+            phone: '0900000014',
+            address: '136 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student10@example.com',
+            username: 'student10',
+            password: hashedPassword,
+            phone: '0900000015',
+            address: '137 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student11@example.com',
+            username: 'student11',
+            password: hashedPassword,
+            phone: '0900000016',
+            address: '138 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student12@example.com',
+            username: 'student12',
+            password: hashedPassword,
+            phone: '0900000017',
+            address: '139 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student13@example.com',
+            username: 'student13',
+            password: hashedPassword,
+            phone: '0900000018',
+            address: '140 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student14@example.com',
+            username: 'student14',
+            password: hashedPassword,
+            phone: '0900000019',
+            address: '141 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student15@example.com',
+            username: 'student15',
+            password: hashedPassword,
+            phone: '0900000020',
+            address: '142 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student16@example.com',
+            username: 'student16',
+            password: hashedPassword,
+            phone: '0900000021',
+            address: '143 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student17@example.com',
+            username: 'student17',
+            password: hashedPassword,
+            phone: '0900000022',
+            address: '144 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student18@example.com',
+            username: 'student18',
+            password: hashedPassword,
+            phone: '0900000023',
+            address: '145 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student19@example.com',
+            username: 'student19',
+            password: hashedPassword,
+            phone: '0900000024',
+            address: '146 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student20@example.com',
+            username: 'student20',
+            password: hashedPassword,
+            phone: '0900000025',
+            address: '147 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student21@example.com',
+            username: 'student21',
+            password: hashedPassword,
+            phone: '0900000026',
+            address: '148 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student22@example.com',
+            username: 'student22',
+            password: hashedPassword,
+            phone: '0900000027',
+            address: '149 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student23@example.com',
+            username: 'student23',
+            password: hashedPassword,
+            phone: '0900000028',
+            address: '150 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student24@example.com',
+            username: 'student24',
+            password: hashedPassword,
+            phone: '0900000029',
+            address: '151 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
+        },
+        {
+            email: 'student25@example.com',
+            username: 'student25',
+            password: hashedPassword,
+            phone: '0900000030',
+            address: '152 Đường ABC, Quận 1, TP.HCM',
+            roleId: seedData.roles[4]._id
         }
     ];
     
@@ -744,6 +905,31 @@ async function seedClasses() {
     const pendingClassEndDate = new Date(today);
     pendingClassEndDate.setDate(today.getDate() + 35); // 5 tuần sau
     
+    // Các startDate khác nhau cho 5 lớp cùng course (để session hiện tại khác nhau)
+    const class2StartDate = new Date(today);
+    class2StartDate.setDate(today.getDate() - 7); // 1 tuần trước
+    const class2EndDate = new Date(today);
+    class2EndDate.setDate(today.getDate() + 21); // 3 tuần sau
+    
+    const class3StartDate = new Date(today); // Hôm nay
+    const class3EndDate = new Date(today);
+    class3EndDate.setDate(today.getDate() + 28); // 4 tuần sau
+    
+    const class4StartDate = new Date(today);
+    class4StartDate.setDate(today.getDate() + 7); // 1 tuần sau
+    const class4EndDate = new Date(today);
+    class4EndDate.setDate(today.getDate() + 35); // 5 tuần sau
+    
+    const class5StartDate = new Date(today);
+    class5StartDate.setDate(today.getDate() + 14); // 2 tuần sau
+    const class5EndDate = new Date(today);
+    class5EndDate.setDate(today.getDate() + 42); // 6 tuần sau
+    
+    const class6StartDate = new Date(today);
+    class6StartDate.setDate(today.getDate() + 21); // 3 tuần sau
+    const class6EndDate = new Date(today);
+    class6EndDate.setDate(today.getDate() + 49); // 7 tuần sau
+    
     const classes = [
         {
             name: 'IELTS Foundation A1 - Lớp Đang Học',
@@ -781,6 +967,62 @@ async function seedClasses() {
             endDate: activeClassEndDate,
             maxStudents: 25,
             status: 'active'
+        },
+        // 5 lớp mới cùng course với "IELTS Foundation A1 - Lớp Đang Học"
+        {
+            name: 'IELTS Foundation A1 - Lớp 2',
+            course: seedData.courses[0]._id, // IELTS Foundation A1 - Nghe (cùng course)
+            teacher: seedData.users[3]._id, // Teacher 1
+            students: [seedData.users[10]._id, seedData.users[11]._id, seedData.users[12]._id, seedData.users[13]._id],
+            room: seedData.rooms[1]._id, // Phòng 201
+            startDate: class2StartDate, // 1 tuần trước
+            endDate: class2EndDate,
+            maxStudents: 25,
+            status: 'active'
+        },
+        {
+            name: 'IELTS Foundation A1 - Lớp 3',
+            course: seedData.courses[0]._id, // IELTS Foundation A1 - Nghe (cùng course)
+            teacher: seedData.users[4]._id, // Teacher 2
+            students: [seedData.users[14]._id, seedData.users[15]._id, seedData.users[16]._id, seedData.users[17]._id],
+            room: seedData.rooms[2]._id, // Phòng 301
+            startDate: class3StartDate, // Hôm nay
+            endDate: class3EndDate,
+            maxStudents: 25,
+            status: 'active'
+        },
+        {
+            name: 'IELTS Foundation A1 - Lớp 4',
+            course: seedData.courses[0]._id, // IELTS Foundation A1 - Nghe (cùng course)
+            teacher: seedData.users[3]._id, // Teacher 1
+            students: [seedData.users[18]._id, seedData.users[19]._id, seedData.users[20]._id, seedData.users[21]._id],
+            room: seedData.rooms[3]._id, // Phòng Lab 401
+            startDate: class4StartDate, // 1 tuần sau
+            endDate: class4EndDate,
+            maxStudents: 25,
+            status: 'pending'
+        },
+        {
+            name: 'IELTS Foundation A1 - Lớp 5',
+            course: seedData.courses[0]._id, // IELTS Foundation A1 - Nghe (cùng course)
+            teacher: seedData.users[4]._id, // Teacher 2
+            students: [seedData.users[22]._id, seedData.users[23]._id, seedData.users[24]._id, seedData.users[25]._id],
+            room: seedData.rooms[4]._id, // Phòng 501
+            startDate: class5StartDate, // 2 tuần sau
+            endDate: class5EndDate,
+            maxStudents: 25,
+            status: 'pending'
+        },
+        {
+            name: 'IELTS Foundation A1 - Lớp 6',
+            course: seedData.courses[0]._id, // IELTS Foundation A1 - Nghe (cùng course)
+            teacher: seedData.users[3]._id, // Teacher 1
+            students: [seedData.users[10]._id, seedData.users[11]._id], // Dùng lại một số students (không conflict vì lịch khác)
+            room: seedData.rooms[0]._id, // Phòng 101 (có thể dùng lại nếu lịch khác)
+            startDate: class6StartDate, // 3 tuần sau
+            endDate: class6EndDate,
+            maxStudents: 25,
+            status: 'pending'
         }
     ];
     
@@ -790,7 +1032,13 @@ async function seedClasses() {
     console.log(`   - Lớp đang học: ${classes[0].name} (${activeClassStartDate.toISOString().split('T')[0]} - ${activeClassEndDate.toISOString().split('T')[0]})`);
     console.log(`   - Lớp chưa học: ${classes[1].name} (${pendingClassStartDate.toISOString().split('T')[0]} - ${pendingClassEndDate.toISOString().split('T')[0]})`);
     console.log(`   - Lớp có conflict: ${classes[2].name} (${activeClassStartDate.toISOString().split('T')[0]} - ${activeClassEndDate.toISOString().split('T')[0]})`);
-    console.log(`     ⚠️ Lớp này có học viên chung với lớp đang học và sẽ có lịch trùng thời gian\n`);
+    console.log(`     ⚠️ Lớp này có học viên chung với lớp đang học và sẽ có lịch trùng thời gian`);
+    console.log(`   - 5 lớp cùng course IELTS Foundation A1 - Nghe:`);
+    console.log(`     • ${classes[3].name} (${class2StartDate.toISOString().split('T')[0]} - ${class2EndDate.toISOString().split('T')[0]})`);
+    console.log(`     • ${classes[4].name} (${class3StartDate.toISOString().split('T')[0]} - ${class3EndDate.toISOString().split('T')[0]})`);
+    console.log(`     • ${classes[5].name} (${class4StartDate.toISOString().split('T')[0]} - ${class4EndDate.toISOString().split('T')[0]})`);
+    console.log(`     • ${classes[6].name} (${class5StartDate.toISOString().split('T')[0]} - ${class5EndDate.toISOString().split('T')[0]})`);
+    console.log(`     • ${classes[7].name} (${class6StartDate.toISOString().split('T')[0]} - ${class6EndDate.toISOString().split('T')[0]})\n`);
 }
 
 async function seedClassSchedules() {
@@ -830,6 +1078,33 @@ async function seedClassSchedules() {
         [
             { dayOfWeek: 4, startTime: '08:00', endTime: '10:00' }, // Thứ 5 - Lịch conflict
             { dayOfWeek: 5, startTime: '10:00', endTime: '12:00' }  // Thứ 6 - Lịch conflict
+        ],
+        // Pattern 6: Thứ 4, Thứ 5 (2 buổi/tuần) - Cho lớp 2
+        [
+            { dayOfWeek: 3, startTime: '14:00', endTime: '16:00' }, // Thứ 4
+            { dayOfWeek: 4, startTime: '14:00', endTime: '16:00' }  // Thứ 5
+        ],
+        // Pattern 7: Thứ 5, Thứ 6 (2 buổi/tuần) - Cho lớp 3
+        [
+            { dayOfWeek: 4, startTime: '18:00', endTime: '20:00' }, // Thứ 5
+            { dayOfWeek: 5, startTime: '18:00', endTime: '20:00' }  // Thứ 6
+        ],
+        // Pattern 8: Thứ 6, Thứ 7 (2 buổi/tuần) - Cho lớp 4
+        [
+            { dayOfWeek: 5, startTime: '08:00', endTime: '10:00' }, // Thứ 6
+            { dayOfWeek: 6, startTime: '10:00', endTime: '12:00' }  // Thứ 7
+        ],
+        // Pattern 9: Thứ 3, Thứ 5, Chủ nhật (3 buổi/tuần) - Cho lớp 5
+        [
+            { dayOfWeek: 2, startTime: '14:00', endTime: '16:00' }, // Thứ 3
+            { dayOfWeek: 4, startTime: '16:00', endTime: '18:00' }, // Thứ 5
+            { dayOfWeek: 0, startTime: '08:00', endTime: '10:00' }  // Chủ nhật
+        ],
+        // Pattern 10: Thứ 2, Thứ 4, Thứ 6 (3 buổi/tuần) - Cho lớp 6
+        [
+            { dayOfWeek: 1, startTime: '14:00', endTime: '16:00' }, // Thứ 2
+            { dayOfWeek: 3, startTime: '16:00', endTime: '18:00' }, // Thứ 4
+            { dayOfWeek: 5, startTime: '14:00', endTime: '16:00' }  // Thứ 6
         ]
     ];
     
@@ -877,9 +1152,36 @@ async function seedClassSchedules() {
         if (classIndex === 2) {
             // Lớp conflict: dùng pattern 5 (index 4, trùng thời gian với pattern 0 - lớp đang học)
             selectedPattern = schedulePatterns[4];
+        } else if (classIndex === 0) {
+            // Lớp 0 (IELTS Foundation A1 - Lớp Đang Học): Pattern 0 (Thứ 2, Thứ 3)
+            selectedPattern = schedulePatterns[0];
+        } else if (classIndex === 3) {
+            // Lớp 3 (IELTS Foundation A1 - Lớp 2): Pattern 6 (Thứ 4, Thứ 5)
+            selectedPattern = schedulePatterns[6];
+        } else if (classIndex === 4) {
+            // Lớp 4 (IELTS Foundation A1 - Lớp 3): Pattern 7 (Thứ 5, Thứ 6)
+            selectedPattern = schedulePatterns[7];
+        } else if (classIndex === 5) {
+            // Lớp 5 (IELTS Foundation A1 - Lớp 4): Pattern 8 (Thứ 6, Thứ 7)
+            selectedPattern = schedulePatterns[8];
+        } else if (classIndex === 6) {
+            // Lớp 6 (IELTS Foundation A1 - Lớp 5): Pattern 9 (Thứ 3, Thứ 5, Chủ nhật)
+            selectedPattern = schedulePatterns[9];
+        } else if (classIndex === 7) {
+            // Lớp 7 (IELTS Foundation A1 - Lớp 6): Pattern 10 (Thứ 2, Thứ 4, Thứ 6)
+            selectedPattern = schedulePatterns[10];
         } else {
             // Các lớp khác: dùng pattern theo index
-            selectedPattern = schedulePatterns[classIndex % schedulePatterns.length];
+            const fallbackIndex = classIndex % schedulePatterns.length;
+            selectedPattern = schedulePatterns[fallbackIndex];
+        }
+        
+        // Kiểm tra selectedPattern có tồn tại không
+        if (!selectedPattern || !Array.isArray(selectedPattern) || selectedPattern.length === 0) {
+            console.log(`    ❌ ERROR: No valid pattern found for class ${classItem.name} (index ${classIndex})`);
+            console.log(`    Available patterns: ${schedulePatterns.length}, trying to access pattern at index ${classIndex}`);
+            console.log(`    schedulePatterns[10] exists: ${schedulePatterns[10] !== undefined}`);
+            continue;
         }
         
         // Tính toán số buổi/tuần từ pattern
@@ -908,19 +1210,61 @@ async function seedClassSchedules() {
             endDate = calculatedEndDate;
         }
         
-        // Tìm ngày đầu tiên của pattern (tìm Thứ 2 đầu tiên từ startDate hoặc sau đó)
-        const firstMonday = new Date(startDate);
-        const dayOfWeek = firstMonday.getDay(); // 0 = Chủ nhật, 1 = Thứ 2, ...
+        // Tìm ngày đầu tiên của pattern (tìm ngày đầu tiên trong pattern từ startDate hoặc sau đó)
+        // Lấy tất cả các dayOfWeek trong pattern và sắp xếp
+        const patternDays = selectedPattern.map(p => p.dayOfWeek).sort((a, b) => a - b);
+        const firstPatternDay = patternDays[0]; // Ngày đầu tiên trong pattern
+        
+        // Tìm ngày đầu tiên của pattern từ startDate
+        const firstPatternDate = new Date(startDate);
+        const currentDayOfWeek = firstPatternDate.getDay(); // 0 = Chủ nhật, 1 = Thứ 2, ...
+        
+        // Tìm ngày đầu tiên trong pattern từ startDate hoặc sau đó
         let daysToAdd = 0;
-        if (dayOfWeek === 0) {
-            // Nếu là Chủ nhật, thêm 1 ngày để thành Thứ 2
-            daysToAdd = 1;
-        } else if (dayOfWeek > 1) {
-            // Nếu là Thứ 3 trở đi, tính số ngày để đến Thứ 2 tuần sau
-            daysToAdd = 8 - dayOfWeek;
+        let foundInCurrentWeek = false;
+        
+        // Kiểm tra xem có ngày nào trong pattern trong tuần hiện tại (từ startDate trở đi) không
+        for (const patternDay of patternDays) {
+            if (patternDay >= currentDayOfWeek) {
+                // Tìm thấy ngày trong pattern từ startDate trở đi trong tuần này
+                daysToAdd = patternDay - currentDayOfWeek;
+                foundInCurrentWeek = true;
+                break;
+            }
         }
-        // Nếu là Thứ 2 (dayOfWeek === 1), daysToAdd = 0, giữ nguyên
-        firstMonday.setDate(firstMonday.getDate() + daysToAdd);
+        
+        if (!foundInCurrentWeek) {
+            // Không tìm thấy ngày nào trong pattern từ startDate trở đi trong tuần này
+            // Tìm ngày đầu tiên của pattern trong tuần sau
+            daysToAdd = 7 - currentDayOfWeek + firstPatternDay;
+        }
+        
+        firstPatternDate.setDate(firstPatternDate.getDate() + daysToAdd);
+        
+        // Tính firstMonday (Thứ 2) của tuần chứa firstPatternDate
+        // Thứ 2 = dayOfWeek 1
+        const firstMonday = new Date(firstPatternDate);
+        const firstPatternDayOfWeek = firstMonday.getDay(); // 0 = Chủ nhật, 1 = Thứ 2, ...
+        
+        // Tính số ngày cần lùi lại để về Thứ 2 của tuần đó
+        // Trong JavaScript: 0 = Chủ nhật, 1 = Thứ 2, 2 = Thứ 3, ..., 6 = Thứ 7
+        // Để từ bất kỳ ngày nào về Thứ 2 của tuần đó:
+        // - Nếu là Chủ nhật (0): lùi 6 ngày về Thứ 2 tuần trước (nhưng ta muốn Thứ 2 tuần này, nên +1)
+        // - Nếu là Thứ 2 (1): không cần lùi (0)
+        // - Nếu là Thứ 3 (2): lùi 1 ngày về Thứ 2
+        // - ...
+        // - Nếu là Thứ 7 (6): lùi 5 ngày về Thứ 2
+        let daysToMonday = 0;
+        if (firstPatternDayOfWeek === 0) {
+            // Chủ nhật: Thứ 2 tuần này = Chủ nhật + 1 (nhưng đây là Thứ 2 tuần sau)
+            // Thực ra, trong tuần, Chủ nhật là ngày cuối, nên Thứ 2 của tuần đó là 6 ngày trước
+            daysToMonday = -6;
+        } else {
+            // Thứ 2 trở đi: lùi (dayOfWeek - 1) ngày
+            daysToMonday = -(firstPatternDayOfWeek - 1);
+        }
+        
+        firstMonday.setDate(firstMonday.getDate() + daysToMonday);
         
         // Tạo lịch học
         let sessionIndex = 0;

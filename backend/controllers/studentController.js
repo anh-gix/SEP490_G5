@@ -43,12 +43,11 @@ exports.getAllStudents = async (req, res) => {
     //   query.status = status;
     // }
     
-    // Search by username, email, or fullName
+    // Search by username or email
     if (search) {
       query.$or = [
         { username: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { fullName: { $regex: search, $options: 'i' } }
+        { email: { $regex: search, $options: 'i' } }
       ];
     }
     
@@ -145,12 +144,12 @@ exports.getStudentById = async (req, res) => {
 // =========================
 exports.createStudent = async (req, res) => {
   try {
-    const { username, email, password, fullName, phone, address, status } = req.body;
+    const { username, email, password, phone, address } = req.body;
     
     // Validate required fields
-    if (!username || !email || !password || !fullName) {
+    if (!username || !email || !password || !phone || !address) {
       return res.status(400).json({ 
-        message: "Thiếu thông tin bắt buộc (username, email, password, fullName)" 
+        message: "Thiếu thông tin bắt buộc (username, email, password, phone, address)" 
       });
     }
     
@@ -180,10 +179,8 @@ exports.createStudent = async (req, res) => {
       username,
       email,
       password,
-      fullName,
-      phone: phone || '',
-      address: address || '',
-      status: status || 'active',
+      phone,
+      address,
       roleId: studentRole._id
     });
     
@@ -211,12 +208,25 @@ exports.createStudent = async (req, res) => {
 exports.updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
-    const { username, email, password, fullName, phone, address, status } = req.body;
+    const { username, email, password, phone, address } = req.body;
     
     const student = await User.findById(id);
     
     if (!student) {
       return res.status(404).json({ message: "Không tìm thấy học viên" });
+    }
+    
+    // Validate required fields if provided
+    if (phone !== undefined && !phone) {
+      return res.status(400).json({ 
+        message: "Số điện thoại là bắt buộc" 
+      });
+    }
+    
+    if (address !== undefined && !address) {
+      return res.status(400).json({ 
+        message: "Địa chỉ là bắt buộc" 
+      });
     }
     
     // Check if new email already exists (excluding current user)
@@ -248,10 +258,8 @@ exports.updateStudent = async (req, res) => {
     // Update fields
     if (username) student.username = username;
     if (email) student.email = email;
-    if (fullName) student.fullName = fullName;
     if (phone !== undefined) student.phone = phone;
     if (address !== undefined) student.address = address;
-    if (status) student.status = status;
     if (password) student.password = password; // Password will be hashed by pre-save hook
     
     await student.save();

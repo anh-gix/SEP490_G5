@@ -211,7 +211,14 @@ exports.getSenderSchedule = async (req, res) => {
           class: { $in: classIds },
           status: { $in: ['temporary', 'fixed'] }
         })
-        .populate('class', 'name')
+        .populate({
+          path: 'class',
+          select: 'name',
+          populate: {
+            path: 'course',
+            select: 'name'
+          }
+        })
         .populate('room', 'room_name location')
         .populate('session', 'title order')
         .sort({ date: 1, startTime: 1 })
@@ -251,7 +258,14 @@ exports.getSenderSchedule = async (req, res) => {
           class: { $in: classIds },
           status: { $in: ['temporary', 'fixed'] }
         })
-        .populate('class', 'name')
+        .populate({
+          path: 'class',
+          select: 'name',
+          populate: {
+            path: 'course',
+            select: 'name'
+          }
+        })
         .populate('room', 'room_name location')
         .populate('session', 'title order')
         .sort({ date: 1, startTime: 1 })

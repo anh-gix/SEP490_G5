@@ -248,16 +248,20 @@ const StudentSchedule = () => {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     
-    const firstDayOfWeek = firstDay.getDay() || 7; // 1-7 (Mon-Sun)
+    // Điều chỉnh để bắt đầu từ Thứ 2 (1) thay vì Chủ nhật (0)
+    // getDay() trả về: 0 = Chủ nhật, 1 = Thứ 2, ..., 6 = Thứ 7
+    // Cần chuyển thành: 0 = Thứ 2, 1 = Thứ 3, ..., 6 = Chủ nhật
+    const firstDayOfWeek = firstDay.getDay(); // 0-6
+    const adjustedFirstDayOfWeek = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1; // Chủ nhật (0) -> 6, Thứ 2 (1) -> 0, ...
     const daysInMonth = lastDay.getDate();
     
     const days = [];
     
-    // Add previous month days
+    // Add previous month days - bắt đầu từ Thứ 2
     const prevMonthLastDay = new Date(year, month, 0).getDate();
-    for (let i = firstDayOfWeek - 2; i >= 0; i--) {
+    for (let i = adjustedFirstDayOfWeek; i > 0; i--) {
       days.push({
-        date: new Date(year, month - 1, prevMonthLastDay - i),
+        date: new Date(year, month - 1, prevMonthLastDay - i + 1),
         isCurrentMonth: false
       });
     }

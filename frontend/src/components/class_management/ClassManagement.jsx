@@ -52,8 +52,8 @@ const ClassManagement = () => {
         roomLocation: cls.roomLocation || cls.room?.location || 'N/A',
         totalStudents: cls.totalStudents || cls.students?.length || 0,
         maxStudents: cls.maxStudents || 25,
-        currentLesson: cls.totalSchedules || 0,
-        totalLessons: cls.totalSchedules || 0,
+        currentLesson: cls.completedSchedules || 0, // Số buổi đã hoàn thành
+        totalLessons: cls.totalSchedules || 0, // Tổng số buổi
         completionRate: typeof cls.completionRate !== 'undefined' ? cls.completionRate : (cls.stats?.completionRate || 0)
       }));
       

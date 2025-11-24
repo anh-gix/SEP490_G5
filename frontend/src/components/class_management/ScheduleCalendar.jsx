@@ -1,10 +1,18 @@
-import React, { useState, useMemo } from 'react';
-import { Card, Button, Badge, Dropdown } from 'react-bootstrap';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Card, Button, Badge, Dropdown, Modal, Form, Spinner } from 'react-bootstrap';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
+import { classScheduleService } from '../../services/classScheduleService';
 
-const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateMakeup }) => {
+const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateMakeup, classService, studentSchedule = [] }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedSchedule, setSelectedSchedule] = useState(null);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [classesWithSameCourse, setClassesWithSameCourse] = useState([]);
+  const [selectedClassId, setSelectedClassId] = useState(null);
+  const [loadingClasses, setLoadingClasses] = useState(false);
+  const [selectedClassInfo, setSelectedClassInfo] = useState(null);
+  const [loadingClassInfo, setLoadingClassInfo] = useState(false);
 
   // Get calendar data
   const calendarData = useMemo(() => {
@@ -15,14 +23,21 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
     const lastDay = new Date(year, month + 1, 0);
     const prevLastDay = new Date(year, month, 0);
     
-    const firstDayIndex = firstDay.getDay();
+    const firstDayIndex = firstDay.getDay(); // 0 = Chủ nhật, 1 = Thứ 2, ..., 6 = Thứ 7
     const lastDayIndex = lastDay.getDay();
-    const nextDays = 7 - lastDayIndex - 1;
+    
+    // Điều chỉnh để bắt đầu từ Thứ 2 (1) thay vì Chủ nhật (0)
+    // Nếu firstDay là Chủ nhật (0), cần thêm 1 ngày để thành Thứ 2
+    // Nếu firstDay là Thứ 2 (1), không cần thêm
+    // Nếu firstDay là Thứ 3-7 (2-6), cần lùi về Thứ 2
+    const adjustedFirstDayIndex = firstDayIndex === 0 ? 6 : firstDayIndex - 1; // Chủ nhật (0) -> 6, Thứ 2 (1) -> 0, Thứ 3 (2) -> 1, ...
+    const adjustedLastDayIndex = lastDayIndex === 0 ? 6 : lastDayIndex - 1;
+    const nextDays = 7 - adjustedLastDayIndex - 1;
     
     const days = [];
     
-    // Previous month days
-    for (let i = firstDayIndex; i > 0; i--) {
+    // Previous month days - bắt đầu từ Thứ 2
+    for (let i = adjustedFirstDayIndex; i > 0; i--) {
       days.push({
         date: new Date(year, month - 1, prevLastDay.getDate() - i + 1),
         isCurrentMonth: false
@@ -79,6 +94,209 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
     return date.toDateString() === today.toDateString();
   };
 
+  // Hàm kiểm tra xung đột thời gian
+  const hasTimeOverlap = (start1, end1, start2, end2) => {
+    // Chuyển đổi thời gian sang phút để so sánh
+    const timeToMinutes = (timeStr) => {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      return hours * 60 + minutes;
+    };
+    
+    const start1Min = timeToMinutes(start1);
+    const end1Min = timeToMinutes(end1);
+    const start2Min = timeToMinutes(start2);
+    const end2Min = timeToMinutes(end2);
+    
+    return start1Min < end2Min && end1Min > start2Min;
+  };
+
+  // Hàm kiểm tra xung đột giữa lịch học sinh và lịch lớp
+  const hasScheduleConflict = async (classId) => {
+    if (!studentSchedule || studentSchedule.length === 0) {
+      return false; // Không có lịch học sinh thì không có xung đột
+    }
+
+    try {
+      // Lấy lịch học của lớp
+      const response = await classScheduleService.getSchedulesByClass(classId);
+      
+      // API có thể trả về array trực tiếp hoặc object với message
+      let classSchedules = Array.isArray(response) ? response : (response.schedules || []);
+      
+      if (!classSchedules || classSchedules.length === 0) {
+        return false; // Lớp không có lịch thì không có xung đột
+      }
+
+      // Kiểm tra từng lịch của lớp với lịch của học sinh
+      for (const classSchedule of classSchedules) {
+        if (!classSchedule.date || !classSchedule.startTime || !classSchedule.endTime) {
+          continue; // Bỏ qua schedule không hợp lệ
+        }
+
+        const classDate = new Date(classSchedule.date);
+        const classDateStr = formatDateToYYYYMMDD(classDate);
+        
+        // Tìm các lịch học sinh cùng ngày
+        const studentSchedulesSameDate = studentSchedule.filter(sch => {
+          if (!sch.date || !sch.startTime || !sch.endTime) {
+            return false;
+          }
+          const schDate = new Date(sch.date);
+          const schDateStr = formatDateToYYYYMMDD(schDate);
+          return schDateStr === classDateStr;
+        });
+
+        // Kiểm tra xung đột thời gian
+        for (const studentSch of studentSchedulesSameDate) {
+          if (hasTimeOverlap(
+            classSchedule.startTime,
+            classSchedule.endTime,
+            studentSch.startTime,
+            studentSch.endTime
+          )) {
+            return true; // Có xung đột
+          }
+        }
+      }
+
+      return false; // Không có xung đột
+    } catch (err) {
+      console.error('Error checking schedule conflict:', err);
+      // Nếu có lỗi (ví dụ: lớp không tồn tại), giữ nguyên lớp trong danh sách để tránh loại bỏ nhầm
+      return false;
+    }
+  };
+
+  // Hàm để lấy danh sách lớp cùng course
+  const fetchClassesByCourse = async (courseId, currentClassId) => {
+    if (!courseId || !classService) return;
+    
+    try {
+      setLoadingClasses(true);
+      const response = await classService.getAllClasses({ courseId });
+      if (response.success) {
+        const classes = response.classes || [];
+        // Lọc bỏ lớp hiện tại và chỉ lấy các lớp khác
+        let otherClasses = classes.filter(cls => {
+          const clsId = cls._id || cls;
+          return clsId.toString() !== currentClassId?.toString();
+        });
+
+        // Lọc bỏ các lớp có xung đột với lịch học sinh
+        if (studentSchedule && studentSchedule.length > 0) {
+          const conflictChecks = await Promise.all(
+            otherClasses.map(async (cls) => {
+              const clsId = cls._id || cls;
+              const hasConflict = await hasScheduleConflict(clsId);
+              return { cls, hasConflict };
+            })
+          );
+
+          // Chỉ giữ lại các lớp không có xung đột
+          otherClasses = conflictChecks
+            .filter(({ hasConflict }) => !hasConflict)
+            .map(({ cls }) => cls);
+        }
+
+        setClassesWithSameCourse(otherClasses);
+        // Reset selected class khi mở modal mới
+        setSelectedClassId(null);
+      }
+    } catch (err) {
+      console.error('Error fetching classes by course:', err);
+      setClassesWithSameCourse([]);
+    } finally {
+      setLoadingClasses(false);
+    }
+  };
+
+  // Khi chọn schedule, lấy danh sách lớp cùng course
+  useEffect(() => {
+    if (selectedSchedule && selectedSchedule.courseId && selectedSchedule.classId) {
+      fetchClassesByCourse(selectedSchedule.courseId, selectedSchedule.classId);
+    } else {
+      setClassesWithSameCourse([]);
+      setSelectedClassId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSchedule, studentSchedule]);
+
+  // Khi chọn lớp từ dropdown, lấy thông tin chi tiết của lớp đó
+  useEffect(() => {
+    const fetchSelectedClassInfo = async () => {
+      if (!selectedClassId || !classService) {
+        setSelectedClassInfo(null);
+        return;
+      }
+
+      try {
+        setLoadingClassInfo(true);
+        const response = await classService.getClassById(selectedClassId);
+        
+        if (response.success && response.class) {
+          const classData = response.class;
+          
+          // Tìm session hiện tại (session gần nhất)
+          const schedules = classData.schedules || [];
+          const now = new Date();
+          const today = formatDateToYYYYMMDD(now);
+          const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+          
+          // Sắp xếp schedules theo date và startTime
+          const sortedSchedules = [...schedules].sort((a, b) => {
+            const dateA = new Date(a.date);
+            const dateB = new Date(b.date);
+            if (dateA.getTime() !== dateB.getTime()) {
+              return dateA - dateB;
+            }
+            return (a.startTime || '').localeCompare(b.startTime || '');
+          });
+
+          // Tìm session đã học gần nhất hoặc session sắp học
+          let currentSession = null;
+          const pastSessions = sortedSchedules.filter(s => {
+            const scheduleDate = formatDateToYYYYMMDD(new Date(s.date));
+            if (scheduleDate < today) return true;
+            if (scheduleDate === today && s.endTime && s.endTime < currentTime) return true;
+            return false;
+          });
+          
+          if (pastSessions.length > 0) {
+            currentSession = pastSessions[pastSessions.length - 1];
+          } else if (sortedSchedules.length > 0) {
+            currentSession = sortedSchedules[0];
+          }
+
+          // Lấy thông tin phòng từ session hiện tại hoặc từ class
+          const roomInfo = currentSession?.room || classData.room;
+          
+          setSelectedClassInfo({
+            className: classData.name || 'N/A',
+            courseName: classData.courseName || 'N/A',
+            currentSession: currentSession ? {
+              title: currentSession.session?.title || 'N/A',
+              order: currentSession.session?.order || null,
+              date: currentSession.date || null,
+              startTime: currentSession.startTime || 'N/A',
+              endTime: currentSession.endTime || 'N/A',
+              roomName: currentSession.room?.room_name || classData.roomName || 'N/A',
+              roomCapacity: currentSession.room?.capacity || classData.room?.capacity || null
+            } : null,
+            studentCount: classData.students?.length || 0,
+            roomCapacity: roomInfo?.capacity || classData.room?.capacity || null
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching class info:', err);
+        setSelectedClassInfo(null);
+      } finally {
+        setLoadingClassInfo(false);
+      }
+    };
+
+    fetchSelectedClassInfo();
+  }, [selectedClassId, classService]);
+
   const getStatusColor = (schedule) => {
     // Ưu tiên kiểm tra timeStatus (cho EditClassModal)
     const timeStatus = schedule.timeStatus;
@@ -129,8 +347,8 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
         <Card.Body className="p-0">
           {/* Calendar Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0 }}>
-            {/* Weekday headers */}
-            {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map(day => (
+            {/* Weekday headers - bắt đầu từ Thứ 2 */}
+            {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map(day => (
               <div 
                 key={day} 
                 className="text-center fw-bold py-2 border-bottom bg-light"
@@ -232,7 +450,9 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              onEditSchedule(schedule);
+                              // Hiển thị modal với thông tin chi tiết
+                              setSelectedSchedule(schedule);
+                              setShowScheduleModal(true);
                             }}
                             title={tooltipText}
                           >
@@ -272,141 +492,192 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
         </Card.Body>
       </Card>
 
-      {/* Selected Date Details */}
-      {selectedDate && (
-        <Card className="mt-3">
-          <Card.Header className="d-flex justify-content-between align-items-center">
-            <h5 className="mb-0">
-              Lịch học ngày {selectedDate.toLocaleDateString('vi-VN', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
-            </h5>
-            <Button variant="link" size="sm" onClick={() => setSelectedDate(null)}>
-              <i className="fas fa-times"></i>
-            </Button>
-          </Card.Header>
-
-          <Card.Body>
-            {getSchedulesForDate(selectedDate).length > 0 ? (
-              <div className="d-flex flex-column gap-3">
-                {getSchedulesForDate(selectedDate).map(schedule => (
-                  <Card key={schedule.id} className="shadow-sm">
-                    <Card.Body>
-                      <div className="row g-2 mb-3">
-                        <div className="col-md-6">
-                          <small className="text-muted">Thời gian:</small>
-                          <div className="fw-bold">{schedule.startTime} - {schedule.endTime}</div>
+      {/* Schedule Detail Modal */}
+      <Modal show={showScheduleModal} onHide={() => {
+        setShowScheduleModal(false);
+        setSelectedSchedule(null);
+        setClassesWithSameCourse([]);
+        setSelectedClassId(null);
+        setSelectedClassInfo(null);
+      }} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Thông tin buổi học</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedSchedule && (
+            <div className="row g-3">
+              <div className="col-md-6">
+                <div className="d-flex flex-column gap-3">
+                  <div>
+                    <small className="text-muted d-block mb-1">Tên lớp:</small>
+                    <div className="fw-bold">{selectedSchedule.className || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <small className="text-muted d-block mb-1">Tên khóa học:</small>
+                    <div className="fw-bold">{selectedSchedule.courseName || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <small className="text-muted d-block mb-1">Thông tin session đang học:</small>
+                    <div className="ps-3">
+                      <div className="mb-2">
+                        <span className="text-muted">Tên session: </span>
+                        <span className="fw-semibold">{selectedSchedule.sessionName || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted">Số thứ tự: </span>
+                        <span className="fw-semibold">{selectedSchedule.sessionOrder || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  {selectedSchedule.startTime && (
+                    <div>
+                      <small className="text-muted d-block mb-1">Thời gian:</small>
+                      <div>
+                        {selectedSchedule.date ? (
+                          <>
+                            {new Date(selectedSchedule.date).toLocaleDateString('vi-VN', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric'
+                            })} ({new Date(selectedSchedule.date).toLocaleDateString('vi-VN', { weekday: 'short' })}) | {selectedSchedule.startTime} - {selectedSchedule.endTime}
+                          </>
+                        ) : (
+                          `${selectedSchedule.startTime} - ${selectedSchedule.endTime}`
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {selectedSchedule.roomName && (
+                    <div>
+                      <small className="text-muted d-block mb-1">Phòng:</small>
+                      <div>{selectedSchedule.roomName}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="d-flex flex-column gap-3">
+                  <div>
+                    <small className="text-muted d-block mb-1">Các lớp cùng khóa học:</small>
+                    {loadingClasses ? (
+                      <div className="text-center py-12">
+                        <Spinner animation="border" size="sm" />
+                        <p className="text-neutral-600 mt-8 text-12">Đang tải...</p>
+                      </div>
+                    ) : classesWithSameCourse.length === 0 ? (
+                      <div className="text-neutral-500 text-13">Không có lớp nào khác cùng khóa học</div>
+                    ) : (
+                      <div>
+                        <Form.Select
+                          value={selectedClassId || ''}
+                          onChange={(e) => setSelectedClassId(e.target.value)}
+                          className="border-neutral-200"
+                          size="sm"
+                        >
+                          <option value="">-- Chọn lớp --</option>
+                          {classesWithSameCourse.map((cls) => {
+                            const clsId = cls._id || cls;
+                            const clsName = cls.name || 'N/A';
+                            return (
+                              <option key={clsId} value={clsId}>
+                                {clsName}
+                              </option>
+                            );
+                          })}
+                        </Form.Select>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {selectedClassId && (
+                    <div className="d-flex flex-column gap-3">
+                      {loadingClassInfo ? (
+                        <div className="text-center py-12">
+                          <Spinner animation="border" size="sm" />
+                          <p className="text-neutral-600 mt-8 text-12">Đang tải thông tin lớp...</p>
                         </div>
-                        <div className="col-md-6">
-                          <small className="text-muted">Lớp:</small>
-                          <div className="fw-bold">{schedule.className}</div>
-                        </div>
-                        <div className="col-md-6">
-                          <small className="text-muted">Giảng viên:</small>
-                          <div>{schedule.teacherName}</div>
-                        </div>
-                        <div className="col-md-6">
-                          <small className="text-muted">Phòng:</small>
-                          <div>{schedule.roomName}</div>
-                        </div>
-                        <div className="col-md-6">
-                          <small className="text-muted">Buổi học:</small>
-                          <div>Buổi {schedule.lessonNumber} - {schedule.lessonTopic}</div>
-                        </div>
-                        <div className="col-md-6">
-                          <small className="text-muted">Trạng thái:</small>
-                          <div className="d-flex gap-2 align-items-center">
-                            {schedule.timeStatus ? (
-                              // Hiển thị theo timeStatus (cho EditClassModal)
-                              <Badge 
-                                bg={
-                                  schedule.timeStatus === 'completed' ? 'success' :
-                                  schedule.timeStatus === 'upcoming' ? 'secondary' :
-                                  'info'
-                                }
-                              >
-                                <i className={`fas ${
-                                  schedule.timeStatus === 'completed' ? 'fa-check-circle' :
-                                  schedule.timeStatus === 'upcoming' ? 'fa-clock' :
-                                  'fa-play-circle'
-                                } me-1`}></i>
-                                {schedule.timeStatus === 'completed' && 'Đã kết thúc'}
-                                {schedule.timeStatus === 'upcoming' && 'Chưa bắt đầu'}
-                                {schedule.timeStatus === 'ongoing' && 'Đang diễn ra'}
-                              </Badge>
-                            ) : schedule.attendanceStatus ? (
-                              // Hiển thị theo attendanceStatus (cho Student/Teacher management)
-                              <Badge 
-                                bg={
-                                  schedule.attendanceStatus === 'present' ? 'success' :
-                                  schedule.attendanceStatus === 'absent' ? 'danger' :
-                                  schedule.attendanceStatus === 'late' ? 'warning' :
-                                  'info'
-                                }
-                              >
-                                <i className={`fas ${
-                                  schedule.attendanceStatus === 'present' ? 'fa-check-circle' :
-                                  schedule.attendanceStatus === 'absent' ? 'fa-times-circle' :
-                                  schedule.attendanceStatus === 'late' ? 'fa-clock' :
-                                  'fa-file-text'
-                                } me-1`}></i>
-                                {schedule.attendanceStatus === 'present' && 'Có mặt'}
-                                {schedule.attendanceStatus === 'absent' && 'Vắng mặt'}
-                                {schedule.attendanceStatus === 'late' && 'Đi muộn'}
-                                {schedule.attendanceStatus === 'excused' && 'Có phép'}
-                              </Badge>
-                            ) : (
-                              <Badge bg="secondary">
-                                <i className="fas fa-clock me-1"></i>
-                                Chưa điểm danh
-                              </Badge>
-                            )}
+                      ) : selectedClassInfo ? (
+                        <>
+                          <div>
+                            <small className="text-muted d-block mb-1">Tên lớp:</small>
+                            <div className="fw-bold">{selectedClassInfo.className || 'N/A'}</div>
                           </div>
-                        </div>
-                      </div>
-
-                      <div className="d-flex gap-2">
-                        <Button 
-                          variant="outline-primary"
-                          size="sm"
-                          onClick={() => onEditSchedule(schedule)}
-                        >
-                          <i className="fas fa-edit me-1"></i>
-                          Sửa
-                        </Button>
-                        <Button 
-                          variant="outline-warning"
-                          size="sm"
-                          onClick={() => onCreateMakeup(schedule)}
-                        >
-                          <i className="fas fa-calendar-plus me-1"></i>
-                          Học bù
-                        </Button>
-                        <Button 
-                          variant="outline-danger"
-                          size="sm"
-                          onClick={() => onDeleteSchedule(schedule.id)}
-                        >
-                          <i className="fas fa-trash me-1"></i>
-                          Xóa
-                        </Button>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                ))}
+                          <div>
+                            <small className="text-muted d-block mb-1">Tên khóa học:</small>
+                            <div className="fw-bold">{selectedClassInfo.courseName || 'N/A'}</div>
+                          </div>
+                          {selectedClassInfo.currentSession ? (
+                            <>
+                              <div>
+                                <small className="text-muted d-block mb-1">Thông tin session đang học:</small>
+                                <div className="ps-3">
+                                  <div className="mb-2">
+                                    <span className="text-muted">Tên session: </span>
+                                    <span className="fw-semibold">{selectedClassInfo.currentSession.title || 'N/A'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted">Số thứ tự: </span>
+                                    <span className="fw-semibold">{selectedClassInfo.currentSession.order !== null ? selectedClassInfo.currentSession.order : 'N/A'}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div>
+                                <small className="text-muted d-block mb-1">Thời gian:</small>
+                                <div>
+                                  {selectedClassInfo.currentSession.date ? (
+                                    <>
+                                      {new Date(selectedClassInfo.currentSession.date).toLocaleDateString('vi-VN', {
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        year: 'numeric'
+                                      })} ({new Date(selectedClassInfo.currentSession.date).toLocaleDateString('vi-VN', { weekday: 'short' })}) | {selectedClassInfo.currentSession.startTime} - {selectedClassInfo.currentSession.endTime}
+                                    </>
+                                  ) : (
+                                    `${selectedClassInfo.currentSession.startTime} - ${selectedClassInfo.currentSession.endTime}`
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <small className="text-muted d-block mb-1">Phòng:</small>
+                                <div>{selectedClassInfo.currentSession.roomName}</div>
+                              </div>
+                              {(selectedClassInfo.studentCount !== null || selectedClassInfo.currentSession.roomCapacity !== null) && (
+                                <div>
+                                  <small className="text-muted d-block mb-1">Số lượng học sinh:</small>
+                                  <div>
+                                    {selectedClassInfo.studentCount !== null ? selectedClassInfo.studentCount : 'N/A'}
+                                    {selectedClassInfo.currentSession.roomCapacity !== null && (
+                                      <span className="text-muted"> / {selectedClassInfo.currentSession.roomCapacity}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="text-neutral-500 text-13">Chưa có thông tin session</div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="text-neutral-500 text-13">Không tìm thấy thông tin lớp</div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            ) : (
-              <div className="text-center text-muted py-5">
-                <i className="fas fa-calendar-times fa-3x mb-3 d-block"></i>
-                <p className="mb-0">Không có lịch học nào trong ngày này</p>
-              </div>
-            )}
-          </Card.Body>
-        </Card>
-      )}
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => {
+            setShowScheduleModal(false);
+            setSelectedSchedule(null);
+            setClassesWithSameCourse([]);
+            setSelectedClassId(null);
+          }}>
+            Đóng
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };

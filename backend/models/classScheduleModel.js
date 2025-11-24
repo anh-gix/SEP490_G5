@@ -4,7 +4,7 @@ const Schema = mongoose.Schema;
 
 const classScheduleSchema = new Schema({
     
-    class: { type: Schema.Types.ObjectId, ref: 'Class', required: true },
+    class: { type: Schema.Types.ObjectId, ref: 'Class'},
     
     session: { type: Schema.Types.ObjectId, ref: 'Session' }, //Noi dung buoi hoc
     
@@ -22,9 +22,6 @@ const classScheduleSchema = new Schema({
     },
     
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    
-    // Lý do
-    reason: { type: String, required: true }, // "Học bù do nghỉ lễ", "Dạy bù ngoài giờ"   
     
     status: {
         type: String,

@@ -1610,7 +1610,7 @@ exports.updateClass = async (req, res) => {
                 studentSchedules.push({
                   student: studentId,
                   classSchedule: schedule._id,
-                  attendance: { status: 'absent' }
+                  // Không set attendance - để null cho đến khi giáo viên điểm danh
                 });
               });
             });
@@ -1627,6 +1627,77 @@ exports.updateClass = async (req, res) => {
       }
     } else {
       console.log('🔍 [DEBUG] Skipping schedule creation - conditions not met');
+    }
+    
+    // Handle StudentSchedule when only students change (no schedule changes)
+    if (students !== undefined && !shouldRegenerateSchedules && !scheduleEntriesOnlyChanged) {
+      console.log('🔍 [DEBUG] Handling StudentSchedule changes for students only');
+      
+      // Get old and new student lists
+      const oldStudents = (classData.students || []).map(id => id.toString());
+      const newStudents = (students || []).map(id => id.toString());
+      
+      // Find students added and removed
+      const addedStudents = newStudents.filter(id => !oldStudents.includes(id));
+      const removedStudents = oldStudents.filter(id => !newStudents.includes(id));
+      
+      console.log('🔍 [DEBUG] Students added:', addedStudents.length, addedStudents);
+      console.log('🔍 [DEBUG] Students removed:', removedStudents.length, removedStudents);
+      
+      // Get all ClassSchedules for this class
+      const allClassSchedules = await ClassSchedule.find({ class: req.params.id })
+        .session(session)
+        .select('_id date');
+      
+      if (allClassSchedules.length > 0) {
+        const classScheduleIds = allClassSchedules.map(s => s._id);
+        
+        // 1. Delete StudentSchedule for removed students
+        if (removedStudents.length > 0) {
+          const removedStudentIds = removedStudents.map(id => new mongoose.Types.ObjectId(id));
+          const deleteResult = await StudentSchedule.deleteMany({
+            student: { $in: removedStudentIds },
+            classSchedule: { $in: classScheduleIds }
+          }).session(session);
+          console.log(`🔍 [DEBUG] Deleted ${deleteResult.deletedCount} StudentSchedule entries for removed students`);
+        }
+        
+        // 2. Create StudentSchedule for added students
+        if (addedStudents.length > 0) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          // Get future schedules (chưa điểm danh) - hoặc tất cả nếu cần
+          // Tạo StudentSchedule cho tất cả ClassSchedule hiện có
+          const studentSchedules = [];
+          const addedStudentIds = addedStudents.map(id => new mongoose.Types.ObjectId(id));
+          
+          for (const scheduleId of classScheduleIds) {
+            for (const studentId of addedStudentIds) {
+              // Check if StudentSchedule already exists (shouldn't, but safety check)
+              const existing = await StudentSchedule.findOne({
+                student: studentId,
+                classSchedule: scheduleId
+              }).session(session);
+              
+              if (!existing) {
+                studentSchedules.push({
+                  student: studentId,
+                  classSchedule: scheduleId,
+                  // Không set attendance - để null cho đến khi giáo viên điểm danh
+                });
+              }
+            }
+          }
+          
+          if (studentSchedules.length > 0) {
+            await StudentSchedule.insertMany(studentSchedules, { session });
+            console.log(`🔍 [DEBUG] Created ${studentSchedules.length} StudentSchedule entries for added students`);
+          }
+        }
+      } else {
+        console.log('🔍 [DEBUG] No ClassSchedules found for this class, skipping StudentSchedule updates');
+      }
     }
     
     // Commit transaction before populating (populate doesn't need to be in transaction)

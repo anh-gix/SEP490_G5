@@ -9,7 +9,6 @@ const studentScheduleSchema = new mongoose.Schema({
   classSchedule: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "ClassSchedule",
-    required: true,
   },
 
   // 🆕 Trường điểm danh (chỉ được set khi giáo viên điểm danh)

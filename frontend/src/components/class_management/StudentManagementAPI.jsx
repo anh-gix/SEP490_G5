@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Nav, Tabs, Tab, Pagination, ButtonGroup } from 'react-bootstrap';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Nav, Tabs, Tab, Pagination, ButtonGroup, Alert } from 'react-bootstrap';
 import studentService from '../../services/studentService';
 import ScheduleCalendar from './ScheduleCalendar';
+import * as XLSX from 'xlsx';
 
 /**
  * Student Management Component with API Integration
@@ -21,22 +22,26 @@ const StudentManagementAPI = () => {
   const [schedulePage, setSchedulePage] = useState(1);
   const [scheduleViewMode, setScheduleViewMode] = useState('calendar'); // 'table' or 'calendar'
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     password: '',
-    fullName: '',
     phone: '',
-    address: '',
-    status: 'active'
+    address: ''
   });
+  
+  // Import Excel states
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [previewStudents, setPreviewStudents] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetchStudents();
     fetchStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, filterStatus]);
+  }, [searchTerm]);
 
   const fetchStudents = async () => {
     try {
@@ -44,7 +49,6 @@ const StudentManagementAPI = () => {
       setError(null);
       const params = {};
       if (searchTerm) params.search = searchTerm;
-      if (filterStatus && filterStatus !== 'all') params.status = filterStatus;
       
       const data = await studentService.getAllStudents(params);
       setStudents(data.students || []);
@@ -122,10 +126,8 @@ const StudentManagementAPI = () => {
       username: student.username,
       email: student.email,
       password: '', // Leave empty for update
-      fullName: student.fullName,
       phone: student.phone || '',
-      address: student.address || '',
-      status: student.status
+      address: student.address || ''
     });
     setShowModal(true);
   };
@@ -174,25 +176,163 @@ const StudentManagementAPI = () => {
       username: '',
       email: '',
       password: '',
-      fullName: '',
       phone: '',
-      address: '',
-      status: 'active'
+      address: ''
     });
   };
 
-  const getStatusBadge = (status) => {
-    const config = {
-      active: { bg: 'bg-success-600', text: 'Hoạt động', icon: 'fa-check-circle' },
-      inactive: { bg: 'bg-danger-600', text: 'Tạm nghỉ', icon: 'fa-times-circle' }
-    };
-    const { bg, text, icon } = config[status] || config.active;
-    return (
-      <Badge className={`${bg} text-white px-12 py-6`}>
-        <i className={`fas ${icon} me-1`}></i>
-        {text}
-      </Badge>
-    );
+  // Import Excel handlers
+  const handleOpenImportModal = () => {
+    setShowImportModal(true);
+    setImportFile(null);
+    setPreviewStudents([]);
+    setImporting(false);
+  };
+
+  const handleCloseImportModal = () => {
+    setShowImportModal(false);
+    setImportFile(null);
+    setPreviewStudents([]);
+    setImporting(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
+    const isValidType = validTypes.includes(file.type) || 
+                       file.name.endsWith('.xlsx') || 
+                       file.name.endsWith('.xls');
+
+    if (!isValidType) {
+      alert('Vui lòng chọn file Excel (.xlsx hoặc .xls)');
+      e.target.value = '';
+      return;
+    }
+
+    setImportFile(file);
+    setPreviewStudents([]);
+  };
+
+  const handlePreviewExcel = async () => {
+    if (!importFile) {
+      alert('Vui lòng chọn file Excel');
+      return;
+    }
+
+    setImporting(true);
+    try {
+      // Read file as array buffer
+      const data = await importFile.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+
+      // Get first sheet
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        alert('File Excel không có sheet nào');
+        setImporting(false);
+        return;
+      }
+
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+
+      if (!worksheet) {
+        alert('Sheet đầu tiên không có dữ liệu');
+        setImporting(false);
+        return;
+      }
+
+      // Convert to JSON (array of objects)
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      if (!jsonData || jsonData.length === 0) {
+        alert('File Excel không có dữ liệu');
+        setImporting(false);
+        return;
+      }
+
+      // Parse and validate each row
+      const previewData = [];
+      jsonData.forEach((row, index) => {
+        const rowNumber = index + 2; // +2 vì có header và index bắt đầu từ 0
+        const errors = [];
+
+        // Get data from Excel (support both Vietnamese and English)
+        const username = row.username || row.Username || row['Tên đăng nhập'] || row['username'] || '';
+        const email = row.email || row.Email || row['Email'] || '';
+        const phone = row.phone || row.Phone || row['Số điện thoại'] || row['Điện thoại'] || '';
+        const address = row.address || row.Address || row['Địa chỉ'] || '';
+
+        // Validate
+        if (!username || !username.toString().trim()) {
+          errors.push('Username không được để trống');
+        }
+
+        if (!email || !email.toString().trim()) {
+          errors.push('Email không được để trống');
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.toString())) {
+          errors.push('Email không hợp lệ');
+        }
+
+        if (!phone || !phone.toString().trim()) {
+          errors.push('Số điện thoại không được để trống');
+        }
+
+        if (!address || !address.toString().trim()) {
+          errors.push('Địa chỉ không được để trống');
+        }
+
+        previewData.push({
+          rowNumber,
+          username: username.toString().trim(),
+          email: email.toString().trim(),
+          phone: phone.toString().trim(),
+          address: address.toString().trim(),
+          hasError: errors.length > 0,
+          errors
+        });
+      });
+
+      setPreviewStudents(previewData);
+    } catch (error) {
+      console.error('Error reading Excel file:', error);
+      alert('Lỗi khi đọc file Excel: ' + (error.message || 'Vui lòng thử lại'));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    const validStudents = previewStudents.filter(s => !s.hasError);
+    
+    if (validStudents.length === 0) {
+      alert('Không có học viên hợp lệ để import');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const result = await studentService.importStudents(validStudents);
+      
+      alert(`Import thành công: ${result.success} học viên\nThất bại: ${result.failed} học viên`);
+      
+      handleCloseImportModal();
+      fetchStudents();
+      fetchStats();
+    } catch (err) {
+      console.error('Error importing students:', err);
+      const errorMessage = err.message || (typeof err === 'string' ? err : 'Không thể import học viên');
+      alert(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredStudents = students;
@@ -232,14 +372,25 @@ const StudentManagementAPI = () => {
           <h4 className="text-neutral-900 fw-bold mb-8">Quản lý Học viên</h4>
           <p className="text-neutral-600 mb-0">Quản lý thông tin và lịch học</p>
         </div>
-        <Button 
-          className="btn-main px-20 py-10 radius-8"
-          onClick={() => setShowModal(true)}
-          disabled={loading}
-        >
-          <i className="fas fa-plus me-2"></i>
-          Thêm Học viên
-        </Button>
+        <div className="d-flex gap-2">
+          <Button 
+            className="btn-main px-20 py-10 radius-8"
+            onClick={() => setShowModal(true)}
+            disabled={loading}
+          >
+            <i className="fas fa-plus me-2"></i>
+            Thêm Học viên
+          </Button>
+          <Button 
+            variant="success"
+            className="px-20 py-10 radius-8"
+            onClick={handleOpenImportModal}
+            disabled={loading}
+          >
+            <i className="fas fa-file-excel me-2"></i>
+            Import từ Excel
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -355,19 +506,7 @@ const StudentManagementAPI = () => {
               </InputGroup>
             </Col>
 
-            <Col md={3}>
-              <Form.Select 
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="border-neutral-200"
-              >
-                <option value="all">Tất cả trạng thái</option>
-                <option value="active">Hoạt động</option>
-                <option value="inactive">Tạm nghỉ</option>
-              </Form.Select>
-            </Col>
-
-            <Col md={5} className="text-end">
+            <Col md={8} className="text-end">
               <div className="btn-group">
                 <Button
                   variant={viewMode === 'grid' ? 'primary' : 'outline-secondary'}
@@ -423,10 +562,9 @@ const StudentManagementAPI = () => {
                       <i className="fas fa-user-graduate text-primary" style={{ fontSize: '24px' }}></i>
                     </div>
                     <div className="flex-grow-1">
-                      <h6 className="text-neutral-900 fw-semibold mb-4">{student.fullName}</h6>
+                      <h6 className="text-neutral-900 fw-semibold mb-4">{student.username}</h6>
                       <p className="text-neutral-600 text-13 mb-0">{student.email}</p>
                     </div>
-                    {getStatusBadge(student.status)}
                   </div>
 
                   <div className="mb-16">
@@ -487,7 +625,6 @@ const StudentManagementAPI = () => {
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Email</th>
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Số điện thoại</th>
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Lớp học</th>
-                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Trạng thái</th>
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Thao tác</th>
                 </tr>
               </thead>
@@ -502,16 +639,13 @@ const StudentManagementAPI = () => {
                         >
                           <i className="fas fa-user-graduate text-primary"></i>
                         </div>
-                        <div className="text-neutral-900 fw-semibold text-14">{student.fullName}</div>
+                        <div className="text-neutral-900 fw-semibold text-14">{student.username}</div>
                       </div>
                     </td>
                     <td className="px-20 py-16 text-neutral-700 text-14">{student.email}</td>
                     <td className="px-20 py-16 text-neutral-700 text-14">{student.phone || 'N/A'}</td>
                     <td className="px-20 py-16 text-center text-neutral-700 fw-medium text-14">
                       {student.stats?.classCount || 0}
-                    </td>
-                    <td className="px-20 py-16">
-                      {getStatusBadge(student.status)}
                     </td>
                     <td className="px-20 py-16">
                       <div className="d-flex gap-8">
@@ -602,13 +736,13 @@ const StudentManagementAPI = () => {
 
               <Col md={6}>
                 <Form.Group>
-                  <Form.Label>Họ tên <span className="text-danger">*</span></Form.Label>
+                  <Form.Label>Số điện thoại <span className="text-danger">*</span></Form.Label>
                   <Form.Control
-                    type="text"
-                    name="fullName"
-                    value={formData.fullName}
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
                     onChange={handleInputChange}
-                    placeholder="Nguyễn Văn A"
+                    placeholder="0123456789"
                     required
                   />
                 </Form.Group>
@@ -616,34 +750,7 @@ const StudentManagementAPI = () => {
 
               <Col md={6}>
                 <Form.Group>
-                  <Form.Label>Số điện thoại</Form.Label>
-                  <Form.Control
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder="0123456789"
-                  />
-                </Form.Group>
-              </Col>
-
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label>Trạng thái</Form.Label>
-                  <Form.Select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleInputChange}
-                  >
-                    <option value="active">Hoạt động</option>
-                    <option value="inactive">Tạm nghỉ</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-
-              <Col md={12}>
-                <Form.Group>
-                  <Form.Label>Địa chỉ</Form.Label>
+                  <Form.Label>Địa chỉ <span className="text-danger">*</span></Form.Label>
                   <Form.Control
                     as="textarea"
                     rows={2}
@@ -651,6 +758,7 @@ const StudentManagementAPI = () => {
                     value={formData.address}
                     onChange={handleInputChange}
                     placeholder="Địa chỉ liên hệ..."
+                    required
                   />
                 </Form.Group>
               </Col>
@@ -671,7 +779,7 @@ const StudentManagementAPI = () => {
       <Modal show={showDetailModal} onHide={() => { setShowDetailModal(false); setSchedulePage(1); }} size="xl">
         <Modal.Header closeButton>
           <Modal.Title>
-            Chi tiết Học viên - {selectedStudent?.fullName}
+            Chi tiết Học viên - {selectedStudent?.username}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -701,14 +809,6 @@ const StudentManagementAPI = () => {
                       <Card.Body className="p-16">
                         <h6 className="text-13 text-neutral-500 mb-8">Địa chỉ</h6>
                         <p className="text-14 text-neutral-900 mb-0">{selectedStudent.address || 'N/A'}</p>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                  <Col md={6}>
-                    <Card className="border-0 bg-neutral-25">
-                      <Card.Body className="p-16">
-                        <h6 className="text-13 text-neutral-500 mb-8">Trạng thái</h6>
-                        {getStatusBadge(selectedStudent.status)}
                       </Card.Body>
                     </Card>
                   </Col>

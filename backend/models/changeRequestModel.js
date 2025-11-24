@@ -9,6 +9,31 @@ const changeRequestSchema = new Schema({
     required: true
   },
   
+  // Loại đơn
+  type: {
+    type: String,
+    enum: ['create_class', 'change_class', 'makeup_class', 'replace_teacher'],
+    required: true
+  },
+  
+  // ID lớp học (dùng cho đổi lớp học)
+  classId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Class'
+  },
+  
+  // ID lịch học của học sinh (dùng cho học bù)
+  studentScheduleId: {
+    type: Schema.Types.ObjectId,
+    ref: 'StudentSchedule'
+  },
+  
+  // ID lịch dạy của lớp (dùng cho thay giáo viên cho buổi dạy)
+  classScheduleId: {
+    type: Schema.Types.ObjectId,
+    ref: 'ClassSchedule'
+  },
+  
   // Nội dung yêu cầu (có thể là đổi lớp hoặc đổi buổi học)
   content: {
     type: String,

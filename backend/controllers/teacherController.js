@@ -365,6 +365,7 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
       });
     }
     
+    
     const classIds = teacherClasses.map(cls => cls._id);
     
     let query = { class: { $in: classIds }, status: 'fixed' };

@@ -89,6 +89,20 @@ const studentService = {
     } catch (error) {
       throw error.response?.data || error.message;
     }
+  },
+
+  // Import students from Excel
+  importStudents: async (studentsData) => {
+    try {
+      const response = await axios.post(`${API_URL}/students/import`, { students: studentsData });
+      return response.data;
+    } catch (error) {
+      const errorData = error.response?.data;
+      const errorMessage = typeof errorData === 'string' 
+        ? errorData 
+        : errorData?.message || error.message || 'Lỗi không xác định';
+      throw { message: errorMessage, status: error.response?.status };
+    }
   }
 };
 

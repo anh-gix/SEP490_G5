@@ -3,6 +3,7 @@ const Role = require("../models/roleModel");
 const Class = require("../models/classModel");
 const ClassSchedule = require("../models/classScheduleModel");
 const StudentSchedule = require("../models/studentScheduleModel");
+const crypto = require("crypto");
 
 // =========================
 // 📋 LẤY DANH SÁCH HỌC VIÊN
@@ -435,6 +436,140 @@ exports.getStudentStats = async (req, res) => {
     console.error("❌ Lỗi khi lấy thống kê học viên:", error);
     res.status(500).json({ 
       message: "Lỗi server khi lấy thống kê học viên",
+      error: error.message 
+    });
+  }
+};
+
+// =========================
+// 📥 IMPORT HỌC VIÊN TỪ EXCEL
+// =========================
+exports.importStudents = async (req, res) => {
+  try {
+    const { students } = req.body;
+    
+    if (!students || !Array.isArray(students) || students.length === 0) {
+      return res.status(400).json({ 
+        message: "Danh sách học viên không hợp lệ" 
+      });
+    }
+    
+    // Find student role
+    const studentRole = await Role.findOne({ name: 'Student' });
+    if (!studentRole) {
+      return res.status(404).json({ message: "Không tìm thấy role học viên" });
+    }
+    
+    const results = {
+      success: [],
+      failed: []
+    };
+    
+    // Function to generate random password
+    const generatePassword = () => {
+      const length = 8;
+      const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      const randomBytes = crypto.randomBytes(length);
+      return Array.from(randomBytes)
+        .map(x => charset[x % charset.length])
+        .join('');
+    };
+    
+    // Process each student
+    for (const studentData of students) {
+      const errors = [];
+      
+      // Validate required fields
+      if (!studentData.username || !studentData.username.trim()) {
+        errors.push('Username không được để trống');
+      }
+      
+      if (!studentData.email || !studentData.email.trim()) {
+        errors.push('Email không được để trống');
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(studentData.email.trim())) {
+        errors.push('Email không hợp lệ');
+      }
+      
+      if (!studentData.phone || !studentData.phone.trim()) {
+        errors.push('Số điện thoại không được để trống');
+      }
+      
+      if (!studentData.address || !studentData.address.trim()) {
+        errors.push('Địa chỉ không được để trống');
+      }
+      
+      // If validation errors, add to failed list
+      if (errors.length > 0) {
+        results.failed.push({
+          ...studentData,
+          errors
+        });
+        continue;
+      }
+      
+      const username = studentData.username.trim();
+      const email = studentData.email.trim().toLowerCase();
+      const phone = studentData.phone.trim();
+      const address = studentData.address.trim();
+      
+      // Check for duplicates
+      const existingEmail = await User.findOne({ email });
+      if (existingEmail) {
+        results.failed.push({
+          ...studentData,
+          errors: ['Email đã tồn tại trong hệ thống']
+        });
+        continue;
+      }
+      
+      const existingUsername = await User.findOne({ username });
+      if (existingUsername) {
+        results.failed.push({
+          ...studentData,
+          errors: ['Username đã tồn tại trong hệ thống']
+        });
+        continue;
+      }
+      
+      // Generate password
+      const password = generatePassword();
+      
+      // Create student
+      try {
+        const newStudent = await User.create({
+          username,
+          email,
+          password,
+          phone,
+          address,
+          roleId: studentRole._id
+        });
+        
+        // Remove sensitive data
+        const studentResponse = newStudent.toObject();
+        delete studentResponse.password;
+        delete studentResponse.token;
+        
+        results.success.push(studentResponse);
+      } catch (createError) {
+        results.failed.push({
+          ...studentData,
+          errors: [createError.message || 'Lỗi khi tạo học viên']
+        });
+      }
+    }
+    
+    res.status(200).json({
+      message: "Import học viên hoàn tất",
+      success: results.success.length,
+      failed: results.failed.length,
+      total: students.length,
+      results
+    });
+  } catch (error) {
+    console.error("❌ Lỗi khi import học viên:", error);
+    res.status(500).json({ 
+      message: "Lỗi server khi import học viên",
       error: error.message 
     });
   }

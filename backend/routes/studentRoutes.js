@@ -12,6 +12,7 @@ router.get('/stats', studentController.getStudentStats);
 router.get('/:id', studentController.getStudentById);
 router.get('/:id/schedule', studentController.getStudentSchedule);
 router.post('/', studentController.createStudent);
+router.post('/import', studentController.importStudents);
 router.put('/:id', studentController.updateStudent);
 router.delete('/:id', studentController.deleteStudent);
 

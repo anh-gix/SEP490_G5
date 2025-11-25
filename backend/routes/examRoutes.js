@@ -4,17 +4,17 @@ const examController = require("../controllers/examController");
 const upload = examController.uploadMiddleware;
 const { verifyToken } = require("../middlewares/verifyToken");
 
-// center head handle
-router.get("/center", examController.getAllExamsCenterHead);
-router.post("/", examController.createExam);
-router.get("/center/:id", examController.getExamByIdCenterHead);
-router.put("/:id", examController.updateExam);
-router.delete("/:id", examController.deleteExam);
-router.post("/:id/publish", examController.publishExam);
-router.post("/:id/unpublish", examController.unpublishExam);
-router.post("/upload/answer-key", upload.single("file"), examController.uploadAnswerKeyCSV);
+// ================== CENTER HEAD - EXAM MANAGEMENT ROUTES ==================
+router.get("/management", examController.getAllExamsForManagement);
+router.get("/management/:id", examController.getExamByIdForManagement);
+router.post("/management", examController.createExamForManagement);
+router.put("/management/:id", examController.updateExamForManagement);
+router.delete("/management/:id", examController.deleteExamForManagement);
+router.post("/management/:id/publish", examController.publishExamForManagement);
+router.post("/management/:id/unpublish", examController.unpublishExamForManagement);
+router.post("/management/upload-answer-key", upload.single("file"), examController.uploadAnswerKeyForManagement);
 
-//student handle
+// ================== STUDENT - PUBLIC EXAM ROUTES ==================
 // 🧠 Lấy danh sách bài thi (public)
 router.get("/", examController.getAllExams);
 

@@ -30,7 +30,7 @@ const ExamList = () => {
   const fetchExams = async () => {
     try {
       setLoading(true);
-      const response = await examService.getAllExams();
+      const response = await examService.getAllExamsForManagement();
 
       if (response.success) {
         setExams(response.data || []);
@@ -52,7 +52,7 @@ const ExamList = () => {
     }
 
     try {
-      const response = await examService.deleteExam(examId);
+      const response = await examService.deleteExamForManagement(examId);
 
       if (response.success) {
         alert('Xóa đề thi thành công!');
@@ -212,7 +212,7 @@ const ExamList = () => {
           <h4 className="mb-8 text-neutral-900 fw-bold">Quản lý đề thi</h4>
           <p className="text-neutral-600 mb-0">Quản lý đề thi và bài làm</p>
         </div>
-        <Button variant="primary" icon="ph ph-plus" onClick={() => navigate('/center-head/exams/create')}>
+        <Button variant="primary" styles={{ "text": "white"}} icon="ph ph-plus" onClick={() => navigate('/center-head/exams/create')}>
           Tạo đề thi
         </Button>
       </div>

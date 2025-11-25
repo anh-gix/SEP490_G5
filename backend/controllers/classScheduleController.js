@@ -184,22 +184,57 @@ exports.validateAddClassSchedule = async (req, res) => {
     console.log('  - TeacherId:', teacherId?.toString() || 'Chưa có');
     console.log('  - Số học sinh:', students.length);
 
+    // ✅ 0. KIỂM TRA CONFLICT VỚI CÁC BUỔI HỌC HIỆN TẠI CỦA LỚP (cùng ngày, trùng giờ)
+    console.log('\n📚 KIỂM TRA CONFLICT VỚI CÁC BUỔI HỌC HIỆN TẠI CỦA LỚP:');
+    const currentClassSchedulesOnSameDate = await ClassSchedule.find({
+      class: new mongoose.Types.ObjectId(classId),
+      date: scheduleDate,
+      status: { $in: ['temporary', 'fixed'] }
+    })
+      .select('_id date startTime endTime')
+      .lean();
+    
+    // Nếu có excludeScheduleId (đang update), loại trừ schedule đó
+    const schedulesToCheck = excludeScheduleId
+      ? currentClassSchedulesOnSameDate.filter(s => s._id.toString() !== excludeScheduleId)
+      : currentClassSchedulesOnSameDate;
+    
+    console.log(`  - Tìm thấy ${schedulesToCheck.length} buổi học của lớp hiện tại vào ngày ${newDateStr}`);
+    
+    schedulesToCheck.forEach((schedule, idx) => {
+      const hasOverlap = hasTimeOverlap(startTime, endTime, schedule.startTime, schedule.endTime);
+      console.log(`  [${idx + 1}] Schedule ID: ${schedule._id}`);
+      console.log(`      - Thời gian: ${schedule.startTime} - ${schedule.endTime}`);
+      console.log(`      - Trùng giờ với ${startTime}-${endTime}: ${hasOverlap ? 'CÓ ⚠️' : 'KHÔNG ✓'}`);
+      
+      if (hasOverlap) {
+        conflicts.room.push({
+          roomId: room.toString(),
+          className: currentClassName,
+          date: formatDateLocal(schedule.date),
+          time: `${schedule.startTime} - ${schedule.endTime}`,
+          conflictingTime: `${startTime} - ${endTime}`,
+          isCurrentClass: true // Đánh dấu đây là conflict với chính lớp hiện tại
+        });
+        conflicts.hasConflict = true;
+        console.log(`      ⚠️ CONFLICT VỚI BUỔI HỌC HIỆN TẠI CỦA LỚP được phát hiện!`);
+      }
+    });
+    
+    if (schedulesToCheck.length === 0 || schedulesToCheck.every(s => !hasTimeOverlap(startTime, endTime, s.startTime, s.endTime))) {
+      console.log('  ✓ Không có conflict với các buổi học hiện tại của lớp');
+    }
+
     // Build query for room schedules, excluding current schedule if updating
-    // Loại trừ tất cả schedules của lớp hiện tại để tránh báo conflict với chính lớp đang chỉnh sửa
+    // Loại trừ tất cả schedules của lớp hiện tại để tránh báo conflict trùng lặp
     const roomScheduleQuery = {
       room: new mongoose.Types.ObjectId(room),
       date: scheduleDate,
       status: { $in: ['temporary', 'fixed'] }
     };
     
-    // Loại trừ tất cả schedules của lớp hiện tại
-    const currentClassSchedules = await ClassSchedule.find({
-      class: new mongoose.Types.ObjectId(classId),
-      date: scheduleDate,
-      status: { $in: ['temporary', 'fixed'] }
-    }).select('_id').lean();
-    
-    const currentClassScheduleIds = currentClassSchedules.map(s => s._id);
+    // Loại trừ tất cả schedules của lớp hiện tại (đã kiểm tra ở trên)
+    const currentClassScheduleIds = schedulesToCheck.map(s => s._id);
     if (currentClassScheduleIds.length > 0) {
       roomScheduleQuery._id = { $nin: currentClassScheduleIds };
     } else if (excludeScheduleId) {

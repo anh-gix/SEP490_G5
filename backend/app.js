@@ -5,8 +5,8 @@ const router = require('./routes');
 require('./models');
 require('dotenv').config();
 const path = require('path');
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 const app = express();
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Middleware
 app.use(cors());

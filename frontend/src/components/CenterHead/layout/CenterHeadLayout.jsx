@@ -76,7 +76,6 @@ const CenterHeadLayout = ({ children }) => {
       <div
         className="flex-grow-1 d-flex flex-column"
         style={{
-          marginLeft: '280px',
           width: 'calc(100% - 280px)',
           minHeight: '100vh'
         }}

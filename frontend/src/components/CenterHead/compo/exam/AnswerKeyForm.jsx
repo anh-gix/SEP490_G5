@@ -6,12 +6,19 @@ const AnswerKeyForm = ({ answerKey, onAnswerKeyChange }) => {
   const addQuestion = () => {
     const newQuestion = {
       questionNumber: (answerKey.length || 0) + 1,
-      questionType: 'single_choice', // default to single_choice for better UX
-      correctAnswer: '',
-      options: ['A', 'B', 'C', 'D'], // default 4 options for multiple/single choice
-      maxScore: 1
+      questionTitle: '',
+      questionAnswer: [
+        { key: 'A', text: '' },
+        { key: 'B', text: '' },
+        { key: 'C', text: '' },
+        { key: 'D', text: '' }
+      ],
+      questionType: 'multiple_choice', // Changed to match backend enum
+      correctAnswer: [''],
+      maxScore: 1,
+      tags: []
     };
-console.log(newQuestion);
+    console.log(newQuestion);
     onAnswerKeyChange([...answerKey, newQuestion]);
   };
 
@@ -42,11 +49,19 @@ console.log(newQuestion);
   };
 
   const questionTypes = {
-    single_choice: 'Trắc nghiệm (1 đáp án)',
-    multiple_choice: 'Trắc nghiệm (nhiều đáp án)',
+    multiple_choice: 'Trắc nghiệm',
     true_false: 'Đúng/Sai',
-    writing: 'Tự luận'
+    input: 'Điền từ'
   };
+
+  const tagOptions = [
+    { value: 'grammar', label: 'Grammar' },
+    { value: 'vocabulary', label: 'Vocabulary' },
+    { value: 'listening', label: 'Listening' },
+    { value: 'reading_comprehension', label: 'Reading Comprehension' },
+    { value: 'writing', label: 'Writing' },
+    { value: 'speaking', label: 'Speaking' }
+  ];
 
   // Generate option labels based on index
   const getOptionLabel = (index) => {
@@ -56,36 +71,46 @@ console.log(newQuestion);
   // Add new option to a question
   const addOption = (questionIndex) => {
     const answer = answerKey[questionIndex];
-    const currentOptions = answer.options || ['A', 'B', 'C', 'D'];
-    const newOptions = [...currentOptions, getOptionLabel(currentOptions.length)];
-    updateQuestion(questionIndex, 'options', newOptions);
+    const currentAnswers = answer.questionAnswer || [];
+    const newKey = getOptionLabel(currentAnswers.length);
+    const newAnswers = [...currentAnswers, { key: newKey, text: '' }];
+    updateQuestion(questionIndex, 'questionAnswer', newAnswers);
   };
 
   // Remove option from a question
-  const removeOption = (questionIndex, optionToRemove) => {
+  const removeOption = (questionIndex, keyToRemove) => {
     const answer = answerKey[questionIndex];
-    const currentOptions = answer.options || ['A', 'B', 'C', 'D'];
+    const currentAnswers = answer.questionAnswer || [];
 
-    if (currentOptions.length <= 2) {
+    if (currentAnswers.length <= 2) {
       alert('Phải có ít nhất 2 đáp án!');
       return;
     }
 
     // Remove the option
-    const newOptions = currentOptions.filter(opt => opt !== optionToRemove);
+    const newAnswers = currentAnswers.filter(opt => opt.key !== keyToRemove);
 
     // Update correct answers if needed
-    let correctAnswers = answer.correctAnswer ? answer.correctAnswer.split(',') : [];
-    correctAnswers = correctAnswers.filter(ans => ans !== optionToRemove);
+    let correctAnswers = Array.isArray(answer.correctAnswer) ? answer.correctAnswer : [];
+    correctAnswers = correctAnswers.filter(ans => ans !== keyToRemove);
 
-    updateQuestion(questionIndex, 'options', newOptions);
-    updateQuestion(questionIndex, 'correctAnswer', correctAnswers.join(','));
+    updateQuestion(questionIndex, 'questionAnswer', newAnswers);
+    updateQuestion(questionIndex, 'correctAnswer', correctAnswers);
+  };
+
+  // Update option text
+  const updateOptionText = (questionIndex, optionKey, text) => {
+    const answer = answerKey[questionIndex];
+    const updatedAnswers = answer.questionAnswer.map(opt =>
+      opt.key === optionKey ? { ...opt, text } : opt
+    );
+    updateQuestion(questionIndex, 'questionAnswer', updatedAnswers);
   };
 
   // Render answer input based on question type
   const renderAnswerInput = (answer, index) => {
     const questionType = answer.questionType;
-    const options = answer.options || ['A', 'B', 'C', 'D'];
+    const questionAnswers = answer.questionAnswer || [];
 
     // If no question type selected, show placeholder
     if (!questionType) {
@@ -98,116 +123,74 @@ console.log(newQuestion);
     }
 
     switch (questionType) {
-      case 'single_choice':
-        return (
-          <div>
-            <select
-              className="form-select radius-8 bg-neutral-50 border-neutral-200 text-xs px-12 py-8 mb-8"
-              value={answer.correctAnswer}
-              onChange={(e) => updateQuestion(index, 'correctAnswer', e.target.value)}
-            >
-              <option value="">Chọn đáp án</option>
-              {options.map((option) => (
-                <option key={option} value={option}>
-                  Đáp án {option}
-                </option>
-              ))}
-            </select>
-
-            {/* Options manager */}
-            <div className="d-flex flex-wrap gap-2 align-items-center">
-              <span className="text-neutral-600 text-xs me-2">Số đáp án: {options.length}</span>
-              {options.map((option) => (
-                <div key={option} className="d-flex align-items-center gap-1 bg-neutral-100 px-8 py-4 rounded-6">
-                  <span className="text-xs">{option}</span>
-                  {options.length > 2 && (
-                    <button
-                      type="button"
-                      className="bg-transparent border-0 text-danger-600 p-0 d-flex align-items-center"
-                      onClick={() => removeOption(index, option)}
-                      title="Xóa đáp án"
-                    >
-                      <i className="fas fa-times text-xs"></i>
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button
-                type="button"
-                className="bg-transparent border-0 text-main-600 p-0 d-flex align-items-center gap-1 text-xs"
-                onClick={() => addOption(index)}
-                title="Thêm đáp án"
-              >
-                <i className="fas fa-plus-circle"></i>
-                <span>Thêm</span>
-              </button>
-            </div>
-          </div>
-        );
-
       case 'multiple_choice':
         return (
           <div>
-            <div className="d-flex flex-wrap gap-2 mb-8">
-              {options.map((option) => {
-                const selectedAnswers = answer.correctAnswer ? answer.correctAnswer.split(',') : [];
-                const isSelected = selectedAnswers.includes(option);
+            {/* Answer options with text input and checkbox */}
+            <div className="mb-12">
+              <label className="text-neutral-700 fw-medium mb-8 d-block text-xs">
+                Các đáp án <span className="text-danger-600">*</span>
+                <span className="text-neutral-500 fw-normal ms-1">(Tick ✓ để đánh dấu đáp án đúng)</span>
+              </label>
+              {questionAnswers.map((option, optIdx) => {
+                const correctAnswers = Array.isArray(answer.correctAnswer) ? answer.correctAnswer : [];
+                const isCorrect = correctAnswers.includes(option.key);
 
                 return (
-                  <label
-                    key={option}
-                    className={`px-12 py-6 rounded-6 border cursor-pointer text-xs position-relative ${
-                      isSelected
-                        ? 'bg-main-600 text-white border-main-600'
-                        : 'bg-white text-neutral-700 border-neutral-300'
-                    }`}
-                  >
+                  <div key={option.key} className="d-flex gap-2 mb-8 align-items-center">
+                    {/* Checkbox to mark as correct */}
+                    <div className="form-check" style={{ minWidth: '16px' }}>
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        style={{ cursor: 'pointer' }}
+                        checked={isCorrect}
+                        onChange={(e) => {
+                          let newCorrectAnswers = [...correctAnswers];
+                          if (e.target.checked) {
+                            newCorrectAnswers.push(option.key);
+                          } else {
+                            newCorrectAnswers = newCorrectAnswers.filter(a => a !== option.key);
+                          }
+                          updateQuestion(index, 'correctAnswer', newCorrectAnswers);
+                        }}
+                        title="Tick để đánh dấu đáp án đúng"
+                      />
+                    </div>
+
+                    <div className={`d-flex align-items-center justify-content-center rounded-6 fw-bold flex-shrink-0 text-xs ${
+                      isCorrect ? 'bg-success-50 text-success-600' : 'bg-main-50 text-main-600'
+                    }`} style={{ width: '32px', height: '32px' }}>
+                      {option.key}
+                    </div>
                     <input
-                      type="checkbox"
-                      className="d-none"
-                      checked={isSelected}
-                      onChange={(e) => {
-                        let newAnswers = [...selectedAnswers];
-                        if (e.target.checked) {
-                          newAnswers.push(option);
-                        } else {
-                          newAnswers = newAnswers.filter(a => a !== option);
-                        }
-                        updateQuestion(index, 'correctAnswer', newAnswers.join(','));
-                      }}
+                      type="text"
+                      className="form-control form-control-sm radius-8 bg-neutral-50 border-neutral-200 text-xs"
+                      placeholder={`Nội dung đáp án ${option.key}`}
+                      value={option.text}
+                      onChange={(e) => updateOptionText(index, option.key, e.target.value)}
                     />
-                    <span>{option}</span>
-                  </label>
+                    {questionAnswers.length > 2 && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-danger flex-shrink-0"
+                        style={{ width: '32px', height: '32px', padding: '0' }}
+                        onClick={() => removeOption(index, option.key)}
+                        title="Xóa đáp án"
+                      >
+                        <i className="fas fa-times text-xs"></i>
+                      </button>
+                    )}
+                  </div>
                 );
               })}
-            </div>
-
-            {/* Options manager */}
-            <div className="d-flex flex-wrap gap-2 align-items-center pt-8 border-top border-neutral-200">
-              <span className="text-neutral-600 text-xs me-2">Quản lý đáp án:</span>
-              {options.map((option) => (
-                <div key={option} className="d-flex align-items-center gap-1 bg-neutral-100 px-8 py-4 rounded-6">
-                  <span className="text-xs">{option}</span>
-                  {options.length > 2 && (
-                    <button
-                      type="button"
-                      className="bg-transparent border-0 text-danger-600 p-0 d-flex align-items-center"
-                      onClick={() => removeOption(index, option)}
-                      title="Xóa đáp án"
-                    >
-                      <i className="fas fa-times text-xs"></i>
-                    </button>
-                  )}
-                </div>
-              ))}
               <button
                 type="button"
-                className="bg-transparent border-0 text-main-600 p-0 d-flex align-items-center gap-1 text-xs"
+                className="btn btn-sm btn-outline-main text-xs"
                 onClick={() => addOption(index)}
-                title="Thêm đáp án"
               >
-                <i className="fas fa-plus-circle"></i>
-                <span>Thêm</span>
+                <i className="fas fa-plus-circle me-1"></i>
+                Thêm đáp án
               </button>
             </div>
           </div>
@@ -217,8 +200,8 @@ console.log(newQuestion);
         return (
           <select
             className="form-select radius-8 bg-neutral-50 border-neutral-200 text-xs px-12 py-8"
-            value={answer.correctAnswer}
-            onChange={(e) => updateQuestion(index, 'correctAnswer', e.target.value)}
+            value={Array.isArray(answer.correctAnswer) ? answer.correctAnswer[0] : ''}
+            onChange={(e) => updateQuestion(index, 'correctAnswer', [e.target.value])}
           >
             <option value="">Chọn đáp án</option>
             <option value="TRUE">Đúng (TRUE)</option>
@@ -226,24 +209,53 @@ console.log(newQuestion);
           </select>
         );
 
-      case 'writing':
+      case 'input':
         return (
           <div>
-            <textarea
-              className="form-control radius-8 bg-neutral-50 border-neutral-200 text-xs px-12 py-8"
-              rows="3"
-              placeholder="Nhập đáp án mẫu (sẽ tự động chuyển thành chữ thường để so sánh)..."
-              value={answer.correctAnswer}
-              onChange={(e) => {
-                // Convert to lowercase for consistency
-                const normalizedAnswer = e.target.value.toLowerCase().trim();
-                updateQuestion(index, 'correctAnswer', normalizedAnswer);
+            <label className="text-neutral-700 fw-medium mb-8 d-block text-xs">
+              Đáp án đúng <span className="text-danger-600">*</span>
+              <span className="text-neutral-500 fw-normal ms-1">(Có thể có nhiều cách trả lời)</span>
+            </label>
+            {Array.isArray(answer.correctAnswer) && answer.correctAnswer.map((ans, ansIdx) => (
+              <div key={ansIdx} className="d-flex gap-2 mb-8">
+                <input
+                  type="text"
+                  className="form-control form-control-sm radius-8 bg-neutral-50 border-neutral-200 text-xs"
+                  placeholder="Nhập từ/cụm từ đúng"
+                  value={ans}
+                  onChange={(e) => {
+                    const newAnswers = [...answer.correctAnswer];
+                    newAnswers[ansIdx] = e.target.value;
+                    updateQuestion(index, 'correctAnswer', newAnswers);
+                  }}
+                />
+                {answer.correctAnswer.length > 1 && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-danger flex-shrink-0"
+                    style={{ width: '32px', height: '32px', padding: '0' }}
+                    onClick={() => {
+                      const newAnswers = answer.correctAnswer.filter((_, i) => i !== ansIdx);
+                      updateQuestion(index, 'correctAnswer', newAnswers);
+                    }}
+                    title="Xóa đáp án này"
+                  >
+                    <i className="fas fa-times text-xs"></i>
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-main text-xs"
+              onClick={() => {
+                const newAnswers = [...(answer.correctAnswer || ['']), ''];
+                updateQuestion(index, 'correctAnswer', newAnswers);
               }}
-            />
-            <div className="mt-8 bg-info-50 border border-info-200 rounded-8 p-8 text-xs text-info-700">
-              <i className="fas fa-info-circle me-2"></i>
-              Đáp án sẽ được chuyển về chữ thường để dễ so sánh
-            </div>
+            >
+              <i className="fas fa-plus-circle me-1"></i>
+              Thêm đáp án đúng khác
+            </button>
           </div>
         );
 
@@ -290,6 +302,20 @@ console.log(newQuestion);
 
                     {/* Answer Configuration */}
                     <div className="flex-grow-1">
+                      {/* Question Title */}
+                      <div className="mb-12">
+                        <label className="text-neutral-700 fw-medium mb-8 d-block text-xs">
+                          Tiêu đề câu hỏi <span className="text-danger-600">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-control radius-8 bg-neutral-50 border-neutral-200 text-xs px-12 py-8"
+                          placeholder="Nhập tiêu đề hoặc nội dung câu hỏi..."
+                          value={answer.questionTitle || ''}
+                          onChange={(e) => updateQuestion(index, 'questionTitle', e.target.value)}
+                        />
+                      </div>
+
                       {/* Question Type Selector */}
                       <div className="mb-12">
                         <label className="text-neutral-700 fw-medium mb-8 d-block text-xs">
@@ -308,12 +334,19 @@ console.log(newQuestion);
                                 const updatedAnswer = {
                                   ...ans,
                                   questionType: newType,
-                                  correctAnswer: '', // Reset answer when changing type
+                                  correctAnswer: newType === 'input' ? [''] : [], // Reset answer when changing type
                                 };
 
-                                // Reset options to default for choice types
-                                if (newType === 'single_choice' || newType === 'multiple_choice') {
-                                  updatedAnswer.options = ['A', 'B', 'C', 'D'];
+                                // Reset questionAnswer to default for multiple_choice
+                                if (newType === 'multiple_choice') {
+                                  updatedAnswer.questionAnswer = [
+                                    { key: 'A', text: '' },
+                                    { key: 'B', text: '' },
+                                    { key: 'C', text: '' },
+                                    { key: 'D', text: '' }
+                                  ];
+                                } else {
+                                  updatedAnswer.questionAnswer = [];
                                 }
 
                                 console.log('Updated answer:', updatedAnswer);
@@ -335,10 +368,51 @@ console.log(newQuestion);
                         </select>
                       </div>
 
+                      {/* Tags */}
+                      <div className="mb-12">
+                        <label className="text-neutral-700 fw-medium mb-8 d-block text-xs">
+                          Tags
+                        </label>
+                        <div className="d-flex flex-wrap gap-2">
+                          {tagOptions.map((tag) => {
+                            const currentTags = answer.tags || [];
+                            const isSelected = currentTags.includes(tag.value);
+
+                            return (
+                              <label
+                                key={tag.value}
+                                className={`px-10 py-5 rounded-6 border cursor-pointer text-xs ${
+                                  isSelected
+                                    ? 'bg-main-600 text-white border-main-600'
+                                    : 'bg-white text-neutral-700 border-neutral-300'
+                                }`}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="d-none"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    let newTags = [...currentTags];
+                                    if (e.target.checked) {
+                                      newTags.push(tag.value);
+                                    } else {
+                                      newTags = newTags.filter(t => t !== tag.value);
+                                    }
+                                    updateQuestion(index, 'tags', newTags);
+                                  }}
+                                />
+                                <span>{tag.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+
                       {/* Answer Input */}
                       <div className="mb-12">
                         <label className="text-neutral-700 fw-medium mb-8 d-block text-xs">
-                          Đáp án {answer.questionType !== 'writing' && <span className="text-danger-600">*</span>}
+                          Đáp án {answer.questionType !== 'input' && <span className="text-danger-600">*</span>}
                         </label>
                         {renderAnswerInput(answer, index)}
                       </div>

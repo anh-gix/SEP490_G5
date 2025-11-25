@@ -3,21 +3,40 @@ const router = express.Router();
 const examController = require("../controllers/examController");
 const upload = examController.uploadMiddleware;
 
+// ==================== EXAM MANAGEMENT ====================
 
-
-// 🧠 Lấy danh sách bài thi (với pagination và filters)
 router.get("/", examController.getAllExams);
 
-// lấy thông tin chi tiết
+
+router.post("/", examController.createExam);
+
+
 router.get("/:id", examController.getExamById);
-// publish/unpublish bài thi
+
+
+router.put("/:id", examController.updateExam);
+
+
+router.delete("/:id", examController.deleteExam);
+
 router.post("/:id/publish", examController.publishExam);
 router.post("/:id/unpublish", examController.unpublishExam);
-//danh sách bài làm
-router.get("/:id/submissions", examController.getExamSubmissions);
+
+// upload pdf/doc file for exam
+router.post("/upload/exam-file", upload.single("file"), examController.uploadExamFile);
+
+// upload audio file for listening section
+router.post("/upload/audio", upload.single("file"), examController.uploadAudioFile);
+
+// upload csv answer key
+router.post("/upload/answer-key", upload.single("file"), examController.uploadAnswerKeyCSV);
+
 
 // 🧩 Bắt đầu làm bài
 router.post("/start", examController.startExam);
+
+//danh sách bài làm
+router.get("/:id/submissions", examController.getExamSubmissions);
 
 // ✅ Lưu câu trả lời cho Reading/Listening
 router.patch("/submissions/:submissionId/objective", examController.saveObjectiveAnswer);

@@ -2,7 +2,15 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../Button';
 
-const Step4Publish = ({ examData, totalDuration, totalQuestions, totalScore }) => {
+const Step4Publish = ({
+  examData,
+  totalDuration,
+  totalQuestions,
+  totalScore,
+  onSave,
+  onPublish,
+  examId
+}) => {
   const navigate = useNavigate();
   const [publishStatus, setPublishStatus] = useState('draft'); // 'draft' or 'publish'
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,27 +51,31 @@ const Step4Publish = ({ examData, totalDuration, totalQuestions, totalScore }) =
     setIsSubmitting(true);
 
     try {
-      const examToSubmit = {
-        ...examData,
-        totalDuration: totalDuration || examData.totalDuration,
-        isPublished: publishStatus === 'publish',
-        publishedAt: publishStatus === 'publish' ? new Date() : null
-      };
+      // Save exam first (if not already saved)
+      if (onSave) {
+        const saved = await onSave();
+        if (!saved) {
+          setIsSubmitting(false);
+          return;
+        }
+      }
 
-      // TODO: API call to save exam
-      console.log('Saving exam:', examToSubmit);
+      // If publish status is 'publish', call publish API
+      if (publishStatus === 'publish') {
+        if (!examId) {
+          alert('Vui lòng lưu đề thi trước');
+          setIsSubmitting(false);
+          return;
+        }
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      alert(
-        publishStatus === 'publish'
-          ? 'Đề thi đã được xuất bản thành công!'
-          : 'Đề thi đã được lưu nháp thành công!'
-      );
-
-      // Navigate back to exam list
-      navigate('/center-head/exams');
+        if (onPublish) {
+          await onPublish();
+        }
+      } else {
+        // Just save as draft
+        alert('Đề thi đã được lưu nháp thành công!');
+        navigate('/center-head/exams');
+      }
     } catch (error) {
       console.error('Error saving exam:', error);
       alert('Có lỗi xảy ra khi lưu đề thi!');

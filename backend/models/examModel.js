@@ -2,16 +2,22 @@ const mongoose = require("mongoose");
 
 const answerKeySchema = new mongoose.Schema({
   questionNumber: { type: Number, required: true },
+  questionTitle: { type: String, required: true },
+  questionAnswer: [{
+      key: { type: String, required: true },
+      text: { type: String, required: true } 
+    }],
   questionType: {
     type: String,
     enum: ["multiple_choice", "true_false", "input"],
     required: true
   },
-  numberOfChoices: {
-    type: Number
-  },
   correctAnswer: [{ type: String, required: true }],
-  maxScore: { type: Number, default: 1 }
+  maxScore: { type: Number, default: 1 },
+  tags: [{
+    type: String,
+    enum: ["grammar", "vocabulary", "listening", "reading_comprehension", "writing", "speaking"]
+  }]
 });
 
 const sectionSchema = new mongoose.Schema({

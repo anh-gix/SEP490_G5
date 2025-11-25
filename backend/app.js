@@ -52,6 +52,8 @@ app.use('/api/homework', require('./routes/homeworkRoutes'));
 // Change Request Routes
 app.use('/api/change-requests', require('./routes/changeRequestRoutes'));
 
+// Academic Staff Routes
+app.use('/api/academic-staff', require('./routes/academicStaffRoutes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

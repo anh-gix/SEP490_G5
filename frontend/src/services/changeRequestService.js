@@ -36,27 +36,6 @@ const changeRequestService = {
     }
   },
 
-  // Approve change request
-  approveChangeRequest: async (id) => {
-    try {
-      const response = await api.put(`/change-requests/${id}/approve`);
-      return response.data;
-    } catch (error) {
-      console.error('Error approving change request:', error);
-      throw error.response?.data || error.message;
-    }
-  },
-
-  // Reject change request
-  rejectChangeRequest: async (id, responseContent) => {
-    try {
-      const response = await api.put(`/change-requests/${id}/reject`, { responseContent });
-      return response.data;
-    } catch (error) {
-      console.error('Error rejecting change request:', error);
-      throw error.response?.data || error.message;
-    }
-  },
 
   // Get sender schedule
   getSenderSchedule: async (requestId) => {

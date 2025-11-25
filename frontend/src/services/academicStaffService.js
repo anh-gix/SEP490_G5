@@ -13,7 +13,39 @@ const academicStaffService = {
   getAttendance: async (scheduleId) => {
     try {
       const response = await axios.get(
-        `${API_URL}/class-schedules/${scheduleId}/attendance`,
+        `${API_URL}/academic-staff/class-schedules/${scheduleId}/attendance`,
+        {
+          headers: getAuthHeader()
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Approve change request
+  approveChangeRequest: async (id) => {
+    try {
+      const response = await axios.put(
+        `${API_URL}/academic-staff/change-requests/${id}/approve`,
+        {},
+        {
+          headers: getAuthHeader()
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Reject change request
+  rejectChangeRequest: async (id, responseContent) => {
+    try {
+      const response = await axios.put(
+        `${API_URL}/academic-staff/change-requests/${id}/reject`,
+        { responseContent },
         {
           headers: getAuthHeader()
         }

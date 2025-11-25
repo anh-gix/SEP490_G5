@@ -3,6 +3,7 @@ import { Container, Card, Table, Badge, Spinner, Alert, Pagination, Button, Moda
 import AcademicNavigation from '../../components/class_management/AcademicNavigation.jsx';
 import ScheduleCalendar from '../../components/class_management/ScheduleCalendar';
 import changeRequestService from '../../services/changeRequestService';
+import academicStaffService from '../../services/academicStaffService';
 import classService from '../../services/classService';
 import { classScheduleService } from '../../services/classScheduleService';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
@@ -983,7 +984,7 @@ const RequestManagementPage = () => {
     
     try {
       setProcessing(true);
-      await changeRequestService.approveChangeRequest(selectedRequest._id);
+      await academicStaffService.approveChangeRequest(selectedRequest._id);
       setShowDetailModal(false);
       setSelectedRequest(null);
       setRejectReason('');
@@ -1005,7 +1006,7 @@ const RequestManagementPage = () => {
     
     try {
       setProcessing(true);
-      await changeRequestService.rejectChangeRequest(requestToReject._id, rejectReason || null);
+      await academicStaffService.rejectChangeRequest(requestToReject._id, rejectReason || null);
       setShowRejectModal(false);
       setRequestToReject(null);
       setRejectReason('');

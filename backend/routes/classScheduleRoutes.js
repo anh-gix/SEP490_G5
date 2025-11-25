@@ -24,9 +24,6 @@ router.post("/", classScheduleController.createClassSchedule);
 // ✅ Điểm danh sinh viên
 router.patch("/:studentScheduleId/attendance", classScheduleController.markAttendance);
 
-// ✅ Xem danh sách điểm danh của một buổi học
-router.get("/:classScheduleId/attendance", classScheduleController.getAttendanceByClassSchedule);
-
 // ✅ Xem tất cả các phòng học
 router.get("/rooms", ministryController.getAllRooms); // 🆕 thêm dòng này
 

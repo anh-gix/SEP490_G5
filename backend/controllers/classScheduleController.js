@@ -1216,30 +1216,6 @@ exports.markAttendance = async (req, res) => {
 };
 
 // =========================
-// ✅ LẤY DANH SÁCH ĐIỂM DANH THEO BUỔI HỌC
-// =========================
-exports.getAttendanceByClassSchedule = async (req, res) => {
-  try {
-    const { classScheduleId } = req.params;
-    const list = await StudentSchedule.find({ classSchedule: classScheduleId })
-      .populate("student", "username")
-      .populate({
-        path: "classSchedule",
-        populate: { path: "room", select: "room_name location" }, // ✅ thêm populate room
-      });
-
-    res.status(200).json({
-      message: "Danh sách điểm danh của buổi học",
-      total: list.length,
-      list,
-    });
-  } catch (err) {
-    console.error("❌ Lỗi khi lấy danh sách:", err);
-    res.status(500).json({ message: "Lỗi server", error: err.message });
-  }
-};
-
-// =========================
 // 📚 LẤY STUDENTSCHEDULE THEO CLASS SCHEDULE IDs
 // =========================
 exports.getStudentSchedulesByClassSchedules = async (req, res) => {

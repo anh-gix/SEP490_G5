@@ -1110,6 +1110,21 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
 
                 // Check time overlap
                 if (hasTimeOverlap(classStart, classEnd, teacherStart, teacherEnd)) {
+                  console.log('🔍 [DEBUG] Phát hiện xung đột:', {
+                    date: classSchedule.date,
+                    currentClass: {
+                      startTime: classSchedule.startTime,
+                      endTime: classSchedule.endTime,
+                      parsed: `${classStart} - ${classEnd}`
+                    },
+                    teacherClass: {
+                      className: teacherSchedule.className,
+                      startTime: teacherSchedule.startTime,
+                      endTime: teacherSchedule.endTime,
+                      parsed: `${teacherStart} - ${teacherEnd}`
+                    }
+                  });
+                  
                   conflicts.push({
                     date: classSchedule.date,
                     classTime: `${classStart} - ${classEnd}`,
@@ -1119,7 +1134,10 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                     conflictingRoom: teacherSchedule.room,
                     currentClassTime: `${classStart} - ${classEnd}`, // Thông tin lịch lớp hiện tại có xung đột
                     currentClassStartTime: classStart, // Lưu startTime để so khớp chính xác
-                    currentClassEndTime: classEnd // Lưu endTime để so khớp chính xác
+                    currentClassEndTime: classEnd, // Lưu endTime để so khớp chính xác
+                    // Lưu thêm thông tin gốc để debug
+                    originalClassStartTime: classSchedule.startTime,
+                    originalClassEndTime: classSchedule.endTime
                   });
                 }
               }
@@ -1172,7 +1190,13 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                   className: c.conflictingClass || 'N/A',
                   date: c.date || '',
                   time: c.teacherTime || '',
-                  conflictingClassTime: c.classTime || ''
+                  conflictingClassTime: c.classTime || '',
+                  // Lưu thêm thông tin để hiển thị chính xác
+                  currentClassTime: c.currentClassTime || c.classTime || '',
+                  currentClassStartTime: c.currentClassStartTime || '',
+                  currentClassEndTime: c.currentClassEndTime || '',
+                  originalClassStartTime: c.originalClassStartTime || '',
+                  originalClassEndTime: c.originalClassEndTime || ''
                 })),
                 conflictingTeacherIds: [teacherId.toString()],
                 // Keep existing room conflicts
@@ -3361,8 +3385,35 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                                     }
                                     
                                     // Ưu tiên dùng thời gian từ conflict (chính xác nhất), sau đó từ currentSchedule, cuối cùng là fallback
-                                    const currentClassTime = conflict.currentClassTime || conflict.classTime || 
-                                      (currentSchedule ? `${currentSchedule.startTime || ''} - ${currentSchedule.endTime || ''}` : 'N/A');
+                                    // Sử dụng currentClassTime từ conflict object (đã được lưu chính xác khi phát hiện conflict)
+                                    let currentClassTime = conflict.currentClassTime || conflict.classTime;
+                                    
+                                    // Nếu không có, thử tìm từ currentSchedule
+                                    if (!currentClassTime && currentSchedule) {
+                                      currentClassTime = `${currentSchedule.startTime || ''} - ${currentSchedule.endTime || ''}`;
+                                    }
+                                    
+                                    // Nếu vẫn không có, log warning và dùng fallback
+                                    if (!currentClassTime || currentClassTime === 'N/A') {
+                                      console.warn('⚠️ [DEBUG] Không tìm thấy thời gian lớp hiện tại cho conflict:', {
+                                        conflict,
+                                        currentSchedule,
+                                        currentClassSchedulesForRender: currentClassSchedulesForRender?.filter(s => s?.date === conflict?.date)
+                                      });
+                                      currentClassTime = conflict.originalClassStartTime && conflict.originalClassEndTime
+                                        ? `${conflict.originalClassStartTime} - ${conflict.originalClassEndTime}`
+                                        : 'N/A';
+                                    }
+                                    
+                                    // Log để debug
+                                    if (conflict.date === '2025-12-01') {
+                                      console.log('🔍 [DEBUG] Hiển thị conflict cho ngày 2025-12-01:', {
+                                        conflict,
+                                        currentSchedule,
+                                        currentClassTime,
+                                        currentClassSchedulesForRender: currentClassSchedulesForRender?.filter(s => s?.date === '2025-12-01')
+                                      });
+                                    }
                                     
                                     return (
                                       <li key={idx || `conflict-${idx}`} className="mb-6">

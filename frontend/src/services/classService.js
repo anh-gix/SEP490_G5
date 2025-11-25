@@ -1,12 +1,12 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8080/api/classes';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
 const classService = {
   // Get all classes with optional filters
   getAllClasses: async (params = {}) => {
     try {
-      const response = await axios.get(API_URL, { params });
+      const response = await axios.get(`${API_URL}/classes`, { params });
       return response.data;
     } catch (error) {
       console.error('Error fetching classes:', error);
@@ -17,7 +17,7 @@ const classService = {
   // Get class by ID
   getClassById: async (id) => {
     try {
-      const response = await axios.get(`${API_URL}/${id}`);
+      const response = await axios.get(`${API_URL}/classes/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching class:', error);
@@ -28,7 +28,7 @@ const classService = {
   // Get class statistics
   getClassStats: async () => {
     try {
-      const response = await axios.get(`${API_URL}/stats`);
+      const response = await axios.get(`${API_URL}/classes/stats`);
       return response.data;
     } catch (error) {
       console.error('Error fetching class stats:', error);
@@ -39,7 +39,7 @@ const classService = {
   // Create new class
   createClass: async (classData) => {
     try {
-      const response = await axios.post(API_URL, classData);
+      const response = await axios.post(`${API_URL}/classes`, classData);
       return response.data;
     } catch (error) {
       console.error('Error creating class:', error);
@@ -50,7 +50,7 @@ const classService = {
   // Update class
   updateClass: async (id, classData) => {
     try {
-      const response = await axios.put(`${API_URL}/${id}`, classData);
+      const response = await axios.put(`${API_URL}/classes/${id}`, classData);
       return response.data;
     } catch (error) {
       console.error('Error updating class:', error);
@@ -61,7 +61,7 @@ const classService = {
   // Delete class
   deleteClass: async (id) => {
     try {
-      const response = await axios.delete(`${API_URL}/${id}`);
+      const response = await axios.delete(`${API_URL}/classes/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error deleting class:', error);
@@ -72,7 +72,7 @@ const classService = {
   // Get schedules for a specific class
   getClassSchedules: async (classId) => {
     try {
-      const response = await axios.get(`http://localhost:3000/api/schedules`, {
+      const response = await axios.get(`${API_URL}/schedules`, {
         params: { classId }
       });
       return response.data;
@@ -85,7 +85,7 @@ const classService = {
   // Check teacher and room conflicts
   checkTeacherRoomConflicts: async (classId, conflictData) => {
     try {
-      const response = await axios.post(`${API_URL}/${classId}/check-teacher-room-conflicts`, conflictData);
+      const response = await axios.post(`${API_URL}/classes/${classId}/check-teacher-room-conflicts`, conflictData);
       return response.data;
     } catch (error) {
       console.error('Error checking teacher/room conflicts:', error);
@@ -96,7 +96,7 @@ const classService = {
   // Validate conflicts before creating class (does not create the class)
   validateConflicts: async (classData) => {
     try {
-      const response = await axios.post(`${API_URL}/validate-conflicts`, classData);
+      const response = await axios.post(`${API_URL}/classes/validate-conflicts`, classData);
       return response.data;
     } catch (error) {
       console.error('Error validating conflicts:', error);

@@ -429,12 +429,23 @@ exports.getTeacherSchedule = async (req, res) => {
     const { id } = req.params;
     const { startDate, endDate } = req.query;
     
+    console.log('\n👨‍🏫 ========== LẤY LỊCH GIÁO VIÊN (getTeacherSchedule) ==========');
+    console.log('  - TeacherId:', id);
+    console.log('  - StartDate:', startDate || 'Không có');
+    console.log('  - EndDate:', endDate || 'Không có');
+    
     // Find all classes taught by this teacher (Class model uses 'teacher' field, not 'teacherId')
     const teacherClasses = await Class.find({ teacher: id })
       .select('_id name startDate endDate')
       .lean();
     
+    console.log('  - Tổng số lớp của giáo viên:', teacherClasses.length);
+    teacherClasses.forEach((cls, idx) => {
+      console.log(`    [${idx + 1}] ${cls.name} (ID: ${cls._id})`);
+    });
+    
     if (!teacherClasses || teacherClasses.length === 0) {
+      console.log('  ⚠️ Giáo viên này chưa có lớp nào');
       return res.status(200).json({
         success: true,
         message: "Giảng viên này chưa có lớp nào",
@@ -453,6 +464,7 @@ exports.getTeacherSchedule = async (req, res) => {
         $gte: new Date(startDate),
         $lte: new Date(endDate)
       };
+      console.log('  - Lọc theo khoảng ngày:', startDate, 'đến', endDate);
     }
     
     const schedules = await ClassSchedule.find(query)
@@ -461,6 +473,8 @@ exports.getTeacherSchedule = async (req, res) => {
       .populate('session', 'title order')
       .sort({ date: 1, startTime: 1 })
       .lean();
+    
+    console.log('  - Tổng số buổi học tìm thấy:', schedules.length);
     
     // Get schedule IDs to count students
     const scheduleIds = schedules.map(s => s._id);
@@ -498,6 +512,36 @@ exports.getTeacherSchedule = async (req, res) => {
         totalStudents: studentCount
       };
     });
+    
+    // Log chi tiết lịch học của giáo viên
+    console.log('\n📅 ========== CHI TIẾT LỊCH HỌC CỦA GIÁO VIÊN ==========');
+    if (schedulesWithClassInfo.length > 0) {
+      // Helper function to format date
+      const formatDateLocal = (dateInput) => {
+        if (!dateInput) return null;
+        const d = new Date(dateInput);
+        if (isNaN(d.getTime())) return null;
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const dayNames = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+        const dayName = dayNames[d.getDay()];
+        return `${year}-${month}-${day} (${dayName})`;
+      };
+      
+      schedulesWithClassInfo.forEach((schedule, idx) => {
+        const dateStr = formatDateLocal(schedule.date);
+        const className = schedule.class?.name || 'N/A';
+        const roomName = schedule.room?.room_name || 'N/A';
+        console.log(`  [${idx + 1}] ${dateStr} - ${schedule.startTime} - ${schedule.endTime}`);
+        console.log(`      Lớp: ${className}`);
+        console.log(`      Phòng: ${roomName}`);
+        console.log(`      Trạng thái: ${schedule.status || 'N/A'}`);
+      });
+    } else {
+      console.log('  ⚠️ Không có buổi học nào trong khoảng thời gian này');
+    }
+    console.log('  ============================================\n');
     
     res.status(200).json({
       success: true,

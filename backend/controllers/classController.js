@@ -447,6 +447,18 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
 
   // 2. Kiểm tra conflict GIÁO VIÊN
   if (teacherId) {
+    console.log('\n👨‍🏫 ========== KIỂM TRA XUNG ĐỘT GIÁO VIÊN (validateClassSchedulesConflicts) ==========');
+    console.log('  - TeacherId:', teacherId.toString());
+    console.log('  - ClassId (lớp hiện tại):', classId ? classId.toString() : 'Không có (tạo mới)');
+    console.log('  - Số buổi học cần kiểm tra:', classSchedules.length);
+    
+    // Log lịch học của lớp hiện tại
+    console.log('\n📚 LỊCH HỌC CỦA LỚP HIỆN TẠI:');
+    classSchedules.forEach((s, idx) => {
+      const dateStr = formatDateLocal(s.date);
+      console.log(`  [${idx + 1}] ${dateStr} - ${s.startTime} - ${s.endTime}`);
+    });
+    
     // Find all classes taught by this teacher (excluding current class if classId is provided)
     const teacherQuery = {
       $or: [
@@ -458,6 +470,11 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
       teacherQuery._id = { $ne: classId };
     }
     const teacherClasses = await Class.find(teacherQuery).select('_id name').lean();
+
+    console.log('  - Tổng số lớp khác của giáo viên (không bao gồm lớp hiện tại):', teacherClasses.length);
+    teacherClasses.forEach((cls, idx) => {
+      console.log(`    [${idx + 1}] ${cls.name} (ID: ${cls._id})`);
+    });
 
     if (teacherClasses.length > 0) {
       const teacherClassIds = teacherClasses.map(c => c._id);
@@ -472,17 +489,38 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
         .select('date startTime endTime class')
         .lean();
 
-      classSchedules.forEach(newSchedule => {
+      console.log('  - Tổng số buổi học của giáo viên (từ các lớp khác) trong các ngày cần kiểm tra:', teacherSchedules.length);
+      
+      // Log chi tiết lịch học của giáo viên
+      if (teacherSchedules.length > 0) {
+        console.log('\n📅 LỊCH HỌC CỦA GIÁO VIÊN (từ các lớp khác):');
+        teacherSchedules.forEach((s, idx) => {
+          const dateStr = formatDateLocal(s.date);
+          const className = s.class?.name || 'N/A';
+          console.log(`  [${idx + 1}] ${dateStr} - ${s.startTime} - ${s.endTime} | Lớp: ${className}`);
+        });
+      }
+
+      classSchedules.forEach((newSchedule, newIdx) => {
         const scheduleDate = new Date(newSchedule.date);
         scheduleDate.setHours(0, 0, 0, 0);
+        const newDateStr = formatDateLocal(newSchedule.date);
 
-        teacherSchedules.forEach(existingSchedule => {
+        teacherSchedules.forEach((existingSchedule, existIdx) => {
           const existingDate = new Date(existingSchedule.date);
           existingDate.setHours(0, 0, 0, 0);
+          const existDateStr = formatDateLocal(existingSchedule.date);
 
           // Check if same date and overlapping time
-          if (scheduleDate.getTime() === existingDate.getTime() &&
-              hasTimeOverlap(newSchedule.startTime, newSchedule.endTime, existingSchedule.startTime, existingSchedule.endTime)) {
+          const sameDate = scheduleDate.getTime() === existingDate.getTime();
+          const hasOverlap = hasTimeOverlap(newSchedule.startTime, newSchedule.endTime, existingSchedule.startTime, existingSchedule.endTime);
+          
+          if (sameDate && hasOverlap) {
+            console.log(`\n  ⚠️ PHÁT HIỆN XUNG ĐỘT [${newIdx + 1} vs ${existIdx + 1}]:`);
+            console.log(`     - Ngày: ${newDateStr}`);
+            console.log(`     - Lớp hiện tại: ${newSchedule.startTime} - ${newSchedule.endTime}`);
+            console.log(`     - Lớp khác "${existingSchedule.class?.name || 'N/A'}": ${existingSchedule.startTime} - ${existingSchedule.endTime}`);
+            
             conflicts.teacher.push({
               teacherId: teacherId.toString(),
               className: existingSchedule.class?.name || 'N/A',
@@ -495,7 +533,12 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
           }
         });
       });
+      
+      console.log('  - Tổng số xung đột tìm thấy:', conflicts.teacher.length);
+    } else {
+      console.log('  ✅ Giáo viên không có lớp nào khác, không có xung đột');
     }
+    console.log('  ============================================\n');
   }
 
   // 3. Kiểm tra conflict SINH VIÊN
@@ -776,6 +819,234 @@ exports.validateClassConflicts = async (req, res) => {
       message: 'Không có schedules để kiểm tra'
     });
   } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi kiểm tra xung đột',
+      error: error.message
+    });
+  }
+};
+
+// =========================
+// 🔍 KIỂM TRA CONFLICT KHI CHỈNH SỬA LỚP (CHỈ KIỂM TRA TEACHER VÀ ROOM)
+// =========================
+exports.checkTeacherRoomConflicts = async (req, res) => {
+  try {
+    const { id: classId } = req.params;
+    const { teacherId, roomId, scheduleEntries, startDate } = req.body;
+    
+    console.log('\n🔍 ========== KIỂM TRA CONFLICT TEACHER/ROOM (checkTeacherRoomConflicts) ==========');
+    console.log('  - ClassId:', classId);
+    console.log('  - TeacherId:', teacherId || 'Không có');
+    console.log('  - RoomId:', roomId || 'Không có');
+    console.log('  - StartDate:', startDate || 'Không có');
+    console.log('  - ScheduleEntries:', scheduleEntries?.length || 0);
+    
+    // Get class data to get course info
+    const classData = await Class.findById(classId)
+      .populate('course', 'numberOfSessions')
+      .select('course startDate')
+      .lean();
+    
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy lớp học'
+      });
+    }
+    
+    // If no scheduleEntries provided, return empty conflicts
+    if (!scheduleEntries || scheduleEntries.length === 0) {
+      return res.status(200).json({
+        success: true,
+        teacherConflicts: [],
+        roomConflicts: [],
+        conflictingTeacherIds: [],
+        conflictingRoomIds: [],
+        message: 'Chưa có lịch học để kiểm tra'
+      });
+    }
+    
+    // Get course to determine numberOfSessions
+    const courseId = classData.course?._id || classData.course;
+    if (!courseId) {
+      return res.status(200).json({
+        success: true,
+        teacherConflicts: [],
+        roomConflicts: [],
+        conflictingTeacherIds: [],
+        conflictingRoomIds: [],
+        message: 'Lớp học chưa có course'
+      });
+    }
+    
+    const courseData = await Course.findById(courseId)
+      .populate('sessions', 'order')
+      .select('numberOfSessions sessions')
+      .lean();
+    
+    if (!courseData || !courseData.numberOfSessions) {
+      return res.status(200).json({
+        success: true,
+        teacherConflicts: [],
+        roomConflicts: [],
+        conflictingTeacherIds: [],
+        conflictingRoomIds: [],
+        message: 'Course không hợp lệ hoặc chưa có số buổi học'
+      });
+    }
+    
+    const numberOfSessions = courseData.numberOfSessions;
+    const courseSessions = (courseData.sessions || []).sort((a, b) => (a.order || 0) - (b.order || 0));
+    const finalStartDate = startDate || classData.startDate;
+    
+    if (!finalStartDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu thông tin ngày khai giảng'
+      });
+    }
+    
+    // Helper function to convert day string to day of week number
+    const getDayOfWeekNumber = (dayStr) => {
+      const dayMap = {
+        'CN': 0,
+        '2': 1,
+        '3': 2,
+        '4': 3,
+        '5': 4,
+        '6': 5,
+        '7': 6
+      };
+      return dayMap[dayStr] !== undefined ? dayMap[dayStr] : null;
+    };
+    
+    // Helper function to find next occurrence of day of week
+    const findNextDayOfWeek = (startDate, targetDayOfWeek) => {
+      const start = new Date(startDate);
+      const currentDay = start.getDay();
+      let daysToAdd = (targetDayOfWeek - currentDay + 7) % 7;
+      if (daysToAdd === 0 && start.getTime() < new Date().getTime()) {
+        daysToAdd = 7;
+      }
+      const result = new Date(start);
+      result.setDate(start.getDate() + daysToAdd);
+      return result;
+    };
+    
+    // Find first occurrence of each day of week
+    const firstOccurrences = {};
+    scheduleEntries.forEach(entry => {
+      const dayOfWeek = getDayOfWeekNumber(entry.day);
+      if (dayOfWeek !== null && !firstOccurrences[dayOfWeek]) {
+        firstOccurrences[dayOfWeek] = findNextDayOfWeek(finalStartDate, dayOfWeek);
+      }
+    });
+    
+    // Generate ClassSchedule entries
+    const classSchedules = [];
+    let entryIndex = 0;
+    let weekOffset = 0;
+    
+    for (let i = 0; i < numberOfSessions; i++) {
+      const entry = scheduleEntries[entryIndex % scheduleEntries.length];
+      const dayOfWeek = getDayOfWeekNumber(entry.day);
+      
+      if (dayOfWeek === null) {
+        entryIndex++;
+        continue;
+      }
+      
+      // Get the first occurrence of this day
+      const firstOccurrence = firstOccurrences[dayOfWeek];
+      
+      // Calculate the date for this session
+      const sessionDate = new Date(firstOccurrence);
+      sessionDate.setDate(firstOccurrence.getDate() + (weekOffset * 7));
+      
+      classSchedules.push({
+        class: classId,
+        date: sessionDate,
+        startTime: entry.startTime,
+        endTime: entry.endTime,
+        room: roomId,
+        teacher: teacherId,
+        status: 'fixed'
+      });
+      
+      // Move to next entry (round-robin)
+      entryIndex++;
+      // If we've gone through all entries, move to next week
+      if (entryIndex % scheduleEntries.length === 0) {
+        weekOffset++;
+      }
+    }
+    
+    console.log('  - Đã tạo', classSchedules.length, 'buổi học để kiểm tra');
+    
+    // Validate conflicts (only teacher and room, not students)
+    if (classSchedules.length > 0) {
+      const classDataForValidation = {
+        _id: classId, // Exclude current class from conflicts
+        teacher: teacherId,
+        teacherId: teacherId,
+        students: [] // Don't check student conflicts here
+      };
+      
+      const conflictResult = await validateClassSchedulesConflicts(classSchedules, classDataForValidation);
+      
+      console.log('  - Kết quả kiểm tra:');
+      console.log('    + Teacher conflicts:', conflictResult.teacher?.length || 0);
+      console.log('    + Room conflicts:', conflictResult.room?.length || 0);
+      console.log('  ============================================\n');
+      
+      // Format conflicts for frontend
+      const teacherConflicts = (conflictResult.teacher || []).map(c => ({
+        teacherId: c.teacherId || teacherId?.toString() || '',
+        className: c.className || 'N/A',
+        date: c.date || c.newScheduleDate || '',
+        time: c.time || '',
+        conflictingTime: c.conflictingTime || ''
+      }));
+      
+      const roomConflicts = (conflictResult.room || []).map(c => ({
+        roomId: c.roomId || roomId?.toString() || '',
+        className: c.className || 'N/A',
+        date: c.date || c.newScheduleDate || '',
+        time: c.time || '',
+        conflictingTime: c.conflictingTime || ''
+      }));
+      
+      const conflictingTeacherIds = teacherConflicts.length > 0 && teacherId
+        ? [teacherId.toString()]
+        : [];
+      
+      const conflictingRoomIds = roomConflicts.length > 0 && roomId
+        ? [roomId.toString()]
+        : [];
+      
+      return res.status(200).json({
+        success: true,
+        teacherConflicts,
+        roomConflicts,
+        conflictingTeacherIds,
+        conflictingRoomIds,
+        message: conflictResult.hasConflict
+          ? 'Có xung đột lịch học được phát hiện'
+          : 'Không có xung đột lịch học'
+      });
+    }
+    
+    return res.status(200).json({
+      success: true,
+      teacherConflicts: [],
+      roomConflicts: [],
+      conflictingTeacherIds: [],
+      conflictingRoomIds: [],
+      message: 'Không có schedules để kiểm tra'
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi kiểm tra conflict teacher/room:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi khi kiểm tra xung đột',

@@ -12,18 +12,12 @@ const studentScheduleSchema = new mongoose.Schema({
     required: true,
   },
 
-  // Cho phép điều chỉnh lịch riêng nếu có (ví dụ dời ngày, đổi phòng)
-  newDate: Date,
-  newStartTime: String,
-  newEndTime: String,
-  newRoom: String,
-
   // 🆕 Trường điểm danh
   attendance: {
     status: {
       type: String,
       enum: ["present", "absent", "late", "excused"],
-      default: "absent",
+      // Không có default - để null khi chưa điểm danh
     },
     checkInTime: Date,
     markedBy: {

@@ -31,9 +31,9 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({ storage, fileFilter });
 exports.uploadMiddleware = upload;
 
-//center head handle
-// ================== 1. LẤY DANH SÁCH BÀI THI ==================
-exports.getAllExamsCenterHead = async (req, res) => {
+// ================== CENTER HEAD - EXAM MANAGEMENT ==================
+// ================== 1. LẤY DANH SÁCH BÀI THI CHO QUẢN LÝ ==================
+exports.getAllExamsForManagement = async (req, res) => {
   try {
     const { search = '', examType = '', level = '', isPublished } = req.query;
 
@@ -81,8 +81,8 @@ exports.getAllExamsCenterHead = async (req, res) => {
   }
 };
 
-// ================== 6. PUBLISH EXAM ==================
-exports.publishExam = async (req, res) => {
+// ================== 2. PUBLISH EXAM ==================
+exports.publishExamForManagement = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -119,8 +119,8 @@ exports.publishExam = async (req, res) => {
   }
 };
 
-// ================== 7. UNPUBLISH EXAM ==================
-exports.unpublishExam = async (req, res) => {
+// ================== 3. UNPUBLISH EXAM ==================
+exports.unpublishExamForManagement = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -157,7 +157,8 @@ exports.unpublishExam = async (req, res) => {
   }
 };
 
-exports.getExamByIdCenterHead = async (req, res) => {
+// ================== 4. LẤY CHI TIẾT BÀI THI CHO QUẢN LÝ ==================
+exports.getExamByIdForManagement = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -189,8 +190,8 @@ exports.getExamByIdCenterHead = async (req, res) => {
   }
 };
 
-// create exam
-exports.createExam = async (req, res) => {
+// ================== 5. TẠO ĐỀ THI MỚI ==================
+exports.createExamForManagement = async (req, res) => {
   try {
     const { title, description, examType, level, totalDuration, sections } = req.body;
     const createdBy = req.user?._id || req.body.createdBy;
@@ -242,8 +243,8 @@ exports.createExam = async (req, res) => {
   }
 };
 
-// update exam
-exports.updateExam = async (req, res) => {
+// ================== 6. CẬP NHẬT ĐỀ THI ==================
+exports.updateExamForManagement = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -281,8 +282,8 @@ exports.updateExam = async (req, res) => {
   }
 };
 
-// upload csv answer key
-exports.uploadAnswerKeyCSV = async (req, res) => {
+// ================== 7. UPLOAD ĐÁP ÁN TỪ FILE CSV/EXCEL ==================
+exports.uploadAnswerKeyForManagement = async (req, res) => {
   try {
     const { examId, sectionId } = req.body;
 
@@ -417,8 +418,8 @@ exports.uploadAnswerKeyCSV = async (req, res) => {
   }
 };
 
-// delete exam
-exports.deleteExam = async (req, res) => {
+// ================== 8. XÓA ĐỀ THI ==================
+exports.deleteExamForManagement = async (req, res) => {
   try {
     const { id } = req.params;
 

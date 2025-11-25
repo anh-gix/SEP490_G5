@@ -23,7 +23,7 @@ const ExamView = () => {
   const fetchExamDetails = async () => {
     try {
       setLoading(true);
-      const response = await examService.getExamById(id);
+      const response = await examService.getExamByIdForManagement(id);
 
       if (response.success) {
         setExam(response.data);

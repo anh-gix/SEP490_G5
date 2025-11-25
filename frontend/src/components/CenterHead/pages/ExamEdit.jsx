@@ -44,7 +44,7 @@ const ExamEdit = () => {
   const fetchExamDetails = async () => {
     try {
       setLoading(true);
-      const response = await examService.getExamById(id);
+      const response = await examService.getExamByIdForManagement(id);
 
       if (response.success) {
         const exam = response.data;
@@ -85,7 +85,7 @@ const ExamEdit = () => {
       const formattedData = examService.formatExamData(examData);
 
       // Update exam
-      const response = await examService.updateExam(id, formattedData);
+      const response = await examService.updateExamForManagement(id, formattedData);
 
       if (response.success) {
         alert('Cập nhật đề thi thành công!');

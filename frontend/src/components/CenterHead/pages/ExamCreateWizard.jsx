@@ -57,9 +57,9 @@ const ExamCreateWizard = () => {
       // Create or update exam
       let response;
       if (examId) {
-        response = await examService.updateExam(examId, formattedData);
+        response = await examService.updateExamForManagement(examId, formattedData);
       } else {
-        response = await examService.createExam(formattedData);
+        response = await examService.createExamForManagement(formattedData);
         if (response.success && response.data._id) {
           setExamId(response.data._id);
         }
@@ -117,7 +117,7 @@ const ExamCreateWizard = () => {
     try {
       setLoading(true);
 
-      const response = await examService.publishExam(examId);
+      const response = await examService.publishExamForManagement(examId);
 
       if (response.success) {
         alert('Xuất bản đề thi thành công!');

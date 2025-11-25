@@ -90,9 +90,15 @@ export const classScheduleService = {
   // Lấy danh sách điểm danh của một buổi học
   getAttendanceByClassSchedule: async (classScheduleId) => {
     try {
-      const response = await api.get(`/${classScheduleId}/attendance`);
+      const response = await api.get(`/${classScheduleId}/attendance`, {
+        timeout: 5000 // 5 seconds timeout
+      });
       return response.data;
     } catch (error) {
+      // Handle timeout specifically
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        throw { message: 'Timeout: Request mất quá nhiều thời gian' };
+      }
       throw error.response?.data || { message: 'Không thể lấy danh sách điểm danh' };
     }
   },

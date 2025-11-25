@@ -1173,6 +1173,47 @@ exports.createClassSchedule = async (req, res) => {
 // =========================
 // ✅ ĐIỂM DANH SINH VIÊN
 // =========================
+// =========================
+// 📋 LẤY DANH SÁCH ĐIỂM DANH CỦA MỘT BUỔI HỌC
+// =========================
+exports.getAttendanceByClassSchedule = async (req, res) => {
+  try {
+    const { id } = req.params; // classScheduleId
+    
+    // Validate ID format
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "ID không hợp lệ"
+      });
+    }
+    
+    // Optimize query: chỉ lấy các fields cần thiết và không populate quá nhiều
+    const list = await StudentSchedule.find({ classSchedule: id })
+      .select("student attendance classSchedule")
+      .populate("student", "username email")
+      .lean(); // Use lean() for better performance
+
+    res.status(200).json({
+      success: true,
+      message: "Danh sách điểm danh của buổi học",
+      total: list.length,
+      attendances: list,
+      list, // Giữ lại để backward compatibility
+    });
+  } catch (err) {
+    console.error("❌ Lỗi khi lấy danh sách điểm danh:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Lỗi server khi lấy danh sách điểm danh", 
+      error: err.message 
+    });
+  }
+};
+
+// =========================
+// ✅ ĐIỂM DANH SINH VIÊN
+// =========================
 exports.markAttendance = async (req, res) => {
   try {
     const { studentScheduleId } = req.params;

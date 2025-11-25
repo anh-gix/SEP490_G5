@@ -1012,28 +1012,39 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           if (teacherScheduleIds.length > 0 && teacherScheduleIds.length <= 50) {
             try {
               // Check attendance for all teacher schedules in parallel with timeout
-              const attendanceChecks = await Promise.allSettled(
-                teacherScheduleIds.map(async (scheduleId) => {
-                  try {
-                    // Add timeout to prevent hanging
-                    const timeoutPromise = new Promise((_, reject) => 
-                      setTimeout(() => reject(new Error('Timeout')), 3000)
-                    );
-                    
-                    const responsePromise = classScheduleService.getAttendanceByClassSchedule(scheduleId);
-                    const response = await Promise.race([responsePromise, timeoutPromise]);
-                    
-                    const attendances = response?.list || response?.attendances || (Array.isArray(response) ? response : []) || [];
-                    // Check if any student has attendance (status is not null/undefined)
-                    const hasAnyAttendance = attendances.some(att => att?.attendance?.status != null);
-                    return hasAnyAttendance ? scheduleId : null;
-                  } catch (error) {
-                    // If error checking, assume no attendance (safer to show conflict)
-                    console.warn(`Warning: Could not check attendance for schedule ${scheduleId}:`, error.message);
-                    return null;
-                  }
-                })
-              );
+              // Batch requests to avoid overwhelming the server
+              const BATCH_SIZE = 5;
+              const attendanceChecks = [];
+              
+              for (let i = 0; i < teacherScheduleIds.length; i += BATCH_SIZE) {
+                const batch = teacherScheduleIds.slice(i, i + BATCH_SIZE);
+                const batchResults = await Promise.allSettled(
+                  batch.map(async (scheduleId) => {
+                    try {
+                      // Add timeout to prevent hanging (increased to 5s)
+                      const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Timeout')), 5000)
+                      );
+                      
+                      const responsePromise = classScheduleService.getAttendanceByClassSchedule(scheduleId);
+                      const response = await Promise.race([responsePromise, timeoutPromise]);
+                      
+                      const attendances = response?.list || response?.attendances || (Array.isArray(response) ? response : []) || [];
+                      // Check if any student has attendance (status is not null/undefined)
+                      const hasAnyAttendance = attendances.some(att => att?.attendance?.status != null);
+                      return hasAnyAttendance ? scheduleId : null;
+                    } catch (error) {
+                      // If error checking, assume no attendance (safer to show conflict)
+                      // Only log if it's not a timeout (to reduce noise)
+                      if (!error.message?.includes('Timeout')) {
+                        console.warn(`Warning: Could not check attendance for schedule ${scheduleId}:`, error.message);
+                      }
+                      return null;
+                    }
+                  })
+                );
+                attendanceChecks.push(...batchResults);
+              }
               
               scheduleIdsWithAttendance = new Set(
                 attendanceChecks
@@ -1379,29 +1390,39 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           // Backend already filters attendance, so this is just for frontend display
           if (roomScheduleIds.length > 0 && roomScheduleIds.length <= 50) {
             try {
-              // Check attendance for all room schedules in parallel with timeout
-              const attendanceChecks = await Promise.allSettled(
-                roomScheduleIds.map(async (scheduleId) => {
-                  try {
-                    // Add timeout to prevent hanging
-                    const timeoutPromise = new Promise((_, reject) => 
-                      setTimeout(() => reject(new Error('Timeout')), 3000)
-                    );
-                    
-                    const responsePromise = classScheduleService.getAttendanceByClassSchedule(scheduleId);
-                    const response = await Promise.race([responsePromise, timeoutPromise]);
-                    
-                    const attendances = response?.list || response?.attendances || (Array.isArray(response) ? response : []) || [];
-                    // Check if any student has attendance (status is not null/undefined)
-                    const hasAnyAttendance = attendances.some(att => att?.attendance?.status != null);
-                    return hasAnyAttendance ? scheduleId : null;
-                  } catch (error) {
-                    // If error checking, assume no attendance (safer to show conflict)
-                    console.warn(`Warning: Could not check attendance for schedule ${scheduleId}:`, error.message);
-                    return null;
-                  }
-                })
-              );
+              // Batch requests to avoid overwhelming the server
+              const BATCH_SIZE = 5;
+              const attendanceChecks = [];
+              
+              for (let i = 0; i < roomScheduleIds.length; i += BATCH_SIZE) {
+                const batch = roomScheduleIds.slice(i, i + BATCH_SIZE);
+                const batchResults = await Promise.allSettled(
+                  batch.map(async (scheduleId) => {
+                    try {
+                      // Add timeout to prevent hanging (increased to 5s)
+                      const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Timeout')), 5000)
+                      );
+                      
+                      const responsePromise = classScheduleService.getAttendanceByClassSchedule(scheduleId);
+                      const response = await Promise.race([responsePromise, timeoutPromise]);
+                      
+                      const attendances = response?.list || response?.attendances || (Array.isArray(response) ? response : []) || [];
+                      // Check if any student has attendance (status is not null/undefined)
+                      const hasAnyAttendance = attendances.some(att => att?.attendance?.status != null);
+                      return hasAnyAttendance ? scheduleId : null;
+                    } catch (error) {
+                      // If error checking, assume no attendance (safer to show conflict)
+                      // Only log if it's not a timeout (to reduce noise)
+                      if (!error.message?.includes('Timeout')) {
+                        console.warn(`Warning: Could not check attendance for schedule ${scheduleId}:`, error.message);
+                      }
+                      return null;
+                    }
+                  })
+                );
+                attendanceChecks.push(...batchResults);
+              }
               
               scheduleIdsWithAttendance = new Set(
                 attendanceChecks

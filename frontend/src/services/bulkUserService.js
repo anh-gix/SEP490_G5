@@ -1,7 +1,7 @@
 import axios from 'axios';
-const API_PORT = import.meta.env.VITE_API_PORT;
+const API_PORT = import.meta.env.VITE_API_PORT || 8080;
 
-const API_BASE_URL = `http://localhost:${API_PORT}/api/v1/schedules`;
+const API_BASE_URL = `http://localhost:${API_PORT}/api/schedules`;
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {

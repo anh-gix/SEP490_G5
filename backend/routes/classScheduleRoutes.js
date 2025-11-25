@@ -21,7 +21,10 @@ router.post("/preview", classScheduleController.previewAddClassSchedule);
 // ✅ Tạo buổi học mới (và generate StudentSchedule)
 router.post("/", classScheduleController.createClassSchedule);
 
-// ✅ Điểm danh sinh viên
+// ✅ Lấy danh sách điểm danh của một buổi học (phải đặt trước route PATCH để tránh conflict)
+router.get("/:id/attendance", classScheduleController.getAttendanceByClassSchedule);
+
+// ✅ Điểm danh sinh viên (PATCH method nên không conflict với GET ở trên)
 router.patch("/:studentScheduleId/attendance", classScheduleController.markAttendance);
 
 // ✅ Xem tất cả các phòng học

@@ -778,4 +778,464 @@ exports.submitHomework = async (req, res) => {
   }
 };
 
+// =========================
+// 📋 LẤY TẤT CẢ HỌC VIÊN (cho Academic Staff/Admin)
+// =========================
+exports.getAllStudents = async (req, res) => {
+  try {
+    const { search, status, page = 1, limit = 50 } = req.query;
+    
+    // Find Student role
+    const studentRole = await Role.findOne({ name: 'Student' });
+    if (!studentRole) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy role học viên'
+      });
+    }
+    
+    // Build query
+    let query = { roleId: studentRole._id };
+    
+    // Search by username, email, or phone
+    if (search) {
+      query.$or = [
+        { username: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+    
+    // Get total count
+    const total = await User.countDocuments(query);
+    
+    // Get students
+    const students = await User.find(query)
+      .select('-password -token')
+      .populate('roleId', 'name')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+    
+    // Get class count for each student
+    const studentsWithClasses = await Promise.all(
+      students.map(async (student) => {
+        const classCount = await Class.countDocuments({ students: student._id });
+        return {
+          ...student,
+          classCount
+        };
+      })
+    );
+    
+    res.status(200).json({
+      success: true,
+      students: studentsWithClasses,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum)
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi lấy danh sách học viên:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy danh sách học viên',
+      error: error.message
+    });
+  }
+};
+
+// =========================
+// 📊 THỐNG KÊ HỌC VIÊN
+// =========================
+exports.getStudentStats = async (req, res) => {
+  try {
+    // Find Student role
+    const studentRole = await Role.findOne({ name: 'Student' });
+    if (!studentRole) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy role học viên'
+      });
+    }
+    
+    // Total students
+    const total = await User.countDocuments({ roleId: studentRole._id });
+    
+    // Students with classes (active)
+    const studentsWithClasses = await Class.distinct('students');
+    const active = studentsWithClasses.length;
+    
+    // Students without classes (inactive)
+    const inactive = total - active;
+    
+    // Total classes
+    const totalClasses = await Class.countDocuments();
+    
+    res.status(200).json({
+      success: true,
+      stats: {
+        total,
+        active,
+        inactive,
+        totalClasses
+      }
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi lấy thống kê học viên:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy thống kê học viên',
+      error: error.message
+    });
+  }
+};
+
+// =========================
+// 👤 LẤY THÔNG TIN HỌC VIÊN THEO ID
+// =========================
+exports.getStudentById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Find Student role
+    const studentRole = await Role.findOne({ name: 'Student' });
+    if (!studentRole) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy role học viên'
+      });
+    }
+    
+    const student = await User.findOne({
+      _id: id,
+      roleId: studentRole._id
+    })
+      .select('-password -token')
+      .populate('roleId', 'name')
+      .lean();
+    
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy học viên'
+      });
+    }
+    
+    // Get class count
+    const classCount = await Class.countDocuments({ students: id });
+    
+    res.status(200).json({
+      success: true,
+      student: {
+        ...student,
+        classCount
+      }
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi lấy thông tin học viên:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy thông tin học viên',
+      error: error.message
+    });
+  }
+};
+
+// =========================
+// ➕ TẠO HỌC VIÊN MỚI
+// =========================
+exports.createStudent = async (req, res) => {
+  try {
+    const { email, password, username, phone, address } = req.body;
+    
+    // Find Student role
+    const studentRole = await Role.findOne({ name: 'Student' });
+    if (!studentRole) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy role học viên'
+      });
+    }
+    
+    // Check if user already exists
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email đã tồn tại trong hệ thống'
+      });
+    }
+    
+    // Check if username already exists
+    const usernameExists = await User.findOne({ username });
+    if (usernameExists) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username đã tồn tại trong hệ thống'
+      });
+    }
+    
+    // Create student
+    const student = await User.create({
+      email,
+      password,
+      username,
+      phone,
+      address,
+      roleId: studentRole._id
+    });
+    
+    const studentData = await User.findById(student._id)
+      .select('-password -token')
+      .populate('roleId', 'name');
+    
+    res.status(201).json({
+      success: true,
+      message: 'Tạo học viên thành công',
+      student: studentData
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi tạo học viên:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi tạo học viên',
+      error: error.message
+    });
+  }
+};
+
+// =========================
+// ✏️ CẬP NHẬT HỌC VIÊN
+// =========================
+exports.updateStudent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { email, password, username, phone, address } = req.body;
+    
+    // Find Student role
+    const studentRole = await Role.findOne({ name: 'Student' });
+    if (!studentRole) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy role học viên'
+      });
+    }
+    
+    const student = await User.findOne({
+      _id: id,
+      roleId: studentRole._id
+    });
+    
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy học viên'
+      });
+    }
+    
+    // Check email uniqueness if changed
+    if (email && email !== student.email) {
+      const emailExists = await User.findOne({ email, _id: { $ne: id } });
+      if (emailExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email đã tồn tại trong hệ thống'
+        });
+      }
+      student.email = email;
+    }
+    
+    // Check username uniqueness if changed
+    if (username && username !== student.username) {
+      const usernameExists = await User.findOne({ username, _id: { $ne: id } });
+      if (usernameExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'Username đã tồn tại trong hệ thống'
+        });
+      }
+      student.username = username;
+    }
+    
+    if (phone) student.phone = phone;
+    if (address) student.address = address;
+    if (password) student.password = password; // Will be hashed by pre-save hook
+    
+    await student.save();
+    
+    const updatedStudent = await User.findById(id)
+      .select('-password -token')
+      .populate('roleId', 'name');
+    
+    res.status(200).json({
+      success: true,
+      message: 'Cập nhật học viên thành công',
+      student: updatedStudent
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi cập nhật học viên:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi cập nhật học viên',
+      error: error.message
+    });
+  }
+};
+
+// =========================
+// 🗑️ XÓA HỌC VIÊN
+// =========================
+exports.deleteStudent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Find Student role
+    const studentRole = await Role.findOne({ name: 'Student' });
+    if (!studentRole) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy role học viên'
+      });
+    }
+    
+    const student = await User.findOne({
+      _id: id,
+      roleId: studentRole._id
+    });
+    
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy học viên'
+      });
+    }
+    
+    // Check if student is enrolled in any classes
+    const classesWithStudent = await Class.find({ students: id });
+    if (classesWithStudent.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Không thể xóa học viên vì đang tham gia ${classesWithStudent.length} lớp học. Vui lòng xóa học viên khỏi các lớp trước.`
+      });
+    }
+    
+    await User.findByIdAndDelete(id);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Xóa học viên thành công'
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi xóa học viên:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi xóa học viên',
+      error: error.message
+    });
+  }
+};
+
+// =========================
+// 📥 IMPORT HỌC VIÊN HÀNG LOẠT
+// =========================
+exports.importStudents = async (req, res) => {
+  try {
+    const { students } = req.body;
+    
+    if (!students || !Array.isArray(students) || students.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Danh sách học viên không hợp lệ'
+      });
+    }
+    
+    // Find Student role
+    const studentRole = await Role.findOne({ name: 'Student' });
+    if (!studentRole) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy role học viên'
+      });
+    }
+    
+    const results = {
+      success: [],
+      failed: []
+    };
+    
+    // Process each student
+    for (const studentData of students) {
+      try {
+        // Check if email exists
+        const emailExists = await User.findOne({ email: studentData.email });
+        if (emailExists) {
+          results.failed.push({
+            email: studentData.email,
+            username: studentData.username,
+            reason: 'Email đã tồn tại trong hệ thống'
+          });
+          continue;
+        }
+        
+        // Check if username exists
+        const usernameExists = await User.findOne({ username: studentData.username });
+        if (usernameExists) {
+          results.failed.push({
+            email: studentData.email,
+            username: studentData.username,
+            reason: 'Username đã tồn tại trong hệ thống'
+          });
+          continue;
+        }
+        
+        // Create student
+        const newStudent = await User.create({
+          email: studentData.email,
+          username: studentData.username,
+          phone: studentData.phone || '',
+          address: studentData.address || '',
+          password: studentData.password || '123456', // Default password
+          roleId: studentRole._id
+        });
+        
+        results.success.push({
+          _id: newStudent._id,
+          email: newStudent.email,
+          username: newStudent.username
+        });
+      } catch (error) {
+        results.failed.push({
+          email: studentData.email,
+          username: studentData.username,
+          reason: error.message || 'Lỗi không xác định'
+        });
+      }
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: `Import thành công ${results.success.length} học viên, thất bại ${results.failed.length} học viên`,
+      total: students.length,
+      successCount: results.success.length,
+      failedCount: results.failed.length,
+      results
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi import học viên:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi import học viên',
+      error: error.message
+    });
+  }
+};
+
 module.exports = exports;

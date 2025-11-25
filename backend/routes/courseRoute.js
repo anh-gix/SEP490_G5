@@ -20,6 +20,12 @@ router.get('/by-program', courseController.getCoursesByProgram);
 // Lấy band từ type và level - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
 router.get('/band', courseController.getBandByTypeAndLevel);
 
+// Lấy tất cả mappings (type, level, band) - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
+router.get('/mappings', courseController.getCourseMappings);
+
+// Lấy types theo level - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
+router.get('/types-by-level', courseController.getTypesByLevel);
+
 //lấy chi tiết giáo trình
 router.get('/:id/details', courseController.getCourseDetails);
 router.patch('/:id/approve', courseController.approveCourse);

@@ -45,6 +45,27 @@ const upload = multer({
   }
 });
 
+// Get all students (for Academic Staff/Admin - no role restriction for now)
+router.get('/', studentController.getAllStudents);
+
+// Get student statistics
+router.get('/stats', studentController.getStudentStats);
+
+// Get student by ID
+router.get('/:id', studentController.getStudentById);
+
+// Create student
+router.post('/', studentController.createStudent);
+
+// Update student
+router.put('/:id', studentController.updateStudent);
+
+// Delete student
+router.delete('/:id', studentController.deleteStudent);
+
+// Import students (bulk)
+router.post('/import', studentController.importStudents);
+
 // Student current user routes (require authentication)
 router.get('/me', verifyToken, isStudent, studentController.getCurrentStudent);
 router.get('/me/classes', verifyToken, isStudent, studentController.getMyClasses);

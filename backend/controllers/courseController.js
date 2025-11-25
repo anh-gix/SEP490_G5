@@ -616,3 +616,67 @@ exports.getBandByTypeAndLevel = async (req, res) => {
     }
 };
 
+/**
+ * Get all course mappings (type, level, band) from Program model
+ * GET /api/courses/mappings
+ */
+exports.getCourseMappings = async (req, res) => {
+    try {
+        const programs = await Program.find({ status: 'active' })
+            .select('type level band program_name code')
+            .sort({ type: 1, level: 1 });
+        
+        const mappings = programs.map(program => ({
+            type: program.type,
+            level: program.level,
+            band: program.band,
+            programName: program.program_name,
+            code: program.code
+        }));
+        
+        res.status(200).json({
+            success: true,
+            mappings
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ khi lấy mappings',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Get types by level from Program model
+ * GET /api/courses/types-by-level?level=A1
+ */
+exports.getTypesByLevel = async (req, res) => {
+    try {
+        const { level } = req.query;
+        
+        if (!level) {
+            return res.status(400).json({
+                success: false,
+                message: 'Thiếu tham số level'
+            });
+        }
+        
+        const programs = await Program.find({
+            level: level,
+            status: 'active'
+        }).distinct('type');
+        
+        res.status(200).json({
+            success: true,
+            types: programs
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ khi lấy types theo level',
+            error: err.message
+        });
+    }
+};
+

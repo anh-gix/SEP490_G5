@@ -1,12 +1,11 @@
 const express = require('express');
 const { getAllUsers, getUserById, createUser, updateUser, deleteUser } = require('../controllers/userController');
-// const { verifyToken } = require('../middlewares/verifyToken');
+const { verifyToken } = require('../middlewares/verifyToken');
 
 const router = express.Router();
 
-// TEMPORARY: Authentication disabled for testing
 // All routes are protected
-// router.use(verifyToken);
+router.use(verifyToken);
 
 router.get('/', getAllUsers);
 router.get('/:id', getUserById);

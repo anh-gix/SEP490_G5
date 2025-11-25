@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, ButtonGroup, Table } from 'react-bootstrap';
+import { assignmentsMock } from './student_mockdata';
 
 /**
  * Student Assignments Component
@@ -19,64 +20,11 @@ const StudentAssignments = () => {
   const fetchAssignments = async () => {
     try {
       // TODO: Replace with actual API call
-      const mockData = [
-        {
-          id: 1,
-          title: 'Unit 6 - Grammar Exercise',
-          description: 'Complete exercises 1-10 on page 45',
-          className: 'A2-Evening-01',
-          dueDate: '2025-11-05',
-          status: 'pending',
-          priority: 'high',
-          score: null,
-          submittedDate: null
-        },
-        {
-          id: 2,
-          title: 'Reading Comprehension Test',
-          description: 'Read the passage and answer questions',
-          className: 'A2-Evening-01',
-          dueDate: '2025-11-07',
-          status: 'pending',
-          priority: 'medium',
-          score: null,
-          submittedDate: null
-        },
-        {
-          id: 3,
-          title: 'IELTS Writing Task 2',
-          description: 'Write an essay about education',
-          className: 'IELTS-Writing-03',
-          dueDate: '2025-11-06',
-          status: 'pending',
-          priority: 'high',
-          score: null,
-          submittedDate: null
-        },
-        {
-          id: 4,
-          title: 'Unit 5 - Writing Assignment',
-          description: 'Write a short paragraph about your daily routine',
-          className: 'A2-Evening-01',
-          dueDate: '2025-10-30',
-          status: 'graded',
-          priority: 'medium',
-          score: 9,
-          submittedDate: '2025-10-29'
-        },
-        {
-          id: 5,
-          title: 'Listening Practice Exercise',
-          description: 'Listen and complete the exercises',
-          className: 'A2-Evening-01',
-          dueDate: '2025-10-28',
-          status: 'submitted',
-          priority: 'low',
-          score: null,
-          submittedDate: '2025-10-27'
-        }
-      ];
-      setAssignments(mockData);
+      // const response = await assignmentApi.getMyAssignments();
+      // setAssignments(response.data);
+      
+      // Using mock data
+      setAssignments(assignmentsMock);
     } catch (error) {
       console.error('Error fetching assignments:', error);
     }
@@ -138,7 +86,7 @@ const StudentAssignments = () => {
 
         return (
           <Col key={assignment.id} md={6} lg={4}>
-            <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm transition-2 item-hover h-100">
+            <Card className="bg-white border-0 rounded-12 transition- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}2 item-hover h-100">
               <Card.Body className="p-20">
                 <div className="d-flex justify-content-between align-items-start mb-12">
                   {getStatusBadge(isOverdue ? 'late' : assignment.status)}
@@ -211,7 +159,7 @@ const StudentAssignments = () => {
   );
 
   const renderListView = () => (
-    <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+    <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
       <Card.Body className="p-0">
         <Table hover className="mb-0">
           <thead>
@@ -289,7 +237,7 @@ const StudentAssignments = () => {
       {/* Summary Stats */}
       <Row className="g-3 mb-24">
         <Col md={3}>
-          <Card className="bg-warning-25 border border-warning-200 rounded-12 box-shadow-sm">
+          <Card className="bg-warning-25 border border-warning-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
                 <div>
@@ -307,7 +255,7 @@ const StudentAssignments = () => {
           </Card>
         </Col>
         <Col md={3}>
-          <Card className="bg-info-25 border border-info-200 rounded-12 box-shadow-sm">
+          <Card className="bg-info-25 border border-info-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
                 <div>
@@ -325,7 +273,7 @@ const StudentAssignments = () => {
           </Card>
         </Col>
         <Col md={3}>
-          <Card className="bg-success-25 border border-success-200 rounded-12 box-shadow-sm">
+          <Card className="bg-success-25 border border-success-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
                 <div>
@@ -343,7 +291,7 @@ const StudentAssignments = () => {
           </Card>
         </Col>
         <Col md={3}>
-          <Card className="bg-main-25 border border-main-200 rounded-12 box-shadow-sm">
+          <Card className="bg-main-25 border border-main-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
                 <div>
@@ -366,7 +314,7 @@ const StudentAssignments = () => {
       </Row>
 
       {/* Filters */}
-      <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+      <Card className="bg-white border-0 rounded-12 mb- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}24">
         <Card.Body className="p-20">
           <Row className="align-items-center">
             <Col lg={4}>
@@ -434,7 +382,7 @@ const StudentAssignments = () => {
       {filteredAssignments.length > 0 ? (
         viewMode === 'grid' ? renderGridView() : renderListView()
       ) : (
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+        <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
           <Card.Body className="text-center py-60">
             <i className="fas fa-tasks fa-4x text-neutral-400 mb-20"></i>
             <h5 className="text-neutral-700 fw-semibold mb-8">Không tìm thấy bài tập nào</h5>

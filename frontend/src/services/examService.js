@@ -1,344 +1,189 @@
 import axios from 'axios';
+const API_PORT = import.meta.env.VITE_API_PORT;
 
-const API_BASE_URL = 'http://localhost:8080/api/exams';
+const API_BASE_URL = `http://localhost:${API_PORT}/api/exams`;
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
+// Interceptor để thêm token vào headers
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 export const examService = {
-  getAllExams: async (params = {}) => {
+  // Lấy danh sách bài thi
+  getAllExams: async () => {
     try {
-      const response = await axios.get(API_BASE_URL, { params });
+      const response = await api.get('/');
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy danh sách đề thi' };
+      throw error.response?.data || { message: 'Không thể lấy danh sách bài thi' };
     }
   },
 
-  getExamById: async (id) => {
+  // Lấy thông tin bài thi theo ID
+  getExamById: async (examId) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/${id}`);
+      const response = await api.get(`/${examId}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy thông tin đề thi' };
+      throw error.response?.data || { message: 'Không thể lấy thông tin bài thi' };
     }
   },
 
-  createExam: async (examData) => {
+  // Bắt đầu làm bài thi
+  startExam: async (examId) => {
     try {
-      const response = await axios.post(API_BASE_URL, examData);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Tạo đề thi thất bại' };
-    }
-  },
-
-  updateExam: async (id, examData) => {
-    try {
-      const response = await axios.put(`${API_BASE_URL}/${id}`, examData);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Cập nhật đề thi thất bại' };
-    }
-  },
-
-  deleteExam: async (id) => {
-    try {
-      const response = await axios.delete(`${API_BASE_URL}/${id}`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Xóa đề thi thất bại' };
-    }
-  },
-
-
-  publishExam: async (id) => {
-    try {
-      const response = await axios.post(`${API_BASE_URL}/${id}/publish`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Xuất bản đề thi thất bại' };
-    }
-  },
-
-  unpublishExam: async (id) => {
-    try {
-      const response = await axios.post(`${API_BASE_URL}/${id}/unpublish`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Hủy xuất bản đề thi thất bại' };
-    }
-  },
-
-  getExamSubmissions: async (id) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/${id}/submissions`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy danh sách bài làm' };
-    }
-  },
-
-  // ==================== FILE UPLOADS ====================
-
-  /**
-   * Upload file đề thi (PDF/DOC) cho section
-   * @param {File} file - File đề thi
-   * @param {String} examId - Exam ID
-   * @param {String} sectionId - Section ID
-   * @param {Function} onUploadProgress - Callback để track upload progress
-   * @returns {Promise} Response data với fileUrl
-   */
-  uploadExamFile: async (file, examId, sectionId, onUploadProgress) => {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('examId', examId);
-      formData.append('sectionId', sectionId);
-
-      const response = await axios.post(`${API_BASE_URL}/upload/exam-file`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
-        onUploadProgress: onUploadProgress ? (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          onUploadProgress(percentCompleted);
-        } : undefined
-      });
-
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Upload file đề thi thất bại' };
-    }
-  },
-
-  /**
-   * Upload file audio cho listening section
-   * @param {File} file - File audio (MP3/WAV)
-   * @param {String} examId - Exam ID
-   * @param {String} sectionId - Section ID (phải là listening section)
-   * @param {Function} onUploadProgress - Callback để track upload progress
-   * @returns {Promise} Response data với audioUrl
-   */
-  uploadAudioFile: async (file, examId, sectionId, onUploadProgress) => {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('examId', examId);
-      formData.append('sectionId', sectionId);
-
-      const response = await axios.post(`${API_BASE_URL}/upload/audio`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
-        onUploadProgress: onUploadProgress ? (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          onUploadProgress(percentCompleted);
-        } : undefined
-      });
-
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Upload file audio thất bại' };
-    }
-  },
-
-  /**
-   * Upload file CSV/Excel đáp án và tự động parse câu hỏi
-   * @param {File} file - File CSV/Excel đáp án
-   * @param {String} examId - Exam ID
-   * @param {String} sectionId - Section ID
-   * @param {Function} onUploadProgress - Callback để track upload progress
-   * @returns {Promise} Response data với số lượng câu hỏi đã parse
-   */
-  uploadAnswerKey: async (file, examId, sectionId, onUploadProgress) => {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('examId', examId);
-      formData.append('sectionId', sectionId);
-
-      const response = await axios.post(`${API_BASE_URL}/upload/answer-key`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
-        onUploadProgress: onUploadProgress ? (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          onUploadProgress(percentCompleted);
-        } : undefined
-      });
-
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Upload file đáp án thất bại' };
-    }
-  },
-
-  // ==================== STUDENT EXAM SUBMISSION ====================
-
-  /**
-   * Bắt đầu làm bài thi (dành cho student)
-   * @param {String} examId - Exam ID
-   * @param {String} studentId - Student ID
-   * @returns {Promise} Response data với submission info
-   */
-  startExam: async (examId, studentId) => {
-    try {
-      const response = await axios.post(`${API_BASE_URL}/start`, {
-        examId,
-        studentId
-      });
+      const response = await api.post('/start', { examId });
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể bắt đầu làm bài' };
     }
   },
 
-  /**
-   * Lưu câu trả lời cho Reading/Listening
-   * @param {String} submissionId - Submission ID
-   * @param {Object} answerData - { sectionType, questionNumber, selectedOption }
-   * @returns {Promise} Response data
-   */
-  saveObjectiveAnswer: async (submissionId, answerData) => {
+  // Lấy thông tin section Reading
+  getReadingSection: async (examId, submissionId) => {
     try {
-      const response = await axios.patch(
-        `${API_BASE_URL}/submissions/${submissionId}/objective`,
-        answerData
-      );
+      const response = await api.get(`/${examId}/submissions/${submissionId}/reading`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'Lưu câu trả lời thất bại' };
+      throw error.response?.data || { message: 'Không thể lấy thông tin phần Reading' };
     }
   },
 
-  /**
-   * Lưu bài viết Writing
-   * @param {String} submissionId - Submission ID
-   * @param {Object} writingData - { questionNumber, answerText }
-   * @returns {Promise} Response data
-   */
-  saveWritingAnswer: async (submissionId, writingData) => {
+  // Nộp đáp án Reading
+  submitReadingAnswers: async (examId, submissionId, answers) => {
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/submissions/${submissionId}/writing`,
-        writingData
-      );
+      const response = await api.post(`/${examId}/submissions/${submissionId}/reading/submit`, {
+        answers,
+      });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'Lưu bài viết thất bại' };
+      throw error.response?.data || { message: 'Không thể nộp đáp án' };
     }
   },
 
-  /**
-   * Upload file Speaking recording
-   * @param {String} submissionId - Submission ID
-   * @param {File} file - Audio file
-   * @param {Number} questionNumber - Question number
-   * @param {Function} onUploadProgress - Callback để track upload progress
-   * @returns {Promise} Response data
-   */
-  uploadSpeakingRecording: async (submissionId, file, questionNumber, onUploadProgress) => {
+  // Xem kết quả Reading
+  getReadingResult: async (examId, submissionId) => {
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('questionNumber', questionNumber);
-
-      const response = await axios.post(
-        `${API_BASE_URL}/submissions/${submissionId}/speaking`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          },
-          onUploadProgress: onUploadProgress ? (progressEvent) => {
-            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            onUploadProgress(percentCompleted);
-          } : undefined
-        }
-      );
-
+      const response = await api.get(`/${examId}/submissions/${submissionId}/reading/result`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'Upload file speaking thất bại' };
+      throw error.response?.data || { message: 'Không thể lấy kết quả' };
     }
   },
 
-  // ==================== HELPER FUNCTIONS ====================
-
-  /**
-   * Validate exam data trước khi tạo/cập nhật
-   * @param {Object} examData - Dữ liệu exam
-   * @param {Boolean} requireSections - Có yêu cầu sections hay không (default: true)
-   * @returns {Object} { isValid: boolean, errors: string[] }
-   */
-  validateExamData: (examData, requireSections = true) => {
-    const errors = [];
-
-    if (!examData.title || examData.title.trim() === '') {
-      errors.push('Tiêu đề là bắt buộc');
+  // Lấy thông tin section Listening
+  getListeningSection: async (examId, submissionId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions/${submissionId}/listening`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy thông tin phần Listening' };
     }
-
-    if (!examData.level) {
-      errors.push('Cấp độ là bắt buộc');
-    }
-
-    // Only validate sections if required
-    if (requireSections) {
-      if (!examData.sections || examData.sections.length === 0) {
-        errors.push('Bài thi phải có ít nhất một section');
-      }
-
-      if (examData.sections && examData.sections.length > 0) {
-        examData.sections.forEach((section, index) => {
-          if (!section.type) {
-            errors.push(`Section ${index + 1}: Loại section là bắt buộc`);
-          }
-        });
-      }
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
   },
 
-  /**
-   * Format exam data để phù hợp với backend schema
-   * @param {Object} examData - Raw exam data
-   * @returns {Object} Formatted exam data
-   */
-  formatExamData: (examData) => {
-    return {
-      title: examData.title,
-      description: examData.description || '',
-      examType: examData.examType || 'practice',
-      level: examData.level,
-      totalDuration: examData.totalDuration || 0,
-      sections: examData.sections.map(section => ({
-        type: section.type,
-        instructions: section.instructions || '',
-        duration: section.duration || 0,
-        questionCount: section.questionCount || 0,
-        fileUrl: section.fileUrl || '',
-        audioUrls: section.audioUrls || [],
-        answerKey: section.answerKey || []
-      }))
-    };
+  // Nộp đáp án Listening
+  submitListeningAnswers: async (examId, submissionId, answers) => {
+    try {
+      const response = await api.post(`/${examId}/submissions/${submissionId}/listening/submit`, {
+        answers,
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể nộp đáp án' };
+    }
   },
 
-  /**
-   * Calculate total score của exam
-   * @param {Object} exam - Exam object
-   * @returns {Number} Total score
-   */
-  calculateTotalScore: (exam) => {
-    if (!exam.sections) return 0;
+  // Xem kết quả Listening
+  getListeningResult: async (examId, submissionId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions/${submissionId}/listening/result`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy kết quả' };
+    }
+  },
 
-    return exam.sections.reduce((total, section) => {
-      const sectionScore = section.maxScore || 0;
-      return total + sectionScore;
-    }, 0);
-  }
+  // Lấy thông tin section Writing
+  getWritingSection: async (examId, submissionId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions/${submissionId}/writing`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy thông tin phần Writing' };
+    }
+  },
+
+  // Nộp đáp án Writing
+  submitWritingAnswers: async (examId, submissionId, answers) => {
+    try {
+      const response = await api.post(`/${examId}/submissions/${submissionId}/writing/submit`, {
+        answers,
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể nộp đáp án' };
+    }
+  },
+
+  // Xem kết quả Writing
+  getWritingResult: async (examId, submissionId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions/${submissionId}/writing/result`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy kết quả' };
+    }
+  },
+
+  // Lấy thông tin section Speaking
+  getSpeakingSection: async (examId, submissionId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions/${submissionId}/speaking`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy thông tin phần Speaking' };
+    }
+  },
+
+  // Nộp đáp án Speaking (với file upload)
+  submitSpeakingAnswers: async (examId, submissionId, formData) => {
+    try {
+      const response = await api.post(`/${examId}/submissions/${submissionId}/speaking/submit`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể nộp đáp án' };
+    }
+  },
+
+  // Xem kết quả Speaking
+  getSpeakingResult: async (examId, submissionId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions/${submissionId}/speaking/result`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy kết quả' };
+    }
+  },
 };
 
 export default examService;
+

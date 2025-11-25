@@ -15,9 +15,10 @@ const sessionSchema = new Schema({
 
     },
     learningType: {
-        type: String
-
+        type: String,
+        default: 'theory'
     },
+
     clos: [{
         type: Schema.Types.ObjectId,
         ref: 'CLO'

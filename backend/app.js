@@ -1,11 +1,11 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
-const path = require('path');
 const router = require('./routes');
 require('./models');
 require('dotenv').config();
-
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 const app = express();
 
 // Middleware
@@ -13,11 +13,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from uploads directory
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Database connection
 mongoose.connect(process.env.MONGODB_URI, {
+  dbName: process.env.DB_NAME,
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
@@ -28,7 +27,7 @@ mongoose.connect(process.env.MONGODB_URI, {
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/roles', require('./routes/roleRoutes'));
-app.use('/api/v1', router);
+app.use('/api/v1', router); // Use the centralized router
 app.use('/api/exams', require('./routes/examRoutes'));
 app.use('/api/class-schedules', require('./routes/classScheduleRoutes'));
 app.use('/api/student-schedules', require('./routes/studentScheduleRoutes'));
@@ -38,8 +37,22 @@ app.use('/api/center-head', require('./routes/centerHeadRoutes'));
 app.use('/api/programs', require('./routes/programRoutes'));
 app.use('/api/courses', require('./routes/courseRoute'));
 app.use('/api/sessions', require('./routes/sessionRoutes'));
+
+// Academic Staff Routes
 app.use('/api/rooms', require('./routes/roomRoutes'));
+app.use('/api/teachers', require('./routes/teacherRoutes'));
+app.use('/api/students', require('./routes/studentRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
+
+// Class Routes
+app.use('/api/classes', require('./routes/classRoutes'));
+
+// Schedule Routes
+app.use('/api/schedules', require('./routes/scheduleRoute'));
+
+// Homework Routes
+app.use('/api/homework', require('./routes/homeworkRoutes'));
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {

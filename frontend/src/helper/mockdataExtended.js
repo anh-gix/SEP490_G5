@@ -510,12 +510,6 @@ export const mockCourses = [
     submittedAt: "2025-10-20T10:00:00Z",
     revisionReason: null,
     status: "pending_approval",
-    materials: [
-      "https://example.com/materials/toeic-textbook.pdf",
-      "https://example.com/materials/toeic-workbook.pdf",
-      "https://example.com/materials/toeic-audio-files.zip"
-    ],
-    mocktestSessionOrders: [5, 10],
     createdAt: "2025-10-15T08:30:00Z",
     updatedAt: "2025-10-20T10:45:00Z",
   },
@@ -538,11 +532,6 @@ export const mockCourses = [
     submittedAt: "2025-10-18T14:00:00Z",
     revisionReason: "Cần bổ sung thêm 2 buổi luyện tập thực hành",
     status: "needs_revision",
-    materials: [
-      "https://example.com/materials/ielts-writing-guide.pdf",
-      "https://example.com/materials/sample-essays.pdf"
-    ],
-    mocktestSessionOrders: [8],
     createdAt: "2025-10-10T09:00:00Z",
     updatedAt: "2025-10-22T11:00:00Z",
   },
@@ -565,12 +554,6 @@ export const mockCourses = [
     submittedAt: null,
     revisionReason: null,
     status: "draft",
-    materials: [
-      "https://example.com/materials/business-english-handbook.pdf",
-      "https://example.com/materials/business-vocabulary.pdf",
-      "https://example.com/materials/case-studies.pdf"
-    ],
-    mocktestSessionOrders: [6, 12],
     createdAt: "2025-11-01T10:00:00Z",
     updatedAt: "2025-11-05T15:30:00Z",
   },

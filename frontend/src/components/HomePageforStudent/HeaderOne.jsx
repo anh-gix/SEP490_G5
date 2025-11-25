@@ -70,7 +70,9 @@ const HeaderOne = () => {
 
   const menuItems = [
     { to: "/", label: "Home" },
-    { to: "/course", label: "Courses" },
+    { to: "/course-cam", label: "Tiếng Anh Trẻ Em" },
+    { to: "/course-ielts", label: "IELTS" },
+    { to: "/course-toeic", label: "TOEIC" },
     { to: "/exams", label: "Đề thi IELTS" },
     { to: "/contact", label: "Contact" },
   ];

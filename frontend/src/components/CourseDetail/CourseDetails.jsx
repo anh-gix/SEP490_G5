@@ -21,7 +21,7 @@ const CourseDetails = () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await axios.get(`${API_URL}/courses/${id}/details`);
+        const response = await axios.get(`${API_URL}/courses/course-home/${id}`);
         console.log('Course details response:', response.data);
         if (response.data.success) {
           setCourse(response.data.data);
@@ -77,6 +77,30 @@ const CourseDetails = () => {
       </section>
     );
   }
+
+  if (!course) {
+    return null;
+  }
+
+  const programType = course.program?.type?.toLowerCase() || '';
+  const isCamCourse = programType === 'cam';
+  const sessionList = Array.isArray(course.camSessions) ? course.camSessions : [];
+  const sessionSectionTitle = 'Chương trình học (Cam Sessions)';
+  const sessionLabel = 'Cam Sessions';
+
+  const getSessionTitle = (session, index) => {
+    if (isCamCourse) {
+      return session?.Title || `Buổi học ${session?.Order || index + 1}`;
+    }
+    return session?.title || `Buổi học ${session?.order || index + 1}`;
+  };
+
+  const getSessionDescription = (session) => {
+    if (isCamCourse) {
+      return session?.Des;
+    }
+    return session?.description;
+  };
 
   try {
     return (
@@ -135,15 +159,15 @@ const CourseDetails = () => {
             </div>
             {/* Details Content End */}
             {/* Curriculum Start */}
-            {course.sessions && Array.isArray(course.sessions) && course.sessions.length > 0 && (
+            {sessionList.length > 0 && (
             <div className='border border-neutral-30 rounded-12 bg-main-25 p-32 mt-24'>
-                <h5 className='mb-0'>Chương trình học (Sessions)</h5>
+                <h5 className='mb-0'>{sessionSectionTitle}</h5>
               <span className='d-block border border-neutral-30 my-24 border-dashed' />
               <div
                 className='accordion common-accordion style-three'
                 id='accordionExampleTwo'
               >
-                  {course.sessions.map((session, index) => (
+                  {sessionList.map((session, index) => (
                     <div key={session?._id || index} className='accordion-item'>
                   <h2 className='accordion-header'>
                     <button
@@ -154,7 +178,7 @@ const CourseDetails = () => {
                           aria-expanded={index === 0 ? 'true' : 'false'}
                           aria-controls={`collapse${index}Two`}
                         >
-                          {session?.title || `Buổi học ${session?.order || index + 1}`}
+                          {getSessionTitle(session, index)}
                     </button>
                   </h2>
                   <div
@@ -163,12 +187,15 @@ const CourseDetails = () => {
                     data-bs-parent='#accordionExampleTwo'
                   >
                     <div className='accordion-body p-0'>
-                          {session?.description && (
-                            <div className='p-16'>
-                              <p className='text-neutral-700 mb-16'>{session.description}</p>
-                    </div>
-                          )}
-                          {session?.content && Array.isArray(session.content) && session.content.length > 0 ? (
+                          {(() => {
+                            const description = getSessionDescription(session);
+                            return description ? (
+                              <div className='p-16'>
+                                <p className='text-neutral-700 mb-16'>{description}</p>
+                              </div>
+                            ) : null;
+                          })()}
+                          {!isCamCourse && session?.content && Array.isArray(session.content) && session.content.length > 0 && (
                             session.content.map((contentItem, contentIndex) => (
                       <Link
                                 key={contentIndex}
@@ -189,10 +216,30 @@ const CourseDetails = () => {
                                 )}
                       </Link>
                             ))
-                          ) : (
+                          )}
+                          {isCamCourse && (
+                            <div className='p-16 text-neutral-600'>
+                              {Array.isArray(session?.Quiz) && session.Quiz.length > 0 && (
+                                <p className='mt-12 mb-0'>
+                                  Số quiz: <strong>{session.Quiz.length}</strong>
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          {isCamCourse && course?._id && session?._id && (
+                            <div className='p-16 border-top border-neutral-30'>
+                              <Link
+                                to={`/cam-lesson/${course._id}/${session._id}`}
+                                className='btn btn-outline-main rounded-pill fw-semibold'
+                              >
+                                Xem chi tiết Cam Session
+                              </Link>
+                            </div>
+                          )}
+                          {!isCamCourse && (!session?.content || session.content.length === 0) && !getSessionDescription(session) && (
                             <div className='p-16 text-neutral-500'>
                               Chưa có nội dung chi tiết cho buổi học này.
-                    </div>
+                            </div>
                           )}
                   </div>
                 </div>
@@ -226,11 +273,11 @@ const CourseDetails = () => {
                       <i className='ph ph-video-camera' />
                     </span>
                     <span className='text-neutral-700 text-lg fw-normal'>
-                      Buổi học
+                      {sessionLabel}
                     </span>
                   </div>
                   <span className='text-lg fw-medium text-neutral-700'>
-                    {course.sessions?.length || 0} Buổi
+                    {sessionList.length} Buổi
                   </span>
                 </div>
                 {course.program && (

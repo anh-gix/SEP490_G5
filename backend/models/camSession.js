@@ -19,4 +19,3 @@ const camSessionSchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model("CamSession", camSessionSchema);
-

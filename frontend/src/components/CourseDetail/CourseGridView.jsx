@@ -1,34 +1,84 @@
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
+export const COURSE_TYPES = [
+  { label: "IELTS", value: "ielts" },
+  { label: "TOEIC", value: "toeic" },
+  { label: "CAM", value: "cam" },
+];
 
-const CourseGridView = () => {
+const fallbackType = COURSE_TYPES[0].value;
+
+const normalizeType = (type) => {
+  if (!type) return fallbackType;
+  const found = COURSE_TYPES.find(
+    (item) => item.value === type.toLowerCase()
+  );
+  return found ? found.value : fallbackType;
+};
+
+const CourseGridView = ({ initialType }) => {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedType, setSelectedType] = useState(
+    normalizeType(initialType)
+  );
+
+  useEffect(() => {
+    setSelectedType(normalizeType(initialType));
+  }, [initialType]);
 
   useEffect(() => {
     const fetchCourses = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`${API_URL}/courses`);
+        setError(null);
+        const response = await axios.get(
+          `${API_URL}/courses/by-type`,
+          {
+            params: { type: selectedType },
+          }
+        );
+
         if (response.data.success) {
           setCourses(response.data.data || []);
         } else {
-          setError('Failed to fetch courses');
+          setError(response.data.message || "Failed to fetch courses");
         }
       } catch (err) {
-        console.error('Error fetching courses:', err);
-        setError(err.response?.data?.message || 'Error loading courses');
+        console.error("Error fetching courses:", err);
+        setError(
+          err.response?.data?.message || "Có lỗi khi tải danh sách khóa học"
+        );
       } finally {
         setLoading(false);
       }
     };
 
     fetchCourses();
-  }, []);
+  }, [selectedType]);
+
+  const sessionLabel = useMemo(() => {
+    if (selectedType === "cam") return "Cam Session";
+    return "Lessons";
+  }, [selectedType]);
+
+  const selectedTypeLabel = useMemo(() => {
+    return (
+      COURSE_TYPES.find((type) => type.value === selectedType)?.label ||
+      selectedType.toUpperCase()
+    );
+  }, [selectedType]);
+
+  const formatSessionCount = (course) => {
+    if (selectedType === "cam") {
+      return course?.camSessions?.length || 0;
+    }
+    return course?.sessions?.length || 0;
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -69,7 +119,14 @@ const CourseGridView = () => {
     <section className='course-grid-view py-120'>
       <div className='container'>
         <div className='flex-between gap-16 flex-wrap mb-40'>
-          <span className='text-neutral-500'>Showing {courses.length} of {courses.length} Results </span>
+          <div className='flex-column gap-4'>
+            <span className='text-neutral-500'>
+              Đang hiển thị {courses.length} khóa học
+            </span>
+            <span className='text-neutral-700 fw-semibold'>
+              Thuộc chương trình: {selectedTypeLabel}
+            </span>
+          </div>
           <div className='flex-align gap-8'>
             <span className='text-neutral-500 flex-shrink-0'>Sort By :</span>
             <select className='form-select ps-20 pe-28 py-8 fw-semibold rounded-pill bg-main-25 border border-neutral-30 text-neutral-700'>
@@ -104,7 +161,7 @@ const CourseGridView = () => {
                         <i className='ph ph-clock' />
                       </span>
                       <span className='text-lg fw-medium'>
-                        {course.sessions?.length || 0} Buổi
+                        {formatSessionCount(course)} Buổi
                       </span>
                     </div>
                     <button
@@ -132,7 +189,7 @@ const CourseGridView = () => {
                             <i className='ph-bold ph-video-camera' />
                           </span>
                           <span className='text-neutral-700 text-lg fw-medium'>
-                            {course.sessions?.length || 0} Lessons
+                            {formatSessionCount(course)} {sessionLabel}
                           </span>
                         </div>
                         {course.program && (

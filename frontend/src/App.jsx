@@ -16,6 +16,9 @@ import CartPage from "./pages/CartPage.jsx";
 import CheckoutPage from "./pages/CheckoutPage.jsx";
 import ContactPage from "./pages/ContactPage.jsx";
 import CoursePage from "./pages/CoursePage.jsx";
+import CourseCamPage from "./pages/CourseCamPage.jsx";
+import CourseIeltsPage from "./pages/CourseIeltsPage.jsx";
+import CourseToeicPage from "./pages/CourseToeicPage.jsx";
 import CourseDetailsPage from "./pages/CourseDetailsPage.jsx";
 import CourseListViewPage from "./pages/CourseListViewPage.jsx";
 import EventDetailsPage from "./pages/EventDetailsPage.jsx";
@@ -31,6 +34,7 @@ import InstructorPage from "./pages/InstructorPage.jsx";
 import InstructorDetailsPage from "./pages/InstructorDetailsPage.jsx";
 import InstructorTwoPage from "./pages/InstructorTwoPage.jsx";
 import LessonDetailsPage from "./pages/LessonDetailsPage.jsx";
+import CamLessonDetailsPage from "./pages/CamLessonDetailsPage.jsx";
 import PricingPlanPage from "./pages/PricingPlanPage.jsx";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage.jsx";
 import ProductPage from "./pages/ProductPage.jsx";
@@ -91,9 +95,6 @@ function App() {
 
 
 
-          {/* Redirect unknown routes to dashboard */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-
           <Route exact path="/" element={<HomePageTwo />} />
           <Route exact path="/index-2" element={<HomePageOne />} />
           <Route exact path="/index-3" element={<HomePageThree />} />
@@ -122,6 +123,9 @@ function App() {
           <Route exact path="/checkout" element={<CheckoutPage />} />
           <Route exact path="/contact" element={<ContactPage />} />
           <Route exact path="/course" element={<CoursePage />} />
+          <Route exact path="/course-cam" element={<CourseCamPage />} />
+          <Route exact path="/course-ielts" element={<CourseIeltsPage />} />
+          <Route exact path="/course-toeic" element={<CourseToeicPage />} />
           <Route exact path="/course-details/:id?" element={<CourseDetailsPage />} />
           <Route
             exact
@@ -147,6 +151,7 @@ function App() {
 
           <Route exact path="/instructor-two" element={<InstructorTwoPage />} />
           <Route exact path="/lesson-details" element={<LessonDetailsPage />} />
+          <Route exact path="/cam-lesson/:courseId/:sessionId" element={<CamLessonDetailsPage />} />
           <Route exact path="/pricing-plan" element={<PricingPlanPage />} />
           <Route exact path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route exact path="/product" element={<ProductPage />} />
@@ -175,6 +180,9 @@ function App() {
             path="/exams/:examId/submissions/:submissionId/reading/result"
             element={<ReadingResultPage />}
           />
+
+          {/* Redirect unknown routes to dashboard */}
+          <Route path="*" element={<Navigate to="/" replace />} />
 
         </Routes>
       </BrowserRouter>

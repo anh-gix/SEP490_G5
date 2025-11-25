@@ -379,13 +379,13 @@ const RoomManagementFull = () => {
 
                   {/* Actions */}
                   <div className="d-flex gap-8">
-                    <Button 
+                    <button 
                       className="btn-outline-main flex-grow-1 text-13 px-12 py-8 radius-6"
                       onClick={() => handleViewSchedule(room)}
                     >
                       <i className="fas fa-calendar me-1"></i>
                       Lịch sử dụng
-                    </Button>
+                    </button>
                     <Button 
                       className="btn-outline-info text-13 px-12 py-8 radius-6"
                       onClick={() => handleEdit(room)}
@@ -585,7 +585,7 @@ const RoomManagementFull = () => {
                           <div className="text-muted text-11">{schedule.startTime} - {schedule.endTime}</div>
                         </td>
                         <td className="px-16 py-12 text-13">{schedule.class?.name || 'N/A'}</td>
-                        <td className="px-16 py-12 text-13">{schedule.topic}</td>
+                        <td className="px-16 py-12 text-13">{schedule.session?.title || schedule.topic || 'N/A'}</td>
                         <td className="px-16 py-12">
                           <Badge className={schedule.status === 'approved' ? 'bg-success-600 text-white' : 'bg-info-500 text-white'}>
                             {schedule.status}

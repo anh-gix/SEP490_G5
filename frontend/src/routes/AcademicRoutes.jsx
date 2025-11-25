@@ -1,9 +1,11 @@
-import AcademicDashboardPage from "../pages/AcademicDashboardPage.jsx";
-import ScheduleManagementPage from "../pages/ScheduleManagementPage.jsx";
-import ClassManagementPage from "../pages/ClassManagementPage.jsx";
+import AcademicDashboardPage from "../pages/AcademicStaff/AcademicDashboardPage.jsx";
+import ScheduleManagementPage from "../pages/AcademicStaff/ScheduleManagementPage.jsx";
+import ClassManagementPage from "../pages/AcademicStaff/ClassManagementPage.jsx";
 import RoomManagementPage from "../pages/AcademicStaff/RoomManagementPage.jsx";
 import TeacherManagementPage from "../pages/AcademicStaff/TeacherManagementPage.jsx";
 import ReportsPage from "../pages/AcademicStaff/ReportsPage.jsx";
+import AcademicLessonDetailPage from "../pages/AcademicStaff/AcademicLessonDetailPage.jsx";
+import AcademicProfilePage from "../pages/AcademicStaff/AcademicProfilePage.jsx";
 
 /**
  * AcademicRoutes
@@ -12,20 +14,24 @@ import ReportsPage from "../pages/AcademicStaff/ReportsPage.jsx";
  */
 export const academicRoutes = [
   // Dashboard
-  { path: '/academic-dashboard', element: <AcademicDashboardPage /> },
+  { path: '/academic/dashboard', element: <AcademicDashboardPage /> },
+
+  // Profile
+  { path: '/academic/profile', element: <AcademicProfilePage /> },
 
   // I. Schedule Management
-  { path: '/schedule-management', element: <ScheduleManagementPage /> },
+  { path: 'academic/schedule-management', element: <ScheduleManagementPage /> },
+  { path: '/academic/lessons/:lessonId', element: <AcademicLessonDetailPage /> },
 
   // II. Class Management
-  { path: '/class-management', element: <ClassManagementPage /> },
+  { path: '/academic/class-management', element: <ClassManagementPage /> },
 
   // III. Room Management
-  { path: '/room-management', element: <RoomManagementPage /> },
+  { path: '/academic/room-management', element: <RoomManagementPage /> },
 
   // IV. Teacher Management
-  { path: '/teacher-management', element: <TeacherManagementPage /> },
+  { path: '/academic/teacher-management', element: <TeacherManagementPage /> },
 
   // V. Reports
-  { path: '/reports', element: <ReportsPage /> },
+  { path: '/academic/ reports', element: <ReportsPage /> },
 ];

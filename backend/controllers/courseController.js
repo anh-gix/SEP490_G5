@@ -1,5 +1,209 @@
 
 const Course = require('../models/courseModel');
+const Program = require('../models/programModel');
+
+// =========================
+// COURSE CRUD OPERATIONS
+// =========================
+
+/**
+ * Get all courses
+ * GET /api/courses
+ */
+exports.getAllCourses = async (req, res) => {
+    try {
+        const courses = await Course.find()
+            .populate('program', 'program_name code')
+            .populate('createdBy', 'fullname email')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            data: courses,
+            count: courses.length
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Get course by ID
+ * GET /api/courses/:id
+ */
+exports.getCourseById = async (req, res) => {
+    try {
+        const course = await Course.findById(req.params.id)
+            .populate('program', 'program_name code')
+            .populate('createdBy', 'fullname email')
+            .populate('clos')
+            .populate({
+                path: 'sessions',
+                populate: { path: 'clos', select: 'code description' },
+                options: { sort: { order: 1 } }
+            });
+
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy giáo trình'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: course
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Create new course
+ * POST /api/courses
+ */
+exports.createCourse = async (req, res) => {
+    try {
+        const { name, description, program, clos, sessions, materials, mocktestSessionOrders } = req.body;
+
+        // Validation
+        if (!name || !program || !req.user) {
+            return res.status(400).json({
+                success: false,
+                message: 'Tên giáo trình và chương trình là bắt buộc'
+            });
+        }
+
+        // Check if program exists
+        const programExists = await Program.findById(program);
+        if (!programExists) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy chương trình'
+            });
+        }
+
+        const course = await Course.create({
+            name,
+            description,
+            program,
+            clos: clos || [],
+            sessions: sessions || [],
+            createdBy: req.user._id,
+            materials: materials || [],
+            mocktestSessionOrders: mocktestSessionOrders || [],
+            status: 'draft'
+        });
+
+        const populatedCourse = await Course.findById(course._id)
+            .populate('program', 'program_name code')
+            .populate('createdBy', 'fullname email')
+            .populate('clos')
+            .populate('sessions');
+
+        res.status(201).json({
+            success: true,
+            message: 'Tạo giáo trình thành công',
+            data: populatedCourse
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Update course
+ * PUT /api/courses/:id
+ */
+exports.updateCourse = async (req, res) => {
+    try {
+        const { name, description, program, clos, sessions, materials, mocktestSessionOrders, status } = req.body;
+
+        const course = await Course.findById(req.params.id);
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy giáo trình'
+            });
+        }
+
+        // Update fields
+        if (name) course.name = name;
+        if (description !== undefined) course.description = description;
+        if (program) course.program = program;
+        if (clos) course.clos = clos;
+        if (sessions) course.sessions = sessions;
+        if (materials) course.materials = materials;
+        if (mocktestSessionOrders) course.mocktestSessionOrders = mocktestSessionOrders;
+        if (status) course.status = status;
+
+        await course.save();
+
+        const updatedCourse = await Course.findById(req.params.id)
+            .populate('program', 'program_name code')
+            .populate('createdBy', 'fullname email')
+            .populate('clos')
+            .populate('sessions');
+
+        res.status(200).json({
+            success: true,
+            message: 'Cập nhật giáo trình thành công',
+            data: updatedCourse
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Delete course
+ * DELETE /api/courses/:id
+ */
+exports.deleteCourse = async (req, res) => {
+    try {
+        const course = await Course.findById(req.params.id);
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy giáo trình'
+            });
+        }
+
+        await Course.findByIdAndDelete(req.params.id);
+
+        res.status(200).json({
+            success: true,
+            message: 'Xóa giáo trình thành công'
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+
+// =========================
+// COURSE APPROVAL WORKFLOW
+// =========================
 
 // Lấy tất cả courses đã được phê duyệt (cho student view)
 exports.getAllCourses = async (req, res) => {
@@ -135,6 +339,113 @@ exports.requestRevision = async (req, res) => {
 
     } catch (err) {
         res.status(500).json({ success: false, message: 'Lỗi máy chủ', error: err.message });
+    }
+};
+
+// =========================
+// PROGRAM HEAD: ACCEPT/REJECT COURSE
+// =========================
+
+/**
+ * Accept course to add to program (Center Head)
+ * PATCH /api/courses/:id/accept
+ */
+exports.acceptCourseToProgram = async (req, res) => {
+    const { approvalNote } = req.body;
+
+    try {
+        const course = await Course.findById(req.params.id);
+
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy giáo trình'
+            });
+        }
+
+        // Only accept courses that are pending approval
+        if (course.status !== 'pending_approval') {
+            return res.status(400).json({
+                success: false,
+                message: 'Chỉ có thể chấp nhận giáo trình đang chờ phê duyệt'
+            });
+        }
+
+        // Update course status to approved
+        course.status = 'approved';
+        course.approvedAt = new Date();
+        course.approvalNote = approvalNote || '';
+        // course.approvedBy = req.user?._id; // Uncomment when auth is enabled
+
+        await course.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Đã chấp nhận giáo trình vào chương trình thành công',
+            data: course
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Reject course from program (Center Head)
+ * PATCH /api/courses/:id/reject
+ */
+exports.rejectCourseFromProgram = async (req, res) => {
+    const { rejectionReason } = req.body;
+
+    if (!rejectionReason) {
+        return res.status(400).json({
+            success: false,
+            message: 'Vui lòng cung cấp lý do từ chối'
+        });
+    }
+
+    try {
+        const course = await Course.findById(req.params.id);
+
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy giáo trình'
+            });
+        }
+
+        // Only reject courses that are pending approval
+        if (course.status !== 'pending_approval') {
+            return res.status(400).json({
+                success: false,
+                message: 'Chỉ có thể từ chối giáo trình đang chờ phê duyệt'
+            });
+        }
+
+        // Update course status to needs_revision
+        course.status = 'needs_revision';
+        course.rejectedAt = new Date();
+        course.rejectionReason = rejectionReason;
+        // course.rejectedBy = req.user?._id; // Uncomment when auth is enabled
+
+        await course.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Đã từ chối giáo trình thành công',
+            data: course
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
     }
 };
 

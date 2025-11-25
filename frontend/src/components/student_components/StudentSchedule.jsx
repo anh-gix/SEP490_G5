@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table, Spinner, Alert } from 'react-bootstrap';
-import RequestAbsenceModal from './RequestAbsenceModal';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import studentScheduleService from '../../services/studentScheduleService';
+import studentService from '../../services/studentService';
 
 /**
  * Student Schedule Component
@@ -14,8 +14,6 @@ const StudentSchedule = () => {
   const [selectedWeek, setSelectedWeek] = useState(getCurrentWeek());
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [schedules, setSchedules] = useState([]);
-  const [showAbsenceModal, setShowAbsenceModal] = useState(false);
-  const [selectedSchedule, setSelectedSchedule] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -104,15 +102,15 @@ const StudentSchedule = () => {
         dayOfWeek: getDayOfWeek(scheduleDate),
         startTime: item.startTime,
         endTime: item.endTime,
-        lessonNumber: index + 1, // Có thể thay bằng session number nếu có
-        topic: item.topic || 'Chưa có chủ đề',
-        teacher: item.teacher?.username || item.teacher?.email || 'Chưa có thông tin',
-        room: item.room ? `${item.room.room_name}${item.room.location ? ` - ${item.room.location}` : ''}` : 'Chưa có phòng',
-        status: status,
+        lessonNumber: item.sessionOrder || index + 1,
+        topic: item.sessionTitle || 'Chưa có chủ đề',
+        teacher: item.class?.teacher?.username || 'Chưa có thông tin',
+        room: item.roomName ? `${item.roomName}${item.location ? ` - ${item.location}` : ''}` : 'Chưa có phòng',
+        status: item.scheduleStatus === 'completed' ? 'completed' : status,
         attendanceStatus: attendanceStatus,
         className: item.className || 'N/A',
-        subject: item.subject || 'N/A',
-        rawData: item // Lưu raw data để dùng cho các chức năng khác
+        subject: item.courseName || 'N/A',
+        rawData: item
       };
     });
   };
@@ -124,11 +122,8 @@ const StudentSchedule = () => {
   };
 
   const fetchSchedules = async () => {
-    // Lấy user từ AuthContext hoặc localStorage
-    const currentUser = user || JSON.parse(localStorage.getItem('user') || 'null');
-    
-    if (!currentUser || !currentUser._id) {
-      setError('Không tìm thấy thông tin học sinh. Vui lòng đăng nhập lại.');
+    if (!user) {
+      setError('Vui lòng đăng nhập để xem lịch học');
       setLoading(false);
       return;
     }
@@ -137,17 +132,32 @@ const StudentSchedule = () => {
       setLoading(true);
       setError(null);
     
-      const response = await studentScheduleService.getStudentSchedule(currentUser._id);/* cái trong ngoặc phải là currentUser._id */
+      // Get current month's date range for initial load
+      const today = new Date();
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       
-      if (response && response.schedules && Array.isArray(response.schedules)) {
-        const transformedData = transformScheduleData(response.schedules);
-        setSchedules(transformedData);
+      const params = {
+        startDate: startOfMonth.toISOString().split('T')[0],
+        endDate: endOfMonth.toISOString().split('T')[0]
+      };
+
+      console.log('Fetching schedules with params:', params);
+      
+      const response = await studentService.getMySchedule(params);
+      
+      console.log('API Response:', response);
+      
+      if (response.success && response.schedules && Array.isArray(response.schedules)) {
+        const transformed = transformScheduleData(response.schedules);
+        console.log('Transformed schedules:', transformed);
+        setSchedules(transformed);
       } else {
         setSchedules([]);
       }
     } catch (error) {
       console.error('Error fetching schedules:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Không thể tải lịch học. Vui lòng thử lại sau.';
+      const errorMessage = error.message || 'Không thể tải lịch học. Vui lòng thử lại sau.';
       setError(errorMessage);
       setSchedules([]);
     } finally {
@@ -206,11 +216,6 @@ const StudentSchedule = () => {
         {config.text}
       </Badge>
     );
-  };
-
-  const handleRequestAbsence = (schedule) => {
-    setSelectedSchedule(schedule);
-    setShowAbsenceModal(true);
   };
 
   const navigateWeek = (direction) => {
@@ -275,13 +280,41 @@ const StudentSchedule = () => {
 
   const renderWeekView = () => {
     const weekDays = getWeekDays();
+    const timeSlots = [
+      '08:00 - 10:00',
+      '10:00 - 12:00',
+      '12:00 - 14:00',
+      '14:00 - 16:00',
+      '16:00 - 18:00',
+      '18:00 - 20:00'
+    ];
+
+    // Helper function to check if schedule fits in time slot
+    const isScheduleInTimeSlot = (schedule, timeSlot) => {
+      const [slotStart, slotEnd] = timeSlot.split(' - ');
+      const scheduleStart = schedule.startTime;
+      const scheduleEnd = schedule.endTime;
+      
+      // Check if schedule overlaps with time slot
+      return (scheduleStart >= slotStart && scheduleStart < slotEnd) ||
+             (scheduleEnd > slotStart && scheduleEnd <= slotEnd) ||
+             (scheduleStart <= slotStart && scheduleEnd >= slotEnd);
+    };
 
     return (
       <Card className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
         <Card.Body className="p-0">
-          <div className="schedule-week-view d-flex flex-column">
+          <div className="schedule-week-view">
             {/* Week Days Header */}
             <div className="d-flex border-bottom border-neutral-100">
+              {/* Time column header */}
+              <div className="bg-neutral-50 text-center py-16" style={{ width: '100px', minWidth: '100px', borderRight: '1px solid #E9ECEF' }}>
+                <div className="text-12 fw-semibold text-neutral-700">
+                  Thời gian
+                </div>
+              </div>
+              
+              {/* Day headers */}
               {weekDays.map((day, index) => {
                 const isToday = day.toDateString() === new Date().toDateString();
                 return (
@@ -306,118 +339,123 @@ const StudentSchedule = () => {
               })}
             </div>
 
-            {/* Schedule Content */}
-            <div className="d-flex" style={{ minHeight: '500px' }}>
-              {weekDays.map((day, index) => {
-                const daySchedules = schedules.filter(s => {
-                  if (!s.date) return false;
-                  const scheduleDate = new Date(s.date);
-                  const compareDate = new Date(day);
-                  // So sánh chỉ ngày, tháng, năm
-                  return scheduleDate.getDate() === compareDate.getDate() &&
-                         scheduleDate.getMonth() === compareDate.getMonth() &&
-                         scheduleDate.getFullYear() === compareDate.getFullYear();
-                });
+            {/* Schedule Content with Time Slots */}
+            {timeSlots.map((timeSlot, slotIndex) => (
+              <div key={slotIndex} className="d-flex border-bottom border-neutral-100">
+                {/* Time column */}
+                <div 
+                  className="bg-neutral-25 d-flex align-items-center justify-content-center text-neutral-700 fw-medium text-12"
+                  style={{ width: '100px', minWidth: '100px', borderRight: '1px solid #E9ECEF', padding: '12px 8px' }}
+                >
+                  {timeSlot}
+                </div>
+                
+                {/* Day columns */}
+                {weekDays.map((day, dayIndex) => {
+                  const daySchedules = schedules.filter(s => {
+                    if (!s.date) return false;
+                    const scheduleDate = new Date(s.date);
+                    const compareDate = new Date(day);
+                    // So sánh ngày và kiểm tra time slot
+                    return scheduleDate.getDate() === compareDate.getDate() &&
+                           scheduleDate.getMonth() === compareDate.getMonth() &&
+                           scheduleDate.getFullYear() === compareDate.getFullYear() &&
+                           isScheduleInTimeSlot(s, timeSlot);
+                  });
 
-                const isToday = day.toDateString() === new Date().toDateString();
+                  const isToday = day.toDateString() === new Date().toDateString();
 
-                return (
-                  <div 
-                    key={index}
-                    className={`p-12 ${
-                      isToday ? 'bg-main-25' : 'bg-white'
-                    }`}
-                    style={{ 
-                      flex: '1 1 0', 
-                      minWidth: '0',
-                      borderRight: index < 6 ? '1px solid #E9ECEF' : 'none'
-                    }}
-                  >
-                    {daySchedules.length > 0 ? (
-                      <div className="d-flex flex-column gap-8">
-                        {daySchedules.map(schedule => (
-                          <div
-                            key={schedule.id}
-                            className={`border rounded-8 p-12 cursor-pointer transition-2 ${
-                              schedule.status === 'upcoming'
-                                ? 'border-main-200 bg-main-50 hover-shadow-sm'
-                                : schedule.attendanceStatus === 'present'
-                                ? 'border-success-200 bg-success-50'
-                                : schedule.attendanceStatus === 'absent'
-                                ? 'border-danger-200 bg-danger-50'
-                                : 'border-neutral-200 bg-neutral-50'
-                            }`}
-                            style={{ cursor: 'pointer' }}
-                          >
-                            <div className="d-flex align-items-start justify-content-between mb-8">
-                              <div className="text-neutral-900 fw-bold text-13">
-                                {schedule.startTime} - {schedule.endTime}
+                  return (
+                    <div 
+                      key={dayIndex}
+                      className={`p-8 ${
+                        isToday ? 'bg-main-25' : 'bg-white'
+                      }`}
+                      style={{ 
+                        flex: '1 1 0', 
+                        minWidth: '0',
+                        minHeight: '100px',
+                        borderRight: dayIndex < 6 ? '1px solid #E9ECEF' : 'none'
+                      }}
+                    >
+                      {daySchedules.length > 0 ? (
+                        <div className="d-flex flex-column gap-6">
+                          {daySchedules.map(schedule => (
+                            <div
+                              key={schedule.id}
+                              className={`border rounded-8 p-10 cursor-pointer transition-2 ${
+                                schedule.status === 'upcoming'
+                                  ? 'border-main-200 bg-main-50 hover-shadow-sm'
+                                  : schedule.attendanceStatus === 'present'
+                                  ? 'border-success-200 bg-success-50'
+                                  : schedule.attendanceStatus === 'absent'
+                                  ? 'border-danger-200 bg-danger-50'
+                                  : 'border-neutral-200 bg-neutral-50'
+                              }`}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <div className="d-flex align-items-start justify-content-between mb-6">
+                                <div className="text-neutral-900 fw-bold text-11">
+                                  {schedule.startTime} - {schedule.endTime}
+                                </div>
+                                {schedule.attendanceStatus && (
+                                  <div className={`rounded-circle ${
+                                    schedule.attendanceStatus === 'present' ? 'bg-success-600' :
+                                    schedule.attendanceStatus === 'absent' ? 'bg-danger-600' :
+                                    'bg-warning-600'
+                                  }`} style={{ width: '6px', height: '6px' }}></div>
+                                )}
                               </div>
-                              {schedule.attendanceStatus && (
-                                <div className={`rounded-circle ${
-                                  schedule.attendanceStatus === 'present' ? 'bg-success-600' :
-                                  schedule.attendanceStatus === 'absent' ? 'bg-danger-600' :
-                                  'bg-warning-600'
-                                }`} style={{ width: '8px', height: '8px' }}></div>
-                              )}
-                            </div>
 
-                            {/* Class Name */}
-                            <div className="text-neutral-900 fw-bold text-12 mb-6" style={{
-                              display: '-webkit-box',
-                              WebkitLineClamp: 1,
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden'
-                            }}>
-                              <i className="fas fa-book-open me-1" style={{ fontSize: '10px', color: '#0D74FF' }}></i>
-                              {schedule.className}
-                            </div>
-                            
-                            <div className="text-neutral-900 fw-semibold text-13 mb-6" style={{
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden',
-                              lineHeight: '1.4'
-                            }}>
-                              {schedule.topic}
-                            </div>
+                              {/* Class Name */}
+                              <div className="text-neutral-900 fw-bold text-11 mb-4" style={{
+                                display: '-webkit-box',
+                                WebkitLineClamp: 1,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden'
+                              }}>
+                                <i className="fas fa-book-open me-1" style={{ fontSize: '9px', color: '#0D74FF' }}></i>
+                                {schedule.className}
+                              </div>
+                              
+                              <div className="text-neutral-900 fw-semibold text-11 mb-4" style={{
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                                lineHeight: '1.3'
+                              }}>
+                                {schedule.topic}
+                              </div>
 
-                            <div className="text-neutral-600 text-11 mb-6">
-                              <i className="fas fa-chalkboard-teacher me-1" style={{ fontSize: '10px' }}></i>
-                              {schedule.teacher}
-                            </div>
+                              <div className="text-neutral-600 text-10 mb-4">
+                                <i className="fas fa-chalkboard-teacher me-1" style={{ fontSize: '9px' }}></i>
+                                {schedule.teacher}
+                              </div>
 
-                            <div className="text-neutral-500 text-11 mb-8">
-                              <i className="fas fa-door-open me-1" style={{ fontSize: '10px' }}></i>
-                              {schedule.room}
-                            </div>
+                              <div className="text-neutral-500 text-10 mb-6">
+                                <i className="fas fa-door-open me-1" style={{ fontSize: '9px' }}></i>
+                                {schedule.room}
+                              </div>
 
-                            {schedule.status === 'upcoming' && (
-                              <Button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRequestAbsence(schedule);
-                                }}
-                                className="btn-outline-warning w-100 py-6 radius-6"
-                                style={{ fontSize: '11px' }}
-                              >
-                                <i className="fas fa-hand-paper me-1"></i>
-                                Xin nghỉ
-                              </Button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-40 text-neutral-300">
-                        <i className="fas fa-calendar-times" style={{ fontSize: '20px' }}></i>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                              <Link to={`/student/lessons/${schedule.id}`} className="w-100">
+                                <Button
+                                  className="btn-outline-main w-100 py-4 radius-6"
+                                  style={{ fontSize: '10px' }}
+                                >
+                                  <i className="fas fa-eye me-1"></i>
+                                  Chi tiết
+                                </Button>
+                              </Link>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </Card.Body>
       </Card>
@@ -429,7 +467,7 @@ const StudentSchedule = () => {
     const weekDayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
     return (
-      <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
+      <Card className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
         <Card.Body className="p-0">
           {/* Month Header */}
           <div className="d-flex border-bottom border-neutral-100">
@@ -491,38 +529,42 @@ const StudentSchedule = () => {
 
                   <div className="d-flex flex-column gap-4">
                     {daySchedules.slice(0, 2).map(schedule => (
-                      <div
+                      <Link 
                         key={schedule.id}
-                        className={`rounded-6 px-6 py-4 cursor-pointer ${
-                          schedule.status === 'upcoming'
-                            ? 'bg-main-100 border-start border-main-600 border-2'
-                            : schedule.attendanceStatus === 'present'
-                            ? 'bg-success-100 border-start border-success-600 border-2'
-                            : schedule.attendanceStatus === 'absent'
-                            ? 'bg-danger-100 border-start border-danger-600 border-2'
-                            : 'bg-neutral-100 border-start border-neutral-400 border-2'
-                        }`}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => handleRequestAbsence(schedule)}
+                        to={`/student/lessons/${schedule.id}`}
+                        className="text-decoration-none"
                       >
-                        <div className="text-neutral-900 fw-medium" style={{ 
-                          fontSize: '11px',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}>
-                          {schedule.startTime} - {schedule.endTime}
+                        <div
+                          className={`rounded-6 px-6 py-4 cursor-pointer transition-2 ${
+                            schedule.status === 'upcoming'
+                              ? 'bg-main-100 border-start border-main-600 border-2'
+                              : schedule.attendanceStatus === 'present'
+                              ? 'bg-success-100 border-start border-success-600 border-2'
+                              : schedule.attendanceStatus === 'absent'
+                              ? 'bg-danger-100 border-start border-danger-600 border-2'
+                              : 'bg-neutral-100 border-start border-neutral-400 border-2'
+                          }`}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <div className="text-neutral-900 fw-medium" style={{ 
+                            fontSize: '11px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            {schedule.startTime} - {schedule.endTime}
+                          </div>
+                          <div className="text-neutral-700 fw-normal" style={{ 
+                            fontSize: '10px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            marginTop: '2px'
+                          }}>
+                            {schedule.className}
+                          </div>
                         </div>
-                        <div className="text-neutral-700 fw-normal" style={{ 
-                          fontSize: '10px',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          marginTop: '2px'
-                        }}>
-                          {schedule.className}
-                        </div>
-                      </div>
+                      </Link>
                     ))}
                     {daySchedules.length > 2 && (
                       <div className="text-main-600 text-11 fw-medium">
@@ -541,7 +583,7 @@ const StudentSchedule = () => {
 
   const renderListView = () => {
     return (
-      <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
+      <Card className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
         <Card.Body className="p-0">
           <div className="table-responsive">
             <Table hover className="mb-0">
@@ -612,15 +654,14 @@ const StudentSchedule = () => {
                         {getAttendanceBadge(schedule.attendanceStatus)}
                       </td>
                       <td className="px-20 py-16 text-center">
-                        {schedule.status === 'upcoming' && (
+                        <Link to={`/student/lessons/${schedule.id}`}>
                           <Button
-                            onClick={() => handleRequestAbsence(schedule)}
-                            className="btn-outline-warning text-13 fw-medium px-12 py-6 radius-6"
+                            className="btn-outline-main text-13 fw-medium px-12 py-6 radius-6"
                           >
-                            <i className="fas fa-hand-paper me-1"></i>
-                            Xin nghỉ
+                            <i className="fas fa-eye me-1"></i>
+                            Chi tiết
                           </Button>
-                        )}
+                        </Link>
                       </td>
                     </tr>
                   ))
@@ -687,7 +728,7 @@ const StudentSchedule = () => {
       </div>
 
       {/* Filters & Controls */}
-      <Card className="bg-white border-0 rounded-12 mb- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}24">
+      <Card className="bg-white border-0 rounded-12 mb-24" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
         <Card.Body className="p-20">
           <Row className="align-items-center">
             <Col lg={4}>
@@ -811,17 +852,6 @@ const StudentSchedule = () => {
           {viewMode === 'list' && renderListView()}
         </>
       )}
-
-      {/* Request Absence Modal */}
-      <RequestAbsenceModal
-        show={showAbsenceModal}
-        onHide={() => setShowAbsenceModal(false)}
-        schedule={selectedSchedule}
-        onSuccess={() => {
-          setShowAbsenceModal(false);
-          fetchSchedules();
-        }}
-      />
     </Container>
   );
 };

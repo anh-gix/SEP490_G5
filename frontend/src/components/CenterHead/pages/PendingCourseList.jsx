@@ -5,8 +5,7 @@ import Card from '../compo/Card';
 import Table from '../compo/Table';
 import Button from '../compo/Button';
 import Badge from '../compo/Badge';
-// import { courseAPI } from '../services/api';
-import { mockPendingCourses, simulateApiDelay } from '../../../helper/mockdata';
+import { courseService } from '../../../services/courseService';
 import { formatDate } from '../../../helper/helper';
 
 const PendingCoursesList = () => {
@@ -22,17 +21,14 @@ const PendingCoursesList = () => {
   const fetchPendingCourses = async () => {
     try {
       setLoading(true);
-      // Simulate API call with delay
-      await simulateApiDelay(600);
-      
-      // Use mock data
-      setCourses(mockPendingCourses);
-      
-      // Real API call (commented out)
-      // const response = await courseAPI.getPendingCourses();
-      // setCourses(response.data.courses || []);
-      
-      setError(null);
+      const response = await courseService.getPendingCourses();
+
+      if (response.success) {
+        setCourses(response.data || []);
+        setError(null);
+      } else {
+        setError('Không thể tải danh sách giáo trình');
+      }
     } catch (err) {
       console.error('Error fetching pending courses:', err);
       setError('Không thể tải danh sách giáo trình. Vui lòng thử lại sau.');

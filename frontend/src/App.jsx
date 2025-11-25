@@ -16,10 +16,7 @@ import CartPage from "./pages/CartPage.jsx";
 import CheckoutPage from "./pages/CheckoutPage.jsx";
 import ContactPage from "./pages/ContactPage.jsx";
 import CoursePage from "./pages/CoursePage.jsx";
-import CourseCamPage from "./pages/CourseCamPage.jsx";
-import CourseIeltsPage from "./pages/CourseIeltsPage.jsx";
-import CourseToeicPage from "./pages/CourseToeicPage.jsx";
-import CourseDetailsPage from "./pages/CourseDetailsPage.jsx";
+import CourseDetailsPage from "./pages/CenterHead/CourseDetailsPage.jsx";
 import CourseListViewPage from "./pages/CourseListViewPage.jsx";
 import EventDetailsPage from "./pages/EventDetailsPage.jsx";
 import EventsPage from "./pages/EventsPage.jsx";
@@ -46,19 +43,16 @@ import TutorPage from "./pages/TutorPage.jsx";
 import TutorDetailsPage from "./pages/TutorDetailsPage.jsx";
 import HomePageFive from "./pages/HomePageFive.jsx";
 import HomePageSix from "./pages/HomePageSix.jsx";
-
-import StudentExamListPage from "./pages/StudentExamListPage.jsx";
-import ExamDetailPage from "./pages/ExamDetailPage.jsx";
-import ReadingExamPage from "./pages/ReadingExamPage.jsx";
-import ReadingResultPage from "./pages/ReadingResultPage.jsx";
-
 import { Navigate } from "react-router-dom";
+
+import Profile from "./pages/Profile.jsx";
+
 import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";
 import { academicRoutes } from "./routes/AcademicRoutes.jsx";
-import Profile from "./pages/Profile.jsx";
 import { teacherRoutes } from "./routes/TeacherRoutes.jsx";
 import { studentRoutes } from "./routes/StudentRoutes.jsx";
 import { ministryRoutes } from "./routes/MinistryRoutes.jsx";
+import { examRoutes } from "./routes/ExamRoutes.jsx";
 function App() {
   return (
     <AuthProvider>
@@ -92,7 +86,9 @@ function App() {
 
           {/* Dashboard */}
           {/* <Route path="/" element={<Dashboard />} /> */}
-
+          {examRoutes.map((route, index) => (
+            <Route key={`exam-${index}`} path={route.path} element={route.element} />
+          ))}
 
 
           <Route exact path="/" element={<HomePageTwo />} />
@@ -123,10 +119,6 @@ function App() {
           <Route exact path="/checkout" element={<CheckoutPage />} />
           <Route exact path="/contact" element={<ContactPage />} />
           <Route exact path="/course" element={<CoursePage />} />
-          <Route exact path="/course-cam" element={<CourseCamPage />} />
-          <Route exact path="/course-ielts" element={<CourseIeltsPage />} />
-          <Route exact path="/course-toeic" element={<CourseToeicPage />} />
-          <Route exact path="/course-details/:id?" element={<CourseDetailsPage />} />
           <Route
             exact
             path="/course-list-view"
@@ -167,19 +159,7 @@ function App() {
           <Route exact path="/tutor" element={<TutorPage />} />
           <Route exact path="/tutor-details" element={<TutorDetailsPage />} />
 
-          {/* Exam Routes */}
-          <Route exact path="/exams" element={<StudentExamListPage />} />
-          <Route exact path="/exams/:id" element={<ExamDetailPage />} />
-          <Route
-            exact
-            path="/exams/:examId/submissions/:submissionId/reading"
-            element={<ReadingExamPage />}
-          />
-          <Route
-            exact
-            path="/exams/:examId/submissions/:submissionId/reading/result"
-            element={<ReadingResultPage />}
-          />
+        
 
           {/* Redirect unknown routes to dashboard */}
           <Route path="*" element={<Navigate to="/" replace />} />

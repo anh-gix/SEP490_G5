@@ -3,10 +3,14 @@ const router = express.Router();
 
 const courseRoute = require('./courseRoute');
 const scheduleRoute = require('./scheduleRoute');
-const courseHomeController = require('../controllers/courseHomeController');
+const sessionRoutes = require('./sessionRoutes');
+const homeworkRoutes = require('./homeworkRoutes');
+
 
 router.use('/courses', courseRoute);
 router.use('/schedules', scheduleRoute);
+router.use('/sessions', sessionRoutes);
+router.use('/homework', homeworkRoutes);
 
 
 

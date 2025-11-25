@@ -2,9 +2,22 @@ const mongoose = require("mongoose");
 
 const answerKeySchema = new mongoose.Schema({
   questionNumber: { type: Number, required: true },
+  questionTitle: { type: String, required: true },
+  questionAnswer: [{
+      key: { type: String, required: true },
+      text: { type: String, required: true } 
+    }],
+  questionType: {
+    type: String,
+    enum: ["multiple_choice", "true_false", "input"],
+    required: true
+  },
   correctAnswer: [{ type: String, required: true }],
   maxScore: { type: Number, default: 1 },
-  questionType: { type: String, enum: ["multiple_choice", "true_false", "input","three_choice","four_choice","five_choice"] }
+  tags: [{
+    type: String,
+    enum: ["grammar", "vocabulary", "listening", "reading_comprehension", "writing", "speaking"]
+  }]
 });
 
 const sectionSchema = new mongoose.Schema({
@@ -27,7 +40,7 @@ const examSchema = new mongoose.Schema(
     title: { type: String, required: true },
     description: String,
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    examType: { type: String, enum: ["practice", "real"], default: "practice" },
+    examType: { type: String, enum: ["cambridge","ielts","toeic"], default: "cambridge" },
     level: { type: String, enum: ["Academic", "General"], required: true },
     totalDuration: Number,
     sections: [sectionSchema],

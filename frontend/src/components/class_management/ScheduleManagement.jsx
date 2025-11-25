@@ -50,22 +50,35 @@ const ScheduleManagement = () => {
       
       const response = await scheduleService.getAllSchedules(params);
       
-      const transformedSchedules = response.schedules.map(sch => ({
-        id: sch._id,
-        classId: sch.class?._id,
-        className: sch.class?.name || 'N/A',
-        teacherId: sch.class?.teacher?._id,
-        teacherName: sch.class?.teacher ? `${sch.class.teacher.firstName} ${sch.class.teacher.lastName}` : 'N/A',
-        roomId: sch.room?._id,
-        roomName: sch.room?.room_name || 'N/A',
-        date: sch.date ? new Date(sch.date).toISOString().split('T')[0] : 'N/A',
-        startTime: sch.startTime || 'N/A',
-        endTime: sch.endTime || 'N/A',
-        lessonNumber: sch.session?.sessionNumber || 0,
-        lessonTopic: sch.topic || sch.session?.topic || 'N/A',
-        status: sch.status || 'draft',
-        type: 'regular'
-      }));
+      // Transform API response to match component's expected format
+      const transformedSchedules = (response.schedules || response.data || []).map(sch => {
+        // Format date to YYYY-MM-DD
+        let dateStr = 'N/A';
+        if (sch.date) {
+          if (sch.date instanceof Date) {
+            dateStr = sch.date.toISOString().split('T')[0];
+          } else if (typeof sch.date === 'string') {
+            dateStr = sch.date.split('T')[0];
+          }
+        }
+        
+        return {
+          id: sch._id || sch.id,
+          classId: sch.class?._id || sch.classId,
+          className: sch.class?.name || 'N/A',
+          teacherId: sch.teacher?._id || sch.class?.teacher?._id || sch.teacherId,
+          teacherName: sch.teacher?.username || sch.class?.teacher?.username || 'N/A',
+          roomId: sch.room?._id || sch.roomId,
+          roomName: sch.room?.room_name || 'N/A',
+          date: dateStr,
+          startTime: sch.startTime || 'N/A',
+          endTime: sch.endTime || 'N/A',
+          lessonNumber: sch.session?.order || sch.session?.sessionNumber || 0,
+          lessonTopic: sch.session?.title || sch.topic || 'N/A',
+          status: sch.status || 'draft',
+          type: sch.type || 'regular'
+        };
+      });
       
       setSchedules(transformedSchedules);
     } catch (err) {

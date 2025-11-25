@@ -227,6 +227,7 @@ exports.getRoomSchedule = async (req, res) => {
           select: 'username email'
         }
       })
+      .populate('session', 'title order') // Populate session để lấy title
       .sort({ date: 1, startTime: 1 });
     
     res.status(200).json({

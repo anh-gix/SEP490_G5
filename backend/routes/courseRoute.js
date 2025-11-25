@@ -7,22 +7,22 @@ const courseHomeController = require('../controllers/courseHomeController');
 // Lấy tất cả courses đã được phê duyệt
 router.get('/', courseController.getAllCourses);
 
-//danh sachs chowf phee duyeejt
+// COURSE APPROVAL WORKFLOW ROUTES (specific routes must come first)
 router.get('/pending', courseController.getPendingCourses);
-
-// Lấy các khóa học theo type (ielts, toeic, cam)
-router.get('/by-type', courseHomeController.getCoursesByType);
-router.get('/course-home/:id', courseHomeController.getCourseDetails);
-router.get('/course-home/:courseId/cam-session/:sessionId', courseHomeController.getCamSessionDetails);
-
-//lấy chi tiết giáo trình
 router.get('/:id/details', courseController.getCourseDetails);
-
-//phê duyệt
 router.patch('/:id/approve', courseController.approveCourse);
-
-//yêu cầu chỉnh sửa
 router.patch('/:id/revise', courseController.requestRevision);
+
+// PROGRAM HEAD: ACCEPT/REJECT COURSE TO PROGRAM
+router.patch('/:id/accept', courseController.acceptCourseToProgram);
+router.patch('/:id/reject', courseController.rejectCourseFromProgram);
+
+// COURSE CRUD ROUTES (dynamic routes come after)
+router.get('/', courseController.getAllCourses);
+router.get('/:id', courseController.getCourseById);
+router.post('/', courseController.createCourse);
+router.put('/:id', courseController.updateCourse);
+router.delete('/:id', courseController.deleteCourse);
 
 module.exports = router;
 

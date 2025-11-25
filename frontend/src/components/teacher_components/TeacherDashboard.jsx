@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, ProgressBar, Table } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
+import teacherService from '../../services/teacherService';
 
 /**
  * Teacher Dashboard Component
@@ -15,116 +16,90 @@ const TeacherDashboard = () => {
       pendingAttendance: 0
     },
     upcomingSchedule: [],
-    recentActivities: [],
     classesSummary: []
   });
+  
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [countdown, setCountdown] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboardData();
+    
+    // Update current time every second
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    
+    return () => clearInterval(timer);
   }, []);
+  
+  useEffect(() => {
+    // Calculate countdown to next lesson
+    if (dashboardData.upcomingSchedule.length > 0) {
+      const calculateCountdown = () => {
+        const now = new Date();
+        const nextLesson = dashboardData.upcomingSchedule[0];
+        const [hours, minutes] = nextLesson.time.split(' - ')[0].split(':');
+        const lessonDate = new Date(nextLesson.date);
+        lessonDate.setHours(parseInt(hours), parseInt(minutes), 0);
+        
+        const diff = lessonDate - now;
+        
+        if (diff <= 0) {
+          setCountdown('Đang diễn ra');
+        } else {
+          const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+          const hrs = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+          
+          if (days > 0) {
+            setCountdown(`${days} ngày ${hrs} giờ`);
+          } else if (hrs > 0) {
+            setCountdown(`${hrs} giờ ${mins} phút`);
+          } else {
+            setCountdown(`${mins} phút`);
+          }
+        }
+      };
+      
+      calculateCountdown();
+      const interval = setInterval(calculateCountdown, 60000); // Update every minute
+      
+      return () => clearInterval(interval);
+    }
+  }, [dashboardData.upcomingSchedule]);
 
   const fetchDashboardData = async () => {
-    // Mock data
-    const mockData = {
-      stats: {
-        upcomingLessons: 8,
-        totalStudents: 85,
-        pendingGrading: 12,
-        pendingAttendance: 3
-      },
-      upcomingSchedule: [
-        {
-          id: 1,
-          date: '2025-11-13',
-          time: '18:00 - 20:00',
-          className: 'A2-Evening-01',
-          topic: 'Present Perfect Tense',
-          room: 'Room 102',
-          students: 25
-        },
-        {
-          id: 2,
-          date: '2025-11-14',
-          time: '18:00 - 20:00',
-          className: 'A2-Evening-01',
-          topic: 'Reading Comprehension',
-          room: 'Room 102',
-          students: 25
-        },
-        {
-          id: 3,
-          date: '2025-11-15',
-          time: '14:00 - 16:00',
-          className: 'B1-Afternoon-02',
-          topic: 'Listening Skills',
-          room: 'Room 201',
-          students: 20
-        }
-      ],
-      recentActivities: [
-        {
-          id: 1,
-          type: 'assignment',
-          message: '15 học viên đã nộp bài "Unit 5 - Grammar Exercise"',
-          time: '30 phút trước',
-          icon: 'fa-file-alt',
-          iconBg: 'bg-info-100',
-          iconColor: 'text-info-600'
-        },
-        {
-          id: 2,
-          type: 'attendance',
-          message: 'Đã hoàn thành điểm danh lớp A2-Evening-01',
-          time: '2 giờ trước',
-          icon: 'fa-user-check',
-          iconBg: 'bg-success-100',
-          iconColor: 'text-success-600'
-        },
-        {
-          id: 3,
-          type: 'grading',
-          message: 'Đã chấm xong 8 bài tập của lớp B1-Afternoon-02',
-          time: '5 giờ trước',
-          icon: 'fa-check-circle',
-          iconBg: 'bg-warning-100',
-          iconColor: 'text-warning-600'
-        }
-      ],
-      classesSummary: [
-        {
-          id: 1,
-          name: 'A2-Evening-01',
-          level: 'A2',
-          students: 25,
-          progress: 65,
-          nextLesson: '13/11/2025 18:00',
-          attendanceRate: 92
-        },
-        {
-          id: 2,
-          name: 'B1-Afternoon-02',
-          level: 'B1',
-          students: 20,
-          progress: 48,
-          nextLesson: '15/11/2025 14:00',
-          attendanceRate: 88
-        },
-        {
-          id: 3,
-          name: 'A1-Morning-03',
-          level: 'A1',
-          students: 30,
-          progress: 30,
-          nextLesson: '16/11/2025 08:00',
-          attendanceRate: 95
-        }
-      ]
-    };
-    setDashboardData(mockData);
+    try {
+      setLoading(true);
+      const response = await teacherService.getTeacherDashboard();
+      
+      if (response.success) {
+        setDashboardData(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  if (loading) {
+    return (
+      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
+        <div className="text-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="text-neutral-600 mt-3">Đang tải dữ liệu dashboard...</p>
+        </div>
+      </Container>
+    );
+  }
+
   return (
-    <Container fluid className="py-24 px-24" style={{ backgroundColor: '#f8f9fa' }}>
+    <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
       {/* Header */}
       <div className="mb-24">
         <h4 className="text-neutral-900 fw-bold mb-8">Dashboard Giảng viên</h4>
@@ -134,22 +109,22 @@ const TeacherDashboard = () => {
       {/* Stats Cards */}
       <Row className="g-3 mb-24">
         <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm h-100">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
+          <Card className="bg-white border-0 rounded-12 h-100" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+            <Card.Body className="p-16">
+              <div className="d-flex align-items-center gap-12">
                 <div 
-                  className="rounded-12 d-flex align-items-center justify-content-center"
+                  className="rounded-8 d-flex align-items-center justify-content-center"
                   style={{ 
-                    width: '56px',
-                    height: '56px',
+                    width: '48px',
+                    height: '48px',
                     background: 'linear-gradient(135deg, #0D74FF 0%, #0A5FD9 100%)'
                   }}
                 >
-                  <i className="fas fa-chalkboard-teacher text-white" style={{ fontSize: '24px' }}></i>
+                  <i className="fas fa-chalkboard-teacher text-white" style={{ fontSize: '20px' }}></i>
                 </div>
                 <div>
-                  <div className="text-neutral-500 text-13 mb-4">Buổi dạy tuần này</div>
-                  <div className="text-neutral-900 fw-bold text-32">{dashboardData.stats.upcomingLessons}</div>
+                  <div className="text-neutral-500 text-12 mb-2">Tuần này</div>
+                  <div className="text-neutral-900 fw-bold text-24">{dashboardData.stats.upcomingLessons}</div>
                 </div>
               </div>
             </Card.Body>
@@ -157,22 +132,22 @@ const TeacherDashboard = () => {
         </Col>
 
         <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm h-100">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
+          <Card className="bg-white border-0 rounded-12 h-100" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+            <Card.Body className="p-16">
+              <div className="d-flex align-items-center gap-12">
                 <div 
-                  className="rounded-12 d-flex align-items-center justify-content-center"
+                  className="rounded-8 d-flex align-items-center justify-content-center"
                   style={{ 
-                    width: '56px',
-                    height: '56px',
+                    width: '48px',
+                    height: '48px',
                     background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
                   }}
                 >
-                  <i className="fas fa-users text-white" style={{ fontSize: '24px' }}></i>
+                  <i className="fas fa-users text-white" style={{ fontSize: '20px' }}></i>
                 </div>
                 <div>
-                  <div className="text-neutral-500 text-13 mb-4">Học viên đang dạy</div>
-                  <div className="text-neutral-900 fw-bold text-32">{dashboardData.stats.totalStudents}</div>
+                  <div className="text-neutral-500 text-12 mb-2">Học viên</div>
+                  <div className="text-neutral-900 fw-bold text-24">{dashboardData.stats.totalStudents}</div>
                 </div>
               </div>
             </Card.Body>
@@ -180,22 +155,22 @@ const TeacherDashboard = () => {
         </Col>
 
         <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm h-100">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
+          <Card className="bg-white border-0 rounded-12 h-100" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+            <Card.Body className="p-16">
+              <div className="d-flex align-items-center gap-12">
                 <div 
-                  className="rounded-12 d-flex align-items-center justify-content-center"
+                  className="rounded-8 d-flex align-items-center justify-content-center"
                   style={{ 
-                    width: '56px',
-                    height: '56px',
+                    width: '48px',
+                    height: '48px',
                     background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
                   }}
                 >
-                  <i className="fas fa-file-alt text-white" style={{ fontSize: '24px' }}></i>
+                  <i className="fas fa-file-alt text-white" style={{ fontSize: '20px' }}></i>
                 </div>
                 <div>
-                  <div className="text-neutral-500 text-13 mb-4">Bài tập chưa chấm</div>
-                  <div className="text-neutral-900 fw-bold text-32">{dashboardData.stats.pendingGrading}</div>
+                  <div className="text-neutral-500 text-12 mb-2">Chưa chấm</div>
+                  <div className="text-neutral-900 fw-bold text-24">{dashboardData.stats.pendingGrading}</div>
                 </div>
               </div>
             </Card.Body>
@@ -203,22 +178,22 @@ const TeacherDashboard = () => {
         </Col>
 
         <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm h-100">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
+          <Card className="bg-white border-0 rounded-12 h-100" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+            <Card.Body className="p-16">
+              <div className="d-flex align-items-center gap-12">
                 <div 
-                  className="rounded-12 d-flex align-items-center justify-content-center"
+                  className="rounded-8 d-flex align-items-center justify-content-center"
                   style={{ 
-                    width: '56px',
-                    height: '56px',
+                    width: '48px',
+                    height: '48px',
                     background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)'
                   }}
                 >
-                  <i className="fas fa-user-check text-white" style={{ fontSize: '24px' }}></i>
+                  <i className="fas fa-user-check text-white" style={{ fontSize: '20px' }}></i>
                 </div>
                 <div>
-                  <div className="text-neutral-500 text-13 mb-4">Điểm danh chưa hoàn thành</div>
-                  <div className="text-neutral-900 fw-bold text-32">{dashboardData.stats.pendingAttendance}</div>
+                  <div className="text-neutral-500 text-12 mb-2">Điểm danh</div>
+                  <div className="text-neutral-900 fw-bold text-24">{dashboardData.stats.pendingAttendance}</div>
                 </div>
               </div>
             </Card.Body>
@@ -227,265 +202,184 @@ const TeacherDashboard = () => {
       </Row>
 
       <Row className="g-3">
-        {/* Upcoming Schedule */}
+        {/* Upcoming Schedule - Left Side */}
         <Col lg={8}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24">
+          <Card className="bg-white border-0 rounded-12 h-100" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
             <Card.Header className="bg-white border-0 pt-20 px-20 pb-16">
               <div className="d-flex justify-content-between align-items-center">
                 <div>
                   <h5 className="text-neutral-900 fw-bold mb-4">Lịch dạy sắp tới</h5>
-                  <p className="text-neutral-500 text-13 mb-0">Các buổi học trong tuần này</p>
+                  <div className="d-flex gap-16 align-items-center">
+                    <p className="text-neutral-500 text-13 mb-0">
+                      <i className="fas fa-clock me-2"></i>
+                      Hiện tại: {currentTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                    {countdown && (
+                      <div className="d-flex align-items-center gap-8">
+                        <div className="bg-main-100 rounded-8 px-12 py-4">
+                          <i className="fas fa-hourglass-half text-main-600 me-2"></i>
+                          <span className="text-main-600 fw-semibold text-13">
+                            Buổi tiếp theo: {countdown}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <Link to="/teacher/schedule" className="btn btn-outline-main text-13 px-16 py-8 radius-8">
                   Xem tất cả
                 </Link>
               </div>
             </Card.Header>
-            <Card.Body className="p-0">
-              <Table hover className="mb-0">
-                <thead>
-                  <tr className="bg-neutral-25">
-                    <th className="px-20 py-12 text-neutral-700 fw-semibold text-12 border-0">Ngày</th>
-                    <th className="px-20 py-12 text-neutral-700 fw-semibold text-12 border-0">Thời gian</th>
-                    <th className="px-20 py-12 text-neutral-700 fw-semibold text-12 border-0">Lớp học</th>
-                    <th className="px-20 py-12 text-neutral-700 fw-semibold text-12 border-0">Chủ đề</th>
-                    <th className="px-20 py-12 text-neutral-700 fw-semibold text-12 border-0">Phòng</th>
-                    <th className="px-20 py-12 text-neutral-700 fw-semibold text-12 border-0 text-center">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dashboardData.upcomingSchedule.map(schedule => (
-                    <tr key={schedule.id}>
-                      <td className="px-20 py-16 text-neutral-900 fw-medium text-13">
-                        {new Date(schedule.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
-                      </td>
-                      <td className="px-20 py-16 text-neutral-700 text-13">{schedule.time}</td>
-                      <td className="px-20 py-16">
-                        <div className="text-main-600 fw-semibold text-13">{schedule.className}</div>
-                        <div className="text-neutral-500 text-11">{schedule.students} học viên</div>
-                      </td>
-                      <td className="px-20 py-16 text-neutral-900 text-13">{schedule.topic}</td>
-                      <td className="px-20 py-16 text-neutral-700 text-13">{schedule.room}</td>
-                      <td className="px-20 py-16 text-center">
-                        <Button className="btn-main text-12 px-12 py-6 radius-6">
-                          <i className="fas fa-chalkboard-teacher me-1"></i>
-                          Vào lớp
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </Card.Body>
-          </Card>
-
-          {/* Classes Summary */}
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-            <Card.Header className="bg-white border-0 pt-20 px-20 pb-16">
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <h5 className="text-neutral-900 fw-bold mb-4">Lớp học của tôi</h5>
-                  <p className="text-neutral-500 text-13 mb-0">Tổng quan các lớp đang giảng dạy</p>
-                </div>
-                <Link to="/teacher/classes" className="btn btn-outline-main text-13 px-16 py-8 radius-8">
-                  Xem tất cả
-                </Link>
-              </div>
-            </Card.Header>
             <Card.Body className="p-20">
-              <Row className="g-3">
-                {dashboardData.classesSummary.map(classItem => (
-                  <Col md={12} key={classItem.id}>
+              <div className="d-flex flex-column gap-12">
+                {dashboardData.upcomingSchedule.map(schedule => {
+                  const isToday = schedule.isToday;
+                  return (
                     <div 
-                      className="border border-neutral-100 rounded-12 p-16 transition-2"
+                      key={schedule.id}
+                      className={`border rounded-12 p-16 transition-2 ${isToday ? 'border-main-300 bg-main-25' : 'border-neutral-100'}`}
                       style={{ cursor: 'pointer' }}
                     >
-                      <div className="d-flex justify-content-between align-items-start mb-12">
-                        <div>
-                          <h6 className="text-neutral-900 fw-bold mb-4">{classItem.name}</h6>
-                          <div className="d-flex gap-12 align-items-center">
-                            <Badge className="bg-main-100 text-main-600 px-8 py-4 text-11">{classItem.level}</Badge>
-                            <span className="text-neutral-600 text-12">
-                              <i className="fas fa-users me-1" style={{ fontSize: '10px' }}></i>
-                              {classItem.students} học viên
-                            </span>
+                      <Row className="align-items-center">
+                        <Col md={2}>
+                          <div className={`text-center ${isToday ? 'text-main-600' : 'text-neutral-700'}`}>
+                            <div className="fw-bold text-24 mb-0">
+                              {new Date(schedule.date).toLocaleDateString('vi-VN', { day: '2-digit' })}
+                            </div>
+                            <div className="text-12">
+                              Tháng {new Date(schedule.date).toLocaleDateString('vi-VN', { month: '2-digit' })}
+                            </div>
+                            {isToday && (
+                              <Badge className="bg-main-600 text-white mt-2 px-8 py-4 text-11">
+                                Hôm nay
+                              </Badge>
+                            )}
                           </div>
-                        </div>
-                        <div className="text-end">
-                          <div className="text-neutral-500 text-11 mb-4">Buổi tiếp theo</div>
-                          <div className="text-neutral-900 fw-semibold text-12">{classItem.nextLesson}</div>
-                        </div>
-                      </div>
-                      
-                      <div className="mb-8">
-                        <div className="d-flex justify-content-between mb-6">
-                          <span className="text-neutral-600 text-12">Tiến độ</span>
-                          <span className="text-neutral-900 fw-semibold text-12">{classItem.progress}%</span>
-                        </div>
-                        <ProgressBar 
-                          now={classItem.progress} 
-                          className="rounded-pill"
-                          style={{ height: '6px', backgroundColor: '#E9ECEF' }}
-                        />
-                      </div>
-
-                      <div className="d-flex justify-content-between align-items-center">
-                        <div className="text-neutral-600 text-12">
-                          <i className="fas fa-chart-line me-1 text-success-600"></i>
-                          Điểm danh: <span className="fw-semibold text-neutral-900">{classItem.attendanceRate}%</span>
-                        </div>
-                        <Button className="btn-outline-main text-11 px-12 py-4 radius-6">
-                          Chi tiết
-                        </Button>
-                      </div>
+                        </Col>
+                        <Col md={2}>
+                          <div className={`${isToday ? 'text-main-600' : 'text-neutral-700'}`}>
+                            <i className="fas fa-clock me-2"></i>
+                            <span className="fw-semibold text-14">{schedule.time}</span>
+                          </div>
+                        </Col>
+                        <Col md={3}>
+                          <div>
+                            <div className={`fw-bold text-14 mb-2 ${isToday ? 'text-main-600' : 'text-neutral-900'}`}>
+                              {schedule.className}
+                            </div>
+                            <div className="text-neutral-600 text-12">
+                              <i className="fas fa-users me-1" style={{ fontSize: '10px' }}></i>
+                              {schedule.students} học viên
+                            </div>
+                          </div>
+                        </Col>
+                        <Col md={3}>
+                          <div className="text-neutral-900 text-13">{schedule.topic}</div>
+                          <div className="text-neutral-500 text-12">
+                            <i className="fas fa-door-open me-1"></i>
+                            {schedule.room}
+                          </div>
+                        </Col>
+                        <Col md={2} className="text-end">
+                          <Link to={`/teacher/lessons/${schedule.id}`}>
+                            <Button 
+                              className={`text-12 px-16 py-8 radius-8 ${isToday ? 'btn-main' : 'btn-outline-main'}`}
+                            >
+                              <i className="fas fa-chalkboard-teacher me-2"></i>
+                              {isToday ? 'Vào lớp' : 'Chi tiết'}
+                            </Button>
+                          </Link>
+                        </Col>
+                      </Row>
                     </div>
-                  </Col>
-                ))}
-              </Row>
+                  );
+                })}
+              </div>
             </Card.Body>
           </Card>
         </Col>
 
-        {/* Recent Activities & Quick Actions */}
+        {/* Classes Summary - Right Side (Vertical) */}
         <Col lg={4}>
-          {/* Quick Actions */}
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24">
+          <Card className="bg-white border-0 rounded-12 h-100" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
             <Card.Header className="bg-white border-0 pt-20 px-20 pb-16">
-              <h5 className="text-neutral-900 fw-bold mb-0">Thao tác nhanh</h5>
+              <div>
+                <h5 className="text-neutral-900 fw-bold mb-4">Lớp học của tôi</h5>
+                <p className="text-neutral-500 text-13 mb-0">Danh sách lớp đang dạy</p>
+              </div>
             </Card.Header>
             <Card.Body className="p-20">
               <div className="d-flex flex-column gap-12">
-                <Link 
-                  to="/teacher/assignments" 
-                  className="text-decoration-none"
-                >
+                {dashboardData.classesSummary.map(classItem => (
                   <div 
-                    className="border border-main-200 rounded-12 p-16 transition-2"
+                    key={classItem.id}
+                    className="border border-neutral-100 rounded-12 p-16 transition-2"
                     style={{ cursor: 'pointer' }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F0F7FF'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#0D74FF';
+                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(13, 116, 255, 0.15)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#E9ECEF';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                   >
-                    <div className="d-flex align-items-center gap-12">
-                      <div 
-                        className="rounded-8 d-flex align-items-center justify-content-center"
-                        style={{ width: '40px', height: '40px', backgroundColor: '#E6F2FF' }}
-                      >
-                        <i className="fas fa-plus text-main-600"></i>
+                    <div className="mb-12">
+                      <div className="d-flex justify-content-between align-items-start mb-8">
+                        <h6 className="text-neutral-900 fw-bold mb-0">{classItem.name}</h6>
+                        <Link to={`/teacher/classes/${classItem.id}`}>
+                          <Button className="btn-outline-main text-11 px-12 py-6 radius-6">
+                            Chi tiết
+                          </Button>
+                        </Link>
                       </div>
-                      <div className="flex-grow-1">
-                        <div className="text-neutral-900 fw-semibold text-14">Tạo bài tập mới</div>
-                        <div className="text-neutral-500 text-11">Giao bài cho lớp học</div>
+                      <div className="d-flex gap-12 align-items-center">
+                        <Badge className="bg-main-100 text-main-600 px-8 py-4 text-11">{classItem.level}</Badge>
+                        <span className="text-neutral-600 text-12">
+                          <i className="fas fa-users me-1" style={{ fontSize: '10px' }}></i>
+                          {classItem.students} học viên
+                        </span>
                       </div>
-                      <i className="fas fa-chevron-right text-neutral-400"></i>
                     </div>
-                  </div>
-                </Link>
+                    
+                    <div className="mb-12">
+                      <div className="d-flex justify-content-between mb-6">
+                        <span className="text-neutral-600 text-12">Tiến độ</span>
+                        <span className="text-neutral-900 fw-semibold text-12">
+                          {classItem.completedLessons}/{classItem.totalLessons} buổi
+                        </span>
+                      </div>
+                      <ProgressBar 
+                        now={classItem.progress} 
+                        className="rounded-pill"
+                        style={{ height: '6px', backgroundColor: '#E9ECEF' }}
+                      />
+                    </div>
 
-                <Link 
-                  to="/teacher/attendance" 
-                  className="text-decoration-none"
-                >
-                  <div 
-                    className="border border-success-200 rounded-12 p-16 transition-2"
-                    style={{ cursor: 'pointer' }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F0FFF4'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                  >
-                    <div className="d-flex align-items-center gap-12">
-                      <div 
-                        className="rounded-8 d-flex align-items-center justify-content-center"
-                        style={{ width: '40px', height: '40px', backgroundColor: '#E6FFED' }}
-                      >
-                        <i className="fas fa-user-check text-success-600"></i>
+                    <div className="d-flex flex-column gap-8">
+                      <div className="d-flex align-items-start gap-8">
+                        <i className="fas fa-file-alt text-warning-600 mt-1" style={{ fontSize: '11px' }}></i>
+                        <div className="flex-grow-1">
+                          <div className="text-neutral-900 text-12 fw-semibold">{classItem.nextTest}</div>
+                          <div className="text-neutral-500 text-11">{classItem.nextTestDate}</div>
+                        </div>
                       </div>
-                      <div className="flex-grow-1">
-                        <div className="text-neutral-900 fw-semibold text-14">Điểm danh</div>
-                        <div className="text-neutral-500 text-11">Điểm danh học viên</div>
-                      </div>
-                      <i className="fas fa-chevron-right text-neutral-400"></i>
-                    </div>
-                  </div>
-                </Link>
-
-                <Link 
-                  to="/teacher/grading" 
-                  className="text-decoration-none"
-                >
-                  <div 
-                    className="border border-warning-200 rounded-12 p-16 transition-2"
-                    style={{ cursor: 'pointer' }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FFF4E6'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                  >
-                    <div className="d-flex align-items-center gap-12">
-                      <div 
-                        className="rounded-8 d-flex align-items-center justify-content-center"
-                        style={{ width: '40px', height: '40px', backgroundColor: '#FFE8CC' }}
-                      >
-                        <i className="fas fa-pen text-warning-600"></i>
-                      </div>
-                      <div className="flex-grow-1">
-                        <div className="text-neutral-900 fw-semibold text-14">Chấm điểm</div>
-                        <div className="text-neutral-500 text-11">{dashboardData.stats.pendingGrading} bài chờ chấm</div>
-                      </div>
-                      <i className="fas fa-chevron-right text-neutral-400"></i>
-                    </div>
-                  </div>
-                </Link>
-
-                <Link 
-                  to="/teacher/schedule" 
-                  className="text-decoration-none"
-                >
-                  <div 
-                    className="border border-info-200 rounded-12 p-16 transition-2"
-                    style={{ cursor: 'pointer' }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F0F9FF'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                  >
-                    <div className="d-flex align-items-center gap-12">
-                      <div 
-                        className="rounded-8 d-flex align-items-center justify-content-center"
-                        style={{ width: '40px', height: '40px', backgroundColor: '#E0F2FE' }}
-                      >
-                        <i className="fas fa-calendar-alt text-info-600"></i>
-                      </div>
-                      <div className="flex-grow-1">
-                        <div className="text-neutral-900 fw-semibold text-14">Xem lịch dạy</div>
-                        <div className="text-neutral-500 text-11">Lịch giảng dạy</div>
-                      </div>
-                      <i className="fas fa-chevron-right text-neutral-400"></i>
-                    </div>
-                  </div>
-                </Link>
-              </div>
-            </Card.Body>
-          </Card>
-
-          {/* Recent Activities */}
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-            <Card.Header className="bg-white border-0 pt-20 px-20 pb-16">
-              <h5 className="text-neutral-900 fw-bold mb-0">Hoạt động gần đây</h5>
-            </Card.Header>
-            <Card.Body className="p-20">
-              <div className="d-flex flex-column gap-16">
-                {dashboardData.recentActivities.map(activity => (
-                  <div key={activity.id} className="d-flex gap-12">
-                    <div 
-                      className={`rounded-8 d-flex align-items-center justify-content-center ${activity.iconBg}`}
-                      style={{ width: '40px', height: '40px', flexShrink: 0 }}
-                    >
-                      <i className={`fas ${activity.icon} ${activity.iconColor}`}></i>
-                    </div>
-                    <div className="flex-grow-1">
-                      <div className="text-neutral-900 text-13 mb-4">{activity.message}</div>
-                      <div className="text-neutral-500 text-11">
-                        <i className="fas fa-clock me-1"></i>
-                        {activity.time}
+                      <div className="d-flex align-items-start gap-8">
+                        <i className="fas fa-tasks text-info-600 mt-1" style={{ fontSize: '11px' }}></i>
+                        <div className="flex-grow-1">
+                          <div className="text-neutral-900 text-12 fw-semibold">{classItem.upcomingAssignment}</div>
+                          <div className="text-neutral-500 text-11">Hạn: {classItem.assignmentDeadline}</div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 ))}
+              </div>
+              <div className="mt-16 text-center">
+                <Link to="/teacher/classes" className="btn btn-outline-main text-13 px-16 py-8 radius-8 w-100">
+                  Xem tất cả lớp học
+                </Link>
               </div>
             </Card.Body>
           </Card>

@@ -1,11 +1,33 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import RoleNavigation from '../common/RoleNavigation';
+import { useAuth } from '../../contexts/AuthContext';
+import teacherService from '../../services/teacherService';
 
 /**
  * Teacher Navigation Component
  * Sidebar navigation dành cho Giảng viên - Sử dụng RoleNavigation component
  */
 const TeacherNavigation = () => {
+  const { user } = useAuth();
+  const [teacherInfo, setTeacherInfo] = useState(null);
+
+  useEffect(() => {
+    const fetchTeacherInfo = async () => {
+      try {
+        const response = await teacherService.getCurrentTeacher();
+        if (response.success) {
+          setTeacherInfo(response.teacher);
+        }
+      } catch (error) {
+        console.error('Lỗi khi lấy thông tin giảng viên:', error);
+      }
+    };
+
+    if (user) {
+      fetchTeacherInfo();
+    }
+  }, [user]);
+
   const menuItems = [
     {
       title: 'Tổng quan',
@@ -38,12 +60,6 @@ const TeacherNavigation = () => {
       color: 'main'
     },
     {
-      title: 'Chấm điểm',
-      icon: 'fa-star',
-      path: '/teacher/grading',
-      color: 'warning'
-    },
-    {
       title: 'Tài liệu giảng dạy',
       icon: 'fa-file-alt',
       path: '/teacher/materials',
@@ -52,9 +68,10 @@ const TeacherNavigation = () => {
   ];
 
   const userInfo = {
-    name: 'Trần Thị B',
-    code: 'GV001',
-    avatar: null
+    name: teacherInfo?.username || user?.username || 'Giảng viên',
+    code: teacherInfo?.email?.split('@')[0]?.toUpperCase() || 'GV',
+    avatar: teacherInfo?.avatar || null,
+    role: 'teacher'
   };
 
   return (

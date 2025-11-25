@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Container, Card, Button, ButtonGroup, Form, Row, Col, Badge } from 'react-bootstrap';
+import { Container, Card, Button, ButtonGroup, Form, Row, Col, Badge, Spinner, Alert } from 'react-bootstrap';
 import ScheduleCalendar from './ScheduleCalendar';
 import ScheduleWeekly from './ScheduleWeekly';
 import ScheduleList from './ScheduleList';
@@ -8,6 +8,10 @@ import CreateScheduleModal from './CreateScheduleModal';
 import EditScheduleModal from './EditScheduleModal';
 import MakeupClassModal from './MakeupClassModal';
 import RoomManagement from './RoomManagement';
+import scheduleService from '../../services/scheduleService';
+import classService from '../../services/classService';
+import teacherService from '../../services/teacherService';
+import roomService from '../../services/roomService';
 
 const ScheduleManagement = () => {
   const [viewMode, setViewMode] = useState('weekly'); // calendar, weekly or list
@@ -20,6 +24,8 @@ const ScheduleManagement = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showMakeupModal, setShowMakeupModal] = useState(false);
   const [showRoomManagement, setShowRoomManagement] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
     classId: '',
     teacherId: '',
@@ -31,95 +37,99 @@ const ScheduleManagement = () => {
 
   const fetchSchedules = async () => {
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/schedules?' + new URLSearchParams(filters));
-      const data = await response.json();
-      setSchedules(data);
-    } catch (error) {
-      console.error('Error fetching schedules:', error);
-      // Mock data for development
-      setSchedules([
-        {
-          id: 1,
-          classId: 1,
-          className: 'A1-Morning-01',
-          teacherId: 1,
-          teacherName: 'Nguyễn Văn A',
-          roomId: 1,
-          roomName: 'Room 101',
-          date: '2025-10-29',
-          startTime: '08:00',
-          endTime: '10:00',
-          lessonNumber: 1,
-          lessonTopic: 'Introduction to English',
-          status: 'scheduled',
-          type: 'regular'
-        },
-        {
-          id: 2,
-          classId: 1,
-          className: 'A1-Morning-01',
-          teacherId: 1,
-          teacherName: 'Nguyễn Văn A',
-          roomId: 1,
-          roomName: 'Room 101',
-          date: '2025-10-31',
-          startTime: '08:00',
-          endTime: '10:00',
-          lessonNumber: 2,
-          lessonTopic: 'Basic Grammar',
-          status: 'scheduled',
-          type: 'regular'
+      setLoading(true);
+      setError(null);
+      
+      const params = {};
+      if (filters.classId) params.classId = filters.classId;
+      if (filters.teacherId) params.teacherId = filters.teacherId;
+      if (filters.roomId) params.roomId = filters.roomId;
+      if (filters.startDate) params.startDate = filters.startDate;
+      if (filters.endDate) params.endDate = filters.endDate;
+      if (filters.status) params.status = filters.status;
+      
+      const response = await scheduleService.getAllSchedules(params);
+      
+      // Transform API response to match component's expected format
+      const transformedSchedules = (response.schedules || response.data || []).map(sch => {
+        // Format date to YYYY-MM-DD
+        let dateStr = 'N/A';
+        if (sch.date) {
+          if (sch.date instanceof Date) {
+            dateStr = sch.date.toISOString().split('T')[0];
+          } else if (typeof sch.date === 'string') {
+            dateStr = sch.date.split('T')[0];
+          }
         }
-      ]);
+        
+        return {
+          id: sch._id || sch.id,
+          classId: sch.class?._id || sch.classId,
+          className: sch.class?.name || 'N/A',
+          teacherId: sch.teacher?._id || sch.class?.teacher?._id || sch.teacherId,
+          teacherName: sch.teacher?.username || sch.class?.teacher?.username || 'N/A',
+          roomId: sch.room?._id || sch.roomId,
+          roomName: sch.room?.room_name || 'N/A',
+          date: dateStr,
+          startTime: sch.startTime || 'N/A',
+          endTime: sch.endTime || 'N/A',
+          lessonNumber: sch.session?.order || sch.session?.sessionNumber || 0,
+          lessonTopic: sch.session?.title || sch.topic || 'N/A',
+          status: sch.status || 'draft',
+          type: sch.type || 'regular'
+        };
+      });
+      
+      setSchedules(transformedSchedules);
+    } catch (err) {
+      console.error('Error fetching schedules:', err);
+      setError(err.message || 'Không thể tải danh sách lịch học');
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchClasses = async () => {
     try {
-      const response = await fetch('/api/classes');
-      const data = await response.json();
-      setClasses(data);
-    } catch (error) {
-      console.error('Error fetching classes:', error);
-      // Mock data
-      setClasses([
-        { id: 1, name: 'A1-Morning-01', level: 'A1', students: 20 },
-        { id: 2, name: 'A2-Evening-01', level: 'A2', students: 18 },
-        { id: 3, name: 'B1-Weekend-01', level: 'B1', students: 15 }
-      ]);
+      const response = await classService.getAllClasses();
+      const transformedClasses = response.classes.map(cls => ({
+        id: cls._id,
+        name: cls.name,
+        level: cls.level,
+        students: cls.students?.length || 0
+      }));
+      setClasses(transformedClasses);
+    } catch (err) {
+      console.error('Error fetching classes:', err);
     }
   };
 
   const fetchTeachers = async () => {
     try {
-      const response = await fetch('/api/teachers');
-      const data = await response.json();
-      setTeachers(data);
-    } catch (error) {
-      console.error('Error fetching teachers:', error);
-      // Mock data
-      setTeachers([
-        { id: 1, name: 'Nguyễn Văn A', email: 'teachera@example.com' },
-        { id: 2, name: 'Trần Thị B', email: 'teacherb@example.com' },
-        { id: 3, name: 'Lê Văn C', email: 'teacherc@example.com' }
-      ]);
+      const response = await teacherService.getAllTeachers();
+      const transformedTeachers = response.teachers.map(t => ({
+        id: t._id,
+        name: `${t.firstName} ${t.lastName}`,
+        email: t.email
+      }));
+      setTeachers(transformedTeachers);
+    } catch (err) {
+      console.error('Error fetching teachers:', err);
     }
   };
 
   const fetchRooms = async () => {
     try {
-      const response = await fetch('/api/rooms');
-      const data = await response.json();
-      setRooms(data);
-    } catch (error) {
-      console.error('Error fetching rooms:', error);
-      // Mock data
-      setRooms([
-        { id: 1, name: 'Room 101', capacity: 25, equipment: ['Projector', 'Whiteboard'] },
-        { id: 2, name: 'Room 102', capacity: 30, equipment: ['Projector', 'Whiteboard', 'Computer'] },
-        { id: 3, name: 'Room 201', capacity: 20, equipment: ['Whiteboard'] }
-      ]);
+      const response = await roomService.getAllRooms();
+      const transformedRooms = response.rooms.map(r => ({
+        id: r._id,
+        name: r.room_name,
+        capacity: r.capacity,
+        equipment: []
+      }));
+      setRooms(transformedRooms);
+    } catch (err) {
+      console.error('Error fetching rooms:', err);
     }
   };
 
@@ -137,39 +147,36 @@ const ScheduleManagement = () => {
 
   const handleCreateSchedule = async (scheduleData) => {
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch('/api/schedules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(scheduleData)
-      });
-      const newSchedule = await response.json();
-      setSchedules([...schedules, newSchedule]);
+      setLoading(true);
+      await scheduleService.createSchedule(scheduleData);
       setShowCreateModal(false);
       alert('Tạo lịch học thành công!');
-      fetchSchedules();
-    } catch (error) {
-      console.error('Error creating schedule:', error);
-      alert('Có lỗi xảy ra khi tạo lịch học!');
+      await fetchSchedules();
+    } catch (err) {
+      console.error('Error creating schedule:', err);
+      if (err.message && err.message.includes('conflict')) {
+        alert(`Xung đột lịch học: ${err.message}`);
+      } else {
+        alert(err.message || 'Có lỗi xảy ra khi tạo lịch học!');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleEditSchedule = async (scheduleData) => {
     try {
-      const response = await fetch(`/api/schedules/${scheduleData.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(scheduleData)
-      });
-      const updatedSchedule = await response.json();
-      setSchedules(schedules.map(s => s.id === updatedSchedule.id ? updatedSchedule : s));
+      setLoading(true);
+      await scheduleService.updateSchedule(scheduleData.id, scheduleData);
       setShowEditModal(false);
       setSelectedSchedule(null);
       alert('Cập nhật lịch học thành công!');
-      fetchSchedules();
-    } catch (error) {
-      console.error('Error updating schedule:', error);
-      alert('Có lỗi xảy ra khi cập nhật lịch học!');
+      await fetchSchedules();
+    } catch (err) {
+      console.error('Error updating schedule:', err);
+      alert(err.message || 'Có lỗi xảy ra khi cập nhật lịch học!');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -177,30 +184,30 @@ const ScheduleManagement = () => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa lịch học này?')) return;
     
     try {
-      await fetch(`/api/schedules/${scheduleId}`, { method: 'DELETE' });
-      setSchedules(schedules.filter(s => s.id !== scheduleId));
+      setLoading(true);
+      await scheduleService.deleteSchedule(scheduleId);
       alert('Xóa lịch học thành công!');
-    } catch (error) {
-      console.error('Error deleting schedule:', error);
-      alert('Có lỗi xảy ra khi xóa lịch học!');
+      await fetchSchedules();
+    } catch (err) {
+      console.error('Error deleting schedule:', err);
+      alert(err.message || 'Có lỗi xảy ra khi xóa lịch học!');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleCreateMakeupClass = async (makeupData) => {
     try {
-      const response = await fetch('/api/schedules/makeup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(makeupData)
-      });
-      const newSchedule = await response.json();
-      setSchedules([...schedules, newSchedule]);
+      setLoading(true);
+      await scheduleService.createSchedule({ ...makeupData, type: 'makeup' });
       setShowMakeupModal(false);
       alert('Tạo lịch học bù thành công!');
-      fetchSchedules();
-    } catch (error) {
-      console.error('Error creating makeup class:', error);
-      alert('Có lỗi xảy ra khi tạo lịch học bù!');
+      await fetchSchedules();
+    } catch (err) {
+      console.error('Error creating makeup class:', err);
+      alert(err.message || 'Có lỗi xảy ra khi tạo lịch học bù!');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -227,6 +234,22 @@ const ScheduleManagement = () => {
 
   return (
     <Container fluid className="p-24">
+      {/* Loading Spinner */}
+      {loading && (
+        <div className="text-center py-5">
+          <Spinner animation="border" variant="primary" />
+          <p className="mt-3 text-neutral-500">Đang tải dữ liệu...</p>
+        </div>
+      )}
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="danger" dismissible onClose={() => setError(null)} className="mb-24">
+          <Alert.Heading>Lỗi!</Alert.Heading>
+          <p>{error}</p>
+        </Alert>
+      )}
+
       {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-24">
         <div>

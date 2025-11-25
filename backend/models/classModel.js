@@ -1,0 +1,47 @@
+const mongoose = require("mongoose");
+
+const classSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+  },
+  course: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Course"
+  },
+  teacher: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  students: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  }],
+  // Thêm room (id)
+  room: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Room"
+  },
+  startDate: {
+    type: Date
+  },
+  endDate: {
+    type: Date
+  },
+  //Luu lai so luong sinh vien toi da cua lop luc khai giang
+  maxStudents: {
+    type: Number,
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'active', 'completed', 'cancelled'],
+    default: 'pending'
+  },
+  teacherId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  }
+}, { timestamps: true });
+
+module.exports = mongoose.model("Class", classSchema);

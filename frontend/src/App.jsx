@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import RouteScrollToTop from "./helper/RouteScrollToTop.jsx";
+import { AuthProvider } from "./contexts/AuthContext";
 import HomePageOne from "./pages/HomePageOne";
 import AboutPage from "./pages/AboutPage.jsx";
 import AboutFourPage from "./pages/AboutFourPage.jsx";
@@ -41,88 +42,136 @@ import TutorPage from "./pages/TutorPage.jsx";
 import TutorDetailsPage from "./pages/TutorDetailsPage.jsx";
 import HomePageFive from "./pages/HomePageFive.jsx";
 import HomePageSix from "./pages/HomePageSix.jsx";
-import ScheduleManagementPage from "./pages/ScheduleManagementPage.jsx";
-import ClassManagementPage from "./pages/ClassManagementPage.jsx";
-import AcademicDashboardPage from "./pages/AcademicDashboardPage.jsx";
-import StudentDashboardPage from "./pages/StudentDashboardPage.jsx";
-import StudentSchedulePage from "./pages/StudentSchedulePage.jsx";
-import StudentCoursesPage from "./pages/StudentCoursesPage.jsx";
-import StudentClassDetailPage from "./pages/StudentClassDetailPage.jsx";
-import StudentAssignmentsPage from "./pages/StudentAssignmentsPage.jsx";
 
+
+import StudentExamListPage from "./pages/ExamPages/StudentExamListPage.jsx";
+import ExamDetailPage from "./pages/ExamPages/ExamDetailPage.jsx";
+import ReadingExamPage from "./pages/ExamPages/ReadingExamPage.jsx";
+import ReadingResultPage from "./pages/ExamPages/ReadingResultPage.jsx";
+
+import { Navigate } from "react-router-dom";
+import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";
+import { academicRoutes } from "./routes/AcademicRoutes.jsx";
+import Profile from "./pages/Profile.jsx";
+import { teacherRoutes } from "./routes/TeacherRoutes.jsx";
+import { studentRoutes } from "./routes/StudentRoutes.jsx";
+import { ministryRoutes } from "./routes/MinistryRoutes.jsx";
+import { examRoutes } from "./routes/ExamRoutes.jsx";
 function App() {
   return (
-    <BrowserRouter>
-      <RouteScrollToTop />
+    <AuthProvider>
+      <BrowserRouter>
+      {/* <RouteScrollToTop /> */}
+        <Routes>
+          
+          {/* Center Head Routes */}
+          {centerHeadRoutes.map((route, index) => (
+            <Route key={`centerhead-${index}`} path={route.path} element={route.element} />
+          ))}
 
-      <Routes>
-        <Route exact path='/' element={<HomePageOne />} />
-        <Route exact path='/index-2' element={<HomePageTwo />} />
-        <Route exact path='/index-3' element={<HomePageThree />} />
-        <Route exact path='/index-4' element={<HomePageFour />} />
-        <Route exact path='/index-5' element={<HomePageFive />} />
-        <Route exact path='/index-6' element={<HomePageSix />} />
-        <Route exact path='/about' element={<AboutPage />} />
-        <Route exact path='/about-two' element={<AboutTwoPage />} />
-        <Route exact path='/about-three' element={<AboutThreePage />} />
-        <Route exact path='/about-four' element={<AboutFourPage />} />
-        <Route exact path='/apply-admission' element={<ApplyAdmissionPage />} />
-        <Route exact path='/blog' element={<BlogPage />} />
-        <Route exact path='/blog-classic' element={<BlogClassicPage />} />
-        <Route exact path='/blog-details' element={<BlogDetailsPage />} />
-        <Route exact path='/blog-list' element={<BlogListPage />} />
-        <Route
-          exact
-          path='/book-online-class'
-          element={<BookOnlineClassPage />}
-        />
-        <Route exact path='/cart' element={<CartPage />} />
-        <Route exact path='/checkout' element={<CheckoutPage />} />
-        <Route exact path='/contact' element={<ContactPage />} />
-        <Route exact path='/course' element={<CoursePage />} />
-        <Route exact path='/course-details' element={<CourseDetailsPage />} />
-        <Route
-          exact
-          path='/course-list-view'
-          element={<CourseListViewPage />}
-        />
-        <Route exact path='/event-details' element={<EventDetailsPage />} />
-        <Route exact path='/events' element={<EventsPage />} />
-        <Route exact path='/faq' element={<FaqPage />} />
-        <Route exact path='/favorite-course' element={<FavoriteCoursePage />} />
-        <Route exact path='/find-tutors' element={<FindTutorsPage />} />
-        <Route exact path='/gallery' element={<GalleryPage />} />
-        <Route exact path='/instructor' element={<InstructorPage />} />
-        <Route
-          exact
-          path='/instructor-details'
-          element={<InstructorDetailsPage />}
-        />
-        <Route exact path='/instructor-two' element={<InstructorTwoPage />} />
-        <Route exact path='/lesson-details' element={<LessonDetailsPage />} />
-        <Route exact path='/pricing-plan' element={<PricingPlanPage />} />
-        <Route exact path='/privacy-policy' element={<PrivacyPolicyPage />} />
-        <Route exact path='/product' element={<ProductPage />} />
-        <Route exact path='/product-details' element={<ProductDetailsPage />} />
-        <Route exact path='/sign-in' element={<SignInPage />} />
-        <Route exact path='/sign-up' element={<SignUpPage />} />
-        <Route exact path='/tuition-jobs' element={<TuitionJobsPage />} />
-        <Route exact path='/tutor' element={<TutorPage />} />
-        <Route exact path='/tutor-details' element={<TutorDetailsPage />} />
+          {/* Academic Routes */}
+          {academicRoutes.map((route, index) => (
+            <Route key={`academic-${index}`} path={route.path} element={route.element} />
+          ))}
+
+          {/* Student Routes */}
+          {studentRoutes.map((route, index) => (
+            <Route key={`student-${index}`} path={route.path} element={route.element} />
+          ))}
+
+          {/* Teacher Routes */}
+          {teacherRoutes.map((route, index) => (
+            <Route key={`teacher-${index}`} path={route.path} element={route.element} />
+          ))}
+          {/* Ministry Routes */}
+          {ministryRoutes.map((route, index) => (
+            <Route key={`ministry-${index}`} path={route.path} element={route.element} />
+          ))}
+
+          {/* Dashboard */}
+          {/* <Route path="/" element={<Dashboard />} /> */}
+          {examRoutes.map((route, index) => (
+            <Route key={`exam-${index}`} path={route.path} element={route.element} />
+          ))}
+
+
+          {/* Redirect unknown routes to dashboard */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+
+          <Route exact path="/" element={<HomePageTwo />} />
+          <Route exact path="/index-2" element={<HomePageOne />} />
+          <Route exact path="/index-3" element={<HomePageThree />} />
+          <Route exact path="/index-4" element={<HomePageFour />} />
+          <Route exact path="/index-5" element={<HomePageFive />} />
+          <Route exact path="/index-6" element={<HomePageSix />} />
+          <Route exact path="/about" element={<AboutPage />} />
+          <Route exact path="/about-two" element={<AboutTwoPage />} />
+          <Route exact path="/about-three" element={<AboutThreePage />} />
+          <Route exact path="/about-four" element={<AboutFourPage />} />
+          <Route
+            exact
+            path="/apply-admission"
+            element={<ApplyAdmissionPage />}
+          />
+          <Route exact path="/blog" element={<BlogPage />} />
+          <Route exact path="/blog-classic" element={<BlogClassicPage />} />
+          <Route exact path="/blog-details" element={<BlogDetailsPage />} />
+          <Route exact path="/blog-list" element={<BlogListPage />} />
+          <Route
+            exact
+            path="/book-online-class"
+            element={<BookOnlineClassPage />}
+          />
+          <Route exact path="/cart" element={<CartPage />} />
+          <Route exact path="/checkout" element={<CheckoutPage />} />
+          <Route exact path="/contact" element={<ContactPage />} />
+          <Route exact path="/course" element={<CoursePage />} />
+          <Route exact path="/course-details" element={<CourseDetailsPage />} />
+          <Route
+            exact
+            path="/course-list-view"
+            element={<CourseListViewPage />}
+          />
+          <Route exact path="/event-details" element={<EventDetailsPage />} />
+          <Route exact path="/events" element={<EventsPage />} />
+          <Route exact path="/faq" element={<FaqPage />} />
+          <Route
+            exact
+            path="/favorite-course"
+            element={<FavoriteCoursePage />}
+          />
+          <Route exact path="/find-tutors" element={<FindTutorsPage />} />
+          <Route exact path="/gallery" element={<GalleryPage />} />
+          <Route exact path="/instructor" element={<InstructorPage />} />
+          <Route
+            exact
+            path="/instructor-details"
+            element={<InstructorDetailsPage />}
+          />
+
+          <Route exact path="/instructor-two" element={<InstructorTwoPage />} />
+          <Route exact path="/lesson-details" element={<LessonDetailsPage />} />
+          <Route exact path="/pricing-plan" element={<PricingPlanPage />} />
+          <Route exact path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route exact path="/product" element={<ProductPage />} />
+          <Route
+            exact
+            path="/product-details"
+            element={<ProductDetailsPage />}
+          />
+          <Route exact path="/sign-in" element={<SignInPage />} />
+          <Route exact path="/profile" element={<Profile />} />
+          <Route exact path="/sign-up" element={<SignUpPage />} />
+          <Route exact path="/tuition-jobs" element={<TuitionJobsPage />} />
+          <Route exact path="/tutor" element={<TutorPage />} />
+          <Route exact path="/tutor-details" element={<TutorDetailsPage />} />
+
         
-        {/* Academic Module Routes */}
-        <Route exact path='/schedule-management' element={<ScheduleManagementPage />} />
-        <Route exact path='/class-management' element={<ClassManagementPage />} />
-        <Route exact path='/academic-dashboard' element={<AcademicDashboardPage />} />
-        
-        {/* Student Module Routes */}
-        <Route exact path='/student/dashboard' element={<StudentDashboardPage />} />
-        <Route exact path='/student/schedule' element={<StudentSchedulePage />} />
-        <Route exact path='/student/courses' element={<StudentCoursesPage />} />
-        <Route exact path='/student/class/:classId' element={<StudentClassDetailPage />} />
-        <Route exact path='/student/assignments' element={<StudentAssignmentsPage />} />
-      </Routes>
-    </BrowserRouter>
+
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+
   );
 }
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Nav, Tab, Form, ProgressBar, Table, Alert } from 'react-bootstrap';
 import { useParams, Link } from 'react-router-dom';
+import { getClassDetailMock, materialsMock, homeworkMock, progressMock } from './student_mockdata';
 
 /**
  * Student Class Detail Component
@@ -21,117 +22,17 @@ const StudentClassDetail = () => {
   const fetchClassDetail = async () => {
     try {
       // TODO: Replace with actual API call
-      // Mock data
-      setClassInfo({
-        id: classId,
-        name: 'A2-Evening-01',
-        level: 'A2',
-        teacher: {
-          name: 'Trần Thị B',
-          email: 'tranthib@example.com',
-          phone: '0123456789',
-          avatar: null
-        },
-        schedule: 'Thứ 2, 4, 6 | 18:00 - 20:00',
-        room: 'Room 102',
-        startDate: '2025-09-01',
-        endDate: '2025-11-30',
-        totalLessons: 30,
-        completedLessons: 18,
-        description: 'Khóa học tiếng Anh cơ bản dành cho người mới bắt đầu, tập trung vào ngữ pháp cơ bản và giao tiếp hàng ngày.',
-        objectives: [
-          'Nắm vững ngữ pháp cơ bản tiếng Anh',
-          'Có thể giao tiếp trong các tình huống hàng ngày',
-          'Đọc hiểu các văn bản đơn giản',
-          'Viết các đoạn văn ngắn'
-        ]
-      });
-
-      setMaterials([
-        {
-          id: 1,
-          title: 'Unit 5 - Present Perfect Tense',
-          type: 'pdf',
-          size: '2.5 MB',
-          uploadDate: '2025-10-28',
-          downloadUrl: '#',
-          lessonNumber: 18
-        },
-        {
-          id: 2,
-          title: 'Grammar Exercise - Unit 5',
-          type: 'pdf',
-          size: '1.2 MB',
-          uploadDate: '2025-10-28',
-          downloadUrl: '#',
-          lessonNumber: 18
-        },
-        {
-          id: 3,
-          title: 'Listening Practice - Video',
-          type: 'video',
-          size: '45 MB',
-          uploadDate: '2025-10-25',
-          downloadUrl: '#',
-          lessonNumber: 17
-        }
-      ]);
-
-      setHomework([
-        {
-          id: 1,
-          title: 'Unit 6 - Grammar Exercise',
-          description: 'Complete exercises 1-10 on page 45',
-          dueDate: '2025-11-05',
-          status: 'pending',
-          score: null,
-          submittedDate: null,
-          feedback: null,
-          attachments: []
-        },
-        {
-          id: 2,
-          title: 'Reading Comprehension Test',
-          description: 'Read the passage and answer questions',
-          dueDate: '2025-11-07',
-          status: 'pending',
-          score: null,
-          submittedDate: null,
-          feedback: null,
-          attachments: []
-        },
-        {
-          id: 3,
-          title: 'Unit 5 - Writing Assignment',
-          description: 'Write a short paragraph about your daily routine',
-          dueDate: '2025-10-30',
-          status: 'graded',
-          score: 9,
-          submittedDate: '2025-10-29',
-          feedback: 'Good work! Pay attention to verb tenses.',
-          attachments: ['assignment_5.pdf']
-        }
-      ]);
-
-      setProgress({
-        attendanceRate: 92,
-        totalPresent: 17,
-        totalAbsent: 1,
-        totalLate: 0,
-        averageScore: 8.5,
-        grades: [
-          { lessonNumber: 10, type: 'Quiz', score: 8.0, date: '2025-10-10' },
-          { lessonNumber: 12, type: 'Assignment', score: 9.0, date: '2025-10-15' },
-          { lessonNumber: 15, type: 'Midterm', score: 8.5, date: '2025-10-22' },
-          { lessonNumber: 18, type: 'Assignment', score: 9.0, date: '2025-10-29' }
-        ],
-        cloAchievement: [
-          { clo: 'CLO1', name: 'Ngữ pháp cơ bản', progress: 85, target: 100 },
-          { clo: 'CLO2', name: 'Giao tiếp hàng ngày', progress: 78, target: 100 },
-          { clo: 'CLO3', name: 'Đọc hiểu', progress: 90, target: 100 },
-          { clo: 'CLO4', name: 'Viết', progress: 82, target: 100 }
-        ]
-      });
+      // const response = await classApi.getClassDetail(classId);
+      // setClassInfo(response.classInfo);
+      // setMaterials(response.materials);
+      // setHomework(response.homework);
+      // setProgress(response.progress);
+      
+      // Using mock data
+      setClassInfo(getClassDetailMock(classId));
+      setMaterials(materialsMock);
+      setHomework(homeworkMock);
+      setProgress(progressMock);
     } catch (error) {
       console.error('Error fetching class detail:', error);
     }
@@ -163,7 +64,7 @@ const StudentClassDetail = () => {
     <Row className="g-3">
       <Col lg={8}>
         {/* Class Description */}
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+        <Card className="bg-white border-0 rounded-12 mb- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}24">
           <Card.Header className="border-0 p-20" style={{ background: 'linear-gradient(135deg, #F0F7FF 0%, #E6F2FF 100%)' }}>
             <h5 className="text-neutral-900 fw-semibold mb-0">Giới thiệu khóa học</h5>
           </Card.Header>
@@ -180,7 +81,7 @@ const StudentClassDetail = () => {
         </Card>
 
         {/* Schedule Info */}
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+        <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
           <Card.Header className="border-0 p-20" style={{ background: 'linear-gradient(135deg, #F0F7FF 0%, #E6F2FF 100%)' }}>
             <h5 className="text-neutral-900 fw-semibold mb-0">Thông tin lịch học</h5>
           </Card.Header>
@@ -245,7 +146,7 @@ const StudentClassDetail = () => {
 
       <Col lg={4}>
         {/* Teacher Info */}
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+        <Card className="bg-white border-0 rounded-12 mb- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}24">
           <Card.Header className="border-0 p-20" style={{ background: 'linear-gradient(135deg, #F0F7FF 0%, #E6F2FF 100%)' }}>
             <h5 className="text-neutral-900 fw-semibold mb-0">Giảng viên</h5>
           </Card.Header>
@@ -275,7 +176,7 @@ const StudentClassDetail = () => {
         </Card>
 
         {/* Quick Stats */}
-        <Card className="bg-gradient border-0 rounded-12 box-shadow-sm text-white"
+        <Card className="bg-gradient border-0 rounded-12 text-white style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}"
               style={{ background: 'linear-gradient(135deg, var(--main-600) 0%, var(--main-700) 100%)' }}>
           <Card.Body className="p-20">
             <h6 className="text-white fw-semibold mb-16">Thống kê nhanh</h6>
@@ -300,7 +201,7 @@ const StudentClassDetail = () => {
   );
 
   const renderMaterials = () => (
-    <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+    <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
       <Card.Header className="bg-main-25 border-0 p-20">
         <div className="d-flex justify-content-between align-items-center">
           <h5 className="text-neutral-900 fw-semibold mb-0">Tài liệu học tập</h5>
@@ -359,7 +260,7 @@ const StudentClassDetail = () => {
   const renderHomework = () => (
     <div className="d-flex flex-column gap-3">
       {homework.map(hw => (
-        <Card key={hw.id} className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+        <Card key={hw.id} className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
           <Card.Body className="p-20">
             <Row className="align-items-start">
               <Col md={8}>
@@ -429,7 +330,7 @@ const StudentClassDetail = () => {
     <Row className="g-3">
       <Col lg={6}>
         {/* Attendance Stats */}
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+        <Card className="bg-white border-0 rounded-12 mb- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}24">
           <Card.Header className="border-0 p-20" style={{ background: 'linear-gradient(135deg, #F0F7FF 0%, #E6F2FF 100%)' }}>
             <h5 className="text-neutral-900 fw-semibold mb-0">Thống kê chuyên cần</h5>
           </Card.Header>
@@ -462,7 +363,7 @@ const StudentClassDetail = () => {
         </Card>
 
         {/* Grade History */}
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+        <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
           <Card.Header className="border-0 p-20" style={{ background: 'linear-gradient(135deg, #F0F7FF 0%, #E6F2FF 100%)' }}>
             <h5 className="text-neutral-900 fw-semibold mb-0">Lịch sử điểm</h5>
           </Card.Header>
@@ -499,7 +400,7 @@ const StudentClassDetail = () => {
 
       <Col lg={6}>
         {/* Average Score */}
-        <Card className="bg-gradient border-0 rounded-12 box-shadow-sm text-white mb-24"
+        <Card className="bg-gradient border-0 rounded-12 text-white style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }} mb-24"
               style={{ background: 'linear-gradient(135deg, var(--warning-600) 0%, var(--warning-700) 100%)' }}>
           <Card.Body className="p-24 text-center">
             <div className="text-white text-48 fw-bold mb-8">{progress?.averageScore}</div>
@@ -508,7 +409,7 @@ const StudentClassDetail = () => {
         </Card>
 
         {/* CLO Achievement */}
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+        <Card className="bg-white border-0 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
           <Card.Header className="border-0 p-20" style={{ background: 'linear-gradient(135deg, #F0F7FF 0%, #E6F2FF 100%)' }}>
             <h5 className="text-neutral-900 fw-semibold mb-0">Đạt chuẩn đầu ra (CLO)</h5>
           </Card.Header>
@@ -566,7 +467,7 @@ const StudentClassDetail = () => {
       </nav>
 
       {/* Header */}
-      <Card className="bg-gradient border-0 rounded-12 box-shadow-sm mb-24"
+      <Card className="bg-gradient border-0 rounded-12 mb- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}24"
             style={{ background: 'linear-gradient(135deg, #0D74FF 0%, #0A5FD9 100%)' }}>
         <Card.Body className="p-24">
           <Row className="align-items-center">
@@ -595,7 +496,7 @@ const StudentClassDetail = () => {
 
       {/* Tabs */}
       <Tab.Container activeKey={activeTab} onSelect={(k) => setActiveTab(k)}>
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+        <Card className="bg-white border-0 rounded-12 mb- style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}24">
           <Card.Header className="bg-white border-0 p-0">
             <Nav variant="tabs" className="border-0 px-20 pt-20">
               <Nav.Item>

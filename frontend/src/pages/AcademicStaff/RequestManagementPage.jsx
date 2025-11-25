@@ -1061,7 +1061,21 @@ const RequestManagementPage = () => {
     
     try {
       setProcessing(true);
-      await academicStaffService.approveChangeRequest(selectedRequest._id);
+      
+      // Chuẩn bị dữ liệu để gửi lên backend
+      const approvalData = {
+        pendingMakeupClasses: pendingMakeupClasses.map(makeup => ({
+          absentScheduleId: makeup.absentScheduleId,
+          makeupScheduleId: makeup.makeupScheduleId,
+          makeupClassId: makeup.makeupClassId
+        })),
+        pendingClassChange: pendingClassChange ? {
+          oldClassId: pendingClassChange.oldClassId,
+          newClassId: pendingClassChange.newClassId
+        } : null
+      };
+      
+      await academicStaffService.approveChangeRequest(selectedRequest._id, approvalData);
       setShowDetailModal(false);
       setSelectedRequest(null);
       setRejectReason('');

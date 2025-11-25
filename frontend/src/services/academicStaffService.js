@@ -25,11 +25,11 @@ const academicStaffService = {
   },
 
   // Approve change request
-  approveChangeRequest: async (id) => {
+  approveChangeRequest: async (id, data = {}) => {
     try {
       const response = await axios.put(
         `${API_URL}/academic-staff/change-requests/${id}/approve`,
-        {},
+        data,
         {
           headers: getAuthHeader()
         }

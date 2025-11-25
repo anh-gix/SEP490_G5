@@ -4,6 +4,7 @@ const Role = require('../models/roleModel');
 const ClassSchedule = require('../models/classScheduleModel');
 const StudentSchedule = require('../models/studentScheduleModel');
 const Class = require('../models/classModel');
+const mongoose = require('mongoose');
 
 // =========================
 // 📋 LẤY DANH SÁCH TẤT CẢ ĐƠN
@@ -212,35 +213,127 @@ exports.getSenderSchedule = async (req, res) => {
 // ✅ CHẤP NHẬN ĐƠN
 // =========================
 exports.approveChangeRequest = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
     const { id } = req.params;
+    const { pendingMakeupClasses, pendingClassChange } = req.body;
     const approverId = req.user?._id || req.body.approverId; // Lấy từ token hoặc body
     
-    const changeRequest = await ChangeRequest.findByIdAndUpdate(
-      id,
-      {
-        status: 'approved',
-        approver: approverId,
-        approvedDate: new Date()
-      },
-      { new: true }
-    )
-    .populate('sender', 'username email phone')
-    .populate('approver', 'username email');
+    // Lấy thông tin đơn trước khi cập nhật
+    const changeRequest = await ChangeRequest.findById(id)
+      .populate('sender', 'username email phone')
+      .session(session);
     
     if (!changeRequest) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy đơn'
       });
     }
     
+    const studentId = changeRequest.sender._id || changeRequest.sender;
+    
+    // Xử lý buổi học bù nếu có
+    if (pendingMakeupClasses && Array.isArray(pendingMakeupClasses) && pendingMakeupClasses.length > 0) {
+      console.log(`📚 Xử lý ${pendingMakeupClasses.length} buổi học bù cho học sinh ${studentId}`);
+      
+      for (const makeup of pendingMakeupClasses) {
+        const { absentScheduleId, makeupScheduleId, makeupClassId } = makeup;
+        
+        if (!absentScheduleId || !makeupScheduleId) {
+          console.warn('⚠️ Thiếu thông tin buổi học bù:', makeup);
+          continue;
+        }
+        
+        // Kiểm tra ClassSchedule có tồn tại không
+        const makeupClassSchedule = await ClassSchedule.findById(makeupScheduleId).session(session);
+        const absentClassSchedule = await ClassSchedule.findById(absentScheduleId).session(session);
+        
+        if (!makeupClassSchedule) {
+          console.warn(`⚠️ Không tìm thấy ClassSchedule cho buổi học bù: ${makeupScheduleId}`);
+          continue;
+        }
+        
+        if (!absentClassSchedule) {
+          console.warn(`⚠️ Không tìm thấy ClassSchedule cho buổi nghỉ: ${absentScheduleId}`);
+          continue;
+        }
+        
+        // Kiểm tra xem đã có StudentSchedule cho buổi học bù chưa (tránh duplicate)
+        const existingMakeupSchedule = await StudentSchedule.findOne({
+          student: studentId,
+          classSchedule: makeupScheduleId
+        }).session(session);
+        
+        if (!existingMakeupSchedule) {
+          // Tạo StudentSchedule mới cho buổi học bù
+          const newStudentSchedule = new StudentSchedule({
+            student: studentId,
+            classSchedule: makeupScheduleId,
+            scheduleStatus: 'scheduled',
+            reason: `Học bù cho buổi nghỉ ngày ${new Date(absentClassSchedule.date).toLocaleDateString('vi-VN')}`
+          });
+          
+          await newStudentSchedule.save({ session });
+          console.log(`✅ Đã tạo StudentSchedule cho buổi học bù: ${makeupScheduleId}`);
+        } else {
+          console.log(`ℹ️ StudentSchedule cho buổi học bù đã tồn tại: ${makeupScheduleId}`);
+        }
+        
+        // Cập nhật StudentSchedule của buổi nghỉ thành cancelled
+        const absentStudentSchedule = await StudentSchedule.findOne({
+          student: studentId,
+          classSchedule: absentScheduleId
+        }).session(session);
+        
+        if (absentStudentSchedule) {
+          absentStudentSchedule.scheduleStatus = 'cancelled';
+          absentStudentSchedule.reason = `Học bù tại lớp khác (${makeupClassId})`;
+          await absentStudentSchedule.save({ session });
+          console.log(`✅ Đã cập nhật StudentSchedule buổi nghỉ thành cancelled: ${absentScheduleId}`);
+        } else {
+          console.warn(`⚠️ Không tìm thấy StudentSchedule cho buổi nghỉ: ${absentScheduleId}`);
+        }
+      }
+    }
+    
+    // Xử lý đổi lớp nếu có (có thể triển khai sau)
+    if (pendingClassChange) {
+      console.log('ℹ️ Yêu cầu đổi lớp được ghi nhận nhưng chưa được xử lý tự động');
+      // TODO: Implement class change logic if needed
+    }
+    
+    // Cập nhật trạng thái đơn sử dụng findByIdAndUpdate để tránh lỗi validation
+    const updatedChangeRequest = await ChangeRequest.findByIdAndUpdate(
+      id,
+      {
+        status: 'approved',
+        approver: approverId,
+        approvedDate: new Date()
+      },
+      { 
+        new: true,
+        session: session
+      }
+    )
+    .populate('sender', 'username email phone')
+    .populate('approver', 'username email');
+    
+    await session.commitTransaction();
+    session.endSession();
+    
     res.status(200).json({
       success: true,
       message: 'Đã chấp nhận đơn thành công',
-      changeRequest
+      changeRequest: updatedChangeRequest
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error("❌ Lỗi khi chấp nhận đơn:", error);
     res.status(500).json({
       success: false,

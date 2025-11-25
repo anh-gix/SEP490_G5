@@ -1,10 +1,10 @@
 import React from 'react';
 
-const Button = ({ 
-  children, 
-  variant = 'primary', 
-  size = 'md', 
-  onClick, 
+const Button = ({
+  children,
+  variant = 'primary',
+  size = 'md',
+  onClick,
   disabled = false,
   className = '',
   type = 'button',
@@ -14,10 +14,18 @@ const Button = ({
   const variantClasses = {
     primary: 'btn-main',
     secondary: 'btn-outline-main',
-    success: 'btn-success-600',
-    danger: 'btn-danger-600',
-    warning: 'btn-warning-600',
-    outline: 'btn-outline-neutral-300',
+    'outline-secondary': 'btn-outline-secondary',
+    success: 'bg-success-600 text-white border-success-600',
+    danger: 'bg-danger-600 text-white border-danger-600',
+    warning: 'bg-warning-600 text-white border-warning-600',
+    outline: 'bg-white text-neutral-700 border-neutral-300',
+    ghost: 'bg-transparent text-neutral-700 border-0',
+  };
+
+  const variantHoverStyles = {
+    success: { backgroundColor: 'var(--success-700)', borderColor: 'var(--success-700)' },
+    danger: { backgroundColor: 'var(--danger-700)', borderColor: 'var(--danger-700)' },
+    warning: { backgroundColor: 'var(--warning-700)', borderColor: 'var(--warning-700)' },
   };
 
   const sizeClasses = {
@@ -26,12 +34,29 @@ const Button = ({
     lg: 'btn-lg px-32 py-16 text-lg',
   };
 
+  const buttonClass = `btn ${variantClasses[variant] || variantClasses.primary} ${sizeClasses[size]} radius-8 d-inline-flex align-items-center gap-2 ${className} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`;
+
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`btn ${variantClasses[variant]} ${sizeClasses[size]} radius-8 d-inline-flex align-items-center gap-2 ${className} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      className={buttonClass}
+      style={{
+        border: '1px solid',
+        transition: 'all 0.2s ease',
+      }}
+      onMouseEnter={(e) => {
+        if (!disabled && variantHoverStyles[variant]) {
+          Object.assign(e.currentTarget.style, variantHoverStyles[variant]);
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!disabled) {
+          e.currentTarget.style.backgroundColor = '';
+          e.currentTarget.style.borderColor = '';
+        }
+      }}
     >
       {icon && iconPosition === 'left' && <i className={icon}></i>}
       {children}

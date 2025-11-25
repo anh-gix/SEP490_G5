@@ -17,6 +17,7 @@ const studentScheduleSchema = new mongoose.Schema({
       type: String,
       enum: ["present", "absent", "late", "excused"],
       // Không có default - để null khi chưa điểm danh
+      // Không có default - để null khi chưa điểm danh
     },
     checkInTime: Date,
     markedBy: {

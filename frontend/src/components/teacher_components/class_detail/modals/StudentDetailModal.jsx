@@ -8,6 +8,7 @@ const StudentDetailModal = ({
   onUpdateMocktestScore 
 }) => {
   const [editingMocktest, setEditingMocktest] = useState(null);
+  const [editingScheduleId, setEditingScheduleId] = useState(null);
   const [mocktestScores, setMocktestScores] = useState({
     reading: '',
     listening: '',
@@ -17,9 +18,18 @@ const StudentDetailModal = ({
 
   if (!student) return null;
 
-  const handleEditMocktest = (sessionOrder, currentScores) => {
+  const handleEditMocktest = (sessionOrder, scheduleId, currentScores) => {
+    console.log('🔍 Edit Mocktest Debug:', {
+      sessionOrder,
+      scheduleId,
+      currentScores,
+      studentId: student.id || student._id,
+      studentName: student.name
+    });
+    
     setEditingMocktest(sessionOrder);
-    if (currentScores) {
+    setEditingScheduleId(scheduleId);
+    if (currentScores && typeof currentScores === 'object') {
       setMocktestScores({
         reading: currentScores.reading || '',
         listening: currentScores.listening || '',
@@ -32,15 +42,24 @@ const StudentDetailModal = ({
   };
 
   const handleSaveMocktestScore = () => {
-    if (onUpdateMocktestScore) {
-      onUpdateMocktestScore(student.id || student._id, editingMocktest, mocktestScores);
+    console.log('💾 Save Mocktest Score:', {
+      studentId: student.id || student._id,
+      scheduleId: editingScheduleId,
+      scores: mocktestScores,
+      sessionOrder: editingMocktest
+    });
+    
+    if (onUpdateMocktestScore && editingScheduleId) {
+      onUpdateMocktestScore(student.id || student._id, editingScheduleId, mocktestScores);
     }
     setEditingMocktest(null);
+    setEditingScheduleId(null);
     setMocktestScores({ reading: '', listening: '', writing: '', speaking: '' });
   };
 
   const handleCancelEdit = () => {
     setEditingMocktest(null);
+    setEditingScheduleId(null);
     setMocktestScores({ reading: '', listening: '', writing: '', speaking: '' });
   };
 
@@ -166,6 +185,7 @@ const StudentDetailModal = ({
                 <tbody>
                   {student.mocktestSessionOrders.map((sessionOrder, idx) => {
                     const mocktest = student.mocktestScores?.[`mocktest${sessionOrder}`];
+                    const scheduleId = mocktest?.scheduleId;
                     const skillScores = mocktest?.skillScores;
                     const totalScore = calculateTotal(skillScores);
                     const isEditing = editingMocktest === sessionOrder;
@@ -283,7 +303,8 @@ const StudentDetailModal = ({
                               <Button 
                                 size="sm" 
                                 className="btn-outline-main text-11 px-10 py-4"
-                                onClick={() => handleEditMocktest(sessionOrder, skillScores)}
+                                onClick={() => handleEditMocktest(sessionOrder, scheduleId, skillScores)}
+                                disabled={!scheduleId}
                               >
                                 <i className="fas fa-edit me-1"></i>
                                 Sửa

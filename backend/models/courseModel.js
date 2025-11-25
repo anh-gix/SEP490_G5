@@ -44,12 +44,29 @@ const courseSchema = new Schema({
     mocktestSessionOrders: [{
         type: Number
     }],
-
+    
     submittedAt: {
         type: Date
     },
     revisionReason: {
         type: String
+    },
+    approvedAt: {
+        type: Date
+    },
+    approvedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    approvalNote: {
+        type: String
+    },
+    rejectedAt: {
+        type: Date
+    },
+    rejectedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User'
     },
     status: {
         type: String,

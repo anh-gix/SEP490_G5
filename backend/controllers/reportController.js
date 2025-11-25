@@ -1,397 +1,507 @@
-const Class = require("../models/classModel");
-const User = require("../models/userModel");
-const ClassSchedule = require("../models/classScheduleModel");
-const StudentSchedule = require("../models/studentScheduleModel");
-const Role = require("../models/roleModel");
+const User = require('../models/userModel');
+const Class = require('../models/classModel');
+const Course = require('../models/courseModel');
+const ClassSchedule = require('../models/classScheduleModel');
+const StudentSchedule = require('../models/studentScheduleModel');
+const Program = require('../models/programModel');
+const Exam = require('../models/examModel');
+const Submission = require('../models/submissionModel');
+const Room = require('../models/room');
+const Role = require('../models/roleModel');
 
 // =========================
-// 📊 BÁO CÁO TỔNG QUAN
+// REPORT STATISTICS
 // =========================
-exports.getOverviewReport = async (req, res) => {
-  try {
-    // Total classes
-    const totalClasses = await Class.countDocuments();
-    
-    // Get active classes (classes that have schedules)
-    const activeClassIds = await ClassSchedule.distinct('class');
-    const activeClasses = activeClassIds.length;
-    
-    // Total students
-    const studentRole = await Role.findOne({ name: 'Student' });
-    const totalStudents = studentRole 
-      ? await User.countDocuments({ roleId: studentRole._id })
-      : 0;
-    
-    // Total teachers
-    const teacherRole = await Role.findOne({ name: 'Teacher' });
-    const totalTeachers = teacherRole
-      ? await User.countDocuments({ roleId: teacherRole._id })
-      : 0;
-    
-    // Calculate average attendance
-    const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    
-    const monthSchedules = await StudentSchedule.find({
-      createdAt: { $gte: firstDayOfMonth }
-    });
-    
-    let averageAttendance = 0;
-    if (monthSchedules.length > 0) {
-      const presentCount = monthSchedules.filter(
-        s => s.attendance && s.attendance.status === 'present'
-      ).length;
-      averageAttendance = ((presentCount / monthSchedules.length) * 100).toFixed(1);
-    }
-    
-    // Completion rate (classes with all sessions completed)
-    const completionRate = totalClasses > 0 
-      ? ((activeClasses / totalClasses) * 100).toFixed(1)
-      : 0;
-    
-    res.status(200).json({
-      message: "Lấy báo cáo tổng quan thành công",
-      overview: {
-        totalClasses,
-        activeClasses,
-        totalStudents,
-        totalTeachers,
-        averageAttendance: parseFloat(averageAttendance),
-        completionRate: parseFloat(completionRate)
-      }
-    });
-  } catch (error) {
-    console.error("❌ Lỗi khi lấy báo cáo tổng quan:", error);
-    res.status(500).json({ 
-      message: "Lỗi server khi lấy báo cáo tổng quan",
-      error: error.message 
-    });
-  }
-};
 
-// =========================
-// 📚 BÁO CÁO THEO LỚP HỌC
-// =========================
-exports.getClassReport = async (req, res) => {
-  try {
-    const { level } = req.query; // Filter by level (A1, A2, B1, B2)
-    
-    let classQuery = {};
-    if (level) {
-      // Assuming class name contains level (e.g., "A1-Morning-01")
-      classQuery.name = { $regex: level, $options: 'i' };
-    }
-    
-    const classes = await Class.find(classQuery)
-      .populate('teacherId', 'username email')
-      .populate('students', 'username email');
-    
-    // Get stats for each class
-    const classStats = await Promise.all(
-      classes.map(async (cls) => {
-        // Get schedules for this class
-        const schedules = await ClassSchedule.find({ class: cls._id });
-        const totalSessions = schedules.length;
-        
-        // Get attendance for this class
-        const studentSchedules = await StudentSchedule.find({
-          classSchedule: { $in: schedules.map(s => s._id) }
-        });
-        
-        let avgAttendance = 0;
-        if (studentSchedules.length > 0) {
-          const presentCount = studentSchedules.filter(
-            s => s.attendance && s.attendance.status === 'present'
-          ).length;
-          avgAttendance = Math.round((presentCount / studentSchedules.length) * 100);
-        }
-        
-        // Extract level from class name
-        const levelMatch = cls.name.match(/^(A1|A2|B1|B2|C1|C2)/i);
-        const classLevel = levelMatch ? levelMatch[1].toUpperCase() : 'N/A';
-        
-        return {
-          _id: cls._id,
-          name: cls.name,
-          level: classLevel,
-          subject: cls.subject,
-          teacher: cls.teacherId,
-          totalStudents: cls.students.length,
-          totalSessions,
-          activeSessions: totalSessions, // All created sessions are considered active
-          avgAttendance
-        };
-      })
-    );
-    
-    res.status(200).json({
-      message: "Lấy báo cáo lớp học thành công",
-      total: classStats.length,
-      classes: classStats
-    });
-  } catch (error) {
-    console.error("❌ Lỗi khi lấy báo cáo lớp học:", error);
-    res.status(500).json({ 
-      message: "Lỗi server khi lấy báo cáo lớp học",
-      error: error.message 
-    });
-  }
-};
-
-// =========================
-// 👨‍🎓 BÁO CÁO HỌC VIÊN
-// =========================
-exports.getStudentReport = async (req, res) => {
-  try {
-    const studentRole = await Role.findOne({ name: 'Student' });
-    if (!studentRole) {
-      return res.status(404).json({ message: "Không tìm thấy role học viên" });
-    }
-    
-    const students = await User.find({ roleId: studentRole._id })
-      .select('-password -token');
-    
-    // Get stats for each student
-    const studentStats = await Promise.all(
-      students.map(async (student) => {
-        // Find classes student is enrolled in
-        const enrolledClasses = await Class.find({ 
-          students: student._id 
-        }).select('name');
-        
-        // Get attendance records
-        const attendanceRecords = await StudentSchedule.find({
-          student: student._id
-        });
-        
-        let attendanceRate = 0;
-        if (attendanceRecords.length > 0) {
-          const presentCount = attendanceRecords.filter(
-            r => r.attendance && r.attendance.status === 'present'
-          ).length;
-          attendanceRate = Math.round((presentCount / attendanceRecords.length) * 100);
-        }
-        
-        return {
-          _id: student._id,
-          username: student.username,
-          email: student.email,
-          phone: student.phone,
-          enrolledClasses: enrolledClasses.length,
-          totalSessions: attendanceRecords.length,
-          attendanceRate
-        };
-      })
-    );
-    
-    res.status(200).json({
-      message: "Lấy báo cáo học viên thành công",
-      total: studentStats.length,
-      students: studentStats
-    });
-  } catch (error) {
-    console.error("❌ Lỗi khi lấy báo cáo học viên:", error);
-    res.status(500).json({ 
-      message: "Lỗi server khi lấy báo cáo học viên",
-      error: error.message 
-    });
-  }
-};
-
-// =========================
-// 👨‍🏫 BÁO CÁO GIẢNG VIÊN
-// =========================
-exports.getTeacherReport = async (req, res) => {
-  try {
-    const teacherRole = await Role.findOne({ name: 'Teacher' });
-    if (!teacherRole) {
-      return res.status(404).json({ message: "Không tìm thấy role giảng viên" });
-    }
-    
-    const teachers = await User.find({ roleId: teacherRole._id })
-      .select('-password -token');
-    
-    // Get stats for each teacher
-    const teacherStats = await Promise.all(
-      teachers.map(async (teacher) => {
-        // Find classes taught by teacher
-        const classes = await Class.find({ teacherId: teacher._id });
-        const classIds = classes.map(c => c._id);
-        
-        // Count total students
-        const totalStudents = classes.reduce((sum, cls) => sum + cls.students.length, 0);
-        
-        // Count total sessions
-        const totalSessions = await ClassSchedule.countDocuments({
-          class: { $in: classIds }
-        });
-        
-        // Calculate attendance rate for teacher's classes
-        const schedules = await ClassSchedule.find({
-          class: { $in: classIds }
-        });
-        const scheduleIds = schedules.map(s => s._id);
-        
-        const attendanceRecords = await StudentSchedule.find({
-          classSchedule: { $in: scheduleIds }
-        });
-        
-        let avgAttendance = 0;
-        if (attendanceRecords.length > 0) {
-          const presentCount = attendanceRecords.filter(
-            r => r.attendance && r.attendance.status === 'present'
-          ).length;
-          avgAttendance = Math.round((presentCount / attendanceRecords.length) * 100);
-        }
-        
-        return {
-          _id: teacher._id,
-          username: teacher.username,
-          email: teacher.email,
-          phone: teacher.phone,
-          totalClasses: classes.length,
-          totalStudents,
-          totalSessions,
-          avgAttendance
-        };
-      })
-    );
-    
-    res.status(200).json({
-      message: "Lấy báo cáo giảng viên thành công",
-      total: teacherStats.length,
-      teachers: teacherStats
-    });
-  } catch (error) {
-    console.error("❌ Lỗi khi lấy báo cáo giảng viên:", error);
-    res.status(500).json({ 
-      message: "Lỗi server khi lấy báo cáo giảng viên",
-      error: error.message 
-    });
-  }
-};
-
-// =========================
-// 💰 BÁO CÁO TÀI CHÍNH (Mock - cần model Payment/Invoice)
-// =========================
-exports.getFinancialReport = async (req, res) => {
+/**
+ * Get student statistics report
+ * GET /api/reports/students
+ */
+const getStudentReport = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    
-    // Get all classes
-    const classes = await Class.find().populate('students');
-    
-    // Mock tuition fee calculation (300,000 VND per student per class)
-    const tuitionPerStudent = 300000;
-    
-    let revenue = {
-      total: 0,
-      byLevel: {}
-    };
-    
-    classes.forEach(cls => {
-      const levelMatch = cls.name.match(/^(A1|A2|B1|B2|C1|C2)/i);
-      const level = levelMatch ? levelMatch[1].toUpperCase() : 'Other';
-      
-      const classRevenue = cls.students.length * tuitionPerStudent;
-      revenue.total += classRevenue;
-      
-      if (!revenue.byLevel[level]) {
-        revenue.byLevel[level] = {
-          studentCount: 0,
-          classCount: 0,
-          revenue: 0
-        };
-      }
-      
-      revenue.byLevel[level].studentCount += cls.students.length;
-      revenue.byLevel[level].classCount += 1;
-      revenue.byLevel[level].revenue += classRevenue;
+
+    // Get student role
+    const studentRole = await Role.findOne({ name: 'student' });
+    if (!studentRole) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy role học viên'
+      });
+    }
+
+    // Build date filter
+    const dateFilter = {};
+    if (startDate) dateFilter.$gte = new Date(startDate);
+    if (endDate) dateFilter.$lte = new Date(endDate);
+
+    // Total students
+    const totalStudents = await User.countDocuments({
+      roleId: studentRole._id
     });
-    
+
+    // New students in date range
+    const newStudents = Object.keys(dateFilter).length > 0
+      ? await User.countDocuments({
+          roleId: studentRole._id,
+          createdAt: dateFilter
+        })
+      : 0;
+
+    // Students by class
+    const studentsByClass = await Class.aggregate([
+      {
+        $project: {
+          name: 1,
+          studentCount: { $size: '$students' }
+        }
+      },
+      { $sort: { studentCount: -1 } },
+      { $limit: 10 }
+    ]);
+
     res.status(200).json({
-      message: "Lấy báo cáo tài chính thành công",
-      note: "Đây là dữ liệu mock. Cần tích hợp với hệ thống thanh toán thực tế.",
-      revenue,
-      tuitionPerStudent
+      success: true,
+      data: {
+        totalStudents,
+        newStudents,
+        studentsByClass
+      }
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy báo cáo tài chính:", error);
-    res.status(500).json({ 
-      message: "Lỗi server khi lấy báo cáo tài chính",
-      error: error.message 
+    console.error('Error getting student report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy báo cáo học viên',
+      error: error.message
     });
   }
 };
 
-// =========================
-// 📈 BÁO CÁO THỐNG KÊ THEO THỜI GIAN
-// =========================
-exports.getTimeBasedReport = async (req, res) => {
+/**
+ * Get course statistics report
+ * GET /api/reports/courses
+ */
+const getCourseReport = async (req, res) => {
   try {
-    const { period } = req.query; // 'week', 'month', 'quarter', 'year'
-    
-    const today = new Date();
-    let startDate, endDate = today;
-    
-    switch(period) {
-      case 'week':
-        startDate = new Date(today.setDate(today.getDate() - 7));
-        break;
-      case 'month':
-        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-        break;
-      case 'quarter':
-        const quarter = Math.floor(today.getMonth() / 3);
-        startDate = new Date(today.getFullYear(), quarter * 3, 1);
-        break;
-      case 'year':
-        startDate = new Date(today.getFullYear(), 0, 1);
-        break;
-      default:
-        startDate = new Date(today.setDate(today.getDate() - 30));
-    }
-    
-    // Get schedules in period
-    const schedules = await ClassSchedule.find({
-      date: { $gte: startDate, $lte: endDate }
-    }).populate('class');
-    
-    // Get attendance in period
-    const studentSchedules = await StudentSchedule.find({
-      createdAt: { $gte: startDate, $lte: endDate }
-    });
-    
-    const totalSchedules = schedules.length;
-    const uniqueClasses = [...new Set(schedules.map(s => s.class?._id?.toString()))].length;
-    
-    let attendanceRate = 0;
-    if (studentSchedules.length > 0) {
-      const presentCount = studentSchedules.filter(
-        s => s.attendance && s.attendance.status === 'present'
-      ).length;
-      attendanceRate = ((presentCount / studentSchedules.length) * 100).toFixed(1);
-    }
-    
-    res.status(200).json({
-      message: `Lấy báo cáo ${period || 'tháng'} thành công`,
-      period: {
-        startDate,
-        endDate,
-        type: period || 'month'
+    const { startDate, endDate } = req.query;
+
+    // Build date filter
+    const dateFilter = {};
+    if (startDate) dateFilter.$gte = new Date(startDate);
+    if (endDate) dateFilter.$lte = new Date(endDate);
+
+    // Total courses by status
+    const totalCourses = await Course.countDocuments();
+    const approvedCourses = await Course.countDocuments({ status: 'approved' });
+    const pendingCourses = await Course.countDocuments({ status: 'pending_approval' });
+    const draftCourses = await Course.countDocuments({ status: 'draft' });
+
+    // Courses by program
+    const coursesByProgram = await Course.aggregate([
+      {
+        $group: {
+          _id: '$program',
+          count: { $sum: 1 }
+        }
       },
-      stats: {
-        totalSchedules,
-        uniqueClasses,
-        totalAttendanceRecords: studentSchedules.length,
-        attendanceRate: parseFloat(attendanceRate)
+      {
+        $lookup: {
+          from: 'programs',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'programInfo'
+        }
+      },
+      { $unwind: '$programInfo' },
+      {
+        $project: {
+          programName: '$programInfo.program_name',
+          programCode: '$programInfo.code',
+          count: 1
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    // New courses in date range
+    const newCourses = Object.keys(dateFilter).length > 0
+      ? await Course.countDocuments({ createdAt: dateFilter })
+      : 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalCourses,
+        approvedCourses,
+        pendingCourses,
+        draftCourses,
+        newCourses,
+        coursesByProgram
       }
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy báo cáo theo thời gian:", error);
-    res.status(500).json({ 
-      message: "Lỗi server khi lấy báo cáo theo thời gian",
-      error: error.message 
+    console.error('Error getting course report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy báo cáo khóa học',
+      error: error.message
     });
   }
+};
+
+/**
+ * Get class statistics report
+ * GET /api/reports/classes
+ */
+const getClassReport = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    // Build date filter
+    const dateFilter = {};
+    if (startDate) dateFilter.$gte = new Date(startDate);
+    if (endDate) dateFilter.$lte = new Date(endDate);
+
+    // Total classes
+    const totalClasses = await Class.countDocuments();
+
+    // Average students per class
+    const classStats = await Class.aggregate([
+      {
+        $project: {
+          studentCount: { $size: '$students' }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          avgStudents: { $avg: '$studentCount' },
+          minStudents: { $min: '$studentCount' },
+          maxStudents: { $max: '$studentCount' }
+        }
+      }
+    ]);
+
+    // Classes by teacher
+    const classesByTeacher = await Class.aggregate([
+      {
+        $group: {
+          _id: '$teacherId',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'teacherInfo'
+        }
+      },
+      { $unwind: '$teacherInfo' },
+      {
+        $project: {
+          teacherName: '$teacherInfo.username',
+          teacherEmail: '$teacherInfo.email',
+          count: 1
+        }
+      },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalClasses,
+        avgStudentsPerClass: classStats[0]?.avgStudents || 0,
+        minStudentsPerClass: classStats[0]?.minStudents || 0,
+        maxStudentsPerClass: classStats[0]?.maxStudents || 0,
+        classesByTeacher
+      }
+    });
+  } catch (error) {
+    console.error('Error getting class report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy báo cáo lớp học',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get room utilization report
+ * GET /api/reports/rooms
+ */
+const getRoomReport = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    // Build date filter
+    const dateFilter = {};
+    if (startDate) dateFilter.$gte = new Date(startDate);
+    if (endDate) dateFilter.$lte = new Date(endDate);
+
+    // Total rooms
+    const totalRooms = await Room.countDocuments();
+    const availableRooms = await Room.countDocuments({ status: 'available' });
+    const maintenanceRooms = await Room.countDocuments({ status: 'maintenance' });
+
+    // Room usage statistics
+    const scheduleQuery = { status: 'approved' };
+    if (Object.keys(dateFilter).length > 0) {
+      scheduleQuery.date = dateFilter;
+    }
+
+    const roomUsage = await ClassSchedule.aggregate([
+      { $match: scheduleQuery },
+      {
+        $group: {
+          _id: '$room',
+          usageCount: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: 'rooms',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'roomInfo'
+        }
+      },
+      { $unwind: '$roomInfo' },
+      {
+        $project: {
+          roomName: '$roomInfo.room_name',
+          location: '$roomInfo.location',
+          capacity: '$roomInfo.capacity',
+          usageCount: 1
+        }
+      },
+      { $sort: { usageCount: -1 } }
+    ]);
+
+    // Calculate utilization rate (assuming 8 time slots per day)
+    const daysInRange = startDate && endDate
+      ? Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24))
+      : 30; // Default to 30 days
+
+    const totalPossibleSlots = totalRooms * daysInRange * 8;
+    const totalUsedSlots = roomUsage.reduce((sum, room) => sum + room.usageCount, 0);
+    const utilizationRate = totalPossibleSlots > 0
+      ? Math.round((totalUsedSlots / totalPossibleSlots) * 100)
+      : 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalRooms,
+        availableRooms,
+        maintenanceRooms,
+        utilizationRate,
+        roomUsage
+      }
+    });
+  } catch (error) {
+    console.error('Error getting room report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy báo cáo phòng học',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get exam statistics report
+ * GET /api/reports/exams
+ */
+const getExamReport = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    // Build date filter
+    const dateFilter = {};
+    if (startDate) dateFilter.$gte = new Date(startDate);
+    if (endDate) dateFilter.$lte = new Date(endDate);
+
+    // Total exams
+    const totalExams = await Exam.countDocuments();
+    const publishedExams = await Exam.countDocuments({ isPublished: true });
+
+    // Exams by type
+    const examsByType = await Exam.aggregate([
+      {
+        $group: {
+          _id: '$examType',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Exams by level
+    const examsByLevel = await Exam.aggregate([
+      {
+        $group: {
+          _id: '$level',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Submission statistics
+    const totalSubmissions = await Submission.countDocuments();
+    const completedSubmissions = await Submission.countDocuments({ status: 'completed' });
+    const inProgressSubmissions = await Submission.countDocuments({ status: 'in-progress' });
+
+    // Average submissions per exam
+    const avgSubmissions = totalExams > 0
+      ? Math.round(totalSubmissions / totalExams)
+      : 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalExams,
+        publishedExams,
+        examsByType,
+        examsByLevel,
+        totalSubmissions,
+        completedSubmissions,
+        inProgressSubmissions,
+        avgSubmissions
+      }
+    });
+  } catch (error) {
+    console.error('Error getting exam report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy báo cáo bài thi',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get training effectiveness report
+ * GET /api/reports/effectiveness
+ */
+const getEffectivenessReport = async (req, res) => {
+  try {
+    // Attendance rate
+    const totalSchedules = await StudentSchedule.countDocuments();
+    const presentSchedules = await StudentSchedule.countDocuments({
+      'attendance.status': 'present'
+    });
+    const attendanceRate = totalSchedules > 0
+      ? Math.round((presentSchedules / totalSchedules) * 100)
+      : 0;
+
+    // Course completion rate
+    const totalPrograms = await Program.countDocuments({ status: 'active' });
+    const completedPrograms = await Program.countDocuments({ status: 'archived' });
+    const completionRate = totalPrograms > 0
+      ? Math.round((completedPrograms / (totalPrograms + completedPrograms)) * 100)
+      : 0;
+
+    // Exam pass rate (assuming score >= 5 is pass)
+    const examResults = await Submission.aggregate([
+      { $match: { status: 'completed' } },
+      {
+        $project: {
+          totalScore: {
+            $sum: {
+              $map: {
+                input: '$sections',
+                as: 'section',
+                in: {
+                  $sum: {
+                    $map: {
+                      input: '$$section.answers',
+                      as: 'answer',
+                      in: '$$answer.score'
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          avgScore: { $avg: '$totalScore' },
+          passCount: {
+            $sum: {
+              $cond: [{ $gte: ['$totalScore', 5] }, 1, 0]
+            }
+          },
+          totalCount: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const examPassRate = examResults[0]?.totalCount > 0
+      ? Math.round((examResults[0].passCount / examResults[0].totalCount) * 100)
+      : 0;
+
+    const avgExamScore = examResults[0]?.avgScore || 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        attendanceRate,
+        completionRate,
+        examPassRate,
+        avgExamScore: Math.round(avgExamScore * 100) / 100
+      }
+    });
+  } catch (error) {
+    console.error('Error getting effectiveness report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy báo cáo hiệu quả đào tạo',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Export reports to Excel
+ * GET /api/reports/export
+ */
+const exportReports = async (req, res) => {
+  try {
+    const { type, format = 'excel' } = req.query;
+
+    // This is a placeholder for export functionality
+    // You would need to implement Excel/PDF export logic here
+    // Using libraries like exceljs or pdfkit
+
+    res.status(501).json({
+      success: false,
+      message: 'Chức năng xuất báo cáo chưa được triển khai',
+      note: 'Cần cài đặt thư viện exceljs hoặc pdfkit để xuất báo cáo'
+    });
+  } catch (error) {
+    console.error('Error exporting reports:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi xuất báo cáo',
+      error: error.message
+    });
+  }
+};
+
+module.exports = {
+  getStudentReport,
+  getCourseReport,
+  getClassReport,
+  getRoomReport,
+  getExamReport,
+  getEffectivenessReport,
+  exportReports
 };

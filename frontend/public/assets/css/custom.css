@@ -449,7 +449,10 @@ dashbord settimgs end
   background-color: var(--main-800) !important;
   border-color: var(--main-800) !important;
 }
-.btn-outline-main {
+.btn-outline-main,
+.btn-outline-main:focus,
+.btn-outline-main:active,
+.btn-outline-main:visited {
   background-color: transparent !important;
   border-color: hsl(var(--main)) !important;
   color: hsl(var(--main)) !important;
@@ -457,6 +460,7 @@ dashbord settimgs end
 .btn-outline-main:hover {
   background-color: hsl(var(--main)/0.1) !important;
   border-color: hsl(var(--main)) !important;
+  color: hsl(var(--main)) !important;
 }
 .btn-white {
   background-color: hsl(var(--white)) !important;
@@ -476,6 +480,66 @@ dashbord settimgs end
 .btn-outline-white:hover {
   background-color: hsl(var(--white)/0.25) !important;
   border-color: hsl(var(--white)) !important;
+}
+
+/* Success Button */
+.btn-success-600,
+.btn-success-600:focus,
+.btn-success-600:active,
+.btn-success-600:visited {
+  background-color: #16a34a !important;
+  border-color: #16a34a !important;
+  color: #ffffff !important;
+}
+.btn-success-600:hover {
+  background-color: #15803d !important;
+  border-color: #15803d !important;
+  color: #ffffff !important;
+}
+
+/* Danger Button */
+.btn-danger,
+.btn-danger:focus,
+.btn-danger:active,
+.btn-danger:visited {
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+}
+.btn-danger:hover {
+  background-color: #b91c1c !important;
+  border-color: #b91c1c !important;
+  color: #ffffff !important;
+}
+
+/* Warning Button */
+.btn-warning-600,
+.btn-warning-600:focus,
+.btn-warning-600:active,
+.btn-warning-600:visited {
+  background-color: #ea580c !important;
+  border-color: #ea580c !important;
+  color: #ffffff !important;
+}
+.btn-warning-600:hover {
+  background-color: #c2410c !important;
+  border-color: #c2410c !important;
+  color: #ffffff !important;
+}
+
+/* Outline Secondary Button */
+.btn-outline-secondary,
+.btn-outline-secondary:focus,
+.btn-outline-secondary:active,
+.btn-outline-secondary:visited {
+  background-color: transparent !important;
+  border-color: #6b7280 !important;
+  color: #6b7280 !important;
+}
+.btn-outline-secondary:hover {
+  background-color: #f3f4f6 !important;
+  border-color: #4b5563 !important;
+  color: #4b5563 !important;
 }
 
 /* ================================= Button Css End =========================== */

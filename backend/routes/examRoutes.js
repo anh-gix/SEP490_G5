@@ -4,6 +4,17 @@ const examController = require("../controllers/examController");
 const upload = examController.uploadMiddleware;
 const { verifyToken } = require("../middlewares/verifyToken");
 
+// ================== CENTER HEAD - EXAM MANAGEMENT ROUTES ==================
+router.get("/management", examController.getAllExamsForManagement);
+router.get("/management/:id", examController.getExamByIdForManagement);
+router.post("/management", examController.createExamForManagement);
+router.put("/management/:id", examController.updateExamForManagement);
+router.delete("/management/:id", examController.deleteExamForManagement);
+router.post("/management/:id/publish", examController.publishExamForManagement);
+router.post("/management/:id/unpublish", examController.unpublishExamForManagement);
+router.post("/management/upload-answer-key", upload.single("file"), examController.uploadAnswerKeyForManagement);
+
+// ================== STUDENT - PUBLIC EXAM ROUTES ==================
 // 🧠 Lấy danh sách bài thi (public)
 router.get("/", examController.getAllExams);
 

@@ -1,146 +1,118 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+const API_BASE_URL = 'http://localhost:8080/api/courses';
 
-// Helper to get auth token
-const getAuthHeader = () => {
-  const token = localStorage.getItem('token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
-const courseService = {
-  // Get all course types
-  getAllTypes: async () => {
+// Course service functions
+export const courseService = {
+  // Lấy tất cả courses
+  getAllCourses: async (params = {}) => {
     try {
-      const response = await axios.get(`${API_URL}/v1/courses/all-types`);
+      const response = await axios.get(API_BASE_URL, { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw error.response?.data || { message: 'Không thể lấy danh sách giáo trình' };
     }
   },
 
-  // Get all course levels
-  getAllLevels: async () => {
+  // Lấy course theo ID
+  getCourseById: async (id) => {
     try {
-      const response = await axios.get(`${API_URL}/v1/courses/all-levels`);
+      const response = await axios.get(`${API_BASE_URL}/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw error.response?.data || { message: 'Không thể lấy thông tin giáo trình' };
     }
   },
 
-  // Get levels by type
-  getLevelsByType: async (type) => {
+  // Tạo course mới
+  createCourse: async (courseData) => {
     try {
-      const response = await axios.get(`${API_URL}/v1/courses/levels`, {
-        params: { type }
-      });
+      const response = await axios.post(API_BASE_URL, courseData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw error.response?.data || { message: 'Tạo giáo trình thất bại' };
     }
   },
 
-  // Get types by level
-  getTypesByLevel: async (level) => {
+  // Cập nhật course
+  updateCourse: async (id, courseData) => {
     try {
-      const response = await axios.get(`${API_URL}/v1/courses/types`, {
-        params: { level }
-      });
+      const response = await axios.put(`${API_BASE_URL}/${id}`, courseData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw error.response?.data || { message: 'Cập nhật giáo trình thất bại' };
     }
   },
 
-  // Get courses by program name and level
-  getCoursesByProgram: async (programName, level) => {
+  // Xóa course
+  deleteCourse: async (id) => {
     try {
-      const response = await axios.get(`${API_URL}/v1/courses/by-program`, {
-        params: { programName, level }
-      });
+      const response = await axios.delete(`${API_BASE_URL}/${id}`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw error.response?.data || { message: 'Xóa giáo trình thất bại' };
     }
   },
 
-  // Get band by type and level
-  getBandByTypeAndLevel: async (type, level) => {
-    try {
-      const response = await axios.get(`${API_URL}/v1/courses/band`, {
-        params: { type, level }
-      });
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error.message;
-    }
-  },
-
-  // Get course details
-  getCourseDetails: async (courseId) => {
-    try {
-      const response = await axios.get(`${API_URL}/v1/courses/${courseId}/details`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error.message;
-    }
-  },
-
-  // Get course mappings (if endpoint exists)
-  getCourseMappings: async () => {
-    try {
-      const response = await axios.get(`${API_URL}/v1/courses/mappings`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error.message;
-    }
-  },
-
-  // Get pending courses
+  // Lấy danh sách courses chờ phê duyệt
   getPendingCourses: async () => {
     try {
-      const response = await axios.get(`${API_URL}/v1/courses/pending`, {
-        headers: getAuthHeader()
-      });
+      const response = await axios.get(`${API_BASE_URL}/pending`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw error.response?.data || { message: 'Không thể lấy danh sách giáo trình chờ duyệt' };
     }
   },
 
-  // Approve course
-  approveCourse: async (courseId) => {
+  // Lấy chi tiết course (với sessions, CLOs)
+  getCourseDetails: async (id) => {
     try {
-      const response = await axios.patch(
-        `${API_URL}/v1/courses/${courseId}/approve`,
-        {},
-        {
-          headers: getAuthHeader()
-        }
-      );
+      const response = await axios.get(`${API_BASE_URL}/${id}/details`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw error.response?.data || { message: 'Không thể lấy chi tiết giáo trình' };
     }
   },
 
-  // Request course revision
-  requestRevision: async (courseId) => {
+  // Phê duyệt course
+  approveCourse: async (id) => {
     try {
-      const response = await axios.patch(
-        `${API_URL}/v1/courses/${courseId}/revise`,
-        {},
-        {
-          headers: getAuthHeader()
-        }
-      );
+      const response = await axios.patch(`${API_BASE_URL}/${id}/approve`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw error.response?.data || { message: 'Phê duyệt giáo trình thất bại' };
     }
-  }
+  },
+
+  // Yêu cầu chỉnh sửa course
+  requestRevision: async (id, data) => {
+    try {
+      const response = await axios.patch(`${API_BASE_URL}/${id}/revise`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Gửi yêu cầu chỉnh sửa thất bại' };
+    }
+  },
+
+  // Accept course to program (Program Head)
+  acceptCourseToProgram: async (id, data) => {
+    try {
+      const response = await axios.patch(`${API_BASE_URL}/${id}/accept`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Chấp nhận giáo trình thất bại' };
+    }
+  },
+
+  // Reject course from program (Program Head)
+  rejectCourseFromProgram: async (id, data) => {
+    try {
+      const response = await axios.patch(`${API_BASE_URL}/${id}/reject`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Từ chối giáo trình thất bại' };
+    }
+  },
 };
 
 export default courseService;
-

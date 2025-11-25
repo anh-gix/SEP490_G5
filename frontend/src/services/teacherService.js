@@ -21,6 +21,18 @@ const teacherService = {
     }
   },
 
+  // Get teacher dashboard data
+  getTeacherDashboard: async () => {
+    try {
+      const response = await axios.get(`${API_URL}/teachers/me/dashboard`, {
+        headers: getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
   // Get current teacher schedule (from logged in user)
   getCurrentTeacherSchedule: async (params = {}) => {
     try {

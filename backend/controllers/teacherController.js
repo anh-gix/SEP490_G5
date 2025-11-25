@@ -2,7 +2,6 @@ const User = require("../models/userModel");
 const Role = require("../models/roleModel");
 const Class = require("../models/classModel");
 const ClassSchedule = require("../models/classScheduleModel");
-const StudentSchedule = require("../models/studentScheduleModel");
 
 // =========================
 // 📋 LẤY DANH SÁCH GIẢNG VIÊN
@@ -366,17 +365,39 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
       });
     }
     
+    
     const classIds = teacherClasses.map(cls => cls._id);
     
-    let query = { class: { $in: classIds }, status: { $in: ['temporary', 'fixed'] } };
+    console.log('🔍 Get Current Teacher Schedule:', {
+      teacherId,
+      startDate,
+      endDate,
+      classIds: classIds.length
+    });
+    
+    let query = { class: { $in: classIds } };
     
     // Filter by date range if provided
     if (startDate && endDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      
       query.date = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
+        $gte: start,
+        $lte: end
       };
+      console.log('📅 Date filter:', {
+        startDate,
+        endDate,
+        startObj: start,
+        endObj: end
+      });
     }
+    
+    console.log('🔍 Query:', JSON.stringify(query));
     
     const schedules = await ClassSchedule.find(query)
       .populate('class', 'name course startDate endDate')
@@ -391,6 +412,15 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
       .populate('session', 'title order content')
       .sort({ date: 1, startTime: 1 })
       .lean();
+    
+    console.log('📋 Schedules found:', {
+      total: schedules.length,
+      sample: schedules[0] ? {
+        date: schedules[0].date,
+        status: schedules[0].status,
+        className: schedules[0].class?.name
+      } : 'No schedules'
+    });
     
     // Format schedules with additional info
     const formattedSchedules = schedules.map(schedule => ({
@@ -429,23 +459,12 @@ exports.getTeacherSchedule = async (req, res) => {
     const { id } = req.params;
     const { startDate, endDate } = req.query;
     
-    console.log('\n👨‍🏫 ========== LẤY LỊCH GIÁO VIÊN (getTeacherSchedule) ==========');
-    console.log('  - TeacherId:', id);
-    console.log('  - StartDate:', startDate || 'Không có');
-    console.log('  - EndDate:', endDate || 'Không có');
-    
     // Find all classes taught by this teacher (Class model uses 'teacher' field, not 'teacherId')
     const teacherClasses = await Class.find({ teacher: id })
       .select('_id name startDate endDate')
       .lean();
     
-    console.log('  - Tổng số lớp của giáo viên:', teacherClasses.length);
-    teacherClasses.forEach((cls, idx) => {
-      console.log(`    [${idx + 1}] ${cls.name} (ID: ${cls._id})`);
-    });
-    
     if (!teacherClasses || teacherClasses.length === 0) {
-      console.log('  ⚠️ Giáo viên này chưa có lớp nào');
       return res.status(200).json({
         success: true,
         message: "Giảng viên này chưa có lớp nào",
@@ -456,7 +475,7 @@ exports.getTeacherSchedule = async (req, res) => {
     
     const classIds = teacherClasses.map(cls => cls._id);
     
-    let query = { class: { $in: classIds }, status: { $in: ['temporary', 'fixed'] } };
+    let query = { class: { $in: classIds }, status: 'fixed' };
     
     // Filter by date range if provided
     if (startDate && endDate) {
@@ -464,7 +483,6 @@ exports.getTeacherSchedule = async (req, res) => {
         $gte: new Date(startDate),
         $lte: new Date(endDate)
       };
-      console.log('  - Lọc theo khoảng ngày:', startDate, 'đến', endDate);
     }
     
     const schedules = await ClassSchedule.find(query)
@@ -474,74 +492,15 @@ exports.getTeacherSchedule = async (req, res) => {
       .sort({ date: 1, startTime: 1 })
       .lean();
     
-    console.log('  - Tổng số buổi học tìm thấy:', schedules.length);
-    
-    // Get schedule IDs to count students
-    const scheduleIds = schedules.map(s => s._id);
-    
-    // Count students for each schedule from StudentSchedule table
-    const studentCounts = await StudentSchedule.aggregate([
-      {
-        $match: {
-          classSchedule: { $in: scheduleIds },
-          scheduleStatus: { $ne: 'cancelled' } // Exclude cancelled schedules
-        }
-      },
-      {
-        $group: {
-          _id: '$classSchedule',
-          studentCount: { $sum: 1 }
-        }
-      }
-    ]);
-    
-    // Create a map for quick lookup
-    const studentCountMap = {};
-    studentCounts.forEach(item => {
-      studentCountMap[item._id.toString()] = item.studentCount;
-    });
-    
-    // Add class date range info and student count to each schedule
+    // Add class date range info to each schedule for easier conflict checking
     const schedulesWithClassInfo = schedules.map(schedule => {
       const classInfo = teacherClasses.find(c => c._id.toString() === schedule.class._id.toString());
-      const studentCount = studentCountMap[schedule._id.toString()] || 0;
       return {
         ...schedule,
         classStartDate: classInfo?.startDate,
-        classEndDate: classInfo?.endDate,
-        totalStudents: studentCount
+        classEndDate: classInfo?.endDate
       };
     });
-    
-    // Log chi tiết lịch học của giáo viên
-    console.log('\n📅 ========== CHI TIẾT LỊCH HỌC CỦA GIÁO VIÊN ==========');
-    if (schedulesWithClassInfo.length > 0) {
-      // Helper function to format date
-      const formatDateLocal = (dateInput) => {
-        if (!dateInput) return null;
-        const d = new Date(dateInput);
-        if (isNaN(d.getTime())) return null;
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        const dayNames = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-        const dayName = dayNames[d.getDay()];
-        return `${year}-${month}-${day} (${dayName})`;
-      };
-      
-      schedulesWithClassInfo.forEach((schedule, idx) => {
-        const dateStr = formatDateLocal(schedule.date);
-        const className = schedule.class?.name || 'N/A';
-        const roomName = schedule.room?.room_name || 'N/A';
-        console.log(`  [${idx + 1}] ${dateStr} - ${schedule.startTime} - ${schedule.endTime}`);
-        console.log(`      Lớp: ${className}`);
-        console.log(`      Phòng: ${roomName}`);
-        console.log(`      Trạng thái: ${schedule.status || 'N/A'}`);
-      });
-    } else {
-      console.log('  ⚠️ Không có buổi học nào trong khoảng thời gian này');
-    }
-    console.log('  ============================================\n');
     
     res.status(200).json({
       success: true,
@@ -587,7 +546,7 @@ exports.getMyClasses = async (req, res) => {
         // Get all schedules for this class
         const allSchedules = await ClassSchedule.find({ 
           class: cls._id,
-          status: { $in: ['temporary', 'fixed'] }
+          status: 'fixed' 
         })
           .populate('session', 'title order')
           .sort({ date: 1 })
@@ -718,7 +677,7 @@ exports.getMyClassDetail = async (req, res) => {
     // Get all schedules/lessons for this class
     const lessons = await ClassSchedule.find({ 
       class: classId,
-      status: { $in: ['temporary', 'fixed'] }
+      status: 'fixed' 
     })
       .populate('session', 'title order content')
       .populate('room', 'room_name location')
@@ -866,49 +825,75 @@ exports.getMyClassDetail = async (req, res) => {
       // Get mocktest scores
       const mocktestScores = {};
       for (const order of mocktestSessionOrders) {
+        // Find lesson by session order (mocktest doesn't need to exist yet)
         const mocktestLesson = lessons.find(
-          l => l.session?.order === order && l.mocktest
+          l => l.session?.order === order
         );
         
-        if (mocktestLesson && mocktestLesson.mocktest?.scores) {
-          const studentScore = mocktestLesson.mocktest.scores.find(
-            s => s.studentId?.toString() === student._id.toString()
-          );
-          
-          if (studentScore) {
-            // Calculate total score based on test type
-            let totalScore = 0;
-            const mocktype = mocktestLesson.mocktest.type;
+        if (mocktestLesson) {
+          // Check if there are existing scores
+          if (mocktestLesson.mocktest?.scores) {
+            const studentScore = mocktestLesson.mocktest.scores.find(
+              s => s.studentId?.toString() === student._id.toString()
+            );
             
-            if (mocktype === 'toeic') {
-              // TOEIC: reading + listening (max 990)
-              totalScore = (studentScore.reading || 0) + (studentScore.listening || 0);
-            } else if (mocktype === 'ielts' || mocktype === 'cam') {
-              // IELTS/CAM: average of 4 skills
-              const scores = [
-                studentScore.reading || 0,
-                studentScore.listening || 0,
-                studentScore.writing || 0,
-                studentScore.speaking || 0
-              ];
-              totalScore = scores.reduce((a, b) => a + b, 0) / 4;
-              totalScore = Math.round(totalScore * 10) / 10; // Round to 1 decimal
-            }
-            
-            mocktestScores[`mocktest${order}`] = {
-              totalScore,
-              skillScores: {
-                reading: studentScore.reading || 0,
-                listening: studentScore.listening || 0,
-                writing: studentScore.writing || 0,
-                speaking: studentScore.speaking || 0
+            if (studentScore) {
+              // Calculate total score based on test type
+              let totalScore = 0;
+              const mocktype = mocktestLesson.mocktest.type;
+              
+              if (mocktype === 'toeic') {
+                // TOEIC: reading + listening (max 990)
+                totalScore = (studentScore.reading || 0) + (studentScore.listening || 0);
+              } else if (mocktype === 'ielts' || mocktype === 'cam') {
+                // IELTS/CAM: average of 4 skills
+                const scores = [
+                  studentScore.reading || 0,
+                  studentScore.listening || 0,
+                  studentScore.writing || 0,
+                  studentScore.speaking || 0
+                ];
+                totalScore = scores.reduce((a, b) => a + b, 0) / 4;
+                totalScore = Math.round(totalScore * 10) / 10; // Round to 1 decimal
               }
-            };
+              
+              mocktestScores[`mocktest${order}`] = {
+                scheduleId: mocktestLesson._id,
+                sessionOrder: order,
+                totalScore,
+                skillScores: {
+                  reading: studentScore.reading || 0,
+                  listening: studentScore.listening || 0,
+                  writing: studentScore.writing || 0,
+                  speaking: studentScore.speaking || 0
+                }
+              };
+            } else {
+              // Mocktest exists but no score for this student
+              mocktestScores[`mocktest${order}`] = {
+                scheduleId: mocktestLesson._id,
+                sessionOrder: order,
+                totalScore: null,
+                skillScores: null
+              };
+            }
           } else {
-            mocktestScores[`mocktest${order}`] = null;
+            // Lesson exists but mocktest not created yet - still provide scheduleId
+            mocktestScores[`mocktest${order}`] = {
+              scheduleId: mocktestLesson._id,
+              sessionOrder: order,
+              totalScore: null,
+              skillScores: null
+            };
           }
         } else {
-          mocktestScores[`mocktest${order}`] = null;
+          // No lesson found for this mocktest session order
+          mocktestScores[`mocktest${order}`] = {
+            scheduleId: null,
+            sessionOrder: order,
+            totalScore: null,
+            skillScores: null
+          };
         }
       }
 
@@ -1130,7 +1115,18 @@ exports.updateMocktestScore = async (req, res) => {
 
     // Find the schedule
     const schedule = await ClassSchedule.findById(scheduleId)
-      .populate('class', 'teacher students');
+      .populate('class', 'teacher students course')
+      .populate('session', 'order title');
+
+    console.log('🔍 Update Mocktest - Schedule Info:', {
+      scheduleId,
+      studentId,
+      hasSchedule: !!schedule,
+      sessionOrder: schedule?.session?.order,
+      sessionTitle: schedule?.session?.title,
+      classId: schedule?.class?._id,
+      courseId: schedule?.class?.course
+    });
 
     if (!schedule) {
       return res.status(404).json({
@@ -1159,12 +1155,56 @@ exports.updateMocktestScore = async (req, res) => {
       });
     }
 
-    // Check if schedule has mocktest
-    if (!schedule.mocktest || !schedule.mocktest.order) {
+    // Get course to check if this is a mocktest session
+    const Course = require('../models/courseModel');
+    const Session = require('../models/sessionModel');
+    
+    const course = await Course.findById(schedule.class.course);
+    const session = schedule.session; // Already populated above
+    
+    console.log('🔍 Update Mocktest - Course & Session Info:', {
+      courseId: schedule.class.course,
+      hasCourse: !!course,
+      mocktestSessionOrders: course?.mocktestSessionOrders,
+      sessionOrder: session?.order,
+      isMocktestSession: course?.mocktestSessionOrders?.includes(session?.order)
+    });
+    
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy session'
+      });
+    }
+
+    const mocktestSessionOrders = course?.mocktestSessionOrders || [];
+    const isMocktestSession = mocktestSessionOrders.includes(session.order);
+
+    if (!isMocktestSession) {
+      console.log('❌ Not a mocktest session:', {
+        sessionOrder: session.order,
+        mocktestSessionOrders,
+        courseName: course?.name
+      });
       return res.status(400).json({
         success: false,
-        message: 'Buổi học này không có bài mocktest'
+        message: 'Buổi học này không phải là buổi mocktest'
       });
+    }
+
+    // Initialize mocktest if not exists
+    if (!schedule.mocktest) {
+      schedule.mocktest = {
+        title: `Mocktest ${session.order}`,
+        order: session.order,
+        type: 'toeic', // Default type, can be changed
+        scores: []
+      };
+    }
+
+    // Ensure scores array exists
+    if (!schedule.mocktest.scores) {
+      schedule.mocktest.scores = [];
     }
 
     // Find or create score entry for student

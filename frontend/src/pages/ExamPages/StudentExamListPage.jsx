@@ -11,6 +11,7 @@ const StudentExamListPage = () => {
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedExamType, setSelectedExamType] = useState("all");
 
   useEffect(() => {
     const fetchExams = async () => {
@@ -28,6 +29,26 @@ const StudentExamListPage = () => {
 
     fetchExams();
   }, []);
+
+  // Filter exams based on selected exam type
+  const filteredExams = selectedExamType === "all" 
+    ? exams 
+    : exams.filter((exam) => exam.examType === selectedExamType);
+
+  // Count exams by type
+  const examCounts = {
+    all: exams.length,
+    ielts: exams.filter((exam) => exam.examType === "ielts").length,
+    toeic: exams.filter((exam) => exam.examType === "toeic").length,
+    cambridge: exams.filter((exam) => exam.examType === "cambridge").length,
+  };
+
+  const examTypes = [
+    { value: "all", label: "Tất cả", count: examCounts.all },
+    { value: "ielts", label: "IELTS", count: examCounts.ielts },
+    { value: "toeic", label: "TOEIC", count: examCounts.toeic },
+    { value: "cambridge", label: "Cambridge", count: examCounts.cambridge },
+  ];
 
   return (
     <>
@@ -54,13 +75,47 @@ const StudentExamListPage = () => {
             </div>
           ) : (
             <>
-              <div className='flex-between gap-16 flex-wrap mb-40'>
-                <span className='text-neutral-500'>
-                  Hiển thị {exams.length} bài thi
-                </span>
+              {/* Exam Type Filter Tabs */}
+              <div className='mb-40'>
+                <div className='d-flex flex-wrap gap-12 border-bottom border-neutral-30 pb-16'>
+                  {examTypes.map((type) => (
+                    <button
+                      key={type.value}
+                      onClick={() => setSelectedExamType(type.value)}
+                      className={`btn px-24 py-12 rounded-pill fw-semibold transition-2 ${
+                        selectedExamType === type.value
+                          ? "btn-primary"
+                          : "btn-outline-primary"
+                      }`}
+                    >
+                      {type.label}
+                      {type.count > 0 && (
+                        <span className='badge bg-white text-main-600 ms-8'>
+                          {type.count}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className='row gy-4'>
-                {exams.map((exam) => (
+
+              {/* Exam List */}
+              {filteredExams.length === 0 ? (
+                <div className='text-center py-80'>
+                  <p className='text-neutral-500 text-lg'>
+                    Không có bài thi nào thuộc loại này
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className='flex-between gap-16 flex-wrap mb-40'>
+                    <span className='text-neutral-500'>
+                      Hiển thị {filteredExams.length} bài thi
+                      {selectedExamType !== "all" && ` (${examTypes.find(t => t.value === selectedExamType)?.label})`}
+                    </span>
+                  </div>
+                  <div className='row gy-4'>
+                    {filteredExams.map((exam) => (
                   <div key={exam._id} className='col-lg-4 col-sm-6'>
                     <div className='course-item bg-main-25 rounded-16 p-12 h-100 border border-neutral-30'>
                       <div className='course-item__content'>
@@ -106,8 +161,19 @@ const StudentExamListPage = () => {
                           </div>
                         </div>
                         <div className='flex-between gap-8 pt-24 border-top border-neutral-50 mt-28'>
-                          <span className='badge bg-main-600 text-white px-16 py-8 rounded-pill'>
-                            {exam.examType === "real" ? "Thi thật" : "Luyện tập"}
+                          <span className={`badge text-white px-16 py-8 rounded-pill ${
+                            exam.examType === "ielts" 
+                              ? "bg-danger" 
+                              : exam.examType === "toeic"
+                              ? "bg-success"
+                              : exam.examType === "cambridge"
+                              ? "bg-info"
+                              : "bg-main-600"
+                          }`}>
+                            {exam.examType === "ielts" ? "IELTS" : 
+                             exam.examType === "toeic" ? "TOEIC" : 
+                             exam.examType === "cambridge" ? "Cambridge" : 
+                             exam.examType}
                           </span>
                           <Link
                             to={`/exams/${exam._id}`}
@@ -120,8 +186,10 @@ const StudentExamListPage = () => {
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>

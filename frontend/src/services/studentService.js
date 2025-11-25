@@ -2,109 +2,117 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
+// Helper to get auth token
+const getAuthHeader = () => {
+  const token = localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 const studentService = {
-  // Get all students
-  getAllStudents: async (params = {}) => {
+  // Get current student info (from logged in user)
+  getCurrentStudent: async () => {
     try {
-      const response = await axios.get(`${API_URL}/students`, { params });
-      return response.data;
-    } catch (error) {
-      const errorData = error.response?.data;
-      const errorMessage = typeof errorData === 'string' 
-        ? errorData 
-        : errorData?.message || error.message || 'Lỗi không xác định';
-      const errorObj = {
-        message: errorMessage,
-        status: error.response?.status,
-        response: error.response
-      };
-      throw errorObj;
-    }
-  },
-
-  // Get student by ID
-  getStudentById: async (id) => {
-    try {
-      const response = await axios.get(`${API_URL}/students/${id}`);
+      const response = await axios.get(`${API_URL}/students/me`, {
+        headers: getAuthHeader()
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
     }
   },
 
-  // Get student schedule
-  getStudentSchedule: async (id, params = {}) => {
+  // Get current student's classes
+  getMyClasses: async (params = {}) => {
     try {
-      const response = await axios.get(`${API_URL}/students/${id}/schedule`, { params });
+      const response = await axios.get(`${API_URL}/students/me/classes`, {
+        params,
+        headers: getAuthHeader()
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
     }
   },
 
-  // Get student stats
-  getStudentStats: async () => {
+  // Get current student's schedule
+  getMySchedule: async (params = {}) => {
     try {
-      const response = await axios.get(`${API_URL}/students/stats`);
-      return response.data;
-    } catch (error) {
-      const errorData = error.response?.data;
-      const errorMessage = typeof errorData === 'string' 
-        ? errorData 
-        : errorData?.message || error.message || 'Lỗi không xác định';
-      const errorObj = {
-        message: errorMessage,
-        status: error.response?.status,
-        response: error.response
-      };
-      throw errorObj;
-    }
-  },
-
-  // Create student
-  createStudent: async (studentData) => {
-    try {
-      const response = await axios.post(`${API_URL}/students`, studentData);
+      const response = await axios.get(`${API_URL}/students/me/schedule`, {
+        params,
+        headers: getAuthHeader()
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
     }
   },
 
-  // Update student
-  updateStudent: async (id, studentData) => {
+  // Get lesson detail by schedule ID
+  getLessonDetail: async (scheduleId) => {
     try {
-      const response = await axios.put(`${API_URL}/students/${id}`, studentData);
+      const response = await axios.get(`${API_URL}/students/me/lessons/${scheduleId}`, {
+        headers: getAuthHeader()
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
     }
   },
 
-  // Delete student
-  deleteStudent: async (id) => {
+  // Get class materials
+  getClassMaterials: async (classId) => {
     try {
-      const response = await axios.delete(`${API_URL}/students/${id}`);
+      const response = await axios.get(`${API_URL}/students/me/classes/${classId}/materials`, {
+        headers: getAuthHeader()
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
     }
   },
 
-  // Import students from Excel
-  importStudents: async (studentsData) => {
+  // Get class homework
+  getClassHomework: async (classId) => {
     try {
-      const response = await axios.post(`${API_URL}/students/import`, { students: studentsData });
+      const response = await axios.get(`${API_URL}/students/me/classes/${classId}/homework`, {
+        headers: getAuthHeader()
+      });
       return response.data;
     } catch (error) {
-      const errorData = error.response?.data;
-      const errorMessage = typeof errorData === 'string' 
-        ? errorData 
-        : errorData?.message || error.message || 'Lỗi không xác định';
-      throw { message: errorMessage, status: error.response?.status };
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get class progress
+  getClassProgress: async (classId) => {
+    try {
+      const response = await axios.get(`${API_URL}/students/me/classes/${classId}/progress`, {
+        headers: getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Submit homework
+  submitHomework: async (classId, scheduleId, homeworkId, formData) => {
+    try {
+      const response = await axios.post(
+        `${API_URL}/students/me/classes/${classId}/schedules/${scheduleId}/homework/${homeworkId}/submit`,
+        formData,
+        {
+          headers: {
+            ...getAuthHeader(),
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
     }
   }
 };
 
 export default studentService;
-

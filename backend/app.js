@@ -4,17 +4,15 @@ const mongoose = require('mongoose');
 const router = require('./routes');
 require('./models');
 require('dotenv').config();
-
+const path = require('path');
 const app = express();
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Static file serving for uploads (PDF files, etc.)
-const path = require('path');
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Database connection
 mongoose.connect(process.env.MONGODB_URI, {
@@ -33,6 +31,12 @@ app.use('/api/v1', router); // Use the centralized router
 app.use('/api/exams', require('./routes/examRoutes'));
 app.use('/api/class-schedules', require('./routes/classScheduleRoutes'));
 app.use('/api/student-schedules', require('./routes/studentScheduleRoutes'));
+
+// Center Head Routes
+app.use('/api/center-head', require('./routes/centerHeadRoutes'));
+app.use('/api/programs', require('./routes/programRoutes'));
+app.use('/api/courses', require('./routes/courseRoute'));
+app.use('/api/sessions', require('./routes/sessionRoutes'));
 
 // Academic Staff Routes
 app.use('/api/rooms', require('./routes/roomRoutes'));

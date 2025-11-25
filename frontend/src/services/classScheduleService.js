@@ -57,6 +57,19 @@ export const classScheduleService = {
     }
   },
 
+  // Validate học bù: Kiểm tra conflict với buổi học của học sinh
+  validateMakeupClassSchedule: async (makeupClassScheduleId, studentId) => {
+    try {
+      const response = await api.post('/validate-makeup', {
+        makeupClassScheduleId,
+        studentId
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể validate học bù' };
+    }
+  },
+
   // Preview: Xem trước khi thêm buổi học (chỉ log, không tạo)
   previewAddClassSchedule: async (scheduleData) => {
     try {

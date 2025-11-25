@@ -1951,15 +1951,190 @@ exports.updateClass = async (req, res) => {
           console.log(`🔍 [DEBUG] Deleted ${deleteResult.deletedCount} StudentSchedule entries for removed students`);
         }
         
-        // 2. Create StudentSchedule for added students
+        // 2. Create StudentSchedule for added students (với kiểm tra conflict)
         if (addedStudents.length > 0) {
+          // ✅ KIỂM TRA CONFLICT LỊCH HỌC CỦA CÁC HỌC VIÊN MỚI THÊM VÀO
+          console.log('🔍 [DEBUG] Checking conflicts for added students:', addedStudents.length);
+          
+          // Lấy thông tin chi tiết của các ClassSchedule (cần date, startTime, endTime để kiểm tra conflict)
+          const allClassSchedulesDetails = await ClassSchedule.find({ class: req.params.id })
+            .session(session)
+            .select('_id date startTime endTime')
+            .lean();
+          
+          // Helper function để check time overlap
+          const hasTimeOverlap = (start1, end1, start2, end2) => {
+            const timeToMinutes = (timeStr) => {
+              if (!timeStr) return 0;
+              const parts = timeStr.split(':');
+              if (parts.length !== 2) return 0;
+              const hours = parseInt(parts[0], 10);
+              const minutes = parseInt(parts[1], 10);
+              return hours * 60 + minutes;
+            };
+            
+            const start1Min = timeToMinutes(start1);
+            const end1Min = timeToMinutes(end1);
+            const start2Min = timeToMinutes(start2);
+            const end2Min = timeToMinutes(end2);
+            
+            return start1Min < end2Min && end1Min > start2Min;
+          };
+          
+          // Helper function để format date
+          const formatDateLocal = (dateInput) => {
+            if (!dateInput) return null;
+            const d = new Date(dateInput);
+            if (isNaN(d.getTime())) return null;
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          };
+          
+          // Tìm tất cả lớp khác mà các học viên mới thêm vào đang tham gia
+          const addedStudentIds = addedStudents.map(id => new mongoose.Types.ObjectId(id));
+          const studentClasses = await Class.find({
+            students: { $in: addedStudentIds },
+            _id: { $ne: req.params.id }
+          })
+            .select('_id name students')
+            .session(session)
+            .lean();
+          
+          // Lấy thông tin học viên để hiển thị tên
+          const studentInfo = await User.find({
+            _id: { $in: addedStudentIds }
+          })
+            .select('_id username fullName name email')
+            .session(session)
+            .lean();
+          
+          const studentInfoMap = new Map();
+          studentInfo.forEach(student => {
+            const studentIdStr = student._id.toString();
+            const studentName = student.fullName || student.name || student.username || student.email?.split('@')[0] || `Học viên ${studentIdStr}`;
+            studentInfoMap.set(studentIdStr, studentName);
+          });
+          
+          // Kiểm tra conflict cho từng học viên mới thêm vào
+          const studentConflicts = [];
+          
+          if (studentClasses.length > 0) {
+            const studentClassIds = studentClasses.map(c => c._id);
+            
+            // Lấy tất cả ClassSchedule của các lớp khác mà học viên đang tham gia
+            const conflictingClassSchedules = await ClassSchedule.find({
+              class: { $in: studentClassIds },
+              status: { $in: ['temporary', 'fixed'] }
+            })
+              .populate('class', 'name')
+              .select('date startTime endTime class')
+              .session(session)
+              .lean();
+            
+            // Kiểm tra conflict cho từng ClassSchedule của lớp hiện tại
+            allClassSchedulesDetails.forEach(currentSchedule => {
+              const currentDate = new Date(currentSchedule.date);
+              currentDate.setHours(0, 0, 0, 0);
+              const currentDateStr = formatDateLocal(currentDate);
+              
+              conflictingClassSchedules.forEach(conflictingSchedule => {
+                const conflictingDate = new Date(conflictingSchedule.date);
+                conflictingDate.setHours(0, 0, 0, 0);
+                const conflictingDateStr = formatDateLocal(conflictingDate);
+                
+                // Kiểm tra cùng ngày và trùng giờ
+                if (currentDateStr === conflictingDateStr && 
+                    hasTimeOverlap(currentSchedule.startTime, currentSchedule.endTime, 
+                                 conflictingSchedule.startTime, conflictingSchedule.endTime)) {
+                  
+                  // Tìm học viên nào trong lớp conflict cũng có trong danh sách học viên mới thêm
+                  const conflictingClass = studentClasses.find(cls => 
+                    cls._id.toString() === (conflictingSchedule.class?._id?.toString() || conflictingSchedule.class?.toString())
+                  );
+                  
+                  if (conflictingClass) {
+                    conflictingClass.students.forEach(studentIdInConflictClass => {
+                      const studentIdStr = studentIdInConflictClass.toString();
+                      if (addedStudentIds.some(id => id.toString() === studentIdStr)) {
+                        const studentName = studentInfoMap.get(studentIdStr) || `Học viên ${studentIdStr}`;
+                        
+                        // Kiểm tra xem conflict này đã được thêm chưa
+                        const existingConflict = studentConflicts.find(c => 
+                          c.studentId === studentIdStr && 
+                          c.conflictingClassId === conflictingClass._id.toString() &&
+                          c.date === conflictingDateStr &&
+                          c.time === `${conflictingSchedule.startTime} - ${conflictingSchedule.endTime}`
+                        );
+                        
+                        if (!existingConflict) {
+                          studentConflicts.push({
+                            studentId: studentIdStr,
+                            studentName: studentName,
+                            conflictingClassId: conflictingClass._id.toString(),
+                            conflictingClassName: conflictingSchedule.class?.name || conflictingClass.name || 'N/A',
+                            date: conflictingDateStr,
+                            time: `${conflictingSchedule.startTime} - ${conflictingSchedule.endTime}`,
+                            conflictingTime: `${currentSchedule.startTime} - ${currentSchedule.endTime}`
+                          });
+                        }
+                      }
+                    });
+                  }
+                }
+              });
+            });
+          }
+          
+          // Nếu có conflict, trả về lỗi
+          if (studentConflicts.length > 0) {
+            await session.abortTransaction();
+            session.endSession();
+            
+            // Group conflicts by student
+            const conflictsByStudent = new Map();
+            studentConflicts.forEach(conflict => {
+              if (!conflictsByStudent.has(conflict.studentId)) {
+                conflictsByStudent.set(conflict.studentId, {
+                  studentId: conflict.studentId,
+                  studentName: conflict.studentName,
+                  conflicts: []
+                });
+              }
+              conflictsByStudent.get(conflict.studentId).conflicts.push({
+                className: conflict.conflictingClassName,
+                date: conflict.date,
+                time: conflict.time,
+                conflictingTime: conflict.conflictingTime
+              });
+            });
+            
+            const conflictsArray = Array.from(conflictsByStudent.values());
+            
+            const errorMessages = conflictsArray.map(studentConflict => {
+              const conflicts = studentConflict.conflicts.map(c => 
+                `    + Ngày ${c.date}: Lớp "${c.className}" từ ${c.time}, trùng với lịch lớp mới ${c.conflictingTime}`
+              ).join('\n');
+              return `  - Học viên "${studentConflict.studentName}":\n${conflicts}`;
+            }).join('\n\n');
+            
+            return res.status(400).json({
+              success: false,
+              message: 'Không thể thêm học viên do có xung đột lịch học',
+              conflicts: {
+                students: conflictsArray
+              },
+              details: `Xung đột lịch học viên:\n${errorMessages}`
+            });
+          }
+          
+          // Không có conflict, tiếp tục tạo StudentSchedule
           const today = new Date();
           today.setHours(0, 0, 0, 0);
           
-          // Get future schedules (chưa điểm danh) - hoặc tất cả nếu cần
           // Tạo StudentSchedule cho tất cả ClassSchedule hiện có
           const studentSchedules = [];
-          const addedStudentIds = addedStudents.map(id => new mongoose.Types.ObjectId(id));
           
           for (const scheduleId of classScheduleIds) {
             for (const studentId of addedStudentIds) {

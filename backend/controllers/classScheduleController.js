@@ -1536,3 +1536,124 @@ exports.getTeacherSchedule = async (req, res) => {
     });
   }
 };
+
+// =========================
+// ✅ VALIDATE HỌC BÙ: KIỂM TRA CONFLICT VỚI BUỔI HỌC CỦA HỌC SINH
+// =========================
+exports.validateMakeupClassSchedule = async (req, res) => {
+  try {
+    const { makeupClassScheduleId, studentId } = req.body;
+
+    if (!makeupClassScheduleId || !studentId) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Thiếu thông tin bắt buộc: makeupClassScheduleId và studentId" 
+      });
+    }
+
+    // 1. Lấy thông tin buổi học bù
+    const makeupSchedule = await ClassSchedule.findById(makeupClassScheduleId)
+      .populate('class', 'name')
+      .select('date startTime endTime class')
+      .lean();
+
+    if (!makeupSchedule) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Không tìm thấy buổi học bù" 
+      });
+    }
+
+    // Parse date và format
+    const makeupDate = new Date(makeupSchedule.date);
+    makeupDate.setHours(0, 0, 0, 0);
+    
+    const formatDateLocal = (dateInput) => {
+      if (!dateInput) return null;
+      const d = new Date(dateInput);
+      if (isNaN(d.getTime())) return null;
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const makeupDateStr = formatDateLocal(makeupDate);
+
+    // Helper function để check time overlap
+    const hasTimeOverlap = (start1, end1, start2, end2) => {
+      const timeToMinutes = (timeStr) => {
+        if (!timeStr) return 0;
+        const parts = timeStr.split(':');
+        if (parts.length !== 2) return 0;
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
+        return hours * 60 + minutes;
+      };
+      
+      const start1Min = timeToMinutes(start1);
+      const end1Min = timeToMinutes(end1);
+      const start2Min = timeToMinutes(start2);
+      const end2Min = timeToMinutes(end2);
+      
+      return start1Min < end2Min && end1Min > start2Min;
+    };
+
+    // 2. Lấy tất cả buổi học của học sinh
+    const studentSchedules = await StudentSchedule.find({ student: studentId })
+      .populate({
+        path: 'classSchedule',
+        select: 'date startTime endTime class',
+        populate: {
+          path: 'class',
+          select: 'name'
+        }
+      })
+      .lean();
+
+    // 3. Kiểm tra conflict
+    const conflicts = [];
+    
+    studentSchedules.forEach(studentSchedule => {
+      if (!studentSchedule.classSchedule) return;
+      
+      const scheduleDate = new Date(studentSchedule.classSchedule.date);
+      scheduleDate.setHours(0, 0, 0, 0);
+      const scheduleDateStr = formatDateLocal(scheduleDate);
+      
+      // Kiểm tra cùng ngày và trùng giờ
+      if (scheduleDateStr === makeupDateStr && 
+          hasTimeOverlap(
+            makeupSchedule.startTime, 
+            makeupSchedule.endTime,
+            studentSchedule.classSchedule.startTime,
+            studentSchedule.classSchedule.endTime
+          )) {
+        conflicts.push({
+          className: studentSchedule.classSchedule.class?.name || 'N/A',
+          date: scheduleDateStr,
+          time: `${studentSchedule.classSchedule.startTime} - ${studentSchedule.classSchedule.endTime}`
+        });
+      }
+    });
+
+    const hasConflict = conflicts.length > 0;
+
+    return res.status(200).json({
+      success: true,
+      hasConflict,
+      conflicts: conflicts,
+      message: hasConflict 
+        ? `Học sinh đã có ${conflicts.length} buổi học khác vào cùng thời gian với buổi học bù` 
+        : "Không có conflict với lịch học của học sinh"
+    });
+
+  } catch (err) {
+    console.error("❌ Lỗi khi validate học bù:", err);
+    res.status(500).json({ 
+      success: false,
+      message: "Lỗi server khi validate học bù", 
+      error: err.message 
+    });
+  }
+};

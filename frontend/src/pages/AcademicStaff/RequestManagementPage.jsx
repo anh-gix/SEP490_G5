@@ -59,10 +59,87 @@ const RequestManagementPage = () => {
   const [selectedCurrentClassInfo, setSelectedCurrentClassInfo] = useState(null); // Thông tin lớp được chọn (bên trái)
   const [selectedCurrentScheduleId, setSelectedCurrentScheduleId] = useState(null); // Buổi học được chọn từ lớp hiện tại
   const [loadingCurrentClassInfo, setLoadingCurrentClassInfo] = useState(false);
+  const [conflictInfo, setConflictInfo] = useState(null); // Lưu thông tin conflict để hiển thị trong modal
+  const [pendingMakeupData, setPendingMakeupData] = useState(null); // Lưu dữ liệu makeup đang chờ xác nhận khi có conflict
+  const [validatingConflict, setValidatingConflict] = useState(false); // Trạng thái đang validate conflict
 
   useEffect(() => {
     fetchChangeRequests();
   }, [page, searchTerm, filterStatus]);
+
+  // Tự động validate conflict khi chọn buổi học bù
+  useEffect(() => {
+    const validateConflict = async () => {
+      // Chỉ validate khi:
+      // 1. Modal đang mở
+      // 2. Đã chọn buổi học bù
+      // 3. Có thông tin request và sender
+      if (!showMakeupClassModal || 
+          !selectedMakeupClassInfo?.selectedScheduleId || 
+          !selectedRequest || 
+          !selectedRequest.sender) {
+        setConflictInfo(null);
+        setPendingMakeupData(null);
+        return;
+      }
+
+      try {
+        setValidatingConflict(true);
+        const studentId = selectedRequest.sender._id || selectedRequest.sender;
+        const makeupClassScheduleId = selectedMakeupClassInfo.selectedScheduleId;
+
+        const validateResponse = await classScheduleService.validateMakeupClassSchedule(
+          makeupClassScheduleId,
+          studentId
+        );
+
+        if (validateResponse.success) {
+          if (validateResponse.hasConflict && validateResponse.conflicts && validateResponse.conflicts.length > 0) {
+            // Format conflict info để hiển thị
+            const conflictInfo = {
+              students: [{
+                studentName: selectedRequest.sender?.username || 'Học sinh',
+                conflicts: validateResponse.conflicts
+              }]
+            };
+            
+            // Lấy thông tin buổi học bù để hiển thị
+            const makeupSchedule = selectedMakeupClassInfo.fixedSchedules?.find(
+              s => (s.id || s._id) === selectedMakeupClassInfo.selectedScheduleId
+            );
+            
+            setConflictInfo(conflictInfo);
+            setPendingMakeupData({
+              absentSchedule: null, // Chưa cần ở đây
+              makeupSchedule: makeupSchedule
+            });
+          } else {
+            // Không có conflict
+            setConflictInfo(null);
+            setPendingMakeupData(null);
+          }
+        } else {
+          // Lỗi validate, xóa conflict info
+          setConflictInfo(null);
+          setPendingMakeupData(null);
+        }
+      } catch (err) {
+        console.error('Error validating conflict:', err);
+        // Không hiển thị lỗi, chỉ xóa conflict info
+        setConflictInfo(null);
+        setPendingMakeupData(null);
+      } finally {
+        setValidatingConflict(false);
+      }
+    };
+
+    // Debounce để tránh gọi quá nhiều lần
+    const timeoutId = setTimeout(() => {
+      validateConflict();
+    }, 300); // Đợi 300ms sau khi người dùng ngừng chọn
+
+    return () => clearTimeout(timeoutId);
+  }, [showMakeupClassModal, selectedMakeupClassInfo?.selectedScheduleId, selectedRequest]);
 
   // Sort requests when sortBy changes
   const sortedRequests = useMemo(() => {
@@ -1425,11 +1502,77 @@ const RequestManagementPage = () => {
           setSelectedMakeupClassId(null);
           setSelectedMakeupClassInfo(null);
           setAvailableMakeupClasses([]);
+          setConflictInfo(null);
+          setPendingMakeupData(null);
         }} size="lg" centered>
           <Modal.Header closeButton>
             <Modal.Title>Thêm buổi học bù</Modal.Title>
           </Modal.Header>
           <Modal.Body className="py-16">
+            {/* Hiển thị conflict nếu có */}
+            {validatingConflict && (
+              <Alert variant="info" className="mb-16">
+                <Spinner animation="border" size="sm" className="me-2" />
+                Đang kiểm tra xung đột...
+              </Alert>
+            )}
+            {!validatingConflict && conflictInfo && (
+              <Alert variant="warning" className="mb-16">
+                <Alert.Heading>
+                  <i className="fas fa-exclamation-triangle me-2"></i>
+                  Có xung đột lịch học
+                </Alert.Heading>
+                <div className="mt-12">
+                  <div className="mb-12 p-8 bg-light rounded">
+                    <strong>Buổi học bù bạn đang chọn:</strong>
+                    <div className="mt-4">
+                      {pendingMakeupData && pendingMakeupData.makeupSchedule && (() => {
+                        const makeupSchedule = pendingMakeupData.makeupSchedule;
+                        const makeupClassInfo = selectedMakeupClassInfo;
+                        if (makeupSchedule) {
+                          const scheduleDate = makeupSchedule.date ? new Date(makeupSchedule.date) : null;
+                          const dateStr = scheduleDate ? scheduleDate.toLocaleDateString('vi-VN') : 'N/A';
+                          return (
+                            <div>
+                              • <strong>Lớp:</strong> {makeupClassInfo?.className || 'N/A'}<br/>
+                              • <strong>Ngày:</strong> {dateStr}<br/>
+                              • <strong>Thời gian:</strong> {makeupSchedule.startTime || 'N/A'} - {makeupSchedule.endTime || 'N/A'}<br/>
+                              • <strong>Phòng:</strong> {makeupSchedule.roomName || 'N/A'}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                  </div>
+                  
+                  {conflictInfo.students && conflictInfo.students.length > 0 && (
+                    <div className="mb-8">
+                      <strong className="text-danger">⚠️ Xung đột Lịch học:</strong>
+                      <p className="text-13 mb-2 mt-2">Học sinh đã có buổi học khác vào cùng thời gian với buổi học bù:</p>
+                      <ul className="mb-0 mt-4">
+                        {conflictInfo.students.map((studentConflict, idx) => (
+                          <li key={idx}>
+                            <strong>{studentConflict.studentName || 'Học sinh'}</strong>:
+                            <ul className="mb-0 mt-2">
+                              {studentConflict.conflicts.map((c, cIdx) => (
+                                <li key={cIdx}>
+                                  Lớp <strong>{c.className}</strong> - Ngày {c.date} - {c.time}
+                                </li>
+                              ))}
+                            </ul>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-12 text-13 text-danger">
+                  <i className="fas fa-exclamation-circle me-2"></i>
+                  <strong>Vui lòng chọn buổi học bù khác</strong> - Không thể tiếp tục khi có xung đột lịch học.
+                </div>
+              </Alert>
+            )}
             <div className="d-flex gap-12 mb-16" style={{ width: '100%' }}>
               <Button
                 variant={makeupClassOption === 'existing' ? 'primary' : 'outline-primary'}
@@ -1928,6 +2071,9 @@ const RequestManagementPage = () => {
                 setSelectedMakeupClassId(null);
                 setSelectedMakeupClassInfo(null);
                 setAvailableMakeupClasses([]);
+                setConflictInfo(null);
+                setPendingMakeupData(null);
+                setValidatingConflict(false);
               }}
             >
               Đóng
@@ -1935,7 +2081,7 @@ const RequestManagementPage = () => {
             {makeupClassOption === 'existing' && (
               <Button 
                 variant="primary" 
-                disabled={!selectedCurrentScheduleId || !selectedMakeupClassInfo?.selectedScheduleId || processing}
+                disabled={!selectedCurrentScheduleId || !selectedMakeupClassInfo?.selectedScheduleId || processing || validatingConflict || (conflictInfo && conflictInfo.students && conflictInfo.students.length > 0)}
                 onClick={async () => {
                   if (!selectedCurrentScheduleId || !selectedMakeupClassInfo?.selectedScheduleId) {
                     alert('Vui lòng chọn đầy đủ buổi học ở cả 2 cột');
@@ -1967,66 +2113,6 @@ const RequestManagementPage = () => {
                       return;
                     }
 
-                    // Format date thành YYYY-MM-DD
-                    const scheduleDate = new Date(selectedSchedule.date);
-                    const dateStr = formatDateToYYYYMMDD(scheduleDate);
-
-                    // Kiểm tra conflict
-                    const validateData = {
-                      classId: selectedMakeupClassId,
-                      date: dateStr,
-                      startTime: selectedSchedule.startTime,
-                      endTime: selectedSchedule.endTime,
-                      room: selectedClass.room._id || selectedClass.room
-                    };
-
-                    const validateResponse = await classScheduleService.validateAddClassSchedule(validateData);
-                    
-                    if (!validateResponse.success) {
-                      alert(`Lỗi: ${validateResponse.message || 'Không thể kiểm tra xung đột'}`);
-                      setProcessing(false);
-                      return;
-                    }
-                    
-                    if (validateResponse.hasConflict || (validateResponse.conflicts && (
-                      (validateResponse.conflicts.teacher && validateResponse.conflicts.teacher.length > 0) ||
-                      (validateResponse.conflicts.room && validateResponse.conflicts.room.length > 0) ||
-                      (validateResponse.conflicts.students && validateResponse.conflicts.students.length > 0)
-                    ))) {
-                      // Hiển thị thông báo conflict
-                      let conflictMessages = [];
-                      if (validateResponse.conflicts) {
-                        if (validateResponse.conflicts.teacher && validateResponse.conflicts.teacher.length > 0) {
-                          const teacherConflicts = validateResponse.conflicts.teacher.map(c => 
-                            `Lớp ${c.className} vào ${c.time}`
-                          );
-                          conflictMessages.push(`Giảng viên: ${teacherConflicts.join(', ')}`);
-                        }
-                        if (validateResponse.conflicts.room && validateResponse.conflicts.room.length > 0) {
-                          const roomConflicts = validateResponse.conflicts.room.map(c => 
-                            `Lớp ${c.className} vào ${c.time}`
-                          );
-                          conflictMessages.push(`Phòng học: ${roomConflicts.join(', ')}`);
-                        }
-                        if (validateResponse.conflicts.students && validateResponse.conflicts.students.length > 0) {
-                          const studentConflicts = validateResponse.conflicts.students.map(c => 
-                            `${c.studentName || 'Học sinh'} - Lớp ${c.className} vào ${c.time}`
-                          );
-                          conflictMessages.push(`Học sinh: ${studentConflicts.join(', ')}`);
-                        }
-                      }
-                      
-                      const message = conflictMessages.length > 0 
-                        ? `⚠️ Có xung đột lịch học:\n\n${conflictMessages.join('\n')}\n\nBạn có muốn tiếp tục không?`
-                        : '⚠️ Có xung đột lịch học. Bạn có muốn tiếp tục không?';
-                      
-                      const shouldContinue = window.confirm(message);
-                      if (!shouldContinue) {
-                        setProcessing(false);
-                        return;
-                      }
-                    }
-
                     // Lấy thông tin buổi nghỉ đã chọn
                     const absentSchedule = selectedCurrentClassInfo.schedules.find(
                       s => (s.id || s._id) === selectedCurrentScheduleId
@@ -2049,7 +2135,14 @@ const RequestManagementPage = () => {
                       return;
                     }
 
-                    // Lưu thông tin buổi học bù vào state
+                    // Kiểm tra conflict - không cho tiếp tục nếu có conflict
+                    if (conflictInfo && conflictInfo.students && conflictInfo.students.length > 0) {
+                      alert('Không thể tiếp tục khi có xung đột lịch học. Vui lòng chọn buổi học bù khác.');
+                      setProcessing(false);
+                      return;
+                    }
+
+                    // Không có conflict, tiếp tục lưu
                     const newMakeupEntry = {
                       absentScheduleId: selectedCurrentScheduleId,
                       absentSchedule: absentSchedule,
@@ -2073,6 +2166,8 @@ const RequestManagementPage = () => {
                     setSelectedMakeupClassId(null);
                     setSelectedMakeupClassInfo(null);
                     setAvailableMakeupClasses([]);
+                    setConflictInfo(null);
+                    setPendingMakeupData(null);
                     
                   } catch (err) {
                     console.error('Error validating makeup session:', err);
@@ -2711,11 +2806,153 @@ const RequestManagementPage = () => {
             setSelectedMakeupClassId(null);
             setSelectedMakeupClassInfo(null);
             setAvailableMakeupClasses([]);
+            setConflictInfo(null);
+            setPendingMakeupData(null);
           }} size="lg" centered>
             <Modal.Header closeButton>
               <Modal.Title>Thêm buổi học bù</Modal.Title>
             </Modal.Header>
             <Modal.Body className="py-16">
+              {/* Hiển thị conflict nếu có */}
+              {conflictInfo && (
+                <Alert variant="warning" className="mb-16">
+                  <Alert.Heading>
+                    <i className="fas fa-exclamation-triangle me-2"></i>
+                    Có xung đột lịch học
+                  </Alert.Heading>
+                  <div className="mt-12">
+                    <div className="mb-12 p-8 bg-light rounded">
+                      <strong>Buổi học bù bạn đang chọn:</strong>
+                      <div className="mt-4">
+                        {selectedMakeupClassInfo && selectedMakeupClassInfo.selectedScheduleId && (() => {
+                          const selectedSchedule = selectedMakeupClassInfo.schedules?.find(
+                            s => (s.id || s._id) === selectedMakeupClassInfo.selectedScheduleId
+                          );
+                          if (selectedSchedule) {
+                            const scheduleDate = new Date(selectedSchedule.date);
+                            const dateStr = scheduleDate.toLocaleDateString('vi-VN');
+                            return (
+                              <div>
+                                • <strong>Lớp:</strong> {selectedMakeupClassInfo.className || 'N/A'}<br/>
+                                • <strong>Ngày:</strong> {dateStr}<br/>
+                                • <strong>Thời gian:</strong> {selectedSchedule.startTime} - {selectedSchedule.endTime}<br/>
+                                • <strong>Phòng:</strong> {selectedSchedule.roomName || 'N/A'}
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
+                    </div>
+                    
+                    {conflictInfo.teacher && conflictInfo.teacher.length > 0 && (
+                      <div className="mb-8">
+                        <strong className="text-danger">⚠️ Xung đột Giảng viên:</strong>
+                        <p className="text-13 mb-2 mt-2">Giảng viên của lớp bạn chọn đã có lớp khác vào cùng thời gian:</p>
+                        <ul className="mb-0 mt-4">
+                          {conflictInfo.teacher.map((c, idx) => (
+                            <li key={idx}>
+                              <strong>Lớp {c.className}</strong> - Ngày {c.date} - {c.time}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {conflictInfo.room && conflictInfo.room.length > 0 && (
+                      <div className="mb-8">
+                        <strong className="text-danger">⚠️ Xung đột Phòng học:</strong>
+                        <p className="text-13 mb-2 mt-2">Phòng học đã được sử dụng bởi lớp khác vào cùng thời gian:</p>
+                        <ul className="mb-0 mt-4">
+                          {conflictInfo.room.map((c, idx) => (
+                            <li key={idx}>
+                              <strong>Lớp {c.className}</strong> - Ngày {c.date} - {c.time}
+                              {c.isCurrentClass && <span className="text-muted"> (Lớp hiện tại)</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {conflictInfo.students && conflictInfo.students.length > 0 && (
+                      <div className="mb-8">
+                        <strong className="text-danger">⚠️ Xung đột Học sinh:</strong>
+                        <p className="text-13 mb-2 mt-2">Có học sinh trong lớp đã có lớp khác vào cùng thời gian:</p>
+                        <ul className="mb-0 mt-4">
+                          {conflictInfo.students.map((studentConflict, idx) => (
+                            <li key={idx}>
+                              <strong>{studentConflict.studentName || 'Học sinh'}</strong>:
+                              <ul className="mb-0 mt-2">
+                                {studentConflict.conflicts.map((c, cIdx) => (
+                                  <li key={cIdx}>
+                                    Lớp <strong>{c.className}</strong> - Ngày {c.date} - {c.time}
+                                  </li>
+                                ))}
+                              </ul>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                  <hr />
+                  <div className="d-flex gap-8 justify-content-end">
+                    <Button 
+                      variant="secondary" 
+                      size="sm"
+                      onClick={() => {
+                        setConflictInfo(null);
+                        setPendingMakeupData(null);
+                        setProcessing(false);
+                      }}
+                    >
+                      Hủy
+                    </Button>
+                    <Button 
+                      variant="warning" 
+                      size="sm"
+                      onClick={async () => {
+                        // Xác nhận tiếp tục với conflict
+                        if (pendingMakeupData) {
+                          const { absentSchedule, makeupSchedule } = pendingMakeupData;
+                          
+                          // Lưu thông tin buổi học bù vào state
+                          const newMakeupEntry = {
+                            absentScheduleId: selectedCurrentScheduleId,
+                            absentSchedule: absentSchedule,
+                            absentClassId: selectedCurrentClassId,
+                            absentClassInfo: selectedCurrentClassInfo,
+                            makeupScheduleId: selectedMakeupClassInfo.selectedScheduleId,
+                            makeupSchedule: makeupSchedule,
+                            makeupClassId: selectedMakeupClassId,
+                            makeupClassInfo: selectedMakeupClassInfo
+                          };
+
+                          // Thêm vào danh sách pending makeup classes
+                          setPendingMakeupClasses(prev => [...prev, newMakeupEntry]);
+
+                          // Đóng modal và reset các state liên quan
+                          setShowMakeupClassModal(false);
+                          setMakeupClassOption(null);
+                          setSelectedCurrentClassId(null);
+                          setSelectedCurrentClassInfo(null);
+                          setSelectedCurrentScheduleId(null);
+                          setSelectedMakeupClassId(null);
+                          setSelectedMakeupClassInfo(null);
+                          setAvailableMakeupClasses([]);
+                          setConflictInfo(null);
+                          setPendingMakeupData(null);
+                          setProcessing(false);
+                        }
+                      }}
+                    >
+                      Tiếp tục
+                    </Button>
+                  </div>
+                </Alert>
+              )}
+              
+              {/* Chỉ hiển thị form khi không có conflict */}
+              {!conflictInfo && (
+                <>
               <div className="d-flex gap-12 mb-16" style={{ width: '100%' }}>
                 <Button
                   variant={makeupClassOption === 'existing' ? 'primary' : 'outline-primary'}
@@ -3191,25 +3428,31 @@ const RequestManagementPage = () => {
                   )}
                 </div>
               )}
+                </>
+              )}
             </Modal.Body>
             <Modal.Footer>
-              <Button 
-                variant="secondary" 
-                onClick={() => {
-                  setShowMakeupClassModal(false);
-                  setMakeupClassOption(null);
-                  setSelectedCurrentClassId(null);
-                  setSelectedCurrentClassInfo(null);
-                  setSelectedCurrentScheduleId(null);
-                  setSelectedMakeupClassId(null);
-                  setSelectedMakeupClassInfo(null);
-                  setAvailableMakeupClasses([]);
-                }}
-              >
-                Đóng
-              </Button>
-              {makeupClassOption === 'existing' && (
-                <Button 
+              {!conflictInfo && (
+                <>
+                  <Button 
+                    variant="secondary" 
+                    onClick={() => {
+                      setShowMakeupClassModal(false);
+                      setMakeupClassOption(null);
+                      setSelectedCurrentClassId(null);
+                      setSelectedCurrentClassInfo(null);
+                      setSelectedCurrentScheduleId(null);
+                      setSelectedMakeupClassId(null);
+                      setSelectedMakeupClassInfo(null);
+                      setAvailableMakeupClasses([]);
+                      setConflictInfo(null);
+                      setPendingMakeupData(null);
+                    }}
+                  >
+                    Đóng
+                  </Button>
+                  {makeupClassOption === 'existing' && (
+                    <Button 
                   variant="primary" 
                   disabled={!selectedCurrentScheduleId || !selectedMakeupClassInfo?.selectedScheduleId || processing}
                   onClick={async () => {
@@ -3243,66 +3486,6 @@ const RequestManagementPage = () => {
                         return;
                       }
 
-                      // Format date thành YYYY-MM-DD
-                      const scheduleDate = new Date(selectedSchedule.date);
-                      const dateStr = formatDateToYYYYMMDD(scheduleDate);
-
-                      // Kiểm tra conflict
-                      const validateData = {
-                        classId: selectedMakeupClassId,
-                        date: dateStr,
-                        startTime: selectedSchedule.startTime,
-                        endTime: selectedSchedule.endTime,
-                        room: selectedClass.room._id || selectedClass.room
-                      };
-
-                      const validateResponse = await classScheduleService.validateAddClassSchedule(validateData);
-                      
-                      if (!validateResponse.success) {
-                        alert(`Lỗi: ${validateResponse.message || 'Không thể kiểm tra xung đột'}`);
-                        setProcessing(false);
-                        return;
-                      }
-                      
-                      if (validateResponse.hasConflict || (validateResponse.conflicts && (
-                        (validateResponse.conflicts.teacher && validateResponse.conflicts.teacher.length > 0) ||
-                        (validateResponse.conflicts.room && validateResponse.conflicts.room.length > 0) ||
-                        (validateResponse.conflicts.students && validateResponse.conflicts.students.length > 0)
-                      ))) {
-                        // Hiển thị thông báo conflict
-                        let conflictMessages = [];
-                        if (validateResponse.conflicts) {
-                          if (validateResponse.conflicts.teacher && validateResponse.conflicts.teacher.length > 0) {
-                            const teacherConflicts = validateResponse.conflicts.teacher.map(c => 
-                              `Lớp ${c.className} vào ${c.time}`
-                            );
-                            conflictMessages.push(`Giảng viên: ${teacherConflicts.join(', ')}`);
-                          }
-                          if (validateResponse.conflicts.room && validateResponse.conflicts.room.length > 0) {
-                            const roomConflicts = validateResponse.conflicts.room.map(c => 
-                              `Lớp ${c.className} vào ${c.time}`
-                            );
-                            conflictMessages.push(`Phòng học: ${roomConflicts.join(', ')}`);
-                          }
-                          if (validateResponse.conflicts.students && validateResponse.conflicts.students.length > 0) {
-                            const studentConflicts = validateResponse.conflicts.students.map(c => 
-                              `${c.studentName || 'Học sinh'} - Lớp ${c.className} vào ${c.time}`
-                            );
-                            conflictMessages.push(`Học sinh: ${studentConflicts.join(', ')}`);
-                          }
-                        }
-                        
-                        const message = conflictMessages.length > 0 
-                          ? `⚠️ Có xung đột lịch học:\n\n${conflictMessages.join('\n')}\n\nBạn có muốn tiếp tục không?`
-                          : '⚠️ Có xung đột lịch học. Bạn có muốn tiếp tục không?';
-                        
-                        const shouldContinue = window.confirm(message);
-                        if (!shouldContinue) {
-                          setProcessing(false);
-                          return;
-                        }
-                      }
-
                       // Lấy thông tin buổi nghỉ đã chọn
                       const absentSchedule = selectedCurrentClassInfo.schedules.find(
                         s => (s.id || s._id) === selectedCurrentScheduleId
@@ -3323,6 +3506,42 @@ const RequestManagementPage = () => {
                         alert('Không tìm thấy thông tin buổi học bù');
                         setProcessing(false);
                         return;
+                      }
+
+                      // Kiểm tra conflict học bù (chỉ kiểm tra với lịch học của học sinh)
+                      if (!selectedRequest || !selectedRequest.sender) {
+                        alert('Không tìm thấy thông tin người gửi đơn');
+                        setProcessing(false);
+                        return;
+                      }
+
+                      const studentId = selectedRequest.sender._id || selectedRequest.sender;
+                      const makeupClassScheduleId = selectedMakeupClassInfo.selectedScheduleId;
+
+                      const validateResponse = await classScheduleService.validateMakeupClassSchedule(
+                        makeupClassScheduleId,
+                        studentId
+                      );
+                      
+                      if (!validateResponse.success) {
+                        alert(`Lỗi: ${validateResponse.message || 'Không thể kiểm tra xung đột'}`);
+                        setProcessing(false);
+                        return;
+                      }
+                      
+                      if (validateResponse.hasConflict && validateResponse.conflicts && validateResponse.conflicts.length > 0) {
+                        // Format conflict info để hiển thị
+                        const conflictMessages = validateResponse.conflicts.map(c => 
+                          `Lớp ${c.className} - Ngày ${c.date} - ${c.time}`
+                        );
+                        
+                        const message = `⚠️ Học sinh đã có buổi học khác vào cùng thời gian:\n\n${conflictMessages.join('\n')}\n\nBạn có muốn tiếp tục không?`;
+                        
+                        const shouldContinue = window.confirm(message);
+                        if (!shouldContinue) {
+                          setProcessing(false);
+                          return;
+                        }
                       }
 
                       // Lưu thông tin buổi học bù vào state
@@ -3360,7 +3579,9 @@ const RequestManagementPage = () => {
                   }}
                 >
                   {processing ? 'Đang xử lý...' : 'Xác nhận'}
-                </Button>
+                    </Button>
+                  )}
+                </>
               )}
             </Modal.Footer>
           </Modal>

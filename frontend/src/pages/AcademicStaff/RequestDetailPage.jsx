@@ -21,6 +21,7 @@ const RequestDetailPage = ({
   onReject,
   onChangeClass,
   onAddMakeupClass,
+  onRemoveMakeupClass,
   processing,
   formatDate,
   renderClassInfo
@@ -361,6 +362,117 @@ const RequestDetailPage = ({
                       };
                     })}
                   />
+                </div>
+              )}
+
+              {/* Danh sách các buổi học bù đã chọn */}
+              {pendingMakeupClasses && pendingMakeupClasses.length > 0 && (
+                <div className="mt-16">
+                  <h6 className="text-neutral-900 fw-bold mb-8 text-14">Danh sách buổi học bù đã chọn:</h6>
+                  <div className="d-flex flex-column gap-4">
+                    {pendingMakeupClasses.map((makeup, index) => {
+                      const absentSchedule = makeup.absentSchedule;
+                      const makeupSchedule = makeup.makeupSchedule;
+                      const absentClassInfo = makeup.absentClassInfo;
+                      const makeupClassInfo = makeup.makeupClassInfo;
+
+                      const absentDateStr = absentSchedule?.date 
+                        ? new Date(absentSchedule.date).toLocaleDateString('vi-VN') 
+                        : '';
+                      const absentTimeStr = absentSchedule?.startTime && absentSchedule?.endTime
+                        ? `${absentSchedule.startTime} - ${absentSchedule.endTime}`
+                        : '';
+                      
+                      const makeupDateStr = makeupSchedule?.date 
+                        ? new Date(makeupSchedule.date).toLocaleDateString('vi-VN') 
+                        : '';
+                      const makeupTimeStr = makeupSchedule?.startTime && makeupSchedule?.endTime
+                        ? `${makeupSchedule.startTime} - ${makeupSchedule.endTime}`
+                        : '';
+
+                      return (
+                        <div 
+                          key={index} 
+                          className="border border-neutral-200 rounded-6 p-8 bg-white d-flex align-items-center justify-content-between gap-8"
+                        >
+                          <div className="flex-grow-1 d-flex align-items-center gap-12 flex-wrap">
+                            {/* Buổi nghỉ */}
+                            <div className="d-flex align-items-center gap-6">
+                              <i className="fas fa-calendar-times text-primary text-12"></i>
+                              <div className="d-flex flex-column gap-1">
+                                <div className="text-primary fw-semibold text-12">Buổi nghỉ:</div>
+                                <div className="text-neutral-700 text-12">
+                                  <span className="fw-medium">{absentClassInfo?.className || 'N/A'}</span>
+                                  {' • '}
+                                  <span>{absentSchedule?.title || `Buổi ${absentSchedule?.order || 'N/A'}`}</span>
+                                  {absentSchedule?.order && (
+                                    <span className="text-neutral-500"> (STT: {absentSchedule.order})</span>
+                                  )}
+                                  {absentDateStr && (
+                                    <>
+                                      {' • '}
+                                      <span>{absentDateStr}</span>
+                                    </>
+                                  )}
+                                  {absentTimeStr && (
+                                    <>
+                                      {' • '}
+                                      <span>{absentTimeStr}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Mũi tên */}
+                            <div className="text-neutral-400">
+                              <i className="fas fa-arrow-right"></i>
+                            </div>
+
+                            {/* Buổi bù */}
+                            <div className="d-flex align-items-center gap-6">
+                              <i className="fas fa-calendar-check text-success text-12"></i>
+                              <div className="d-flex flex-column gap-1">
+                                <div className="text-success fw-semibold text-12">Buổi bù:</div>
+                                <div className="text-neutral-700 text-12">
+                                  <span className="fw-medium">{makeupClassInfo?.className || 'N/A'}</span>
+                                  {' • '}
+                                  <span>{makeupSchedule?.title || `Buổi ${makeupSchedule?.order || 'N/A'}`}</span>
+                                  {makeupSchedule?.order && (
+                                    <span className="text-neutral-500"> (STT: {makeupSchedule.order})</span>
+                                  )}
+                                  {makeupDateStr && (
+                                    <>
+                                      {' • '}
+                                      <span>{makeupDateStr}</span>
+                                    </>
+                                  )}
+                                  {makeupTimeStr && (
+                                    <>
+                                      {' • '}
+                                      <span>{makeupTimeStr}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Nút xóa */}
+                          <Button
+                            variant="outline-danger"
+                            size="sm"
+                            onClick={() => onRemoveMakeupClass && onRemoveMakeupClass(index)}
+                            className="d-flex align-items-center gap-1 px-8 py-4"
+                            title="Xóa buổi học bù này"
+                          >
+                            <i className="fas fa-trash text-11"></i>
+                            <span className="text-11">Xóa</span>
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </Card.Body>

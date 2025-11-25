@@ -839,6 +839,26 @@ const RequestManagementPage = () => {
     return false; // Không có conflict
   };
 
+  // Lọc các buổi nghỉ đã được chọn
+  const filteredAbsentSchedules = useMemo(() => {
+    if (!selectedCurrentClassInfo?.schedules || selectedCurrentClassInfo.schedules.length === 0) {
+      return [];
+    }
+    
+    // Lấy danh sách các absentScheduleId đã được chọn
+    const selectedAbsentScheduleIds = (pendingMakeupClasses || []).map(makeup => {
+      return makeup.absentScheduleId?.toString() || 
+             makeup.absentSchedule?.id?.toString() || 
+             makeup.absentSchedule?._id?.toString();
+    }).filter(Boolean);
+    
+    // Lọc bỏ các buổi đã được chọn
+    return selectedCurrentClassInfo.schedules.filter(schedule => {
+      const scheduleId = (schedule.id || schedule._id)?.toString();
+      return scheduleId && !selectedAbsentScheduleIds.includes(scheduleId);
+    });
+  }, [selectedCurrentClassInfo, pendingMakeupClasses]);
+
   // Filter các lớp có buổi học bù phù hợp
   const filteredMakeupClasses = useMemo(() => {
     if (!selectedCurrentScheduleId || !availableMakeupClassesWithSchedules || availableMakeupClassesWithSchedules.length === 0) {
@@ -856,6 +876,13 @@ const RequestManagementPage = () => {
       return availableMakeupClasses || [];
     }
     
+    // Lấy danh sách các makeupScheduleId đã được chọn
+    const selectedMakeupScheduleIds = (pendingMakeupClasses || []).map(makeup => {
+      return makeup.makeupScheduleId?.toString() || 
+             makeup.makeupSchedule?.id?.toString() || 
+             makeup.makeupSchedule?._id?.toString();
+    }).filter(Boolean);
+    
     // Filter các lớp có ít nhất một buổi phù hợp
     const classesWithValidSchedules = availableMakeupClassesWithSchedules.filter(classWithSchedule => {
       if (!classWithSchedule.schedules || classWithSchedule.schedules.length === 0) {
@@ -864,6 +891,12 @@ const RequestManagementPage = () => {
       
       // Kiểm tra xem lớp này có buổi nào cùng session và sau ngày buổi nghỉ không
       const hasValidSchedule = classWithSchedule.schedules.some(schedule => {
+        // Bỏ qua buổi đã được chọn
+        const scheduleId = (schedule.id || schedule._id)?.toString();
+        if (scheduleId && selectedMakeupScheduleIds.includes(scheduleId)) {
+          return false;
+        }
+        
         // Cùng session order
         if (schedule.order !== currentSessionOrder) {
           return false;
@@ -893,7 +926,7 @@ const RequestManagementPage = () => {
     });
     
     return classesWithValidSchedules;
-  }, [selectedCurrentScheduleId, availableMakeupClassesWithSchedules, selectedCurrentClassInfo, availableMakeupClasses, senderSchedule]);
+  }, [selectedCurrentScheduleId, availableMakeupClassesWithSchedules, selectedCurrentClassInfo, availableMakeupClasses, senderSchedule, pendingMakeupClasses]);
 
   // Tự động load dữ liệu khi mở modal "Thêm buổi học bù"
   useEffect(() => {
@@ -973,6 +1006,17 @@ const RequestManagementPage = () => {
     }
   };
 
+  // Hàm xử lý xóa buổi học bù
+  const handleRemoveMakeupClass = (index) => {
+    if (index < 0 || index >= pendingMakeupClasses.length) return;
+    
+    setPendingMakeupClasses(prev => {
+      const newList = [...prev];
+      newList.splice(index, 1);
+      return newList;
+    });
+  };
+
 
   // Nếu đang hiển thị chi tiết đơn, render component RequestDetailPage
   if (showDetailModal && selectedRequest) {
@@ -1001,6 +1045,7 @@ const RequestManagementPage = () => {
             setShowMakeupClassModal(true);
             setMakeupClassOption(null);
           }}
+          onRemoveMakeupClass={handleRemoveMakeupClass}
           processing={processing}
           formatDate={formatDate}
           renderClassInfo={renderClassInfo}
@@ -1520,7 +1565,7 @@ const RequestManagementPage = () => {
                               </div>
                               <div>
                                 <small className="text-muted d-block mb-1">Chọn buổi học:</small>
-                                {selectedCurrentClassInfo.schedules && selectedCurrentClassInfo.schedules.length > 0 ? (
+                                {filteredAbsentSchedules && filteredAbsentSchedules.length > 0 ? (
                                   <Form.Select
                                     value={selectedCurrentScheduleId || ''}
                                     onChange={(e) => setSelectedCurrentScheduleId(e.target.value)}
@@ -1528,7 +1573,7 @@ const RequestManagementPage = () => {
                                     size="sm"
                                   >
                                     <option value="">-- Chọn buổi học --</option>
-                                    {selectedCurrentClassInfo.schedules.map((schedule) => {
+                                    {filteredAbsentSchedules.map((schedule) => {
                                       const scheduleId = schedule.id || schedule._id;
                                       const dateStr = schedule.date ? new Date(schedule.date).toLocaleDateString('vi-VN') : '';
                                       const timeStr = `${schedule.startTime} - ${schedule.endTime}`;
@@ -1541,7 +1586,11 @@ const RequestManagementPage = () => {
                                     })}
                                   </Form.Select>
                                 ) : (
-                                  <div className="text-neutral-500 text-13">Không có buổi học</div>
+                                  <div className="text-neutral-500 text-13">
+                                    {selectedCurrentClassInfo.schedules && selectedCurrentClassInfo.schedules.length > 0
+                                      ? 'Tất cả buổi học đã được chọn'
+                                      : 'Không có buổi học'}
+                                  </div>
                                 )}
                               </div>
                               {selectedCurrentScheduleId && selectedCurrentClassInfo.schedules && (
@@ -1678,9 +1727,22 @@ const RequestManagementPage = () => {
                                   };
                                   const currentDateStr = currentScheduleDate ? getDateString(currentScheduleDate) : null;
 
+                                  // Lấy danh sách các makeupScheduleId đã được chọn
+                                  const selectedMakeupScheduleIds = (pendingMakeupClasses || []).map(makeup => {
+                                    return makeup.makeupScheduleId?.toString() || 
+                                           makeup.makeupSchedule?.id?.toString() || 
+                                           makeup.makeupSchedule?._id?.toString();
+                                  }).filter(Boolean);
+
                                   // Filter chỉ lấy các buổi có cùng session order và ngày sau buổi nghỉ
                                   const filteredSchedules = selectedMakeupClassInfo.fixedSchedules && selectedMakeupClassInfo.fixedSchedules.length > 0
                                     ? selectedMakeupClassInfo.fixedSchedules.filter(schedule => {
+                                        // Bỏ qua buổi đã được chọn
+                                        const scheduleId = (schedule.id || schedule._id)?.toString();
+                                        if (scheduleId && selectedMakeupScheduleIds.includes(scheduleId)) {
+                                          return false;
+                                        }
+                                        
                                         // Nếu chưa chọn buổi nghỉ, không hiển thị
                                         if (!selectedCurrentScheduleId || currentSessionOrder === null || currentSessionOrder === undefined) {
                                           return false;
@@ -2768,7 +2830,7 @@ const RequestManagementPage = () => {
                                 </div>
                                 <div>
                                   <small className="text-muted d-block mb-1">Chọn buổi học:</small>
-                                  {selectedCurrentClassInfo.schedules && selectedCurrentClassInfo.schedules.length > 0 ? (
+                                  {filteredAbsentSchedules && filteredAbsentSchedules.length > 0 ? (
                                     <Form.Select
                                       value={selectedCurrentScheduleId || ''}
                                       onChange={(e) => setSelectedCurrentScheduleId(e.target.value)}
@@ -2776,7 +2838,7 @@ const RequestManagementPage = () => {
                                       size="sm"
                                     >
                                       <option value="">-- Chọn buổi học --</option>
-                                      {selectedCurrentClassInfo.schedules.map((schedule) => {
+                                      {filteredAbsentSchedules.map((schedule) => {
                                         const scheduleId = schedule.id || schedule._id;
                                         const dateStr = schedule.date ? new Date(schedule.date).toLocaleDateString('vi-VN') : '';
                                         const timeStr = `${schedule.startTime} - ${schedule.endTime}`;
@@ -2789,7 +2851,11 @@ const RequestManagementPage = () => {
                                       })}
                                     </Form.Select>
                                   ) : (
-                                    <div className="text-neutral-500 text-13">Không có buổi học</div>
+                                    <div className="text-neutral-500 text-13">
+                                      {selectedCurrentClassInfo.schedules && selectedCurrentClassInfo.schedules.length > 0
+                                        ? 'Tất cả buổi học đã được chọn'
+                                        : 'Không có buổi học'}
+                                    </div>
                                   )}
                                 </div>
                                 {selectedCurrentScheduleId && selectedCurrentClassInfo.schedules && (
@@ -2926,9 +2992,22 @@ const RequestManagementPage = () => {
                                     };
                                     const currentDateStr = currentScheduleDate ? getDateString(currentScheduleDate) : null;
 
+                                    // Lấy danh sách các makeupScheduleId đã được chọn
+                                    const selectedMakeupScheduleIds = (pendingMakeupClasses || []).map(makeup => {
+                                      return makeup.makeupScheduleId?.toString() || 
+                                             makeup.makeupSchedule?.id?.toString() || 
+                                             makeup.makeupSchedule?._id?.toString();
+                                    }).filter(Boolean);
+
                                     // Filter chỉ lấy các buổi có cùng session order và ngày sau buổi nghỉ
                                     const filteredSchedules = selectedMakeupClassInfo.fixedSchedules && selectedMakeupClassInfo.fixedSchedules.length > 0
                                       ? selectedMakeupClassInfo.fixedSchedules.filter(schedule => {
+                                          // Bỏ qua buổi đã được chọn
+                                          const scheduleId = (schedule.id || schedule._id)?.toString();
+                                          if (scheduleId && selectedMakeupScheduleIds.includes(scheduleId)) {
+                                            return false;
+                                          }
+                                          
                                           // Nếu chưa chọn buổi nghỉ, không hiển thị
                                           if (!selectedCurrentScheduleId || currentSessionOrder === null || currentSessionOrder === undefined) {
                                             return false;

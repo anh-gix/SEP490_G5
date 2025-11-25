@@ -34,6 +34,12 @@ const changeRequestSchema = new Schema({
     ref: 'ClassSchedule'
   },
   
+  // File Excel đính kèm (chỉ dùng cho đơn tạo lớp - type: 'create_class')
+  excelFile: {
+    type: String,
+    trim: true
+  },
+  
   // Nội dung yêu cầu (có thể là đổi lớp hoặc đổi buổi học)
   content: {
     type: String,

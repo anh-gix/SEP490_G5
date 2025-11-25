@@ -1511,10 +1511,10 @@ const RequestManagementPage = () => {
               </Button>
             </div>
 
-            {/* Hiển thị 2 cột khi chọn "Chọn buổi của lớp đang sẵn có" */}
-            {makeupClassOption === 'existing' && (
+            {/* Hiển thị nội dung khi đã chọn option */}
+            {(makeupClassOption === 'existing' || makeupClassOption === 'new') && (
               <div className="row g-3 mt-16">
-                {/* Cột trái: Buổi nghỉ */}
+                {/* Cột trái: Buổi nghỉ - hiển thị cho cả existing và new */}
                 <div className="col-md-6">
                   <div className="border border-primary rounded-8 p-12 bg-primary-25">
                     <h6 className="text-primary fw-bold mb-12 text-14">Buổi nghỉ</h6>
@@ -1643,8 +1643,9 @@ const RequestManagementPage = () => {
                   </div>
                 </div>
 
-                {/* Cột phải: Buổi học bù */}
-                <div className="col-md-6">
+                {/* Cột phải: Buổi học bù - chỉ hiển thị khi chọn existing */}
+                {makeupClassOption === 'existing' && (
+                  <div className="col-md-6">
                   <div className="border border-success rounded-8 p-12 bg-success-25">
                     <h6 className="text-success fw-bold mb-12 text-14">Buổi học bù</h6>
                     <div className="d-flex flex-column gap-2">
@@ -1871,6 +1872,14 @@ const RequestManagementPage = () => {
                     </div>
                   </div>
                 </div>
+                )}
+
+                {/* Cột phải: Tạo lớp mới - chỉ hiển thị khi chọn new */}
+                {makeupClassOption === 'new' && (
+                  <div className="col-md-6">
+                    {/* Placeholder - sẽ được thêm sau */}
+                  </div>
+                )}
               </div>
             )}
           </Modal.Body>
@@ -2774,10 +2783,10 @@ const RequestManagementPage = () => {
                 </Button>
       </div>
 
-              {/* Hiển thị 2 cột khi chọn "Chọn buổi của lớp đang sẵn có" */}
-              {makeupClassOption === 'existing' && (
+              {/* Hiển thị nội dung khi đã chọn option */}
+              {(makeupClassOption === 'existing' || makeupClassOption === 'new') && (
                 <div className="row g-3 mt-16">
-                  {/* Cột trái: Buổi nghỉ */}
+                  {/* Cột trái: Buổi nghỉ - hiển thị cho cả existing và new */}
                   <div className="col-md-6">
                     <div className="border border-primary rounded-8 p-12 bg-primary-25">
                       <h6 className="text-primary fw-bold mb-12 text-14">Buổi nghỉ</h6>
@@ -2910,10 +2919,11 @@ const RequestManagementPage = () => {
                     </div>
                   </div>
 
-                  {/* Cột phải: Buổi học bù */}
-                  <div className="col-md-6">
-                    <div className="border border-success rounded-8 p-12 bg-success-25">
-                      <h6 className="text-success fw-bold mb-12 text-14">Buổi học bù</h6>
+                  {/* Cột phải: Buổi học bù - chỉ hiển thị khi chọn existing */}
+                  {makeupClassOption === 'existing' && (
+                    <div className="col-md-6">
+                      <div className="border border-success rounded-8 p-12 bg-success-25">
+                        <h6 className="text-success fw-bold mb-12 text-14">Buổi học bù</h6>
                       <div className="d-flex flex-column gap-2">
                         {selectedCurrentClassInfo && (
                           <div>
@@ -3138,6 +3148,14 @@ const RequestManagementPage = () => {
                       </div>
                     </div>
                   </div>
+                  )}
+
+                  {/* Cột phải: Tạo lớp mới - chỉ hiển thị khi chọn new */}
+                  {makeupClassOption === 'new' && (
+                    <div className="col-md-6">
+                      {/* Placeholder - sẽ được thêm sau */}
+                    </div>
+                  )}
                 </div>
               )}
             </Modal.Body>

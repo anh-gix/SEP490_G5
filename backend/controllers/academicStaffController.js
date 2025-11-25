@@ -1,91 +1,15 @@
-const ChangeRequest = require('../models/changeRequestModel');
 const StudentSchedule = require('../models/studentScheduleModel');
+const changeRequestController = require('./changeRequestController');
 
 // =========================
-// ✅ CHẤP NHẬN ĐƠN
+// ✅ CHẤP NHẬN ĐƠN (Re-export từ changeRequestController để tránh duplicate code)
 // =========================
-exports.approveChangeRequest = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const approverId = req.user?._id || req.body.approverId; // Lấy từ token hoặc body
-    
-    const changeRequest = await ChangeRequest.findByIdAndUpdate(
-      id,
-      {
-        status: 'approved',
-        approver: approverId,
-        approvedDate: new Date()
-      },
-      { new: true }
-    )
-    .populate('sender', 'username email phone')
-    .populate('approver', 'username email');
-    
-    if (!changeRequest) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy đơn'
-      });
-    }
-    
-    res.status(200).json({
-      success: true,
-      message: 'Đã chấp nhận đơn thành công',
-      changeRequest
-    });
-  } catch (error) {
-    console.error("❌ Lỗi khi chấp nhận đơn:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi server khi chấp nhận đơn",
-      error: error.message
-    });
-  }
-};
+exports.approveChangeRequest = changeRequestController.approveChangeRequest;
 
 // =========================
-// ❌ TỪ CHỐI ĐƠN
+// ❌ TỪ CHỐI ĐƠN (Re-export từ changeRequestController để tránh duplicate code)
 // =========================
-exports.rejectChangeRequest = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { responseContent } = req.body; // Lý do từ chối (không bắt buộc)
-    const approverId = req.user?._id || req.body.approverId; // Lấy từ token hoặc body
-    
-    const changeRequest = await ChangeRequest.findByIdAndUpdate(
-      id,
-      {
-        status: 'rejected',
-        approver: approverId,
-        approvedDate: new Date(),
-        responseContent: responseContent || null
-      },
-      { new: true }
-    )
-    .populate('sender', 'username email phone')
-    .populate('approver', 'username email');
-    
-    if (!changeRequest) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy đơn'
-      });
-    }
-    
-    res.status(200).json({
-      success: true,
-      message: 'Đã từ chối đơn thành công',
-      changeRequest
-    });
-  } catch (error) {
-    console.error("❌ Lỗi khi từ chối đơn:", error);
-    res.status(500).json({
-      success: false,
-      message: "Lỗi server khi từ chối đơn",
-      error: error.message
-    });
-  }
-};
+exports.rejectChangeRequest = changeRequestController.rejectChangeRequest;
 
 // =========================
 // 📋 LẤY DANH SÁCH ĐIỂM DANH CỦA MỘT BUỔI HỌC

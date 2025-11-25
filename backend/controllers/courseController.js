@@ -429,3 +429,190 @@ exports.rejectCourseFromProgram = async (req, res) => {
     }
 };
 
+// =========================
+// COURSE UTILITY FUNCTIONS
+// =========================
+
+/**
+ * Get all unique types from Program collection
+ * GET /api/courses/all-types
+ */
+exports.getAllTypes = async (req, res) => {
+    try {
+        const types = await Program.distinct('type', { status: 'active' });
+        
+        res.status(200).json({
+            success: true,
+            types: types.sort()
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Get all unique levels from Program collection
+ * GET /api/courses/all-levels
+ */
+exports.getAllLevels = async (req, res) => {
+    try {
+        const levels = await Program.distinct('level', { status: 'active' });
+        
+        // Sort levels in order: Pre-A1, A1, A2, B1, B2, C1, C2
+        const levelOrder = ['Pre-A1', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+        const sortedLevels = levels.sort((a, b) => {
+            const indexA = levelOrder.indexOf(a);
+            const indexB = levelOrder.indexOf(b);
+            return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+        });
+        
+        res.status(200).json({
+            success: true,
+            levels: sortedLevels
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Get levels by type
+ * GET /api/courses/levels?type=ielts
+ */
+exports.getLevelsByType = async (req, res) => {
+    try {
+        const { type } = req.query;
+        
+        if (!type) {
+            return res.status(400).json({
+                success: false,
+                message: 'Thiếu tham số type'
+            });
+        }
+        
+        const levels = await Program.distinct('level', { 
+            type: type,
+            status: 'active' 
+        });
+        
+        // Sort levels in order
+        const levelOrder = ['Pre-A1', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+        const sortedLevels = levels.sort((a, b) => {
+            const indexA = levelOrder.indexOf(a);
+            const indexB = levelOrder.indexOf(b);
+            return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+        });
+        
+        res.status(200).json({
+            success: true,
+            levels: sortedLevels
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Get courses by program name and level
+ * GET /api/courses/by-program?programName=IELTS&level=B1
+ */
+exports.getCoursesByProgram = async (req, res) => {
+    try {
+        const { programName, level } = req.query;
+        
+        if (!programName || !level) {
+            return res.status(400).json({
+                success: false,
+                message: 'Thiếu tham số programName hoặc level'
+            });
+        }
+        
+        // Find program by program_name and level
+        const program = await Program.findOne({
+            program_name: { $regex: new RegExp(programName, 'i') },
+            level: level,
+            status: 'active'
+        });
+        
+        if (!program) {
+            return res.status(200).json({
+                success: true,
+                courses: []
+            });
+        }
+        
+        // Find courses that belong to this program
+        const courses = await Course.find({
+            program: program._id,
+            status: 'approved'
+        })
+        .populate('program', 'program_name code type level')
+        .select('name description program')
+        .sort({ name: 1 });
+        
+        res.status(200).json({
+            success: true,
+            courses: courses
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Get band by type and level
+ * GET /api/courses/band?type=ielts&level=B1
+ */
+exports.getBandByTypeAndLevel = async (req, res) => {
+    try {
+        const { type, level } = req.query;
+        
+        if (!type || !level) {
+            return res.status(400).json({
+                success: false,
+                message: 'Thiếu tham số type hoặc level'
+            });
+        }
+        
+        const program = await Program.findOne({
+            type: type,
+            level: level,
+            status: 'active'
+        });
+        
+        if (!program || !program.band) {
+            return res.status(200).json({
+                success: true,
+                band: null
+            });
+        }
+        
+        res.status(200).json({
+            success: true,
+            band: program.band
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+

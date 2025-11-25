@@ -22,7 +22,7 @@ export const academicRoutes = [
   { path: '/academic/profile', element: <AcademicProfilePage /> },
 
   // I. Schedule Management
-  { path: 'academic/schedule-management', element: <ScheduleManagementPage /> },
+  { path: '/academic/schedule-management', element: <ScheduleManagementPage /> },
   { path: '/academic/lessons/:lessonId', element: <AcademicLessonDetailPage /> },
 
   // II. Class Management
@@ -41,5 +41,5 @@ export const academicRoutes = [
   { path: '/academic/student-management', element: <StudentManagementPage /> },
 
   // VII. Reports
-  { path: '/academic/ reports', element: <ReportsPage /> },
+  { path: '/academic/reports', element: <ReportsPage /> },
 ];

@@ -22,7 +22,7 @@ const getStudentReport = async (req, res) => {
     const { startDate, endDate } = req.query;
 
     // Get student role
-    const studentRole = await Role.findOne({ name: 'student' });
+    const studentRole = await Role.findOne({ name: 'Student' });
     if (!studentRole) {
       return res.status(404).json({
         success: false,

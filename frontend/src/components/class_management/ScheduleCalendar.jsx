@@ -161,6 +161,16 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
   };
 
   const getStatusColor = (schedule) => {
+    // Kiểm tra buổi nghỉ (absent)
+    if (schedule.isAbsentSchedule || schedule.status === 'absent') {
+      return '#f44336'; // Màu đỏ cho buổi nghỉ
+    }
+    
+    // Kiểm tra buổi học bù (makeup)
+    if (schedule.isMakeupSchedule || schedule.status === 'makeup') {
+      return '#FF9800'; // Màu cam cho buổi học bù
+    }
+    
     // Ưu tiên kiểm tra timeStatus (cho EditClassModal)
     const timeStatus = schedule.timeStatus;
     
@@ -257,8 +267,12 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                         // Màu nền khác nhau theo trạng thái
                         let backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt mặc định
                         
-                        // Ưu tiên timeStatus (cho EditClassModal)
-                        if (timeStatus === 'completed') {
+                        // Kiểm tra buổi nghỉ và buổi học bù trước
+                        if (schedule.isAbsentSchedule || schedule.status === 'absent') {
+                          backgroundColor = 'rgba(244, 67, 54, 0.15)'; // Đỏ nhạt cho buổi nghỉ
+                        } else if (schedule.isMakeupSchedule || schedule.status === 'makeup') {
+                          backgroundColor = 'rgba(255, 152, 0, 0.15)'; // Cam nhạt cho buổi học bù
+                        } else if (timeStatus === 'completed') {
                           backgroundColor = 'rgba(76, 175, 80, 0.1)'; // Xanh lá nhạt cho buổi đã kết thúc
                         } else if (timeStatus === 'upcoming') {
                           backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt cho buổi chưa bắt đầu
@@ -284,7 +298,11 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                         
                         // Tooltip text
                         let tooltipText = 'Buổi chưa học';
-                        if (timeStatus === 'completed') {
+                        if (schedule.isAbsentSchedule || schedule.status === 'absent') {
+                          tooltipText = 'Buổi nghỉ';
+                        } else if (schedule.isMakeupSchedule || schedule.status === 'makeup') {
+                          tooltipText = 'Buổi học bù';
+                        } else if (timeStatus === 'completed') {
                           tooltipText = 'Buổi đã kết thúc';
                         } else if (timeStatus === 'upcoming') {
                           tooltipText = 'Buổi chưa bắt đầu';
@@ -315,9 +333,11 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                           >
                             <div className="fw-bold d-flex align-items-center justify-content-between">
                               <span>{schedule.startTime}</span>
-                              {(timeStatus || hasAttendance) && (
+                              {(schedule.isAbsentSchedule || schedule.isMakeupSchedule || schedule.status === 'absent' || schedule.status === 'makeup' || timeStatus || hasAttendance) && (
                                 <i 
                                   className={`fas ${
+                                    schedule.isAbsentSchedule || schedule.status === 'absent' ? 'fa-times-circle' :
+                                    schedule.isMakeupSchedule || schedule.status === 'makeup' ? 'fa-calendar-plus' :
                                     timeStatus === 'completed' ? 'fa-check-circle' :
                                     timeStatus === 'upcoming' ? 'fa-clock' :
                                     timeStatus === 'ongoing' ? 'fa-play-circle' :

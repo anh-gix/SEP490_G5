@@ -14,6 +14,7 @@ const RequestDetailPage = ({
   senderSchedule,
   loadingSchedule,
   pendingClassChange,
+  pendingMakeupClasses,
   onBack,
   onApprove,
   onReject,
@@ -91,30 +92,65 @@ const RequestDetailPage = ({
 
   // Tính toán calendarSchedules từ senderSchedule
   const calendarSchedules = useMemo(() => {
-    return senderSchedule.map((schedule, index) => {
+    const schedules = senderSchedule.map((schedule, index) => {
       const scheduleDate = new Date(schedule.date);
       const dateStr = formatDateToYYYYMMDD(scheduleDate);
       
       // Lấy attendance status nếu có
       const attendanceStatus = schedule.attendance?.status || null;
       
+      // Kiểm tra xem buổi này có phải là buổi nghỉ không
+      const scheduleId = schedule._id || schedule.id || index;
+      const isAbsentSchedule = pendingMakeupClasses && pendingMakeupClasses.some(makeup => {
+        const absentId = makeup.absentScheduleId || makeup.absentSchedule?.id || makeup.absentSchedule?._id;
+        return absentId && (absentId.toString() === scheduleId.toString() || absentId.toString() === schedule._id?.toString());
+      });
+      
       return {
-        id: schedule._id || index,
+        id: scheduleId,
         date: dateStr,
         startTime: schedule.startTime || '',
         endTime: schedule.endTime || '',
         className: schedule.class?.name || 'N/A',
         roomName: schedule.room?.room_name || 'N/A',
         topic: schedule.topic || '',
-        status: schedule.status === 'fixed' ? 'scheduled' : schedule.status === 'temporary' ? 'makeup' : 'scheduled',
+        status: isAbsentSchedule ? 'absent' : (schedule.status === 'fixed' ? 'scheduled' : schedule.status === 'temporary' ? 'makeup' : 'scheduled'),
         attendanceStatus: attendanceStatus, // 'present', 'absent', 'late', 'excused', or null
         hasAttendance: !!attendanceStatus,
         teacherName: schedule.teacher?.username || 'N/A',
         lessonNumber: schedule.session?.order || '',
-        lessonTopic: schedule.topic || ''
+        lessonTopic: schedule.topic || '',
+        isAbsentSchedule: isAbsentSchedule
       };
     });
-  }, [senderSchedule]);
+    
+    // Thêm các buổi học bù vào calendar
+    const makeupSchedules = (pendingMakeupClasses || []).map((makeup, index) => {
+      if (!makeup.makeupSchedule || !makeup.makeupSchedule.date) return null;
+      
+      const scheduleDate = new Date(makeup.makeupSchedule.date);
+      const dateStr = formatDateToYYYYMMDD(scheduleDate);
+      
+      return {
+        id: `makeup-${index}-${makeup.makeupScheduleId}`,
+        date: dateStr,
+        startTime: makeup.makeupSchedule.startTime || '',
+        endTime: makeup.makeupSchedule.endTime || '',
+        className: makeup.makeupClassInfo?.className || 'N/A',
+        roomName: makeup.makeupSchedule.roomName || 'N/A',
+        topic: makeup.makeupSchedule.title || '',
+        status: 'makeup',
+        attendanceStatus: null,
+        hasAttendance: false,
+        teacherName: 'N/A',
+        lessonNumber: makeup.makeupSchedule.order || '',
+        lessonTopic: makeup.makeupSchedule.title || '',
+        isMakeupSchedule: true
+      };
+    }).filter(Boolean);
+    
+    return [...schedules, ...makeupSchedules];
+  }, [senderSchedule, pendingMakeupClasses]);
 
   if (!selectedRequest) {
     return null;

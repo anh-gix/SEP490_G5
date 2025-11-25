@@ -290,36 +290,30 @@ const RequestManagementPage = () => {
     const title = isOldClass ? 'Lớp đang học' : 'Lớp muốn đổi';
 
     return (
-      <div className={`border ${borderColor} rounded-8 p-12 ${bgColor}`}>
-        <h6 className={`${textColor} fw-bold mb-12 text-14`}>{title}</h6>
-        <div className="d-flex flex-column gap-2">
-          <div>
-            <small className="text-muted d-block mb-1">Tên lớp:</small>
-            <div className="fw-bold">{classInfo.className || 'N/A'}</div>
+      <div className={`border ${borderColor} rounded-4 p-6 ${bgColor}`}>
+        <h6 className={`${textColor} fw-bold mb-4 text-12`} style={{ lineHeight: '1.2' }}>{title}</h6>
+        <div className="d-flex flex-column" style={{ gap: '2px' }}>
+          <div className="d-flex align-items-center" style={{ gap: '6px' }}>
+            <small className="text-muted text-11" style={{ minWidth: '65px', lineHeight: '1.3' }}>Tên lớp:</small>
+            <div className="fw-semibold text-12" style={{ lineHeight: '1.3' }}>{classInfo.className || 'N/A'}</div>
           </div>
-          <div>
-            <small className="text-muted d-block mb-1">Tên khóa học:</small>
-            <div className="fw-bold">{classInfo.courseName || 'N/A'}</div>
+          <div className="d-flex align-items-center" style={{ gap: '6px' }}>
+            <small className="text-muted text-11" style={{ minWidth: '65px', lineHeight: '1.3' }}>Khóa học:</small>
+            <div className="fw-semibold text-12" style={{ lineHeight: '1.3' }}>{classInfo.courseName || 'N/A'}</div>
           </div>
-          <div>
-            <small className="text-muted d-block mb-1">Session đang học:</small>
-            <div className="fw-semibold">
+          <div className="d-flex align-items-center" style={{ gap: '6px' }}>
+            <small className="text-muted text-11" style={{ minWidth: '65px', lineHeight: '1.3' }}>Session:</small>
+            <div className="fw-semibold text-12" style={{ lineHeight: '1.3' }}>
               {classInfo.currentSessionTitle || 'Chưa có session'}
               {classInfo.currentSessionOrder !== null && (
-                <span className="text-neutral-500 ms-2">(Số thứ tự: {classInfo.currentSessionOrder})</span>
+                <span className="text-neutral-500 ms-1">(STT: {classInfo.currentSessionOrder})</span>
               )}
             </div>
           </div>
-          {classInfo.roomName && (
-            <div>
-              <small className="text-muted d-block mb-1">Phòng học:</small>
-              <div className="fw-semibold">{classInfo.roomName || 'N/A'}</div>
-            </div>
-          )}
           {classInfo.fixedSchedules && classInfo.fixedSchedules.length > 0 ? (
-            <div>
-              <small className="text-muted d-block mb-1">Lịch học:</small>
-              <div className="border rounded-8 p-8 bg-white">
+            <div className="d-flex align-items-start" style={{ gap: '6px' }}>
+              <small className="text-muted text-11" style={{ minWidth: '65px', lineHeight: '1.3' }}>Lịch học:</small>
+              <div className="flex-grow-1" style={{ lineHeight: '1.3' }}>
                 {(() => {
                   // Nhóm các buổi học theo thứ, startTime, endTime
                   const scheduleGroups = {};
@@ -362,7 +356,7 @@ const RequestManagementPage = () => {
                   });
                   
                   return sortedGroups.map((group, index) => (
-                    <div key={index} className="text-13 text-neutral-700 mb-1">
+                    <div key={index} className="text-12 text-neutral-700" style={{ lineHeight: '1.3' }}>
                       {group.dayName} | {group.startTimeFormatted}-{group.endTimeFormatted}
                     </div>
                   ));
@@ -370,15 +364,15 @@ const RequestManagementPage = () => {
               </div>
             </div>
           ) : (
-            <div className="text-neutral-500 text-13">Chưa có lịch học cố định</div>
+            <div className="text-neutral-500 text-11" style={{ lineHeight: '1.3' }}>Chưa có lịch học cố định</div>
           )}
           {!isOldClass && classInfo.studentCount !== null && (
-            <div>
-              <small className="text-muted d-block mb-1">Số lượng học sinh:</small>
-              <div className="fw-semibold">
+            <div className="d-flex align-items-center" style={{ gap: '6px' }}>
+              <small className="text-muted text-11" style={{ minWidth: '65px', lineHeight: '1.3' }}>Số HS:</small>
+              <div className="fw-semibold text-12" style={{ lineHeight: '1.3' }}>
                 {classInfo.studentCount !== null ? classInfo.studentCount : 'N/A'}
                 {classInfo.roomCapacity !== null && (
-                  <span className="text-muted ms-2">/ {classInfo.roomCapacity}</span>
+                  <span className="text-muted ms-1">/ {classInfo.roomCapacity}</span>
                 )}
               </div>
             </div>
@@ -1417,10 +1411,11 @@ const RequestManagementPage = () => {
             <Modal.Title>Thêm buổi học bù</Modal.Title>
           </Modal.Header>
           <Modal.Body className="py-16">
-            <div className="d-flex gap-12 mb-16">
+            <div className="d-flex gap-12 mb-16" style={{ width: '100%' }}>
               <Button
                 variant={makeupClassOption === 'existing' ? 'primary' : 'outline-primary'}
-                className="flex-fill py-12 d-flex align-items-center justify-content-center gap-2"
+                className="py-12 d-flex align-items-center justify-content-center gap-2"
+                style={{ flex: '1 1 0', minWidth: 0, width: 'calc(50% - 6px)' }}
                 onClick={async () => {
                   setMakeupClassOption('existing');
                   // Lấy lớp đầu tiên từ studentClasses làm lớp hiện tại
@@ -1504,7 +1499,8 @@ const RequestManagementPage = () => {
               
               <Button
                 variant={makeupClassOption === 'new' ? 'success' : 'outline-success'}
-                className="flex-fill py-12 d-flex align-items-center justify-content-center gap-2"
+                className="py-12 d-flex align-items-center justify-content-center gap-2"
+                style={{ flex: '1 1 0', minWidth: 0, width: 'calc(50% - 6px)' }}
                 onClick={() => {
                   setMakeupClassOption('new');
                   // TODO: Xử lý logic tạo lớp mới
@@ -2678,10 +2674,11 @@ const RequestManagementPage = () => {
               <Modal.Title>Thêm buổi học bù</Modal.Title>
             </Modal.Header>
             <Modal.Body className="py-16">
-              <div className="d-flex gap-12 mb-16">
+              <div className="d-flex gap-12 mb-16" style={{ width: '100%' }}>
                 <Button
                   variant={makeupClassOption === 'existing' ? 'primary' : 'outline-primary'}
-                  className="flex-fill py-12 d-flex align-items-center justify-content-center gap-2"
+                  className="py-12 d-flex align-items-center justify-content-center gap-2"
+                  style={{ flex: '1 1 0', minWidth: 0, width: 'calc(50% - 6px)' }}
                   onClick={async () => {
                     setMakeupClassOption('existing');
                     // Lấy lớp đầu tiên từ studentClasses làm lớp hiện tại
@@ -2765,7 +2762,8 @@ const RequestManagementPage = () => {
                 
                 <Button
                   variant={makeupClassOption === 'new' ? 'success' : 'outline-success'}
-                  className="flex-fill py-12 d-flex align-items-center justify-content-center gap-2"
+                  className="py-12 d-flex align-items-center justify-content-center gap-2"
+                  style={{ flex: '1 1 0', minWidth: 0, width: 'calc(50% - 6px)' }}
                   onClick={() => {
                     setMakeupClassOption('new');
                     // TODO: Xử lý logic tạo lớp mới

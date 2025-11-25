@@ -227,10 +227,10 @@ const RequestDetailPage = ({
                   
                   {/* Danh sách lớp học viên đang học */}
                   {studentClasses.length > 0 && (
-                    <div className="mb-16">
-                      <h6 className="text-neutral-900 fw-bold mb-12">Các lớp học viên đang học:</h6>
-                      <div className="border border-neutral-200 rounded-8 p-12 bg-neutral-25">
-                        <div className="d-flex flex-column gap-8">
+                    <div className="mb-12">
+                      <h6 className="text-neutral-900 fw-bold mb-8 text-14">Các lớp học viên đang học:</h6>
+                      <div className="border border-neutral-200 rounded-6 p-8 bg-neutral-25">
+                        <div className="d-flex flex-column" style={{ gap: '12px' }}>
                           {studentClasses.map((classItem, index) => {
                             // Kiểm tra xem lớp này có đang pending đổi không
                             const isPendingChange = pendingClassChange && 
@@ -311,10 +311,6 @@ const RequestDetailPage = ({
                                   </li>
                                 ))}
                               </ul>
-                              <p className="mb-0 mt-8 text-13 text-neutral-700">
-                                <i className="fas fa-info-circle me-4"></i>
-                                Các buổi này sẽ được giữ nguyên ClassSchedule cũ và cần được xếp học bù riêng.
-                              </p>
                             </div>
                           </div>
                         </Alert>
@@ -496,9 +492,12 @@ const RequestDetailPage = ({
             <Button 
               variant="success" 
               onClick={onApprove} 
-              disabled={processing}
+              disabled={processing || (filteredPendingMakeupSessions && filteredPendingMakeupSessions.length > 0)}
+              title={filteredPendingMakeupSessions && filteredPendingMakeupSessions.length > 0 
+                ? 'Vui lòng xếp học bù cho tất cả các buổi còn thiếu trước khi chấp nhận' 
+                : ''}
             >
-              {processing ? 'Đang xử lý...' : 'Xác nhận chấp nhận'}
+              {processing ? 'Đang xử lý...' : 'Xác nhận'}
             </Button>
           </div>
         </Container>

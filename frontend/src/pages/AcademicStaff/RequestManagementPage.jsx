@@ -1643,7 +1643,14 @@ const RequestManagementPage = () => {
                                         {selectedSchedule.roomName && (
                                           <div>
                                             <small className="text-muted d-block mb-1">Phòng học:</small>
-                                            <div className="fw-semibold">{selectedSchedule.roomName || 'N/A'}</div>
+                                            <div className="fw-semibold d-flex justify-content-between align-items-center">
+                                              <span>{selectedSchedule.roomName || 'N/A'}</span>
+                                              {selectedSchedule.roomCapacity && selectedMakeupClassInfo?.studentCount !== undefined && (
+                                                <span className="text-neutral-600 text-13 ms-2">
+                                                  ({selectedMakeupClassInfo.studentCount}/{selectedSchedule.roomCapacity})
+                                                </span>
+                                              )}
+                                            </div>
                                           </div>
                                         )}
                                       </>
@@ -1873,7 +1880,14 @@ const RequestManagementPage = () => {
                                         {selectedSchedule.roomName && (
                                           <div>
                                             <small className="text-muted d-block mb-1">Phòng học:</small>
-                                            <div className="fw-semibold">{selectedSchedule.roomName || 'N/A'}</div>
+                                            <div className="fw-semibold d-flex justify-content-between align-items-center">
+                                              <span>{selectedSchedule.roomName || 'N/A'}</span>
+                                              {selectedSchedule.roomCapacity && selectedMakeupClassInfo?.studentCount !== undefined && (
+                                                <span className="text-neutral-600 text-13 ms-2">
+                                                  ({selectedMakeupClassInfo.studentCount}/{selectedSchedule.roomCapacity})
+                                                </span>
+                                              )}
+                                            </div>
                                           </div>
                                         )}
                                       </>

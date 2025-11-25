@@ -45,6 +45,73 @@ const studentService = {
     } catch (error) {
       throw error.response?.data || error.message;
     }
+  },
+
+  // Get lesson detail by schedule ID
+  getLessonDetail: async (scheduleId) => {
+    try {
+      const response = await axios.get(`${API_URL}/students/me/lessons/${scheduleId}`, {
+        headers: getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get class materials
+  getClassMaterials: async (classId) => {
+    try {
+      const response = await axios.get(`${API_URL}/students/me/classes/${classId}/materials`, {
+        headers: getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get class homework
+  getClassHomework: async (classId) => {
+    try {
+      const response = await axios.get(`${API_URL}/students/me/classes/${classId}/homework`, {
+        headers: getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get class progress
+  getClassProgress: async (classId) => {
+    try {
+      const response = await axios.get(`${API_URL}/students/me/classes/${classId}/progress`, {
+        headers: getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Submit homework
+  submitHomework: async (classId, scheduleId, homeworkId, formData) => {
+    try {
+      const response = await axios.post(
+        `${API_URL}/students/me/classes/${classId}/schedules/${scheduleId}/homework/${homeworkId}/submit`,
+        formData,
+        {
+          headers: {
+            ...getAuthHeader(),
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
   }
 };
 

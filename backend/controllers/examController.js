@@ -55,7 +55,7 @@ exports.getAllExams = async (req, res) => {
     }
 
     const exams = await Exam.find(query)
-      .populate('createdBy', 'username email')
+      .populate('createdBy', 'username email phone address')
       .sort({ createdAt: -1 });
 
     // Get statistics
@@ -289,7 +289,7 @@ exports.getExamById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const exam = await Exam.findById(id).populate('createdBy', 'username email');
+    const exam = await Exam.findById(id).populate('createdBy', 'username email phone address');
 
     if (!exam) {
       return res.status(404).json({

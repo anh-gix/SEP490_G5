@@ -69,7 +69,7 @@ const ActionMenu = ({
               <button
                 key={index}
                 type="button"
-                className={`dropdown-item d-flex align-items-center gap-2 ${variantClass}`}
+                className={`dropdown-item d-flex align-items-center gap-2 ${variantClass} ${action.className || ''}`}
                 onClick={() => handleActionClick(action)}
                 disabled={action.disabled}
               >

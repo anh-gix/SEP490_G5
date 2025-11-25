@@ -40,7 +40,7 @@ const examSchema = new mongoose.Schema(
     title: { type: String, required: true },
     description: String,
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    examType: { type: String, enum: ["practice", "real","ielts","toeic"], default: "practice" },
+    examType: { type: String, enum: ["cambridge","ielts","toeic"], default: "cambridge" },
     level: { type: String, enum: ["Academic", "General"], required: true },
     totalDuration: Number,
     sections: [sectionSchema],

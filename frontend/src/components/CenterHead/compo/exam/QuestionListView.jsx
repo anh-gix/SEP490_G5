@@ -178,7 +178,7 @@ const QuestionListView = ({ questions, onUpdateQuestions, onDeleteQuestion, onEd
                 <div className="col-auto text-center" style={{ width: '120px' }}>
                   <div className="d-flex gap-2 justify-content-center">
                     <button
-                      className="btn btn-sm btn-outline-primary"
+                      className="btn btn-sm btn-primary"
                       onClick={() => onEditQuestion(index)}
                       title="Edit question"
                       style={{ transition: 'all 0.2s' }}
@@ -186,7 +186,7 @@ const QuestionListView = ({ questions, onUpdateQuestions, onDeleteQuestion, onEd
                       <i className="ph ph-pencil-simple"></i>
                     </button>
                     <button
-                      className="btn btn-sm btn-outline-danger"
+                      className="btn btn-sm btn-danger"
                       onClick={() => onDeleteQuestion(index)}
                       title="Delete question"
                       style={{ transition: 'all 0.2s' }}

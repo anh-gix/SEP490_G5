@@ -45,6 +45,7 @@ const RequestManagementPage = () => {
   const [loadingNewClassInfo, setLoadingNewClassInfo] = useState(false);
   const [pendingClassChange, setPendingClassChange] = useState(null); // Lưu tạm thông tin đổi lớp
   const [pendingMakeupClasses, setPendingMakeupClasses] = useState([]); // Lưu danh sách buổi học bù pending
+  const [pendingMakeupSessions, setPendingMakeupSessions] = useState([]); // Lưu danh sách sessions cần học bù (trường hợp 2)
   const [showMakeupClassModal, setShowMakeupClassModal] = useState(false); // Modal thêm buổi học bù
   const [makeupClassOption, setMakeupClassOption] = useState(null); // 'existing' hoặc 'new'
   const [selectedMakeupClassId, setSelectedMakeupClassId] = useState(null); // Lớp được chọn cho buổi học bù
@@ -942,6 +943,9 @@ const RequestManagementPage = () => {
       setSelectedRequest(null);
       setRejectReason('');
       setSenderSchedule([]);
+      setPendingClassChange(null);
+      setPendingMakeupClasses([]);
+      setPendingMakeupSessions([]);
       fetchChangeRequests(); // Refresh list
     } catch (err) {
       console.error('Error approving request:', err);
@@ -980,6 +984,7 @@ const RequestManagementPage = () => {
           loadingSchedule={loadingSchedule}
           pendingClassChange={pendingClassChange}
           pendingMakeupClasses={pendingMakeupClasses}
+          pendingMakeupSessions={pendingMakeupSessions}
           onBack={() => {
             setShowDetailModal(false);
             setRejectReason('');
@@ -987,6 +992,7 @@ const RequestManagementPage = () => {
             setSenderSchedule([]);
             setPendingClassChange(null);
             setPendingMakeupClasses([]);
+            setPendingMakeupSessions([]);
           }}
           onApprove={handleApprove}
           onReject={() => handleRejectClick(selectedRequest)}
@@ -1284,6 +1290,46 @@ const RequestManagementPage = () => {
                   return;
                 }
                 
+                // Kiểm tra trường hợp 2: Lớp mới học nhanh hơn
+                const oldSessionOrder = selectedClassToChange.currentSessionOrder;
+                const newSessionOrder = selectedNewClassInfo.currentSessionOrder;
+                const makeupSessions = [];
+                
+                if (oldSessionOrder !== null && newSessionOrder !== null && newSessionOrder > oldSessionOrder) {
+                  // Tìm các sessions chưa học của lớp cũ có session order < newSessionOrder
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  
+                  const oldClassSchedules = senderSchedule.filter(sch => {
+                    const classId = sch.class?._id?.toString() || sch.class?.toString();
+                    return classId === selectedClassToChange.classId;
+                  });
+                  
+                  oldClassSchedules.forEach(schedule => {
+                    const scheduleDate = new Date(schedule.date);
+                    scheduleDate.setHours(0, 0, 0, 0);
+                    const sessionOrder = schedule.session?.order;
+                    const attendanceStatus = schedule.attendance?.status;
+                    
+                    // Kiểm tra session chưa học và có order < newSessionOrder
+                    if (sessionOrder !== null && sessionOrder !== undefined && 
+                        sessionOrder < newSessionOrder &&
+                        (scheduleDate > today || attendanceStatus === null || attendanceStatus === undefined)) {
+                      makeupSessions.push({
+                        sessionOrder: sessionOrder,
+                        sessionTitle: schedule.session?.title || `Session ${sessionOrder}`,
+                        date: schedule.date,
+                        startTime: schedule.startTime,
+                        endTime: schedule.endTime,
+                        classScheduleId: schedule._id || schedule.id
+                      });
+                    }
+                  });
+                  
+                  // Sắp xếp theo session order
+                  makeupSessions.sort((a, b) => a.sessionOrder - b.sessionOrder);
+                }
+                
                 // Lưu thông tin đổi lớp vào state
                 setPendingClassChange({
                   oldClassId: selectedClassToChange.classId,
@@ -1291,6 +1337,9 @@ const RequestManagementPage = () => {
                   oldClassInfo: selectedClassToChange,
                   newClassInfo: selectedNewClassInfo
                 });
+                
+                // Lưu danh sách sessions cần học bù
+                setPendingMakeupSessions(makeupSessions);
                 
                 // Đóng modal đổi lớp
                 setShowChangeClassModal(false);

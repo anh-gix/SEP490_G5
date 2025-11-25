@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Container, Card, Button, Spinner } from 'react-bootstrap';
+import { Container, Card, Button, Spinner, Alert } from 'react-bootstrap';
 import AcademicNavigation from '../../components/class_management/AcademicNavigation.jsx';
 import ScheduleCalendar from '../../components/class_management/ScheduleCalendar';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
@@ -15,6 +15,7 @@ const RequestDetailPage = ({
   loadingSchedule,
   pendingClassChange,
   pendingMakeupClasses,
+  pendingMakeupSessions,
   onBack,
   onApprove,
   onReject,
@@ -89,6 +90,37 @@ const RequestDetailPage = ({
 
     return result;
   }, [senderSchedule]);
+
+  // Lọc các buổi học bù đã được xếp trong calendar
+  const filteredPendingMakeupSessions = useMemo(() => {
+    if (!pendingMakeupSessions || pendingMakeupSessions.length === 0) {
+      return [];
+    }
+    
+    if (!pendingMakeupClasses || pendingMakeupClasses.length === 0) {
+      return pendingMakeupSessions;
+    }
+    
+    // Lọc bỏ các buổi đã được xếp học bù
+    return pendingMakeupSessions.filter(session => {
+      const sessionScheduleId = session.classScheduleId?.toString();
+      
+      // Nếu không có classScheduleId, giữ lại buổi này (không thể xác định)
+      if (!sessionScheduleId) {
+        return true;
+      }
+      
+      // Kiểm tra xem buổi này đã được xếp học bù chưa
+      const isAlreadyScheduled = pendingMakeupClasses.some(makeup => {
+        const absentId = makeup.absentScheduleId?.toString() || 
+                        makeup.absentSchedule?.id?.toString() || 
+                        makeup.absentSchedule?._id?.toString();
+        return absentId && absentId === sessionScheduleId;
+      });
+      
+      return !isAlreadyScheduled;
+    });
+  }, [pendingMakeupSessions, pendingMakeupClasses]);
 
   // Tính toán calendarSchedules từ senderSchedule
   const calendarSchedules = useMemo(() => {
@@ -258,6 +290,34 @@ const RequestDetailPage = ({
                           })}
                         </div>
                       </div>
+                      
+                      {/* Cảnh báo các buổi cần học bù (trường hợp 2) */}
+                      {pendingClassChange && filteredPendingMakeupSessions && filteredPendingMakeupSessions.length > 0 && (
+                        <Alert variant="warning" className="mt-12 mb-0">
+                          <div className="d-flex align-items-start gap-8">
+                            <i className="fas fa-exclamation-triangle text-warning mt-1"></i>
+                            <div className="flex-grow-1">
+                              <strong className="text-warning-dark">Cảnh báo: Học sinh cần học bù các buổi sau:</strong>
+                              <ul className="mb-0 mt-8 ps-20">
+                                {filteredPendingMakeupSessions.map((session, idx) => (
+                                  <li key={idx} className="mb-4">
+                                    <strong>Buổi {session.sessionOrder}:</strong> {session.sessionTitle}
+                                    {session.date && (
+                                      <span className="text-neutral-600 ms-8">
+                                        ({new Date(session.date).toLocaleDateString('vi-VN')} {session.startTime}-{session.endTime})
+                                      </span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                              <p className="mb-0 mt-8 text-13 text-neutral-700">
+                                <i className="fas fa-info-circle me-4"></i>
+                                Các buổi này sẽ được giữ nguyên ClassSchedule cũ và cần được xếp học bù riêng.
+                              </p>
+                            </div>
+                          </div>
+                        </Alert>
+                      )}
                     </div>
                   )}
                 </div>

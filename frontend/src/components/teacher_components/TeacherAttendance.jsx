@@ -59,9 +59,15 @@ const TeacherAttendance = () => {
     if (diff <= 0) {
       setCountdown('');
     } else {
-      const hoursLeft = Math.floor(diff / (1000 * 60 * 60));
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hoursLeft = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutesLeft = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      setCountdown(`${hoursLeft}h ${minutesLeft}m`);
+      
+      if (days > 0) {
+        setCountdown(`${days} ngày ${hoursLeft}h`);
+      } else {
+        setCountdown(`${hoursLeft}h ${minutesLeft}m`);
+      }
     }
   };
 
@@ -218,7 +224,7 @@ const TeacherAttendance = () => {
     return matchesSearch && matchesStatus;
   });
 
-  if (!scheduleInfo && loading) {
+  if (loading) {
     return (
       <Container fluid className="py-24 px-24" style={{ backgroundColor: '#f8f9fa' }}>
         <div className="text-center py-5">
@@ -285,6 +291,28 @@ const TeacherAttendance = () => {
         </Card>
       )}
 
+      {/* Empty state when no schedules today */}
+      {!loading && todaySchedules.length === 0 && (
+        <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24">
+          <Card.Body className="text-center py-5">
+            <i className="fas fa-calendar-times text-neutral-300" style={{ fontSize: '64px' }}></i>
+            <h5 className="text-neutral-700 mt-3 mb-2">Không có lịch dạy hôm nay</h5>
+            <p className="text-neutral-500 mb-0">Bạn không có buổi học nào được lên lịch cho hôm nay</p>
+          </Card.Body>
+        </Card>
+      )}
+
+      {/* Show message to select a class if no schedule selected yet */}
+      {!scheduleInfo && todaySchedules.length > 0 && !loading && (
+        <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24">
+          <Card.Body className="text-center py-5">
+            <i className="fas fa-hand-pointer text-main-600" style={{ fontSize: '48px' }}></i>
+            <h5 className="text-neutral-700 mt-3 mb-2">Chọn lớp để điểm danh</h5>
+            <p className="text-neutral-500 mb-0">Vui lòng chọn một lớp học từ danh sách bên trên để bắt đầu điểm danh</p>
+          </Card.Body>
+        </Card>
+      )}
+
       {/* Schedule Info with Countdown */}
       {scheduleInfo && (
         <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24" 
@@ -339,78 +367,81 @@ const TeacherAttendance = () => {
       )}
 
       {/* Attendance Stats */}
-      <Row className="g-3 mb-24">
-        <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
-                <div className="rounded-12 d-flex align-items-center justify-content-center"
-                     style={{ width: '56px', height: '56px', background: '#E6FFED' }}>
-                  <i className="fas fa-check text-success-600" style={{ fontSize: '24px' }}></i>
+      {scheduleInfo && (
+        <Row className="g-3 mb-24">
+          <Col md={3}>
+            <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+              <Card.Body className="p-20">
+                <div className="d-flex align-items-center gap-16">
+                  <div className="rounded-12 d-flex align-items-center justify-content-center"
+                       style={{ width: '56px', height: '56px', background: '#E6FFED' }}>
+                    <i className="fas fa-check text-success-600" style={{ fontSize: '24px' }}></i>
+                  </div>
+                  <div>
+                    <div className="text-neutral-500 text-13 mb-4">Có mặt</div>
+                    <div className="text-neutral-900 fw-bold text-32">{stats.present}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-neutral-500 text-13 mb-4">Có mặt</div>
-                  <div className="text-neutral-900 fw-bold text-32">{stats.present}</div>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
+              </Card.Body>
+            </Card>
+          </Col>
 
-        <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
-                <div className="rounded-12 d-flex align-items-center justify-content-center"
-                     style={{ width: '56px', height: '56px', background: '#FFE6E6' }}>
-                  <i className="fas fa-times text-danger-600" style={{ fontSize: '24px' }}></i>
+          <Col md={3}>
+            <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+              <Card.Body className="p-20">
+                <div className="d-flex align-items-center gap-16">
+                  <div className="rounded-12 d-flex align-items-center justify-content-center"
+                       style={{ width: '56px', height: '56px', background: '#FFE6E6' }}>
+                    <i className="fas fa-times text-danger-600" style={{ fontSize: '24px' }}></i>
+                  </div>
+                  <div>
+                    <div className="text-neutral-500 text-13 mb-4">Vắng</div>
+                    <div className="text-neutral-900 fw-bold text-32">{stats.absent}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-neutral-500 text-13 mb-4">Vắng</div>
-                  <div className="text-neutral-900 fw-bold text-32">{stats.absent}</div>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
+              </Card.Body>
+            </Card>
+          </Col>
 
-        <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
-                <div className="rounded-12 d-flex align-items-center justify-content-center"
-                     style={{ width: '56px', height: '56px', background: '#FFE8CC' }}>
-                  <i className="fas fa-clock text-warning-600" style={{ fontSize: '24px' }}></i>
+          <Col md={3}>
+            <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+              <Card.Body className="p-20">
+                <div className="d-flex align-items-center gap-16">
+                  <div className="rounded-12 d-flex align-items-center justify-content-center"
+                       style={{ width: '56px', height: '56px', background: '#FFE8CC' }}>
+                    <i className="fas fa-clock text-warning-600" style={{ fontSize: '24px' }}></i>
+                  </div>
+                  <div>
+                    <div className="text-neutral-500 text-13 mb-4">Trễ</div>
+                    <div className="text-neutral-900 fw-bold text-32">{stats.late}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-neutral-500 text-13 mb-4">Trễ</div>
-                  <div className="text-neutral-900 fw-bold text-32">{stats.late}</div>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
+              </Card.Body>
+            </Card>
+          </Col>
 
-        <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
-                <div className="rounded-12 d-flex align-items-center justify-content-center"
-                     style={{ width: '56px', height: '56px', background: '#E6F2FF' }}>
-                  <i className="fas fa-hand-paper text-info-500" style={{ fontSize: '24px' }}></i>
+          <Col md={3}>
+            <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+              <Card.Body className="p-20">
+                <div className="d-flex align-items-center gap-16">
+                  <div className="rounded-12 d-flex align-items-center justify-content-center"
+                       style={{ width: '56px', height: '56px', background: '#E6F2FF' }}>
+                    <i className="fas fa-hand-paper text-info-500" style={{ fontSize: '24px' }}></i>
+                  </div>
+                  <div>
+                    <div className="text-neutral-500 text-13 mb-4">Có phép</div>
+                    <div className="text-neutral-900 fw-bold text-32">{stats.excused}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-neutral-500 text-13 mb-4">Có phép</div>
-                  <div className="text-neutral-900 fw-bold text-32">{stats.excused}</div>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      )}
 
       {/* Filters & Actions */}
-      <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+      {scheduleInfo && (
+        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
         <Card.Body className="p-20">
           <Row className="align-items-center g-3">
             <Col md={4}>
@@ -444,10 +475,12 @@ const TeacherAttendance = () => {
           </Row>
         </Card.Body>
       </Card>
-
+      )}
+      
       {/* Students Table */}
-      <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
-        <Card.Body className="p-0">
+      {scheduleInfo && (
+        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+          <Card.Body className="p-0">
           <Table hover className="mb-0">
             <thead>
               <tr className="bg-neutral-25">
@@ -523,6 +556,7 @@ const TeacherAttendance = () => {
           </Table>
         </Card.Body>
       </Card>
+      )}
 
       {/* Confirm Modal */}
       <Modal show={showConfirmModal} onHide={() => setShowConfirmModal(false)}>

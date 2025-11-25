@@ -395,22 +395,26 @@ const TeacherClassDetailLayout = () => {
     setShowStudentDetail(true);
   };
 
-  const handleUpdateMocktestScore = async (studentId, sessionOrder, scores) => {
+  const handleUpdateMocktestScore = async (studentId, scheduleId, scores) => {
     try {
-      // Find the schedule ID for this mocktest session
-      const mocktestLesson = lessons.find(
-        lesson => lesson.sessionOrder === sessionOrder
-      );
-
-      if (!mocktestLesson) {
+      console.log('📤 API Request - Update Mocktest Score:', {
+        studentId,
+        scheduleId,
+        scores,
+        apiUrl: `/api/teachers/me/mocktest/${scheduleId}/student/${studentId}`
+      });
+      
+      if (!scheduleId) {
         throw new Error('Không tìm thấy buổi học mocktest');
       }
 
-      await teacherService.updateMocktestScore(
-        mocktestLesson._id,
+      const response = await teacherService.updateMocktestScore(
+        scheduleId,
         studentId,
         scores
       );
+      
+      console.log('📥 API Response:', response);
 
       alert('Cập nhật điểm thành công!');
       // Refresh students list to update table and modal

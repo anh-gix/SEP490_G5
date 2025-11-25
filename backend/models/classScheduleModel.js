@@ -4,7 +4,7 @@ const Schema = mongoose.Schema;
 
 const classScheduleSchema = new Schema({
     
-    class: { type: Schema.Types.ObjectId, ref: 'Class', required: true },
+    class: { type: Schema.Types.ObjectId, ref: 'Class'},
     
     session: { type: Schema.Types.ObjectId, ref: 'Session' }, //Noi dung buoi hoc
     
@@ -28,8 +28,8 @@ const classScheduleSchema = new Schema({
     
     status: {
         type: String,
-        enum: ['draft', 'pending_approval', 'approved', 'rejected'],
-        default: 'draft'
+        enum: ['temporary', 'fixed'],
+        default: 'fixed'
     },
     
     // Bài tập về nhà

@@ -16,7 +16,7 @@ import CartPage from "./pages/CartPage.jsx";
 import CheckoutPage from "./pages/CheckoutPage.jsx";
 import ContactPage from "./pages/ContactPage.jsx";
 import CoursePage from "./pages/CoursePage.jsx";
-import CourseDetailsPage from "./pages/CourseDetailsPage.jsx";
+import CourseDetailsPage from "./pages/CenterHead/CourseDetailsPage.jsx";
 import CourseListViewPage from "./pages/CourseListViewPage.jsx";
 import EventDetailsPage from "./pages/EventDetailsPage.jsx";
 import EventsPage from "./pages/EventsPage.jsx";
@@ -42,17 +42,12 @@ import TutorPage from "./pages/TutorPage.jsx";
 import TutorDetailsPage from "./pages/TutorDetailsPage.jsx";
 import HomePageFive from "./pages/HomePageFive.jsx";
 import HomePageSix from "./pages/HomePageSix.jsx";
-
-
-import StudentExamListPage from "./pages/ExamPages/StudentExamListPage.jsx";
-import ExamDetailPage from "./pages/ExamPages/ExamDetailPage.jsx";
-import ReadingExamPage from "./pages/ExamPages/ReadingExamPage.jsx";
-import ReadingResultPage from "./pages/ExamPages/ReadingResultPage.jsx";
-
 import { Navigate } from "react-router-dom";
+
+import Profile from "./pages/Profile.jsx";
+
 import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";
 import { academicRoutes } from "./routes/AcademicRoutes.jsx";
-import Profile from "./pages/Profile.jsx";
 import { teacherRoutes } from "./routes/TeacherRoutes.jsx";
 import { studentRoutes } from "./routes/StudentRoutes.jsx";
 import { ministryRoutes } from "./routes/MinistryRoutes.jsx";

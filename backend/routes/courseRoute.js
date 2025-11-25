@@ -1,22 +1,23 @@
 const express = require('express');
 const router = express.Router();
-const courseController = require('../controllers/courseController'); 
+const courseController = require('../controllers/courseController');
 
-// Lấy band từ type và level - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
-// Lấy tất cả mappings
-// Lấy types theo level
-
-//danh sachs chowf phee duyeejt
+// COURSE APPROVAL WORKFLOW ROUTES (specific routes must come first)
 router.get('/pending', courseController.getPendingCourses);
-
-//lấy chi tiết giáo trình
 router.get('/:id/details', courseController.getCourseDetails);
-
-//phê duyệt
 router.patch('/:id/approve', courseController.approveCourse);
-
-//yêu cầu chỉnh sửa
 router.patch('/:id/revise', courseController.requestRevision);
+
+// PROGRAM HEAD: ACCEPT/REJECT COURSE TO PROGRAM
+router.patch('/:id/accept', courseController.acceptCourseToProgram);
+router.patch('/:id/reject', courseController.rejectCourseFromProgram);
+
+// COURSE CRUD ROUTES (dynamic routes come after)
+router.get('/', courseController.getAllCourses);
+router.get('/:id', courseController.getCourseById);
+router.post('/', courseController.createCourse);
+router.put('/:id', courseController.updateCourse);
+router.delete('/:id', courseController.deleteCourse);
 
 module.exports = router;
 

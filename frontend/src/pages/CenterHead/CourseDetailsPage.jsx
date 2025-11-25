@@ -1,10 +1,10 @@
-import Breadcrumb from "../components/Breadcrumb";
-import CertificateOne from "../components/CertificateOne";
-import CourseDetails from "../components/CourseDetails";
-import FooterOne from "../components/FooterOne";
-import HeaderOne from "../components/HeaderOne";
-import Animation from "../helper/Animation";
-import Preloader from "../helper/Preloader";
+import Breadcrumb from "../../components/Breadcrumb";
+import CertificateOne from "../../components/CertificateOne";
+import CourseDetails from "../../components/CourseDetails";
+import FooterOne from "../../components/FooterOne";
+import HeaderOne from "../../components/HeaderOne";
+import Animation from "../../helper/Animation";
+import Preloader from "../../helper/Preloader";
 
 const CourseDetailsPage = () => {
   return (

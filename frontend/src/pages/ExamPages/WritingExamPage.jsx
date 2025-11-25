@@ -175,6 +175,20 @@ const WritingExamPage = () => {
     return `http://localhost:${API_PORT}/uploads/${sectionData.section.fileUrl}`;
   };
 
+  const getQuestionData = useCallback(
+    (questionNumber) => {
+      if (!sectionData?.section?.questions) return { questionTitle: "", questionAnswer: [] };
+      const question = sectionData.section.questions.find(
+        (q) => q.questionNumber === questionNumber
+      );
+      return {
+        questionTitle: question?.questionTitle || "",
+        questionAnswer: question?.questionAnswer || [],
+      };
+    },
+    [sectionData]
+  );
+
   const generateQuestionNumbers = () => {
     if (!sectionData?.section?.questionCount) return [];
     return Array.from({ length: sectionData.section.questionCount }, (_, i) => i + 1);
@@ -204,8 +218,6 @@ const WritingExamPage = () => {
     <>
       <Preloader />
       <Animation />
-      <Breadcrumb title={"Writing Section"} />
-
       <section className="py-40">
         <div className="container-fluid px-0">
           <div className="row g-0">
@@ -291,6 +303,7 @@ const WritingExamPage = () => {
                     {generateQuestionNumbers().map((qNum) => {
                       const answerText = answers[qNum] || "";
                       const wordCount = getWordCount(answerText);
+                      const questionData = getQuestionData(qNum);
                       return (
                         <div
                           key={qNum}
@@ -308,6 +321,27 @@ const WritingExamPage = () => {
                               )}
                             </div>
                           </div>
+
+                          {/* Question Title */}
+                          {questionData.questionTitle && (
+                            <div className="mb-16">
+                              <p className="text-neutral-700 fw-semibold mb-0">{questionData.questionTitle}</p>
+                            </div>
+                          )}
+
+                          {/* Question Answers (if any) */}
+                          {questionData.questionAnswer && questionData.questionAnswer.length > 0 && (
+                            <div className="mb-16">
+                              <p className="text-neutral-600 text-sm mb-8">Các đáp án:</p>
+                              <div className="d-flex flex-column gap-4">
+                                {questionData.questionAnswer.map((option, idx) => (
+                                  <div key={idx} className="text-neutral-600 text-sm">
+                                    <span className="fw-semibold">{option.key}.</span> {option.text}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
                           <textarea
                             className="form-control"

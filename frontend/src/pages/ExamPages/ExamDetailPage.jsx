@@ -49,28 +49,7 @@ const ExamDetailPage = () => {
     fetchExam();
   }, [id, isAuthenticated]);
 
-  const handleStartExam = async () => {
-    if (!isAuthenticated) {
-      navigate("/sign-in");
-      return;
-    }
-
-    try {
-      setStarting(true);
-      const result = await examService.startExam(id);
-      setSubmission(result.submission);
-      
-      // Find reading section and navigate to it
-      const readingSection = exam?.sections?.find(s => s.type === "reading");
-      if (readingSection && result.submission?._id) {
-        navigate(`/exams/${id}/submissions/${result.submission._id}/reading`);
-      }
-    } catch (err) {
-      setError(err.message || "Không thể bắt đầu làm bài");
-    } finally {
-      setStarting(false);
-    }
-  };
+  
 
   const getSectionIcon = (type) => {
     switch (type) {
@@ -171,47 +150,6 @@ const ExamDetailPage = () => {
                         <i className='ph ph-arrow-right ms-8' />
                       </button>
                     </div>
-                  </div>
-                </>
-              ) : !submission ? (
-                <>
-                  {/* Hiển thị thông tin đề thi khi đã đăng nhập nhưng chưa bắt đầu làm bài */}
-                  <div className='bg-main-25 rounded-16 p-24 mb-40 border border-neutral-30'>
-                    <h2 className='mb-16'>{exam.title}</h2>
-                    {exam.description && (
-                      <p className='text-neutral-600 text-lg mb-16'>{exam.description}</p>
-                    )}
-                    <div className='flex-align gap-24 flex-wrap'>
-                      <div className='flex-align gap-8'>
-                        <span className='text-neutral-700 text-2xl d-flex'>
-                          <i className='ph-bold ph-clock' />
-                        </span>
-                        <span className='text-neutral-700 text-lg'>
-                          Thời gian: {exam.totalDuration || 0} phút
-                        </span>
-                      </div>
-                      <div className='flex-align gap-8'>
-                        <span className='text-neutral-700 text-2xl d-flex'>
-                          <i className='ph-bold ph-book' />
-                        </span>
-                        <span className='text-neutral-700 text-lg'>Level: {exam.level}</span>
-                      </div>
-                      <div className='flex-align gap-8'>
-                        <span className='badge bg-main-600 text-white px-16 py-8 rounded-pill'>
-                          {exam.examType === "real" ? "Thi thật" : "Luyện tập"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className='text-center py-40'>
-                    <button
-                      onClick={handleStartExam}
-                      disabled={starting}
-                      className='btn btn-primary btn-lg px-40 py-16 rounded-pill'
-                    >
-                      {starting ? "Đang khởi tạo..." : "Bắt đầu làm bài"}
-                    </button>
                   </div>
                 </>
               ) : (

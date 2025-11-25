@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, ProgressBar, Table } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { teacherDashboardMock } from './teacher_mockdata';
+import teacherService from '../../services/teacherService';
 
 /**
  * Teacher Dashboard Component
@@ -16,12 +16,12 @@ const TeacherDashboard = () => {
       pendingAttendance: 0
     },
     upcomingSchedule: [],
-    recentActivities: [],
     classesSummary: []
   });
   
   const [currentTime, setCurrentTime] = useState(new Date());
   const [countdown, setCountdown] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboardData();
@@ -71,13 +71,32 @@ const TeacherDashboard = () => {
   }, [dashboardData.upcomingSchedule]);
 
   const fetchDashboardData = async () => {
-    // TODO: Replace with actual API call
-    // const response = await teacherAPI.getDashboardData();
-    // setDashboardData(response.data);
-    
-    // Using mock data
-    setDashboardData(teacherDashboardMock);
+    try {
+      setLoading(true);
+      const response = await teacherService.getTeacherDashboard();
+      
+      if (response.success) {
+        setDashboardData(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
+        <div className="text-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="text-neutral-600 mt-3">Đang tải dữ liệu dashboard...</p>
+        </div>
+      </Container>
+    );
+  }
 
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>

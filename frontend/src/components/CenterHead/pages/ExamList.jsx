@@ -8,7 +8,7 @@ import SearchBox from '../compo/SearchBox';
 import FilterBar from '../compo/FilterBar';
 import StatusBadge from '../compo/StatusBadge';
 import ActionMenu from '../compo/ActionMenu';
-import { mockExams, mockExamStats, simulateApiDelay } from '../../../helper/mockdataExtended';
+import examService from '../../../services/examService';
 import { formatDate } from '../../../helper/helper';
 
 const ExamList = () => {
@@ -30,12 +30,39 @@ const ExamList = () => {
   const fetchExams = async () => {
     try {
       setLoading(true);
-      await simulateApiDelay(500);
-      setExams(mockExams);
+      const response = await examService.getAllExams();
+
+      if (response.success) {
+        setExams(response.data || []);
+      } else {
+        console.error('Failed to fetch exams:', response.message);
+        alert(response.message || 'Không thể tải danh sách đề thi');
+      }
     } catch (err) {
       console.error('Error:', err);
+      alert(err.message || 'Không thể tải danh sách đề thi');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteExam = async (examId, examTitle) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa đề thi "${examTitle}"? Hành động này không thể hoàn tác.`)) {
+      return;
+    }
+
+    try {
+      const response = await examService.deleteExam(examId);
+
+      if (response.success) {
+        alert('Xóa đề thi thành công!');
+        fetchExams(); // Reload the list
+      } else {
+        alert(response.message || 'Xóa đề thi thất bại');
+      }
+    } catch (err) {
+      console.error('Error deleting exam:', err);
+      alert(err.message || 'Xóa đề thi thất bại');
     }
   };
 
@@ -127,7 +154,7 @@ const ExamList = () => {
       header: 'Người tạo',
       field: 'createdBy',
       render: (row) => (
-        <span className="text-neutral-700">{row.createdBy?.fullname}</span>
+        <span className="text-neutral-700">{row.createdBy?.username || 'N/A'}</span>
       ),
     },
     {
@@ -142,6 +169,11 @@ const ExamList = () => {
               onClick: () => navigate(`/center-head/exams/${row._id}`)
             },
             {
+              label: "Chỉnh sửa",
+              icon: "ph ph-pencil",
+              onClick: () => navigate(`/center-head/exams/${row._id}/edit`)
+            },
+            {
               label: "Xem bài làm",
               icon: "ph ph-notebook",
               onClick: () => navigate(`/center-head/exams/${row._id}/submissions`)
@@ -150,6 +182,12 @@ const ExamList = () => {
               label: row.isPublished ? 'Hủy xuất bản' : 'Xuất bản',
               icon: row.isPublished ? 'ph ph-eye-slash' : 'ph ph-book-open',
               onClick: () => console.log('Toggle publish', row._id)
+            },
+            {
+              label: "Xóa",
+              icon: "ph ph-trash",
+              onClick: () => handleDeleteExam(row._id, row.title),
+              className: "text-danger"
             },
           ]}
         />
@@ -184,19 +222,23 @@ const ExamList = () => {
         <div className="col-md-4">
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng đề thi</h6>
-            <h4 className="text-neutral-900 fw-bold mb-0">{mockExamStats.total}</h4>
+            <h4 className="text-neutral-900 fw-bold mb-0">{exams.length}</h4>
           </Card>
         </div>
         <div className="col-md-4">
           <Card>
             <h6 className="text-neutral-600 mb-8">Đã xuất bản</h6>
-            <h4 className="text-success-600 fw-bold mb-0">{mockExamStats.published}</h4>
+            <h4 className="text-success-600 fw-bold mb-0">
+              {exams.filter(exam => exam.isPublished).length}
+            </h4>
           </Card>
         </div>
         <div className="col-md-4">
           <Card>
-            <h6 className="text-neutral-600 mb-8">Bài chờ chấm</h6>
-            <h4 className="text-warning-600 fw-bold mb-0">{mockExamStats.pendingGrading}</h4>
+            <h6 className="text-neutral-600 mb-8">Bản nháp</h6>
+            <h4 className="text-warning-600 fw-bold mb-0">
+              {exams.filter(exam => !exam.isPublished).length}
+            </h4>
           </Card>
         </div>
       </div>

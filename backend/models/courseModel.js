@@ -32,11 +32,38 @@ const courseSchema = new Schema({
         ref: 'User',
         required: true
     },
+        // Tài liệu cho course (mảng các URL)
+    materials: [{
+        type: String
+    }],
+    // Session nào là mocktest (theo order)
+    // VD: [5, 10] nghĩa là session order 5 và 10 là mocktest
+    mocktestSessionOrders: [{
+        type: Number
+    }],
+    
     submittedAt: {
         type: Date
     },
     revisionReason: {
         type: String
+    },
+    approvedAt: {
+        type: Date
+    },
+    approvedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    approvalNote: {
+        type: String
+    },
+    rejectedAt: {
+        type: Date
+    },
+    rejectedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User'
     },
     status: {
         type: String,

@@ -1,11 +1,33 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import RoleNavigation from '../common/RoleNavigation.jsx';
+import { useAuth } from '../../contexts/AuthContext';
+import studentService from '../../services/studentService';
 
 /**
  * Student Navigation Component
  * Sidebar navigation dành cho học viên - Sử dụng RoleNavigation component
  */
 const StudentNavigation = () => {
+  const { user } = useAuth();
+  const [studentInfo, setStudentInfo] = useState(null);
+
+  useEffect(() => {
+    const fetchStudentInfo = async () => {
+      try {
+        const response = await studentService.getCurrentStudent();
+        if (response.success) {
+          setStudentInfo(response.student);
+        }
+      } catch (error) {
+        console.error('Lỗi khi lấy thông tin học viên:', error);
+      }
+    };
+
+    if (user) {
+      fetchStudentInfo();
+    }
+  }, [user]);
+
   const menuItems = [
     {
       title: 'Tổng quan',
@@ -58,9 +80,9 @@ const StudentNavigation = () => {
   ];
 
   const userInfo = {
-    name: 'Nguyễn Văn A',
-    code: 'SV001',
-    avatar: null,
+    name: studentInfo?.username || user?.username || 'Học viên',
+    code: studentInfo?.email?.split('@')[0]?.toUpperCase() || 'HV',
+    avatar: studentInfo?.avatar || null,
     role: 'student'
   };
 

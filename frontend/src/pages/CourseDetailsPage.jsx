@@ -2,7 +2,7 @@ import Breadcrumb from "../components/Breadcrumb";
 import CertificateOne from "../components/CertificateOne";
 import CourseDetails from "../components/CourseDetail/CourseDetails";
 import FooterOne from "../components/FooterOne";
-import HeaderOne from "../components/HeaderOne";
+import HeaderOne from "../components/HomePageforStudent/HeaderOne";
 import Animation from "../helper/Animation";
 import Preloader from "../helper/Preloader";
 

@@ -37,7 +37,7 @@ const CourseGridView = ({ initialType }) => {
         setLoading(true);
         setError(null);
         const response = await axios.get(
-          `${API_URL}/courses/by-type`,
+          `${API_URL}/courseshome/by-type`,
           {
             params: { type: selectedType },
           }

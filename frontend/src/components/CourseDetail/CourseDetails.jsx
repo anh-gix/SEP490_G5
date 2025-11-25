@@ -21,7 +21,7 @@ const CourseDetails = () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await axios.get(`${API_URL}/courses/course-home/${id}`);
+        const response = await axios.get(`${API_URL}/courseshome/course-home/${id}`);
         console.log('Course details response:', response.data);
         if (response.data.success) {
           setCourse(response.data.data);

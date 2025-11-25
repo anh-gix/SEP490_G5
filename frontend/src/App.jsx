@@ -16,7 +16,6 @@ import CartPage from "./pages/CartPage.jsx";
 import CheckoutPage from "./pages/CheckoutPage.jsx";
 import ContactPage from "./pages/ContactPage.jsx";
 import CoursePage from "./pages/CoursePage.jsx";
-import CourseDetailsPage from "./pages/CenterHead/CourseDetailsPage.jsx";
 import CourseListViewPage from "./pages/CourseListViewPage.jsx";
 import EventDetailsPage from "./pages/EventDetailsPage.jsx";
 import EventsPage from "./pages/EventsPage.jsx";
@@ -31,7 +30,6 @@ import InstructorPage from "./pages/InstructorPage.jsx";
 import InstructorDetailsPage from "./pages/InstructorDetailsPage.jsx";
 import InstructorTwoPage from "./pages/InstructorTwoPage.jsx";
 import LessonDetailsPage from "./pages/LessonDetailsPage.jsx";
-import CamLessonDetailsPage from "./pages/CamLessonDetailsPage.jsx";
 import PricingPlanPage from "./pages/PricingPlanPage.jsx";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage.jsx";
 import ProductPage from "./pages/ProductPage.jsx";
@@ -44,7 +42,7 @@ import TutorDetailsPage from "./pages/TutorDetailsPage.jsx";
 import HomePageFive from "./pages/HomePageFive.jsx";
 import HomePageSix from "./pages/HomePageSix.jsx";
 import { Navigate } from "react-router-dom";
-
+import { HomePageRoutes } from "./routes/HomePageRoutes.jsx";
 import Profile from "./pages/Profile.jsx";
 
 import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";
@@ -88,6 +86,9 @@ function App() {
           {/* <Route path="/" element={<Dashboard />} /> */}
           {examRoutes.map((route, index) => (
             <Route key={`exam-${index}`} path={route.path} element={route.element} />
+          ))}
+          {HomePageRoutes.map((route, index) => (
+            <Route key={`home-${index}`} path={route.path} element={route.element} />
           ))}
 
 
@@ -143,7 +144,6 @@ function App() {
 
           <Route exact path="/instructor-two" element={<InstructorTwoPage />} />
           <Route exact path="/lesson-details" element={<LessonDetailsPage />} />
-          <Route exact path="/cam-lesson/:courseId/:sessionId" element={<CamLessonDetailsPage />} />
           <Route exact path="/pricing-plan" element={<PricingPlanPage />} />
           <Route exact path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route exact path="/product" element={<ProductPage />} />

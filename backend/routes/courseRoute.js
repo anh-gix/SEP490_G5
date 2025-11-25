@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const courseController = require('../controllers/courseController');
-const courseHomeController = require('../controllers/courseHomeController'); 
+
 
 
 // Lấy tất cả courses đã được phê duyệt

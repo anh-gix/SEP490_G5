@@ -25,7 +25,7 @@ const LessonDetails = () => {
         setError(null);
 
         const response = await axios.get(
-          `${API_URL}/courses/course-home/${courseId}/cam-session/${sessionId}`
+          `${API_URL}/courseshome/course-home/${courseId}/cam-session/${sessionId}`
         );
 
         if (!response.data.success) {

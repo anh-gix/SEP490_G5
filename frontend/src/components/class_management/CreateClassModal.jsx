@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
-import axios from 'axios';
 import * as XLSX from 'xlsx';
 import scheduleService from '../../services/scheduleService';
 import roomService from '../../services/roomService';
 import teacherService from '../../services/teacherService';
 import studentService from '../../services/studentService';
 import classService from '../../services/classService';
+import courseService from '../../services/courseService';
 import SelectStudentModal from './SelectStudentModal';
 
 const createEmptyScheduleEntry = () => ({
@@ -452,18 +452,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
       try {
         console.log('🌐 Fetching band from API with params:', { type, level: formData.level });
-        const response = await axios.get('http://localhost:8080/api/v1/courses/band', {
-          params: {
-            type: type,
-            level: formData.level
-          }
-        });
+        const response = await courseService.getBandByTypeAndLevel(type, formData.level);
 
-        console.log('✅ API Response:', response.data);
+        console.log('✅ API Response:', response);
 
-        if (response.data && response.data.success && response.data.band) {
-          console.log('✅ Setting band to:', response.data.band);
-          setFormData(prev => ({ ...prev, band: response.data.band }));
+        if (response && response.success && response.band) {
+          console.log('✅ Setting band to:', response.band);
+          setFormData(prev => ({ ...prev, band: response.band }));
         } else {
           console.warn('⚠️ No band found in response, clearing band');
           // Clear band if no mapping found
@@ -471,10 +466,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         }
       } catch (error) {
         console.error('❌ Error fetching band:', error);
-        if (error.response) {
-          console.error('❌ Response data:', error.response.data);
-          console.error('❌ Response status:', error.response.status);
-        }
         // Don't clear band on error, keep existing value
       }
     };
@@ -494,18 +485,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
       try {
         setCoursesLoading(true);
-        const response = await axios.get('http://localhost:8080/api/v1/courses/by-program', {
-          params: {
-            programName: formData.program,
-            level: formData.level // Gửi cả level để filter chính xác
-          }
-        });
+        const response = await courseService.getCoursesByProgram(formData.program, formData.level);
 
-        if (response.data && response.data.success && response.data.courses) {
-          setCourses(response.data.courses);
+        if (response && response.success && response.courses) {
+          setCourses(response.courses);
           // Clear course selection if current course is not in the new list
           if (formData.course) {
-            const courseExists = response.data.courses.some(c => 
+            const courseExists = response.courses.some(c => 
               (c._id || c.id) === formData.course
             );
             if (!courseExists) {
@@ -545,9 +531,9 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
       // If not found in list or missing numberOfSessions, fetch details
       try {
-        const response = await axios.get(`http://localhost:8080/api/v1/courses/${formData.course}/details`);
-        if (response.data && response.data.success && response.data.data) {
-          setSelectedCourse(response.data.data);
+        const response = await courseService.getCourseDetails(formData.course);
+        if (response && response.success && response.data) {
+          setSelectedCourse(response.data);
         } else {
           // Fallback to course from list if available
           if (courseFromList) {
@@ -814,29 +800,29 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       try {
         // Fetch all types and levels from program table
         const [typesResponse, levelsResponse] = await Promise.all([
-          axios.get('http://localhost:8080/api/v1/courses/all-types'),
-          axios.get('http://localhost:8080/api/v1/courses/all-levels')
+          courseService.getAllTypes(),
+          courseService.getAllLevels()
         ]);
         
-        if (typesResponse.data?.success && typesResponse.data.types) {
-          const allTypes = typesResponse.data.types;
+        if (typesResponse?.success && typesResponse.types) {
+          const allTypes = typesResponse.types;
           const allPrograms = allTypes.map(type => typeProgramMap[type]).filter(Boolean);
           setAvailablePrograms(allPrograms);
           console.log('✅ Loaded types from program table:', allTypes.length);
         }
         
-        if (levelsResponse.data?.success && levelsResponse.data.levels) {
-          const allLevels = levelsResponse.data.levels;
+        if (levelsResponse?.success && levelsResponse.levels) {
+          const allLevels = levelsResponse.levels;
           setAvailableLevels(allLevels);
           console.log('✅ Loaded levels from program table:', allLevels.length);
         }
         
         // Also fetch mappings for band lookup (still needed for band display)
         try {
-          const mappingsResponse = await axios.get('http://localhost:8080/api/v1/courses/mappings');
-          if (mappingsResponse.data && mappingsResponse.data.success && mappingsResponse.data.mappings) {
-            setMappings(mappingsResponse.data.mappings);
-            console.log('✅ Loaded mappings from program table:', mappingsResponse.data.mappings.length);
+          const mappingsResponse = await courseService.getCourseMappings();
+          if (mappingsResponse && mappingsResponse.success && mappingsResponse.mappings) {
+            setMappings(mappingsResponse.mappings);
+            console.log('✅ Loaded mappings from program table:', mappingsResponse.mappings.length);
           }
         } catch (mappingsError) {
           console.error('❌ Error fetching mappings:', mappingsError);
@@ -854,9 +840,9 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       if (!formData.program) {
         // If no program selected, show all levels from program table
         try {
-          const response = await axios.get('http://localhost:8080/api/v1/courses/all-levels');
-          if (response.data?.success && response.data.levels) {
-            setAvailableLevels(response.data.levels);
+          const response = await courseService.getAllLevels();
+          if (response?.success && response.levels) {
+            setAvailableLevels(response.levels);
           }
         } catch (error) {
           console.error('❌ Error fetching all levels:', error);
@@ -872,14 +858,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
       // Fetch levels for this type from program table
       try {
-        const response = await axios.get('http://localhost:8080/api/v1/courses/levels', {
-          params: { type }
-        });
-        if (response.data?.success && response.data.levels) {
-          setAvailableLevels(response.data.levels);
+        const response = await courseService.getLevelsByType(type);
+        if (response?.success && response.levels) {
+          setAvailableLevels(response.levels);
           
           // If current level is not available for selected program, clear it
-          if (formData.level && !response.data.levels.includes(formData.level)) {
+          if (formData.level && !response.levels.includes(formData.level)) {
             setFormData(prev => ({ ...prev, level: '', band: '' }));
           }
         }
@@ -897,9 +881,9 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       if (!formData.level) {
         // If no level selected, show all types from program table
         try {
-          const response = await axios.get('http://localhost:8080/api/v1/courses/all-types');
-          if (response.data?.success && response.data.types) {
-            const allTypes = response.data.types;
+          const response = await courseService.getAllTypes();
+          if (response?.success && response.types) {
+            const allTypes = response.types;
             const allPrograms = allTypes.map(type => typeProgramMap[type]).filter(Boolean);
             setAvailablePrograms(allPrograms);
           }
@@ -911,11 +895,9 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
       // Fetch types for this level from program table
       try {
-        const response = await axios.get('http://localhost:8080/api/v1/courses/types', {
-          params: { level: formData.level }
-        });
-        if (response.data?.success && response.data.types) {
-          const programsForLevel = response.data.types
+        const response = await courseService.getTypesByLevel(formData.level);
+        if (response?.success && response.types) {
+          const programsForLevel = response.types
             .map(type => typeProgramMap[type])
             .filter(Boolean);
           setAvailablePrograms(programsForLevel);
@@ -1126,7 +1108,26 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
   const hasTimeOverlap = (startA, endA, startB, endB) => {
     if (!startA || !endA || !startB || !endB) return false;
-    return startA < endB && startB < endA;
+    
+    // Chuyển đổi thời gian từ string "HH:MM" sang phút để so sánh chính xác
+    const timeToMinutes = (timeStr) => {
+      if (!timeStr) return 0;
+      const parts = timeStr.split(':');
+      if (parts.length !== 2) return 0;
+      const hours = parseInt(parts[0], 10);
+      const minutes = parseInt(parts[1], 10);
+      return hours * 60 + minutes;
+    };
+    
+    const startAMin = timeToMinutes(startA);
+    const endAMin = timeToMinutes(endA);
+    const startBMin = timeToMinutes(startB);
+    const endBMin = timeToMinutes(endB);
+    
+    // Hai khoảng thời gian overlap nếu: startA < endB VÀ endA > startB
+    // Lưu ý: Nếu một lớp kết thúc đúng lúc lớp kia bắt đầu (ví dụ: 08:00-10:00 và 10:00-12:00)
+    // thì KHÔNG có overlap vì sử dụng > và < (không có =)
+    return startAMin < endBMin && endAMin > startBMin;
   };
 
   const hasDateRangeOverlap = (startDateA, endDateA, startDateB, endDateB) => {

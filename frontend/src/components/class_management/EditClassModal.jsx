@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Modal, Button, Form, Alert, ButtonGroup } from 'react-bootstrap';
-import axios from 'axios';
 import * as XLSX from 'xlsx';
 import classService from '../../services/classService';
 import teacherService from '../../services/teacherService';
@@ -8,6 +7,7 @@ import roomService from '../../services/roomService';
 import scheduleService from '../../services/scheduleService';
 import studentService from '../../services/studentService';
 import classScheduleService from '../../services/classScheduleService';
+import courseService from '../../services/courseService';
 import SelectStudentModal from './SelectStudentModal';
 import ScheduleCalendar from './ScheduleCalendar';
 import ScheduleWeekly from './ScheduleWeekly';
@@ -696,7 +696,26 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
 
   const hasTimeOverlap = (startA, endA, startB, endB) => {
     if (!startA || !endA || !startB || !endB) return false;
-    return startA < endB && startB < endA;
+    
+    // Chuyển đổi thời gian từ string "HH:MM" sang phút để so sánh chính xác
+    const timeToMinutes = (timeStr) => {
+      if (!timeStr) return 0;
+      const parts = timeStr.split(':');
+      if (parts.length !== 2) return 0;
+      const hours = parseInt(parts[0], 10);
+      const minutes = parseInt(parts[1], 10);
+      return hours * 60 + minutes;
+    };
+    
+    const startAMin = timeToMinutes(startA);
+    const endAMin = timeToMinutes(endA);
+    const startBMin = timeToMinutes(startB);
+    const endBMin = timeToMinutes(endB);
+    
+    // Hai khoảng thời gian overlap nếu: startA < endB VÀ endA > startB
+    // Lưu ý: Nếu một lớp kết thúc đúng lúc lớp kia bắt đầu (ví dụ: 08:00-10:00 và 10:00-12:00)
+    // thì KHÔNG có overlap vì sử dụng > và < (không có =)
+    return startAMin < endBMin && endAMin > startBMin;
   };
 
   // Convert day string to day of week number (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
@@ -1038,7 +1057,26 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
 
           const hasTimeOverlap = (startA, endA, startB, endB) => {
             if (!startA || !endA || !startB || !endB) return false;
-            return startA < endB && startB < endA;
+            
+            // Chuyển đổi thời gian từ string "HH:MM" sang phút để so sánh chính xác
+            const timeToMinutes = (timeStr) => {
+              if (!timeStr) return 0;
+              const parts = timeStr.split(':');
+              if (parts.length !== 2) return 0;
+              const hours = parseInt(parts[0], 10);
+              const minutes = parseInt(parts[1], 10);
+              return hours * 60 + minutes;
+            };
+            
+            const startAMin = timeToMinutes(startA);
+            const endAMin = timeToMinutes(endA);
+            const startBMin = timeToMinutes(startB);
+            const endBMin = timeToMinutes(endB);
+            
+            // Hai khoảng thời gian overlap nếu: startA < endB VÀ endA > startB
+            // Lưu ý: Nếu một lớp kết thúc đúng lúc lớp kia bắt đầu (ví dụ: 08:00-10:00 và 10:00-12:00)
+            // thì KHÔNG có overlap vì sử dụng > và < (không có =)
+            return startAMin < endBMin && endAMin > startBMin;
           };
 
           // Get current class ID as string for comparison
@@ -1079,7 +1117,9 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                     conflictingClass: teacherSchedule.className || 'N/A',
                     conflictingClassId: teacherSchedule.classId || 'N/A',
                     conflictingRoom: teacherSchedule.room,
-                    currentClassTime: `${classStart} - ${classEnd}` // Thêm thông tin lịch lớp hiện tại
+                    currentClassTime: `${classStart} - ${classEnd}`, // Thông tin lịch lớp hiện tại có xung đột
+                    currentClassStartTime: classStart, // Lưu startTime để so khớp chính xác
+                    currentClassEndTime: classEnd // Lưu endTime để so khớp chính xác
                   });
                 }
               }
@@ -1361,7 +1401,26 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
 
           const hasTimeOverlap = (startA, endA, startB, endB) => {
             if (!startA || !endA || !startB || !endB) return false;
-            return startA < endB && startB < endA;
+            
+            // Chuyển đổi thời gian từ string "HH:MM" sang phút để so sánh chính xác
+            const timeToMinutes = (timeStr) => {
+              if (!timeStr) return 0;
+              const parts = timeStr.split(':');
+              if (parts.length !== 2) return 0;
+              const hours = parseInt(parts[0], 10);
+              const minutes = parseInt(parts[1], 10);
+              return hours * 60 + minutes;
+            };
+            
+            const startAMin = timeToMinutes(startA);
+            const endAMin = timeToMinutes(endA);
+            const startBMin = timeToMinutes(startB);
+            const endBMin = timeToMinutes(endB);
+            
+            // Hai khoảng thời gian overlap nếu: startA < endB VÀ endA > startB
+            // Lưu ý: Nếu một lớp kết thúc đúng lúc lớp kia bắt đầu (ví dụ: 08:00-10:00 và 10:00-12:00)
+            // thì KHÔNG có overlap vì sử dụng > và < (không có =)
+            return startAMin < endBMin && endAMin > startBMin;
           };
 
           // Get current class ID as string for comparison
@@ -1402,7 +1461,9 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                     conflictingClass: roomSchedule.className || 'N/A',
                     conflictingClassId: roomSchedule.classId || 'N/A',
                     conflictingRoom: roomSchedule.room,
-                    currentClassTime: `${classStart} - ${classEnd}` // Thêm thông tin lịch lớp hiện tại
+                    currentClassTime: `${classStart} - ${classEnd}`, // Thông tin lịch lớp hiện tại có xung đột
+                    currentClassStartTime: classStart, // Lưu startTime để so khớp chính xác
+                    currentClassEndTime: classEnd // Lưu endTime để so khớp chính xác
                   });
                 }
               }
@@ -2287,15 +2348,10 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
       }
 
       try {
-        const response = await axios.get('http://localhost:8080/api/v1/courses/band', {
-          params: {
-            type: type,
-            level: formData.level
-          }
-        });
+        const response = await courseService.getBandByTypeAndLevel(type, formData.level);
 
-        if (response.data && response.data.success && response.data.band) {
-          setFormData(prev => ({ ...prev, band: response.data.band }));
+        if (response && response.success && response.band) {
+          setFormData(prev => ({ ...prev, band: response.band }));
         } else {
           setFormData(prev => ({ ...prev, band: '' }));
         }
@@ -2429,13 +2485,13 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
 
       try {
         const [typesResponse, levelsResponse] = await Promise.all([
-          axios.get('http://localhost:8080/api/v1/courses/all-types'),
-          axios.get('http://localhost:8080/api/v1/courses/all-levels')
+          courseService.getAllTypes(),
+          courseService.getAllLevels()
         ]);
         
         let allPrograms = [];
-        if (typesResponse.data?.success && typesResponse.data.types) {
-          const allTypes = typesResponse.data.types;
+        if (typesResponse?.success && typesResponse.types) {
+          const allTypes = typesResponse.types;
           // Map type to program name using reverse map
           allPrograms = allTypes.map(type => typeToProgramMap[type]).filter(Boolean);
         }
@@ -2450,8 +2506,8 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
         setAvailablePrograms(allPrograms);
         
         let allLevels = [];
-        if (levelsResponse.data?.success && levelsResponse.data.levels) {
-          allLevels = levelsResponse.data.levels;
+        if (levelsResponse?.success && levelsResponse.levels) {
+          allLevels = levelsResponse.levels;
         }
         
         // Ensure current level is in the list
@@ -2486,9 +2542,9 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
 
       if (!formData.program) {
         try {
-          const response = await axios.get('http://localhost:8080/api/v1/courses/all-levels');
-          if (response.data?.success && response.data.levels) {
-            let levels = response.data.levels;
+          const response = await courseService.getAllLevels();
+          if (response?.success && response.levels) {
+            let levels = response.levels;
             // Ensure current level is in the list
             if (formData.level && !levels.includes(formData.level)) {
               levels.push(formData.level);
@@ -2517,11 +2573,9 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
       }
 
       try {
-        const response = await axios.get('http://localhost:8080/api/v1/courses/levels', {
-          params: { type }
-        });
-        if (response.data?.success && response.data.levels) {
-          let levels = response.data.levels;
+        const response = await courseService.getLevelsByType(type);
+        if (response?.success && response.levels) {
+          let levels = response.levels;
           // Ensure current level is in the list even if not in filtered results
           if (formData.level && !levels.includes(formData.level)) {
             levels.push(formData.level);
@@ -2576,15 +2630,10 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
 
       try {
         setCoursesLoading(true);
-        const response = await axios.get('http://localhost:8080/api/v1/courses/by-program', {
-          params: {
-            programName: programName,
-            level: formData.level
-          }
-        });
+        const response = await courseService.getCoursesByProgram(programName, formData.level);
 
-        if (response.data && response.data.success && response.data.courses) {
-          let coursesList = response.data.courses;
+        if (response && response.success && response.courses) {
+          let coursesList = response.courses;
           
           // Check if program/level actually changed (not just initial load)
           const programChanged = prevProgramRef.current !== null && prevProgramRef.current !== formData.program;
@@ -2670,10 +2719,10 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
 
       // Otherwise, fetch course details from API
       try {
-        const response = await axios.get(`http://localhost:8080/api/v1/courses/${formData.course}/details`);
+        const response = await courseService.getCourseDetails(formData.course);
         
-        if (response.data && response.data.success && response.data.data) {
-          setSelectedCourse(response.data.data);
+        if (response && response.success && response.data) {
+          setSelectedCourse(response.data);
         } else {
           setSelectedCourse(null);
         }
@@ -3293,11 +3342,27 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                                 })
                                 .map((conflict, idx) => {
                                   try {
-                                    // Get current class schedule for this date to show what's conflicting
-                                    const currentSchedule = currentClassSchedulesForRender?.find(s => s?.date === conflict?.date);
-                                    const currentClassTime = currentSchedule 
-                                      ? `${currentSchedule.startTime || ''} - ${currentSchedule.endTime || ''}`
-                                      : conflict.conflictingClassTime || conflict.currentClassTime || conflict.classTime || 'N/A';
+                                    // Get current class schedule for this date AND time to show the exact conflicting schedule
+                                    // Nếu có nhiều buổi trong cùng một ngày, cần tìm đúng buổi có xung đột
+                                    let currentSchedule = null;
+                                    if (conflict.currentClassStartTime && conflict.currentClassEndTime) {
+                                      // Tìm buổi học có cùng ngày VÀ cùng thời gian
+                                      currentSchedule = currentClassSchedulesForRender?.find(s => {
+                                        if (!s || s.date !== conflict.date) return false;
+                                        const sStart = s.startTime || '';
+                                        const sEnd = s.endTime || '';
+                                        return sStart === conflict.currentClassStartTime && sEnd === conflict.currentClassEndTime;
+                                      });
+                                    }
+                                    
+                                    // Nếu không tìm thấy bằng thời gian chính xác, fallback về tìm theo ngày
+                                    if (!currentSchedule) {
+                                      currentSchedule = currentClassSchedulesForRender?.find(s => s?.date === conflict?.date);
+                                    }
+                                    
+                                    // Ưu tiên dùng thời gian từ conflict (chính xác nhất), sau đó từ currentSchedule, cuối cùng là fallback
+                                    const currentClassTime = conflict.currentClassTime || conflict.classTime || 
+                                      (currentSchedule ? `${currentSchedule.startTime || ''} - ${currentSchedule.endTime || ''}` : 'N/A');
                                     
                                     return (
                                       <li key={idx || `conflict-${idx}`} className="mb-6">

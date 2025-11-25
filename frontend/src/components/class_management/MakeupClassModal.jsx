@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, Alert, Card, ListGroup, Badge } from 'react-bootstrap';
 import ConflictChecker from './ConflictChecker';
-import axios from 'axios';
+import academicStaffService from '../../services/academicStaffService';
 
 const MakeupClassModal = ({ 
   originalSchedule, 
@@ -36,11 +36,9 @@ const MakeupClassModal = ({
   const fetchAbsenceRequests = async (scheduleId) => {
     try {
       // Get attendance for this class schedule
-      const response = await axios.get(
-        `http://localhost:8080/api/class-schedules/${scheduleId}/attendance`
-      );
+      const response = await academicStaffService.getAttendance(scheduleId);
       
-      const attendances = response.data.list || response.data.attendances || [];
+      const attendances = response.list || response.attendances || [];
       
       // Filter for absent/excused students and transform to absence requests format
       const absenceRequests = attendances

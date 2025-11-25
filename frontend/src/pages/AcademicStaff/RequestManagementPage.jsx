@@ -795,8 +795,26 @@ const RequestManagementPage = () => {
     scheduleDate.setHours(0, 0, 0, 0);
     
     // Helper để check time overlap
+    // Chuyển đổi thời gian từ string "HH:MM" sang phút để so sánh chính xác
     const hasTimeOverlap = (start1, end1, start2, end2) => {
-      return start1 < end2 && end1 > start2;
+      const timeToMinutes = (timeStr) => {
+        if (!timeStr) return 0;
+        const parts = timeStr.split(':');
+        if (parts.length !== 2) return 0;
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
+        return hours * 60 + minutes;
+      };
+      
+      const start1Min = timeToMinutes(start1);
+      const end1Min = timeToMinutes(end1);
+      const start2Min = timeToMinutes(start2);
+      const end2Min = timeToMinutes(end2);
+      
+      // Hai khoảng thời gian overlap nếu: start1 < end2 VÀ end1 > start2
+      // Lưu ý: Nếu một lớp kết thúc đúng lúc lớp kia bắt đầu (ví dụ: 08:00-10:00 và 10:00-12:00)
+      // thì KHÔNG có overlap vì sử dụng > và < (không có =)
+      return start1Min < end2Min && end1Min > start2Min;
     };
     
     // Kiểm tra từng buổi học của sinh viên

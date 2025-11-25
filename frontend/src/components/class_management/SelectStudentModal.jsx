@@ -106,7 +106,26 @@ const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents 
 
   const hasTimeOverlap = (startA, endA, startB, endB) => {
     if (!startA || !endA || !startB || !endB) return false;
-    return startA < endB && startB < endA;
+    
+    // Chuyển đổi thời gian từ string "HH:MM" sang phút để so sánh chính xác
+    const timeToMinutes = (timeStr) => {
+      if (!timeStr) return 0;
+      const parts = timeStr.split(':');
+      if (parts.length !== 2) return 0;
+      const hours = parseInt(parts[0], 10);
+      const minutes = parseInt(parts[1], 10);
+      return hours * 60 + minutes;
+    };
+    
+    const startAMin = timeToMinutes(startA);
+    const endAMin = timeToMinutes(endA);
+    const startBMin = timeToMinutes(startB);
+    const endBMin = timeToMinutes(endB);
+    
+    // Hai khoảng thời gian overlap nếu: startA < endB VÀ endA > startB
+    // Lưu ý: Nếu một lớp kết thúc đúng lúc lớp kia bắt đầu (ví dụ: 08:00-10:00 và 10:00-12:00)
+    // thì KHÔNG có overlap vì sử dụng > và < (không có =)
+    return startAMin < endBMin && endAMin > startBMin;
   };
 
   // Calculate conflicting student IDs with details

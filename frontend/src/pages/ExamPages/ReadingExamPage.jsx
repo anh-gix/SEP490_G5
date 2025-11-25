@@ -19,18 +19,35 @@ const ReadingExamPage = () => {
   const [error, setError] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState(null);
   const timerRef = useRef(null);
+  const [leftWidth, setLeftWidth] = useState(50); // Percentage width for left panel
+  const containerRef = useRef(null);
+  const isResizingRef = useRef(false);
 
-  const getQuestionType = useCallback(
+  const getQuestionData = useCallback(
     (questionNumber) => {
-      if (!sectionData?.section?.questions) return "multiple_choice";
+      if (!sectionData?.section?.questions) return { questionType: "multiple_choice", questionTitle: "", questionAnswer: [] };
       const question = sectionData.section.questions.find(
         (q) => q.questionNumber === questionNumber
       );
-      return question?.questionType || "multiple_choice";
+      return {
+        questionType: question?.questionType || "multiple_choice",
+        questionTitle: question?.questionTitle || "",
+        questionAnswer: question?.questionAnswer || [],
+      };
     },
     [sectionData]
   );
-
+  
+  const getQuestionType = useCallback(
+    (questionNumber) => {
+      return getQuestionData(questionNumber).questionType;
+    },
+    [getQuestionData]
+  );
+  
+  const isMultipleChoiceType = (questionType) => {
+    return questionType === "multiple_choice";
+  };
   const handleSubmit = useCallback(
     async (force = false) => {
       // Stop timer (if any)
@@ -45,10 +62,19 @@ const ReadingExamPage = () => {
       try {
         setSubmitting(true);
         const answersArray = Object.keys(answers).map((qNum) => {
-          const questionType = getQuestionType(parseInt(qNum));
+          const questionData = getQuestionData(parseInt(qNum));
+          const questionType = questionData.questionType;
           const answerValue = answers[qNum];
 
-          if (questionType === "multiple_choice" || questionType === "true_false") {
+          // Nếu là multiple choice type
+          if (isMultipleChoiceType(questionType)) {
+            // Gửi array cho các loại câu hỏi cho phép chọn nhiều
+            const answerArray = Array.isArray(answerValue) ? answerValue : [answerValue].filter(Boolean);
+            return {
+              questionNumber: parseInt(qNum),
+              selectedOption: answerArray,
+            };
+          } else if (questionType === "true_false") {
             return {
               questionNumber: parseInt(qNum),
               selectedOption: answerValue,
@@ -70,7 +96,7 @@ const ReadingExamPage = () => {
         setSubmitting(false);
       }
     },
-    [submitting, answers, examId, submissionId, navigate, getQuestionType]
+    [submitting, answers, examId, submissionId, navigate, getQuestionData, isMultipleChoiceType]
   );
 
   // Fetch section + initialize state
@@ -99,7 +125,11 @@ const ReadingExamPage = () => {
         if (data.submission?.answers?.length > 0) {
           const existingAnswers = {};
           data.submission.answers.forEach((ans) => {
-            existingAnswers[ans.questionNumber] = ans.selectedOption ?? ans.answerText ?? "";
+            // Nếu là array, giữ nguyên; nếu không, chuyển thành string
+            const answerValue = ans.selectedOption ?? ans.answerText ?? "";
+            existingAnswers[ans.questionNumber] = Array.isArray(answerValue) 
+              ? answerValue 
+              : answerValue;
           });
           setAnswers(existingAnswers);
         } else {
@@ -178,11 +208,43 @@ const ReadingExamPage = () => {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const handleAnswerChange = (questionNumber, value) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionNumber]: value,
-    }));
+  const getOptionsForQuestion = (questionNumber) => {
+    const questionData = getQuestionData(questionNumber);
+    const questionType = questionData.questionType;
+    
+    if (questionType === "multiple_choice") {
+      // Sử dụng questionAnswer từ API: [{ key: "A", text: "nội dung" }, ...]
+      return questionData.questionAnswer || [];
+    } else if (questionType === "true_false") {
+      return ["True", "False"];
+    }
+    return [];
+  };
+
+  const handleAnswerChange = (questionNumber, value, questionType) => {
+    const isMultiple = isMultipleChoiceType(questionType);
+    
+    if (isMultiple) {
+      // Xử lý multiple choice: toggle giá trị trong array
+      setAnswers((prev) => {
+        const currentAnswer = prev[questionNumber] || [];
+        const answerArray = Array.isArray(currentAnswer) ? currentAnswer : [];
+        const newAnswer = answerArray.includes(value)
+          ? answerArray.filter((item) => item !== value)
+          : [...answerArray, value].sort();
+        
+        return {
+          ...prev,
+          [questionNumber]: newAnswer,
+        };
+      });
+    } else {
+      // Xử lý single choice: lưu giá trị đơn
+      setAnswers((prev) => ({
+        ...prev,
+        [questionNumber]: value,
+      }));
+    }
   };
 
   const getPDFUrl = () => {
@@ -202,6 +264,44 @@ const ReadingExamPage = () => {
     if (!sectionData?.section?.questionCount) return [];
     return Array.from({ length: sectionData.section.questionCount }, (_, i) => i + 1);
   };
+
+  // Resize handlers
+  const handleMouseMove = useCallback((e) => {
+    if (!isResizingRef.current || !containerRef.current) return;
+    
+    const container = containerRef.current;
+    const containerRect = container.getBoundingClientRect();
+    const newLeftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+    
+    // Limit between 20% and 80%
+    const clampedWidth = Math.max(20, Math.min(80, newLeftWidth));
+    setLeftWidth(clampedWidth);
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    isResizingRef.current = false;
+    document.removeEventListener("mousemove", handleMouseMove);
+    document.removeEventListener("mouseup", handleMouseUp);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  }, [handleMouseMove]);
+
+  const handleMouseDown = useCallback((e) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [handleMouseMove, handleMouseUp]);
+
+  // Cleanup resize listeners on unmount
+  useEffect(() => {
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [handleMouseMove, handleMouseUp]);
 
   if (authLoading || loading) {
     return (
@@ -223,17 +323,52 @@ const ReadingExamPage = () => {
       <Preloader />
       <Animation />
      
-      <Breadcrumb title={"Reading Section"} />
+      
 
       <section className="py-40">
+        <style>{`
+          .hide-scrollbar::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
+          }
+          .resizable-container {
+            display: flex;
+            height: calc(100vh - 200px);
+            min-height: calc(100vh - 200px);
+            position: relative;
+          }
+          .resizable-panel {
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+          }
+          .resizer {
+            width: 4px;
+            background-color: #e0e0e0;
+            cursor: col-resize;
+            position: relative;
+            flex-shrink: 0;
+            transition: background-color 0.2s;
+          }
+          .resizer:hover {
+            background-color: #4a90e2;
+          }
+          .resizer::before {
+            content: '';
+            position: absolute;
+            left: -2px;
+            right: -2px;
+            top: 0;
+            bottom: 0;
+            cursor: col-resize;
+          }
+        `}</style>
         <div className="container-fluid px-0">
-          <div className="row g-0">
+          <div className="resizable-container" ref={containerRef}>
             {/* Left side - PDF Viewer */}
-            <div className="col-lg-6 col-md-6">
-              <div
-                className="bg-white border-end border-neutral-30 h-100"
-                style={{ minHeight: "calc(100vh - 200px)" }}
-              >
+            <div
+              className="resizable-panel bg-white border-end border-neutral-30"
+              style={{ width: `${leftWidth}%` }}
+            >
                 <div className="p-24 border-bottom border-neutral-30 flex-between gap-16">
                   <h4 className="mb-0">Đề thi Reading</h4>
                   {timeRemaining !== null && (
@@ -251,7 +386,15 @@ const ReadingExamPage = () => {
                     </div>
                   )}
                 </div>
-                <div className="p-24" style={{ height: "calc(100vh - 280px)", overflow: "auto" }}>
+                <div 
+                  className="p-24 hide-scrollbar" 
+                  style={{ 
+                    height: "calc(100vh - 280px)", 
+                    overflow: "auto",
+                    scrollbarWidth: "none", /* Firefox */
+                    msOverflowStyle: "none", /* IE and Edge */
+                  }}
+                >
                   {getPDFUrl() ? (
                     <iframe
                       src={getPDFUrl()}
@@ -266,11 +409,21 @@ const ReadingExamPage = () => {
                   )}
                 </div>
               </div>
-            </div>
+
+            {/* Resizer Bar */}
+            <div 
+              className="resizer"
+              onMouseDown={handleMouseDown}
+              role="separator"
+              aria-label="Resize panels"
+              aria-orientation="vertical"
+            />
 
             {/* Right side - Answer Section */}
-            <div className="col-lg-6 col-md-6">
-              <div className="bg-main-25 h-100" style={{ minHeight: "calc(100vh - 200px)" }}>
+            <div
+              className="resizable-panel bg-main-25"
+              style={{ width: `${100 - leftWidth}%` }}
+            >
                 <div className="p-24 border-bottom border-neutral-30 bg-white">
                   <h4 className="mb-8">Chọn đáp án</h4>
                   {sectionData?.section?.instructions && (
@@ -286,41 +439,64 @@ const ReadingExamPage = () => {
 
                   <div className="mb-24">
                     {generateQuestionNumbers().map((qNum) => {
-                      const questionType = getQuestionType(qNum);
+                      const questionData = getQuestionData(qNum);
+                      const questionType = questionData.questionType;
+                      const options = getOptionsForQuestion(qNum);
                       return (
                         <div key={qNum} className="bg-white rounded-12 p-16 mb-16 border border-neutral-30">
                           <div className="flex-between gap-16 mb-12">
                             <label className="fw-semibold text-neutral-700">Câu {qNum}</label>
-                            {answers[qNum] && (
-                              <span className="badge bg-main-600 text-white px-12 py-4 rounded-pill">
-                                Đã trả lời
-                              </span>
-                            )}
+                            {(() => {
+                              const answerValue = answers[qNum];
+                              const hasAnswer = Array.isArray(answerValue) 
+                                ? answerValue.length > 0 
+                                : answerValue && answerValue !== "";
+                              return hasAnswer && (
+                                <span className="badge bg-main-600 text-white px-12 py-4 rounded-pill">
+                                  Đã trả lời
+                                </span>
+                              );
+                            })()}
                           </div>
+
+                          {/* Question Title */}
+                          {questionData.questionTitle && (
+                            <div className="mb-12">
+                              <p className="text-neutral-700 mb-0">{questionData.questionTitle}</p>
+                            </div>
+                          )}
 
                           {/* Multiple Choice */}
                           {questionType === "multiple_choice" && (
                             <div className="d-flex flex-column gap-8">
-                              {["A", "B", "C", "D"].map((option) => (
-                                <label
-                                  key={option}
-                                  className={`d-flex align-items-center gap-12 p-12 rounded-8 border cursor-pointer transition-2 ${
-                                    answers[qNum] === option
-                                      ? "border-main-600 bg-main-25"
-                                      : "border-neutral-30 hover-border-main-300"
-                                  }`}
-                                >
-                                  <input
-                                    type="radio"
-                                    name={`question-${qNum}`}
-                                    value={option}
-                                    checked={answers[qNum] === option}
-                                    onChange={() => handleAnswerChange(qNum, option)}
-                                    className="form-check-input"
-                                  />
-                                  <span className="text-neutral-700">{option}</span>
-                                </label>
-                              ))}
+                              {options.map((option) => {
+                                const optionKey = typeof option === 'object' ? option.key : option;
+                                const optionText = typeof option === 'object' ? option.text : '';
+                                const answerArray = Array.isArray(answers[qNum]) ? answers[qNum] : [];
+                                const isChecked = answerArray.includes(optionKey);
+                                return (
+                                  <label
+                                    key={optionKey}
+                                    className={`d-flex align-items-center gap-12 p-12 rounded-8 border cursor-pointer transition-2 ${
+                                      isChecked
+                                        ? "border-main-600 bg-main-25"
+                                        : "border-neutral-30 hover-border-main-300"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      value={optionKey}
+                                      checked={isChecked}
+                                      onChange={() => handleAnswerChange(qNum, optionKey, questionType)}
+                                      className="form-check-input"
+                                    />
+                                    <div className="d-flex align-items-center gap-8">
+                                      <span className="fw-semibold text-neutral-700">{optionKey}.</span>
+                                      {optionText && <span className="text-neutral-700">{optionText}</span>}
+                                    </div>
+                                  </label>
+                                );
+                              })}
                             </div>
                           )}
 
@@ -354,7 +530,7 @@ const ReadingExamPage = () => {
                                     name={`question-${qNum}`}
                                     value={option}
                                     checked={answers[qNum] === option}
-                                    onChange={() => handleAnswerChange(qNum, option)}
+                                    onChange={() => handleAnswerChange(qNum, option, questionType)}
                                     className="form-check-input"
                                   />
                                   <span className="text-neutral-700">{option}</span>
@@ -385,7 +561,6 @@ const ReadingExamPage = () => {
                   </div>
                 </div>
               </div>
-            </div>
           </div>
         </div>
       </section>

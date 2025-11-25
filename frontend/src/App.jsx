@@ -52,7 +52,6 @@ import { teacherRoutes } from "./routes/TeacherRoutes.jsx";
 import { studentRoutes } from "./routes/StudentRoutes.jsx";
 import { ministryRoutes } from "./routes/MinistryRoutes.jsx";
 import { examRoutes } from "./routes/ExamRoutes.jsx";
-
 function App() {
   return (
     <AuthProvider>

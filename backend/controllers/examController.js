@@ -608,10 +608,12 @@ exports.getSection = async (req, res) => {
       sectionSubmission = submission.sections[submission.sections.length - 1];
     }
 
-    // Trả về thông tin section với questionType cho mỗi câu hỏi (không bao gồm answer key)
+    // Trả về thông tin section với questionType, questionTitle và questionAnswer cho mỗi câu hỏi (không bao gồm answer key)
     const questions = examSection.answerKey?.map((key) => ({
       questionNumber: key.questionNumber,
+      questionTitle: key.questionTitle,
       questionType: key.questionType,
+      questionAnswer: key.questionAnswer || [],
     })) || [];
 
     // Build response object
@@ -752,26 +754,70 @@ exports.submitSectionAnswers = async (req, res) => {
         let isCorrect = false;
 
         if (correctAnswer) {
-          const studentAnswer = answer.selectedOption || answer.answerText || "";
-          const correctAns = correctAnswer.correctAnswer || "";
+          // Xử lý studentAnswer - có thể là string hoặc array
+          let studentAnswers = answer.selectedOption || answer.answerText || "";
+          if (typeof studentAnswers === "string") {
+            // Nếu là string, chuyển thành array có 1 phần tử
+            studentAnswers = [studentAnswers];
+          } else if (!Array.isArray(studentAnswers)) {
+            // Nếu không phải array và không phải string, chuyển thành array rỗng
+            studentAnswers = [];
+          }
 
-          // Chấm điểm theo loại câu hỏi
-          switch (correctAnswer.questionType) {
-            case "multiple_choice":
-              // So sánh chính xác (case-insensitive)
-              isCorrect = studentAnswer.trim().toUpperCase() === correctAns.trim().toUpperCase();
-              break;
-            case "input":
-              // So sánh text (case-insensitive, trim whitespace)
-              isCorrect = studentAnswer.trim().toLowerCase() === correctAns.trim().toLowerCase();
-              break;
-            case "true_false":
-              // So sánh True/False (case-insensitive)
-              isCorrect = studentAnswer.trim().toLowerCase() === correctAns.trim().toLowerCase();
-              break;
-            default:
-              // Mặc định so sánh chính xác
-              isCorrect = studentAnswer.trim() === correctAns.trim();
+          const correctAnswers = Array.isArray(correctAnswer.correctAnswer) 
+            ? correctAnswer.correctAnswer 
+            : [correctAnswer.correctAnswer || ""];
+
+          // Phải khớp hết: số lượng phần tử phải bằng nhau và tất cả phần tử đều khớp (không phân biệt thứ tự)
+          if (studentAnswers.length !== correctAnswers.length) {
+            isCorrect = false;
+          } else {
+            // Helper function để so sánh hai array không phân biệt thứ tự
+            const compareArraysUnordered = (arr1, arr2, compareFn) => {
+              // Tạo bản sao để không ảnh hưởng đến array gốc
+              const sorted1 = [...arr1].map(item => compareFn(String(item)));
+              const sorted2 = [...arr2].map(item => compareFn(String(item)));
+              // Sắp xếp và so sánh
+              sorted1.sort();
+              sorted2.sort();
+              return sorted1.length === sorted2.length && 
+                     sorted1.every((val, idx) => val === sorted2[idx]);
+            };
+
+            // Chấm điểm theo loại câu hỏi - kiểm tra tất cả phần tử đều khớp (không phân biệt thứ tự)
+            switch (correctAnswer.questionType) {
+              case "multiple_choice":
+                // So sánh chính xác (case-insensitive) - phải khớp hết, không phân biệt thứ tự
+                isCorrect = compareArraysUnordered(
+                  correctAnswers,
+                  studentAnswers,
+                  (val) => val.trim().toUpperCase()
+                );
+                break;
+              case "input":
+                // So sánh text (case-insensitive, trim whitespace) - phải khớp hết, không phân biệt thứ tự
+                isCorrect = compareArraysUnordered(
+                  correctAnswers,
+                  studentAnswers,
+                  (val) => val.trim().toLowerCase()
+                );
+                break;
+              case "true_false":
+                // So sánh True/False (case-insensitive) - phải khớp hết, không phân biệt thứ tự
+                isCorrect = compareArraysUnordered(
+                  correctAnswers,
+                  studentAnswers,
+                  (val) => val.trim().toLowerCase()
+                );
+                break;
+              default:
+                // Mặc định so sánh chính xác - phải khớp hết, không phân biệt thứ tự
+                isCorrect = compareArraysUnordered(
+                  correctAnswers,
+                  studentAnswers,
+                  (val) => val.trim()
+                );
+            }
           }
 
           if (isCorrect) {
@@ -915,8 +961,14 @@ exports.getSectionResult = async (req, res) => {
 
         return {
           questionNumber: answer.questionNumber,
+          questionTitle: correctAnswer ? correctAnswer.questionTitle || "" : "",
+          questionAnswer: correctAnswer ? correctAnswer.questionAnswer || [] : [],
           studentAnswer: answer.selectedOption,
-          correctAnswer: correctAnswer ? correctAnswer.correctAnswer : null,
+          correctAnswer: correctAnswer 
+            ? (Array.isArray(correctAnswer.correctAnswer) 
+                ? correctAnswer.correctAnswer 
+                : [correctAnswer.correctAnswer || ""])
+            : null,
           score: answer.score,
           maxScore: correctAnswer ? correctAnswer.maxScore || 1 : 0,
           isCorrect: answer.score > 0,
@@ -924,23 +976,39 @@ exports.getSectionResult = async (req, res) => {
       });
     } else if (sectionType === "writing") {
       // Writing: hiển thị đáp án text và điểm (nếu đã chấm)
-      detailedResults = sectionSubmission.answers.map((answer) => ({
-        questionNumber: answer.questionNumber,
-        studentAnswer: answer.answerText || answer.selectedOption || "",
-        score: answer.score || 0,
-        maxScore: 0, // Sẽ được cập nhật khi chấm
-        isCorrect: null, // Không áp dụng cho writing
-      }));
+      const answerKey = examSection.answerKey || [];
+      detailedResults = sectionSubmission.answers.map((answer) => {
+        const correctAnswer = answerKey.find(
+          (key) => key.questionNumber === answer.questionNumber
+        );
+        return {
+          questionNumber: answer.questionNumber,
+          questionTitle: correctAnswer ? correctAnswer.questionTitle || "" : "",
+          questionAnswer: correctAnswer ? correctAnswer.questionAnswer || [] : [],
+          studentAnswer: answer.answerText || answer.selectedOption || "",
+          score: answer.score || 0,
+          maxScore: correctAnswer ? correctAnswer.maxScore || 0 : 0,
+          isCorrect: null, // Không áp dụng cho writing
+        };
+      });
     } else if (sectionType === "speaking") {
       // Speaking: hiển thị đáp án text, recording và điểm (nếu đã chấm)
-      detailedResults = sectionSubmission.answers.map((answer) => ({
-        questionNumber: answer.questionNumber,
-        studentAnswer: answer.answerText || answer.selectedOption || "",
-        recordingUrl: answer.recordingUrl || null,
-        score: answer.score || 0,
-        maxScore: 0, // Sẽ được cập nhật khi chấm
-        isCorrect: null, // Không áp dụng cho speaking
-      }));
+      const answerKey = examSection.answerKey || [];
+      detailedResults = sectionSubmission.answers.map((answer) => {
+        const correctAnswer = answerKey.find(
+          (key) => key.questionNumber === answer.questionNumber
+        );
+        return {
+          questionNumber: answer.questionNumber,
+          questionTitle: correctAnswer ? correctAnswer.questionTitle || "" : "",
+          questionAnswer: correctAnswer ? correctAnswer.questionAnswer || [] : [],
+          studentAnswer: answer.answerText || answer.selectedOption || "",
+          recordingUrl: answer.recordingUrl || null,
+          score: answer.score || 0,
+          maxScore: correctAnswer ? correctAnswer.maxScore || 0 : 0,
+          isCorrect: null, // Không áp dụng cho speaking
+        };
+      });
     }
 
     res.json({

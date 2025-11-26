@@ -14811,3 +14811,17 @@ table.dataTable.display > tbody > tr > * {
   background-color: #487FFF !important;
   color: #fff !important;
 }
+
+/* Custom modal width for makeup class modal */
+.modal-xl-custom {
+  max-width: 1700px !important;
+}
+
+.modal-xl-custom .modal-content {
+  max-height: 90vh !important;
+}
+
+.modal-xl-custom .modal-body {
+  max-height: calc(90vh - 120px) !important;
+  overflow-y: auto !important;
+}

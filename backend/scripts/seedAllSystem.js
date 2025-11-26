@@ -1446,11 +1446,13 @@ async function seedChangeRequests() {
     const today = new Date();
     
     // Tạo đơn cho mỗi học sinh (ít nhất 1 đơn)
+    const studentRequestTypes = ['change_class', 'makeup_class'];
     for (const student of students) {
         const requestCount = Math.random() < 0.3 ? 2 : 1; // 30% có 2 đơn, 70% có 1 đơn
         
         for (let i = 0; i < requestCount; i++) {
             const randomContent = contentTemplates[Math.floor(Math.random() * contentTemplates.length)];
+            const randomType = studentRequestTypes[Math.floor(Math.random() * studentRequestTypes.length)];
             const daysAgo = Math.floor(Math.random() * 30); // Đơn gửi trong vòng 30 ngày qua
             const createdAt = new Date(today);
             createdAt.setDate(createdAt.getDate() - daysAgo);
@@ -1458,6 +1460,7 @@ async function seedChangeRequests() {
             
             changeRequests.push({
                 sender: student._id,
+                type: randomType,
                 content: randomContent,
                 status: 'pending',
                 approver: null,
@@ -1470,6 +1473,7 @@ async function seedChangeRequests() {
     }
     
     // Tạo đơn cho mỗi giáo viên (ít nhất 1 đơn)
+    const teacherRequestTypes = ['replace_teacher'];
     for (const teacher of teachers) {
         const requestCount = Math.random() < 0.3 ? 2 : 1; // 30% có 2 đơn, 70% có 1 đơn
         
@@ -1482,6 +1486,7 @@ async function seedChangeRequests() {
             
             changeRequests.push({
                 sender: teacher._id,
+                type: 'replace_teacher',
                 content: randomContent,
                 status: 'pending',
                 approver: null,
@@ -1511,7 +1516,7 @@ async function seedExams() {
             description: 'Bài thi thử IELTS',
             createdBy: seedData.users[1]._id, // Subject Leader
             userId: seedData.users[5]._id, // Student 1
-            examType: 'practice',
+            examType: 'ielts',
             level: 'Academic',
             totalDuration: 180,
             sections: [

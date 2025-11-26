@@ -114,52 +114,71 @@ exports.getSenderSchedule = async (req, res) => {
     let schedules = [];
     
     if (isStudent) {
-      // Lấy lịch học của học sinh - lấy tất cả lịch học (không giới hạn thời gian)
-      const studentClasses = await Class.find({ students: sender._id })
-        .select('_id name')
-        .lean();
+      // Lấy TẤT CẢ StudentSchedule của học sinh (bao gồm cả buổi học bù ở lớp khác)
+      const allStudentSchedules = await StudentSchedule.find({
+        student: sender._id
+      })
+      .populate({
+        path: 'classSchedule',
+        select: 'date startTime endTime class room session status topic teacher createdBy reason',
+        populate: [
+          {
+            path: 'class',
+            select: 'name',
+            populate: {
+              path: 'course',
+              select: 'name'
+            }
+          },
+          {
+            path: 'room',
+            select: 'room_name location'
+          },
+          {
+            path: 'session',
+            select: 'title order'
+          },
+          {
+            path: 'teacher',
+            select: 'username email'
+          }
+        ]
+      })
+      .lean();
       
-      if (studentClasses.length > 0) {
-        const classIds = studentClasses.map(cls => cls._id);
-        
-        schedules = await ClassSchedule.find({
-          class: { $in: classIds },
-          status: { $in: ['temporary', 'fixed'] }
+      // Chuyển đổi StudentSchedule thành format giống ClassSchedule để tương thích với frontend
+      schedules = allStudentSchedules
+        .filter(ss => ss.classSchedule) // Chỉ lấy những cái có classSchedule hợp lệ
+        .map(ss => {
+          const classSchedule = ss.classSchedule;
+          return {
+            _id: classSchedule._id,
+            date: classSchedule.date,
+            startTime: classSchedule.startTime,
+            endTime: classSchedule.endTime,
+            status: classSchedule.status,
+            topic: classSchedule.topic,
+            class: classSchedule.class,
+            room: classSchedule.room,
+            session: classSchedule.session,
+            teacher: classSchedule.teacher,
+            createdBy: classSchedule.createdBy,
+            reason: classSchedule.reason,
+            // Thông tin từ StudentSchedule
+            attendance: ss.attendance || null,
+            scheduleStatus: ss.scheduleStatus || 'scheduled',
+            studentScheduleReason: ss.reason || null
+          };
         })
-        .populate({
-          path: 'class',
-          select: 'name',
-          populate: {
-            path: 'course',
-            select: 'name'
+        .sort((a, b) => {
+          // Sắp xếp theo date và startTime
+          const dateA = new Date(a.date);
+          const dateB = new Date(b.date);
+          if (dateA.getTime() !== dateB.getTime()) {
+            return dateA - dateB;
           }
-        })
-        .populate('room', 'room_name location')
-        .populate('session', 'title order')
-        .sort({ date: 1, startTime: 1 })
-        .lean();
-        
-        // Lấy thông tin điểm danh từ StudentSchedule
-        const scheduleIds = schedules.map(s => s._id);
-        const studentSchedules = await StudentSchedule.find({
-          student: sender._id,
-          classSchedule: { $in: scheduleIds }
-        }).lean();
-        
-        // Tạo map classScheduleId -> attendance
-        const attendanceMap = {};
-        studentSchedules.forEach(ss => {
-          if (ss.classSchedule) {
-            attendanceMap[ss.classSchedule.toString()] = ss.attendance;
-          }
+          return (a.startTime || '').localeCompare(b.startTime || '');
         });
-        
-        // Thêm attendance vào mỗi schedule
-        schedules = schedules.map(schedule => ({
-          ...schedule,
-          attendance: attendanceMap[schedule._id.toString()] || null
-        }));
-      }
     } else if (isTeacher) {
       // Lấy lịch dạy của giáo viên - lấy tất cả lịch dạy (không giới hạn thời gian)
       const teacherClasses = await Class.find({ teacher: sender._id })
@@ -274,7 +293,7 @@ exports.approveChangeRequest = async (req, res) => {
           const newStudentSchedule = new StudentSchedule({
             student: studentId,
             classSchedule: makeupScheduleId,
-            scheduleStatus: 'scheduled',
+            scheduleStatus: 'rescheduled',
             reason: `Học bù cho buổi nghỉ ngày ${new Date(absentClassSchedule.date).toLocaleDateString('vi-VN')}`
           });
           

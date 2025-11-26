@@ -234,12 +234,31 @@ const RequestManagementPage = () => {
       // Lấy attendance status nếu có
       const attendanceStatus = schedule.attendance?.status || null;
       
+      // Lấy scheduleStatus từ StudentSchedule (cancelled, scheduled, etc.)
+      const scheduleStatus = schedule.scheduleStatus || 'scheduled';
+      
       // Kiểm tra xem buổi này có phải là buổi nghỉ không
       const scheduleId = schedule._id || schedule.id || index;
       const isAbsentSchedule = pendingMakeupClasses.some(makeup => {
         const absentId = makeup.absentScheduleId || makeup.absentSchedule?.id || makeup.absentSchedule?._id;
         return absentId && (absentId.toString() === scheduleId.toString() || absentId.toString() === schedule._id?.toString());
       });
+      
+      // Buổi đã bị cancelled (từ StudentSchedule)
+      const isCancelled = scheduleStatus === 'cancelled';
+      
+      // Xác định status hiển thị
+      let displayStatus = 'scheduled';
+      if (isCancelled || isAbsentSchedule) {
+        displayStatus = 'cancelled';
+      } else if (scheduleStatus === 'rescheduled' || schedule.status === 'temporary') {
+        displayStatus = 'makeup';
+      } else if (schedule.status === 'fixed') {
+        displayStatus = 'scheduled';
+      }
+      
+      // Kiểm tra xem có phải buổi học bù không (từ database với scheduleStatus: 'rescheduled')
+      const isMakeupFromDB = scheduleStatus === 'rescheduled';
       
       return {
         id: scheduleId,
@@ -252,7 +271,8 @@ const RequestManagementPage = () => {
         courseName: schedule.class?.course?.name || 'N/A',
         roomName: schedule.room?.room_name || 'N/A',
         topic: schedule.session?.title || schedule.topic || '',
-        status: isAbsentSchedule ? 'absent' : (schedule.status === 'fixed' ? 'scheduled' : schedule.status === 'temporary' ? 'makeup' : 'scheduled'),
+        status: displayStatus,
+        scheduleStatus: scheduleStatus, // 'scheduled', 'cancelled', 'rescheduled', 'completed', 'pending'
         teacherName: schedule.class?.teacher?.username || 'N/A',
         lessonNumber: schedule.session?.order || '',
         lessonTopic: schedule.session?.title || '',
@@ -260,36 +280,58 @@ const RequestManagementPage = () => {
         sessionOrder: schedule.session?.order || '',
         attendanceStatus: attendanceStatus, // 'present', 'absent', 'late', 'excused', or null
         hasAttendance: !!attendanceStatus,
-        isAbsentSchedule: isAbsentSchedule
+        isAbsentSchedule: isAbsentSchedule || isCancelled,
+        isCancelled: isCancelled,
+        isMakeupSchedule: isMakeupFromDB, // Đánh dấu buổi học bù từ database
+        cancellationReason: schedule.studentScheduleReason || null,
+        makeupReason: isMakeupFromDB ? schedule.studentScheduleReason : null // Lý do học bù
       };
     });
     
-    // Thêm các buổi học bù vào calendar
-    const makeupSchedules = pendingMakeupClasses.map((makeup, index) => {
-      if (!makeup.makeupSchedule || !makeup.makeupSchedule.date) return null;
-      
-      const scheduleDate = new Date(makeup.makeupSchedule.date);
-      const dateStr = formatDateToYYYYMMDD(scheduleDate);
-      
-      return {
-        id: `makeup-${index}-${makeup.makeupScheduleId}`,
-        date: dateStr,
-        startTime: makeup.makeupSchedule.startTime || '',
-        endTime: makeup.makeupSchedule.endTime || '',
-        className: makeup.makeupClassInfo?.className || 'N/A',
-        classId: makeup.makeupClassId,
-        courseName: makeup.makeupClassInfo?.courseName || 'N/A',
-        roomName: makeup.makeupSchedule.roomName || 'N/A',
-        topic: makeup.makeupSchedule.title || '',
-        status: 'makeup',
-        lessonNumber: makeup.makeupSchedule.order || '',
-        sessionName: makeup.makeupSchedule.title || 'N/A',
-        sessionOrder: makeup.makeupSchedule.order || '',
-        attendanceStatus: null,
-        hasAttendance: false,
-        isMakeupSchedule: true
-      };
-    }).filter(Boolean);
+    // Lấy danh sách ID của các buổi học bù đã có trong schedules (từ database)
+    const existingMakeupScheduleIds = schedules
+      .filter(s => s.isMakeupSchedule || s.scheduleStatus === 'rescheduled')
+      .map(s => s.id?.toString() || s._id?.toString());
+    
+    // Thêm các buổi học bù từ pendingMakeupClasses (chưa được approve)
+    // Chỉ thêm những buổi chưa có trong database
+    const makeupSchedules = pendingMakeupClasses
+      .map((makeup, index) => {
+        if (!makeup.makeupSchedule || !makeup.makeupSchedule.date) return null;
+        
+        const makeupScheduleId = makeup.makeupScheduleId?.toString() || 
+                                 makeup.makeupSchedule?.id?.toString() || 
+                                 makeup.makeupSchedule?._id?.toString();
+        
+        // Bỏ qua nếu buổi học bù này đã có trong database
+        if (makeupScheduleId && existingMakeupScheduleIds.includes(makeupScheduleId)) {
+          return null;
+        }
+        
+        const scheduleDate = new Date(makeup.makeupSchedule.date);
+        const dateStr = formatDateToYYYYMMDD(scheduleDate);
+        
+        return {
+          id: `makeup-pending-${index}-${makeupScheduleId}`,
+          date: dateStr,
+          startTime: makeup.makeupSchedule.startTime || '',
+          endTime: makeup.makeupSchedule.endTime || '',
+          className: makeup.makeupClassInfo?.className || 'N/A',
+          classId: makeup.makeupClassId,
+          courseName: makeup.makeupClassInfo?.courseName || 'N/A',
+          roomName: makeup.makeupSchedule.roomName || 'N/A',
+          topic: makeup.makeupSchedule.title || '',
+          status: 'makeup',
+          scheduleStatus: 'rescheduled', // Đánh dấu là rescheduled
+          lessonNumber: makeup.makeupSchedule.order || '',
+          sessionName: makeup.makeupSchedule.title || 'N/A',
+          sessionOrder: makeup.makeupSchedule.order || '',
+          attendanceStatus: null,
+          hasAttendance: false,
+          isMakeupSchedule: true
+        };
+      })
+      .filter(Boolean);
     
     return [...schedules, ...makeupSchedules];
   }, [senderSchedule, pendingMakeupClasses]);

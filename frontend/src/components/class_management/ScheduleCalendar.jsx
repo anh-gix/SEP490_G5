@@ -161,13 +161,18 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
   };
 
   const getStatusColor = (schedule) => {
+    // Kiểm tra buổi bị hủy (cancelled)
+    if (schedule.isCancelled || schedule.scheduleStatus === 'cancelled') {
+      return '#9e9e9e'; // Màu xám đậm cho buổi bị hủy
+    }
+    
     // Kiểm tra buổi nghỉ (absent)
     if (schedule.isAbsentSchedule || schedule.status === 'absent') {
       return '#f44336'; // Màu đỏ cho buổi nghỉ
     }
     
-    // Kiểm tra buổi học bù (makeup)
-    if (schedule.isMakeupSchedule || schedule.status === 'makeup') {
+    // Kiểm tra buổi học bù (makeup/rescheduled)
+    if (schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled') {
       return '#FF9800'; // Màu cam cho buổi học bù
     }
     
@@ -267,10 +272,12 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                         // Màu nền khác nhau theo trạng thái
                         let backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt mặc định
                         
-                        // Kiểm tra buổi nghỉ và buổi học bù trước
-                        if (schedule.isAbsentSchedule || schedule.status === 'absent') {
+                        // Kiểm tra buổi bị hủy trước
+                        if (schedule.isCancelled || schedule.scheduleStatus === 'cancelled') {
+                          backgroundColor = 'rgba(158, 158, 158, 0.2)'; // Xám đậm cho buổi bị hủy
+                        } else if (schedule.isAbsentSchedule || schedule.status === 'absent') {
                           backgroundColor = 'rgba(244, 67, 54, 0.15)'; // Đỏ nhạt cho buổi nghỉ
-                        } else if (schedule.isMakeupSchedule || schedule.status === 'makeup') {
+                        } else if (schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled') {
                           backgroundColor = 'rgba(255, 152, 0, 0.15)'; // Cam nhạt cho buổi học bù
                         } else if (timeStatus === 'completed') {
                           backgroundColor = 'rgba(76, 175, 80, 0.1)'; // Xanh lá nhạt cho buổi đã kết thúc
@@ -298,9 +305,13 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                         
                         // Tooltip text
                         let tooltipText = 'Buổi chưa học';
-                        if (schedule.isAbsentSchedule || schedule.status === 'absent') {
+                        if (schedule.isCancelled || schedule.scheduleStatus === 'cancelled') {
+                          tooltipText = schedule.cancellationReason 
+                            ? `Buổi đã hủy: ${schedule.cancellationReason}` 
+                            : 'Buổi đã hủy';
+                        } else if (schedule.isAbsentSchedule || schedule.status === 'absent') {
                           tooltipText = 'Buổi nghỉ';
-                        } else if (schedule.isMakeupSchedule || schedule.status === 'makeup') {
+                        } else if (schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled') {
                           tooltipText = 'Buổi học bù';
                         } else if (timeStatus === 'completed') {
                           tooltipText = 'Buổi đã kết thúc';
@@ -333,11 +344,12 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                           >
                             <div className="fw-bold d-flex align-items-center justify-content-between">
                               <span>{schedule.startTime}</span>
-                              {(schedule.isAbsentSchedule || schedule.isMakeupSchedule || schedule.status === 'absent' || schedule.status === 'makeup' || timeStatus || hasAttendance) && (
+                              {(schedule.isCancelled || schedule.isAbsentSchedule || schedule.isMakeupSchedule || schedule.status === 'absent' || schedule.status === 'makeup' || schedule.scheduleStatus === 'cancelled' || schedule.scheduleStatus === 'rescheduled' || timeStatus || hasAttendance) && (
                                 <i 
                                   className={`fas ${
+                                    schedule.isCancelled || schedule.scheduleStatus === 'cancelled' ? 'fa-ban' :
                                     schedule.isAbsentSchedule || schedule.status === 'absent' ? 'fa-times-circle' :
-                                    schedule.isMakeupSchedule || schedule.status === 'makeup' ? 'fa-calendar-plus' :
+                                    schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled' ? 'fa-calendar-plus' :
                                     timeStatus === 'completed' ? 'fa-check-circle' :
                                     timeStatus === 'upcoming' ? 'fa-clock' :
                                     timeStatus === 'ongoing' ? 'fa-play-circle' :
@@ -351,7 +363,15 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                                 ></i>
                               )}
                             </div>
-                            <div className="text-truncate">{schedule.className}</div>
+                            <div className="text-truncate d-flex align-items-center gap-1">
+                              <span>{schedule.className}</span>
+                              {(schedule.isCancelled || schedule.scheduleStatus === 'cancelled') && (
+                                <Badge bg="secondary" style={{ fontSize: '8px', padding: '2px 4px' }}>Đã hủy</Badge>
+                              )}
+                              {(schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled') && (
+                                <Badge bg="warning" text="dark" style={{ fontSize: '8px', padding: '2px 4px' }}>Học bù</Badge>
+                              )}
+                            </div>
                           </div>
                         );
                       })}

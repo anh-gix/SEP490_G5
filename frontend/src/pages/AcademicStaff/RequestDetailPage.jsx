@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Container, Card, Button, Spinner, Alert } from 'react-bootstrap';
+import React, { useMemo, useState } from 'react';
+import { Container, Card, Button, Spinner, Alert, Modal, Form } from 'react-bootstrap';
 import AcademicNavigation from '../../components/class_management/AcademicNavigation.jsx';
 import ScheduleCalendar from '../../components/class_management/ScheduleCalendar';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
@@ -27,6 +27,8 @@ const RequestDetailPage = ({
   formatDate,
   renderClassInfo
 }) => {
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
   // Xác định role của người gửi đơn
   const isStudent = senderRole === 'Student';
   const isTeacher = senderRole === 'Teacher';
@@ -545,7 +547,10 @@ const RequestDetailPage = ({
             </Button>
             <Button 
               variant="danger" 
-              onClick={onReject}
+              onClick={() => {
+                setShowRejectModal(true);
+                setRejectReason('');
+              }}
               disabled={processing}
             >
               {processing ? 'Đang xử lý...' : 'Từ chối'}
@@ -563,6 +568,66 @@ const RequestDetailPage = ({
           </div>
         </Container>
       </div>
+
+      {/* Modal từ chối */}
+      <Modal show={showRejectModal} onHide={() => {
+        setShowRejectModal(false);
+        setRejectReason('');
+      }} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Từ chối đơn</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedRequest && (
+            <div className="mb-16">
+              <p className="text-neutral-700 mb-8">
+                <strong>Người gửi:</strong> {selectedRequest.sender?.username} ({selectedRequest.sender?.email})
+              </p>
+              <p className="text-neutral-700 mb-8">
+                <strong>Ngày gửi:</strong> {formatDate(selectedRequest.createdAt)}
+              </p>
+              <p className="text-neutral-700 mb-16">
+                <strong>Nội dung đơn:</strong> {selectedRequest.content}
+              </p>
+            </div>
+          )}
+          <Form.Group>
+            <Form.Label>Lý do từ chối (không bắt buộc)</Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={3}
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Nhập lý do từ chối (nếu có)..."
+            />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button 
+            variant="secondary" 
+            onClick={() => {
+              setShowRejectModal(false);
+              setRejectReason('');
+            }}
+            disabled={processing}
+          >
+            Hủy
+          </Button>
+          <Button 
+            variant="danger" 
+            onClick={async () => {
+              if (onReject) {
+                await onReject(rejectReason || null);
+                setShowRejectModal(false);
+                setRejectReason('');
+              }
+            }}
+            disabled={processing}
+          >
+            {processing ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };

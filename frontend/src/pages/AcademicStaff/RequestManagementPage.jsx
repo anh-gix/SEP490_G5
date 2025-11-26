@@ -1617,15 +1617,22 @@ const RequestManagementPage = () => {
     }
   };
 
-  const handleReject = async () => {
-    if (!requestToReject) return;
+  const handleReject = async (rejectReasonParam = null) => {
+    if (!selectedRequest) return;
     
     try {
       setProcessing(true);
-      await academicStaffService.rejectChangeRequest(requestToReject._id, rejectReason || null);
+      await academicStaffService.rejectChangeRequest(selectedRequest._id, rejectReasonParam || rejectReason || null);
       setShowRejectModal(false);
       setRequestToReject(null);
       setRejectReason('');
+      setShowDetailModal(false);
+      setSelectedRequest(null);
+      setSenderSchedule([]);
+      setSenderRole(null);
+      setPendingClassChange(null);
+      setPendingMakeupClasses([]);
+      setPendingMakeupSessions([]);
       fetchChangeRequests(); // Refresh list
     } catch (err) {
       console.error('Error rejecting request:', err);
@@ -1670,7 +1677,7 @@ const RequestManagementPage = () => {
             setPendingMakeupSessions([]);
           }}
           onApprove={handleApprove}
-          onReject={() => handleRejectClick(selectedRequest)}
+          onReject={handleReject}
           onChangeClass={handleChangeClassClick}
           onAddMakeupClass={() => {
             setShowMakeupClassModal(true);
@@ -3070,32 +3077,17 @@ const RequestManagementPage = () => {
                           </td>
                           <td className="px-20 py-16">
                             {request.status === 'pending' ? (
-                              <div className="d-flex gap-2">
-                                <Button
-                                  variant="success"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleApproveClick(request);
-                                  }}
-                                  disabled={processing}
-                                >
-                                  <i className="fas fa-check me-1"></i>
-                                  Chấp nhận
-                                </Button>
-                                <Button
-                                  variant="danger"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRejectClick(request);
-                                  }}
-                                  disabled={processing}
-                                >
-                                  <i className="fas fa-times me-1"></i>
-                                  Từ chối
-                                </Button>
-                              </div>
+                              <Button
+                                variant="success"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleApproveClick(request);
+                                }}
+                                disabled={processing}
+                              >
+                                Xem chi tiết
+                              </Button>
                             ) : (
                               <span className="text-neutral-500 text-13">-</span>
                             )}

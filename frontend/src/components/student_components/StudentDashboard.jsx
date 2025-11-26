@@ -1,26 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Form } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
-import { 
-  studentInfoMock, 
-  generateWeekScheduleMock, 
-  dashboardAssignmentsMock, 
-  toeicResultsMock,
-  activeClassesMock 
-} from './student_mockdata';
+import { Container, Row, Col, Card, Button, Badge, Form, Alert } from 'react-bootstrap';
+import { Link, useNavigate } from 'react-router-dom';
+import studentService from '../../services/studentService';
 
 /**
  * Student Dashboard Component - Redesigned
  * Trang tổng quan dành cho học viên - Tập trung vào lịch học và bài tập
  */
 const StudentDashboard = () => {
+  const navigate = useNavigate();
   const [studentInfo, setStudentInfo] = useState(null);
   const [weekSchedule, setWeekSchedule] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [assignmentFilter, setAssignmentFilter] = useState('all'); // all, pending, overdue
-  const [toeicResults, setToeicResults] = useState([]);
+  const [practiceTests, setPracticeTests] = useState([]);
   const [activeClasses, setActiveClasses] = useState([]);
   const [practiceTestFilter, setPracticeTestFilter] = useState('all'); // all, toeic, ielts
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchStudentData();
@@ -28,37 +25,37 @@ const StudentDashboard = () => {
 
   const fetchStudentData = async () => {
     try {
-      // TODO: Replace with actual API calls
-      // const response = await studentApi.getDashboardData();
-      // setStudentInfo(response.studentInfo);
-      // setWeekSchedule(response.weekSchedule);
-      // setAssignments(response.assignments);
-      // setToeicResults(response.toeicResults);
+      setLoading(true);
+      setError(null);
       
-      // Using mock data
-      setStudentInfo(studentInfoMock);
-      setWeekSchedule(generateWeekScheduleMock());
-      setAssignments(dashboardAssignmentsMock);
-      setToeicResults(toeicResultsMock);
-      setActiveClasses(activeClassesMock);
+      const response = await studentService.getDashboardData();
+      
+      if (response.success) {
+        setStudentInfo(response.data.studentInfo);
+        setWeekSchedule(response.data.weekSchedule || []);
+        setAssignments(response.data.assignments || []);
+        setPracticeTests(response.data.practiceTests || []);
+        setActiveClasses(response.data.activeClasses || []);
+      }
     } catch (error) {
       console.error('Error fetching student data:', error);
+      setError(error.message || 'Không thể tải dữ liệu dashboard');
+    } finally {
+      setLoading(false);
     }
   };
 
   const getFilteredAssignments = () => {
-    const now = new Date();
     return assignments
       .filter(assignment => {
         if (assignmentFilter === 'all') return true;
-        if (assignmentFilter === 'pending') return assignment.status === 'pending';
-        if (assignmentFilter === 'overdue') {
-          return new Date(assignment.dueDate) < now || assignment.status === 'overdue';
-        }
+        if (assignmentFilter === 'pending') return assignment.status === 'not_submitted' && !assignment.isOverdue;
+        if (assignmentFilter === 'overdue') return assignment.isOverdue;
         return true;
       })
       .sort((a, b) => {
-        // Sort by priority (high first) then by due date
+        // Sort by overdue first, then priority, then by due date
+        if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
         if (a.priority === 'high' && b.priority !== 'high') return -1;
         if (a.priority !== 'high' && b.priority === 'high') return 1;
         return new Date(a.dueDate) - new Date(b.dueDate);
@@ -66,13 +63,40 @@ const StudentDashboard = () => {
   };
 
   const getFilteredPracticeTests = () => {
-    return toeicResults.filter(result => {
+    return practiceTests.filter(result => {
       if (practiceTestFilter === 'all') return true;
       if (practiceTestFilter === 'toeic') return result.type === 'toeic';
       if (practiceTestFilter === 'ielts') return result.type === 'ielts';
       return true;
     });
   };
+
+  if (loading) {
+    return (
+      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
+        <div className="text-center py-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Đang tải...</span>
+          </div>
+          <p className="mt-3 text-neutral-600">Đang tải dữ liệu dashboard...</p>
+        </div>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
+        <Alert variant="danger">
+          <Alert.Heading>Lỗi tải dữ liệu</Alert.Heading>
+          <p>{error}</p>
+          <Button onClick={fetchStudentData} variant="outline-danger">
+            <i className="fas fa-redo me-2"></i>Thử lại
+          </Button>
+        </Alert>
+      </Container>
+    );
+  }
 
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
@@ -346,17 +370,31 @@ const StudentDashboard = () => {
                           {result.type === 'toeic' ? (
                             <Row className="g-2">
                               <Col xs={6}>
-                                <div className="bg-white rounded-8 p-12 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-                                  <i className="fas fa-headphones text-info-500 mb-6"></i>
-                                  <div className="text-neutral-900 fw-bold text-16">{result.listening}</div>
-                                  <div className="text-neutral-600 text-11">Listening</div>
+                                <div className="bg-white rounded-8 p-10 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <i className="fas fa-headphones text-info-500 mb-4"></i>
+                                  <div className="text-neutral-900 fw-bold text-14">{result.listening || 0}</div>
+                                  <div className="text-neutral-600 text-10">Listening</div>
                                 </div>
                               </Col>
                               <Col xs={6}>
-                                <div className="bg-white rounded-8 p-12 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-                                  <i className="fas fa-book-open text-warning-600 mb-6"></i>
-                                  <div className="text-neutral-900 fw-bold text-16">{result.reading}</div>
-                                  <div className="text-neutral-600 text-11">Reading</div>
+                                <div className="bg-white rounded-8 p-10 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <i className="fas fa-book-open text-warning-600 mb-4"></i>
+                                  <div className="text-neutral-900 fw-bold text-14">{result.reading || 0}</div>
+                                  <div className="text-neutral-600 text-10">Reading</div>
+                                </div>
+                              </Col>
+                              <Col xs={6}>
+                                <div className="bg-white rounded-8 p-10 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <i className="fas fa-pen text-success-600 mb-4"></i>
+                                  <div className="text-neutral-900 fw-bold text-14">{result.writing || 0}</div>
+                                  <div className="text-neutral-600 text-10">Writing</div>
+                                </div>
+                              </Col>
+                              <Col xs={6}>
+                                <div className="bg-white rounded-8 p-10 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <i className="fas fa-microphone text-purple-600 mb-4"></i>
+                                  <div className="text-neutral-900 fw-bold text-14">{result.speaking || 0}</div>
+                                  <div className="text-neutral-600 text-10">Speaking</div>
                                 </div>
                               </Col>
                             </Row>
@@ -395,12 +433,19 @@ const StudentDashboard = () => {
                 </Row>
               ) : (
                 <div className="text-center py-40">
-                  <i className="fas fa-clipboard-list fa-3x text-neutral-300 mb-12"></i>
-                  <p className="text-neutral-500 mb-0">
-                    {practiceTestFilter === 'all' ? 'Chưa có kết quả luyện đề' :
-                     practiceTestFilter === 'toeic' ? 'Chưa có kết quả TOEIC' :
-                     'Chưa có kết quả IELTS'}
+                  <i className="fas fa-clipboard-list fa-3x text-neutral-300 mb-16"></i>
+                  <p className="text-neutral-600 mb-16 fw-medium">
+                    {practiceTestFilter === 'all' ? 'Bạn chưa luyện đề thi nào' :
+                     practiceTestFilter === 'toeic' ? 'Bạn chưa có kết quả TOEIC' :
+                     'Bạn chưa có kết quả IELTS'}
                   </p>
+                  <Button 
+                    className="btn-main px-24 py-12"
+                    onClick={() => navigate('/student/toeic')}
+                  >
+                    <i className="fas fa-play-circle me-2"></i>
+                    Bắt đầu luyện đề ngay
+                  </Button>
                 </div>
               )}
             </Card.Body>
@@ -422,7 +467,7 @@ const StudentDashboard = () => {
                   Bài tập
                 </h6>
                 <Badge className="bg-danger-100 text-danger-600 px-12 py-6 text-13 fw-bold">
-                  {assignments.filter(a => a.status === 'pending').length}
+                  {assignments.filter(a => a.status === 'not_submitted' && !a.isOverdue).length}
                 </Badge>
               </div>
 

@@ -998,12 +998,12 @@ const StudentManagementAPI = () => {
 
       {/* Student Detail Modal */}
       <Modal show={showDetailModal} onHide={() => { setShowDetailModal(false); setSchedulePage(1); }} size="xl">
-        <Modal.Header closeButton>
-          <Modal.Title>
+        <Modal.Header closeButton className="py-12">
+          <Modal.Title className="text-16">
             Chi tiết Học viên - {selectedStudent?.username}
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body style={{ padding: '16px' }}>
           {selectedStudent && (
             <Tabs defaultActiveKey="info" className="mb-3">
               {/* Info Tab */}
@@ -1079,22 +1079,24 @@ const StudentManagementAPI = () => {
                 {studentSchedule.length > 0 ? (
                   <>
                     {/* View Toggle */}
-                    <div className="d-flex justify-content-end mb-3">
-                      <ButtonGroup>
+                    <div className="d-flex justify-content-end mb-2">
+                      <ButtonGroup size="sm">
                         <Button
                           variant={scheduleViewMode === 'table' ? 'primary' : 'outline-secondary'}
                           size="sm"
                           onClick={() => setScheduleViewMode('table')}
+                          className="px-12 py-6"
                         >
-                          <i className="fas fa-table me-2"></i>
+                          <i className="fas fa-table me-1"></i>
                           Bảng
                         </Button>
                         <Button
                           variant={scheduleViewMode === 'calendar' ? 'primary' : 'outline-secondary'}
                           size="sm"
                           onClick={() => setScheduleViewMode('calendar')}
+                          className="px-12 py-6"
                         >
-                          <i className="fas fa-calendar-alt me-2"></i>
+                          <i className="fas fa-calendar-alt me-1"></i>
                           Lịch
                         </Button>
                       </ButtonGroup>
@@ -1103,44 +1105,57 @@ const StudentManagementAPI = () => {
                     {/* Table View */}
                     {scheduleViewMode === 'table' && (
                       <>
-                        <Table hover>
-                          <thead className="bg-neutral-25">
-                            <tr>
-                              <th className="px-16 py-12 text-13">Thời gian</th>
-                              <th className="px-16 py-12 text-13">Lớp học</th>
-                              <th className="px-16 py-12 text-13">Phòng</th>
-                              <th className="px-16 py-12 text-13">Chủ đề</th>
-                              <th className="px-16 py-12 text-13">Trạng thái</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {studentSchedule
-                              .slice((schedulePage - 1) * 10, schedulePage * 10)
-                              .map((schedule, index) => (
-                              <tr key={index}>
-                                <td className="px-16 py-12">
-                                  <div className="text-14">
-                                    {new Date(schedule.date).toLocaleDateString('vi-VN')}
-                                  </div>
-                                  <div className="text-13 text-muted">
-                                    {schedule.startTime} - {schedule.endTime}
-                                  </div>
-                                </td>
-                                <td className="px-16 py-12">{schedule.class?.name || 'N/A'}</td>
-                                <td className="px-16 py-12">{schedule.room?.room_name || 'N/A'}</td>
-                                <td className="px-16 py-12">{schedule.topic}</td>
-                                <td className="px-16 py-12">
-                                  <Badge bg={schedule.status === 'fixed' ? 'success' : schedule.status === 'temporary' ? 'warning' : 'secondary'}>
-                                    {schedule.status === 'fixed' ? 'Buổi cố định' : schedule.status === 'temporary' ? 'Buổi tạm' : schedule.status}
-                                  </Badge>
-                                </td>
+                        <Table hover size="sm">
+                            <thead className="bg-neutral-25 sticky-top">
+                              <tr>
+                                <th className="px-12 py-8 text-12">Thời gian</th>
+                                <th className="px-12 py-8 text-12">Lớp học</th>
+                                <th className="px-12 py-8 text-12">Phòng</th>
+                                <th className="px-12 py-8 text-12">Trạng thái</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </Table>
+                            </thead>
+                            <tbody>
+                              {studentSchedule
+                                .slice((schedulePage - 1) * 10, schedulePage * 10)
+                                .map((schedule, index) => (
+                                <tr key={index}>
+                                  <td className="px-12 py-8">
+                                    <div className="text-13">
+                                      {new Date(schedule.date).toLocaleDateString('vi-VN')}
+                                    </div>
+                                    <div className="text-12 text-muted">
+                                      {schedule.startTime} - {schedule.endTime}
+                                    </div>
+                                  </td>
+                                  <td className="px-12 py-8 text-13">{schedule.className || 'N/A'}</td>
+                                  <td className="px-12 py-8 text-13">{schedule.room?.room_name || 'N/A'}</td>
+                                  <td className="px-12 py-8">
+                                    {!schedule.attendance || !schedule.attendance.status ? (
+                                      <Badge bg="secondary" className="text-12">Chưa học</Badge>
+                                    ) : (
+                                      <Badge 
+                                        bg={
+                                          schedule.attendance.status === 'present' ? 'success' :
+                                          schedule.attendance.status === 'absent' ? 'danger' :
+                                          schedule.attendance.status === 'late' ? 'warning' :
+                                          'info'
+                                        }
+                                        className="text-12"
+                                      >
+                                        {schedule.attendance.status === 'present' ? 'Có mặt' :
+                                         schedule.attendance.status === 'absent' ? 'Vắng mặt' :
+                                         schedule.attendance.status === 'late' ? 'Đi muộn' :
+                                         'Có phép'}
+                                      </Badge>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </Table>
                         {studentSchedule.length > 10 && (
-                          <div className="d-flex justify-content-center mt-3">
-                            <Pagination>
+                          <div className="d-flex justify-content-center mt-2">
+                            <Pagination size="sm">
                               <Pagination.First 
                                 onClick={() => setSchedulePage(1)} 
                                 disabled={schedulePage === 1}
@@ -1216,8 +1231,8 @@ const StudentManagementAPI = () => {
             </Tabs>
           )}
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => { setShowDetailModal(false); setSchedulePage(1); }}>
+        <Modal.Footer className="py-10 border-top">
+          <Button variant="secondary" size="sm" onClick={() => { setShowDetailModal(false); setSchedulePage(1); }}>
             Đóng
           </Button>
         </Modal.Footer>

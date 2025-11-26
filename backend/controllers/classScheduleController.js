@@ -1352,16 +1352,18 @@ exports.getStudentSchedulesByClassSchedules = async (req, res) => {
 exports.getStudentSchedule = async (req, res) => {
   try {
     const { studentId } = req.params;
+    const Class = require("../models/classModel");
+    const Course = require("../models/courseModel");
 
     // Tìm tất cả StudentSchedule của học sinh và populate các thông tin cần thiết
     const studentSchedules = await StudentSchedule.find({ student: studentId })
       .populate({
         path: "classSchedule",
-        select: "date startTime endTime room class topic",
+        select: "date startTime endTime room class topic session status",
         populate: [
           {
             path: "class",
-            select: "name subject teacherId",
+            select: "name subject teacherId course",
             populate: {
               path: "teacherId",
               select: "username email",
@@ -1370,6 +1372,10 @@ exports.getStudentSchedule = async (req, res) => {
           {
             path: "room",
             select: "room_name location",
+          },
+          {
+            path: "session",
+            select: "title order",
           },
         ],
       })
@@ -1396,40 +1402,106 @@ exports.getStudentSchedule = async (req, res) => {
       });
     }
 
+    // Nhóm schedules theo class để lấy course sessions một lần
+    const classSessionsMap = {};
+    
     // Format dữ liệu để trả về đúng định dạng yêu cầu
-    const formattedSchedules = studentSchedules
-      .filter((ss) => ss.classSchedule) // Lọc những schedule hợp lệ
-      .map((ss) => {
-        const classSchedule = ss.classSchedule;
-        const classInfo = classSchedule.class;
-        const teacher = classInfo?.teacherId;
-        const room = classSchedule.room;
+    const formattedSchedules = await Promise.all(
+      studentSchedules
+        .filter((ss) => ss.classSchedule) // Lọc những schedule hợp lệ
+        .map(async (ss) => {
+          const classSchedule = ss.classSchedule;
+          const classInfo = classSchedule.class;
+          const teacher = classInfo?.teacherId;
+          const room = classSchedule.room;
 
-        return {
-          _id: ss._id,
-          startTime: classSchedule.startTime,
-          endTime: classSchedule.endTime,
-          className: classInfo?.name || "N/A",
-          subject: classInfo?.subject || "N/A",
-          teacher: teacher
-            ? {
-                _id: teacher._id,
-                username: teacher.username,
-                email: teacher.email,
+          // Nếu không có session, thử lấy từ course
+          let sessionTitle = classSchedule.session?.title;
+          if (!sessionTitle && classInfo?.course) {
+            const classId = classInfo._id?.toString();
+            
+            // Lấy course sessions nếu chưa có trong map
+            if (!classSessionsMap[classId]) {
+              try {
+                const classData = await Class.findById(classId)
+                  .populate({
+                    path: "course",
+                    select: "sessions",
+                    populate: {
+                      path: "sessions",
+                      select: "title order",
+                    },
+                  })
+                  .lean();
+                
+                if (classData?.course?.sessions) {
+                  const courseSessions = [...classData.course.sessions].sort(
+                    (a, b) => (a.order || 0) - (b.order || 0)
+                  );
+                  
+                  // Lấy tất cả ClassSchedule của lớp này để xác định thứ tự
+                  const ClassSchedule = require("../models/classScheduleModel");
+                  const allClassSchedules = await ClassSchedule.find({ class: classId })
+                    .sort({ date: 1, startTime: 1 })
+                    .lean();
+                  
+                  // Tìm index của schedule hiện tại
+                  const scheduleIndex = allClassSchedules.findIndex(
+                    (s) => s._id.toString() === classSchedule._id.toString()
+                  );
+                  
+                  if (scheduleIndex >= 0 && courseSessions.length > 0) {
+                    const sessionIndex = scheduleIndex % courseSessions.length;
+                    sessionTitle = courseSessions[sessionIndex]?.title;
+                  }
+                  
+                  classSessionsMap[classId] = { courseSessions, allClassSchedules };
+                }
+              } catch (err) {
+                console.error("Error getting course sessions:", err);
               }
-            : null,
-          room: room
-            ? {
-                _id: room._id,
-                room_name: room.room_name,
-                location: room.location,
+            } else {
+              // Đã có trong map, sử dụng lại
+              const { courseSessions, allClassSchedules } = classSessionsMap[classId];
+              const scheduleIndex = allClassSchedules.findIndex(
+                (s) => s._id.toString() === classSchedule._id.toString()
+              );
+              
+              if (scheduleIndex >= 0 && courseSessions.length > 0) {
+                const sessionIndex = scheduleIndex % courseSessions.length;
+                sessionTitle = courseSessions[sessionIndex]?.title;
               }
-            : null,
-          date: classSchedule.date,
-          topic: classSchedule.topic,
-          attendance: ss.attendance,
-        };
-      });
+            }
+          }
+
+          return {
+            _id: ss._id,
+            startTime: classSchedule.startTime,
+            endTime: classSchedule.endTime,
+            className: classInfo?.name || "N/A",
+            subject: classInfo?.subject || "N/A",
+            teacher: teacher
+              ? {
+                  _id: teacher._id,
+                  username: teacher.username,
+                  email: teacher.email,
+                }
+              : null,
+            room: room
+              ? {
+                  _id: room._id,
+                  room_name: room.room_name,
+                  location: room.location,
+                }
+              : null,
+            date: classSchedule.date,
+            topic: classSchedule.topic,
+            sessionTitle: sessionTitle || classSchedule.topic || null,
+            status: classSchedule.status || "fixed",
+            attendance: ss.attendance,
+          };
+        })
+    );
 
     res.status(200).json({
       message: "Lấy lịch học của học sinh thành công.",

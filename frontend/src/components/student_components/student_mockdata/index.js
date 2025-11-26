@@ -36,3 +36,6 @@ export {
   toeicHistoryMock,
   getToeicResultMock
 } from './toeicMockData';
+
+// Exam Mock Data
+export { examsMock } from './examMockData';

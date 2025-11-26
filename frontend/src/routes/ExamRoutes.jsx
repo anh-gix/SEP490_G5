@@ -8,9 +8,13 @@ import WritingExamPage from "../pages/ExamPages/WritingExamPage.jsx";
 import WritingResultPage from "../pages/ExamPages/WritingResultPage.jsx";
 import SpeakingExamPage from "../pages/ExamPages/SpeakingExamPage.jsx";
 import SpeakingResultPage from "../pages/ExamPages/SpeakingResultPage.jsx";
+import StudentExamListPage2 from "../pages/ExamPages/StudentExamListPage2.jsx";
+import ExamDetailPage2 from "../pages/ExamPages/ExamDetailPage2.jsx";
 export const examRoutes = [
     { path: '/exams', element: <StudentExamListPage /> },
+    { path: '/exams2', element: <StudentExamListPage2 /> },
     { path: '/exams/:id', element: <ExamDetailPage /> },
+    { path: '/exams/:id/2', element: <ExamDetailPage2 /> },
     { path: '/exams/:examId/submissions/:submissionId/reading', element: <ReadingExamPage /> },
     { path: '/exams/:examId/submissions/:submissionId/reading/result', element: <ReadingResultPage /> },
     { path: '/exams/:examId/submissions/:submissionId/listening', element: <ListeningExamPage /> },

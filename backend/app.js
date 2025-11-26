@@ -24,6 +24,7 @@ mongoose.connect(process.env.MONGODB_URI, {
 .catch(err => console.error('MongoDB connection error:', err));
 
 // Routes
+app.use('/api/courses', require('./routes/courseRoute'));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/roles', require('./routes/roleRoutes'));
@@ -36,6 +37,7 @@ app.use('/api/student-schedules', require('./routes/studentScheduleRoutes'));
 app.use('/api/center-head', require('./routes/centerHeadRoutes'));
 app.use('/api/programs', require('./routes/programRoutes'));
 app.use('/api/courses', require('./routes/courseRoute'));
+app.use('/api/courseshome', require('./routes/courseHomeRoutes'));
 app.use('/api/sessions', require('./routes/sessionRoutes'));
 
 // Academic Staff Routes

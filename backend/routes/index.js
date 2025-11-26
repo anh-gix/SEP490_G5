@@ -12,4 +12,6 @@ router.use('/schedules', scheduleRoute);
 router.use('/sessions', sessionRoutes);
 router.use('/homework', homeworkRoutes);
 
+
+
 module.exports = router;

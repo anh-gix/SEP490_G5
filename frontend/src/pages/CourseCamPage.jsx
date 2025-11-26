@@ -2,35 +2,23 @@ import Breadcrumb from "../components/Breadcrumb";
 import CertificateOne from "../components/CertificateOne";
 import CourseGridView from "../components/CourseDetail/CourseGridView";
 import FooterOne from "../components/FooterOne";
-import HeaderOne from "../components/HeaderOne";
+import HeaderOne from "../components/HomePageforStudent/HeaderOne";
 import Animation from "../helper/Animation";
 import Preloader from "../helper/Preloader";
 
-const CoursePage = () => {
+const CourseCamPage = () => {
   return (
     <>
-      {/* Preloader */}
       <Preloader />
-
-      {/* Animation */}
       <Animation />
-
-      {/* HeaderTwo */}
       <HeaderOne />
-
-      {/* Breadcrumb */}
-      <Breadcrumb title={"Courses Grid View"} />
-
-      {/* CourseGridView */}
-      <CourseGridView />
-
-      {/* CertificateOne */}
+      <Breadcrumb title={"Khóa học Tiếng Anh Trẻ Em"} />
+      <CourseGridView initialType='cam' />
       <CertificateOne />
-
-      {/* FooterOne */}
       <FooterOne />
     </>
   );
 };
 
-export default CoursePage;
+export default CourseCamPage;
+

@@ -205,6 +205,26 @@ exports.deleteCourse = async (req, res) => {
 // COURSE APPROVAL WORKFLOW
 // =========================
 
+// Lấy tất cả courses đã được phê duyệt (cho student view)
+exports.getAllCourses = async (req, res) => {
+    try {
+        const courses = await Course.find({ status: 'approved' })
+            .populate('createdBy', 'name fullname email')
+            .populate('program', 'program_name code')
+            .select('name description program createdBy status createdAt updatedAt')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            count: courses.length,
+            data: courses
+        });
+
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Lỗi máy chủ', error: err.message });
+    }
+};
+
 // [Màn 2] Lấy danh sách Giáo trình chờ duyệt
 exports.getPendingCourses = async (req, res) => {
     try {

@@ -2,6 +2,11 @@ const express = require('express');
 const router = express.Router();
 const courseController = require('../controllers/courseController');
 
+
+
+// Lấy tất cả courses đã được phê duyệt
+router.get('/', courseController.getAllCourses);
+
 // COURSE APPROVAL WORKFLOW ROUTES (specific routes must come first)
 router.get('/pending', courseController.getPendingCourses);
 

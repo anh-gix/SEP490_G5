@@ -45,6 +45,34 @@ const upload = multer({
   }
 });
 
+// ==========================================
+// STUDENT AUTHENTICATED ROUTES (must be before /:id)
+// ==========================================
+
+// Student current user routes (require authentication)
+router.get('/me', verifyToken, isStudent, studentController.getCurrentStudent);
+router.get('/me/dashboard', verifyToken, isStudent, studentController.getDashboardData);
+router.get('/me/classes', verifyToken, isStudent, studentController.getMyClasses);
+router.get('/me/schedule', verifyToken, isStudent, studentController.getMySchedule);
+router.get('/me/lessons/:scheduleId', verifyToken, isStudent, studentController.getLessonDetail);
+
+// Class detail routes
+router.get('/me/classes/:classId/materials', verifyToken, isStudent, studentController.getClassMaterials);
+router.get('/me/classes/:classId/homework', verifyToken, isStudent, studentController.getClassHomework);
+router.get('/me/classes/:classId/progress', verifyToken, isStudent, studentController.getClassProgress);
+
+// Homework submission
+router.post('/me/classes/:classId/schedules/:scheduleId/homework/:homeworkId/submit', 
+  verifyToken, 
+  isStudent, 
+  upload.array('files', 5), // Allow up to 5 files
+  studentController.submitHomework
+);
+
+// ==========================================
+// ADMIN/ACADEMIC STAFF ROUTES (for student management)
+// ==========================================
+
 // Get all students (for Academic Staff/Admin - no role restriction for now)
 router.get('/', studentController.getAllStudents);
 
@@ -65,24 +93,5 @@ router.delete('/:id', studentController.deleteStudent);
 
 // Import students (bulk)
 router.post('/import', studentController.importStudents);
-
-// Student current user routes (require authentication)
-router.get('/me', verifyToken, isStudent, studentController.getCurrentStudent);
-router.get('/me/classes', verifyToken, isStudent, studentController.getMyClasses);
-router.get('/me/schedule', verifyToken, isStudent, studentController.getMySchedule);
-router.get('/me/lessons/:scheduleId', verifyToken, isStudent, studentController.getLessonDetail);
-
-// Class detail routes
-router.get('/me/classes/:classId/materials', verifyToken, isStudent, studentController.getClassMaterials);
-router.get('/me/classes/:classId/homework', verifyToken, isStudent, studentController.getClassHomework);
-router.get('/me/classes/:classId/progress', verifyToken, isStudent, studentController.getClassProgress);
-
-// Homework submission
-router.post('/me/classes/:classId/schedules/:scheduleId/homework/:homeworkId/submit', 
-  verifyToken, 
-  isStudent, 
-  upload.array('files', 5), // Allow up to 5 files
-  studentController.submitHomework
-);
 
 module.exports = router;

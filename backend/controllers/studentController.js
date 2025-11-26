@@ -779,6 +779,323 @@ exports.submitHomework = async (req, res) => {
 };
 
 // =========================
+// 📊 LẤY DỮ LIỆU DASHBOARD CỦA HỌC VIÊN
+// =========================
+exports.getDashboardData = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+
+    // 1. Get student basic info
+    const student = await User.findById(studentId)
+      .select('-password -token')
+      .populate('roleId', 'name')
+      .lean();
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy học viên'
+      });
+    }
+
+    // 2. Get active classes
+    const activeClasses = await Class.find({
+      students: studentId,
+      status: 'active'
+    })
+      .populate('course', 'name')
+      .populate('teacher', 'username')
+      .populate('room', 'room_name')
+      .select('name course teacher room startDate endDate')
+      .lean();
+
+    // 3. Get week schedule (current week)
+    const startOfWeek = new Date();
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(endOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const classIds = activeClasses.map(cls => cls._id);
+    
+    const weekSchedules = await ClassSchedule.find({
+      class: { $in: classIds },
+      date: { $gte: startOfWeek, $lte: endOfWeek }
+    })
+      .populate('class', 'name course')
+      .populate({
+        path: 'class',
+        populate: { path: 'course', select: 'name' }
+      })
+      .populate('room', 'room_name')
+      .populate('session', 'title order')
+      .sort({ date: 1, startTime: 1 })
+      .lean();
+
+    // 4. Get pending/overdue homework
+    const allSchedules = await ClassSchedule.find({
+      class: { $in: classIds },
+      'homework.assignment': { $exists: true, $ne: null }
+    })
+      .populate('class', 'name course')
+      .populate({
+        path: 'class',
+        populate: { path: 'course', select: 'name' }
+      })
+      .select('class homework date')
+      .lean();
+
+    const assignments = [];
+    for (const schedule of allSchedules) {
+      if (schedule.homework?.assignment) {
+        // Get submission status
+        const submission = await HomeworkSubmission.findOne({
+          classSchedule: schedule._id,
+          homeworkId: schedule.homework._id,
+          student: studentId
+        }).lean();
+
+        const now = new Date();
+        const deadline = new Date(schedule.homework.deadline);
+        const isOverdue = deadline < now && submission?.status !== 'submitted';
+        const daysLeft = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+
+        assignments.push({
+          id: schedule.homework._id.toString(),
+          scheduleId: schedule._id.toString(),
+          classId: schedule.class._id.toString(),
+          className: schedule.class.name,
+          subject: schedule.class.course?.name || 'N/A',
+          title: schedule.homework.assignment.title,
+          dueDate: schedule.homework.deadline,
+          status: submission?.status || 'not_submitted',
+          priority: daysLeft <= 2 && !isOverdue ? 'high' : 'normal',
+          isOverdue,
+          daysLeft
+        });
+      }
+    }
+
+    // Sort assignments by priority and due date
+    assignments.sort((a, b) => {
+      if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+      if (a.priority !== b.priority) return a.priority === 'high' ? -1 : 1;
+      return new Date(a.dueDate) - new Date(b.dueDate);
+    });
+
+    // 5. Get practice test results (from Submission model)
+    console.log('📊 [Dashboard] Bắt đầu lấy dữ liệu luyện đề cho studentId:', studentId);
+    
+    const Submission = require('../models/submissionModel');
+    const Exam = require('../models/examModel');
+    
+    console.log('🔍 [Dashboard] Query Submission model với điều kiện:', {
+      studentId,
+      status: { $in: ['completed', 'graded'] }
+    });
+    
+    const submissions = await Submission.find({
+      studentId,
+      status: { $in: ['completed', 'graded'] }
+    })
+      .populate({
+        path: 'examId',
+        select: 'title type examType createdAt'
+      })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    console.log(`✅ [Dashboard] Tìm thấy ${submissions.length} submissions`);
+    
+    if (submissions.length > 0) {
+      console.log('📋 [Dashboard] Chi tiết submissions:');
+      submissions.forEach((sub, index) => {
+        console.log(`  [${index + 1}] Submission ID: ${sub._id}`);
+        console.log(`      - Exam: ${sub.examId?.title || 'N/A'}`);
+        console.log(`      - Type: ${sub.examId?.type || sub.examId?.examType || 'N/A'}`);
+        console.log(`      - Status: ${sub.status}`);
+        console.log(`      - Total Score: ${sub.totalScore}`);
+        console.log(`      - Band Score: ${sub.bandScore || 'N/A'}`);
+        console.log(`      - Sections: ${sub.sections?.length || 0}`);
+        if (sub.sections && sub.sections.length > 0) {
+          sub.sections.forEach(section => {
+            console.log(`        • ${section.sectionType}: ${section.sectionScore || 0}`);
+          });
+        }
+      });
+    } else {
+      console.log('⚠️ [Dashboard] Không tìm thấy submission nào cho student này');
+    }
+
+    const practiceTests = submissions
+      .filter(sub => {
+        const hasExam = sub.examId && sub.totalScore !== undefined;
+        if (!hasExam) {
+          console.log(`⚠️ [Dashboard] Submission ${sub._id} bị loại: examId=${!!sub.examId}, totalScore=${sub.totalScore}`);
+        }
+        return hasExam;
+      })
+      .map((sub, index) => {
+        const exam = sub.examId;
+        console.log(`🔄 [Dashboard] Processing submission ${index + 1}/${submissions.length}: ${sub._id}`);
+        
+        const result = {
+          id: sub._id.toString(),
+          testName: exam.title,
+          date: sub.createdAt,
+          type: exam.examType || exam.type || 'toeic'
+        };
+
+        console.log(`   Type detected: ${result.type}`);
+
+        // Calculate scores by section type
+        if (exam.type === 'toeic' || exam.examType === 'toeic') {
+          const listeningSection = sub.sections?.find(s => s.sectionType === 'listening');
+          const readingSection = sub.sections?.find(s => s.sectionType === 'reading');
+          const writingSection = sub.sections?.find(s => s.sectionType === 'writing');
+          const speakingSection = sub.sections?.find(s => s.sectionType === 'speaking');
+
+          result.listening = listeningSection?.sectionScore || 0;
+          result.reading = readingSection?.sectionScore || 0;
+          result.writing = writingSection?.sectionScore || 0;
+          result.speaking = speakingSection?.sectionScore || 0;
+          result.total = sub.totalScore || 0;
+          
+          console.log(`   TOEIC Scores - L:${result.listening} R:${result.reading} W:${result.writing} S:${result.speaking} Total:${result.total}`);
+        } else if (exam.type === 'ielts' || exam.examType === 'ielts') {
+          const listeningSection = sub.sections?.find(s => s.sectionType === 'listening');
+          const readingSection = sub.sections?.find(s => s.sectionType === 'reading');
+          const writingSection = sub.sections?.find(s => s.sectionType === 'writing');
+          const speakingSection = sub.sections?.find(s => s.sectionType === 'speaking');
+
+          result.listening = listeningSection?.sectionScore || 0;
+          result.reading = readingSection?.sectionScore || 0;
+          result.writing = writingSection?.sectionScore || 0;
+          result.speaking = speakingSection?.sectionScore || 0;
+          result.overallBand = sub.bandScore || 0;
+          
+          console.log(`   IELTS Scores - L:${result.listening} R:${result.reading} W:${result.writing} S:${result.speaking} Band:${result.overallBand}`);
+        }
+
+        return result;
+      });
+
+    console.log(`✅ [Dashboard] Đã xử lý xong ${practiceTests.length} practice tests`);
+
+    // 6. Calculate class details with progress
+    const classesWithDetails = await Promise.all(
+      activeClasses.map(async (cls) => {
+        const totalSchedules = await ClassSchedule.countDocuments({
+          class: cls._id
+        });
+
+        const completedSchedules = await ClassSchedule.countDocuments({
+          class: cls._id,
+          date: { $lt: new Date() }
+        });
+
+        const studentSchedules = await StudentSchedule.find({
+          student: studentId,
+          classSchedule: { $in: await ClassSchedule.find({ class: cls._id }).distinct('_id') }
+        }).lean();
+
+        const presentCount = studentSchedules.filter(s => s.attendance?.status === 'present').length;
+        const attendanceRate = studentSchedules.length > 0 
+          ? Math.round((presentCount / studentSchedules.length) * 100) 
+          : 100;
+
+        // Get schedule pattern
+        const schedules = await ClassSchedule.find({
+          class: cls._id
+        })
+          .select('date startTime endTime')
+          .limit(3)
+          .lean();
+
+        const schedulePattern = schedules.length > 0
+          ? `${schedules[0].startTime} - ${schedules[0].endTime}`
+          : 'N/A';
+
+        return {
+          id: cls._id.toString(),
+          className: cls.name,
+          program: cls.course?.name || 'N/A',
+          course: cls.course?.name || 'N/A',
+          teacher: cls.teacher?.username || 'N/A',
+          room: cls.room?.room_name || 'N/A',
+          schedule: schedulePattern,
+          totalLessons: totalSchedules,
+          completedLessons: completedSchedules,
+          attendanceRate
+        };
+      })
+    );
+
+    // Format week schedule for frontend
+    const formattedWeekSchedule = [];
+    for (let i = 0; i < 7; i++) {
+      const currentDate = new Date(startOfWeek);
+      currentDate.setDate(currentDate.getDate() + i);
+      
+      const daySchedules = weekSchedules.filter(s => {
+        const scheduleDate = new Date(s.date);
+        return scheduleDate.toDateString() === currentDate.toDateString();
+      });
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      formattedWeekSchedule.push({
+        dayName: currentDate.toLocaleDateString('vi-VN', { weekday: 'short' }),
+        dayNumber: currentDate.getDate(),
+        isToday: currentDate.toDateString() === today.toDateString(),
+        schedules: daySchedules.map(s => ({
+          time: `${s.startTime} - ${s.endTime}`,
+          subject: s.class?.course?.name || s.session?.title || 'N/A',
+          room: s.room?.room_name || 'N/A',
+          className: s.class?.name
+        }))
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Lấy dữ liệu dashboard thành công',
+      data: {
+        studentInfo: {
+          name: student.username,
+          email: student.email,
+          phone: student.phone
+        },
+        weekSchedule: formattedWeekSchedule,
+        assignments,
+        practiceTests,
+        activeClasses: classesWithDetails
+      }
+    });
+    
+    console.log('🎉 [Dashboard] Response gửi thành công với:');
+    console.log(`   - Student: ${student.username}`);
+    console.log(`   - Week schedule: ${formattedWeekSchedule.length} days`);
+    console.log(`   - Assignments: ${assignments.length} items`);
+    console.log(`   - Practice tests: ${practiceTests.length} items`);
+    console.log(`   - Active classes: ${classesWithDetails.length} classes`);
+    
+  } catch (error) {
+    console.error('❌ [Dashboard] Lỗi khi lấy dữ liệu dashboard:', error);
+    console.error('   Stack trace:', error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy dữ liệu dashboard',
+      error: error.message
+    });
+  }
+};
+
+// =========================
 // 📋 LẤY TẤT CẢ HỌC VIÊN (cho Academic Staff/Admin)
 // =========================
 exports.getAllStudents = async (req, res) => {

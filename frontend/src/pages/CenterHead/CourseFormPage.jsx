@@ -1,5 +1,5 @@
-import CenterHeadLayout from '../../components/CenterHead/layout/CenterHeadLayout';
 import CourseForm from '../../components/CenterHead/pages/CourseForm';
+import CenterHeadLayout from '../../components/CenterHead/layout/CenterHeadLayout';
 
 const CourseFormPage = () => {
   return (

@@ -70,6 +70,26 @@ export const classScheduleService = {
     }
   },
 
+  // Validate conflict đơn giản: Kiểm tra conflict với teacher và room (không cần classId)
+  validateScheduleConflictSimple: async (scheduleData) => {
+    try {
+      const response = await api.post('/validate-simple', scheduleData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể validate conflict' };
+    }
+  },
+
+  // Tạo buổi học bù mới (không cần classId)
+  createMakeupClassSchedule: async (scheduleData) => {
+    try {
+      const response = await api.post('/makeup', scheduleData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể tạo buổi học bù' };
+    }
+  },
+
   // Preview: Xem trước khi thêm buổi học (chỉ log, không tạo)
   previewAddClassSchedule: async (scheduleData) => {
     try {

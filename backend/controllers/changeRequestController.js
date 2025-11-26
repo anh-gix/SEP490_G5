@@ -261,46 +261,96 @@ exports.approveChangeRequest = async (req, res) => {
       console.log(`📚 Xử lý ${pendingMakeupClasses.length} buổi học bù cho học sinh ${studentId}`);
       
       for (const makeup of pendingMakeupClasses) {
-        const { absentScheduleId, makeupScheduleId, makeupClassId } = makeup;
+        const { absentScheduleId, makeupScheduleId, makeupClassId, isNewMakeupClass, newMakeupClassData } = makeup;
         
-        if (!absentScheduleId || !makeupScheduleId) {
-          console.warn('⚠️ Thiếu thông tin buổi học bù:', makeup);
+        if (!absentScheduleId) {
+          console.warn('⚠️ Thiếu thông tin buổi nghỉ:', makeup);
           continue;
         }
         
-        // Kiểm tra ClassSchedule có tồn tại không
-        const makeupClassSchedule = await ClassSchedule.findById(makeupScheduleId).session(session);
+        // Kiểm tra ClassSchedule của buổi nghỉ
         const absentClassSchedule = await ClassSchedule.findById(absentScheduleId).session(session);
-        
-        if (!makeupClassSchedule) {
-          console.warn(`⚠️ Không tìm thấy ClassSchedule cho buổi học bù: ${makeupScheduleId}`);
-          continue;
-        }
         
         if (!absentClassSchedule) {
           console.warn(`⚠️ Không tìm thấy ClassSchedule cho buổi nghỉ: ${absentScheduleId}`);
           continue;
         }
         
+        let finalMakeupScheduleId = makeupScheduleId;
+        
+        // Nếu là buổi học bù mới cần tạo ClassSchedule
+        if (isNewMakeupClass && newMakeupClassData) {
+          console.log(`🆕 Tạo ClassSchedule mới cho buổi học bù...`);
+          
+          const { date, startTime, endTime, room, teacher, session: sessionId, reason, createdBy } = newMakeupClassData;
+          
+          if (!date || !startTime || !endTime || !room || !teacher) {
+            console.warn('⚠️ Thiếu thông tin để tạo ClassSchedule mới:', newMakeupClassData);
+            continue;
+          }
+          
+          // Parse date
+          const dateParts = date.split('-');
+          if (dateParts.length !== 3) {
+            console.warn('⚠️ Định dạng ngày không hợp lệ:', date);
+            continue;
+          }
+          
+          const scheduleDate = new Date(
+            parseInt(dateParts[0]),
+            parseInt(dateParts[1]) - 1,
+            parseInt(dateParts[2])
+          );
+          scheduleDate.setHours(0, 0, 0, 0);
+          
+          // Tạo ClassSchedule mới
+          const newMakeupSchedule = await ClassSchedule.create([{
+            class: null,
+            session: sessionId ? new mongoose.Types.ObjectId(sessionId) : null,
+            date: scheduleDate,
+            startTime,
+            endTime,
+            room: new mongoose.Types.ObjectId(room),
+            teacher: new mongoose.Types.ObjectId(teacher),
+            createdBy: createdBy ? new mongoose.Types.ObjectId(createdBy) : new mongoose.Types.ObjectId(teacher),
+            reason: reason || 'Buổi học bù',
+            status: 'temporary'
+          }], { session });
+          
+          finalMakeupScheduleId = newMakeupSchedule[0]._id;
+          console.log(`✅ Đã tạo ClassSchedule mới cho buổi học bù: ${finalMakeupScheduleId}`);
+        } else if (!makeupScheduleId) {
+          console.warn('⚠️ Thiếu makeupScheduleId và không phải buổi học bù mới:', makeup);
+          continue;
+        } else {
+          // Kiểm tra ClassSchedule có tồn tại không (trường hợp chọn buổi có sẵn)
+          const makeupClassSchedule = await ClassSchedule.findById(makeupScheduleId).session(session);
+          
+          if (!makeupClassSchedule) {
+            console.warn(`⚠️ Không tìm thấy ClassSchedule cho buổi học bù: ${makeupScheduleId}`);
+            continue;
+          }
+        }
+        
         // Kiểm tra xem đã có StudentSchedule cho buổi học bù chưa (tránh duplicate)
         const existingMakeupSchedule = await StudentSchedule.findOne({
           student: studentId,
-          classSchedule: makeupScheduleId
+          classSchedule: finalMakeupScheduleId
         }).session(session);
         
         if (!existingMakeupSchedule) {
           // Tạo StudentSchedule mới cho buổi học bù
           const newStudentSchedule = new StudentSchedule({
             student: studentId,
-            classSchedule: makeupScheduleId,
+            classSchedule: finalMakeupScheduleId,
             scheduleStatus: 'rescheduled',
             reason: `Học bù cho buổi nghỉ ngày ${new Date(absentClassSchedule.date).toLocaleDateString('vi-VN')}`
           });
           
           await newStudentSchedule.save({ session });
-          console.log(`✅ Đã tạo StudentSchedule cho buổi học bù: ${makeupScheduleId}`);
+          console.log(`✅ Đã tạo StudentSchedule cho buổi học bù: ${finalMakeupScheduleId}`);
         } else {
-          console.log(`ℹ️ StudentSchedule cho buổi học bù đã tồn tại: ${makeupScheduleId}`);
+          console.log(`ℹ️ StudentSchedule cho buổi học bù đã tồn tại: ${finalMakeupScheduleId}`);
         }
         
         // Cập nhật StudentSchedule của buổi nghỉ thành cancelled
@@ -311,7 +361,7 @@ exports.approveChangeRequest = async (req, res) => {
         
         if (absentStudentSchedule) {
           absentStudentSchedule.scheduleStatus = 'cancelled';
-          absentStudentSchedule.reason = `Học bù tại lớp khác (${makeupClassId})`;
+          absentStudentSchedule.reason = `Học bù tại lớp khác${makeupClassId ? ` (${makeupClassId})` : ''}`;
           await absentStudentSchedule.save({ session });
           console.log(`✅ Đã cập nhật StudentSchedule buổi nghỉ thành cancelled: ${absentScheduleId}`);
         } else {

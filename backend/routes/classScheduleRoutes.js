@@ -15,8 +15,14 @@ router.get("/class/:classId/schedules", classScheduleController.getSchedulesByCl
 // ✅ Validate: Kiểm tra conflict trước khi thêm buổi học
 router.post("/validate", classScheduleController.validateAddClassSchedule);
 
+// ✅ Validate: Kiểm tra conflict đơn giản (không cần classId)
+router.post("/validate-simple", classScheduleController.validateScheduleConflictSimple);
+
 // ✅ Validate học bù: Kiểm tra conflict với buổi học của học sinh
 router.post("/validate-makeup", classScheduleController.validateMakeupClassSchedule);
+
+// ✅ Tạo buổi học bù mới (không cần classId)
+router.post("/makeup", classScheduleController.createMakeupClassSchedule);
 
 // ✅ Preview: Xem trước khi thêm buổi học (chỉ log, không tạo)
 router.post("/preview", classScheduleController.previewAddClassSchedule);

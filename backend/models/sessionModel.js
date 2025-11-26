@@ -16,6 +16,7 @@ const sessionSchema = new Schema({
     },
     learningType: {
         type: String,
+        enum: ['theory', 'mocktest'],
         default: 'theory'
     },
 

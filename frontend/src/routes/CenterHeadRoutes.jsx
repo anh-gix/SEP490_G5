@@ -21,7 +21,7 @@ import ReportsOverviewPage from "../pages/CenterHead/ReportsOverviewPage.jsx";
 /**
  * CenterHeadRoutes
  *
- * Tất cả routes cho Center Head
+ * Routes cho Center Head với luồng tạo program hoàn chỉnh
  */
 export const centerHeadRoutes = [
   // Dashboard
@@ -35,13 +35,19 @@ export const centerHeadRoutes = [
 
   // II. Program & Course Management
   { path: '/center-head/programs', element: <ProgramListPage /> },
+
+  // Tạo/Sửa Program (với PLO, Course, CLO, Session)
   { path: '/center-head/programs/create', element: <ProgramFormPage /> },
-  { path: '/center-head/programs/:id', element: <ProgramDetailPage /> },
   { path: '/center-head/programs/:id/edit', element: <ProgramFormPage /> },
-  { path: '/center-head/programs/:id/courses/create', element: <CourseFormPage /> },
+
+  // Tạo/Sửa Course trong Program
+  { path: '/center-head/programs/:programId/courses/create', element: <CourseFormPage /> },
+  { path: '/center-head/programs/:programId/courses/:courseId/edit', element: <CourseFormPage /> },
+
+  // Program Detail & Course Management
+  { path: '/center-head/programs/:id', element: <ProgramDetailPage /> },
   { path: '/center-head/courses/pending', element: <PendingCoursesPage /> },
   { path: '/center-head/courses/:id/details', element: <CourseDetailPage /> },
-  { path: '/center-head/courses/:id/edit', element: <CourseFormPage /> },
 
   // III. Class & Schedule Management
   { path: '/center-head/classes', element: <ClassListPage /> },

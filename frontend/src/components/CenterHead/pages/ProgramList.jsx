@@ -31,18 +31,121 @@ const ProgramList = () => {
   const fetchPrograms = async () => {
     try {
       setLoading(true);
-      const response = await programService.getAllPrograms();
 
-      if (response.success) {
-        setPrograms(response.data || []);
-        if (response.stats) {
-          setStats(response.stats);
+      // TODO: Replace with actual API call when backend is ready
+      // const response = await programService.getAllPrograms();
+
+      // Mock data for development
+      const mockPrograms = [
+        {
+          _id: 'prog1',
+          code: 'IELTS-B2',
+          program_name: 'IELTS Intermediate Program',
+          description: 'Chương trình IELTS trình độ trung cấp',
+          type: 'ielts',
+          level: 'B2',
+          band: '5.5-6.5',
+          tuitionFee: 5000000,
+          status: 'active',
+          plos: [
+            { _id: 'plo1', code: 'PLO1', name: 'Listening Skills' },
+            { _id: 'plo2', code: 'PLO2', name: 'Reading Comprehension' },
+            { _id: 'plo3', code: 'PLO3', name: 'Writing Skills' },
+            { _id: 'plo4', code: 'PLO4', name: 'Speaking Fluency' }
+          ],
+          courseCount: 2,
+          updatedAt: new Date('2025-01-15')
+        },
+        {
+          _id: 'prog2',
+          code: 'IELTS-C1',
+          program_name: 'IELTS Advanced Program',
+          description: 'Chương trình IELTS nâng cao',
+          type: 'ielts',
+          level: 'C1',
+          band: '7.0-8.0',
+          tuitionFee: 7000000,
+          status: 'active',
+          plos: [
+            { _id: 'plo5', code: 'PLO1', name: 'Advanced Listening' },
+            { _id: 'plo6', code: 'PLO2', name: 'Critical Reading' },
+            { _id: 'plo7', code: 'PLO3', name: 'Academic Writing' }
+          ],
+          courseCount: 3,
+          updatedAt: new Date('2025-01-20')
+        },
+        {
+          _id: 'prog3',
+          code: 'TOEIC-B1',
+          program_name: 'TOEIC Basic Program',
+          description: 'Chương trình TOEIC cơ bản',
+          type: 'toeic',
+          level: 'B1',
+          band: '550-700',
+          tuitionFee: 4000000,
+          status: 'draft',
+          plos: [
+            { _id: 'plo8', code: 'PLO1', name: 'Business Listening' },
+            { _id: 'plo9', code: 'PLO2', name: 'Business Reading' }
+          ],
+          courseCount: 1,
+          updatedAt: new Date('2025-01-10')
         }
-      }
+      ];
+
+      setPrograms(mockPrograms);
+
+      // Calculate stats from mock data
+      const calculatedStats = {
+        total: mockPrograms.length,
+        active: mockPrograms.filter(p => p.status === 'active').length,
+        draft: mockPrograms.filter(p => p.status === 'draft').length,
+        archived: mockPrograms.filter(p => p.status === 'archived').length
+      };
+      setStats(calculatedStats);
+
+      console.log('Mock programs loaded:', mockPrograms);
     } catch (err) {
       console.error('Error fetching programs:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (programId) => {
+    const program = programs.find(p => p._id === programId);
+    if (!program) return;
+
+    const confirmed = window.confirm(
+      `Bạn có chắc chắn muốn xóa chương trình "${program.program_name}" (${program.code})?\n\nHành động này không thể hoàn tác.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      // TODO: Replace with actual API call when backend is ready
+      // await programService.deleteProgram(programId);
+
+      // Mock deletion
+      console.log(`Deleting program: ${programId}`);
+
+      // Remove from local state
+      const updatedPrograms = programs.filter(p => p._id !== programId);
+      setPrograms(updatedPrograms);
+
+      // Recalculate stats
+      const calculatedStats = {
+        total: updatedPrograms.length,
+        active: updatedPrograms.filter(p => p.status === 'active').length,
+        draft: updatedPrograms.filter(p => p.status === 'draft').length,
+        archived: updatedPrograms.filter(p => p.status === 'archived').length
+      };
+      setStats(calculatedStats);
+
+      alert('Xóa chương trình thành công!');
+    } catch (err) {
+      console.error('Error deleting program:', err);
+      alert('Có lỗi xảy ra khi xóa chương trình.');
     }
   };
 
@@ -138,6 +241,12 @@ const ProgramList = () => {
               label: "Xem PLOs",
               icon: "ph ph-list-bullets",
               onClick: () => navigate(`/center-head/programs/${row._id}/plos`)
+            },
+            {
+              label: "Xóa",
+              icon: "ph ph-trash",
+              onClick: () => handleDelete(row._id),
+              variant: "danger"
             },
           ]}
         />

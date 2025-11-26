@@ -2,6 +2,13 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const courseSchema = new Schema({
+    // Mã môn học (VD: "ACC101", "IELTS-6.5", "SE301")
+    subjectCode: {
+        type: String,
+        required: true,
+        trim: true,
+        uppercase: true
+    },
     name: {
         type: String,
         required: true,
@@ -14,6 +21,25 @@ const courseSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'Program',
         required: true
+    },
+    //Số lượng buổi dạy trong 1 course
+    numberOfSessions: {
+        type: Number,
+    },
+    // Phân bổ thời gian (VD: "Study hour (150h) = 45h (60 sessions) contact hours + 1h final exam + 104h self-study")
+    timeAllocation: {
+        type: String,
+        trim: true
+    },
+    // Yêu cầu tiên quyết (VD: "Hoàn thành IELTS 5.5", "None")
+    preRequisite: {
+        type: String,
+        trim: true,
+        default: 'None'
+    },
+    // Nhiệm vụ của sinh viên
+    studentTasks: {
+        type: String
     },
     clos: [{
         type: Schema.Types.ObjectId,
@@ -32,9 +58,38 @@ const courseSchema = new Schema({
         ref: 'User',
         required: true
     },
-        // Tài liệu cho course (mảng các URL)
+    // Tài liệu cho course
     materials: [{
-        type: String
+        description: {
+            type: String,
+            required: true,
+            trim: true
+        },
+        author: {
+            type: String,
+            trim: true
+        },
+        publisher: {
+            type: String,
+            trim: true
+        },
+        publishedDate: {
+            type: String,
+            trim: true
+            //ngày phát hành
+        },
+        onlineUrl: {
+            type: String,
+            trim: true
+        },
+        documentUpload:{
+            type: String,
+            trim: true
+        },
+        note: {
+            type: String,
+            trim: true
+        }
     }],
     // Session nào là mocktest (theo order)
     // VD: [5, 10] nghĩa là session order 5 và 10 là mocktest

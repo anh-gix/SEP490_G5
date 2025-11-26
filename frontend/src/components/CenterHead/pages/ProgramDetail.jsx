@@ -29,13 +29,150 @@ const ProgramDetail = () => {
     try {
       setLoading(true);
 
-      // Fetch program data with courses
-      const response = await programService.getProgramById(id);
+      // TODO: Replace with actual API call when backend is ready
+      // const response = await programService.getProgramById(id);
 
-      if (response.success) {
-        const programData = response.data;
-        // console.log(programData);
-        
+      // Mock data based on program ID
+      const mockPrograms = {
+        'prog1': {
+          _id: 'prog1',
+          code: 'IELTS-B2',
+          program_name: 'IELTS Intermediate Program',
+          description: 'Chương trình IELTS trình độ trung cấp',
+          type: 'ielts',
+          level: 'B2',
+          band: '5.5-6.5',
+          tuitionFee: 5000000,
+          status: 'active',
+          plos: [
+            { _id: 'plo1', code: 'PLO1', name: 'Listening Skills', description: 'Hiểu và phản ứng với các đoạn hội thoại tiếng Anh' },
+            { _id: 'plo2', code: 'PLO2', name: 'Reading Comprehension', description: 'Đọc hiểu các văn bản học thuật và thông tin' },
+            { _id: 'plo3', code: 'PLO3', name: 'Writing Skills', description: 'Viết các bài luận và báo cáo tiếng Anh' },
+            { _id: 'plo4', code: 'PLO4', name: 'Speaking Fluency', description: 'Giao tiếp lưu loát và tự tin bằng tiếng Anh' }
+          ],
+          courses: [
+            {
+              _id: 'course1',
+              subjectCode: 'IELTS-B2-RW',
+              name: 'IELTS Reading & Writing',
+              description: 'Khóa học tập trung vào kỹ năng Reading và Writing',
+              status: 'approved',
+              updatedAt: new Date('2025-01-15'),
+              clos: [
+                {
+                  _id: 'clo1',
+                  code: 'CLO1',
+                  name: 'Reading Strategies',
+                  description: 'Áp dụng các chiến lược đọc hiệu quả cho IELTS Reading',
+                  detail: 'Áp dụng các chiến lược đọc hiệu quả cho IELTS Reading',
+                  mappedPLOs: [
+                    { _id: 'plo2', code: 'PLO2', name: 'Reading Comprehension' }
+                  ]
+                },
+                {
+                  _id: 'clo2',
+                  code: 'CLO2',
+                  name: 'Writing Task 1',
+                  description: 'Viết Writing Task 1 đạt band 6.0+',
+                  detail: 'Viết Writing Task 1 đạt band 6.0+',
+                  mappedPLOs: [
+                    { _id: 'plo3', code: 'PLO3', name: 'Writing Skills' }
+                  ]
+                },
+                {
+                  _id: 'clo3',
+                  code: 'CLO3',
+                  name: 'Writing Task 2',
+                  description: 'Viết Writing Task 2 đạt band 6.0+',
+                  detail: 'Viết Writing Task 2 đạt band 6.0+',
+                  mappedPLOs: [
+                    { _id: 'plo3', code: 'PLO3', name: 'Writing Skills' }
+                  ]
+                }
+              ],
+              sessions: [
+                { _id: 's1', title: 'Week 1', order: 1 },
+                { _id: 's2', title: 'Week 2', order: 2 },
+                { _id: 's3', title: 'Week 3', order: 3 }
+              ]
+            },
+            {
+              _id: 'course2',
+              subjectCode: 'IELTS-B2-LS',
+              name: 'IELTS Listening & Speaking',
+              description: 'Khóa học tập trung vào kỹ năng Listening và Speaking',
+              status: 'approved',
+              updatedAt: new Date('2025-01-20'),
+              clos: [
+                {
+                  _id: 'clo4',
+                  code: 'CLO4',
+                  name: 'Listening Comprehension',
+                  description: 'Nghe hiểu các đoạn hội thoại và bài giảng',
+                  detail: 'Nghe hiểu các đoạn hội thoại và bài giảng',
+                  mappedPLOs: [
+                    { _id: 'plo1', code: 'PLO1', name: 'Listening Skills' }
+                  ]
+                },
+                {
+                  _id: 'clo5',
+                  code: 'CLO5',
+                  name: 'Speaking Fluency',
+                  description: 'Nói lưu loát trong các tình huống giao tiếp',
+                  detail: 'Nói lưu loát trong các tình huống giao tiếp',
+                  mappedPLOs: [
+                    { _id: 'plo4', code: 'PLO4', name: 'Speaking Fluency' }
+                  ]
+                }
+              ],
+              sessions: [
+                { _id: 's4', title: 'Week 1', order: 1 },
+                { _id: 's5', title: 'Week 2', order: 2 }
+              ]
+            }
+          ],
+          updatedAt: new Date('2025-01-15')
+        },
+        'prog2': {
+          _id: 'prog2',
+          code: 'IELTS-C1',
+          program_name: 'IELTS Advanced Program',
+          description: 'Chương trình IELTS nâng cao',
+          type: 'ielts',
+          level: 'C1',
+          band: '7.0-8.0',
+          tuitionFee: 7000000,
+          status: 'active',
+          plos: [
+            { _id: 'plo5', code: 'PLO1', name: 'Advanced Listening', description: 'Nghe hiểu nâng cao các bài giảng phức tạp' },
+            { _id: 'plo6', code: 'PLO2', name: 'Critical Reading', description: 'Đọc và phân tích văn bản học thuật' },
+            { _id: 'plo7', code: 'PLO3', name: 'Academic Writing', description: 'Viết luận văn học thuật chuyên nghiệp' }
+          ],
+          courses: [],
+          updatedAt: new Date('2025-01-20')
+        },
+        'prog3': {
+          _id: 'prog3',
+          code: 'TOEIC-B1',
+          program_name: 'TOEIC Basic Program',
+          description: 'Chương trình TOEIC cơ bản',
+          type: 'toeic',
+          level: 'B1',
+          band: '550-700',
+          tuitionFee: 4000000,
+          status: 'draft',
+          plos: [
+            { _id: 'plo8', code: 'PLO1', name: 'Business Listening', description: 'Nghe hiểu trong môi trường kinh doanh' },
+            { _id: 'plo9', code: 'PLO2', name: 'Business Reading', description: 'Đọc hiểu tài liệu kinh doanh' }
+          ],
+          courses: [],
+          updatedAt: new Date('2025-01-10')
+        }
+      };
+
+      const programData = mockPrograms[id];
+
+      if (programData) {
         setProgram(programData);
 
         // Courses are included in the program response
@@ -59,6 +196,8 @@ const ProgramDetail = () => {
           }
         });
         setCloMapping(cloMappingData);
+
+        console.log('Mock program detail loaded:', programData);
       }
 
     } catch (err) {

@@ -3,11 +3,12 @@ const Schema = mongoose.Schema;
 
 const courseSchema = new Schema({
     // Mã môn học (VD: "ACC101", "IELTS-6.5", "SE301")
-    subjectCode: {
+    courseCode: {
         type: String,
         required: true,
         trim: true,
-        uppercase: true
+        uppercase: true,
+        unique: true
     },
     name: {
         type: String,

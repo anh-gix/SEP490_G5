@@ -62,6 +62,7 @@ const RequestManagementPage = () => {
   const [conflictInfo, setConflictInfo] = useState(null); // Lưu thông tin conflict để hiển thị trong modal
   const [pendingMakeupData, setPendingMakeupData] = useState(null); // Lưu dữ liệu makeup đang chờ xác nhận khi có conflict
   const [validatingConflict, setValidatingConflict] = useState(false); // Trạng thái đang validate conflict
+  const [newClassSchedule, setNewClassSchedule] = useState([]); // Lưu lịch học của lớp mới khi có đổi lớp
 
   useEffect(() => {
     fetchChangeRequests();
@@ -1047,7 +1048,11 @@ const RequestManagementPage = () => {
         }
         
         // Kiểm tra conflict với lịch học của sinh viên
-        if (checkScheduleConflict(schedule, senderSchedule, selectedCurrentScheduleId)) {
+        // Nếu có đổi lớp, check với lịch lớp mới; nếu không, check với lịch hiện tại
+        const scheduleToCheck = pendingClassChange && pendingClassChange.newClassId 
+          ? newClassSchedule 
+          : senderSchedule;
+        if (checkScheduleConflict(schedule, scheduleToCheck, selectedCurrentScheduleId)) {
           return false;
         }
         
@@ -1058,7 +1063,7 @@ const RequestManagementPage = () => {
     });
     
     return classesWithValidSchedules;
-  }, [selectedCurrentScheduleId, availableMakeupClassesWithSchedules, selectedCurrentClassInfo, availableMakeupClasses, senderSchedule, pendingMakeupClasses]);
+  }, [selectedCurrentScheduleId, availableMakeupClassesWithSchedules, selectedCurrentClassInfo, availableMakeupClasses, senderSchedule, pendingMakeupClasses, pendingClassChange, newClassSchedule]);
 
   // Tự động load dữ liệu khi mở modal "Thêm buổi học bù"
   useEffect(() => {
@@ -1069,6 +1074,46 @@ const RequestManagementPage = () => {
       setSelectedCurrentClassId(firstClass.classId);
     }
   }, [showMakeupClassModal, studentClasses, makeupClassOption]);
+
+  // Load lịch lớp mới khi có đổi lớp
+  useEffect(() => {
+    const loadNewClassSchedule = async () => {
+      if (!pendingClassChange || !pendingClassChange.newClassId) {
+        setNewClassSchedule([]);
+        return;
+      }
+
+      try {
+        const response = await classService.getClassById(pendingClassChange.newClassId);
+        if (response.success && response.class) {
+          const schedules = response.class.schedules || [];
+          // Chuyển đổi format lịch từ class.schedules sang format tương thích với checkScheduleConflict
+          const formattedSchedules = schedules
+            .filter(sch => sch.status === 'fixed' || sch.status === 'temporary')
+            .map(sch => ({
+              _id: sch._id || sch.id,
+              date: sch.date,
+              startTime: sch.startTime,
+              endTime: sch.endTime,
+              class: {
+                _id: response.class._id,
+                name: response.class.name
+              },
+              room: sch.room,
+              session: sch.session
+            }));
+          setNewClassSchedule(formattedSchedules);
+        } else {
+          setNewClassSchedule([]);
+        }
+      } catch (err) {
+        console.error('Error loading new class schedule:', err);
+        setNewClassSchedule([]);
+      }
+    };
+
+    loadNewClassSchedule();
+  }, [pendingClassChange]);
 
   // Hàm để mở modal chi tiết khi chấp nhận
   const handleApproveClick = async (request) => {
@@ -1991,7 +2036,11 @@ const RequestManagementPage = () => {
                                         }
                                         
                                         // Kiểm tra conflict với lịch học của sinh viên
-                                        if (checkScheduleConflict(schedule, senderSchedule, selectedCurrentScheduleId)) {
+                                        // Nếu có đổi lớp, check với lịch lớp mới; nếu không, check với lịch hiện tại
+                                        const scheduleToCheck = pendingClassChange && pendingClassChange.newClassId 
+                                          ? newClassSchedule 
+                                          : senderSchedule;
+                                        if (checkScheduleConflict(schedule, scheduleToCheck, selectedCurrentScheduleId)) {
                                           return false;
                                         }
                                         
@@ -3368,10 +3417,14 @@ const RequestManagementPage = () => {
                                           }
                                           
                                           // Kiểm tra conflict với lịch học của sinh viên
-                                          if (checkScheduleConflict(schedule, senderSchedule, selectedCurrentScheduleId)) {
+                                          // Nếu có đổi lớp, check với lịch lớp mới; nếu không, check với lịch hiện tại
+                                          const scheduleToCheck = pendingClassChange && pendingClassChange.newClassId 
+                                            ? newClassSchedule 
+                                            : senderSchedule;
+                                          if (checkScheduleConflict(schedule, scheduleToCheck, selectedCurrentScheduleId)) {
                                             return false;
                                           }
-                                          
+
                                           return true;
                                         })
                                       : [];

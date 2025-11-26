@@ -320,10 +320,315 @@ exports.approveChangeRequest = async (req, res) => {
       }
     }
     
-    // Xử lý đổi lớp nếu có (có thể triển khai sau)
+    // Xử lý đổi lớp nếu có
     if (pendingClassChange) {
-      console.log('ℹ️ Yêu cầu đổi lớp được ghi nhận nhưng chưa được xử lý tự động');
-      // TODO: Implement class change logic if needed
+      console.log('🔄 Bắt đầu xử lý đổi lớp...');
+      
+      const { oldClassId, newClassId } = pendingClassChange;
+      
+      // 1. Validate dữ liệu
+      if (!oldClassId || !newClassId) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          success: false,
+          message: 'Thiếu thông tin lớp cũ hoặc lớp mới'
+        });
+      }
+      
+      // Kiểm tra lớp cũ và lớp mới có tồn tại
+      const oldClass = await Class.findById(oldClassId).session(session);
+      const newClass = await Class.findById(newClassId).session(session);
+      
+      if (!oldClass) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy lớp cũ'
+        });
+      }
+      
+      if (!newClass) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy lớp mới'
+        });
+      }
+      
+      // Kiểm tra học viên có trong lớp cũ không
+      const studentInOldClass = oldClass.students.some(
+        id => id.toString() === studentId.toString()
+      );
+      
+      if (!studentInOldClass) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          success: false,
+          message: 'Học viên không có trong lớp cũ'
+        });
+      }
+      
+      // Kiểm tra lớp mới còn chỗ không (nếu có maxStudents)
+      if (newClass.maxStudents) {
+        const currentStudentCount = newClass.students ? newClass.students.length : 0;
+        if (currentStudentCount >= newClass.maxStudents) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({
+            success: false,
+            message: 'Lớp mới đã đầy'
+          });
+        }
+      }
+      
+      // 2. Lấy session order hiện tại của lớp cũ và lớp mới
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Tìm ClassSchedule gần nhất (date >= today) của lớp cũ
+      const oldClassSchedules = await ClassSchedule.find({
+        class: oldClassId,
+        date: { $gte: today }
+      })
+        .populate('session', 'order')
+        .sort({ date: 1, startTime: 1 })
+        .limit(1)
+        .session(session)
+        .lean();
+      
+      // Tìm ClassSchedule gần nhất (date >= today) của lớp mới
+      const newClassSchedules = await ClassSchedule.find({
+        class: newClassId,
+        date: { $gte: today }
+      })
+        .populate('session', 'order')
+        .sort({ date: 1, startTime: 1 })
+        .limit(1)
+        .session(session)
+        .lean();
+      
+      const oldClassSessionOrder = oldClassSchedules.length > 0 && oldClassSchedules[0].session
+        ? oldClassSchedules[0].session.order
+        : null;
+      const newClassSessionOrder = newClassSchedules.length > 0 && newClassSchedules[0].session
+        ? newClassSchedules[0].session.order
+        : null;
+      
+      console.log(`📊 Session order - Lớp cũ: ${oldClassSessionOrder}, Lớp mới: ${newClassSessionOrder}`);
+      
+      // Xác định trường hợp
+      let caseType = 1; // Mặc định là trường hợp 1
+      if (oldClassSessionOrder !== null && newClassSessionOrder !== null) {
+        if (oldClassSessionOrder < newClassSessionOrder) {
+          caseType = 2; // Lớp cũ < lớp mới
+        } else if (oldClassSessionOrder > newClassSessionOrder) {
+          caseType = 3; // Lớp cũ > lớp mới
+        }
+      }
+      
+      console.log(`🔍 Trường hợp xử lý: ${caseType}`);
+      
+      // 3. Xử lý Class model
+      // Xóa học viên khỏi lớp cũ
+      oldClass.students = oldClass.students.filter(
+        id => id.toString() !== studentId.toString()
+      );
+      await oldClass.save({ session });
+      console.log(`✅ Đã xóa học viên khỏi lớp cũ: ${oldClassId}`);
+      
+      // Thêm học viên vào lớp mới (nếu chưa có)
+      const studentInNewClass = newClass.students.some(
+        id => id.toString() === studentId.toString()
+      );
+      if (!studentInNewClass) {
+        newClass.students.push(studentId);
+        await newClass.save({ session });
+        console.log(`✅ Đã thêm học viên vào lớp mới: ${newClassId}`);
+      }
+      
+      // 4. Xử lý StudentSchedule
+      // a) Lấy tất cả ClassSchedule của lớp cũ
+      const allOldClassSchedules = await ClassSchedule.find({
+        class: oldClassId
+      })
+        .populate('session', 'order')
+        .session(session)
+        .lean();
+      
+      const oldClassScheduleIds = allOldClassSchedules.map(s => s._id);
+      
+      // b) Lấy tất cả StudentSchedule của học viên ở lớp cũ
+      const studentSchedules = await StudentSchedule.find({
+        student: studentId,
+        classSchedule: { $in: oldClassScheduleIds }
+      })
+        .populate({
+          path: 'classSchedule',
+          populate: {
+            path: 'session',
+            select: 'order'
+          }
+        })
+        .session(session)
+        .lean();
+      
+      console.log(`📋 Tìm thấy ${studentSchedules.length} StudentSchedule của học viên ở lớp cũ`);
+      
+      // c) Lấy tất cả ClassSchedule của lớp mới để match
+      const allNewClassSchedules = await ClassSchedule.find({
+        class: newClassId
+      })
+        .populate('session', 'order')
+        .session(session)
+        .lean();
+      
+      // Tạo map để tìm ClassSchedule theo session order
+      const newClassScheduleMap = new Map();
+      allNewClassSchedules.forEach(schedule => {
+        if (schedule.session && schedule.session.order !== null && schedule.session.order !== undefined) {
+          const order = schedule.session.order;
+          if (!newClassScheduleMap.has(order)) {
+            newClassScheduleMap.set(order, []);
+          }
+          newClassScheduleMap.get(order).push(schedule);
+        }
+      });
+      
+      // Tạo set các absentScheduleId đã được xử lý trong pendingMakeupClasses (đã cancel riêng)
+      const processedAbsentScheduleIds = new Set();
+      if (pendingMakeupClasses && Array.isArray(pendingMakeupClasses)) {
+        pendingMakeupClasses.forEach(makeup => {
+          if (makeup.absentScheduleId) {
+            processedAbsentScheduleIds.add(makeup.absentScheduleId.toString());
+          }
+        });
+      }
+      console.log(`📋 Đã xử lý ${processedAbsentScheduleIds.size} buổi học bù, các buổi này sẽ không bị cancel lại`);
+      
+      // d) Xử lý từng StudentSchedule
+      let updatedCount = 0;
+      let cancelledCount = 0;
+      let unchangedCount = 0;
+      
+      for (const studentSchedule of studentSchedules) {
+        const classSchedule = studentSchedule.classSchedule;
+        if (!classSchedule) continue;
+        
+        const sessionOrder = classSchedule.session?.order;
+        const hasAttendance = studentSchedule.attendance && studentSchedule.attendance.status !== null;
+        const classScheduleId = classSchedule._id?.toString() || classSchedule.toString();
+        
+        // Kiểm tra buổi học đã diễn ra chưa (date < today)
+        const scheduleDate = new Date(classSchedule.date);
+        scheduleDate.setHours(0, 0, 0, 0);
+        const isPastSchedule = scheduleDate < today;
+        
+        // Nếu đã có điểm danh hoặc đã diễn ra, giữ nguyên
+        if (hasAttendance || isPastSchedule) {
+          unchangedCount++;
+          console.log(`⏭️ Giữ nguyên StudentSchedule ${studentSchedule._id} (${hasAttendance ? 'đã có điểm danh' : 'đã diễn ra'})`);
+          continue;
+        }
+        
+        // Nếu buổi học này đã được xử lý trong pendingMakeupClasses (đã cancel riêng), bỏ qua
+        if (processedAbsentScheduleIds.has(classScheduleId)) {
+          unchangedCount++;
+          console.log(`⏭️ Giữ nguyên StudentSchedule ${studentSchedule._id} (đã được xử lý trong buổi học bù)`);
+          continue;
+        }
+        
+        // Xử lý theo từng trường hợp
+        if (caseType === 1) {
+          // Trường hợp 1: session order bằng nhau
+          if (sessionOrder !== null && sessionOrder !== undefined) {
+            const matchingSchedules = newClassScheduleMap.get(sessionOrder);
+            if (matchingSchedules && matchingSchedules.length > 0) {
+              // Lấy ClassSchedule đầu tiên có cùng session order
+              const newClassScheduleId = matchingSchedules[0]._id;
+              await StudentSchedule.findByIdAndUpdate(
+                studentSchedule._id,
+                { classSchedule: newClassScheduleId },
+                { session }
+              );
+              updatedCount++;
+              console.log(`✅ Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
+            }
+          }
+        } else if (caseType === 2) {
+          // Trường hợp 2: lớp cũ < lớp mới
+          // Khi có học bù, chỉ cancel những buổi được chọn để học bù
+          // Các buổi khác có sessionOrder < newClassSessionOrder sẽ được giữ nguyên
+          // vì học viên đã học ở lớp cũ rồi, không cần cancel
+          if (sessionOrder !== null && sessionOrder !== undefined) {
+            if (sessionOrder < newClassSessionOrder) {
+              // Nếu có pendingMakeupClasses, chỉ cancel những buổi trong danh sách học bù
+              // Các buổi khác giữ nguyên (học viên đã học rồi)
+              if (pendingMakeupClasses && pendingMakeupClasses.length > 0) {
+                // Đã được xử lý ở trên (processedAbsentScheduleIds), nên đến đây là các buổi không cần cancel
+                unchangedCount++;
+                console.log(`⏭️ Giữ nguyên StudentSchedule ${studentSchedule._id} (session ${sessionOrder} < ${newClassSessionOrder}, không nằm trong danh sách học bù)`);
+              } else {
+                // Không có học bù, cancel tất cả buổi có sessionOrder < newClassSessionOrder
+                await StudentSchedule.findByIdAndUpdate(
+                  studentSchedule._id,
+                  {
+                    scheduleStatus: 'cancelled',
+                    reason: 'Đã đổi lớp'
+                  },
+                  { session }
+                );
+                cancelledCount++;
+                console.log(`🚫 Cancelled StudentSchedule ${studentSchedule._id} (session ${sessionOrder} < ${newClassSessionOrder}, date: ${scheduleDate.toISOString().split('T')[0]})`);
+              }
+            } else if (sessionOrder >= newClassSessionOrder) {
+              // Session order >= lớp mới: update classSchedule
+              const matchingSchedules = newClassScheduleMap.get(sessionOrder);
+              if (matchingSchedules && matchingSchedules.length > 0) {
+                const newClassScheduleId = matchingSchedules[0]._id;
+                await StudentSchedule.findByIdAndUpdate(
+                  studentSchedule._id,
+                  { classSchedule: newClassScheduleId },
+                  { session }
+                );
+                updatedCount++;
+                console.log(`✅ Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
+              }
+            }
+          }
+        } else if (caseType === 3) {
+          // Trường hợp 3: lớp cũ > lớp mới
+          if (sessionOrder !== null && sessionOrder !== undefined) {
+            if (sessionOrder < oldClassSessionOrder) {
+              // Session order < lớp cũ: không thay đổi gì
+              unchangedCount++;
+              console.log(`⏭️ Giữ nguyên StudentSchedule ${studentSchedule._id} (session ${sessionOrder} < ${oldClassSessionOrder})`);
+            } else if (sessionOrder >= oldClassSessionOrder) {
+              // Session order >= lớp cũ: update classSchedule
+              const matchingSchedules = newClassScheduleMap.get(sessionOrder);
+              if (matchingSchedules && matchingSchedules.length > 0) {
+                const newClassScheduleId = matchingSchedules[0]._id;
+                await StudentSchedule.findByIdAndUpdate(
+                  studentSchedule._id,
+                  { classSchedule: newClassScheduleId },
+                  { session }
+                );
+                updatedCount++;
+                console.log(`✅ Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
+              }
+            }
+          }
+        }
+      }
+      
+      console.log(`📊 Kết quả xử lý StudentSchedule:`);
+      console.log(`   - Updated: ${updatedCount}`);
+      console.log(`   - Cancelled: ${cancelledCount}`);
+      console.log(`   - Unchanged: ${unchangedCount}`);
+      console.log(`✅ Hoàn thành xử lý đổi lớp`);
     }
     
     // Cập nhật trạng thái đơn sử dụng findByIdAndUpdate để tránh lỗi validation

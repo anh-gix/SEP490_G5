@@ -1352,16 +1352,18 @@ exports.getStudentSchedulesByClassSchedules = async (req, res) => {
 exports.getStudentSchedule = async (req, res) => {
   try {
     const { studentId } = req.params;
+    const Class = require("../models/classModel");
+    const Course = require("../models/courseModel");
 
     // Tìm tất cả StudentSchedule của học sinh và populate các thông tin cần thiết
     const studentSchedules = await StudentSchedule.find({ student: studentId })
       .populate({
         path: "classSchedule",
-        select: "date startTime endTime room class topic",
+        select: "date startTime endTime room class topic session status",
         populate: [
           {
             path: "class",
-            select: "name subject teacherId",
+            select: "name subject teacherId course",
             populate: {
               path: "teacherId",
               select: "username email",
@@ -1370,6 +1372,10 @@ exports.getStudentSchedule = async (req, res) => {
           {
             path: "room",
             select: "room_name location",
+          },
+          {
+            path: "session",
+            select: "title order",
           },
         ],
       })
@@ -1396,40 +1402,106 @@ exports.getStudentSchedule = async (req, res) => {
       });
     }
 
+    // Nhóm schedules theo class để lấy course sessions một lần
+    const classSessionsMap = {};
+    
     // Format dữ liệu để trả về đúng định dạng yêu cầu
-    const formattedSchedules = studentSchedules
-      .filter((ss) => ss.classSchedule) // Lọc những schedule hợp lệ
-      .map((ss) => {
-        const classSchedule = ss.classSchedule;
-        const classInfo = classSchedule.class;
-        const teacher = classInfo?.teacherId;
-        const room = classSchedule.room;
+    const formattedSchedules = await Promise.all(
+      studentSchedules
+        .filter((ss) => ss.classSchedule) // Lọc những schedule hợp lệ
+        .map(async (ss) => {
+          const classSchedule = ss.classSchedule;
+          const classInfo = classSchedule.class;
+          const teacher = classInfo?.teacherId;
+          const room = classSchedule.room;
 
-        return {
-          _id: ss._id,
-          startTime: classSchedule.startTime,
-          endTime: classSchedule.endTime,
-          className: classInfo?.name || "N/A",
-          subject: classInfo?.subject || "N/A",
-          teacher: teacher
-            ? {
-                _id: teacher._id,
-                username: teacher.username,
-                email: teacher.email,
+          // Nếu không có session, thử lấy từ course
+          let sessionTitle = classSchedule.session?.title;
+          if (!sessionTitle && classInfo?.course) {
+            const classId = classInfo._id?.toString();
+            
+            // Lấy course sessions nếu chưa có trong map
+            if (!classSessionsMap[classId]) {
+              try {
+                const classData = await Class.findById(classId)
+                  .populate({
+                    path: "course",
+                    select: "sessions",
+                    populate: {
+                      path: "sessions",
+                      select: "title order",
+                    },
+                  })
+                  .lean();
+                
+                if (classData?.course?.sessions) {
+                  const courseSessions = [...classData.course.sessions].sort(
+                    (a, b) => (a.order || 0) - (b.order || 0)
+                  );
+                  
+                  // Lấy tất cả ClassSchedule của lớp này để xác định thứ tự
+                  const ClassSchedule = require("../models/classScheduleModel");
+                  const allClassSchedules = await ClassSchedule.find({ class: classId })
+                    .sort({ date: 1, startTime: 1 })
+                    .lean();
+                  
+                  // Tìm index của schedule hiện tại
+                  const scheduleIndex = allClassSchedules.findIndex(
+                    (s) => s._id.toString() === classSchedule._id.toString()
+                  );
+                  
+                  if (scheduleIndex >= 0 && courseSessions.length > 0) {
+                    const sessionIndex = scheduleIndex % courseSessions.length;
+                    sessionTitle = courseSessions[sessionIndex]?.title;
+                  }
+                  
+                  classSessionsMap[classId] = { courseSessions, allClassSchedules };
+                }
+              } catch (err) {
+                console.error("Error getting course sessions:", err);
               }
-            : null,
-          room: room
-            ? {
-                _id: room._id,
-                room_name: room.room_name,
-                location: room.location,
+            } else {
+              // Đã có trong map, sử dụng lại
+              const { courseSessions, allClassSchedules } = classSessionsMap[classId];
+              const scheduleIndex = allClassSchedules.findIndex(
+                (s) => s._id.toString() === classSchedule._id.toString()
+              );
+              
+              if (scheduleIndex >= 0 && courseSessions.length > 0) {
+                const sessionIndex = scheduleIndex % courseSessions.length;
+                sessionTitle = courseSessions[sessionIndex]?.title;
               }
-            : null,
-          date: classSchedule.date,
-          topic: classSchedule.topic,
-          attendance: ss.attendance,
-        };
-      });
+            }
+          }
+
+          return {
+            _id: ss._id,
+            startTime: classSchedule.startTime,
+            endTime: classSchedule.endTime,
+            className: classInfo?.name || "N/A",
+            subject: classInfo?.subject || "N/A",
+            teacher: teacher
+              ? {
+                  _id: teacher._id,
+                  username: teacher.username,
+                  email: teacher.email,
+                }
+              : null,
+            room: room
+              ? {
+                  _id: room._id,
+                  room_name: room.room_name,
+                  location: room.location,
+                }
+              : null,
+            date: classSchedule.date,
+            topic: classSchedule.topic,
+            sessionTitle: sessionTitle || classSchedule.topic || null,
+            status: classSchedule.status || "fixed",
+            attendance: ss.attendance,
+          };
+        })
+    );
 
     res.status(200).json({
       message: "Lấy lịch học của học sinh thành công.",
@@ -1533,6 +1605,264 @@ exports.getTeacherSchedule = async (req, res) => {
     res.status(500).json({
       message: "Lỗi server khi lấy lịch dạy của giáo viên.",
       error: error.message,
+    });
+  }
+};
+
+// =========================
+// ✅ VALIDATE SCHEDULE CONFLICT: KIỂM TRA CONFLICT VỚI TEACHER VÀ ROOM (KHÔNG CẦN CLASSID)
+// =========================
+exports.validateScheduleConflictSimple = async (req, res) => {
+  try {
+    const { date, startTime, endTime, room, teacher } = req.body;
+
+    if (!date || !startTime || !endTime || !room) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Thiếu thông tin bắt buộc: date, startTime, endTime, room" 
+      });
+    }
+
+    const conflicts = {
+      teacher: [],
+      room: [],
+      hasConflict: false
+    };
+
+    // Parse date string (YYYY-MM-DD) và tạo Date object ở local timezone
+    const dateParts = date.split('-');
+    if (dateParts.length !== 3) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Định dạng ngày không hợp lệ. Phải là YYYY-MM-DD." 
+      });
+    }
+    
+    const scheduleDate = new Date(
+      parseInt(dateParts[0]), // year
+      parseInt(dateParts[1]) - 1, // month (0-indexed)
+      parseInt(dateParts[2]) // day
+    );
+    scheduleDate.setHours(0, 0, 0, 0);
+
+    // Helper function để check time overlap
+    const hasTimeOverlap = (start1, end1, start2, end2) => {
+      const timeToMinutes = (timeStr) => {
+        if (!timeStr) return 0;
+        const parts = timeStr.split(':');
+        if (parts.length !== 2) return 0;
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
+        return hours * 60 + minutes;
+      };
+      
+      const start1Min = timeToMinutes(start1);
+      const end1Min = timeToMinutes(end1);
+      const start2Min = timeToMinutes(start2);
+      const end2Min = timeToMinutes(end2);
+      
+      return start1Min < end2Min && end1Min > start2Min;
+    };
+
+    // Helper function để format date
+    const formatDateLocal = (dateInput) => {
+      if (!dateInput) return null;
+      const d = new Date(dateInput);
+      if (isNaN(d.getTime())) return null;
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    // 1. Kiểm tra conflict PHÒNG HỌC
+    const roomScheduleQuery = {
+      room: new mongoose.Types.ObjectId(room),
+      date: scheduleDate,
+      status: { $in: ['temporary', 'fixed'] }
+    };
+
+    const roomSchedules = await ClassSchedule.find(roomScheduleQuery)
+      .populate('class', 'name')
+      .select('date startTime endTime class')
+      .lean();
+
+    roomSchedules.forEach((schedule) => {
+      if (hasTimeOverlap(startTime, endTime, schedule.startTime, schedule.endTime)) {
+        conflicts.room.push({
+          roomId: room.toString(),
+          className: schedule.class?.name || 'N/A',
+          date: formatDateLocal(schedule.date),
+          time: `${schedule.startTime} - ${schedule.endTime}`,
+          conflictingTime: `${startTime} - ${endTime}`
+        });
+        conflicts.hasConflict = true;
+      }
+    });
+
+    // 2. Kiểm tra conflict GIÁO VIÊN (nếu có)
+    if (teacher) {
+      const teacherClasses = await Class.find({
+        $or: [
+          { teacher: teacher },
+          { teacherId: teacher }
+        ]
+      }).select('_id name').lean();
+
+      if (teacherClasses.length > 0) {
+        const teacherClassIds = teacherClasses.map(c => c._id);
+
+        const teacherScheduleQuery = {
+          class: { $in: teacherClassIds },
+          date: scheduleDate,
+          status: { $in: ['temporary', 'fixed'] }
+        };
+
+        const teacherSchedules = await ClassSchedule.find(teacherScheduleQuery)
+          .populate('class', 'name')
+          .select('date startTime endTime class')
+          .lean();
+
+        teacherSchedules.forEach((schedule) => {
+          if (hasTimeOverlap(startTime, endTime, schedule.startTime, schedule.endTime)) {
+            conflicts.teacher.push({
+              teacherId: teacher.toString(),
+              className: schedule.class?.name || 'N/A',
+              date: formatDateLocal(schedule.date),
+              time: `${schedule.startTime} - ${schedule.endTime}`,
+              conflictingTime: `${startTime} - ${endTime}`
+            });
+            conflicts.hasConflict = true;
+          }
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      hasConflict: conflicts.hasConflict,
+      conflicts: conflicts
+    });
+  } catch (error) {
+    console.error("❌ Lỗi khi validate conflict:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi validate conflict",
+      error: error.message
+    });
+  }
+};
+
+// =========================
+// ✅ TẠO BUỔI HỌC BÙ MỚI (KHÔNG CẦN CLASSID)
+// =========================
+exports.createMakeupClassSchedule = async (req, res) => {
+  try {
+    const { date, startTime, endTime, room, teacher, session, reason, createdBy } = req.body;
+
+    if (!date || !startTime || !endTime || !room || !teacher) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Thiếu thông tin bắt buộc: date, startTime, endTime, room, teacher" 
+      });
+    }
+
+    // Parse date string (YYYY-MM-DD) và tạo Date object ở local timezone
+    const dateParts = date.split('-');
+    if (dateParts.length !== 3) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Định dạng ngày không hợp lệ. Phải là YYYY-MM-DD." 
+      });
+    }
+    
+    const scheduleDate = new Date(
+      parseInt(dateParts[0]), // year
+      parseInt(dateParts[1]) - 1, // month (0-indexed)
+      parseInt(dateParts[2]) // day
+    );
+    scheduleDate.setHours(0, 0, 0, 0);
+
+    // Kiểm tra conflict với room và teacher
+    const roomConflict = await ClassSchedule.findOne({
+      room: new mongoose.Types.ObjectId(room),
+      date: scheduleDate,
+      status: { $in: ['temporary', 'fixed'] },
+      $or: [
+        { $and: [{ startTime: { $lte: startTime } }, { endTime: { $gt: startTime } }] },
+        { $and: [{ startTime: { $lt: endTime } }, { endTime: { $gte: endTime } }] },
+        { $and: [{ startTime: { $gte: startTime } }, { endTime: { $lte: endTime } }] }
+      ]
+    }).lean();
+
+    if (roomConflict) {
+      return res.status(400).json({
+        success: false,
+        message: "Phòng học đã được sử dụng vào thời gian này"
+      });
+    }
+
+    // Kiểm tra conflict với teacher
+    const teacherClasses = await Class.find({
+      $or: [
+        { teacher: teacher },
+        { teacherId: teacher }
+      ]
+    }).select('_id').lean();
+
+    if (teacherClasses.length > 0) {
+      const teacherClassIds = teacherClasses.map(c => c._id);
+      const teacherConflict = await ClassSchedule.findOne({
+        class: { $in: teacherClassIds },
+        date: scheduleDate,
+        status: { $in: ['temporary', 'fixed'] },
+        $or: [
+          { $and: [{ startTime: { $lte: startTime } }, { endTime: { $gt: startTime } }] },
+          { $and: [{ startTime: { $lt: endTime } }, { endTime: { $gte: endTime } }] },
+          { $and: [{ startTime: { $gte: startTime } }, { endTime: { $lte: endTime } }] }
+        ]
+      }).lean();
+
+      if (teacherConflict) {
+        return res.status(400).json({
+          success: false,
+          message: "Giáo viên đã có lớp khác vào thời gian này"
+        });
+      }
+    }
+
+    // Tạo ClassSchedule mới (không có classId)
+    const newSchedule = await ClassSchedule.create({
+      class: null, // Không có classId cho buổi học bù
+      session: session ? new mongoose.Types.ObjectId(session) : null, // Session từ buổi nghỉ (nếu có)
+      date: scheduleDate,
+      startTime,
+      endTime,
+      room: new mongoose.Types.ObjectId(room),
+      teacher: new mongoose.Types.ObjectId(teacher),
+      createdBy: createdBy ? new mongoose.Types.ObjectId(createdBy) : new mongoose.Types.ObjectId(teacher),
+      reason: reason || 'Buổi học bù',
+      status: 'temporary' // Buổi học bù là temporary
+    });
+
+    // Populate để trả về đầy đủ thông tin
+    const populatedSchedule = await ClassSchedule.findById(newSchedule._id)
+      .populate('room', 'room_name location')
+      .populate('teacher', 'username email fullName')
+      .populate('session', 'title order content')
+      .lean();
+
+    return res.status(201).json({
+      success: true,
+      message: "Đã tạo buổi học bù thành công",
+      schedule: populatedSchedule
+    });
+  } catch (error) {
+    console.error("❌ Lỗi khi tạo buổi học bù:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi tạo buổi học bù",
+      error: error.message
     });
   }
 };

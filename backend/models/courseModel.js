@@ -18,7 +18,7 @@ const courseSchema = new Schema({
     description: {
         type: String
     },
-        numberOfSessions: {
+    numberOfSessions: {
         type: Number,
     },
     program: {

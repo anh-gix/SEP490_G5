@@ -12,6 +12,7 @@ import classService from '../../services/classService';
 const RequestDetailPage = ({
   selectedRequest,
   senderSchedule,
+  senderRole,
   loadingSchedule,
   pendingClassChange,
   pendingMakeupClasses,
@@ -26,6 +27,10 @@ const RequestDetailPage = ({
   formatDate,
   renderClassInfo
 }) => {
+  // Xác định role của người gửi đơn
+  const isStudent = senderRole === 'Student';
+  const isTeacher = senderRole === 'Teacher';
+  
   // Tính toán studentClasses từ senderSchedule
   const studentClasses = useMemo(() => {
     if (!senderSchedule || senderSchedule.length === 0) {
@@ -249,7 +254,9 @@ const RequestDetailPage = ({
                 Quay lại
               </Button>
             </div>
-            <h4 className="text-neutral-900 fw-bold mb-8">Chi tiết đơn - Lịch học/dạy</h4>
+            <h4 className="text-neutral-900 fw-bold mb-8">
+              {isStudent ? 'Chi tiết đơn - Lịch học' : isTeacher ? 'Chi tiết đơn - Lịch dạy' : 'Chi tiết đơn - Lịch học/dạy'}
+            </h4>
           </div>
 
           {/* Card chứa thông tin đơn */}
@@ -267,10 +274,12 @@ const RequestDetailPage = ({
                     <strong>Nội dung đơn:</strong> {selectedRequest.content}
                   </p>
                   
-                  {/* Danh sách lớp học viên đang học */}
+                  {/* Danh sách lớp học viên đang học / đang dạy */}
                   {studentClasses.length > 0 && (
                     <div className="mb-12">
-                      <h6 className="text-neutral-900 fw-bold mb-8 text-14">Các lớp học viên đang học:</h6>
+                      <h6 className="text-neutral-900 fw-bold mb-8 text-14">
+                        {isStudent ? 'Các lớp học viên đang học:' : isTeacher ? 'Các lớp đang dạy:' : 'Các lớp học viên đang học:'}
+                      </h6>
                       <div className="border border-neutral-200 rounded-6 p-8 bg-neutral-25">
                         <div className="d-flex flex-column" style={{ gap: '12px' }}>
                           {studentClasses.map((classItem, index) => {
@@ -307,7 +316,9 @@ const RequestDetailPage = ({
                                       <span className="text-neutral-700 text-13">{classItem.courseName}</span>
                                     </div>
                                     <div className="ps-20">
-                                      <span className="text-neutral-600 text-13">Session đang học: </span>
+                                      <span className="text-neutral-600 text-13">
+                                        {isStudent ? 'Session đang học: ' : isTeacher ? 'Session đang dạy: ' : 'Session đang học: '}
+                                      </span>
                                       <span className="text-neutral-700 text-13 fw-medium">
                                         {classItem.currentSessionTitle}
                                         {classItem.currentSessionOrder !== null && (
@@ -316,17 +327,19 @@ const RequestDetailPage = ({
                                       </span>
                                     </div>
                                   </div>
-                                  <div className="d-flex align-items-center">
-                                    <Button
-                                      variant="outline-primary"
-                                      size="sm"
-                                      onClick={() => onChangeClass(classItem)}
-                                      className="d-flex align-items-center gap-2"
-                                    >
-                                      <i className="fas fa-exchange-alt"></i>
-                                      Đổi lớp
-                                    </Button>
-                                  </div>
+                                  {isStudent && (
+                                    <div className="d-flex align-items-center">
+                                      <Button
+                                        variant="outline-primary"
+                                        size="sm"
+                                        onClick={() => onChangeClass(classItem)}
+                                        className="d-flex align-items-center gap-2"
+                                      >
+                                        <i className="fas fa-exchange-alt"></i>
+                                        Đổi lớp
+                                      </Button>
+                                    </div>
+                                  )}
                                 </div>
                               );
                             }
@@ -363,7 +376,9 @@ const RequestDetailPage = ({
               )}
               
               <div className="d-flex align-items-center justify-content-between mb-12">
-                <h6 className="text-neutral-900 fw-bold mb-0">Lịch học/dạy:</h6>
+                <h6 className="text-neutral-900 fw-bold mb-0">
+                  {isStudent ? 'Lịch học:' : isTeacher ? 'Lịch dạy:' : 'Lịch học/dạy:'}
+                </h6>
                 <Button
                   variant="outline-primary"
                   size="sm"
@@ -371,7 +386,7 @@ const RequestDetailPage = ({
                   className="d-flex align-items-center gap-2"
                 >
                   <i className="fas fa-plus"></i>
-                  Thêm buổi học bù
+                  {isStudent ? 'Thêm buổi học bù' : isTeacher ? 'Thêm buổi dạy bù' : 'Thêm buổi học bù'}
                 </Button>
               </div>
               
@@ -381,7 +396,9 @@ const RequestDetailPage = ({
                   <p className="text-neutral-600 mt-8">Đang tải lịch...</p>
                 </div>
               ) : calendarSchedules.length === 0 ? (
-                <p className="text-neutral-500 text-center py-20">Không có lịch học/dạy</p>
+                <p className="text-neutral-500 text-center py-20">
+                  {isStudent ? 'Không có lịch học' : isTeacher ? 'Không có lịch dạy' : 'Không có lịch học/dạy'}
+                </p>
               ) : (
                 <div className="border border-neutral-100 rounded-12 p-16 bg-white mb-16">
                   <ScheduleCalendar
@@ -406,7 +423,9 @@ const RequestDetailPage = ({
               {/* Danh sách các buổi học bù đã chọn */}
               {pendingMakeupClasses && pendingMakeupClasses.length > 0 && (
                 <div className="mt-16">
-                  <h6 className="text-neutral-900 fw-bold mb-8 text-14">Danh sách buổi học bù đã chọn:</h6>
+                  <h6 className="text-neutral-900 fw-bold mb-8 text-14">
+                    {isStudent ? 'Danh sách buổi học bù đã chọn:' : isTeacher ? 'Danh sách buổi dạy bù đã chọn:' : 'Danh sách buổi học bù đã chọn:'}
+                  </h6>
                   <div className="d-flex flex-column gap-4">
                     {pendingMakeupClasses.map((makeup, index) => {
                       const absentSchedule = makeup.absentSchedule;

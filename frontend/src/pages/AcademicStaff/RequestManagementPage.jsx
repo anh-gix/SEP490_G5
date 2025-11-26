@@ -34,6 +34,7 @@ const RequestManagementPage = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [senderSchedule, setSenderSchedule] = useState([]);
+  const [senderRole, setSenderRole] = useState(null);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [processing, setProcessing] = useState(false);
@@ -154,6 +155,42 @@ const RequestManagementPage = () => {
     return () => clearTimeout(timeoutId);
   }, [showMakeupClassModal, selectedMakeupClassInfo?.selectedScheduleId, selectedRequest]);
 
+  // Helper function để so sánh tên với số một cách thông minh (natural sort)
+  const naturalCompare = (nameA, nameB) => {
+    const a = nameA.toLowerCase();
+    const b = nameB.toLowerCase();
+    
+    // Tách phần text và số
+    const regex = /(\d+)/g;
+    const partsA = a.split(regex);
+    const partsB = b.split(regex);
+    
+    const minLength = Math.min(partsA.length, partsB.length);
+    
+    for (let i = 0; i < minLength; i++) {
+      const partA = partsA[i];
+      const partB = partsB[i];
+      
+      // Nếu cả hai đều là số, so sánh như số
+      if (/^\d+$/.test(partA) && /^\d+$/.test(partB)) {
+        const numA = parseInt(partA, 10);
+        const numB = parseInt(partB, 10);
+        if (numA !== numB) {
+          return numA - numB;
+        }
+      } else {
+        // So sánh như string
+        const compare = partA.localeCompare(partB, 'vi');
+        if (compare !== 0) {
+          return compare;
+        }
+      }
+    }
+    
+    // Nếu các phần đầu giống nhau, phần nào dài hơn thì lớn hơn
+    return partsA.length - partsB.length;
+  };
+
   // Sort requests when sortBy changes
   const sortedRequests = useMemo(() => {
     if (!allChangeRequests || allChangeRequests.length === 0) return [];
@@ -166,15 +203,15 @@ const RequestManagementPage = () => {
       sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     } else if (sortBy === 'sender') {
       sorted.sort((a, b) => {
-        const nameA = (a.sender?.username || a.sender?.fullName || a.sender?.name || '').toLowerCase();
-        const nameB = (b.sender?.username || b.sender?.fullName || b.sender?.name || '').toLowerCase();
-        return nameA.localeCompare(nameB, 'vi');
+        const nameA = a.sender?.username || a.sender?.fullName || a.sender?.name || '';
+        const nameB = b.sender?.username || b.sender?.fullName || b.sender?.name || '';
+        return naturalCompare(nameA, nameB);
       });
     } else if (sortBy === 'sender-desc') {
       sorted.sort((a, b) => {
-        const nameA = (a.sender?.username || a.sender?.fullName || a.sender?.name || '').toLowerCase();
-        const nameB = (b.sender?.username || b.sender?.fullName || b.sender?.name || '').toLowerCase();
-        return nameB.localeCompare(nameA, 'vi');
+        const nameA = a.sender?.username || a.sender?.fullName || a.sender?.name || '';
+        const nameB = b.sender?.username || b.sender?.fullName || b.sender?.name || '';
+        return naturalCompare(nameB, nameA);
       });
     }
     
@@ -1517,15 +1554,18 @@ const RequestManagementPage = () => {
     setRejectReason('');
     setLoadingSchedule(true);
     setSenderSchedule([]);
+    setSenderRole(null);
     
     try {
       const response = await changeRequestService.getSenderSchedule(request._id);
       if (response.success) {
         setSenderSchedule(response.schedules || []);
+        setSenderRole(response.sender?.role || null);
       }
     } catch (err) {
       console.error('Error fetching schedule:', err);
       setSenderSchedule([]);
+      setSenderRole(null);
     } finally {
       setLoadingSchedule(false);
     }
@@ -1614,6 +1654,7 @@ const RequestManagementPage = () => {
         <RequestDetailPage
           selectedRequest={selectedRequest}
           senderSchedule={senderSchedule}
+          senderRole={senderRole}
           loadingSchedule={loadingSchedule}
           pendingClassChange={pendingClassChange}
           pendingMakeupClasses={pendingMakeupClasses}
@@ -1623,6 +1664,7 @@ const RequestManagementPage = () => {
             setRejectReason('');
             setSelectedRequest(null);
             setSenderSchedule([]);
+            setSenderRole(null);
             setPendingClassChange(null);
             setPendingMakeupClasses([]);
             setPendingMakeupSessions([]);
@@ -2193,7 +2235,9 @@ const RequestManagementPage = () => {
                 <div className="col-md-6">
                   <div className="border border-primary rounded-8 p-12 bg-primary-25">
                     <div className="mb-12">
-                      <h6 className="text-primary fw-bold mb-2 text-14">Buổi nghỉ</h6>
+                      <h6 className="text-primary fw-bold mb-2 text-14">
+                        Buổi nghỉ của {selectedRequest?.sender?.username || selectedRequest?.sender?.name || 'học viên'}
+                      </h6>
                       {selectedCurrentClassInfo?.className && (
                         <small className="text-muted text-12">
                           Lớp: {selectedCurrentClassInfo.className}
@@ -3771,7 +3815,9 @@ const RequestManagementPage = () => {
                   <div className="col-md-6">
                     <div className="border border-primary rounded-8 p-12 bg-primary-25">
                       <div className="mb-12">
-                        <h6 className="text-primary fw-bold mb-2 text-14">Buổi nghỉ</h6>
+                        <h6 className="text-primary fw-bold mb-2 text-14">
+                          Buổi nghỉ của {selectedRequest?.sender?.username || selectedRequest?.sender?.name || 'học viên'}
+                        </h6>
                         {selectedCurrentClassInfo?.className && (
                           <small className="text-muted text-12">
                             Lớp: {selectedCurrentClassInfo.className}

@@ -1,7 +1,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Course = require('../models/courseModel');
-const LevelBandMapping = require('../models/levelBandMappingModel');
 
 async function updateCourseBands() {
     try {
@@ -13,13 +12,24 @@ async function updateCourseBands() {
         });
         console.log('✅ Connected to MongoDB\n');
 
-        // Lấy tất cả mappings
-        const mappings = await LevelBandMapping.find().lean();
-        const mappingMap = {};
-        mappings.forEach(m => {
-            mappingMap[`${m.type}_${m.level}`] = m.band;
-        });
-        console.log(`📋 Loaded ${mappings.length} level-band mappings\n`);
+        // Hardcoded mapping (since LevelBandMapping is removed)
+        const mappingMap = {
+            'ielts_A1': '0-2.5',
+            'ielts_A2': '3.0-3.5',
+            'ielts_B1': '4.0-5.0',
+            'ielts_B2': '5.5-6.5',
+            'ielts_C1': '7.0-8.0',
+            'ielts_C2': '8.5-9.0',
+            'toeic_A1': '0-250',
+            'toeic_A2': '251-500',
+            'toeic_B1': '501-700',
+            'toeic_B2': '701-900',
+            'toeic_C1': '901-990',
+            'toeic_C2': '990+',
+            'cam_Pre-A1': 'Starter',
+            'cam_A1': 'Mover'
+        };
+        console.log(`📋 Loaded ${Object.keys(mappingMap).length} level-band mappings\n`);
 
         // Lấy tất cả courses chưa có band hoặc band rỗng
         const courses = await Course.find({

@@ -1,0 +1,18 @@
+const express = require('express');
+const router = express.Router();
+const academicStaffController = require('../controllers/academicStaffController');
+// const { verifyToken, isAcademicStaff } = require('../middlewares/verifyToken');
+
+// All routes are protected
+// router.use(verifyToken); // Temporarily disabled for testing
+// router.use(isAcademicStaff); // Only Academic Staff can access these routes
+
+// Change Request Management
+router.put('/change-requests/:id/approve', academicStaffController.approveChangeRequest);
+router.put('/change-requests/:id/reject', academicStaffController.rejectChangeRequest);
+
+// Attendance Management
+router.get('/class-schedules/:classScheduleId/attendance', academicStaffController.getAttendanceByClassSchedule);
+
+module.exports = router;
+

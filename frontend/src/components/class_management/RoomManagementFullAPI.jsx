@@ -601,8 +601,8 @@ const RoomManagementFull = () => {
                       {schedule.session?.title || schedule.topic || 'N/A'}
                     </td>
                     <td className="px-16 py-12">
-                      <Badge bg={schedule.status === 'approved' ? 'success' : 'warning'}>
-                        {schedule.status}
+                      <Badge bg={schedule.status === 'fixed' ? 'success' : schedule.status === 'temporary' ? 'warning' : 'secondary'}>
+                        {schedule.status === 'fixed' ? 'Buổi cố định' : schedule.status === 'temporary' ? 'Buổi tạm' : schedule.status}
                       </Badge>
                     </td>
                   </tr>

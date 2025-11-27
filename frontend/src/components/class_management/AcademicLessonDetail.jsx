@@ -7,6 +7,7 @@ import scheduleService from '../../services/scheduleService';
 import classService from '../../services/classService';
 import teacherService from '../../services/teacherService';
 import roomService from '../../services/roomService';
+import { formatDateToYYYYMMDD } from '../../helper/helper';
 
 /**
  * Academic Lesson Detail Component
@@ -38,13 +39,14 @@ const AcademicLessonDetail = () => {
         return;
       }
 
-      // Format date to YYYY-MM-DD
+      // Format date to YYYY-MM-DD (using helper to avoid timezone issues)
       let dateStr = 'N/A';
       if (schedule.date) {
-        if (schedule.date instanceof Date) {
-          dateStr = schedule.date.toISOString().split('T')[0];
-        } else if (typeof schedule.date === 'string') {
+        if (typeof schedule.date === 'string') {
           dateStr = schedule.date.split('T')[0];
+        } else {
+          // Use helper function to format date correctly
+          dateStr = formatDateToYYYYMMDD(schedule.date);
         }
       }
 
@@ -67,7 +69,7 @@ const AcademicLessonDetail = () => {
         teacherName: schedule.teacher?.username || schedule.class?.teacher?.username || 'N/A',
         lessonNumber: schedule.session?.order || 0,
         lessonTopic: schedule.session?.title || schedule.topic || 'N/A',
-        status: schedule.status || 'draft',
+        status: schedule.status || 'fixed',
         type: schedule.type || 'regular',
         description: schedule.session?.description || schedule.session?.content || schedule.topic || 'Chưa có mô tả',
         objectives: schedule.session?.clos?.map(clo => clo.detail || clo.name) || [
@@ -76,7 +78,7 @@ const AcademicLessonDetail = () => {
           'Áp dụng kiến thức vào thực tế'
         ],
         clos: schedule.session?.clos || [],
-        materials: schedule.session?.materials || schedule.session?.documents || [],
+        materials: schedule.class?.course?.materials || [],
         homework: schedule.session?.homework || 'Chưa có bài tập về nhà',
         homeworkDeadline: schedule.session?.homeworkDeadline || 'N/A',
         notes: schedule.notes || schedule.reason || 'Không có ghi chú'
@@ -368,8 +370,12 @@ const AcademicLessonDetail = () => {
           {lessonData.materials && lessonData.materials.length > 0 ? (
             <div className="d-flex flex-column gap-12">
               {lessonData.materials.map((material, index) => {
-                const materialName = typeof material === 'string' ? material : (material.name || 'Tài liệu');
-                const materialUrl = typeof material === 'object' ? material.url : null;
+                // Course materials is array of strings (URLs)
+                const materialUrl = typeof material === 'string' ? material : (material.url || null);
+                // Extract filename from URL or use default name
+                const materialName = typeof material === 'string' 
+                  ? (material.split('/').pop() || 'Tài liệu')
+                  : (material.name || 'Tài liệu');
                 
                 return (
                   <div 

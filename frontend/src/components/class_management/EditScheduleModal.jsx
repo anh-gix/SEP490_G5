@@ -13,9 +13,9 @@ const EditScheduleModal = ({
 }) => {
   const [formData, setFormData] = useState({
     id: schedule.id,
-    classId: schedule.classId,
-    teacherId: schedule.teacherId,
-    roomId: schedule.roomId,
+    classId: schedule.classId ? String(schedule.classId) : '',
+    teacherId: schedule.teacherId ? String(schedule.teacherId) : '',
+    roomId: schedule.roomId ? String(schedule.roomId) : '',
     date: schedule.date,
     startTime: schedule.startTime,
     endTime: schedule.endTime,
@@ -36,9 +36,9 @@ const EditScheduleModal = ({
       const updatedSchedule = {
         ...schedule,
         ...newFormData,
-        className: classes.find(c => c.id === parseInt(newFormData.classId))?.name,
-        teacherName: teachers.find(t => t.id === parseInt(newFormData.teacherId))?.name,
-        roomName: rooms.find(r => r.id === parseInt(newFormData.roomId))?.name
+        className: classes.find(c => String(c.id) === String(newFormData.classId))?.name,
+        teacherName: teachers.find(t => String(t.id) === String(newFormData.teacherId))?.name,
+        roomName: rooms.find(r => String(r.id) === String(newFormData.roomId))?.name
       };
       
       const otherSchedules = existingSchedules.filter(s => s.id !== schedule.id);
@@ -58,9 +58,9 @@ const EditScheduleModal = ({
 
     const updatedSchedule = {
       ...formData,
-      className: classes.find(c => c.id === parseInt(formData.classId))?.name,
-      teacherName: teachers.find(t => t.id === parseInt(formData.teacherId))?.name,
-      roomName: rooms.find(r => r.id === parseInt(formData.roomId))?.name
+      className: classes.find(c => String(c.id) === String(formData.classId))?.name,
+      teacherName: teachers.find(t => String(t.id) === String(formData.teacherId))?.name,
+      roomName: rooms.find(r => String(r.id) === String(formData.roomId))?.name
     };
 
     onSubmit(updatedSchedule);
@@ -125,7 +125,7 @@ const EditScheduleModal = ({
                   required
                 >
                   {teachers.map(teacher => (
-                    <option key={teacher.id} value={teacher.id}>
+                    <option key={teacher.id} value={String(teacher.id)}>
                       {teacher.name}
                     </option>
                   ))}

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import classService from '../../services/classService';
 import scheduleService from '../../services/scheduleService';
 import roomService from '../../services/roomService';
-import axios from 'axios';
+import academicStaffService from '../../services/academicStaffService';
 
 /**
  * Academic Dashboard Component
@@ -47,8 +47,8 @@ const AcademicDashboard = () => {
 
       // Fetch today's schedules
       const schedulesResponse = await scheduleService.getAllSchedules({ 
-        date: todayStr,
-        status: 'approved'
+        date: todayStr
+        // Không filter theo status cũ nữa, lấy tất cả schedules
       });
       const todaySchedules = schedulesResponse.schedules || schedulesResponse || [];
 
@@ -66,10 +66,10 @@ const AcademicDashboard = () => {
       
       for (const schedule of todaySchedules) {
         try {
-          const attendanceResponse = await axios.get(
-            `http://localhost:8080/api/class-schedules/${schedule._id || schedule.id}/attendance`
+          const attendanceResponse = await academicStaffService.getAttendance(
+            schedule._id || schedule.id
           );
-          const attendances = attendanceResponse.data.attendances || attendanceResponse.data || [];
+          const attendances = attendanceResponse.attendances || attendanceResponse || [];
           
           for (const att of attendances) {
             if (att.attendance?.status === 'absent') {

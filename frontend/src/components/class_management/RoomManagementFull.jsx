@@ -587,8 +587,8 @@ const RoomManagementFull = () => {
                         <td className="px-16 py-12 text-13">{schedule.class?.name || 'N/A'}</td>
                         <td className="px-16 py-12 text-13">{schedule.session?.title || schedule.topic || 'N/A'}</td>
                         <td className="px-16 py-12">
-                          <Badge className={schedule.status === 'approved' ? 'bg-success-600 text-white' : 'bg-info-500 text-white'}>
-                            {schedule.status}
+                          <Badge className={schedule.status === 'fixed' ? 'bg-success-600 text-white' : schedule.status === 'temporary' ? 'bg-warning-600 text-white' : 'bg-info-500 text-white'}>
+                            {schedule.status === 'fixed' ? 'Buổi cố định' : schedule.status === 'temporary' ? 'Buổi tạm' : schedule.status}
                           </Badge>
                         </td>
                       </tr>

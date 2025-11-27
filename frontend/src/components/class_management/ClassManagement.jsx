@@ -38,7 +38,8 @@ const ClassManagement = () => {
         level: cls.level || cls.course?.level || 'N/A', // Level từ course
         program: cls.courseName || cls.course?.name || 'N/A',
         band: cls.band || cls.course?.band || 'N/A', // Band từ course
-        courseType: cls.courseType || cls.course?.type || 'N/A',
+        courseType: cls.courseType || cls.course?.program?.type || 'N/A',
+        course: cls.course?._id || cls.course || null, // Keep course ID for EditClassModal
         status: cls.status,
         startDate: cls.startDate ? new Date(cls.startDate).toISOString().split('T')[0] : 'N/A',
         endDate: cls.endDate ? new Date(cls.endDate).toISOString().split('T')[0] : 'N/A',
@@ -51,8 +52,8 @@ const ClassManagement = () => {
         roomLocation: cls.roomLocation || cls.room?.location || 'N/A',
         totalStudents: cls.totalStudents || cls.students?.length || 0,
         maxStudents: cls.maxStudents || 25,
-        currentLesson: cls.totalSchedules || 0,
-        totalLessons: cls.totalSchedules || 0,
+        currentLesson: cls.completedSchedules || 0, // Số buổi đã hoàn thành
+        totalLessons: cls.totalSchedules || 0, // Tổng số buổi
         completionRate: typeof cls.completionRate !== 'undefined' ? cls.completionRate : (cls.stats?.completionRate || 0)
       }));
       

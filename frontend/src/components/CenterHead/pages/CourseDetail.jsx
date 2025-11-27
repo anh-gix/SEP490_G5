@@ -250,16 +250,6 @@ const CourseDetails = () => {
                       ))}
                     </div>
                   )}
-                  
-                  {/* Materials */}
-                  {session.material && (
-                    <div className="bg-neutral-20 p-12 radius-4">
-                      <p className="text-neutral-700 text-sm mb-0">
-                        <i className="ph ph-file-text me-2"></i>
-                        {session.material}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
             </Card>

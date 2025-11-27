@@ -16,7 +16,7 @@ const Exam = require('../models/examModel');
 const getDashboardStats = async (req, res) => {
   try {
     // Đếm tổng số học viên (students)
-    const studentRole = await require('../models/roleModel').findOne({ name: 'student' });
+    const studentRole = await require('../models/roleModel').findOne({ name: 'Student' });
     const totalStudents = studentRole
       ? await User.countDocuments({ roleId: studentRole._id })
       : 0;

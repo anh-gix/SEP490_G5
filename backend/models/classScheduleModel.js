@@ -23,12 +23,9 @@ const classScheduleSchema = new Schema({
     
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     
-    // Lý do
-    reason: { type: String, required: true }, // "Học bù do nghỉ lễ", "Dạy bù ngoài giờ"   
-    
     status: {
         type: String,
-        enum: ['temporary', 'fixed'],
+        enum: ['temporary', 'fixed'],//temporary: buổi tạm, fixed: buổi cố định
         default: 'fixed'
     },
     
@@ -44,7 +41,7 @@ const classScheduleSchema = new Schema({
             files: [{ type: String }] // Changed from 'file' to 'files' array
         },
         deadline: { type: Date, required: true },
-        answerFiles: [{ type: String }] // Changed from 'answerFile' to 'answerFiles' array
+        answerFiles: [{ type: String }], // Changed from 'answerFile' to 'answerFiles' array
         // Removed: userstudy field (deprecated - use HomeworkSubmission model instead)
     }],
     

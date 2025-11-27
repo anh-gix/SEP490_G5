@@ -22,7 +22,7 @@ const getStudentReport = async (req, res) => {
     const { startDate, endDate } = req.query;
 
     // Get student role
-    const studentRole = await Role.findOne({ name: 'student' });
+    const studentRole = await Role.findOne({ name: 'Student' });
     if (!studentRole) {
       return res.status(404).json({
         success: false,
@@ -496,6 +496,298 @@ const exportReports = async (req, res) => {
   }
 };
 
+/**
+ * Get overview report (summary statistics)
+ * GET /api/reports/overview
+ */
+const getOverviewReport = async (req, res) => {
+  try {
+    // Get student role
+    const studentRole = await Role.findOne({ name: 'Student' });
+    const teacherRole = await Role.findOne({ name: 'Teacher' });
+    
+    // Total counts
+    const totalStudents = studentRole ? await User.countDocuments({ roleId: studentRole._id }) : 0;
+    const totalTeachers = teacherRole ? await User.countDocuments({ roleId: teacherRole._id }) : 0;
+    const totalClasses = await Class.countDocuments();
+    const totalCourses = await Course.countDocuments();
+    const totalRooms = await Room.countDocuments();
+    
+    // Active classes
+    const activeClasses = await Class.countDocuments({ status: 'active' });
+    
+    // Recent activity (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const newStudents = studentRole ? await User.countDocuments({
+      roleId: studentRole._id,
+      createdAt: { $gte: thirtyDaysAgo }
+    }) : 0;
+    
+    const newClasses = await Class.countDocuments({
+      createdAt: { $gte: thirtyDaysAgo }
+    });
+    
+    res.status(200).json({
+      success: true,
+      overview: {
+        totalStudents,
+        totalTeachers,
+        totalClasses,
+        activeClasses,
+        totalCourses,
+        totalRooms,
+        newStudents,
+        newClasses
+      }
+    });
+  } catch (error) {
+    console.error('Error getting overview report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy báo cáo tổng quan',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get teacher performance report
+ * GET /api/reports/teachers
+ */
+const getTeacherReport = async (req, res) => {
+  try {
+    const teacherRole = await Role.findOne({ name: 'Teacher' });
+    if (!teacherRole) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy role giáo viên'
+      });
+    }
+    
+    const teachers = await User.find({ roleId: teacherRole._id })
+      .select('username email phone')
+      .lean();
+    
+    // Get statistics for each teacher
+    const teachersWithStats = await Promise.all(
+      teachers.map(async (teacher) => {
+        // Count classes
+        const totalClasses = await Class.countDocuments({ teacherId: teacher._id });
+        
+        // Count students across all classes
+        const classes = await Class.find({ teacherId: teacher._id }).select('students');
+        const totalStudents = new Set();
+        classes.forEach(cls => {
+          if (cls.students && Array.isArray(cls.students)) {
+            cls.students.forEach(studentId => totalStudents.add(studentId.toString()));
+          }
+        });
+        
+        // Count sessions
+        const totalSessions = await ClassSchedule.countDocuments({ teacher: teacher._id });
+        
+        return {
+          _id: teacher._id,
+          fullName: teacher.username,
+          email: teacher.email,
+          phone: teacher.phone,
+          stats: {
+            totalClasses,
+            totalStudents: totalStudents.size,
+            totalSessions
+          },
+          status: 'active'
+        };
+      })
+    );
+    
+    res.status(200).json({
+      success: true,
+      report: {
+        teachers: teachersWithStats
+      }
+    });
+  } catch (error) {
+    console.error('Error getting teacher report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy báo cáo giáo viên',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get financial report
+ * GET /api/reports/financial
+ */
+const getFinancialReport = async (req, res) => {
+  try {
+    const { period = 'month' } = req.query;
+    
+    // Calculate date range based on period
+    const now = new Date();
+    let startDate = new Date();
+    
+    switch (period) {
+      case 'week':
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        startDate.setMonth(now.getMonth() - 1);
+        break;
+      case 'quarter':
+        startDate.setMonth(now.getMonth() - 3);
+        break;
+      case 'year':
+        startDate.setFullYear(now.getFullYear() - 1);
+        break;
+      default:
+        startDate.setMonth(now.getMonth() - 1);
+    }
+    
+    // Get classes created in period
+    const classesInPeriod = await Class.find({
+      createdAt: { $gte: startDate }
+    }).select('name level startDate endDate students').lean();
+    
+    // Calculate revenue (simplified - based on class count and students)
+    // In a real system, you would have payment records
+    let totalRevenue = 0;
+    let totalClasses = classesInPeriod.length;
+    let totalEnrollments = 0;
+    
+    classesInPeriod.forEach(cls => {
+      const studentCount = cls.students ? cls.students.length : 0;
+      totalEnrollments += studentCount;
+      // Simplified revenue calculation (would need actual payment data)
+      totalRevenue += studentCount * 1000000; // Assume 1M per student
+    });
+    
+    // Get programs with tuition fees
+    const programs = await Program.find({ status: 'active' }).select('tuitionFee').lean();
+    const avgTuitionFee = programs.length > 0
+      ? programs.reduce((sum, p) => sum + (p.tuitionFee || 0), 0) / programs.length
+      : 0;
+    
+    res.status(200).json({
+      success: true,
+      report: {
+        period,
+        startDate,
+        endDate: now,
+        totalRevenue,
+        totalClasses,
+        totalEnrollments,
+        avgTuitionFee: Math.round(avgTuitionFee),
+        revenueByPeriod: {
+          [period]: totalRevenue
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error getting financial report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy báo cáo tài chính',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get time-based report
+ * GET /api/reports/time-based
+ */
+const getTimeBasedReport = async (req, res) => {
+  try {
+    const { period = 'month' } = req.query;
+    
+    // Calculate date ranges
+    const now = new Date();
+    const ranges = [];
+    
+    let startDate = new Date();
+    let intervalDays = 1;
+    
+    switch (period) {
+      case 'week':
+        intervalDays = 1;
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        intervalDays = 1;
+        startDate.setMonth(now.getMonth() - 1);
+        break;
+      case 'quarter':
+        intervalDays = 7;
+        startDate.setMonth(now.getMonth() - 3);
+        break;
+      case 'year':
+        intervalDays = 30;
+        startDate.setFullYear(now.getFullYear() - 1);
+        break;
+      default:
+        intervalDays = 1;
+        startDate.setMonth(now.getMonth() - 1);
+    }
+    
+    // Generate time ranges
+    let currentStart = new Date(startDate);
+    while (currentStart < now) {
+      const currentEnd = new Date(currentStart);
+      currentEnd.setDate(currentEnd.getDate() + intervalDays);
+      
+      if (currentEnd > now) currentEnd.setTime(now.getTime());
+      
+      ranges.push({
+        start: new Date(currentStart),
+        end: new Date(currentEnd)
+      });
+      
+      currentStart.setDate(currentStart.getDate() + intervalDays);
+    }
+    
+    // Get data for each range
+    const timeBasedData = await Promise.all(
+      ranges.map(async (range) => {
+        const classesCount = await Class.countDocuments({
+          createdAt: { $gte: range.start, $lt: range.end }
+        });
+        
+        const studentRole = await Role.findOne({ name: 'Student' });
+        const studentsCount = studentRole ? await User.countDocuments({
+          roleId: studentRole._id,
+          createdAt: { $gte: range.start, $lt: range.end }
+        }) : 0;
+        
+        return {
+          date: range.start.toISOString().split('T')[0],
+          classes: classesCount,
+          students: studentsCount
+        };
+      })
+    );
+    
+    res.status(200).json({
+      success: true,
+      report: {
+        period,
+        data: timeBasedData
+      }
+    });
+  } catch (error) {
+    console.error('Error getting time-based report:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy báo cáo theo thời gian',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getStudentReport,
   getCourseReport,
@@ -503,5 +795,9 @@ module.exports = {
   getRoomReport,
   getExamReport,
   getEffectivenessReport,
-  exportReports
+  exportReports,
+  getOverviewReport,
+  getTeacherReport,
+  getFinancialReport,
+  getTimeBasedReport
 };

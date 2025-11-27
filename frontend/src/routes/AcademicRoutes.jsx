@@ -3,7 +3,9 @@ import ScheduleManagementPage from "../pages/AcademicStaff/ScheduleManagementPag
 import ClassManagementPage from "../pages/AcademicStaff/ClassManagementPage.jsx";
 import RoomManagementPage from "../pages/AcademicStaff/RoomManagementPage.jsx";
 import TeacherManagementPage from "../pages/AcademicStaff/TeacherManagementPage.jsx";
+import StudentManagementPage from "../pages/AcademicStaff/StudentManagementPage.jsx";
 import ReportsPage from "../pages/AcademicStaff/ReportsPage.jsx";
+import RequestManagementPage from "../pages/AcademicStaff/RequestManagementPage.jsx";
 import AcademicLessonDetailPage from "../pages/AcademicStaff/AcademicLessonDetailPage.jsx";
 import AcademicProfilePage from "../pages/AcademicStaff/AcademicProfilePage.jsx";
 
@@ -20,7 +22,7 @@ export const academicRoutes = [
   { path: '/academic/profile', element: <AcademicProfilePage /> },
 
   // I. Schedule Management
-  { path: 'academic/schedule-management', element: <ScheduleManagementPage /> },
+  { path: '/academic/schedule-management', element: <ScheduleManagementPage /> },
   { path: '/academic/lessons/:lessonId', element: <AcademicLessonDetailPage /> },
 
   // II. Class Management
@@ -29,9 +31,15 @@ export const academicRoutes = [
   // III. Room Management
   { path: '/academic/room-management', element: <RoomManagementPage /> },
 
-  // IV. Teacher Management
+  // IV. Request Management
+  { path: '/academic/request-management', element: <RequestManagementPage /> },
+
+  // V. Teacher Management
   { path: '/academic/teacher-management', element: <TeacherManagementPage /> },
 
-  // V. Reports
-  { path: '/academic/ reports', element: <ReportsPage /> },
+  // VI. Student Management
+  { path: '/academic/student-management', element: <StudentManagementPage /> },
+
+  // VII. Reports
+  { path: '/academic/reports', element: <ReportsPage /> },
 ];

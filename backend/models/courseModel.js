@@ -18,6 +18,9 @@ const courseSchema = new Schema({
     description: {
         type: String
     },
+    numberOfSessions: {
+        type: Number,
+    },
     program: {
         type: Schema.Types.ObjectId,
         ref: 'Program',

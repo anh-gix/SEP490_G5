@@ -113,6 +113,28 @@ export const courseService = {
       throw error.response?.data || { message: 'Từ chối giáo trình thất bại' };
     }
   },
+
+  // Get all course mappings (type, level, band)
+  getCourseMappings: async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/mappings`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy danh sách mappings' };
+    }
+  },
+
+  // Get types by level
+  getTypesByLevel: async (level) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/types-by-level`, {
+        params: { level }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy types theo level' };
+    }
+  },
 };
 
 export default courseService;

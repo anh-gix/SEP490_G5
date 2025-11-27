@@ -111,14 +111,7 @@ const RoleNavigation = ({
                     }}
                   ></i>
                 </div>
-                <span 
-                  className={`fw-${active ? 'semibold' : 'medium'} text-14`}
-                  style={{
-                    writingMode: 'horizontal-tb',
-                    textOrientation: 'mixed',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
+                <span className={`fw-${active ? 'semibold' : 'medium'} text-14`}>
                   {item.title}
                 </span>
               </NavLink>

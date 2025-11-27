@@ -1638,12 +1638,17 @@ exports.validateScheduleConflictSimple = async (req, res) => {
       });
     }
     
-    const scheduleDate = new Date(
-      parseInt(dateParts[0]), // year
-      parseInt(dateParts[1]) - 1, // month (0-indexed)
-      parseInt(dateParts[2]) // day
+    // Parse date string (YYYY-MM-DD) và tạo Date range để tránh vấn đề timezone
+    // Tạo start và end của ngày ở UTC để đảm bảo query chính xác
+    const scheduleDateStart = new Date(
+      Date.UTC(
+        parseInt(dateParts[0]), // year
+        parseInt(dateParts[1]) - 1, // month (0-indexed)
+        parseInt(dateParts[2]) // day
+      )
     );
-    scheduleDate.setHours(0, 0, 0, 0);
+    const scheduleDateEnd = new Date(scheduleDateStart);
+    scheduleDateEnd.setUTCDate(scheduleDateEnd.getUTCDate() + 1); // Ngày tiếp theo
 
     // Helper function để check time overlap
     const hasTimeOverlap = (start1, end1, start2, end2) => {
@@ -1664,21 +1669,26 @@ exports.validateScheduleConflictSimple = async (req, res) => {
       return start1Min < end2Min && end1Min > start2Min;
     };
 
-    // Helper function để format date
+    // Helper function để format date (sử dụng UTC để tránh lệch timezone)
     const formatDateLocal = (dateInput) => {
       if (!dateInput) return null;
       const d = new Date(dateInput);
       if (isNaN(d.getTime())) return null;
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
+      // Sử dụng UTC để tránh lệch timezone khi format date từ database
+      const year = d.getUTCFullYear();
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
     };
 
     // 1. Kiểm tra conflict PHÒNG HỌC
+    // Sử dụng range query để tránh vấn đề timezone
     const roomScheduleQuery = {
       room: new mongoose.Types.ObjectId(room),
-      date: scheduleDate,
+      date: {
+        $gte: scheduleDateStart,
+        $lt: scheduleDateEnd
+      },
       status: { $in: ['temporary', 'fixed'] }
     };
 
@@ -1714,7 +1724,10 @@ exports.validateScheduleConflictSimple = async (req, res) => {
 
         const teacherScheduleQuery = {
           class: { $in: teacherClassIds },
-          date: scheduleDate,
+          date: {
+            $gte: scheduleDateStart,
+            $lt: scheduleDateEnd
+          },
           status: { $in: ['temporary', 'fixed'] }
         };
 
@@ -1898,13 +1911,15 @@ exports.validateMakeupClassSchedule = async (req, res) => {
     const makeupDate = new Date(makeupSchedule.date);
     makeupDate.setHours(0, 0, 0, 0);
     
+    // Helper function để format date (sử dụng UTC để tránh lệch timezone)
     const formatDateLocal = (dateInput) => {
       if (!dateInput) return null;
       const d = new Date(dateInput);
       if (isNaN(d.getTime())) return null;
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
+      // Sử dụng UTC để tránh lệch timezone khi format date từ database
+      const year = d.getUTCFullYear();
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
     };
 

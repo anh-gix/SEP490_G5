@@ -145,16 +145,34 @@ const RequestDetailPage = ({
       // Kiểm tra xem buổi này có phải là buổi nghỉ không (từ pendingMakeupClasses hoặc đã bị cancelled)
       const scheduleId = schedule._id || schedule.id || index;
       const isAbsentSchedule = pendingMakeupClasses && pendingMakeupClasses.some(makeup => {
+        // Bỏ qua nếu là giáo viên dạy thay (buổi học vẫn diễn ra, chỉ đổi giáo viên)
+        if (makeup.isSubstituteClass) return false;
         const absentId = makeup.absentScheduleId || makeup.absentSchedule?.id || makeup.absentSchedule?._id;
         return absentId && (absentId.toString() === scheduleId.toString() || absentId.toString() === schedule._id?.toString());
       });
+      
+      // Kiểm tra xem buổi này có giáo viên dạy thay không
+      const hasSubstituteTeacher = pendingMakeupClasses && pendingMakeupClasses.some(makeup => {
+        if (!makeup.isSubstituteClass) return false;
+        const absentId = makeup.absentScheduleId || makeup.absentSchedule?.id || makeup.absentSchedule?._id;
+        return absentId && (absentId.toString() === scheduleId.toString() || absentId.toString() === schedule._id?.toString());
+      });
+      
+      // Lấy thông tin giáo viên dạy thay nếu có
+      const substituteTeacherInfo = hasSubstituteTeacher 
+        ? pendingMakeupClasses.find(makeup => {
+            if (!makeup.isSubstituteClass) return false;
+            const absentId = makeup.absentScheduleId || makeup.absentSchedule?.id || makeup.absentSchedule?._id;
+            return absentId && (absentId.toString() === scheduleId.toString() || absentId.toString() === schedule._id?.toString());
+          })?.substituteTeacherInfo
+        : null;
       
       // Buổi đã bị cancelled (từ StudentSchedule)
       const isCancelled = scheduleStatus === 'cancelled';
       
       // Xác định status hiển thị
       let displayStatus = 'scheduled';
-      if (isCancelled || isAbsentSchedule) {
+      if ((isCancelled || isAbsentSchedule) && !hasSubstituteTeacher) {
         displayStatus = 'cancelled';
       } else if (scheduleStatus === 'rescheduled' || schedule.status === 'temporary') {
         displayStatus = 'makeup';
@@ -177,12 +195,15 @@ const RequestDetailPage = ({
         scheduleStatus: scheduleStatus, // 'scheduled', 'cancelled', 'rescheduled', 'completed', 'pending'
         attendanceStatus: attendanceStatus, // 'present', 'absent', 'late', 'excused', or null
         hasAttendance: !!attendanceStatus,
-        teacherName: schedule.teacher?.username || 'N/A',
+        teacherName: hasSubstituteTeacher 
+          ? (substituteTeacherInfo?.username || substituteTeacherInfo?.fullName || substituteTeacherInfo?.name || 'N/A')
+          : (schedule.teacher?.username || 'N/A'),
         lessonNumber: schedule.session?.order || '',
         lessonTopic: schedule.topic || '',
-        isAbsentSchedule: isAbsentSchedule || isCancelled,
-        isCancelled: isCancelled,
+        isAbsentSchedule: isAbsentSchedule || (isCancelled && !hasSubstituteTeacher),
+        isCancelled: isCancelled && !hasSubstituteTeacher,
         isMakeupSchedule: isMakeupFromDB, // Đánh dấu buổi học bù từ database
+        isSubstituteClass: hasSubstituteTeacher, // Đánh dấu có giáo viên dạy thay
         cancellationReason: schedule.studentScheduleReason || null,
         makeupReason: isMakeupFromDB ? schedule.studentScheduleReason : null // Lý do học bù
       };
@@ -195,8 +216,12 @@ const RequestDetailPage = ({
     
     // Thêm các buổi học bù từ pendingMakeupClasses (chưa được approve)
     // Chỉ thêm những buổi chưa có trong database
+    // Bỏ qua các buổi giáo viên dạy thay vì buổi học vẫn diễn ra vào đúng thời gian (chỉ đổi giáo viên)
     const makeupSchedules = (pendingMakeupClasses || [])
       .map((makeup, index) => {
+        // Bỏ qua nếu là giáo viên dạy thay (buổi học vẫn diễn ra vào đúng thời gian)
+        if (makeup.isSubstituteClass) return null;
+        
         if (!makeup.makeupSchedule || !makeup.makeupSchedule.date) return null;
         
         const makeupScheduleId = makeup.makeupScheduleId?.toString() || 
@@ -388,7 +413,7 @@ const RequestDetailPage = ({
                   className="d-flex align-items-center gap-2"
                 >
                   <i className="fas fa-plus"></i>
-                  {isStudent ? 'Thêm buổi học bù' : isTeacher ? 'Thêm buổi dạy bù' : 'Thêm buổi học bù'}
+                  {isStudent ? 'Thêm buổi học bù' : isTeacher ? 'Xếp lịch dạy thay' : 'Thêm buổi học bù'}
                 </Button>
               </div>
               
@@ -426,7 +451,13 @@ const RequestDetailPage = ({
               {pendingMakeupClasses && pendingMakeupClasses.length > 0 && (
                 <div className="mt-16">
                   <h6 className="text-neutral-900 fw-bold mb-8 text-14">
-                    {isStudent ? 'Danh sách buổi học bù đã chọn:' : isTeacher ? 'Danh sách buổi dạy bù đã chọn:' : 'Danh sách buổi học bù đã chọn:'}
+                    {isStudent 
+                      ? 'Danh sách buổi học bù đã chọn:' 
+                      : isTeacher 
+                        ? (pendingMakeupClasses.some(m => m.isSubstituteClass) 
+                            ? 'Danh sách buổi dạy thay đã chọn:' 
+                            : 'Danh sách buổi dạy bù đã chọn:')
+                        : 'Danh sách buổi học bù đã chọn:'}
                   </h6>
                   <div className="d-flex flex-column gap-4">
                     {pendingMakeupClasses.map((makeup, index) => {
@@ -434,6 +465,8 @@ const RequestDetailPage = ({
                       const makeupSchedule = makeup.makeupSchedule;
                       const absentClassInfo = makeup.absentClassInfo;
                       const makeupClassInfo = makeup.makeupClassInfo;
+                      const isSubstituteClass = makeup.isSubstituteClass || false;
+                      const substituteTeacherInfo = makeup.substituteTeacherInfo;
 
                       const absentDateStr = absentSchedule?.date 
                         ? new Date(absentSchedule.date).toLocaleDateString('vi-VN') 
@@ -449,6 +482,60 @@ const RequestDetailPage = ({
                         ? `${makeupSchedule.startTime} - ${makeupSchedule.endTime}`
                         : '';
 
+                      // Hiển thị khác nhau cho giáo viên dạy thay
+                      if (isSubstituteClass) {
+                        return (
+                          <div 
+                            key={index} 
+                            className="border border-neutral-200 rounded-6 p-8 bg-white d-flex align-items-center justify-content-between gap-8"
+                          >
+                            <div className="flex-grow-1 d-flex align-items-center gap-6">
+                              <i className="fas fa-user-tie text-success text-12"></i>
+                              <div className="d-flex flex-column gap-1">
+                                <div className="text-success fw-semibold text-12">Buổi học với giáo viên dạy thay:</div>
+                                <div className="text-neutral-700 text-12">
+                                  <span className="fw-medium">{absentClassInfo?.className || 'N/A'}</span>
+                                  {' • '}
+                                  <span>{absentSchedule?.title || `Buổi ${absentSchedule?.order || 'N/A'}`}</span>
+                                  {absentSchedule?.order && (
+                                    <span className="text-neutral-500"> (STT: {absentSchedule.order})</span>
+                                  )}
+                                  {absentDateStr && (
+                                    <>
+                                      {' • '}
+                                      <span>{absentDateStr}</span>
+                                    </>
+                                  )}
+                                  {absentTimeStr && (
+                                    <>
+                                      {' • '}
+                                      <span>{absentTimeStr}</span>
+                                    </>
+                                  )}
+                                  {' • '}
+                                  <span className="text-success fw-semibold">
+                                    Giáo viên dạy thay: {substituteTeacherInfo?.username || substituteTeacherInfo?.fullName || substituteTeacherInfo?.name || 'N/A'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Nút xóa */}
+                            <Button
+                              variant="outline-danger"
+                              size="sm"
+                              onClick={() => onRemoveMakeupClass && onRemoveMakeupClass(index)}
+                              className="d-flex align-items-center gap-1 px-8 py-4"
+                              title="Xóa buổi dạy thay này"
+                            >
+                              <i className="fas fa-trash text-11"></i>
+                              <span className="text-11">Xóa</span>
+                            </Button>
+                          </div>
+                        );
+                      }
+
+                      // Hiển thị bình thường cho học sinh
                       return (
                         <div 
                           key={index} 
@@ -563,7 +650,7 @@ const RequestDetailPage = ({
                 ? 'Vui lòng xếp học bù cho tất cả các buổi còn thiếu trước khi chấp nhận' 
                 : ''}
             >
-              {processing ? 'Đang xử lý...' : 'Xác nhận'}
+              {processing ? 'Đang xử lý...' : 'Chấp nhận'}
             </Button>
           </div>
         </Container>

@@ -47,18 +47,24 @@ const StudentNavigation = () => {
       path: '/student/courses',
       color: 'success'
     },
+    // {
+    //   title: 'Bài tập',
+    //   icon: 'fa-tasks',
+    //   path: '/student/assignments',
+    //   color: 'warning'
+    // },
     {
-      title: 'Bài tập',
-      icon: 'fa-tasks',
-      path: '/student/assignments',
+      title: 'Tips học tập',
+      icon: 'fa-lightbulb',
+      path: '/student/tips',
       color: 'warning'
     },
-    {
-      title: 'Luyện thi TOEIC',
-      icon: 'fa-headphones',
-      path: '/student/toeic',
-      color: 'main'
-    },
+    // {
+    //   title: 'Luyện thi TOEIC',
+    //   icon: 'fa-headphones',
+    //   path: '/student/toeic',
+    //   color: 'main'
+    // },
     // {
     //   title: 'Tài liệu học tập',
     //   icon: 'fa-file-alt',

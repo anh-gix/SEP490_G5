@@ -10,6 +10,7 @@ import ToeicPractice from "../components/student_components/ToeicPractice.jsx";
 import ToeicTestTaking from "../components/student_components/ToeicTestTaking.jsx";
 import ToeicTestResult from "../components/student_components/ToeicTestResult.jsx";
 import ToeicTestHistory from "../components/student_components/ToeicTestHistory.jsx";
+import StudentTipsPage from "../pages/StudentPages/StudentTipsPage.jsx";
 
 /**
  * StudentRoutes
@@ -34,19 +35,22 @@ export const studentRoutes = [
   // III. Assignments
   { path: '/student/assignments', element: <StudentAssignmentsPage /> },
 
-  // IV. TOEIC Practice
+  // IV. Tips học tập
+  { path: '/student/tips', element: <StudentTipsPage /> },
+
+  // V. TOEIC Practice
   { path: '/student/toeic', element: <ToeicPractice /> },
   { path: '/student/toeic/test/:testId', element: <ToeicTestTaking /> },
   { path: '/student/toeic/result/:testId', element: <ToeicTestResult /> },
   { path: '/student/toeic/history', element: <ToeicTestHistory /> },
 
-  // V. Materials (future)
+  // VI. Materials (future)
   // { path: '/student/materials', element: <StudentMaterialsPage /> },
 
-  // VI. Grades (future)
+  // VII. Grades (future)
   // { path: '/student/grades', element: <StudentGradesPage /> },
 
-  // VII. Leave Request (future)
+  // VIII. Leave Request (future)
   // { path: '/student/leave-request', element: <StudentLeaveRequestPage /> },
 
  

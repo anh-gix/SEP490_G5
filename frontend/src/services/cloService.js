@@ -53,6 +53,26 @@ export const cloService = {
       throw error.response?.data || { message: 'Xóa CLO thất bại' };
     }
   },
+
+  // Tạo nhiều CLOs cùng lúc
+  createBulkCLOs: async (clos) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/bulk`, { clos });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Tạo danh sách CLO thất bại' };
+    }
+  },
+
+  // Ánh xạ CLO với PLOs
+  mapCLOtoPLOs: async (id, ploIds) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/${id}/map-plos`, { ploIds });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Ánh xạ CLO với PLO thất bại' };
+    }
+  },
 };
 
 export default cloService;

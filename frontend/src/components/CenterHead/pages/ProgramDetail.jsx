@@ -5,8 +5,8 @@ import Card from '../compo/Card';
 import Button from '../compo/Button';
 import StatusBadge from '../compo/StatusBadge';
 import Table from '../compo/Table';
-import { programService } from '../../../services/programService';
-import { courseService } from '../../../services/courseService';
+import programService from '../../../services/programService';
+import courseService from '../../../services/courseService';
 import { formatDate } from '../../../helper/helper';
 
 const ProgramDetail = () => {
@@ -29,11 +29,48 @@ const ProgramDetail = () => {
     try {
       setLoading(true);
 
-      // TODO: Replace with actual API call when backend is ready
-      // const response = await programService.getProgramById(id);
+      const response = await programService.getProgramById(id);
+      const programData = response.data;
 
-      // Mock data based on program ID
-      const mockPrograms = {
+      if (programData) {
+        setProgram(programData);
+
+        // Courses are included in the program response
+        const programCourses = programData.courses || [];
+        setCourses(programCourses);
+
+        // Build CLO → PLO mapping from courses
+        const cloMappingData = [];
+        programCourses.forEach(course => {
+          if (course.clos && Array.isArray(course.clos)) {
+            course.clos.forEach(clo => {
+              cloMappingData.push({
+                _id: clo._id,
+                code: clo.code,
+                name: clo.name || clo.description,
+                detail: clo.description || clo.detail,
+                courseName: course.name,
+                mappedPLOs: clo.mappedPLOs || []
+              });
+            });
+          }
+        });
+        setCloMapping(cloMappingData);
+
+        console.log('Program detail loaded from API:', programData);
+      }
+
+    } catch (err) {
+      console.error('Error fetching program detail:', err);
+      alert('Không thể tải thông tin chương trình!');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // BACKUP MOCK DATA (can be removed later)
+  const _oldMockData = () => {
+    const mockPrograms = {
         'prog1': {
           _id: 'prog1',
           code: 'IELTS-B2',
@@ -169,42 +206,7 @@ const ProgramDetail = () => {
           updatedAt: new Date('2025-01-10')
         }
       };
-
-      const programData = mockPrograms[id];
-
-      if (programData) {
-        setProgram(programData);
-
-        // Courses are included in the program response
-        const programCourses = programData.courses || [];
-        setCourses(programCourses);
-
-        // Build CLO → PLO mapping from courses
-        const cloMappingData = [];
-        programCourses.forEach(course => {
-          if (course.clos && Array.isArray(course.clos)) {
-            course.clos.forEach(clo => {
-              cloMappingData.push({
-                _id: clo._id,
-                code: clo.code,
-                name: clo.name || clo.description,
-                detail: clo.description || clo.detail,
-                courseName: course.name,
-                mappedPLOs: clo.mappedPLOs || []
-              });
-            });
-          }
-        });
-        setCloMapping(cloMappingData);
-
-        console.log('Mock program detail loaded:', programData);
-      }
-
-    } catch (err) {
-      console.error('Error fetching program detail:', err);
-    } finally {
-      setLoading(false);
-    }
+    // END OF MOCK DATA
   };
 
   const handleAcceptCourse = async (courseId) => {

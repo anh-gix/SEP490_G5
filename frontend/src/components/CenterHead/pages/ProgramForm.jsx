@@ -6,15 +6,8 @@ import Button from '../compo/Button';
 import Modal from '../compo/Modal';
 import Tabs from '../compo/Tabs';
 import Badge from '../compo/Badge';
-
-// Mock data cho PLOs
-const MOCK_PLOS = [
-  { _id: 'plo1', code: 'PLO1', name: 'Listening Skills', detail: 'Hiểu và phản ứng với các đoạn hội thoại tiếng Anh' },
-  { _id: 'plo2', code: 'PLO2', name: 'Reading Comprehension', detail: 'Đọc hiểu các văn bản học thuật và thông tin' },
-  { _id: 'plo3', code: 'PLO3', name: 'Writing Skills', detail: 'Viết các bài luận và báo cáo tiếng Anh' },
-  { _id: 'plo4', code: 'PLO4', name: 'Speaking Fluency', detail: 'Giao tiếp lưu loát và tự tin bằng tiếng Anh' },
-  { _id: 'plo5', code: 'PLO5', name: 'Grammar & Vocabulary', detail: 'Sử dụng ngữ pháp và từ vựng chính xác' },
-];
+import programService from '../../../services/programService';
+import ploService from '../../../services/ploService';
 
 const ProgramFormNew = () => {
   const navigate = useNavigate();
@@ -40,8 +33,9 @@ const ProgramFormNew = () => {
   const [loading, setLoading] = useState(false);
   const [showPLOModal, setShowPLOModal] = useState(false);
   const [showCreatePLOModal, setShowCreatePLOModal] = useState(false);
-  const [availablePLOs, setAvailablePLOs] = useState(MOCK_PLOS);
+  const [availablePLOs, setAvailablePLOs] = useState([]);
   const [selectedPLOs, setSelectedPLOs] = useState([]);
+  const [loadingPLOs, setLoadingPLOs] = useState(false);
 
   // New PLO form
   const [newPLO, setNewPLO] = useState({
@@ -64,36 +58,57 @@ const ProgramFormNew = () => {
     { label: isEdit ? 'Chỉnh sửa chương trình' : 'Tạo chương trình mới' }
   ];
 
+  // Load available PLOs
+  useEffect(() => {
+    const fetchPLOs = async () => {
+      try {
+        setLoadingPLOs(true);
+        const response = await ploService.getAllPLOs();
+        setAvailablePLOs(response.data || []);
+      } catch (error) {
+        console.error('Error loading PLOs:', error);
+        alert('Không thể tải danh sách PLOs!');
+      } finally {
+        setLoadingPLOs(false);
+      }
+    };
+
+    fetchPLOs();
+  }, []);
+
   // Load program data if editing
   useEffect(() => {
     if (isEdit && id) {
-      // TODO: Replace with actual API call (TẠM THỜI NGẮT)
-      // Mock data for editing
-      setFormData({
-        code: 'IELTS-B2',
-        program_name: 'IELTS Intermediate Program',
-        description: 'Chương trình luyện thi IELTS từ band 5.5 đến 6.5',
-        type: 'ielts',
-        level: 'B2',
-        band: '5.5-6.5',
-        tuitionFee: 5000000,
-        status: 'active',
-        plos: ['plo1', 'plo2', 'plo3'],
-        courses: [
-          {
-            _id: 'course1',
-            subjectCode: 'IELTS-B2-01',
-            name: 'IELTS Reading & Writing',
-            description: 'Khóa học về Reading và Writing skills',
-            status: 'approved',
-            closCount: 4,
-            sessionsCount: 12,
-            materialsCount: 3
-          }
-        ]
-      });
+      const fetchProgramData = async () => {
+        try {
+          setLoading(true);
+          const response = await programService.getProgramById(id);
+          const programData = response.data;
+
+          setFormData({
+            code: programData.code,
+            program_name: programData.program_name,
+            description: programData.description || '',
+            type: programData.type,
+            level: programData.level,
+            band: programData.band || '',
+            tuitionFee: programData.tuitionFee || 0,
+            status: programData.status,
+            plos: programData.plos?.map(plo => plo._id || plo) || [],
+            courses: programData.courses || []
+          });
+        } catch (error) {
+          console.error('Error loading program:', error);
+          alert('Không thể tải thông tin chương trình!');
+          navigate('/center-head/programs');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchProgramData();
     }
-  }, [isEdit, id]);
+  }, [isEdit, id, navigate]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -151,27 +166,31 @@ const ProgramFormNew = () => {
     }));
   };
 
-  const handleSaveNewPLO = () => {
+  const handleSaveNewPLO = async () => {
     if (!newPLO.code || !newPLO.name || !newPLO.detail) {
       alert('Vui lòng điền đầy đủ thông tin PLO!');
       return;
     }
 
-    // TODO: API call to create PLO (TẠM THỜI NGẮT)
-    // Mock: Add to available PLOs
-    const mockNewPLO = {
-      _id: `plo_new_${Date.now()}`,
-      ...newPLO
-    };
+    try {
+      setLoading(true);
+      const response = await ploService.createPLO(newPLO);
+      const createdPLO = response.data;
 
-    setAvailablePLOs(prev => [...prev, mockNewPLO]);
-    setFormData(prev => ({
-      ...prev,
-      plos: [...prev.plos, mockNewPLO._id]
-    }));
+      setAvailablePLOs(prev => [...prev, createdPLO]);
+      setFormData(prev => ({
+        ...prev,
+        plos: [...prev.plos, createdPLO._id]
+      }));
 
-    setShowCreatePLOModal(false);
-    alert('Tạo PLO mới thành công!');
+      setShowCreatePLOModal(false);
+      alert('Tạo PLO mới thành công!');
+    } catch (error) {
+      console.error('Error creating PLO:', error);
+      alert(error.message || 'Tạo PLO thất bại!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ==================== Course Management ====================
@@ -211,21 +230,41 @@ const ProgramFormNew = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.code || !formData.program_name) {
+    if (!formData.code || !formData.program_name || !formData.type || !formData.level) {
       alert('Vui lòng điền đầy đủ thông tin bắt buộc!');
       return;
     }
 
     setLoading(true);
 
-    // TODO: API Call (TẠM THỜI NGẮT)
-    // Simulate API call (MOCK)
-    setTimeout(() => {
-      console.log('Submitting program:', formData);
-      alert(isEdit ? 'Cập nhật chương trình thành công!' : 'Tạo chương trình thành công!');
-      setLoading(false);
+    try {
+      const programData = {
+        code: formData.code,
+        program_name: formData.program_name,
+        description: formData.description,
+        type: formData.type,
+        level: formData.level,
+        band: formData.band,
+        tuitionFee: formData.tuitionFee,
+        plos: formData.plos,
+        status: formData.status
+      };
+
+      if (isEdit) {
+        await programService.updateProgram(id, programData);
+        alert('Cập nhật chương trình thành công!');
+      } else {
+        await programService.createProgram(programData);
+        alert('Tạo chương trình thành công!');
+      }
+
       navigate('/center-head/programs');
-    }, 1000);
+    } catch (error) {
+      console.error('Error submitting program:', error);
+      alert(error.message || 'Lỗi khi lưu chương trình!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSaveDraft = () => {

@@ -1,17 +1,21 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import Breadcrumb from '../compo/Breadcrumb';
-import Card from '../compo/Card';
-import Button from '../compo/Button';
-import Modal from '../compo/Modal';
-import Tabs from '../compo/Tabs';
-import Badge from '../compo/Badge';
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import Breadcrumb from "../compo/Breadcrumb";
+import Card from "../compo/Card";
+import Button from "../compo/Button";
+import Modal from "../compo/Modal";
+import Tabs from "../compo/Tabs";
+import Badge from "../compo/Badge";
+import programService from "../../../services/programService";
+import courseService from "../../../services/courseService";
+import cloService from "../../../services/cloService";
+import sessionService from "../../../services/sessionService";
 
 const CourseFormNew = () => {
   const navigate = useNavigate();
   const { programId, courseId } = useParams();
   const isEdit = Boolean(courseId);
-  const [activeTab, setActiveTab] = useState('info');
+  const [activeTab, setActiveTab] = useState("info");
 
   // Program data (PLOs từ Program)
   const [program, setProgram] = useState(null);
@@ -19,67 +23,71 @@ const CourseFormNew = () => {
 
   // Form state - CẬP NHẬT với các trường mới từ courseModel
   const [formData, setFormData] = useState({
-    subjectCode: '',          // ← MỚI
-    name: '',
-    description: '',
-    timeAllocation: '',       // ← MỚI
-    preRequisite: 'None',     // ← MỚI
-    studentTasks: '',         // ← MỚI
+    courseCode: "", // ← Đổi từ subjectCode thành courseCode
+    name: "",
+    description: "",
+    numberOfSessions: 0, // ← MỚI
+    timeAllocation: "", // ← MỚI
+    preRequisite: "None", // ← MỚI
+    studentTasks: "", // ← MỚI
     program: programId,
-    status: 'draft',
+    status: "draft",
     clos: [],
     sessions: [],
-    materials: [],            // ← CẬP NHẬT: Array of objects
-    mocktestSessionOrders: []
+    materials: [], // ← CẬP NHẬT: Array of objects
+    mocktestSessionOrders: [],
   });
 
   // Material Form - CẬP NHẬT structure
   const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [editingMaterialIndex, setEditingMaterialIndex] = useState(null);
   const [materialForm, setMaterialForm] = useState({
-    description: '',
-    author: '',
-    publisher: '',
-    publishedDate: '',
-    url: '',
-    note: ''
+    description: "",
+    author: "",
+    publisher: "",
+    publishedDate: "",
+    url: "",
+    note: "",
   });
 
   // CLO Form
   const [showCLOModal, setShowCLOModal] = useState(false);
   const [editingCLOIndex, setEditingCLOIndex] = useState(null);
   const [cloForm, setCloForm] = useState({
-    code: '',
-    name: '',
-    detail: '',
-    mappedPLOs: []
+    code: "",
+    name: "",
+    detail: "",
+    mappedPLOs: [],
   });
 
   // Session Form
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [editingSessionIndex, setEditingSessionIndex] = useState(null);
   const [sessionForm, setSessionForm] = useState({
-    title: '',
+    title: "",
     order: 1,
-    content: '',
-    learningType: 'theory',
-    clos: []
+    content: "",
+    learningType: "theory",
+    clos: [],
   });
 
   // Tabs configuration
   const tabs = [
-    { id: 'info', label: 'Thông tin cơ bản', icon: 'ph ph-info' },
-    { id: 'materials', label: 'Tài liệu học tập', icon: 'ph ph-book-open' },
-    { id: 'clo', label: 'CLO & Mapping PLO', icon: 'ph ph-target' },
-    { id: 'sessions', label: 'Kế hoạch giảng dạy', icon: 'ph ph-calendar' }
+    { id: "info", label: "Thông tin cơ bản", icon: "ph ph-info" },
+    { id: "materials", label: "Tài liệu học tập", icon: "ph ph-book-open" },
+    { id: "clo", label: "CLO & Mapping PLO", icon: "ph ph-target" },
+    { id: "sessions", label: "Kế hoạch giảng dạy", icon: "ph ph-calendar" },
   ];
 
   // Breadcrumb
   const breadcrumbItems = [
-    { label: 'Dashboard', path: '/center-head/dashboard' },
-    { label: 'Quản lý chương trình', path: '/center-head/programs' },
-    { label: 'Chi tiết chương trình', path: `/center-head/programs/${programId}/edit` },
-    { label: isEdit ? 'Chỉnh sửa học phần' : 'Tạo học phần mới' }
+    { label: "Dashboard", path: "/center-head/dashboard" },
+    { label: "Quản lý chương trình", path: "/center-head/programs" },
+    {
+      label: "Chi tiết chương trình",
+      path: `/center-head/programs/${programId}/edit`,
+    },
+    { label: isEdit ? "Chỉnh sửa học phần" : "Tạo học phần mới" },
   ];
 
   // Load program data để lấy PLOs
@@ -88,27 +96,12 @@ const CourseFormNew = () => {
       setLoadingProgram(true);
 
       try {
-        // TODO: Replace with actual API call (TẠM THỜI NGẮT)
-        // Mock data
-        const mockProgram = {
-          _id: programId,
-          code: 'IELTS-B2',
-          program_name: 'IELTS Intermediate Program',
-          type: 'ielts',
-          level: 'B2',
-          plos: [
-            { _id: 'plo1', code: 'PLO1', name: 'Listening Skills', detail: 'Hiểu và phản ứng với các đoạn hội thoại' },
-            { _id: 'plo2', code: 'PLO2', name: 'Reading Comprehension', detail: 'Đọc hiểu các văn bản học thuật' },
-            { _id: 'plo3', code: 'PLO3', name: 'Writing Skills', detail: 'Viết các bài luận và báo cáo' },
-            { _id: 'plo4', code: 'PLO4', name: 'Speaking Fluency', detail: 'Giao tiếp lưu loát bằng tiếng Anh' },
-          ]
-        };
-
-        setProgram(mockProgram);
+        const response = await programService.getProgramById(programId);
+        setProgram(response.data);
       } catch (error) {
-        console.error('Error loading program:', error);
-        alert('Không thể tải thông tin Program!');
-        navigate('/center-head/programs');
+        console.error("Error loading program:", error);
+        alert("Không thể tải thông tin Program!");
+        navigate("/center-head/programs");
       } finally {
         setLoadingProgram(false);
       }
@@ -119,97 +112,61 @@ const CourseFormNew = () => {
 
   // Load course data if editing
   useEffect(() => {
-    if (isEdit && !loadingProgram) {
-      // TODO: Load course data (TẠM THỜI NGẮT)
-      // Mock data for editing
-      setFormData({
-        subjectCode: 'IELTS-B2-RW',
-        name: 'IELTS Reading & Writing',
-        description: 'Khóa học tập trung vào kỹ năng Reading và Writing cho kỳ thi IELTS',
-        timeAllocation: 'Total 120 hours: 40h class + 1h final exam + 79h self-study',
-        preRequisite: 'Hoàn thành IELTS 5.0 hoặc tương đương',
-        studentTasks: '- Tham gia ít nhất 80% buổi học\n- Hoàn thành 10 bài tập Writing\n- Làm 15 bài Reading practice\n- Tham gia mock test',
-        program: programId,
-        status: 'draft',
-        clos: [
-          {
-            code: 'CLO1',
-            name: 'Reading Strategies',
-            detail: 'Áp dụng các chiến lược đọc hiệu quả cho IELTS Reading',
-            mappedPLOs: ['plo2']
-          },
-          {
-            code: 'CLO2',
-            name: 'Writing Task 1',
-            detail: 'Viết Writing Task 1 đạt band 6.0+',
-            mappedPLOs: ['plo3']
-          },
-          {
-            code: 'CLO3',
-            name: 'Writing Task 2',
-            detail: 'Viết Writing Task 2 đạt band 6.0+',
-            mappedPLOs: ['plo3']
-          }
-        ],
-        sessions: [
-          {
-            title: 'Introduction to IELTS Reading',
-            order: 1,
-            content: 'Tổng quan về IELTS Reading, các dạng câu hỏi, chiến lược làm bài',
-            learningType: 'theory',
-            clos: ['CLO1']
-          },
-          {
-            title: 'Reading Practice: True/False/Not Given',
-            order: 2,
-            content: 'Luyện tập dạng câu hỏi True/False/Not Given với 5 bài tập',
-            learningType: 'practice',
-            clos: ['CLO1']
-          },
-          {
-            title: 'Writing Task 1: Line Graph & Bar Chart',
-            order: 3,
-            content: 'Cách viết mô tả biểu đồ Line Graph và Bar Chart',
-            learningType: 'theory',
-            clos: ['CLO2']
-          }
-        ],
-        materials: [
-          {
-            description: 'Cambridge IELTS 18',
-            author: 'Cambridge University Press',
-            publisher: 'Cambridge',
-            publishedDate: '2023',
-            url: '',
-            note: 'Sách chính, bắt buộc'
-          },
-          {
-            description: 'IELTS Writing Task 1 & 2 Guide',
-            author: 'Simon',
-            publisher: 'Online',
-            publishedDate: '2022',
-            url: 'https://ielts-simon.com',
-            note: 'Tài liệu tham khảo online'
-          },
-          {
-            description: 'Complete IELTS Bands 5-6.5',
-            author: 'Guy Brook-Hart, Vanessa Jakeman',
-            publisher: 'Cambridge University Press',
-            publishedDate: '2013',
-            url: '',
-            note: 'Sách tham khảo'
-          }
-        ],
-        mocktestSessionOrders: [5, 10]
-      });
+    if (isEdit && !loadingProgram && courseId) {
+      const fetchCourseData = async () => {
+        try {
+          setLoading(true);
+          const response = await courseService.getCourseById(courseId);
+          const courseData = response.data;
+
+          setFormData({
+            courseCode: courseData.courseCode,
+            name: courseData.name,
+            description: courseData.description || "",
+            numberOfSessions: courseData.numberOfSessions || 0,
+            timeAllocation: courseData.timeAllocation || "",
+            preRequisite: courseData.preRequisite || "None",
+            studentTasks: courseData.studentTasks || "",
+            program: programId,
+            status: courseData.status,
+            clos:
+              courseData.clos?.map((clo) => ({
+                _id: clo._id,
+                code: clo.code,
+                name: clo.name,
+                detail: clo.detail,
+                mappedPLOs: clo.mappedPLOs?.map((plo) => plo._id || plo) || [],
+              })) || [],
+            sessions:
+              courseData.sessions?.map((session) => ({
+                _id: session._id,
+                title: session.title,
+                order: session.order,
+                content: session.content,
+                learningType: session.learningType,
+                clos: session.clos?.map((clo) => clo.code || clo) || [],
+              })) || [],
+            materials: courseData.materials || [],
+            mocktestSessionOrders: courseData.mocktestSessionOrders || [],
+          });
+        } catch (error) {
+          console.error("Error loading course:", error);
+          alert("Không thể tải thông tin học phần!");
+          navigate(`/center-head/programs/${programId}/edit`);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchCourseData();
     }
-  }, [isEdit, courseId, programId, loadingProgram]);
+  }, [isEdit, courseId, programId, loadingProgram, navigate]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
@@ -217,12 +174,12 @@ const CourseFormNew = () => {
   const handleAddMaterial = () => {
     setEditingMaterialIndex(null);
     setMaterialForm({
-      description: '',
-      author: '',
-      publisher: '',
-      publishedDate: '',
-      url: '',
-      note: ''
+      description: "",
+      author: "",
+      publisher: "",
+      publishedDate: "",
+      url: "",
+      note: "",
     });
     setShowMaterialModal(true);
   };
@@ -235,15 +192,15 @@ const CourseFormNew = () => {
 
   const handleMaterialFormChange = (e) => {
     const { name, value } = e.target;
-    setMaterialForm(prev => ({
+    setMaterialForm((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const handleSaveMaterial = () => {
     if (!materialForm.description) {
-      alert('Vui lòng nhập tên/mô tả tài liệu!');
+      alert("Vui lòng nhập tên/mô tả tài liệu!");
       return;
     }
 
@@ -254,15 +211,15 @@ const CourseFormNew = () => {
       materials.push(materialForm);
     }
 
-    setFormData(prev => ({ ...prev, materials }));
+    setFormData((prev) => ({ ...prev, materials }));
     setShowMaterialModal(false);
   };
 
   const handleDeleteMaterial = (index) => {
-    if (window.confirm('Bạn có chắc muốn xóa tài liệu này?')) {
-      setFormData(prev => ({
+    if (window.confirm("Bạn có chắc muốn xóa tài liệu này?")) {
+      setFormData((prev) => ({
         ...prev,
-        materials: prev.materials.filter((_, i) => i !== index)
+        materials: prev.materials.filter((_, i) => i !== index),
       }));
     }
   };
@@ -271,10 +228,10 @@ const CourseFormNew = () => {
   const handleAddCLO = () => {
     setEditingCLOIndex(null);
     setCloForm({
-      code: '',
-      name: '',
-      detail: '',
-      mappedPLOs: []
+      code: "",
+      name: "",
+      detail: "",
+      mappedPLOs: [],
     });
     setShowCLOModal(true);
   };
@@ -287,16 +244,16 @@ const CourseFormNew = () => {
 
   const handleCLOFormChange = (e) => {
     const { name, value } = e.target;
-    setCloForm(prev => ({
+    setCloForm((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const handlePLOCheckbox = (ploId) => {
-    setCloForm(prev => {
+    setCloForm((prev) => {
       const mappedPLOs = prev.mappedPLOs.includes(ploId)
-        ? prev.mappedPLOs.filter(id => id !== ploId)
+        ? prev.mappedPLOs.filter((id) => id !== ploId)
         : [...prev.mappedPLOs, ploId];
       return { ...prev, mappedPLOs };
     });
@@ -304,12 +261,12 @@ const CourseFormNew = () => {
 
   const handleSaveCLO = () => {
     if (!cloForm.code || !cloForm.name || !cloForm.detail) {
-      alert('Vui lòng điền đầy đủ thông tin CLO!');
+      alert("Vui lòng điền đầy đủ thông tin CLO!");
       return;
     }
 
     if (cloForm.mappedPLOs.length === 0) {
-      alert('CLO phải mapping với ít nhất 1 PLO!');
+      alert("CLO phải mapping với ít nhất 1 PLO!");
       return;
     }
 
@@ -320,25 +277,27 @@ const CourseFormNew = () => {
       clos.push(cloForm);
     }
 
-    setFormData(prev => ({ ...prev, clos }));
+    setFormData((prev) => ({ ...prev, clos }));
     setShowCLOModal(false);
   };
 
   const handleDeleteCLO = (index) => {
     const cloCode = formData.clos[index].code;
-    const sessionsUsingCLO = formData.sessions.filter(s =>
+    const sessionsUsingCLO = formData.sessions.filter((s) =>
       s.clos.includes(cloCode)
     );
 
     if (sessionsUsingCLO.length > 0) {
-      alert(`Không thể xóa CLO này vì đang được sử dụng trong ${sessionsUsingCLO.length} session(s)!`);
+      alert(
+        `Không thể xóa CLO này vì đang được sử dụng trong ${sessionsUsingCLO.length} session(s)!`
+      );
       return;
     }
 
-    if (window.confirm('Bạn có chắc muốn xóa CLO này?')) {
-      setFormData(prev => ({
+    if (window.confirm("Bạn có chắc muốn xóa CLO này?")) {
+      setFormData((prev) => ({
         ...prev,
-        clos: prev.clos.filter((_, i) => i !== index)
+        clos: prev.clos.filter((_, i) => i !== index),
       }));
     }
   };
@@ -346,18 +305,18 @@ const CourseFormNew = () => {
   // ==================== SESSION MANAGEMENT ====================
   const handleAddSession = () => {
     if (formData.clos.length === 0) {
-      alert('Vui lòng tạo ít nhất 1 CLO trước khi tạo Session!');
-      setActiveTab('clo');
+      alert("Vui lòng tạo ít nhất 1 CLO trước khi tạo Session!");
+      setActiveTab("clo");
       return;
     }
 
     setEditingSessionIndex(null);
     setSessionForm({
-      title: '',
+      title: "",
       order: formData.sessions.length + 1,
-      content: '',
-      learningType: 'theory',
-      clos: []
+      content: "",
+      learningType: "theory",
+      clos: [],
     });
     setShowSessionModal(true);
   };
@@ -370,16 +329,16 @@ const CourseFormNew = () => {
 
   const handleSessionFormChange = (e) => {
     const { name, value } = e.target;
-    setSessionForm(prev => ({
+    setSessionForm((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const handleSessionCLOCheckbox = (cloCode) => {
-    setSessionForm(prev => {
+    setSessionForm((prev) => {
       const clos = prev.clos.includes(cloCode)
-        ? prev.clos.filter(c => c !== cloCode)
+        ? prev.clos.filter((c) => c !== cloCode)
         : [...prev.clos, cloCode];
       return { ...prev, clos };
     });
@@ -387,12 +346,12 @@ const CourseFormNew = () => {
 
   const handleSaveSession = () => {
     if (!sessionForm.title || !sessionForm.content) {
-      alert('Vui lòng điền đầy đủ thông tin Session!');
+      alert("Vui lòng điền đầy đủ thông tin Session!");
       return;
     }
 
     if (sessionForm.clos.length === 0) {
-      alert('Session phải gán ít nhất 1 CLO!');
+      alert("Session phải gán ít nhất 1 CLO!");
       return;
     }
 
@@ -403,15 +362,15 @@ const CourseFormNew = () => {
       sessions.push(sessionForm);
     }
 
-    setFormData(prev => ({ ...prev, sessions }));
+    setFormData((prev) => ({ ...prev, sessions }));
     setShowSessionModal(false);
   };
 
   const handleDeleteSession = (index) => {
-    if (window.confirm('Bạn có chắc muốn xóa Session này?')) {
-      setFormData(prev => ({
+    if (window.confirm("Bạn có chắc muốn xóa Session này?")) {
+      setFormData((prev) => ({
         ...prev,
-        sessions: prev.sessions.filter((_, i) => i !== index)
+        sessions: prev.sessions.filter((_, i) => i !== index),
       }));
     }
   };
@@ -420,21 +379,103 @@ const CourseFormNew = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.subjectCode || !formData.name) {
-      alert('Vui lòng điền đầy đủ thông tin bắt buộc!');
+    if (!formData.courseCode || !formData.name) {
+      alert("Vui lòng điền đầy đủ thông tin bắt buộc!");
       return;
     }
 
-    // TODO: API Call (TẠM THỜI NGẮT)
-    console.log('Submitting course:', formData);
-    alert(isEdit ? 'Cập nhật học phần thành công!' : 'Tạo học phần thành công!');
-    navigate(`/center-head/programs/${programId}/edit`);
+    setLoading(true);
+
+    try {
+      // 1. Tạo hoặc cập nhật tất cả CLOs trước
+      const cloIds = [];
+      for (const clo of formData.clos) {
+        if (clo._id) {
+          // CLO đã tồn tại, cập nhật
+          await cloService.updateCLO(clo._id, {
+            code: clo.code,
+            name: clo.name,
+            detail: clo.detail,
+            mappedPLOs: clo.mappedPLOs,
+          });
+          cloIds.push(clo._id);
+        } else {
+          // CLO mới, tạo mới
+          const response = await cloService.createCLO({
+            code: clo.code,
+            name: clo.name,
+            detail: clo.detail,
+            mappedPLOs: clo.mappedPLOs,
+          });
+          cloIds.push(response.data._id);
+        }
+      }
+
+      // 2. Tạo hoặc cập nhật tất cả Sessions
+      const sessionIds = [];
+      for (const session of formData.sessions) {
+        const sessionData = {
+          title: session.title,
+          order: session.order,
+          content: session.content,
+          learningType: session.learningType,
+          clos: session.clos, // Giữ nguyên mã CLO
+        };
+
+        if (session._id) {
+          // Session đã tồn tại, cập nhật
+          await sessionService.updateSession(session._id, sessionData);
+          sessionIds.push(session._id);
+        } else {
+          // Session mới, tạo mới
+          const response = await sessionService.createSession(sessionData);
+          sessionIds.push(response.data._id);
+        }
+      }
+
+      // 3. Tạo hoặc cập nhật Course
+      const courseData = {
+        courseCode: formData.courseCode,
+        name: formData.name,
+        description: formData.description,
+        numberOfSessions: formData.numberOfSessions,
+        timeAllocation: formData.timeAllocation,
+        preRequisite: formData.preRequisite,
+        studentTasks: formData.studentTasks,
+        program: programId,
+        clos: cloIds,
+        sessions: sessionIds,
+        materials: formData.materials,
+        mocktestSessionOrders: formData.mocktestSessionOrders,
+        status: formData.status,
+      };
+
+      if (isEdit) {
+        await courseService.updateCourse(courseId, courseData);
+        alert("Cập nhật học phần thành công!");
+      } else {
+        await courseService.createCourse(courseData);
+        alert("Tạo học phần thành công!");
+      }
+
+      navigate(`/center-head/programs/${programId}/edit`);
+    } catch (error) {
+      console.error("Error submitting course:", error);
+      alert(error.message || "Lỗi khi lưu học phần!");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Get PLO by ID
   const getPLOById = (ploId) => {
-    if (!program) return { code: 'N/A', name: 'Unknown' };
-    return program.plos.find(p => p._id === ploId) || { code: 'N/A', name: 'Unknown' };
+    if (!program) return { code: "N/A", name: "Unknown" };
+    return (
+      program.plos.find((p) => p._id === ploId) || {
+        code: "N/A",
+        name: "Unknown",
+      }
+    );
   };
 
   // CLO-PLO Matrix
@@ -449,16 +490,20 @@ const CourseFormNew = () => {
             <thead>
               <tr>
                 <th>CLO / PLO</th>
-                {program.plos.map(plo => (
-                  <th key={plo._id} className="text-center">{plo.code}</th>
+                {program.plos.map((plo) => (
+                  <th key={plo._id} className="text-center">
+                    {plo.code}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {formData.clos.map((clo, index) => (
                 <tr key={index}>
-                  <td><strong>{clo.code}</strong></td>
-                  {program.plos.map(plo => (
+                  <td>
+                    <strong>{clo.code}</strong>
+                  </td>
+                  {program.plos.map((plo) => (
                     <td key={plo._id} className="text-center">
                       {clo.mappedPLOs.includes(plo._id) && (
                         <i className="ph ph-check-circle text-success"></i>
@@ -476,7 +521,10 @@ const CourseFormNew = () => {
 
   if (loadingProgram) {
     return (
-      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
+      <div
+        className="d-flex justify-content-center align-items-center"
+        style={{ minHeight: "400px" }}
+      >
         <div className="spinner-border text-primary" role="status">
           <span className="visually-hidden">Loading...</span>
         </div>
@@ -489,7 +537,7 @@ const CourseFormNew = () => {
       <div className="text-center py-5">
         <i className="ph ph-warning-circle ph-3x text-warning mb-3"></i>
         <p>Không tìm thấy thông tin chương trình!</p>
-        <Button onClick={() => navigate('/center-head/programs')}>
+        <Button onClick={() => navigate("/center-head/programs")}>
           Quay lại danh sách
         </Button>
       </div>
@@ -504,10 +552,13 @@ const CourseFormNew = () => {
       <div className="d-flex justify-content-between align-items-start mb-24">
         <div>
           <h4 className="mb-8 text-neutral-900 fw-bold">
-            {isEdit ? 'Chỉnh sửa học phần' : 'Tạo học phần mới'}
+            {isEdit ? "Chỉnh sửa học phần" : "Tạo học phần mới"}
           </h4>
           <p className="text-neutral-600 mb-0">
-            Chương trình: <strong>{program.code} - {program.program_name}</strong>
+            Chương trình:{" "}
+            <strong>
+              {program.code} - {program.program_name}
+            </strong>
           </p>
         </div>
         <div className="d-flex gap-2">
@@ -533,7 +584,7 @@ const CourseFormNew = () => {
 
       <form onSubmit={handleSubmit} className="mt-24">
         {/* Tab 1: Thông tin cơ bản */}
-        {activeTab === 'info' && (
+        {activeTab === "info" && (
           <Card>
             <div className="row g-4">
               <div className="col-md-4">
@@ -542,13 +593,13 @@ const CourseFormNew = () => {
                 </label>
                 <input
                   type="text"
-                  name="subjectCode"
+                  name="courseCode"
                   className="form-control"
                   placeholder="VD: IELTS-B2-RW"
-                  value={formData.subjectCode}
+                  value={formData.courseCode}
                   onChange={handleInputChange}
                   required
-                  style={{ textTransform: 'uppercase' }}
+                  style={{ textTransform: "uppercase" }}
                 />
               </div>
 
@@ -597,6 +648,19 @@ const CourseFormNew = () => {
                 </select>
               </div>
 
+              <div className="col-md-6">
+                <label className="form-label fw-semibold text-neutral-900">
+                  Số lượng buổi dạy
+                </label>
+                <input
+                  type="text"
+                  name="numberOfSessions"
+                  className="form-control"
+                  placeholder="30"
+                  value={formData.numberOfSessions}
+                  onChange={handleInputChange}
+                />
+              </div>
               <div className="col-12">
                 <label className="form-label fw-semibold text-neutral-900">
                   Phân bổ thời gian
@@ -633,18 +697,22 @@ const CourseFormNew = () => {
                   name="studentTasks"
                   className="form-control"
                   rows="5"
-                  placeholder={'- Tham gia ít nhất 80% buổi học\n- Hoàn thành bài tập sau mỗi buổi học\n- ...'}
+                  placeholder={
+                    "- Tham gia ít nhất 80% buổi học\n- Hoàn thành bài tập sau mỗi buổi học\n- ..."
+                  }
                   value={formData.studentTasks}
                   onChange={handleInputChange}
                 />
-                <small className="text-muted">Các nhiệm vụ mà sinh viên cần hoàn thành trong khóa học</small>
+                <small className="text-muted">
+                  Các nhiệm vụ mà sinh viên cần hoàn thành trong khóa học
+                </small>
               </div>
             </div>
           </Card>
         )}
 
         {/* Tab 2: Materials */}
-        {activeTab === 'materials' && (
+        {activeTab === "materials" && (
           <Card>
             <div className="d-flex justify-content-between align-items-center mb-4">
               <div>
@@ -665,8 +733,14 @@ const CourseFormNew = () => {
             {formData.materials.length === 0 ? (
               <div className="text-center py-5">
                 <i className="ph ph-book-open ph-3x text-neutral-400 mb-3"></i>
-                <p className="text-neutral-600">Chưa có tài liệu nào được thêm</p>
-                <Button variant="primary" icon="ph ph-plus" onClick={handleAddMaterial}>
+                <p className="text-neutral-600">
+                  Chưa có tài liệu nào được thêm
+                </p>
+                <Button
+                  variant="primary"
+                  icon="ph ph-plus"
+                  onClick={handleAddMaterial}
+                >
                   Thêm tài liệu đầu tiên
                 </Button>
               </div>
@@ -676,29 +750,38 @@ const CourseFormNew = () => {
                   <thead>
                     <tr>
                       <th>Tên/Mô tả</th>
-                      <th style={{ width: '200px' }}>Tác giả</th>
-                      <th style={{ width: '150px' }}>Nhà xuất bản</th>
-                      <th style={{ width: '100px' }}>Năm</th>
-                      <th style={{ width: '200px' }}>Ghi chú</th>
-                      <th style={{ width: '120px' }} className="text-center">Thao tác</th>
+                      <th style={{ width: "200px" }}>Tác giả</th>
+                      <th style={{ width: "150px" }}>Nhà xuất bản</th>
+                      <th style={{ width: "100px" }}>Năm</th>
+                      <th style={{ width: "200px" }}>Ghi chú</th>
+                      <th style={{ width: "120px" }} className="text-center">
+                        Thao tác
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {formData.materials.map((material, index) => (
                       <tr key={index}>
                         <td>
-                          <div className="fw-semibold">{material.description}</div>
+                          <div className="fw-semibold">
+                            {material.description}
+                          </div>
                           {material.url && (
-                            <a href={material.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary">
+                            <a
+                              href={material.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-primary"
+                            >
                               <i className="ph ph-link me-1"></i>
                               Link
                             </a>
                           )}
                         </td>
-                        <td>{material.author || '-'}</td>
-                        <td>{material.publisher || '-'}</td>
-                        <td>{material.publishedDate || '-'}</td>
-                        <td className="text-sm">{material.note || '-'}</td>
+                        <td>{material.author || "-"}</td>
+                        <td>{material.publisher || "-"}</td>
+                        <td>{material.publishedDate || "-"}</td>
+                        <td className="text-sm">{material.note || "-"}</td>
                         <td className="text-center">
                           <div className="d-flex gap-1 justify-content-center">
                             <Button
@@ -725,7 +808,7 @@ const CourseFormNew = () => {
         )}
 
         {/* Tab 3: CLO & Mapping PLO */}
-        {activeTab === 'clo' && (
+        {activeTab === "clo" && (
           <Card>
             <div className="d-flex justify-content-between align-items-center mb-4">
               <div>
@@ -747,7 +830,11 @@ const CourseFormNew = () => {
               <div className="text-center py-5">
                 <i className="ph ph-target ph-3x text-neutral-400 mb-3"></i>
                 <p className="text-neutral-600">Chưa có CLO nào được thêm</p>
-                <Button variant="primary" icon="ph ph-plus" onClick={handleAddCLO}>
+                <Button
+                  variant="primary"
+                  icon="ph ph-plus"
+                  onClick={handleAddCLO}
+                >
                   Thêm CLO đầu tiên
                 </Button>
               </div>
@@ -757,11 +844,13 @@ const CourseFormNew = () => {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th style={{ width: '100px' }}>Mã CLO</th>
+                        <th style={{ width: "100px" }}>Mã CLO</th>
                         <th>Tên CLO</th>
                         <th>Chi tiết</th>
-                        <th style={{ width: '200px' }}>Mapped PLOs</th>
-                        <th style={{ width: '120px' }} className="text-center">Thao tác</th>
+                        <th style={{ width: "200px" }}>Mapped PLOs</th>
+                        <th style={{ width: "120px" }} className="text-center">
+                          Thao tác
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -774,7 +863,7 @@ const CourseFormNew = () => {
                           <td className="text-neutral-600">{clo.detail}</td>
                           <td>
                             <div className="d-flex flex-wrap gap-1">
-                              {clo.mappedPLOs.map(ploId => {
+                              {clo.mappedPLOs.map((ploId) => {
                                 const plo = getPLOById(ploId);
                                 return (
                                   <Badge key={ploId} variant="info" size="sm">
@@ -813,7 +902,7 @@ const CourseFormNew = () => {
         )}
 
         {/* Tab 4: Sessions */}
-        {activeTab === 'sessions' && (
+        {activeTab === "sessions" && (
           <Card>
             <div className="d-flex justify-content-between align-items-center mb-4">
               <div>
@@ -842,9 +931,15 @@ const CourseFormNew = () => {
             {formData.sessions.length === 0 ? (
               <div className="text-center py-5">
                 <i className="ph ph-calendar ph-3x text-neutral-400 mb-3"></i>
-                <p className="text-neutral-600">Chưa có session nào được thêm</p>
+                <p className="text-neutral-600">
+                  Chưa có session nào được thêm
+                </p>
                 {formData.clos.length > 0 && (
-                  <Button variant="primary" icon="ph ph-plus" onClick={handleAddSession}>
+                  <Button
+                    variant="primary"
+                    icon="ph ph-plus"
+                    onClick={handleAddSession}
+                  >
                     Thêm session đầu tiên
                   </Button>
                 )}
@@ -854,12 +949,14 @@ const CourseFormNew = () => {
                 <table className="table">
                   <thead>
                     <tr>
-                      <th style={{ width: '80px' }}>Order</th>
+                      <th style={{ width: "80px" }}>Order</th>
                       <th>Tiêu đề</th>
                       <th>Nội dung</th>
-                      <th style={{ width: '150px' }}>Loại hình</th>
-                      <th style={{ width: '150px' }}>CLOs</th>
-                      <th style={{ width: '120px' }} className="text-center">Thao tác</th>
+                      <th style={{ width: "150px" }}>Loại hình</th>
+                      <th style={{ width: "150px" }}>CLOs</th>
+                      <th style={{ width: "120px" }} className="text-center">
+                        Thao tác
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -871,13 +968,17 @@ const CourseFormNew = () => {
                             <Badge variant="secondary">{session.order}</Badge>
                           </td>
                           <td className="fw-semibold">{session.title}</td>
-                          <td className="text-neutral-600">{session.content}</td>
+                          <td className="text-neutral-600">
+                            {session.content}
+                          </td>
                           <td>
                             <Badge
                               variant={
-                                session.learningType === 'theory' ? 'info' :
-                                session.learningType === 'practice' ? 'success' :
-                                'warning'
+                                session.learningType === "theory"
+                                  ? "info"
+                                  : session.learningType === "practice"
+                                  ? "success"
+                                  : "warning"
                               }
                             >
                               {session.learningType}
@@ -885,8 +986,12 @@ const CourseFormNew = () => {
                           </td>
                           <td>
                             <div className="d-flex flex-wrap gap-1">
-                              {session.clos.map(cloCode => (
-                                <Badge key={cloCode} variant="primary" size="sm">
+                              {session.clos.map((cloCode) => (
+                                <Badge
+                                  key={cloCode}
+                                  variant="primary"
+                                  size="sm"
+                                >
                                   {cloCode}
                                 </Badge>
                               ))}
@@ -922,7 +1027,11 @@ const CourseFormNew = () => {
       <Modal
         show={showMaterialModal}
         onClose={() => setShowMaterialModal(false)}
-        title={editingMaterialIndex !== null ? 'Chỉnh sửa tài liệu' : 'Thêm tài liệu mới'}
+        title={
+          editingMaterialIndex !== null
+            ? "Chỉnh sửa tài liệu"
+            : "Thêm tài liệu mới"
+        }
         size="lg"
       >
         <div className="modal-body">
@@ -1017,7 +1126,7 @@ const CourseFormNew = () => {
       <Modal
         show={showCLOModal}
         onClose={() => setShowCLOModal(false)}
-        title={editingCLOIndex !== null ? 'Chỉnh sửa CLO' : 'Thêm CLO mới'}
+        title={editingCLOIndex !== null ? "Chỉnh sửa CLO" : "Thêm CLO mới"}
         size="lg"
       >
         <div className="modal-body">
@@ -1069,7 +1178,7 @@ const CourseFormNew = () => {
                 Mapping PLO <span className="text-danger">*</span>
               </label>
               <div className="border rounded p-3">
-                {program.plos.map(plo => (
+                {program.plos.map((plo) => (
                   <div key={plo._id} className="form-check mb-2">
                     <input
                       type="checkbox"
@@ -1078,10 +1187,17 @@ const CourseFormNew = () => {
                       checked={cloForm.mappedPLOs.includes(plo._id)}
                       onChange={() => handlePLOCheckbox(plo._id)}
                     />
-                    <label className="form-check-label" htmlFor={`plo-${plo._id}`}>
-                      <Badge variant="info" className="me-2">{plo.code}</Badge>
+                    <label
+                      className="form-check-label"
+                      htmlFor={`plo-${plo._id}`}
+                    >
+                      <Badge variant="info" className="me-2">
+                        {plo.code}
+                      </Badge>
                       <span className="fw-semibold">{plo.name}</span>
-                      <div className="text-sm text-neutral-600">{plo.detail}</div>
+                      <div className="text-sm text-neutral-600">
+                        {plo.detail}
+                      </div>
                     </label>
                   </div>
                 ))}
@@ -1104,7 +1220,11 @@ const CourseFormNew = () => {
       <Modal
         show={showSessionModal}
         onClose={() => setShowSessionModal(false)}
-        title={editingSessionIndex !== null ? 'Chỉnh sửa Session' : 'Thêm Session mới'}
+        title={
+          editingSessionIndex !== null
+            ? "Chỉnh sửa Session"
+            : "Thêm Session mới"
+        }
         size="lg"
       >
         <div className="modal-body">
@@ -1136,7 +1256,9 @@ const CourseFormNew = () => {
             </div>
 
             <div className="col-md-6">
-              <label className="form-label fw-semibold">Loại hình học tập</label>
+              <label className="form-label fw-semibold">
+                Loại hình học tập
+              </label>
               <select
                 name="learningType"
                 className="form-select"
@@ -1179,8 +1301,13 @@ const CourseFormNew = () => {
                       checked={sessionForm.clos.includes(clo.code)}
                       onChange={() => handleSessionCLOCheckbox(clo.code)}
                     />
-                    <label className="form-check-label" htmlFor={`session-clo-${clo.code}`}>
-                      <Badge variant="primary" className="me-2">{clo.code}</Badge>
+                    <label
+                      className="form-check-label"
+                      htmlFor={`session-clo-${clo.code}`}
+                    >
+                      <Badge variant="primary" className="me-2">
+                        {clo.code}
+                      </Badge>
                       <span className="fw-semibold">{clo.name}</span>
                     </label>
                   </div>

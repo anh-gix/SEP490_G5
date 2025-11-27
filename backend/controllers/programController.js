@@ -1,6 +1,5 @@
 const Program = require('../models/programModel');
 const Course = require('../models/courseModel');
-const PLO = require('../models/ploModel');
 
 // =========================
 // PROGRAM CRUD OPERATIONS
@@ -12,22 +11,8 @@ const PLO = require('../models/ploModel');
  */
 const getAllPrograms = async (req, res) => {
   try {
-    const { search = '', status = '' } = req.query;
-
-    // Build query
-    const query = {};
-    if (search) {
-      query.$or = [
-        { code: { $regex: search, $options: 'i' } },
-        { program_name: { $regex: search, $options: 'i' } }
-      ];
-    }
-    if (status) {
-      query.status = status;
-    }
-
-    const programs = await Program.find(query)
-      .populate('plos', 'code description')
+    const programs = await Program.find()
+      .populate('plos')
       .sort({ createdAt: -1 });
 
     // Get course count for each program
@@ -43,18 +28,9 @@ const getAllPrograms = async (req, res) => {
       })
     );
 
-    // Get status statistics
-    const stats = {
-      total: programs.length,
-      active: await Program.countDocuments({ status: 'active' }),
-      draft: await Program.countDocuments({ status: 'draft' }),
-      archived: await Program.countDocuments({ status: 'archived' })
-    };
-
     res.status(200).json({
       success: true,
       data: programsWithStats,
-      stats,
       count: programs.length
     });
   } catch (error) {
@@ -114,13 +90,13 @@ const getProgramById = async (req, res) => {
  */
 const createProgram = async (req, res) => {
   try {
-    const { code, program_name, description, plos } = req.body;
+    const { code, program_name, description, type, level, band, tuitionFee, plos } = req.body;
 
     // Validation
-    if (!code || !program_name) {
+    if (!code || !program_name || !type || !level) {
       return res.status(400).json({
         success: false,
-        message: 'Mã chương trình và tên chương trình là bắt buộc'
+        message: 'Mã chương trình, tên, loại và cấp độ là bắt buộc'
       });
     }
 
@@ -137,6 +113,10 @@ const createProgram = async (req, res) => {
       code,
       program_name,
       description,
+      type,
+      level,
+      band,
+      tuitionFee: tuitionFee || 0,
       plos: plos || [],
       status: 'draft'
     });
@@ -163,7 +143,7 @@ const createProgram = async (req, res) => {
 const updateProgram = async (req, res) => {
   try {
     const { id } = req.params;
-    const { code, program_name, description, plos, status } = req.body;
+    const { code, program_name, description, type, level, band, tuitionFee, plos, status } = req.body;
 
     const program = await Program.findById(id);
     if (!program) {
@@ -188,6 +168,10 @@ const updateProgram = async (req, res) => {
     if (code) program.code = code;
     if (program_name) program.program_name = program_name;
     if (description !== undefined) program.description = description;
+    if (type) program.type = type;
+    if (level) program.level = level;
+    if (band !== undefined) program.band = band;
+    if (tuitionFee !== undefined) program.tuitionFee = tuitionFee;
     if (plos) program.plos = plos;
     if (status) program.status = status;
 

@@ -73,13 +73,26 @@ exports.getCourseById = async (req, res) => {
  */
 exports.createCourse = async (req, res) => {
     try {
-        const { name, description, program, clos, sessions, materials, mocktestSessionOrders } = req.body;
+        const {
+            courseCode,
+            name,
+            description,
+            numberOfSessions,
+            timeAllocation,
+            preRequisite,
+            studentTasks,
+            program,
+            clos,
+            sessions,
+            materials,
+            mocktestSessionOrders
+        } = req.body;
 
         // Validation
-        if (!name || !program || !req.user) {
+        if (!courseCode || !name || !program) {
             return res.status(400).json({
                 success: false,
-                message: 'Tên giáo trình và chương trình là bắt buộc'
+                message: 'Mã môn học, tên giáo trình và chương trình là bắt buộc'
             });
         }
 
@@ -92,17 +105,37 @@ exports.createCourse = async (req, res) => {
             });
         }
 
-        const course = await Course.create({
+        // Check if courseCode already exists
+        const existingCourse = await Course.findOne({ courseCode });
+        if (existingCourse) {
+            return res.status(400).json({
+                success: false,
+                message: 'Mã môn học đã tồn tại'
+            });
+        }
+
+        const courseData = {
+            courseCode,
             name,
             description,
+            numberOfSessions,
+            timeAllocation,
+            preRequisite,
+            studentTasks,
             program,
             clos: clos || [],
             sessions: sessions || [],
-            createdBy: req.user._id,
             materials: materials || [],
             mocktestSessionOrders: mocktestSessionOrders || [],
             status: 'draft'
-        });
+        };
+
+        // Add createdBy if user is authenticated
+        if (req.user && req.user._id) {
+            courseData.createdBy = req.user._id;
+        }
+
+        const course = await Course.create(courseData);
 
         const populatedCourse = await Course.findById(course._id)
             .populate('program', 'program_name code')
@@ -130,7 +163,21 @@ exports.createCourse = async (req, res) => {
  */
 exports.updateCourse = async (req, res) => {
     try {
-        const { name, description, program, clos, sessions, materials, mocktestSessionOrders, status } = req.body;
+        const {
+            courseCode,
+            name,
+            description,
+            numberOfSessions,
+            timeAllocation,
+            preRequisite,
+            studentTasks,
+            program,
+            clos,
+            sessions,
+            materials,
+            mocktestSessionOrders,
+            status
+        } = req.body;
 
         const course = await Course.findById(req.params.id);
         if (!course) {
@@ -140,9 +187,25 @@ exports.updateCourse = async (req, res) => {
             });
         }
 
+        // Check if new courseCode already exists (if courseCode is being changed)
+        if (courseCode && courseCode !== course.courseCode) {
+            const existingCourse = await Course.findOne({ courseCode });
+            if (existingCourse) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Mã môn học đã tồn tại'
+                });
+            }
+        }
+
         // Update fields
+        if (courseCode) course.courseCode = courseCode;
         if (name) course.name = name;
         if (description !== undefined) course.description = description;
+        if (numberOfSessions !== undefined) course.numberOfSessions = numberOfSessions;
+        if (timeAllocation !== undefined) course.timeAllocation = timeAllocation;
+        if (preRequisite !== undefined) course.preRequisite = preRequisite;
+        if (studentTasks !== undefined) course.studentTasks = studentTasks;
         if (program) course.program = program;
         if (clos) course.clos = clos;
         if (sessions) course.sessions = sessions;
@@ -298,9 +361,9 @@ exports.requestRevision = async (req, res) => {
     try {
         const course = await Course.findByIdAndUpdate(
             req.params.id,
-            { 
+            {
                 status: 'needs_revision',
-                revisionReason: reason 
+                revisionReason: reason
             },
             { new: true, runValidators: true }
         );
@@ -308,8 +371,6 @@ exports.requestRevision = async (req, res) => {
         if (!course) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy giáo trình' });
         }
-
-        // Logic phụ (nếu có): Gửi email thông báo + lý do cho Subject Leader...
 
         res.status(200).json({
             success: true,
@@ -355,7 +416,6 @@ exports.acceptCourseToProgram = async (req, res) => {
         course.status = 'approved';
         course.approvedAt = new Date();
         course.approvalNote = approvalNote || '';
-        // course.approvedBy = req.user?._id; // Uncomment when auth is enabled
 
         await course.save();
 
@@ -410,7 +470,6 @@ exports.rejectCourseFromProgram = async (req, res) => {
         course.status = 'needs_revision';
         course.rejectedAt = new Date();
         course.rejectionReason = rejectionReason;
-        // course.rejectedBy = req.user?._id; // Uncomment when auth is enabled
 
         await course.save();
 

@@ -35,7 +35,9 @@ app.use('/api/student-schedules', require('./routes/studentScheduleRoutes'));
 // Center Head Routes
 app.use('/api/center-head', require('./routes/centerHeadRoutes'));
 app.use('/api/programs', require('./routes/programRoutes'));
+app.use('/api/plos', require('./routes/ploRoutes'));
 app.use('/api/courses', require('./routes/courseRoute'));
+app.use('/api/clos', require('./routes/cloRoutes'));
 app.use('/api/sessions', require('./routes/sessionRoutes'));
 
 // Academic Staff Routes

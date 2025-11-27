@@ -1228,111 +1228,113 @@ const RequestManagementPage = () => {
   }, [pendingClassChange]);
 
   // Load danh sách giáo viên và phòng khi mở modal tạo lớp mới
-  useEffect(() => {
-    const loadTeachersAndRooms = async () => {
-      if (showMakeupClassModal && makeupClassOption === 'new') {
-        // Load teachers
-        setLoadingTeachers(true);
-        try {
-          const teachersResponse = await teacherService.getAllTeachers();
-          if (teachersResponse.success) {
-            setAvailableTeachers(teachersResponse.teachers || []);
-          }
-        } catch (err) {
-          console.error('Error loading teachers:', err);
-          setAvailableTeachers([]);
-        } finally {
-          setLoadingTeachers(false);
-        }
+  // Đã xóa vì không còn sử dụng tùy chọn "Tạo lớp mới"
+  // useEffect(() => {
+  //   const loadTeachersAndRooms = async () => {
+  //     if (showMakeupClassModal && makeupClassOption === 'new') {
+  //       // Load teachers
+  //       setLoadingTeachers(true);
+  //       try {
+  //         const teachersResponse = await teacherService.getAllTeachers();
+  //         if (teachersResponse.success) {
+  //           setAvailableTeachers(teachersResponse.teachers || []);
+  //         }
+  //       } catch (err) {
+  //         console.error('Error loading teachers:', err);
+  //         setAvailableTeachers([]);
+  //       } finally {
+  //         setLoadingTeachers(false);
+  //       }
 
-        // Load rooms
-        setLoadingRooms(true);
-        try {
-          const roomsResponse = await roomService.getAllRooms();
-          console.log('Rooms response:', roomsResponse);
-          // API trả về { message, total, rooms } hoặc { success, data }
-          if (roomsResponse.rooms) {
-            setAvailableRooms(roomsResponse.rooms || []);
-          } else if (roomsResponse.data) {
-            setAvailableRooms(roomsResponse.data || []);
-          } else if (roomsResponse.success && roomsResponse.data) {
-            setAvailableRooms(roomsResponse.data || []);
-          } else {
-            console.warn('Unexpected rooms response format:', roomsResponse);
-            setAvailableRooms([]);
-          }
-        } catch (err) {
-          console.error('Error loading rooms:', err);
-          setAvailableRooms([]);
-        } finally {
-          setLoadingRooms(false);
-        }
-      }
-    };
+  //       // Load rooms
+  //       setLoadingRooms(true);
+  //       try {
+  //         const roomsResponse = await roomService.getAllRooms();
+  //         console.log('Rooms response:', roomsResponse);
+  //         // API trả về { message, total, rooms } hoặc { success, data }
+  //         if (roomsResponse.rooms) {
+  //           setAvailableRooms(roomsResponse.rooms || []);
+  //         } else if (roomsResponse.data) {
+  //           setAvailableRooms(roomsResponse.data || []);
+  //         } else if (roomsResponse.success && roomsResponse.data) {
+  //           setAvailableRooms(roomsResponse.data || []);
+  //         } else {
+  //           console.warn('Unexpected rooms response format:', roomsResponse);
+  //           setAvailableRooms([]);
+  //         }
+  //       } catch (err) {
+  //         console.error('Error loading rooms:', err);
+  //         setAvailableRooms([]);
+  //       } finally {
+  //         setLoadingRooms(false);
+  //       }
+  //     }
+  //   };
 
-    loadTeachersAndRooms();
-  }, [showMakeupClassModal, makeupClassOption]);
+  //   loadTeachersAndRooms();
+  // }, [showMakeupClassModal, makeupClassOption]);
 
   // Validate conflict khi chọn giáo viên/phòng học trong phần tạo lớp mới
-  useEffect(() => {
-    const validateNewMakeupConflict = async () => {
-      // Chỉ validate khi:
-      // 1. Modal đang mở và chọn "Tạo lớp mới"
-      // 2. Đã có đủ thông tin: date, startTime, endTime, teacher, room
-      if (!showMakeupClassModal || 
-          makeupClassOption !== 'new' ||
-          !newMakeupDate || 
-          !newMakeupStartTime || 
-          !newMakeupEndTime || 
-          !newMakeupTeacherId || 
-          !newMakeupRoomId) {
-        setConflictInfo(null);
-        return;
-      }
+  // Đã xóa vì không còn sử dụng tùy chọn "Tạo lớp mới"
+  // useEffect(() => {
+  //   const validateNewMakeupConflict = async () => {
+  //     // Chỉ validate khi:
+  //     // 1. Modal đang mở và chọn "Tạo lớp mới"
+  //     // 2. Đã có đủ thông tin: date, startTime, endTime, teacher, room
+  //     if (!showMakeupClassModal || 
+  //         makeupClassOption !== 'new' ||
+  //         !newMakeupDate || 
+  //         !newMakeupStartTime || 
+  //         !newMakeupEndTime || 
+  //         !newMakeupTeacherId || 
+  //         !newMakeupRoomId) {
+  //       setConflictInfo(null);
+  //       return;
+  //     }
 
-      try {
-        setValidatingConflict(true);
+  //     try {
+  //       setValidatingConflict(true);
         
-        // Gọi API validate conflict đơn giản (không cần classId)
-        const validateResponse = await classScheduleService.validateScheduleConflictSimple({
-          date: newMakeupDate,
-          startTime: newMakeupStartTime,
-          endTime: newMakeupEndTime,
-          room: newMakeupRoomId,
-          teacher: newMakeupTeacherId
-        });
+  //       // Gọi API validate conflict đơn giản (không cần classId)
+  //       const validateResponse = await classScheduleService.validateScheduleConflictSimple({
+  //         date: newMakeupDate,
+  //         startTime: newMakeupStartTime,
+  //         endTime: newMakeupEndTime,
+  //         room: newMakeupRoomId,
+  //         teacher: newMakeupTeacherId
+  //       });
 
-        if (validateResponse.success) {
-          if (validateResponse.hasConflict) {
-            // Format conflict info để hiển thị
-            const conflictInfo = {
-              teacher: validateResponse.conflicts?.teacher || [],
-              room: validateResponse.conflicts?.room || [],
-              students: validateResponse.conflicts?.students || []
-            };
-            setConflictInfo(conflictInfo);
-          } else {
-            setConflictInfo(null);
-          }
-        } else {
-          setConflictInfo(null);
-        }
-      } catch (err) {
-        console.error('Error validating new makeup conflict:', err);
-        // Không hiển thị lỗi, chỉ log
-        setConflictInfo(null);
-      } finally {
-        setValidatingConflict(false);
-      }
-    };
+  //       if (validateResponse.success) {
+  //         if (validateResponse.hasConflict) {
+  //           // Format conflict info để hiển thị
+  //           const conflictInfo = {
+  //             teacher: validateResponse.conflicts?.teacher || [],
+  //             room: validateResponse.conflicts?.room || [],
+  //             students: validateResponse.conflicts?.students || []
+  //           };
+  //           setConflictInfo(conflictInfo);
+  //         } else {
+  //           setConflictInfo(null);
+  //         }
+  //       } else {
+  //         setConflictInfo(null);
+  //       }
+  //     } catch (err) {
+  //       console.error('Error validating new makeup conflict:', err);
+  //       // Không hiển thị lỗi, chỉ log
+  //       setConflictInfo(null);
+  //     } finally {
+  //       setValidatingConflict(false);
+  //     }
+  //   };
 
-    // Debounce để tránh gọi API quá nhiều
-    const timeoutId = setTimeout(() => {
-      validateNewMakeupConflict();
-    }, 500);
+  //   // Debounce để tránh gọi API quá nhiều
+  //   const timeoutId = setTimeout(() => {
+  //     validateNewMakeupConflict();
+  //   }, 500);
 
-    return () => clearTimeout(timeoutId);
-  }, [showMakeupClassModal, makeupClassOption, newMakeupDate, newMakeupStartTime, newMakeupEndTime, newMakeupTeacherId, newMakeupRoomId]);
+  //   return () => clearTimeout(timeoutId);
+  // }, [showMakeupClassModal, makeupClassOption, newMakeupDate, newMakeupStartTime, newMakeupEndTime, newMakeupTeacherId, newMakeupRoomId]);
 
   // Hàm xử lý lưu buổi học bù
   const handleSaveMakeupClass = async () => {
@@ -1412,114 +1414,6 @@ const RequestManagementPage = () => {
       } catch (err) {
         console.error('Error saving makeup class:', err);
         alert(err.message || 'Có lỗi xảy ra khi lưu buổi học bù');
-      } finally {
-        setProcessing(false);
-      }
-    } else if (makeupClassOption === 'new') {
-      // Xử lý trường hợp tạo lớp mới
-      if (!newMakeupDate || !newMakeupStartTime || !newMakeupEndTime || !newMakeupTeacherId || !newMakeupRoomId) {
-        alert('Vui lòng điền đầy đủ thông tin: ngày, giờ bắt đầu, giờ kết thúc, giáo viên, phòng học');
-        return;
-      }
-
-      // Kiểm tra conflict - không cho lưu nếu có conflict với teacher/room
-      if (conflictInfo && (conflictInfo.teacher?.length > 0 || conflictInfo.room?.length > 0)) {
-        alert('Không thể lưu khi có xung đột lịch học. Vui lòng chọn ngày/giờ/giáo viên/phòng khác.');
-        return;
-      }
-
-      try {
-        setProcessing(true);
-
-        // Lấy thông tin buổi nghỉ đã chọn từ calendarSchedules
-        const absentScheduleFromCalendar = calendarSchedules?.find(
-          s => (s.id || s._id)?.toString() === selectedCurrentScheduleId.toString()
-        );
-
-        if (!absentScheduleFromCalendar) {
-          alert('Không tìm thấy thông tin buổi nghỉ');
-          setProcessing(false);
-          return;
-        }
-
-        // Format absentSchedule để tương thích với code hiện tại
-        const absentSchedule = {
-          id: absentScheduleFromCalendar.id,
-          _id: absentScheduleFromCalendar.id,
-          date: absentScheduleFromCalendar.date,
-          startTime: absentScheduleFromCalendar.startTime,
-          endTime: absentScheduleFromCalendar.endTime,
-          title: absentScheduleFromCalendar.sessionName || absentScheduleFromCalendar.lessonTopic,
-          order: absentScheduleFromCalendar.sessionOrder || absentScheduleFromCalendar.lessonNumber,
-          session: absentScheduleFromCalendar.sessionOrder ? {
-            order: absentScheduleFromCalendar.sessionOrder,
-            title: absentScheduleFromCalendar.sessionName
-          } : null
-        };
-
-        // Lấy thông tin lớp để tạo reason
-        const className = absentScheduleFromCalendar.className || selectedCurrentClassInfo?.className || selectedCurrentClassInfo?.name || 'N/A';
-        const absentDate = absentSchedule.date ? new Date(absentSchedule.date).toLocaleDateString('vi-VN') : 'N/A';
-        const reason = `Buổi học bù cho ${className} - ${absentDate}`;
-
-        // Lấy session từ buổi nghỉ (nếu có) để giữ cùng nội dung học
-        const sessionIdRaw = absentSchedule.session?._id || absentSchedule.session?.id || absentSchedule.session || null;
-        // Convert sessionId thành string nếu có
-        const sessionId = sessionIdRaw ? String(sessionIdRaw) : null;
-
-        // Lấy user hiện tại làm createdBy
-        const userStr = localStorage.getItem('user');
-        let createdBy = null;
-        if (userStr) {
-          try {
-            const user = JSON.parse(userStr);
-            createdBy = user._id || user.id;
-          } catch (e) {
-            console.error('Error parsing user:', e);
-          }
-        }
-
-        // Lưu thông tin buổi học bù vào pendingMakeupClasses (CHƯA tạo ClassSchedule)
-        // Đánh dấu isNewMakeupClass: true để backend biết cần tạo ClassSchedule khi approve
-        const newMakeupEntry = {
-          absentScheduleId: selectedCurrentScheduleId,
-          absentSchedule: absentSchedule,
-          absentClassId: absentScheduleFromCalendar.classId || selectedCurrentClassId,
-          absentClassInfo: selectedCurrentClassInfo,
-          makeupScheduleId: null, // Chưa có vì chưa tạo ClassSchedule
-          isNewMakeupClass: true, // Đánh dấu là buổi học bù mới cần tạo
-          // Lưu đầy đủ thông tin để tạo ClassSchedule khi approve
-          newMakeupClassData: {
-            date: newMakeupDate,
-            startTime: newMakeupStartTime,
-            endTime: newMakeupEndTime,
-            room: newMakeupRoomId,
-            teacher: newMakeupTeacherId,
-            session: sessionId,
-            reason: reason,
-            createdBy: createdBy || newMakeupTeacherId
-          },
-          // Thông tin để hiển thị trong UI
-          makeupSchedule: {
-            date: newMakeupDate,
-            startTime: newMakeupStartTime,
-            endTime: newMakeupEndTime,
-            roomName: availableRooms.find(r => (r._id || r.id) === newMakeupRoomId)?.room_name || 'N/A',
-            teacherName: availableTeachers.find(t => (t._id || t.id) === newMakeupTeacherId)?.username || availableTeachers.find(t => (t._id || t.id) === newMakeupTeacherId)?.fullName || 'N/A'
-          },
-          makeupClassId: null, // Không có classId vì là buổi học bù độc lập
-          makeupClassInfo: null
-        };
-
-        setPendingMakeupClasses(prev => [...prev, newMakeupEntry]);
-        
-        // Reset và đóng modal
-        resetMakeupModalState();
-        
-      } catch (err) {
-        console.error('Error saving makeup class:', err);
-        const errorMessage = err.message || err.response?.data?.message || 'Có lỗi xảy ra khi lưu buổi học bù';
-        alert(`Lỗi: ${errorMessage}`);
       } finally {
         setProcessing(false);
       }
@@ -2128,115 +2022,9 @@ const RequestManagementPage = () => {
                 </div>
               </Alert>
             )}
-            <div className="d-flex gap-12 mb-16" style={{ width: '100%' }}>
-              <Button
-                variant={makeupClassOption === 'existing' ? 'primary' : 'outline-primary'}
-                className="py-12 d-flex align-items-center justify-content-center gap-2"
-                style={{ flex: '1 1 0', minWidth: 0, width: 'calc(50% - 6px)' }}
-                onClick={async () => {
-                  setMakeupClassOption('existing');
-                  // Clear conflict info khi chuyển sang "Chọn buổi của lớp đang sẵn có"
-                  setConflictInfo(null);
-                  setPendingMakeupData(null);
-                  setValidatingConflict(false);
-                  // Lấy lớp đầu tiên từ studentClasses làm lớp hiện tại
-                  if (studentClasses.length > 0) {
-                    const firstClass = studentClasses[0];
-                    setSelectedCurrentClassId(firstClass.classId);
-                    
-                    // Lấy danh sách lớp cùng khóa học
-                    const classSchedules = senderSchedule.filter(sch => {
-                      const classId = sch.class?._id?.toString() || sch.class?.toString();
-                      return classId === firstClass.classId;
-                    });
-
-                    if (classSchedules.length > 0) {
-                      const courseId = classSchedules[0]?.class?.course?._id || classSchedules[0]?.class?.course || null;
-                      setSelectedMakeupClassId(null);
-                      setSelectedMakeupClassInfo(null);
-                      setAvailableMakeupClasses([]);
-                      setLoadingMakeupClasses(true);
-
-                      try {
-                        if (courseId) {
-                          const response = await classService.getAllClasses({ courseId });
-                          if (response.success) {
-                            const classes = response.classes || [];
-                            setAvailableMakeupClasses(classes);
-                            
-                            // Load schedules cho tất cả các lớp để filter
-                            const classesWithSchedules = await Promise.all(
-                              classes.map(async (cls) => {
-                                try {
-                                  const classId = cls._id || cls;
-                                  const classResponse = await classService.getClassById(classId);
-                                  if (classResponse.success && classResponse.class) {
-                                    const classData = classResponse.class;
-                                    const schedules = classData.schedules || [];
-                                    const fixedSchedules = schedules.filter(sch => {
-                                      const status = sch.status || 'fixed';
-                                      return status === 'fixed';
-                                    });
-                                    
-                                    const fixedSchedulesList = fixedSchedules.map(sch => ({
-                                      id: sch._id || sch.id,
-                                      title: sch.session?.title || 'N/A',
-                                      order: sch.session?.order || null,
-                                      date: sch.date || null,
-                                      startTime: sch.startTime || 'N/A',
-                                      endTime: sch.endTime || 'N/A'
-                                    }));
-                                    
-                                    return {
-                                      ...cls,
-                                      schedules: fixedSchedulesList
-                                    };
-                                  }
-                                  return { ...cls, schedules: [] };
-                                } catch (err) {
-                                  console.error(`Error loading schedules for class ${cls._id}:`, err);
-                                  return { ...cls, schedules: [] };
-                                }
-                              })
-                            );
-                            
-                            setAvailableMakeupClassesWithSchedules(classesWithSchedules);
-                          }
-                        }
-                      } catch (err) {
-                        console.error('Error fetching available classes:', err);
-                        setAvailableMakeupClasses([]);
-                        setAvailableMakeupClassesWithSchedules([]);
-                      } finally {
-                        setLoadingMakeupClasses(false);
-                      }
-                    }
-                  }
-                }}
-              >
-                <i className="fas fa-calendar-check"></i>
-                Chọn buổi của lớp đang sẵn có
-              </Button>
-              
-              <Button
-                variant={makeupClassOption === 'new' ? 'success' : 'outline-success'}
-                className="py-12 d-flex align-items-center justify-content-center gap-2"
-                style={{ flex: '1 1 0', minWidth: 0, width: 'calc(50% - 6px)' }}
-                onClick={() => {
-                  setMakeupClassOption('new');
-                  // Clear conflict info khi chuyển sang "Tạo lớp mới"
-                  setConflictInfo(null);
-                  setPendingMakeupData(null);
-                  setValidatingConflict(false);
-                }}
-              >
-                <i className="fas fa-plus-circle"></i>
-                Tạo lớp mới
-              </Button>
-            </div>
 
             {/* Hiển thị nội dung khi đã chọn option */}
-            {(makeupClassOption === 'existing' || makeupClassOption === 'new') && (
+            {makeupClassOption === 'existing' && (
               <div className="row g-3 mt-16">
                 {/* Cột trái: Buổi nghỉ - hiển thị cho cả existing và new */}
                 <div className="col-md-6">
@@ -2265,7 +2053,7 @@ const RequestManagementPage = () => {
                             <p className="text-neutral-600 mt-4 text-12">Đang tải thông tin...</p>
                           </div>
                         ) : filteredAbsentSchedules && filteredAbsentSchedules.length > 0 ? (
-                          <div className="row g-2" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                          <div className="row g-2" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                             {filteredAbsentSchedules.map((schedule) => {
                               const scheduleId = schedule.id || schedule._id;
                               const dateStr = schedule.date ? new Date(schedule.date).toLocaleDateString('vi-VN') : '';
@@ -2738,149 +2526,6 @@ const RequestManagementPage = () => {
                   </div>
                 </div>
                 )}
-
-                {/* Cột phải: Tạo lớp mới - chỉ hiển thị khi chọn new */}
-                {makeupClassOption === 'new' && (
-                  <div className="col-md-6">
-                    <div className="border border-success rounded-8 p-12 bg-success-25">
-                      <h6 className="text-success fw-bold mb-12 text-14">Buổi học bù</h6>
-                      
-                      {/* Hiển thị conflict nếu có - gọn gàng hơn */}
-                      {validatingConflict && (
-                        <div className="mb-8 text-13 text-info">
-                          <Spinner animation="border" size="sm" className="me-2" />
-                          Đang kiểm tra xung đột...
-                        </div>
-                      )}
-                      {!validatingConflict && conflictInfo && (conflictInfo.teacher?.length > 0 || conflictInfo.room?.length > 0) && (
-                        <div className="mb-12">
-                          <Accordion defaultActiveKey="0">
-                            <Accordion.Item eventKey="0">
-                              <Accordion.Header>
-                                <div className="d-flex align-items-center gap-2 text-warning">
-                                  <i className="fas fa-exclamation-triangle"></i>
-                                  <span className="fw-semibold">
-                                    Có xung đột lịch học 
-                                    {conflictInfo.teacher?.length > 0 && ` (${conflictInfo.teacher.length} giáo viên)`}
-                                    {conflictInfo.room?.length > 0 && ` (${conflictInfo.room.length} phòng)`}
-                                  </span>
-                                </div>
-                              </Accordion.Header>
-                              <Accordion.Body className="p-12">
-                                {conflictInfo.teacher && conflictInfo.teacher.length > 0 && (
-                                  <div className="mb-8">
-                                    <strong className="text-danger text-13">⚠️ Xung đột Giảng viên:</strong>
-                                    <ul className="mb-0 mt-2 text-13">
-                                      {conflictInfo.teacher.map((c, idx) => (
-                                        <li key={idx}>
-                                          <strong>Lớp {c.className}</strong> - {c.date} - {c.time}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
-                                {conflictInfo.room && conflictInfo.room.length > 0 && (
-                                  <div className="mb-8">
-                                    <strong className="text-danger text-13">⚠️ Xung đột Phòng học:</strong>
-                                    <ul className="mb-0 mt-2 text-13">
-                                      {conflictInfo.room.map((c, idx) => (
-                                        <li key={idx}>
-                                          <strong>Lớp {c.className}</strong> - {c.date} - {c.time}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
-                                <div className="mt-8 text-13 text-danger">
-                                  <i className="fas fa-exclamation-circle me-2"></i>
-                                  <strong>Vui lòng chọn ngày/giờ/giáo viên/phòng khác</strong>
-                                </div>
-                              </Accordion.Body>
-                            </Accordion.Item>
-                          </Accordion>
-                        </div>
-                      )}
-                      
-                      <Form>
-                        <Form.Group className="mb-12">
-                          <Form.Label className="text-13 fw-semibold">Ngày học:</Form.Label>
-                          <Form.Control
-                            type="date"
-                            value={newMakeupDate}
-                            onChange={(e) => setNewMakeupDate(e.target.value)}
-                            min={new Date().toISOString().split('T')[0]}
-                            required
-                          />
-                        </Form.Group>
-
-                        <Row>
-                          <Col md={6}>
-                            <Form.Group className="mb-12">
-                              <Form.Label className="text-13 fw-semibold">Giờ bắt đầu:</Form.Label>
-                              <Form.Control
-                                type="time"
-                                value={newMakeupStartTime}
-                                onChange={(e) => setNewMakeupStartTime(e.target.value)}
-                                required
-                              />
-                            </Form.Group>
-                          </Col>
-                          <Col md={6}>
-                            <Form.Group className="mb-12">
-                              <Form.Label className="text-13 fw-semibold">Giờ kết thúc:</Form.Label>
-                              <Form.Control
-                                type="time"
-                                value={newMakeupEndTime}
-                                onChange={(e) => setNewMakeupEndTime(e.target.value)}
-                                required
-                              />
-                            </Form.Group>
-                          </Col>
-                        </Row>
-
-                        <Form.Group className="mb-12">
-                          <Form.Label className="text-13 fw-semibold">Giáo viên:</Form.Label>
-                          {loadingTeachers ? (
-                            <Spinner animation="border" size="sm" />
-                          ) : (
-                            <Form.Select
-                              value={newMakeupTeacherId}
-                              onChange={(e) => setNewMakeupTeacherId(e.target.value)}
-                              required
-                            >
-                              <option value="">Chọn giáo viên</option>
-                              {availableTeachers.map((teacher) => (
-                                <option key={teacher._id || teacher.id} value={teacher._id || teacher.id}>
-                                  {teacher.username || teacher.fullName || teacher.name}
-                                </option>
-                              ))}
-                            </Form.Select>
-                          )}
-                        </Form.Group>
-
-                        <Form.Group className="mb-12">
-                          <Form.Label className="text-13 fw-semibold">Phòng học:</Form.Label>
-                          {loadingRooms ? (
-                            <Spinner animation="border" size="sm" />
-                          ) : (
-                            <Form.Select
-                              value={newMakeupRoomId}
-                              onChange={(e) => setNewMakeupRoomId(e.target.value)}
-                              required
-                            >
-                              <option value="">Chọn phòng học</option>
-                              {availableRooms.map((room) => (
-                                <option key={room._id || room.id} value={room._id || room.id}>
-                                  {room.room_name || room.name} {room.location ? `- ${room.location}` : ''}
-                                </option>
-                              ))}
-                            </Form.Select>
-                          )}
-                        </Form.Group>
-                      </Form>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </Modal.Body>
@@ -2896,8 +2541,7 @@ const RequestManagementPage = () => {
               disabled={
                 processing || 
                 validatingConflict ||
-                (makeupClassOption === 'existing' && (!selectedCurrentScheduleId || !selectedMakeupClassInfo?.selectedScheduleId || (conflictInfo && conflictInfo.students && conflictInfo.students.length > 0))) ||
-                (makeupClassOption === 'new' && (!newMakeupDate || !newMakeupStartTime || !newMakeupEndTime || !newMakeupTeacherId || !newMakeupRoomId || (conflictInfo && (conflictInfo.teacher?.length > 0 || conflictInfo.room?.length > 0))))
+                (!selectedCurrentScheduleId || !selectedMakeupClassInfo?.selectedScheduleId || (conflictInfo && conflictInfo.students && conflictInfo.students.length > 0))
               }
               onClick={handleSaveMakeupClass}
             >
@@ -3690,118 +3334,8 @@ const RequestManagementPage = () => {
                 </Alert>
               )}
               
-              {/* Chỉ hiển thị form khi không có conflict */}
-              {!conflictInfo && (
-                <>
-              <div className="d-flex gap-12 mb-16" style={{ width: '100%' }}>
-                <Button
-                  variant={makeupClassOption === 'existing' ? 'primary' : 'outline-primary'}
-                  className="py-12 d-flex align-items-center justify-content-center gap-2"
-                  style={{ flex: '1 1 0', minWidth: 0, width: 'calc(50% - 6px)' }}
-                  onClick={async () => {
-                    setMakeupClassOption('existing');
-                    // Clear conflict info khi chuyển sang "Chọn buổi của lớp đang sẵn có"
-                    setConflictInfo(null);
-                    setPendingMakeupData(null);
-                    setValidatingConflict(false);
-                    // Lấy lớp đầu tiên từ studentClasses làm lớp hiện tại
-                    if (studentClasses.length > 0) {
-                      const firstClass = studentClasses[0];
-                      setSelectedCurrentClassId(firstClass.classId);
-                      
-                      // Lấy danh sách lớp cùng khóa học
-                      const classSchedules = senderSchedule.filter(sch => {
-                        const classId = sch.class?._id?.toString() || sch.class?.toString();
-                        return classId === firstClass.classId;
-                      });
-
-                      if (classSchedules.length > 0) {
-                        const courseId = classSchedules[0]?.class?.course?._id || classSchedules[0]?.class?.course || null;
-                        setSelectedMakeupClassId(null);
-                        setSelectedMakeupClassInfo(null);
-                        setAvailableMakeupClasses([]);
-                        setLoadingMakeupClasses(true);
-
-                        try {
-                          if (courseId) {
-                            const response = await classService.getAllClasses({ courseId });
-                            if (response.success) {
-                              const classes = response.classes || [];
-                              setAvailableMakeupClasses(classes);
-                              
-                              // Load schedules cho tất cả các lớp để filter
-                              const classesWithSchedules = await Promise.all(
-                                classes.map(async (cls) => {
-                                  try {
-                                    const classId = cls._id || cls;
-                                    const classResponse = await classService.getClassById(classId);
-                                    if (classResponse.success && classResponse.class) {
-                                      const classData = classResponse.class;
-                                      const schedules = classData.schedules || [];
-                                      const fixedSchedules = schedules.filter(sch => {
-                                        const status = sch.status || 'fixed';
-                                        return status === 'fixed';
-                                      });
-                                      
-                                      const fixedSchedulesList = fixedSchedules.map(sch => ({
-                                        id: sch._id || sch.id,
-                                        title: sch.session?.title || 'N/A',
-                                        order: sch.session?.order || null,
-                                        date: sch.date || null,
-                                        startTime: sch.startTime || 'N/A',
-                                        endTime: sch.endTime || 'N/A'
-                                      }));
-                                      
-                                      return {
-                                        ...cls,
-                                        schedules: fixedSchedulesList
-                                      };
-                                    }
-                                    return { ...cls, schedules: [] };
-                                  } catch (err) {
-                                    console.error(`Error loading schedules for class ${cls._id}:`, err);
-                                    return { ...cls, schedules: [] };
-                                  }
-                                })
-                              );
-                              
-                              setAvailableMakeupClassesWithSchedules(classesWithSchedules);
-                            }
-                          }
-                        } catch (err) {
-                          console.error('Error fetching available classes:', err);
-                          setAvailableMakeupClasses([]);
-                          setAvailableMakeupClassesWithSchedules([]);
-                        } finally {
-                          setLoadingMakeupClasses(false);
-                        }
-                      }
-                    }
-                  }}
-                >
-                  <i className="fas fa-calendar-check"></i>
-                  Chọn buổi của lớp đang sẵn có
-                </Button>
-                
-                <Button
-                  variant={makeupClassOption === 'new' ? 'success' : 'outline-success'}
-                  className="py-12 d-flex align-items-center justify-content-center gap-2"
-                  style={{ flex: '1 1 0', minWidth: 0, width: 'calc(50% - 6px)' }}
-                  onClick={() => {
-                    setMakeupClassOption('new');
-                    // Clear conflict info khi chuyển sang "Tạo lớp mới"
-                    setConflictInfo(null);
-                    setPendingMakeupData(null);
-                    setValidatingConflict(false);
-                  }}
-                >
-                  <i className="fas fa-plus-circle"></i>
-                  Tạo lớp mới
-                </Button>
-      </div>
-
               {/* Hiển thị nội dung khi đã chọn option */}
-              {(makeupClassOption === 'existing' || makeupClassOption === 'new') && (
+              {makeupClassOption === 'existing' && (
                 <div className="row g-3 mt-16">
                   {/* Cột trái: Buổi nghỉ - hiển thị cho cả existing và new */}
                   <div className="col-md-6">
@@ -3830,7 +3364,7 @@ const RequestManagementPage = () => {
                               <p className="text-neutral-600 mt-4 text-12">Đang tải thông tin...</p>
                             </div>
                           ) : filteredAbsentSchedules && filteredAbsentSchedules.length > 0 ? (
-                            <div className="row g-2" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                            <div className="row g-2" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                               {filteredAbsentSchedules.map((schedule) => {
                                 const scheduleId = schedule.id || schedule._id;
                                 const dateStr = schedule.date ? new Date(schedule.date).toLocaleDateString('vi-VN') : '';
@@ -4296,152 +3830,7 @@ const RequestManagementPage = () => {
                     </div>
                   </div>
                   )}
-
-                  {/* Cột phải: Tạo lớp mới - chỉ hiển thị khi chọn new */}
-                  {makeupClassOption === 'new' && (
-                    <div className="col-md-6">
-                      <div className="border border-success rounded-8 p-12 bg-success-25">
-                        <h6 className="text-success fw-bold mb-12 text-14">Buổi học bù</h6>
-                        
-                        {/* Hiển thị conflict nếu có - gọn gàng hơn */}
-                        {validatingConflict && (
-                          <div className="mb-8 text-13 text-info">
-                            <Spinner animation="border" size="sm" className="me-2" />
-                            Đang kiểm tra xung đột...
-                          </div>
-                        )}
-                        {!validatingConflict && conflictInfo && (conflictInfo.teacher?.length > 0 || conflictInfo.room?.length > 0) && (
-                          <div className="mb-12">
-                            <Accordion defaultActiveKey="0">
-                              <Accordion.Item eventKey="0">
-                                <Accordion.Header>
-                                  <div className="d-flex align-items-center gap-2 text-warning">
-                                    <i className="fas fa-exclamation-triangle"></i>
-                                    <span className="fw-semibold">
-                                      Có xung đột lịch học 
-                                      {conflictInfo.teacher?.length > 0 && ` (${conflictInfo.teacher.length} giáo viên)`}
-                                      {conflictInfo.room?.length > 0 && ` (${conflictInfo.room.length} phòng)`}
-                                    </span>
-                                  </div>
-                                </Accordion.Header>
-                                <Accordion.Body className="p-12">
-                                  {conflictInfo.teacher && conflictInfo.teacher.length > 0 && (
-                                    <div className="mb-8">
-                                      <strong className="text-danger text-13">⚠️ Xung đột Giảng viên:</strong>
-                                      <ul className="mb-0 mt-2 text-13">
-                                        {conflictInfo.teacher.map((c, idx) => (
-                                          <li key={idx}>
-                                            <strong>Lớp {c.className}</strong> - {c.date} - {c.time}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                  {conflictInfo.room && conflictInfo.room.length > 0 && (
-                                    <div className="mb-8">
-                                      <strong className="text-danger text-13">⚠️ Xung đột Phòng học:</strong>
-                                      <ul className="mb-0 mt-2 text-13">
-                                        {conflictInfo.room.map((c, idx) => (
-                                          <li key={idx}>
-                                            <strong>Lớp {c.className}</strong> - {c.date} - {c.time}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                  <div className="mt-8 text-13 text-danger">
-                                    <i className="fas fa-exclamation-circle me-2"></i>
-                                    <strong>Vui lòng chọn ngày/giờ/giáo viên/phòng khác</strong>
-                                  </div>
-                                </Accordion.Body>
-                              </Accordion.Item>
-                            </Accordion>
-                          </div>
-                        )}
-                        
-                        <Form>
-                          <Form.Group className="mb-12">
-                            <Form.Label className="text-13 fw-semibold">Ngày học:</Form.Label>
-                            <Form.Control
-                              type="date"
-                              value={newMakeupDate}
-                              onChange={(e) => setNewMakeupDate(e.target.value)}
-                              min={new Date().toISOString().split('T')[0]}
-                              required
-                            />
-                          </Form.Group>
-
-                          <Row>
-                            <Col md={6}>
-                              <Form.Group className="mb-12">
-                                <Form.Label className="text-13 fw-semibold">Giờ bắt đầu:</Form.Label>
-                                <Form.Control
-                                  type="time"
-                                  value={newMakeupStartTime}
-                                  onChange={(e) => setNewMakeupStartTime(e.target.value)}
-                                  required
-                                />
-                              </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                              <Form.Group className="mb-12">
-                                <Form.Label className="text-13 fw-semibold">Giờ kết thúc:</Form.Label>
-                                <Form.Control
-                                  type="time"
-                                  value={newMakeupEndTime}
-                                  onChange={(e) => setNewMakeupEndTime(e.target.value)}
-                                  required
-                                />
-                              </Form.Group>
-                            </Col>
-                          </Row>
-
-                          <Form.Group className="mb-12">
-                            <Form.Label className="text-13 fw-semibold">Giáo viên:</Form.Label>
-                            {loadingTeachers ? (
-                              <Spinner animation="border" size="sm" />
-                            ) : (
-                              <Form.Select
-                                value={newMakeupTeacherId}
-                                onChange={(e) => setNewMakeupTeacherId(e.target.value)}
-                                required
-                              >
-                                <option value="">Chọn giáo viên</option>
-                                {availableTeachers.map((teacher) => (
-                                  <option key={teacher._id || teacher.id} value={teacher._id || teacher.id}>
-                                    {teacher.username || teacher.fullName || teacher.name}
-                                  </option>
-                                ))}
-                              </Form.Select>
-                            )}
-                          </Form.Group>
-
-                          <Form.Group className="mb-12">
-                            <Form.Label className="text-13 fw-semibold">Phòng học:</Form.Label>
-                            {loadingRooms ? (
-                              <Spinner animation="border" size="sm" />
-                            ) : (
-                              <Form.Select
-                                value={newMakeupRoomId}
-                                onChange={(e) => setNewMakeupRoomId(e.target.value)}
-                                required
-                              >
-                                <option value="">Chọn phòng học</option>
-                                {availableRooms.map((room) => (
-                                  <option key={room._id || room.id} value={room._id || room.id}>
-                                    {room.room_name || room.name} {room.location ? `- ${room.location}` : ''}
-                                  </option>
-                                ))}
-                              </Form.Select>
-                            )}
-                          </Form.Group>
-                        </Form>
-                      </div>
-                    </div>
-                  )}
                 </div>
-              )}
-                </>
               )}
             </Modal.Body>
             <Modal.Footer>
@@ -4456,8 +3845,7 @@ const RequestManagementPage = () => {
                 disabled={
                   processing || 
                   validatingConflict ||
-                  (makeupClassOption === 'existing' && (!selectedCurrentScheduleId || !selectedMakeupClassInfo?.selectedScheduleId || (conflictInfo && conflictInfo.students && conflictInfo.students.length > 0))) ||
-                  (makeupClassOption === 'new' && (!newMakeupDate || !newMakeupStartTime || !newMakeupEndTime || !newMakeupTeacherId || !newMakeupRoomId || (conflictInfo && (conflictInfo.teacher?.length > 0 || conflictInfo.room?.length > 0))))
+                  (!selectedCurrentScheduleId || !selectedMakeupClassInfo?.selectedScheduleId || (conflictInfo && conflictInfo.students && conflictInfo.students.length > 0))
                 }
                 onClick={handleSaveMakeupClass}
               >

@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { examsMock } from "../../components/student_components/student_mockdata/examMockData";
+import examService from "../../services/examService";
 import HeaderOne from "../../components/HomePageforStudent/HeaderOne";
 import FooterOne from "../../components/FooterOne";
 import Breadcrumb from "../../components/Breadcrumb";
@@ -10,11 +10,53 @@ import Preloader from "../../helper/Preloader";
 const ExamDetailPage2 = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [exam, setExam] = useState(null);
+  const [submission, setSubmission] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [startingExam, setStartingExam] = useState(false);
 
-  // Find exam by ID from mock data
-  const exam = useMemo(() => {
-    return examsMock.find((e) => e._id === id);
+  // Fetch exam data on component mount
+  useEffect(() => {
+    const fetchExam = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const examData = await examService.getExamById(id);
+        setExam(examData);
+      } catch (err) {
+        console.error('Error fetching exam:', err);
+        setError(err.message || 'Không thể tải thông tin đề thi');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchExam();
+    }
   }, [id]);
+
+  // Fetch submission after exam is loaded
+  useEffect(() => {
+    const fetchSubmission = async () => {
+      if (!exam || !id) return;
+      
+      try {
+        // Try to get existing submission by calling startExam
+        // This will return existing submission if available, or create new one
+        const result = await examService.startExam(id);
+        if (result.submission) {
+          setSubmission(result.submission);
+        }
+      } catch (err) {
+        // If error (e.g., not authenticated), submission will remain null
+        console.log('No submission found or not authenticated:', err);
+      }
+    };
+
+    fetchSubmission();
+  }, [exam, id]);
 
   // Get section configuration
   const getSectionConfig = (type) => {
@@ -71,22 +113,81 @@ const ExamDetailPage2 = () => {
     );
   };
 
-  // Calculate progress (mock - can be replaced with real data)
-  const progress = 0; // 0% progress
+  // Calculate progress based on submission
+  const progress = useMemo(() => {
+    if (!submission || !exam || !exam.sections) return 0;
+    
+    const totalSections = exam.sections.length;
+    if (totalSections === 0) return 0;
+    
+    const submittedSections = submission.sections?.filter(
+      (section) => section.submittedAt !== null
+    ).length || 0;
+    
+    return Math.round((submittedSections / totalSections) * 100);
+  }, [submission, exam]);
 
-  const handleSectionClick = (sectionType,submissionId) => {
-    // Navigate to section exam page
-    // This will need to be updated when submission system is ready
-    navigate(`/exams/${id}/submissions/${submissionId}/${sectionType}`);
+  // Check if a section is completed (has submittedAt)
+  const isSectionCompleted = (sectionType) => {
+    if (!submission || !submission.sections) return false;
+    const sectionSubmission = submission.sections.find(
+      (s) => s.sectionType === sectionType
+    );
+    return sectionSubmission?.submittedAt !== null && sectionSubmission?.submittedAt !== undefined;
   };
 
-  const handleFullTestClick = () => {
-    // Navigate to full test
-    // This will need to be updated when submission system is ready
-    navigate(`/exams/${id}/full-test`);
+  const handleSectionClick = async (sectionType) => {
+    try {
+      setStartingExam(true);
+      
+      // If no submission exists, create one by starting the exam
+      if (!submission) {
+        const result = await examService.startExam(id);
+        if (result.submission) {
+          setSubmission(result.submission);
+          navigate(`/exams/${id}/submissions/${result.submission._id}/${sectionType}`);
+        } else {
+          throw new Error('Không thể tạo bài làm');
+        }
+      } else {
+        // If submission exists, navigate directly
+        navigate(`/exams/${id}/submissions/${submission._id}/${sectionType}`);
+      }
+    } catch (err) {
+      console.error('Error starting exam:', err);
+      alert(err.message || 'Không thể bắt đầu làm bài. Vui lòng thử lại.');
+    } finally {
+      setStartingExam(false);
+    }
   };
 
-  if (!exam) {
+  const handleFullTestClick = async () => {
+    try {
+      setStartingExam(true);
+      
+      // If no submission exists, create one by starting the exam
+      if (!submission) {
+        const result = await examService.startExam(id);
+        if (result.submission) {
+          setSubmission(result.submission);
+          navigate(`/exams/${id}/full-test`);
+        } else {
+          throw new Error('Không thể tạo bài làm');
+        }
+      } else {
+        // If submission exists, navigate directly
+        navigate(`/exams/${id}/full-test`);
+      }
+    } catch (err) {
+      console.error('Error starting exam:', err);
+      alert(err.message || 'Không thể bắt đầu làm bài. Vui lòng thử lại.');
+    } finally {
+      setStartingExam(false);
+    }
+  };
+
+  // Show loading state
+  if (loading) {
     return (
       <>
         <Preloader />
@@ -96,9 +197,52 @@ const ExamDetailPage2 = () => {
         <section className="py-120">
           <div className="container">
             <div className="text-center py-80">
-              <p className="text-neutral-500 text-lg">
-                Không tìm thấy đề thi
+              <div className="spinner-border text-main-600" role="status">
+                <span className="visually-hidden">Đang tải...</span>
+              </div>
+              <p className="mt-16 text-neutral-600">Đang tải thông tin đề thi...</p>
+            </div>
+          </div>
+        </section>
+        <FooterOne />
+      </>
+    );
+  }
+
+  // Show error state
+  if (error || !exam) {
+    return (
+      <>
+        <Preloader />
+        <Animation />
+        <HeaderOne />
+        <Breadcrumb title={"Chi tiết đề thi"} />
+        <section className="py-120">
+          <div className="container">
+            <div className="text-center py-80">
+              <div className="inline-flex flex-center w-80 h-80 rounded-circle bg-danger-25 mb-24">
+                <i className="ph-bold ph-warning text-4xl text-danger" />
+              </div>
+              <h3 className="text-xl fw-semibold text-neutral-900 mb-16">
+                {error ? 'Có lỗi xảy ra' : 'Không tìm thấy đề thi'}
+              </h3>
+              <p className="text-neutral-500 text-lg mb-24">
+                {error || 'Đề thi không tồn tại hoặc đã bị xóa'}
               </p>
+              <button
+                onClick={() => navigate('/exams')}
+                className="btn btn-main me-12"
+              >
+                Quay lại danh sách
+              </button>
+              {error && (
+                <button
+                  onClick={() => window.location.reload()}
+                  className="btn btn-outline-main"
+                >
+                  Thử lại
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -114,10 +258,59 @@ const ExamDetailPage2 = () => {
       <HeaderOne />
       <Breadcrumb title={exam.title || "Chi tiết đề thi"} />
 
-      <section className="py-120">
-        <div className="container">
+      <section 
+        className="py-120 position-relative"
+        style={{
+          background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f0f9ff 50%, #e0f2fe 75%, #f0f9ff 100%)",
+          backgroundSize: "400% 400%",
+          animation: "gradientShift 15s ease infinite",
+          minHeight: "100vh",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        {/* Decorative background elements */}
+        <div 
+          style={{
+            position: "absolute",
+            top: "-50%",
+            right: "-10%",
+            width: "600px",
+            height: "600px",
+            background: "radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)",
+            borderRadius: "50%",
+            zIndex: 0,
+          }}
+        />
+        <div 
+          style={{
+            position: "absolute",
+            bottom: "-30%",
+            left: "-5%",
+            width: "500px",
+            height: "500px",
+            background: "radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%)",
+            borderRadius: "50%",
+            zIndex: 0,
+          }}
+        />
+        <style>{`
+          @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+          }
+        `}</style>
+        <div className="container position-relative" style={{ zIndex: 1 }}>
           {/* Main Card Container */}
-          <div className="bg-white rounded-16 p-32 border border-neutral-30 box-shadow-md">
+          <div 
+            className="bg-white rounded-16 p-32 border border-neutral-30 box-shadow-md"
+            style={{
+              boxShadow: "0 20px 60px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(59, 130, 246, 0.08)",
+              backdropFilter: "blur(10px)",
+              position: "relative",
+            }}
+          >
             {/* Title */}
             <h1 className="mb-40 text-neutral-900">{exam.title}</h1>
 
@@ -125,6 +318,7 @@ const ExamDetailPage2 = () => {
             <div className="row gy-4 mb-40">
               {exam.sections?.map((section, index) => {
                 const config = getSectionConfig(section.type);
+                const isCompleted = isSectionCompleted(section.type);
                 return (
                   <div key={index} className="col-lg-3 col-md-6 col-sm-6">
                     <div
@@ -158,21 +352,38 @@ const ExamDetailPage2 = () => {
                         {config.name}
                       </h4>
 
-                      {/* Take Test Button */}
+                      {/* Take Test / Làm lại Button */}
                       <button
                         className="btn py-12 rounded-8 text-white fw-semibold transition-2 mb-16 flex-center gap-8"
                         style={{
                           width: "100%",
-                          background: config.gradient,
+                          background: isCompleted 
+                            ? "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)"
+                            : config.gradient,
                           border: "none",
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleSectionClick(section.type,section.submissionId);
+                          handleSectionClick(section.type);
                         }}
+                        disabled={startingExam}
                       >
-                        Take Test
-                        <i className="ph ph-lightning" />
+                        {startingExam ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-8" />
+                            Đang tải...
+                          </>
+                        ) : isCompleted ? (
+                          <>
+                            Làm lại
+                            <i className="ph ph-arrow-counter-clockwise" />
+                          </>
+                        ) : (
+                          <>
+                            Làm Bài
+                            <i className="ph ph-lightning" />
+                          </>
+                        )}
                       </button>
 
                       {/* Key and Document Icons */}
@@ -274,9 +485,19 @@ const ExamDetailPage2 = () => {
                     e.stopPropagation();
                     handleFullTestClick();
                   }}
+                  disabled={startingExam}
                 >
-                  Start
-                  <i className="ph ph-lightning ms-8" />
+                  {startingExam ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-8" />
+                      Đang tải...
+                    </>
+                  ) : (
+                    <>
+                      Làm Bài
+                      <i className="ph ph-lightning ms-8" />
+                    </>
+                  )}
                 </button>
               </div>
             </div>

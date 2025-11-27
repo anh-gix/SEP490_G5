@@ -393,14 +393,17 @@ const ReadingResultPage = () => {
                         className="p-24" 
                         style={{ 
                           height: "calc(100vh - 400px)", 
-                          overflow: "auto",
+                          overflow: "hidden",
                         }}
                       >
                         <iframe
                           src={getPDFUrl()}
                           className="w-100 h-100 border-0 rounded-8"
                           title="Reading PDF"
-                          style={{ minHeight: "600px" }}
+                          style={{ 
+                            minHeight: "600px",
+                            display: "block"
+                          }}
                         />
                       </div>
                     </div>
@@ -427,53 +430,51 @@ const ReadingResultPage = () => {
                           <h4 className="mb-0">Chi tiết đáp án</h4>
                         </div>
                       </div>
-                      <div className="p-24" style={{ height: "calc(100vh - 400px)", overflow: "auto" }}>
-                        <div className='row gy-4'>
+                      <div className="p-16" style={{ height: "calc(100vh - 400px)", overflow: "auto" }}>
+                        <div className='row gy-2'>
                           {result.results?.map((item, index) => (
                             <div key={index} className='col-12'>
                               <div
-                                className={`rounded-16 p-24 border box-shadow-sm ${
+                                className={`rounded-8 p-12 border ${
                                   item.isCorrect
                                     ? "border-success bg-success-25"
                                     : "border-danger bg-danger-25"
                                 }`}
                               >
-                                <div className='flex-between gap-16 mb-16 flex-wrap'>
-                                  <div className='flex-align gap-12'>
-                                    <span className='w-40 h-40 flex-center bg-white text-main-600 rounded-circle flex-shrink-0'>
-                                      <i className='ph-bold ph-question' />
-                                    </span>
-                                    <span className='fw-semibold text-neutral-700 text-lg'>
-                                      Câu {item.questionNumber}
+                                <div className='flex-between gap-8 mb-8 flex-wrap'>
+                                  <div className='flex-align gap-8'>
+                                    
+                                    <span className='fw-semibold text-neutral-700 text-sm'>
+                                      Câu {item.questionNumber}: {item.questionTitle && (
+                                  <div className='mb-8'>
+                                    <p className='text-neutral-700 fw-semibold mb-0 text-sm'>{item.questionTitle}</p>
+                                  </div>
+                                )}
                                     </span>
                                   </div>
                                   {item.isCorrect ? (
-                                    <span className='badge bg-success text-white px-16 py-6 rounded-pill'>
-                                      <i className='ph ph-check-circle me-4' />
+                                    <span className='badge bg-success text-white px-8 py-2 rounded-pill text-xs'>
+                                      <i className='ph ph-check-circle me-2' />
                                       Đúng
                                     </span>
                                   ) : (
-                                    <span className='badge bg-danger text-white px-16 py-6 rounded-pill'>
-                                      <i className='ph ph-x-circle me-4' />
+                                    <span className='badge bg-danger text-white px-8 py-2 rounded-pill text-xs'>
+                                      <i className='ph ph-x-circle me-2' />
                                       Sai
                                     </span>
                                   )}
                                 </div>
                                 {/* Question Title */}
-                                {item.questionTitle && (
-                                  <div className='mb-16'>
-                                    <p className='text-neutral-700 fw-semibold mb-0'>{item.questionTitle}</p>
-                                  </div>
-                                )}
+                               
 
-                                <div className='mb-16'>
-                                  <p className='text-neutral-600 text-sm mb-8'>
+                                <div className='mb-0'>
+                                  <p className='text-neutral-600 text-xs mb-4'>
                                     <span className='fw-semibold'>Đáp án của bạn:</span>
                                   </p>
-                                  <div className={`bg-white rounded-12 p-16 border ${
+                                  <div className={`bg-white rounded-6 p-8 border ${
                                     item.isCorrect ? "border-success" : "border-danger"
                                   }`}>
-                                    <p className={`mb-0 fw-medium ${
+                                    <p className={`mb-0 fw-medium text-sm ${
                                       item.isCorrect ? "text-success" : "text-danger"
                                     }`}>
                                       {item.studentAnswer 
@@ -482,22 +483,17 @@ const ReadingResultPage = () => {
                                     </p>
                                   </div>
                                   {!item.isCorrect && item.correctAnswer && (
-                                    <div className='mt-12'>
-                                      <p className='text-neutral-600 text-sm mb-8'>
+                                    <div className='mt-6'>
+                                      <p className='text-neutral-600 text-xs mb-4'>
                                         <span className='fw-semibold'>Đáp án đúng:</span>
                                       </p>
-                                      <div className='bg-success-25 rounded-12 p-16 border border-success'>
-                                        <p className='mb-0 fw-medium text-success'>
+                                      <div className='bg-success-25 rounded-6 p-8 border border-success'>
+                                        <p className='mb-0 fw-medium text-success text-sm'>
                                           {getAnswerText(item.correctAnswer, item.questionAnswer)}
                                         </p>
                                       </div>
                                     </div>
                                   )}
-                                </div>
-                                <div className='pt-16 border-top border-neutral-30'>
-                                  <span className='text-neutral-600 text-sm'>
-                                    Điểm: <span className='fw-bold text-main-600'>{item.score}</span> / {item.maxScore}
-                                  </span>
                                 </div>
                               </div>
                             </div>
@@ -519,77 +515,61 @@ const ReadingResultPage = () => {
                         <h4 className="mb-0">Chi tiết đáp án</h4>
                       </div>
                     </div>
-                    <div className="p-24" style={{ minHeight: "400px", overflow: "auto" }}>
-                      <div className='row gy-4'>
+                    <div className="p-16" style={{ minHeight: "400px", overflow: "auto" }}>
+                      <div className='row gy-2'>
                         {result.results?.map((item, index) => (
                           <div key={index} className='col-md-6 col-lg-4'>
                             <div
-                              className={`rounded-16 p-24 border box-shadow-sm h-100 ${
+                              className={`rounded-8 p-10 border h-100 ${
                                 item.isCorrect
                                   ? "border-success bg-success-25"
                                   : "border-danger bg-danger-25"
                               }`}
                             >
-                              <div className='flex-between gap-16 mb-16 flex-wrap'>
-                                <div className='flex-align gap-12'>
-                                  <span className='w-40 h-40 flex-center bg-white text-main-600 rounded-circle flex-shrink-0'>
-                                    <i className='ph-bold ph-question' />
-                                  </span>
-                                  <span className='fw-semibold text-neutral-700'>
-                                    Câu {item.questionNumber}
-                                  </span>
-                                </div>
+                              <div className='flex-between gap-8 mb-6'>
+                                <span className='fw-semibold text-neutral-700 text-sm'>
+                                  Câu {item.questionNumber}
+                                </span>
                                 {item.isCorrect ? (
-                                  <span className='badge bg-success text-white px-12 py-4 rounded-pill'>
-                                    <i className='ph ph-check-circle me-4' />
+                                  <span className='badge bg-success text-white px-8 py-2 rounded-pill text-xs'>
+                                    <i className='ph ph-check-circle me-2' />
                                     Đúng
                                   </span>
                                 ) : (
-                                  <span className='badge bg-danger text-white px-12 py-4 rounded-pill'>
-                                    <i className='ph ph-x-circle me-4' />
+                                  <span className='badge bg-danger text-white px-8 py-2 rounded-pill text-xs'>
+                                    <i className='ph ph-x-circle me-2' />
                                     Sai
                                   </span>
                                 )}
                               </div>
                               {/* Question Title */}
                               {item.questionTitle && (
-                                <div className='mb-12'>
-                                  <p className='text-neutral-700 fw-semibold mb-0 text-sm'>{item.questionTitle}</p>
+                                <div className='mb-6'>
+                                  <p className='text-neutral-700 fw-semibold mb-0 text-xs'>{item.questionTitle}</p>
                                 </div>
                               )}
 
-                              <div className='mb-12'>
-                                <p className='text-neutral-600 text-sm mb-8'>
-                                  <span className='fw-semibold'>Đáp án của bạn:</span>
-                                </p>
-                                <div className={`bg-white rounded-8 p-12 border ${
-                                  item.isCorrect ? "border-success" : "border-danger"
-                                }`}>
-                                  <p className={`mb-0 text-sm fw-medium ${
-                                    item.isCorrect ? "text-success" : "text-danger"
-                                  }`}>
+                              <div className='mb-0'>
+                                <p className='text-neutral-600 text-xs mb-3'>
+                                  <span className='fw-semibold'>Đáp án của bạn:</span>{" "}
+                                  <span
+                                    className={`fw-medium ${
+                                      item.isCorrect ? "text-success" : "text-danger"
+                                    }`}
+                                  >
                                     {item.studentAnswer 
                                       ? getAnswerText(item.studentAnswer, item.questionAnswer)
                                       : "Chưa trả lời"}
-                                  </p>
-                                </div>
+                                  </span>
+                                </p>
                                 {!item.isCorrect && item.correctAnswer && (
-                                  <div className='mt-8'>
-                                    <p className='text-neutral-600 text-sm mb-4'>
-                                      <span className='fw-semibold'>Đáp án đúng:</span>
-                                    </p>
-                                    <div className='bg-success-25 rounded-8 p-12 border border-success'>
-                                      <p className='mb-0 text-sm fw-medium text-success'>
-                                        {getAnswerText(item.correctAnswer, item.questionAnswer)}
-                                      </p>
-                                    </div>
-                                  </div>
+                                  <p className='text-neutral-600 text-xs mb-0'>
+                                    <span className='fw-semibold'>Đáp án đúng:</span>{" "}
+                                    <span className='fw-medium text-success'>
+                                      {getAnswerText(item.correctAnswer, item.questionAnswer)}
+                                    </span>
+                                  </p>
                                 )}
-                              </div>
-                              <div className='pt-12 border-top border-neutral-30'>
-                                <span className='text-neutral-600 text-xs'>
-                                  Điểm: <span className='fw-bold text-main-600'>{item.score}</span> / {item.maxScore}
-                                </span>
                               </div>
                             </div>
                           </div>
@@ -625,7 +605,7 @@ const ReadingResultPage = () => {
                   Quay lại bài thi
                 </Link>
                 <Link
-                  to='/exams'
+                  to='/exams2'
                   className='btn btn-outline-main px-40 py-16 rounded-pill'
                 >
                   <i className='ph ph-list me-8' />

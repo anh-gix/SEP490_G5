@@ -183,6 +183,20 @@ export const examService = {
       throw error.response?.data || { message: 'Không thể lấy kết quả' };
     }
   },
+  
+  // Lấy danh sách submissions của học sinh hiện tại
+  getStudentSubmissions: async () => {
+    try {
+      const response = await api.get('/submissions/student');
+      return response.data;
+    } catch (error) {
+      // Nếu endpoint chưa tồn tại, trả về mảng rỗng
+      if (error.response?.status === 404) {
+        return [];
+      }
+      throw error.response?.data || { message: 'Không thể lấy danh sách bài làm' };
+    }
+  },
 };
 
 export default examService;

@@ -387,7 +387,7 @@ const WritingResultPage = () => {
                   Quay lại bài thi
                 </Link>
                 <Link
-                  to="/exams"
+                  to="/exams2"
                   className="btn btn-outline-main px-40 py-16 rounded-pill"
                 >
                   <i className="ph ph-list me-8" />

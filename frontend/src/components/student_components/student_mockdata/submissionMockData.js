@@ -4,7 +4,7 @@
 
 export const submissionsMock = [
   {
-    _id: "69269d366d5afcf9124cf720",
+    _id: "692706226d5afcf9124cfefe",
     examId: "69260da9e10e71329fb35187",
     studentId: "69268b8f61083fe5354f37a6",
     status: "completed",
@@ -20,7 +20,7 @@ export const submissionsMock = [
           }
         ],
         sectionScore: 0,
-        _id: "69269d366d5afcf9124cf721",
+        _id: "692706226d5afcf9124cfeff",
         submittedAt: "2025-11-26T06:24:59.608Z"
       },
       {

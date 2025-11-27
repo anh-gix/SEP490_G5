@@ -1,7 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { examsMock } from "../../components/student_components/student_mockdata/examMockData";
-import { submissionsMock } from "../../components/student_components/student_mockdata/submissionMockData";
+import examService from "../../services/examService";
 import HeaderOne from "../../components/HomePageforStudent/HeaderOne";
 import FooterOne from "../../components/FooterOne";
 import Breadcrumb from "../../components/Breadcrumb";
@@ -12,20 +11,53 @@ const StudentExamListPage2 = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState("all");
+  const [exams, setExams] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch exams and submissions on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Fetch exams
+        const examsData = await examService.getAllExams();
+        setExams(examsData || []);
+        
+        // Try to fetch submissions (if endpoint exists)
+        try {
+          const submissionsData = await examService.getStudentSubmissions();
+          setSubmissions(submissionsData || []);
+        } catch (submissionError) {
+          // If endpoint doesn't exist, submissions will remain empty array
+          console.log('Submissions endpoint not available:', submissionError);
+          setSubmissions([]);
+        }
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError(err.message || 'Không thể tải dữ liệu');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Get submission status for an exam
   const getSubmissionStatus = (examId) => {
-    // TODO: Replace with actual studentId from auth/context
-    const studentId = "69268b8f61083fe5354f37a6";
-    const submission = submissionsMock.find(
-      (sub) => sub.examId === examId && sub.studentId === studentId
+    const submission = submissions.find(
+      (sub) => String(sub.examId) === String(examId)
     );
     return submission?.status || null;
   };
 
   // Filter exams based on search query, selected filter and status filter
   const filteredExams = useMemo(() => {
-    return examsMock.filter((exam) => {
+    return exams.filter((exam) => {
       // Filter by exam type
       const matchesFilter =
         selectedFilter === "all" || exam.examType === selectedFilter;
@@ -35,7 +67,7 @@ const StudentExamListPage2 = () => {
       const matchesStatus =
         selectedStatusFilter === "all" ||
         (selectedStatusFilter === "completed" && examStatus === "completed") ||
-        (selectedStatusFilter === "in-progress" && examStatus === "in-progress") ||
+        (selectedStatusFilter === "in-progress" && (examStatus === "in-progress" || examStatus === "partially-submitted")) ||
         (selectedStatusFilter === "not-started" && !examStatus);
 
       // Filter by search query (title or description)
@@ -46,44 +78,43 @@ const StudentExamListPage2 = () => {
 
       return matchesFilter && matchesStatus && matchesSearch;
     });
-  }, [searchQuery, selectedFilter, selectedStatusFilter]);
+  }, [exams, submissions, searchQuery, selectedFilter, selectedStatusFilter]);
 
   // Count exams by type
   const examCounts = useMemo(() => {
     return {
-      all: examsMock.length,
-      ielts: examsMock.filter((exam) => exam.examType === "ielts").length,
-      toeic: examsMock.filter((exam) => exam.examType === "toeic").length,
-      cambridge: examsMock.filter((exam) => exam.examType === "cambridge")
+      all: exams.length,
+      ielts: exams.filter((exam) => exam.examType === "ielts").length,
+      toeic: exams.filter((exam) => exam.examType === "toeic").length,
+      cambridge: exams.filter((exam) => exam.examType === "cambridge")
         .length,
     };
-  }, []);
+  }, [exams]);
 
   // Count exams by status
   const statusCounts = useMemo(() => {
-    const studentId = "69268b8f61083fe5354f37a6";
     return {
-      all: examsMock.length,
-      completed: examsMock.filter((exam) => {
-        const submission = submissionsMock.find(
-          (sub) => sub.examId === exam._id && sub.studentId === studentId
+      all: exams.length,
+      completed: exams.filter((exam) => {
+        const submission = submissions.find(
+          (sub) => String(sub.examId) === String(exam._id)
         );
         return submission?.status === "completed";
       }).length,
-      "in-progress": examsMock.filter((exam) => {
-        const submission = submissionsMock.find(
-          (sub) => sub.examId === exam._id && sub.studentId === studentId
+      "in-progress": exams.filter((exam) => {
+        const submission = submissions.find(
+          (sub) => String(sub.examId) === String(exam._id)
         );
-        return submission?.status === "in-progress";
+        return submission?.status === "in-progress" || submission?.status === "partially-submitted";
       }).length,
-      "not-started": examsMock.filter((exam) => {
-        const submission = submissionsMock.find(
-          (sub) => sub.examId === exam._id && sub.studentId === studentId
+      "not-started": exams.filter((exam) => {
+        const submission = submissions.find(
+          (sub) => String(sub.examId) === String(exam._id)
         );
         return !submission;
       }).length,
     };
-  }, []);
+  }, [exams, submissions]);
 
   // Calculate total questions for an exam
   const getTotalQuestions = (exam) => {
@@ -132,6 +163,7 @@ const StudentExamListPage2 = () => {
           className: "bg-success"
         };
       case "in-progress":
+      case "partially-submitted":
         return {
           label: "Đang làm bài",
           className: "bg-warning"
@@ -157,6 +189,61 @@ const StudentExamListPage2 = () => {
     { value: "in-progress", label: "Đang làm bài", count: statusCounts["in-progress"] },
     { value: "not-started", label: "Chưa làm", count: statusCounts["not-started"] },
   ];
+
+  // Show loading state
+  if (loading) {
+    return (
+      <>
+        <Preloader />
+        <Animation />
+        <HeaderOne />
+        <Breadcrumb title={"Đề thi"} />
+        <section className="course-grid-view py-120">
+          <div className="container">
+            <div className="text-center py-80">
+              <div className="spinner-border text-main-600" role="status">
+                <span className="visually-hidden">Đang tải...</span>
+              </div>
+              <p className="mt-16 text-neutral-600">Đang tải danh sách đề thi...</p>
+            </div>
+          </div>
+        </section>
+        <FooterOne />
+      </>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <>
+        <Preloader />
+        <Animation />
+        <HeaderOne />
+        <Breadcrumb title={"Đề thi"} />
+        <section className="course-grid-view py-120">
+          <div className="container">
+            <div className="text-center py-80">
+              <div className="inline-flex flex-center w-80 h-80 rounded-circle bg-danger-25 mb-24">
+                <i className="ph-bold ph-warning text-4xl text-danger" />
+              </div>
+              <h3 className="text-xl fw-semibold text-neutral-900 mb-16">
+                Có lỗi xảy ra
+              </h3>
+              <p className="text-neutral-500 text-lg mb-24">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="btn btn-main"
+              >
+                Thử lại
+              </button>
+            </div>
+          </div>
+        </section>
+        <FooterOne />
+      </>
+    );
+  }
 
   return (
     <>

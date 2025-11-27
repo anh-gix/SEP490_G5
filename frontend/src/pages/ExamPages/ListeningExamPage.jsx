@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import HeaderOne from "../../components/HomePageforStudent/HeaderOne";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import Animation from "../../helper/Animation";
 import Preloader from "../../helper/Preloader";
 import { examService } from "../../services/examService";
@@ -18,11 +17,14 @@ const ListeningExamPage = () => {
   const [timeRemaining, setTimeRemaining] = useState(null);
   const [currentAudioIndex, setCurrentAudioIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [splitPosition, setSplitPosition] = useState(50); // Percentage
-  const [isResizing, setIsResizing] = useState(false);
+  const [leftWidth, setLeftWidth] = useState(50); // Percentage width for left panel
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState(1);
   const audioRef = useRef(null);
   const timerRef = useRef(null);
   const containerRef = useRef(null);
+  const isResizingRef = useRef(false);
+  const questionRefs = useRef({});
 
   const getQuestionData = useCallback(
     (questionNumber) => {
@@ -128,20 +130,8 @@ const ListeningExamPage = () => {
 
         setSectionData(data);
 
-        // Initialize answers from existing submission
-        if (data.submission?.answers?.length > 0) {
-          const existingAnswers = {};
-          data.submission.answers.forEach((ans) => {
-            // Nếu là array, giữ nguyên; nếu không, chuyển thành string
-            const answerValue = ans.selectedOption ?? ans.answerText ?? "";
-            existingAnswers[ans.questionNumber] = Array.isArray(answerValue) 
-              ? answerValue 
-              : answerValue;
-          });
-          setAnswers(existingAnswers);
-        } else {
-          setAnswers({});
-        }
+        // Initialize answers as empty
+        setAnswers({});
 
         // Initialize timer if duration exists
         if (data.section?.duration) {
@@ -318,44 +308,81 @@ const ListeningExamPage = () => {
     return Array.from({ length: sectionData.section.questionCount }, (_, i) => i + 1);
   };
 
-  // Resizable splitter handlers
-  const handleMouseDown = (e) => {
-    setIsResizing(true);
-    e.preventDefault();
-  };
-
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      if (!isResizing || !containerRef.current) return;
-      
-      const container = containerRef.current;
-      const rect = container.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const percentage = (x / rect.width) * 100;
-      
-      // Limit between 20% and 80%
-      const clampedPercentage = Math.max(20, Math.min(80, percentage));
-      setSplitPosition(clampedPercentage);
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
-
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
+  // Fullscreen functionality
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+      }).catch((err) => {
+        console.error("Error attempting to enable fullscreen:", err);
+      });
+    } else {
+      document.exitFullscreen().then(() => {
+        setIsFullscreen(false);
+      }).catch((err) => {
+        console.error("Error attempting to exit fullscreen:", err);
+      });
     }
+  }, []);
 
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
     };
-  }, [isResizing]);
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  // Scroll to question
+  const scrollToQuestion = useCallback((questionNumber) => {
+    setCurrentQuestion(questionNumber);
+    const questionElement = questionRefs.current[questionNumber];
+    if (questionElement) {
+      questionElement.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, []);
+
+  // Resize handlers
+  const handleMouseMove = useCallback((e) => {
+    if (!isResizingRef.current || !containerRef.current) return;
+    
+    const container = containerRef.current;
+    const containerRect = container.getBoundingClientRect();
+    const newLeftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+    
+    // Limit between 20% and 80%
+    const clampedWidth = Math.max(20, Math.min(80, newLeftWidth));
+    setLeftWidth(clampedWidth);
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    isResizingRef.current = false;
+    document.removeEventListener("mousemove", handleMouseMove);
+    document.removeEventListener("mouseup", handleMouseUp);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  }, [handleMouseMove]);
+
+  const handleMouseDown = useCallback((e) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [handleMouseMove, handleMouseUp]);
+
+  // Cleanup resize listeners on unmount
+  useEffect(() => {
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [handleMouseMove, handleMouseUp]);
 
  
 
@@ -364,7 +391,6 @@ const ListeningExamPage = () => {
       <>
         <Preloader />
         <Animation />
-        <HeaderOne />
         <div className="text-center py-80">
           <div className="spinner-border text-main-600" role="status">
             <span className="visually-hidden">Loading...</span>
@@ -378,288 +404,401 @@ const ListeningExamPage = () => {
     <>
       <Preloader />
       <Animation />
-      <section className="py-16">
-        <div className="container-fluid px-0" style={{ maxWidth: '100%', width: '100%' }}>
-          {/* Audio Player Section (full width) */}
-          {audioUrls.length > 0 && (
-            <div className="bg-white border border-neutral-30 rounded-16 p-12 mb-12 mx-0">
-              {/* Audio Selector */}
-              {audioUrls.length > 1 && (
-                <div className="mb-8">
-                  <div className="d-flex flex-wrap gap-8 align-items-center">
-                    <span className="fw-semibold text-neutral-700 text-sm mb-0">Chọn audio:</span>
-                    {audioUrls.map((url, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleAudioChange(index)}
-                        className={`btn ${
-                          currentAudioIndex === index ? "btn-primary" : "btn-outline-primary"
-                        } px-12 py-4 rounded-pill text-sm`}
-                      >
-                        Audio {index + 1}
-                      </button>
-                    ))}
-                  </div>
+      
+      <div className="listening-exam-container" style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+        <style>{`
+          .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+          }
+          .hide-scrollbar {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+          }
+          .listening-exam-container {
+            background: hsl(var(--main-25));
+          }
+          .listening-exam-header {
+            background: white;
+            border-bottom: 1px solid hsl(var(--border-color));
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            z-index: 10;
+          }
+          .listening-exam-header .logo img {
+            height: 40px;
+            width: auto;
+          }
+          .listening-exam-timer {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 18px;
+            font-weight: 600;
+          }
+          .listening-exam-timer.danger {
+            color: var(--danger-600);
+          }
+          .listening-exam-main {
+            flex: 1;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            position: relative;
+          }
+          .resizable-panel {
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+          }
+          .resizer {
+            width: 4px;
+            background-color: #e0e0e0;
+            cursor: col-resize;
+            position: relative;
+            flex-shrink: 0;
+            transition: background-color 0.2s;
+          }
+          .resizer:hover {
+            background-color: hsl(var(--main-600));
+          }
+          .resizer::before {
+            content: '';
+            position: absolute;
+            left: -2px;
+            right: -2px;
+            top: 0;
+            bottom: 0;
+            cursor: col-resize;
+          }
+          .question-navigation {
+            background: white;
+            border-top: 1px solid hsl(var(--border-color));
+            padding: 16px 24px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+            overflow-x: auto;
+            flex-shrink: 0;
+          }
+          .question-nav-item {
+            min-width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            border: 1px solid hsl(var(--border-color));
+            background: white;
+            color: var(--neutral-700);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+          }
+          .question-nav-item:hover {
+            border-color: hsl(var(--main-600));
+            color: hsl(var(--main-600));
+          }
+          .question-nav-item.active {
+            background: hsl(var(--main-600));
+            color: white;
+            border-color: hsl(var(--main-600));
+          }
+          .question-nav-item.answered {
+            background: hsl(var(--main-25));
+            border-color: hsl(var(--main-300));
+          }
+          .question-nav-item.answered.active {
+            background: hsl(var(--main-600));
+            border-color: hsl(var(--main-600));
+          }
+        `}</style>
+
+        {/* Header: Logo, Timer, Submit Button */}
+        <div className="listening-exam-header">
+          <div className="logo">
+            <Link to="/" className="link">
+              <img src="assets/images/logo/logo.png" alt="Logo" />
+            </Link>
+          </div>
+          
+          {timeRemaining !== null && (
+            <div className={`listening-exam-timer ${timeRemaining < 300 ? "danger" : ""}`}>
+              <i className="ph ph-clock" style={{ fontSize: "20px" }}></i>
+              <span>{formatTime(timeRemaining)}</span>
+            </div>
+          )}
+          
+          <div className="flex-align gap-16">
+            <button
+              onClick={toggleFullscreen}
+              className="btn btn-outline-main rounded-pill flex-align gap-8"
+              title={isFullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
+            >
+              <i className={`ph ${isFullscreen ? "ph-arrows-in" : "ph-arrows-out"}`}></i>
+              {isFullscreen ? "Thoát" : "Toàn màn hình"}
+            </button>
+            <button
+              onClick={() => handleSubmit()}
+              disabled={submitting || Object.keys(answers).length === 0}
+              className="btn btn-main rounded-pill px-32 py-12 flex-align gap-8"
+            >
+              {submitting ? (
+                <>
+                  <span className="spinner-border spinner-border-sm" role="status"></span>
+                  Đang nộp...
+                </>
+              ) : (
+                <>
+                  <i className="ph ph-check"></i>
+                  Nộp bài
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Audio Player Section */}
+        {audioUrls.length > 0 && (
+          <div className="bg-white border-bottom border-neutral-30 px-24 py-16 flex-shrink-0">
+            {audioUrls.length > 1 && (
+              <div className="mb-12">
+                <div className="d-flex flex-wrap gap-8 align-items-center">
+                  <span className="fw-semibold text-neutral-700 text-sm mb-0">Chọn audio:</span>
+                  {audioUrls.map((url, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleAudioChange(index)}
+                      className={`btn ${
+                        currentAudioIndex === index ? "btn-main" : "btn-outline-main"
+                      } px-12 py-4 rounded-pill text-sm`}
+                    >
+                      Audio {index + 1}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="bg-main-25 rounded-12 p-12 border border-neutral-30">
+              <div className="text-center mb-6">
+                <h6 className="mb-0 text-sm fw-semibold">
+                  {audioUrls.length > 1 ? `Audio ${currentAudioIndex + 1}` : "Audio"}
+                </h6>
+              </div>
+              <audio
+                ref={audioRef}
+                src={getAudioUrl(currentAudioUrl)}
+                onEnded={handleAudioEnded}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                className="w-100"
+                controls
+                style={{ height: "40px" }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Main Content: PDF and Answers */}
+        <div className="listening-exam-main" ref={containerRef}>
+          {/* Left side - PDF Viewer */}
+          <div
+            className="resizable-panel bg-white"
+            style={{ width: `${leftWidth}%` }}
+          >
+            <div 
+              className="p-24 hide-scrollbar" 
+              style={{ 
+                height: "100%", 
+                overflow: "auto",
+              }}
+            >
+              {getPDFUrl() ? (
+                <iframe
+                  src={getPDFUrl()}
+                  className="w-100 h-100 border-0 rounded-8"
+                  title="Listening PDF"
+                  style={{ minHeight: "600px" }}
+                />
+              ) : (
+                <div className="text-center py-80">
+                  <p className="text-neutral-500">Không có file PDF</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Resizer Bar */}
+          <div 
+            className="resizer"
+            onMouseDown={handleMouseDown}
+            role="separator"
+            aria-label="Resize panels"
+            aria-orientation="vertical"
+          />
+
+          {/* Right side - Answer Section */}
+          <div
+            className="resizable-panel bg-main-25"
+            style={{ width: `${100 - leftWidth}%` }}
+          >
+            <div className="p-24" style={{ height: "100%", overflow: "auto" }}>
+              {error && (
+                <div className="alert alert-danger mb-24" role="alert">
+                  {error}
                 </div>
               )}
 
-              {/* Audio Player */}
-              <div className="bg-main-25 rounded-12 p-12 border border-neutral-30">
-                <div className="text-center mb-6">
-                  <h6 className="mb-0 text-sm fw-semibold">
-                    {audioUrls.length > 1 ? `Audio ${currentAudioIndex + 1}` : "Audio"}
-                  </h6>
+              {sectionData?.section?.instructions && (
+                <div className="bg-white rounded-12 p-16 mb-24 border border-neutral-30">
+                  <p className="text-neutral-700 mb-0 fw-semibold">Hướng dẫn:</p>
+                  <p className="text-neutral-600 text-sm mb-0 mt-8">{sectionData.section.instructions}</p>
                 </div>
-                <audio
-                  ref={audioRef}
-                  src={getAudioUrl(currentAudioUrl)}
-                  onEnded={handleAudioEnded}
-                  onPlay={() => setIsPlaying(true)}
-                  onPause={() => setIsPlaying(false)}
-                  className="w-100"
-                  controls
-                  style={{ height: "40px" }}
-                />
-              </div>
-            </div>
-          )}
+              )}
 
-          <div 
-            ref={containerRef}
-            className="d-flex g-0 position-relative"
-            style={{ 
-              minHeight: audioUrls.length > 0 ? (audioUrls.length > 1 ? "calc(100vh - 200px)" : "calc(100vh - 180px)") : "calc(100vh - 100px)",
-              height: audioUrls.length > 0 ? (audioUrls.length > 1 ? "calc(100vh - 200px)" : "calc(100vh - 180px)") : "calc(100vh - 100px)"
-            }}
-          >
-            {/* Left side - PDF Viewer */}
-            <div
-              className="bg-white border-end border-neutral-30 h-100"
-              style={{ 
-                width: `${splitPosition}%`,
-                minWidth: '20%',
-                maxWidth: '80%',
-                overflow: 'hidden'
-              }}
-            >
-              <div className="p-24 border-bottom border-neutral-30 flex-between gap-16">
-                <h4 className="mb-0">Đề thi Listening</h4>
-                {timeRemaining !== null && (
-                  <div className="flex-align gap-8">
-                    <span className="text-2xl text-main-600">
-                      <i className="ph ph-clock" />
-                    </span>
-                    <span
-                      className={`text-lg fw-bold ${
-                        timeRemaining < 300 ? "text-danger" : "text-neutral-700"
-                      }`}
+              <div className="mb-24">
+                {generateQuestionNumbers().map((qNum) => {
+                  const questionData = getQuestionData(qNum);
+                  const questionType = questionData.questionType;
+                  const options = getOptionsForQuestion(qNum);
+                  const answerValue = answers[qNum];
+                  const hasAnswer = Array.isArray(answerValue) 
+                    ? answerValue.length > 0 
+                    : answerValue && answerValue !== "";
+                  
+                  return (
+                    <div 
+                      key={qNum} 
+                      ref={(el) => (questionRefs.current[qNum] = el)}
+                      className="bg-white rounded-12 p-16 mb-16 border border-neutral-30"
                     >
-                      {formatTime(timeRemaining)}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="p-24" style={{ height: audioUrls.length > 0 ? (audioUrls.length > 1 ? "calc(100vh - 280px)" : "calc(100vh - 260px)") : "calc(100vh - 180px)", overflow: "hidden" }}>
-                {getPDFUrl() ? (
-                  <iframe
-                    src={getPDFUrl()}
-                    className="w-100 h-100 border-0 rounded-8"
-                    title="Listening PDF"
-                    style={{ height: "100%" }}
-                  />
-                ) : (
-                  <div className="text-center py-80">
-                    <p className="text-neutral-500">Không có file PDF</p>
-                  </div>
-                )}
-              </div>
-            </div>
+                      <div className="flex-between gap-16 mb-12">
+                        <label className="fw-semibold text-neutral-700">Câu {qNum}</label>
+                        {hasAnswer && (
+                          <span className="badge bg-main-600 text-white px-12 py-4 rounded-pill">
+                            Đã trả lời
+                          </span>
+                        )}
+                      </div>
 
-            {/* Resizable Gutter */}
-            <div
-              onMouseDown={handleMouseDown}
-              className="resizable-gutter"
-              style={{
-                width: '4px',
-                cursor: 'col-resize',
-                backgroundColor: isResizing ? 'var(--main-600)' : 'var(--neutral-30)',
-                position: 'relative',
-                zIndex: 10,
-                transition: isResizing ? 'none' : 'background-color 0.2s',
-                userSelect: 'none'
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  left: '-2px',
-                  top: 0,
-                  bottom: 0,
-                  width: '8px',
-                  cursor: 'col-resize'
-                }}
-              />
-            </div>
-
-            {/* Right side - Answer Section */}
-            <div 
-              className="bg-main-25 h-100"
-              style={{ 
-                width: `${100 - splitPosition}%`,
-                minWidth: '20%',
-                maxWidth: '80%',
-                overflow: 'hidden'
-              }}
-            >
-              <div className="p-24 border-bottom border-neutral-30 bg-white">
-                <h4 className="mb-8">Chọn đáp án</h4>
-                {sectionData?.section?.instructions && (
-                  <p className="text-neutral-600 text-sm mb-0">
-                    {sectionData.section.instructions}
-                  </p>
-                )}
-              </div>
-              <div 
-                className="p-24" 
-                style={{ 
-                  height: audioUrls.length > 0 ? (audioUrls.length > 1 ? "calc(100vh - 280px)" : "calc(100vh - 260px)") : "calc(100vh - 180px)",
-                  overflow: "auto" 
-                }}
-              >
-                {error && (
-                  <div className="alert alert-danger mb-24" role="alert">
-                    {error}
-                  </div>
-                )}
-
-                <div className="mb-24">
-                  {generateQuestionNumbers().map((qNum) => {
-                    const questionData = getQuestionData(qNum);
-                    const questionType = questionData.questionType;
-                    const options = getOptionsForQuestion(qNum);
-                    return (
-                      <div key={qNum} className="bg-white rounded-12 p-16 mb-16 border border-neutral-30">
-                        <div className="flex-between gap-16 mb-12">
-                          <label className="fw-semibold text-neutral-700">Câu {qNum}</label>
-                          {(() => {
-                            const answerValue = answers[qNum];
-                            const hasAnswer = Array.isArray(answerValue) 
-                              ? answerValue.length > 0 
-                              : answerValue && answerValue !== "";
-                            return hasAnswer && (
-                              <span className="badge bg-main-600 text-white px-12 py-4 rounded-pill">
-                                Đã trả lời
-                              </span>
-                            );
-                          })()}
+                      {/* Question Title */}
+                      {questionData.questionTitle && (
+                        <div className="mb-12">
+                          <p className="text-neutral-700 mb-0">{questionData.questionTitle}</p>
                         </div>
+                      )}
 
-                        {/* Question Title */}
-                        {questionData.questionTitle && (
-                          <div className="mb-12">
-                            <p className="text-neutral-700 mb-0">{questionData.questionTitle}</p>
-                          </div>
-                        )}
-
-                        {/* Multiple Choice */}
-                        {questionType === "multiple_choice" && (
-                          <div className="d-flex flex-column gap-8">
-                            {options.map((option) => {
-                              const optionKey = typeof option === 'object' ? option.key : option;
-                              const optionText = typeof option === 'object' ? option.text : '';
-                              const answerArray = Array.isArray(answers[qNum]) ? answers[qNum] : [];
-                              const isChecked = answerArray.includes(optionKey);
-                              return (
-                                <label
-                                  key={optionKey}
-                                  className={`d-flex align-items-center gap-12 p-12 rounded-8 border cursor-pointer transition-2 ${
-                                    isChecked
-                                      ? "border-main-600 bg-main-25"
-                                      : "border-neutral-30 hover-border-main-300"
-                                  }`}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    value={optionKey}
-                                    checked={isChecked}
-                                    onChange={() => handleAnswerChange(qNum, optionKey, questionType)}
-                                    className="form-check-input"
-                                  />
-                                  <div className="d-flex align-items-center gap-8">
-                                    <span className="fw-semibold text-neutral-700">{optionKey}.</span>
-                                    {optionText && <span className="text-neutral-700">{optionText}</span>}
-                                  </div>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {/* Input Text */}
-                        {questionType === "input" && (
-                          <div>
-                            <input
-                              type="text"
-                              className="form-control"
-                              placeholder="Nhập đáp án của bạn..."
-                              value={answers[qNum] || ""}
-                              onChange={(e) => handleAnswerChange(qNum, e.target.value)}
-                            />
-                          </div>
-                        )}
-
-                        {/* True/False */}
-                        {questionType === "true_false" && (
-                          <div className="d-flex flex-column gap-8">
-                            {["True", "False"].map((option) => (
+                      {/* Multiple Choice */}
+                      {questionType === "multiple_choice" && (
+                        <div className="d-flex flex-column gap-8">
+                          {options.map((option) => {
+                            const optionKey = typeof option === 'object' ? option.key : option;
+                            const optionText = typeof option === 'object' ? option.text : '';
+                            const answerArray = Array.isArray(answers[qNum]) ? answers[qNum] : [];
+                            const isChecked = answerArray.includes(optionKey);
+                            return (
                               <label
-                                key={option}
+                                key={optionKey}
                                 className={`d-flex align-items-center gap-12 p-12 rounded-8 border cursor-pointer transition-2 ${
-                                  answers[qNum] === option
+                                  isChecked
                                     ? "border-main-600 bg-main-25"
                                     : "border-neutral-30 hover-border-main-300"
                                 }`}
                               >
                                 <input
-                                  type="radio"
-                                  name={`question-${qNum}`}
-                                  value={option}
-                                  checked={answers[qNum] === option}
-                                  onChange={() => handleAnswerChange(qNum, option, questionType)}
+                                  type="checkbox"
+                                  value={optionKey}
+                                  checked={isChecked}
+                                  onChange={() => handleAnswerChange(qNum, optionKey, questionType)}
                                   className="form-check-input"
                                 />
-                                <span className="text-neutral-700">{option}</span>
+                                <div className="d-flex align-items-center gap-8">
+                                  <span className="fw-semibold text-neutral-700">{optionKey}.</span>
+                                  {optionText && <span className="text-neutral-700">{optionText}</span>}
+                                </div>
                               </label>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                            );
+                          })}
+                        </div>
+                      )}
 
-                <div className="sticky-bottom bg-white border-top border-neutral-30 p-24 mt-24">
-                  <div className="flex-between gap-16 flex-wrap">
-                    <div>
-                      <p className="text-neutral-600 text-sm mb-0">
-                        Đã trả lời: {Object.keys(answers).length} /{" "}
-                        {sectionData?.section?.questionCount || 0} câu
-                      </p>
+                      {/* Input Text */}
+                      {questionType === "input" && (
+                        <div>
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="Nhập đáp án của bạn..."
+                            value={answers[qNum] || ""}
+                            onChange={(e) => handleAnswerChange(qNum, e.target.value, questionType)}
+                          />
+                        </div>
+                      )}
+
+                      {/* True/False */}
+                      {questionType === "true_false" && (
+                        <div className="d-flex flex-column gap-8">
+                          {["True", "False"].map((option) => (
+                            <label
+                              key={option}
+                              className={`d-flex align-items-center gap-12 p-12 rounded-8 border cursor-pointer transition-2 ${
+                                answers[qNum] === option
+                                  ? "border-main-600 bg-main-25"
+                                  : "border-neutral-30 hover-border-main-300"
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name={`question-${qNum}`}
+                                value={option}
+                                checked={answers[qNum] === option}
+                                onChange={() => handleAnswerChange(qNum, option, questionType)}
+                                className="form-check-input"
+                              />
+                              <span className="text-neutral-700">{option}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <button
-                      onClick={() => handleSubmit()}
-                      disabled={submitting || Object.keys(answers).length === 0}
-                      className="btn btn-primary px-32 py-12 rounded-pill"
-                    >
-                      {submitting ? "Đang nộp..." : "Nộp bài"}
-                    </button>
-                  </div>
-                </div>
+                  );
+                })}
+              </div>
+
+              <div className="bg-white rounded-12 p-16 border border-neutral-30">
+                <p className="text-neutral-600 text-sm mb-0 text-center">
+                  Đã trả lời: <strong className="text-main-600">{Object.keys(answers).length}</strong> / {sectionData?.section?.questionCount || 0} câu
+                </p>
               </div>
             </div>
           </div>
         </div>
-      </section>
+
+        {/* Question Navigation at Bottom */}
+        <div className="question-navigation">
+          {generateQuestionNumbers().map((qNum) => {
+            const answerValue = answers[qNum];
+            const hasAnswer = Array.isArray(answerValue) 
+              ? answerValue.length > 0 
+              : answerValue && answerValue !== "";
+            const isActive = currentQuestion === qNum;
+            
+            return (
+              <button
+                key={qNum}
+                onClick={() => scrollToQuestion(qNum)}
+                className={`question-nav-item ${isActive ? "active" : ""} ${hasAnswer ? "answered" : ""}`}
+                title={`Câu ${qNum}${hasAnswer ? " - Đã trả lời" : ""}`}
+              >
+                {qNum}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </>
   );
 };

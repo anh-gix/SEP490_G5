@@ -7,8 +7,6 @@ import Button from '../compo/Button';
 import SearchBox from '../compo/SearchBox';
 import FilterBar from '../compo/FilterBar';
 import StatusBadge from '../compo/StatusBadge';
-import ActionMenu from '../compo/ActionMenu';
-import { programService } from '../../../services/programService';
 import { formatDate } from '../../../helper/helper';
 
 const ProgramList = () => {
@@ -112,21 +110,15 @@ const ProgramList = () => {
     }
   };
 
-  const handleDelete = async (programId) => {
-    const program = programs.find(p => p._id === programId);
-    if (!program) return;
-
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn xóa chương trình "${program.program_name}" (${program.code})?\n\nHành động này không thể hoàn tác.`
-    );
-
-    if (!confirmed) return;
+  const handleDeleteExam = async (programId, programName) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa chương trình "${programName}"? Hành động này không thể hoàn tác.`)) {
+      return;
+    }
 
     try {
       // TODO: Replace with actual API call when backend is ready
       // await programService.deleteProgram(programId);
 
-      // Mock deletion
       console.log(`Deleting program: ${programId}`);
 
       // Remove from local state
@@ -225,31 +217,48 @@ const ProgramList = () => {
       header: 'Hành động',
       field: 'actions',
       render: (row) => (
-        <ActionMenu
-          actions={[
-            {
-              label: "Xem chi tiết",
-              icon: "ph ph-eye",
-              onClick: () => navigate(`/center-head/programs/${row._id}`)
-            },
-            {
-              label: "Chỉnh sửa",
-              icon: "ph ph-pencil-simple",
-              onClick: () => navigate(`/center-head/programs/${row._id}/edit`)
-            },
-            {
-              label: "Xem PLOs",
-              icon: "ph ph-list-bullets",
-              onClick: () => navigate(`/center-head/programs/${row._id}/plos`)
-            },
-            {
-              label: "Xóa",
-              icon: "ph ph-trash",
-              onClick: () => handleDelete(row._id),
-              variant: "danger"
-            },
-          ]}
-        />
+        <div className="d-flex gap-2 justify-content-center">
+          <button
+            className="btn btn-sm btn-outline-primary"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/programs/${row._id}`);
+            }}
+            title="Xem chi tiết"
+          >
+            <i className="ph ph-eye"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-secondary"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/programs/${row._id}/edit`);
+            }}
+            title="Chỉnh sửa"
+          >
+            <i className="ph ph-pencil"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-info"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/programs/${row._id}/plos`);
+            }}
+            title="Xem PLOs"
+          >
+            <i className="ph ph-list-bullets"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-danger"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteExam(row._id, row.program_name);
+            }}
+            title="Xóa"
+          >
+            <i className="ph ph-trash"></i>
+          </button>
+        </div>
       ),
     },
   ];

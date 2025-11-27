@@ -7,7 +7,6 @@ import Button from '../compo/Button';
 import SearchBox from '../compo/SearchBox';
 import FilterBar from '../compo/FilterBar';
 import StatusBadge from '../compo/StatusBadge';
-import ActionMenu from '../compo/ActionMenu';
 import examService from '../../../services/examService';
 import { formatDate } from '../../../helper/helper';
 
@@ -161,36 +160,58 @@ const ExamList = () => {
       header: 'Hành động',
       field: 'actions',
       render: (row) => (
-        <ActionMenu
-          actions={[
-            {
-              label: "Xem chi tiết",
-              icon: "ph ph-eye",
-              onClick: () => navigate(`/center-head/exams/${row._id}`)
-            },
-            {
-              label: "Chỉnh sửa",
-              icon: "ph ph-pencil",
-              onClick: () => navigate(`/center-head/exams/${row._id}/edit`)
-            },
-            {
-              label: "Xem bài làm",
-              icon: "ph ph-notebook",
-              onClick: () => navigate(`/center-head/exams/${row._id}/submissions`)
-            },
-            {
-              label: row.isPublished ? 'Hủy xuất bản' : 'Xuất bản',
-              icon: row.isPublished ? 'ph ph-eye-slash' : 'ph ph-book-open',
-              onClick: () => console.log('Toggle publish', row._id)
-            },
-            {
-              label: "Xóa",
-              icon: "ph ph-trash",
-              onClick: () => handleDeleteExam(row._id, row.title),
-              className: "text-danger"
-            },
-          ]}
-        />
+        <div className="d-flex gap-2 justify-content-center">
+          <button
+            className="btn btn-sm btn-outline-primary"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/exams/${row._id}`);
+            }}
+            title="Xem chi tiết"
+          >
+            <i className="ph ph-eye"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-secondary"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/exams/${row._id}/edit`);
+            }}
+            title="Chỉnh sửa"
+          >
+            <i className="ph ph-pencil"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-info"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/exams/${row._id}/submissions`);
+            }}
+            title="Xem bài làm"
+          >
+            <i className="ph ph-notebook"></i>
+          </button>
+          <button
+            className={`btn btn-sm ${row.isPublished ? 'btn-outline-warning' : 'btn-outline-success'}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log('Toggle publish', row._id);
+            }}
+            title={row.isPublished ? 'Hủy xuất bản' : 'Xuất bản'}
+          >
+            <i className={row.isPublished ? 'ph ph-eye-slash' : 'ph ph-book-open'}></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-danger"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteExam(row._id, row.title);
+            }}
+            title="Xóa"
+          >
+            <i className="ph ph-trash"></i>
+          </button>
+        </div>
       ),
     },
   ];

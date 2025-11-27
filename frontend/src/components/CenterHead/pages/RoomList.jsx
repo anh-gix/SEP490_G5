@@ -4,7 +4,6 @@ import Card from '../compo/Card';
 import Table from '../compo/Table';
 import Button from '../compo/Button';
 import StatusBadge from '../compo/StatusBadge';
-import ActionMenu from '../compo/ActionMenu';
 import { mockRooms, mockRoomStats, simulateApiDelay } from '../../../helper/mockdataExtended';
 
 const RoomList = () => {
@@ -74,25 +73,38 @@ const RoomList = () => {
       header: 'Hành động',
       field: 'actions',
       render: (row) => (
-        <ActionMenu
-          actions={[
-            {
-              label: "Xem lịch sử",
-              icon: "ph ph-clock-clockwise",
-              onClick: () => console.log('View history', row._id)
-            },
-            {
-              label: "Chỉnh sửa",
-              icon: "ph ph-pencil-simple",
-              onClick: () => console.log('Edit', row._id)
-            },
-            {
-              label: row.status === 'maintenance' ? 'Kích hoạt' : 'Bảo trì',
-              icon: row.status === 'maintenance' ? 'ph ph-check' : 'ph ph-wrench',
-              onClick: () => console.log('Toggle maintenance', row._id)
-            },
-          ]}
-        />
+        <div className="d-flex gap-2 justify-content-center">
+          <button
+            className="btn btn-sm btn-outline-info"
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log('View history', row._id);
+            }}
+            title="Xem lịch sử"
+          >
+            <i className="ph ph-clock-clockwise"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-secondary"
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log('Edit', row._id);
+            }}
+            title="Chỉnh sửa"
+          >
+            <i className="ph ph-pencil"></i>
+          </button>
+          <button
+            className={`btn btn-sm ${row.status === 'maintenance' ? 'btn-outline-success' : 'btn-outline-warning'}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log('Toggle maintenance', row._id);
+            }}
+            title={row.status === 'maintenance' ? 'Kích hoạt' : 'Bảo trì'}
+          >
+            <i className={row.status === 'maintenance' ? 'ph ph-check' : 'ph ph-wrench'}></i>
+          </button>
+        </div>
       ),
     },
   ];

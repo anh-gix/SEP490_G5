@@ -7,7 +7,6 @@ import Button from '../compo/Button';
 import SearchBox from '../compo/SearchBox';
 import FilterBar from '../compo/FilterBar';
 import StatusBadge from '../compo/StatusBadge';
-import ActionMenu from '../compo/ActionMenu';
 import ImportExportButtons from '../compo/ImportExportButtons';
 import { mockUsers, mockRoles, mockRoleStats, simulateApiDelay } from '../../../helper/mockdataExtended';
 import { formatDate } from '../../../helper/helper';
@@ -184,31 +183,48 @@ const UserList = () => {
       header: 'Hành động',
       field: 'actions',
       render: (row) => (
-        <ActionMenu
-          actions={[
-            {
-              label: "Xem chi tiết",
-              icon: "ph ph-eye",
-              onClick: () => handleViewUser(row)
-            },
-            {
-              label: "Chỉnh sửa",
-              icon: "ph ph-pencil-simple",
-              onClick: () => handleEditUser(row)
-            },
-            {
-              label: "Đổi mật khẩu",
-              icon: "ph ph-key",
-              onClick: () => console.log('Reset password', row._id)
-            },
-            {
-              label: "Xóa",
-              icon: "ph ph-trash",
-              variant: "danger",
-              onClick: () => handleDeleteUser(row)
-            }
-          ]}
-        />
+        <div className="d-flex gap-2 justify-content-center">
+          <button
+            className="btn btn-sm btn-outline-primary"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleViewUser(row);
+            }}
+            title="Xem chi tiết"
+          >
+            <i className="ph ph-eye"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-secondary"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEditUser(row);
+            }}
+            title="Chỉnh sửa"
+          >
+            <i className="ph ph-pencil"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-warning"
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log('Reset password', row._id);
+            }}
+            title="Đổi mật khẩu"
+          >
+            <i className="ph ph-key"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-danger"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteUser(row);
+            }}
+            title="Xóa"
+          >
+            <i className="ph ph-trash"></i>
+          </button>
+        </div>
       ),
     },
   ];

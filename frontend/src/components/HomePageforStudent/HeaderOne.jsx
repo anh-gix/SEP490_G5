@@ -69,12 +69,12 @@ const HeaderOne = () => {
   };
 
   const menuItems = [
-    { to: "/", label: "Home" },
+    { to: "/", label: "Trang Chủ" },
     { to: "/course-cam", label: "Tiếng Anh Trẻ Em" },
     { to: "/course-ielts", label: "IELTS" },
     { to: "/course-toeic", label: "TOEIC" },
     { to: "/exams", label: "Đề thi IELTS" },
-    { to: "/contact", label: "Contact" },
+    { to: "/contact", label: "Liên Hệ" },
   ];
 
   return (
@@ -152,7 +152,7 @@ const HeaderOne = () => {
                 <input
                   type='text'
                   className='common-input rounded-pill bg-main-25 pe-48 border-neutral-30'
-                  placeholder='Search...'
+                  placeholder='Tìm kiếm...'
                 />
                 <button
                   type='submit'

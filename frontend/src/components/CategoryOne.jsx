@@ -47,14 +47,14 @@ const CategoryOne = () => {
             <span className='text-main-600 text-2xl d-flex'>
               <i className='ph-bold ph-book' />
             </span>
-            <h5 className='text-main-600 mb-0'>Categories</h5>
+            <h5 className='text-main-600 mb-0'>Danh Mục</h5>
           </div>
           <h2 className='mb-24 wow bounceIn'>
-            Elevate Your Learning Experience
+            Nâng Tầm Trải Nghiệm Học Tập Của Bạn
           </h2>
           <p className=' wow bounceInUp'>
-            Our platform is built on the principles of innovation, quality, and
-            inclusivity, aiming to provide a seamless learning
+            Nền tảng của chúng tôi được xây dựng trên các nguyên tắc đổi mới, chất lượng và
+            toàn diện, nhằm cung cấp trải nghiệm học tập liền mạch
           </p>
         </div>
         <Slider ref={sliderRef} {...settings} className='category-item-slider'>
@@ -71,16 +71,16 @@ const CategoryOne = () => {
               />
             </span>
             <h4 className='display-four mb-16 text-neutral-700'>
-              Arts &amp; Design
+              Nghệ Thuật &amp; Thiết Kế
             </h4>
             <p className='text-neutral-500 text-lg text-line-2'>
-              Courses on nutrition, fitness training, yoga...
+              Các khóa học về dinh dưỡng, thể dục, yoga...
             </p>
             <Link
               to='/courses'
               className='py-12 px-24 bg-white rounded-8 border border-neutral-30 mt-28 fw-semibold text-main-600 hover-bg-main-600 hover-text-white hover-border-main-600'
             >
-              14 Course
+              14 Khóa học
             </Link>
           </div>
           <div
@@ -95,15 +95,15 @@ const CategoryOne = () => {
                 alt=''
               />
             </span>
-            <h4 className='display-four mb-16 text-neutral-700'>ArtsDesign</h4>
+            <h4 className='display-four mb-16 text-neutral-700'>Thiết Kế Nghệ Thuật</h4>
             <p className='text-neutral-500 text-lg text-line-2'>
-              Courses on nutrition, fitness training, yoga...
+              Các khóa học về dinh dưỡng, thể dục, yoga...
             </p>
             <Link
               to='/courses'
               className='py-12 px-24 bg-white rounded-8 border border-neutral-30 mt-28 fw-semibold text-main-two-600 hover-bg-main-two-600 hover-text-white hover-border-main-two-600'
             >
-              15 Course
+              15 Khóa học
             </Link>
           </div>
           <div
@@ -119,16 +119,16 @@ const CategoryOne = () => {
               />
             </span>
             <h4 className='display-four mb-16 text-neutral-700'>
-              Data Science
+              Khoa Học Dữ Liệu
             </h4>
             <p className='text-neutral-500 text-lg text-line-2'>
-              Courses on nutrition, fitness training, yoga...
+              Các khóa học về dinh dưỡng, thể dục, yoga...
             </p>
             <Link
               to='/courses'
               className='py-12 px-24 bg-white rounded-8 border border-neutral-30 mt-28 fw-semibold text-main-three-600 hover-bg-main-three-600 hover-text-white hover-border-main-three-600'
             >
-              14 Course
+              14 Khóa học
             </Link>
           </div>
           <div
@@ -144,16 +144,16 @@ const CategoryOne = () => {
               />
             </span>
             <h4 className='display-four mb-16 text-neutral-700'>
-              Business &amp; Finance
+              Kinh Doanh &amp; Tài Chính
             </h4>
             <p className='text-neutral-500 text-lg text-line-2'>
-              Courses on nutrition, fitness training, yoga...
+              Các khóa học về dinh dưỡng, thể dục, yoga...
             </p>
             <Link
               to='/courses'
               className='py-12 px-24 bg-white rounded-8 border border-neutral-30 mt-28 fw-semibold text-main-two-600 hover-bg-main-two-600 hover-text-white hover-border-main-two-600'
             >
-              21 Course
+              21 Khóa học
             </Link>
           </div>
           <div
@@ -169,16 +169,16 @@ const CategoryOne = () => {
               />
             </span>
             <h4 className='display-four mb-16 text-neutral-700'>
-              Data Science
+              Khoa Học Dữ Liệu
             </h4>
             <p className='text-neutral-500 text-lg text-line-2'>
-              Courses on nutrition, fitness training, yoga...
+              Các khóa học về dinh dưỡng, thể dục, yoga...
             </p>
             <Link
               to='/courses'
               className='py-12 px-24 bg-white rounded-8 border border-neutral-30 mt-28 fw-semibold text-main-three-600 hover-bg-main-three-600 hover-text-white hover-border-main-three-600'
             >
-              14 Course
+              14 Khóa học
             </Link>
           </div>
           <div
@@ -193,15 +193,15 @@ const CategoryOne = () => {
                 alt=''
               />
             </span>
-            <h4 className='display-four mb-16 text-neutral-700'>ArtsDesign</h4>
+            <h4 className='display-four mb-16 text-neutral-700'>Thiết Kế Nghệ Thuật</h4>
             <p className='text-neutral-500 text-lg text-line-2'>
-              Courses on nutrition, fitness training, yoga...
+              Các khóa học về dinh dưỡng, thể dục, yoga...
             </p>
             <Link
               to='/courses'
               className='py-12 px-24 bg-white rounded-8 border border-neutral-30 mt-28 fw-semibold text-main-two-600 hover-bg-main-two-600 hover-text-white hover-border-main-two-600'
             >
-              15 Course
+              15 Khóa học
             </Link>
           </div>
         </Slider>

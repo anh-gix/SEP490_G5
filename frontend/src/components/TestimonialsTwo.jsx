@@ -34,13 +34,13 @@ const TestimonialsTwo = () => {
               <i className='ph-bold ph-book' />
             </span>
             <h5 className='text-main-600 mb-0'>
-              Testimonials from Happy Learners
+              Lời Chứng Thực Từ Học Viên Hài Lòng
             </h5>
           </div>
-          <h2 className='mb-24 wow bounceIn'>What Our Students Say</h2>
+          <h2 className='mb-24 wow bounceIn'>Học Viên Chúng Tôi Nói Gì</h2>
           <p className=' wow bounceInUp'>
-            Our students' success stories speak volumes. Here are just a few
-            testimonials from our satisfied learners
+            Câu chuyện thành công của học viên chúng tôi nói lên tất cả. Đây là một số
+            lời chứng thực từ các học viên hài lòng của chúng tôi
           </p>
         </div>
         <Slider
@@ -71,9 +71,8 @@ const TestimonialsTwo = () => {
               </li>
             </ul>
             <p className='text-neutral-700 text-xl'>
-              "I've taken several courses through, and each one has exceeded my
-              expectations. I've gained valuable skills that have helped me
-              advance in my career. Highly recommend!"
+              "Tôi đã tham gia nhiều khóa học, và mỗi khóa học đều vượt quá mong đợi của tôi.
+              Tôi đã có được những kỹ năng quý giá giúp tôi phát triển trong sự nghiệp. Rất khuyên dùng!"
             </p>
             <div className='flex-between gap-24 flex-wrap pt-28 mt-28 border-top border-neutral-50 mt-28 border-dashed border-0'>
               <div className='flex-align gap-24 '>
@@ -84,7 +83,7 @@ const TestimonialsTwo = () => {
                 />
                 <div className=''>
                   <h5 className='mb-8 fw-medium'>John D.</h5>
-                  <span className='text-neutral-700'>Graphic Designer</span>
+                  <span className='text-neutral-700'>Nhà Thiết Kế Đồ Họa</span>
                 </div>
               </div>
               <span className='quate text-48 d-flex opacity-25'>
@@ -115,9 +114,9 @@ const TestimonialsTwo = () => {
               </li>
             </ul>
             <p className='text-neutral-700 text-xl'>
-              "I was initially skeptical about online learning, but changed my
-              perspective completely. The courses are well-designed, and the
-              flexibility to learn at my own pace is invaluable."
+              "Ban đầu tôi hoài nghi về việc học trực tuyến, nhưng đã thay đổi hoàn toàn
+              quan điểm của mình. Các khóa học được thiết kế tốt, và sự linh hoạt
+              để học theo tốc độ của riêng tôi là vô giá."
             </p>
             <div className='flex-between gap-24 flex-wrap pt-28 mt-28 border-top border-neutral-50 mt-28 border-dashed border-0'>
               <div className='flex-align gap-24 '>
@@ -128,7 +127,7 @@ const TestimonialsTwo = () => {
                 />
                 <div className=''>
                   <h5 className='mb-8 fw-medium'>Sarah L.</h5>
-                  <span className='text-neutral-700'>UI/UX Designer</span>
+                  <span className='text-neutral-700'>Nhà Thiết Kế UI/UX</span>
                 </div>
               </div>
               <span className='quate text-48 d-flex opacity-25'>
@@ -159,9 +158,9 @@ const TestimonialsTwo = () => {
               </li>
             </ul>
             <p className='text-neutral-700 text-xl'>
-              "I was at first doubtful about web based learning, yet adjusted my
-              viewpoint totally. The courses are very much planned to learn at
-              my own speed is important."
+              "Lúc đầu tôi nghi ngờ về việc học trực tuyến, nhưng đã hoàn toàn thay đổi
+              quan điểm của mình. Các khóa học được lập kế hoạch rất tốt để học theo
+              tốc độ của riêng mình là điều quan trọng."
             </p>
             <div className='flex-between gap-24 flex-wrap pt-28 mt-28 border-top border-neutral-50 mt-28 border-dashed border-0'>
               <div className='flex-align gap-24 '>
@@ -172,7 +171,7 @@ const TestimonialsTwo = () => {
                 />
                 <div className=''>
                   <h5 className='mb-8 fw-medium'>John Doe</h5>
-                  <span className='text-neutral-700'>Front End Developer</span>
+                  <span className='text-neutral-700'>Nhà Phát Triển Front End</span>
                 </div>
               </div>
               <span className='quate text-48 d-flex opacity-25'>

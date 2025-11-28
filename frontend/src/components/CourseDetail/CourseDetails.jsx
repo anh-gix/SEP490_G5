@@ -1,8 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import axios from "axios";
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+import { courseHomeService } from "../../services/courseHomeService";
 
 const CourseDetails = () => {
   const { id } = useParams();
@@ -21,12 +19,12 @@ const CourseDetails = () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await axios.get(`${API_URL}/courseshome/course-home/${id}`);
-        console.log('Course details response:', response.data);
-        if (response.data.success) {
-          setCourse(response.data.data);
+        const data = await courseHomeService.getCourseHomeById(id);
+        console.log('Course details response:', data);
+        if (data.success) {
+          setCourse(data.data);
         } else {
-          setError(response.data.message || 'Failed to fetch course details');
+          setError(data.message || 'Failed to fetch course details');
         }
       } catch (err) {
         console.error('Error fetching course details:', err);

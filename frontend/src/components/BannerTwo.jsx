@@ -32,29 +32,29 @@ const BannerTwo = () => {
                 <span className='text-main-600 text-2xl d-flex'>
                   <i className='ph-bold ph-book' />
                 </span>
-                <h5 className='text-main-600 mb-0'>Elevate Your Learning</h5>
+                <h5 className='text-main-600 mb-0'>Nâng Tầm Học Tập Của Bạn</h5>
               </div>
               <h1 className='display2 mb-24 wow bounceInLeft'>
-                Learn,
+                Học Tập,
                 <span
                   className='text-main-two-600 wow bounceInRight'
                   data-wow-duration='2s'
                   data-wow-delay='.5s'
                 >
-                  Grow,{" "}
+                  Phát Triển,{" "}
                 </span>
                 <span
                   className='text-main-three-600 wow bounceInLeft'
                   data-wow-duration='1s'
                   data-wow-delay='.5s'
                 >
-                  Achieve
+                  Thành Công
                 </span>{" "}
-                And Succeed
+                Và Vượt Trội
               </h1>
               <p className='text-neutral-500 text-line-2 wow bounceInUp'>
-                Welcome to EduAll, where learning knows no bounds. Whether
-                you're a student, professional, or lifelong learner...
+                Chào mừng đến với EduAll, nơi việc học tập không có giới hạn. Dù bạn là học sinh, 
+                chuyên gia hay người học suốt đời...
               </p>
               <div className='buttons-wrapper flex-align flex-wrap gap-24 mt-40'>
                 <Link
@@ -62,7 +62,7 @@ const BannerTwo = () => {
                   className='btn btn-main rounded-pill flex-align gap-8'
                   data-aos='fade-right'
                 >
-                  Browse Courses
+                  Khám Phá Khóa Học
                   <i className='ph-bold ph-arrow-up-right d-flex text-lg' />
                 </Link>
                 <Link
@@ -70,7 +70,7 @@ const BannerTwo = () => {
                   className='btn btn-outline-main rounded-pill flex-align gap-8'
                   data-aos='fade-left'
                 >
-                  About Us
+                  Về Chúng Tôi
                   <i className='ph-bold ph-arrow-up-right d-flex text-lg' />
                 </Link>
               </div>

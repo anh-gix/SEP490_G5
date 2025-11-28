@@ -24,15 +24,15 @@ const FaqOne = () => {
                     <i className='ph-bold ph-book' />
                   </span>
                   <h5 className='text-main-600 mb-0'>
-                    Frequently Asked Questions (FAQs)
+                    Câu Hỏi Thường Gặp (FAQs)
                   </h5>
                 </div>
                 <h2 className='mb-24 wow bounceIn'>
-                  Find Answers to Your Questions
+                  Tìm Câu Trả Lời Cho Câu Hỏi Của Bạn
                 </h2>
                 <p className='text-neutral-500 text-line-2  wow bounceInUp'>
-                  Welcome to our FAQs section! Here, we've compiled answers to
-                  some of the most common questions our users ask.
+                  Chào mừng đến với phần Câu Hỏi Thường Gặp! Tại đây, chúng tôi đã tổng hợp câu trả lời cho
+                  một số câu hỏi phổ biến nhất mà người dùng của chúng tôi đặt ra.
                 </p>
               </div>
               <div className='accordion common-accordion' id='accordionExample'>
@@ -50,7 +50,7 @@ const FaqOne = () => {
                       aria-expanded='true'
                       aria-controls='collapseOne'
                     >
-                      How do I enroll in a course?
+                      Làm thế nào để đăng ký khóa học?
                     </button>
                   </h2>
                   <div
@@ -60,9 +60,9 @@ const FaqOne = () => {
                   >
                     <div className='accordion-body'>
                       <p className='accordion-body__desc'>
-                        Once you enroll in a course, you'll have unlimited
-                        access to the course materials for as long as the course
-                        is available on our platform.
+                        Sau khi bạn đăng ký khóa học, bạn sẽ có quyền truy cập không giới hạn
+                        vào tài liệu khóa học miễn là khóa học
+                        còn có sẵn trên nền tảng của chúng tôi.
                       </p>
                     </div>
                   </div>
@@ -81,7 +81,7 @@ const FaqOne = () => {
                       aria-expanded='false'
                       aria-controls='collapseTwo'
                     >
-                      Can I access my courses on mobile devices?
+                      Tôi có thể truy cập khóa học trên thiết bị di động không?
                     </button>
                   </h2>
                   <div
@@ -91,9 +91,8 @@ const FaqOne = () => {
                   >
                     <div className='accordion-body'>
                       <p className='accordion-body__desc'>
-                        Once you enroll in a course, you'll have unlimited
-                        access to the course materials for as long as the course
-                        is available on our platform.
+                        Có, bạn có thể truy cập các khóa học của mình trên mọi thiết bị di động.
+                        Nền tảng của chúng tôi được tối ưu hóa cho điện thoại thông minh và máy tính bảng.
                       </p>
                     </div>
                   </div>
@@ -112,7 +111,7 @@ const FaqOne = () => {
                       aria-expanded='false'
                       aria-controls='collapseThree'
                     >
-                      How long do I have access to a course?
+                      Tôi có thể truy cập khóa học trong bao lâu?
                     </button>
                   </h2>
                   <div
@@ -122,9 +121,9 @@ const FaqOne = () => {
                   >
                     <div className='accordion-body'>
                       <p className='accordion-body__desc'>
-                        Once you enroll in a course, you'll have unlimited
-                        access to the course materials for as long as the course
-                        is available on our platform.
+                        Sau khi bạn đăng ký khóa học, bạn sẽ có quyền truy cập không giới hạn
+                        vào tài liệu khóa học miễn là khóa học
+                        còn có sẵn trên nền tảng của chúng tôi.
                       </p>
                     </div>
                   </div>
@@ -143,7 +142,7 @@ const FaqOne = () => {
                       aria-expanded='false'
                       aria-controls='collapseFour'
                     >
-                      What if I need help or have questions during the course?
+                      Nếu tôi cần giúp đỡ hoặc có câu hỏi trong quá trình học thì sao?
                     </button>
                   </h2>
                   <div
@@ -153,9 +152,8 @@ const FaqOne = () => {
                   >
                     <div className='accordion-body'>
                       <p className='accordion-body__desc'>
-                        Once you enroll in a course, you'll have unlimited
-                        access to the course materials for as long as the course
-                        is available on our platform.
+                        Chúng tôi có đội ngũ hỗ trợ luôn sẵn sàng giúp đỡ bạn. Bạn có thể liên hệ qua
+                        email, chat trực tuyến hoặc diễn đàn cộng đồng để được hỗ trợ.
                       </p>
                     </div>
                   </div>
@@ -174,7 +172,7 @@ const FaqOne = () => {
                       aria-expanded='false'
                       aria-controls='collapseFive'
                     >
-                      Do you offer refunds if I'm not satisfied with a course?
+                      Bạn có hoàn tiền nếu tôi không hài lòng với khóa học không?
                     </button>
                   </h2>
                   <div
@@ -184,9 +182,8 @@ const FaqOne = () => {
                   >
                     <div className='accordion-body'>
                       <p className='accordion-body__desc'>
-                        Once you enroll in a course, you'll have unlimited
-                        access to the course materials for as long as the course
-                        is available on our platform.
+                        Có, chúng tôi cung cấp chính sách hoàn tiền trong vòng 30 ngày nếu bạn không hài lòng.
+                        Vui lòng liên hệ với bộ phận hỗ trợ khách hàng để được xử lý.
                       </p>
                     </div>
                   </div>

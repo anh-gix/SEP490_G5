@@ -42,7 +42,7 @@ const ProgramList = () => {
           code: 'IELTS-B2',
           program_name: 'IELTS Intermediate Program',
           description: 'Chương trình IELTS trình độ trung cấp',
-          type: 'ielts',
+          type: 'cam',
           level: 'B2',
           band: '5.5-6.5',
           tuitionFee: 5000000,

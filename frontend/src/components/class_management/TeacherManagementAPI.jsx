@@ -13,24 +13,13 @@ const TeacherManagementAPI = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('grid');
-  const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [editingTeacher, setEditingTeacher] = useState(null);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [teacherSchedule, setTeacherSchedule] = useState([]);
   const [schedulePage, setSchedulePage] = useState(1);
   const [scheduleViewMode, setScheduleViewMode] = useState('calendar'); // 'table' or 'calendar'
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    fullName: '',
-    phone: '',
-    address: '',
-    status: 'active'
-  });
 
   useEffect(() => {
     fetchTeachers();
@@ -65,76 +54,6 @@ const TeacherManagementAPI = () => {
     }
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    try {
-      setLoading(true);
-      if (editingTeacher) {
-        // Update: Xóa password nếu không thay đổi
-        const updateData = { ...formData };
-        if (!updateData.password) {
-          delete updateData.password;
-        }
-        await teacherService.updateTeacher(editingTeacher._id, updateData);
-        alert('Cập nhật giảng viên thành công!');
-      } else {
-        // Create: Yêu cầu password
-        if (!formData.password) {
-          alert('Vui lòng nhập mật khẩu!');
-          return;
-        }
-        await teacherService.createTeacher(formData);
-        alert('Thêm giảng viên thành công!');
-      }
-      
-      handleCloseModal();
-      fetchTeachers();
-      fetchStats();
-    } catch (err) {
-      console.error('Error saving teacher:', err);
-      alert(err.message || 'Không thể lưu thông tin giảng viên');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEdit = (teacher) => {
-    setEditingTeacher(teacher);
-    setFormData({
-      username: teacher.username,
-      email: teacher.email,
-      password: '', // Leave empty for update
-      fullName: teacher.fullName,
-      phone: teacher.phone || '',
-      address: teacher.address || '',
-      status: teacher.status
-    });
-    setShowModal(true);
-  };
-
-  const handleDelete = async (teacherId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa giảng viên này?')) return;
-    
-    try {
-      setLoading(true);
-      await teacherService.deleteTeacher(teacherId);
-      alert('Xóa giảng viên thành công!');
-      fetchTeachers();
-      fetchStats();
-    } catch (err) {
-      console.error('Error deleting teacher:', err);
-      alert(err.message || 'Không thể xóa giảng viên');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleViewDetail = async (teacher) => {
     try {
       setLoading(true);
@@ -153,20 +72,6 @@ const TeacherManagementAPI = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setEditingTeacher(null);
-    setFormData({
-      username: '',
-      email: '',
-      password: '',
-      fullName: '',
-      phone: '',
-      address: '',
-      status: 'active'
-    });
   };
 
   const getStatusBadge = (status) => {
@@ -217,14 +122,6 @@ const TeacherManagementAPI = () => {
           <h4 className="text-neutral-900 fw-bold mb-8">Quản lý Giảng viên</h4>
           <p className="text-neutral-600 mb-0">Quản lý thông tin và lịch giảng dạy</p>
         </div>
-        <Button 
-          className="btn-main px-20 py-10 radius-8"
-          onClick={() => setShowModal(true)}
-          disabled={loading}
-        >
-          <i className="fas fa-plus me-2"></i>
-          Thêm giảng viên
-        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -439,20 +336,6 @@ const TeacherManagementAPI = () => {
                       <i className="fas fa-eye me-1"></i>
                       Chi tiết
                     </Button>
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={() => handleEdit(teacher)}
-                    >
-                      <i className="fas fa-edit"></i>
-                    </Button>
-                    <Button
-                      variant="outline-danger"
-                      size="sm"
-                      onClick={() => handleDelete(teacher._id)}
-                    >
-                      <i className="fas fa-trash"></i>
-                    </Button>
                   </div>
                 </Card.Body>
               </Card>
@@ -508,20 +391,6 @@ const TeacherManagementAPI = () => {
                           <i className="fas fa-eye me-1"></i>
                           Chi tiết
                         </Button>
-                        <Button
-                          variant="outline-secondary"
-                          size="sm"
-                          onClick={() => handleEdit(teacher)}
-                        >
-                          <i className="fas fa-edit"></i>
-                        </Button>
-                        <Button
-                          variant="outline-danger"
-                          size="sm"
-                          onClick={() => handleDelete(teacher._id)}
-                        >
-                          <i className="fas fa-trash"></i>
-                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -531,126 +400,6 @@ const TeacherManagementAPI = () => {
           </Card.Body>
         </Card>
       )}
-
-      {/* Add/Edit Modal */}
-      <Modal show={showModal} onHide={handleCloseModal} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>{editingTeacher ? 'Cập nhật giảng viên' : 'Thêm giảng viên mới'}</Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleSubmit}>
-          <Modal.Body>
-            <Row className="g-3">
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label>Tên đăng nhập <span className="text-danger">*</span></Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="username"
-                    value={formData.username}
-                    onChange={handleInputChange}
-                    placeholder="Username"
-                    required
-                    disabled={!!editingTeacher}
-                  />
-                </Form.Group>
-              </Col>
-
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label>Email <span className="text-danger">*</span></Form.Label>
-                  <Form.Control
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    placeholder="email@example.com"
-                    required
-                  />
-                </Form.Group>
-              </Col>
-
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label>
-                    Mật khẩu {!editingTeacher && <span className="text-danger">*</span>}
-                  </Form.Label>
-                  <Form.Control
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    placeholder={editingTeacher ? "Để trống nếu không đổi" : "Nhập mật khẩu"}
-                    required={!editingTeacher}
-                  />
-                </Form.Group>
-              </Col>
-
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label>Họ tên <span className="text-danger">*</span></Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="fullName"
-                    value={formData.fullName}
-                    onChange={handleInputChange}
-                    placeholder="Nguyễn Văn A"
-                    required
-                  />
-                </Form.Group>
-              </Col>
-
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label>Số điện thoại</Form.Label>
-                  <Form.Control
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder="0123456789"
-                  />
-                </Form.Group>
-              </Col>
-
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label>Trạng thái</Form.Label>
-                  <Form.Select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleInputChange}
-                  >
-                    <option value="active">Hoạt động</option>
-                    <option value="inactive">Tạm nghỉ</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-
-              <Col md={12}>
-                <Form.Group>
-                  <Form.Label>Địa chỉ</Form.Label>
-                  <Form.Control
-                    as="textarea"
-                    rows={2}
-                    name="address"
-                    value={formData.address}
-                    onChange={handleInputChange}
-                    placeholder="Địa chỉ liên hệ..."
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={handleCloseModal} disabled={loading}>
-              Hủy
-            </Button>
-            <Button variant="primary" type="submit" disabled={loading}>
-              {loading ? 'Đang lưu...' : (editingTeacher ? 'Cập nhật' : 'Thêm mới')}
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
 
       {/* Teacher Detail Modal */}
       <Modal show={showDetailModal} onHide={() => { setShowDetailModal(false); setSchedulePage(1); }} size="xl">

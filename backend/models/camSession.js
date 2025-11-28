@@ -1,6 +1,8 @@
+const e = require("express");
 const mongoose = require("mongoose");
 
 const quizSchema = new mongoose.Schema({
+  Type: { type: String , enum: ['multiple-choice', 'yes-no', 'spell', 'word-from-box'] },
   Img: { type: String },
   Question: { type: String },
   Answer: [{ type: String }],

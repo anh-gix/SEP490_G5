@@ -36,3 +36,9 @@ export {
   toeicHistoryMock,
   getToeicResultMock
 } from './toeicMockData';
+
+// Cambridge Quiz Mock Data
+export {
+  cambridgeQuizMock,
+  getCambridgeQuizMock
+} from './cambridgeQuizMockData';

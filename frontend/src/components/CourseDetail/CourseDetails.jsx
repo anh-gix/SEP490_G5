@@ -45,10 +45,11 @@ const CourseDetails = () => {
     return date.toLocaleDateString('vi-VN');
   };
 
-  const getInitials = (name) => {
-    if (!name) return 'U';
-    return name.charAt(0).toUpperCase();
-  };
+  // const getInitials = (name) => {
+  //   if (!name) return 'U';
+  //   return name.charAt(0).toUpperCase();
+  // };
+
 
   if (loading) {
     return (

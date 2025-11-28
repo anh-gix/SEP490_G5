@@ -85,7 +85,8 @@ exports.createCourse = async (req, res) => {
             clos,
             sessions,
             materials,
-            mocktestSessionOrders
+            mocktestSessionOrders,
+            createdBy
         } = req.body;
 
         // Validation
@@ -93,6 +94,14 @@ exports.createCourse = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Mã môn học, tên giáo trình và chương trình là bắt buộc'
+            });
+        }
+
+        // Validate createdBy
+        if (!createdBy) {
+            return res.status(400).json({
+                success: false,
+                message: 'Thiếu thông tin người tạo (createdBy)'
             });
         }
 
@@ -127,13 +136,9 @@ exports.createCourse = async (req, res) => {
             sessions: sessions || [],
             materials: materials || [],
             mocktestSessionOrders: mocktestSessionOrders || [],
+            createdBy,
             status: 'draft'
         };
-
-        // Add createdBy if user is authenticated
-        if (req.user && req.user._id) {
-            courseData.createdBy = req.user._id;
-        }
 
         const course = await Course.create(courseData);
 

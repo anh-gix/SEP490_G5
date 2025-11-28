@@ -20,6 +20,7 @@ const CourseFormNew = () => {
   // Program data (PLOs từ Program)
   const [program, setProgram] = useState(null);
   const [loadingProgram, setLoadingProgram] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Form state - CẬP NHẬT với các trường mới từ courseModel
   const [formData, setFormData] = useState({
@@ -377,7 +378,7 @@ const CourseFormNew = () => {
 
   // ==================== FORM SUBMISSION ====================
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
 
     if (!formData.courseCode || !formData.name) {
       alert("Vui lòng điền đầy đủ thông tin bắt buộc!");
@@ -389,6 +390,7 @@ const CourseFormNew = () => {
     try {
       // 1. Tạo hoặc cập nhật tất cả CLOs trước
       const cloIds = [];
+      const cloCodeToIdMap = {}; // Map từ mã CLO sang _id
       for (const clo of formData.clos) {
         if (clo._id) {
           // CLO đã tồn tại, cập nhật
@@ -399,6 +401,7 @@ const CourseFormNew = () => {
             mappedPLOs: clo.mappedPLOs,
           });
           cloIds.push(clo._id);
+          cloCodeToIdMap[clo.code] = clo._id;
         } else {
           // CLO mới, tạo mới
           const response = await cloService.createCLO({
@@ -408,18 +411,22 @@ const CourseFormNew = () => {
             mappedPLOs: clo.mappedPLOs,
           });
           cloIds.push(response.data._id);
+          cloCodeToIdMap[clo.code] = response.data._id;
         }
       }
 
       // 2. Tạo hoặc cập nhật tất cả Sessions
       const sessionIds = [];
       for (const session of formData.sessions) {
+        // Convert mã CLO thành CLO _id
+        const closIds = session.clos.map(cloCode => cloCodeToIdMap[cloCode]).filter(id => id);
+
         const sessionData = {
           title: session.title,
           order: session.order,
           content: session.content,
           learningType: session.learningType,
-          clos: session.clos, // Giữ nguyên mã CLO
+          clos: closIds, // Gửi mảng ObjectId thay vì mã CLO
         };
 
         if (session._id) {
@@ -449,6 +456,36 @@ const CourseFormNew = () => {
         mocktestSessionOrders: formData.mocktestSessionOrders,
         status: formData.status,
       };
+
+      // Thêm createdBy khi tạo mới (lấy từ localStorage)
+      if (!isEdit) {
+        const userStr = localStorage.getItem('user');
+
+        if (userStr) {
+          try {
+            const user = JSON.parse(userStr);
+            const userId = user._id || user.id;
+            if (userId) {
+              courseData.createdBy = userId;
+            } else {
+              console.error('No user ID found in localStorage');
+              alert('Không tìm thấy thông tin user. Vui lòng đăng nhập lại!');
+              setLoading(false);
+              return;
+            }
+          } catch (e) {
+            console.error('Error parsing user from localStorage:', e);
+            alert('Lỗi đọc thông tin user. Vui lòng đăng nhập lại!');
+            setLoading(false);
+            return;
+          }
+        } else {
+          console.error('No user found in localStorage');
+          alert('Vui lòng đăng nhập trước khi tạo course!');
+          setLoading(false);
+          return;
+        }
+      }
 
       if (isEdit) {
         await courseService.updateCourse(courseId, courseData);
@@ -573,8 +610,9 @@ const CourseFormNew = () => {
             variant="primary"
             icon="ph ph-check-circle"
             onClick={handleSubmit}
+            disabled={loading}
           >
-            Lưu học phần
+            {loading ? "Đang lưu..." : "Lưu học phần"}
           </Button>
         </div>
       </div>

@@ -15,6 +15,11 @@ const courseSchema = new Schema({
         required: true,
         trim: true
     },
+    learningType: {
+        type: String,
+        enum: ['online', 'offline', 'hybrid'],
+        required: true
+    },
     description: {
         type: String
     },

@@ -9,6 +9,7 @@ import ProgramFormPage from "../pages/CenterHead/ProgramFormPage.jsx";
 import PendingCoursesPage from "../pages/CenterHead/PendingCoursesPage.jsx";
 import CourseDetailPage from "../pages/CenterHead/CourseDetailPage.jsx";
 import CourseFormPage from "../pages/CenterHead/CourseFormPage.jsx";
+import CamSessionPage from "../pages/CenterHead/CamSessionPage.jsx";
 import ClassListPage from "../pages/CenterHead/ClassListPage.jsx";
 import PendingSchedulesPage from "../pages/CenterHead/PendingSchedulesPage.jsx";
 import RoomListPage from "../pages/CenterHead/RoomListPage.jsx";
@@ -43,6 +44,10 @@ export const centerHeadRoutes = [
   // Tạo/Sửa Course trong Program
   { path: '/center-head/programs/:programId/courses/create', element: <CourseFormPage /> },
   { path: '/center-head/programs/:programId/courses/:courseId/edit', element: <CourseFormPage /> },
+
+  // CAM Session Management
+  { path: '/center-head/cam-sessions/create', element: <CamSessionPage /> },
+  { path: '/center-head/cam-sessions/:sessionId/edit', element: <CamSessionPage /> },
 
   // Program Detail & Course Management
   { path: '/center-head/programs/:id', element: <ProgramDetailPage /> },

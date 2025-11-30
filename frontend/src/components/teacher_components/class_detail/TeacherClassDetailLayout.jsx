@@ -531,12 +531,21 @@ const TeacherClassDetailLayout = () => {
             </Col>
             <Col lg={4} className="text-lg-end">
               <div className="text-white mb-8" style={{ opacity: 0.8 }}>Buổi tiếp theo</div>
-              <div className="text-white fw-bold text-18 mb-4">
-                {new Date(classInfo.nextLesson.date).toLocaleDateString('vi-VN')}
-              </div>
-              <div className="text-white" style={{ opacity: 0.9 }}>
-                {classInfo.nextLesson.time} - {classInfo.nextLesson.topic}
-              </div>
+              {classInfo.nextLesson ? (
+                <>
+                  <div className="text-white fw-bold text-18 mb-4">
+                    {new Date(classInfo.nextLesson.date).toLocaleDateString('vi-VN')}
+                  </div>
+                  <div className="text-white" style={{ opacity: 0.9 }}>
+                    {classInfo.nextLesson.time} - {classInfo.nextLesson.topic}
+                  </div>
+                </>
+              ) : (
+                <div className="text-white" style={{ opacity: 0.7 }}>
+                  <i className="fas fa-info-circle me-2"></i>
+                  Chưa có lịch
+                </div>
+              )}
             </Col>
           </Row>
         </Card.Body>

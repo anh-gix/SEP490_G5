@@ -36,6 +36,7 @@ const CamSession = () => {
   const [quizForm, setQuizForm] = useState({
     Type: 'multiple-choice',
     Img: '',
+    imgFile: null,
     Question: '',
     Answer: [''],
     AnswerKey: ['']
@@ -44,7 +45,7 @@ const CamSession = () => {
   // Vocabulary Form
   const [showVocabularyModal, setShowVocabularyModal] = useState(false);
   const [vocabularyForm, setVocabularyForm] = useState({
-    items: [{ word: '', img: '' }]
+    items: [{ word: '', img: '', imgFile: null }]
   });
 
   // Tabs configuration
@@ -138,6 +139,7 @@ const CamSession = () => {
     setQuizForm({
       Type: 'multiple-choice',
       Img: '',
+      imgFile: null,
       Question: '',
       Answer: [''],
       AnswerKey: ['']
@@ -151,6 +153,7 @@ const CamSession = () => {
     setQuizForm({
       Type: quiz.Type || 'multiple-choice',
       Img: quiz.Img || '',
+      imgFile: null,
       Question: quiz.Question || '',
       Answer: quiz.Answer && quiz.Answer.length > 0 ? [...quiz.Answer] : [''],
       AnswerKey: quiz.AnswerKey && quiz.AnswerKey.length > 0 ? [...quiz.AnswerKey] : ['']
@@ -210,6 +213,45 @@ const CamSession = () => {
     }));
   };
 
+  const handleQuizImageUpload = (file) => {
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Chỉ chấp nhận file ảnh!');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File ảnh không được vượt quá 5MB!');
+      return;
+    }
+
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    
+    setQuizForm(prev => ({
+      ...prev,
+      imgFile: file,
+      Img: previewUrl // Use preview URL for display
+    }));
+  };
+
+  const handleRemoveQuizImage = () => {
+    setQuizForm(prev => {
+      // Revoke object URL if exists
+      if (prev.imgFile && prev.Img) {
+        URL.revokeObjectURL(prev.Img);
+      }
+      return {
+        ...prev,
+        imgFile: null,
+        Img: ''
+      };
+    });
+  };
+
   const handleSaveQuiz = () => {
     if (!quizForm.Question) {
       alert('Vui lòng nhập câu hỏi!');
@@ -232,7 +274,8 @@ const CamSession = () => {
       Img: quizForm.Img || undefined,
       Question: quizForm.Question,
       Answer: quizForm.Answer.filter(a => a.trim()),
-      AnswerKey: quizForm.AnswerKey.filter(a => a.trim())
+      AnswerKey: quizForm.AnswerKey.filter(a => a.trim()),
+      imgFile: quizForm.imgFile // Keep file reference for upload on form submit
     };
 
     if (editingQuizIndex !== null) {
@@ -245,7 +288,17 @@ const CamSession = () => {
       ...prev,
       quizzes: {
         ...prev.quizzes,
-        quiz: quizzes
+        quiz: quizzes.map(q => ({
+          Type: q.Type,
+          Img: q.Img,
+          Question: q.Question,
+          Answer: q.Answer,
+          AnswerKey: q.AnswerKey
+        })),
+        // Store files separately for upload
+        files: quizzes
+          .map((quiz, index) => quiz.imgFile ? { index, file: quiz.imgFile } : null)
+          .filter(Boolean)
       }
     }));
     setShowQuizModal(false);
@@ -267,8 +320,8 @@ const CamSession = () => {
   const handleEditVocabulary = () => {
     setVocabularyForm({
       items: formData.vocabulary.items && formData.vocabulary.items.length > 0
-        ? [...formData.vocabulary.items]
-        : [{ word: '', img: '' }]
+        ? formData.vocabulary.items.map(item => ({ ...item, imgFile: null }))
+        : [{ word: '', img: '', imgFile: null }]
     });
     setShowVocabularyModal(true);
   };
@@ -284,18 +337,70 @@ const CamSession = () => {
     });
   };
 
+  const handleVocabularyImageUpload = (index, file) => {
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Chỉ chấp nhận file ảnh!');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File ảnh không được vượt quá 5MB!');
+      return;
+    }
+
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    
+    setVocabularyForm(prev => {
+      const newItems = [...prev.items];
+      newItems[index] = {
+        ...newItems[index],
+        imgFile: file,
+        img: previewUrl // Use preview URL for display
+      };
+      return { ...prev, items: newItems };
+    });
+  };
+
+  const handleRemoveVocabularyImage = (index) => {
+    setVocabularyForm(prev => {
+      const newItems = [...prev.items];
+      // Revoke object URL if exists
+      if (newItems[index].imgFile && newItems[index].img) {
+        URL.revokeObjectURL(newItems[index].img);
+      }
+      newItems[index] = {
+        ...newItems[index],
+        imgFile: null,
+        img: ''
+      };
+      return { ...prev, items: newItems };
+    });
+  };
+
   const handleAddVocabularyItem = () => {
     setVocabularyForm(prev => ({
       ...prev,
-      items: [...prev.items, { word: '', img: '' }]
+      items: [...prev.items, { word: '', img: '', imgFile: null }]
     }));
   };
 
   const handleRemoveVocabularyItem = (index) => {
-    setVocabularyForm(prev => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index)
-    }));
+    setVocabularyForm(prev => {
+      const itemToRemove = prev.items[index];
+      // Revoke object URL if exists
+      if (itemToRemove?.imgFile && itemToRemove?.img) {
+        URL.revokeObjectURL(itemToRemove.img);
+      }
+      return {
+        ...prev,
+        items: prev.items.filter((_, i) => i !== index)
+      };
+    });
   };
 
   const handleSaveVocabulary = () => {
@@ -306,10 +411,24 @@ const CamSession = () => {
       return;
     }
 
+    // Process items: keep URL or preview URL (file will be handled on form submit)
+    const processedItems = validItems.map(item => ({
+      word: item.word.trim(),
+      img: item.img || '', // Keep URL or preview URL from file
+      imgFile: item.imgFile // Keep file reference for upload on form submit
+    }));
+
     setFormData(prev => ({
       ...prev,
       vocabulary: {
-        items: validItems
+        items: processedItems.map(item => ({
+          word: item.word,
+          img: item.img
+        })),
+        // Store files separately for upload
+        files: processedItems
+          .map((item, index) => item.imgFile ? { index, file: item.imgFile } : null)
+          .filter(Boolean)
       }
     }));
     setShowVocabularyModal(false);
@@ -326,10 +445,60 @@ const CamSession = () => {
 
     try {
       setLoading(true);
-      // Prepare data for API - convert videoURL structure if needed
+      
+      // Handle image file uploads if any
+      let finalVocabulary = formData.vocabulary;
+      if (formData.vocabulary?.files && formData.vocabulary.files.length > 0) {
+        // TODO: Upload files to server and get URLs
+        // For now, we'll use the preview URLs (blob URLs)
+        // In production, you should upload files to a storage service (S3, Cloudinary, etc.)
+        // and replace preview URLs with actual URLs
+        
+        // Example upload logic (uncomment when API is ready):
+        /*
+        const uploadPromises = formData.vocabulary.files.map(async ({ index, file }) => {
+          const formDataUpload = new FormData();
+          formDataUpload.append('image', file);
+          const response = await fetch('/api/upload/image', {
+            method: 'POST',
+            body: formDataUpload
+          });
+          const data = await response.json();
+          return { index, url: data.url };
+        });
+        
+        const uploadResults = await Promise.all(uploadPromises);
+        finalVocabulary = {
+          items: formData.vocabulary.items.map((item, idx) => {
+            const uploadResult = uploadResults.find(r => r.index === idx);
+            return {
+              word: item.word,
+              img: uploadResult ? uploadResult.url : item.img
+            };
+          })
+        };
+        */
+      }
+      
+      // Prepare data for API
       const submitData = {
         ...formData,
-        videoURL: formData.videoURL || undefined
+        videoURL: formData.videoURL || undefined,
+        quizzes: {
+          quiz: finalQuizzes.map(quiz => ({
+            Type: quiz.Type,
+            Img: quiz.Img,
+            Question: quiz.Question,
+            Answer: quiz.Answer,
+            AnswerKey: quiz.AnswerKey
+          }))
+        },
+        vocabulary: {
+          items: finalVocabulary.items.map(item => ({
+            word: item.word,
+            img: item.img
+          }))
+        }
       };
       
       if (isEdit) {
@@ -673,17 +842,78 @@ const CamSession = () => {
             </div>
 
             <div className="col-12">
-              <label className="form-label fw-semibold">
-                URL hình ảnh (nếu có)
-              </label>
-              <input
-                type="url"
-                name="Img"
-                className="form-control"
-                placeholder="https://..."
-                value={quizForm.Img}
-                onChange={handleQuizFormChange}
-              />
+              <label className="form-label fw-semibold">Hình ảnh</label>
+              
+              {/* Upload File Option */}
+              <div className="mb-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="form-control form-control-sm"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      handleQuizImageUpload(file);
+                    }
+                    e.target.value = ''; // Reset input
+                  }}
+                />
+                <small className="text-muted">Hoặc upload file ảnh (tối đa 5MB)</small>
+              </div>
+
+              {/* URL Input Option */}
+              <div className="mb-2">
+                <input
+                  type="url"
+                  name="Img"
+                  className="form-control form-control-sm"
+                  placeholder="https://... (hoặc upload file ở trên)"
+                  value={quizForm.imgFile ? '' : quizForm.Img}
+                  onChange={(e) => {
+                    if (!quizForm.imgFile) {
+                      handleQuizFormChange(e);
+                    }
+                  }}
+                  disabled={!!quizForm.imgFile}
+                />
+                <small className="text-muted">Nhập URL hình ảnh</small>
+              </div>
+
+              {/* Preview */}
+              {quizForm.Img && (
+                <div className="mt-2 text-center">
+                  <div className="position-relative d-inline-block">
+                    <img
+                      src={quizForm.Img}
+                      alt="Preview"
+                      style={{ maxWidth: '300px', maxHeight: '200px', objectFit: 'contain' }}
+                      className="border rounded"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                    {quizForm.Img && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-danger position-absolute top-0 end-0 m-1"
+                        style={{ borderRadius: '50%', width: '24px', height: '24px', padding: 0 }}
+                        onClick={handleRemoveQuizImage}
+                        title="Xóa ảnh"
+                      >
+                        <i className="ph ph-x" style={{ fontSize: '12px' }}></i>
+                      </button>
+                    )}
+                  </div>
+                  {quizForm.imgFile && (
+                    <div className="mt-1">
+                      <small className="text-success">
+                        <i className="ph ph-check-circle me-1"></i>
+                        File: {quizForm.imgFile.name}
+                      </small>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="col-12">
@@ -833,25 +1063,75 @@ const CamSession = () => {
                     </div>
                     
                     <div>
-                      <label className="form-label text-sm">URL hình ảnh</label>
-                      <input
-                        type="url"
-                        className="form-control"
-                        placeholder="https://..."
-                        value={item.img}
-                        onChange={(e) => handleVocabularyItemChange(index, 'img', e.target.value)}
-                      />
+                      <label className="form-label text-sm">Hình ảnh</label>
+                      
+                      {/* Upload File Option */}
+                      <div className="mb-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="form-control form-control-sm"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              handleVocabularyImageUpload(index, file);
+                            }
+                            e.target.value = ''; // Reset input
+                          }}
+                        />
+                        <small className="text-muted">Hoặc upload file ảnh (tối đa 5MB)</small>
+                      </div>
+
+                      {/* URL Input Option */}
+                      <div className="mb-2">
+                        <input
+                          type="url"
+                          className="form-control form-control-sm"
+                          placeholder="https://... (hoặc upload file ở trên)"
+                          value={item.imgFile ? '' : item.img}
+                          onChange={(e) => {
+                            if (!item.imgFile) {
+                              handleVocabularyItemChange(index, 'img', e.target.value);
+                            }
+                          }}
+                          disabled={!!item.imgFile}
+                        />
+                        <small className="text-muted">Nhập URL hình ảnh</small>
+                      </div>
+
+                      {/* Preview */}
                       {item.img && (
                         <div className="mt-2 text-center">
-                          <img
-                            src={item.img}
-                            alt={`Preview ${item.word || index + 1}`}
-                            style={{ maxWidth: '200px', maxHeight: '150px', objectFit: 'contain' }}
-                            className="border rounded"
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                            }}
-                          />
+                          <div className="position-relative d-inline-block">
+                            <img
+                              src={item.img}
+                              alt={`Preview ${item.word || index + 1}`}
+                              style={{ maxWidth: '200px', maxHeight: '150px', objectFit: 'contain' }}
+                              className="border rounded"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                            {item.img && (
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger position-absolute top-0 end-0 m-1"
+                                style={{ borderRadius: '50%', width: '24px', height: '24px', padding: 0 }}
+                                onClick={() => handleRemoveVocabularyImage(index)}
+                                title="Xóa ảnh"
+                              >
+                                <i className="ph ph-x" style={{ fontSize: '12px' }}></i>
+                              </button>
+                            )}
+                          </div>
+                          {item.imgFile && (
+                            <div className="mt-1">
+                              <small className="text-success">
+                                <i className="ph ph-check-circle me-1"></i>
+                                File: {item.imgFile.name}
+                              </small>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

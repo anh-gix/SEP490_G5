@@ -36,3 +36,25 @@ export {
   toeicHistoryMock,
   getToeicResultMock
 } from './toeicMockData';
+
+// Cambridge Quiz Mock Data
+export {
+  cambridgeQuizMock,
+  getCambridgeQuizMock
+} from './cambridgeQuizMockData';
+
+// Online Course Mock Data
+export {
+  onlineCourses,
+  camSessions,
+  studentOnlineLearning,
+  getStudentOnlineCourses,
+  getCourseProgress,
+  calculateCompletionPercentage,
+  calculateSkillProgress,
+  getSessionWithProgress,
+  mockApiDelay
+} from './onlineCourseMockData';
+
+// Exam Mock Data
+export { examsMock } from './examMockData';

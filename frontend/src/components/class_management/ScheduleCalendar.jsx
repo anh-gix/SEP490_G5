@@ -341,6 +341,12 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                               position: 'relative'
                             }}
                             title={tooltipText}
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent triggering parent div's onClick
+                              if (onEditSchedule) {
+                                onEditSchedule(schedule);
+                              }
+                            }}
                           >
                             <div className="fw-bold d-flex align-items-center justify-content-between">
                               <span>{schedule.startTime}</span>

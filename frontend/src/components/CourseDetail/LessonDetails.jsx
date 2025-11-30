@@ -1,8 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
+import { courseHomeService } from "../../services/courseHomeService";
 
 const LessonDetails = () => {
   const { courseId, sessionId } = useParams();
@@ -24,19 +22,20 @@ const LessonDetails = () => {
         setLoading(true);
         setError(null);
 
-        const response = await axios.get(
-          `${API_URL}/courseshome/course-home/${courseId}/cam-session/${sessionId}`
+        const data = await courseHomeService.getCamSessionByCourseAndSession(
+          courseId,
+          sessionId
         );
 
-        if (!response.data.success) {
+        if (!data.success) {
           setError(
-            response.data.message || "Không thể tải thông tin Cam Session."
+            data.message || "Không thể tải thông tin Cam Session."
           );
           setLoading(false);
           return;
         }
 
-        const { course: fetchedCourse, camSession } = response.data.data || {};
+        const { course: fetchedCourse, camSession } = data.data || {};
 
         if (!camSession) {
           setError("Không tìm thấy Cam Session tương ứng.");

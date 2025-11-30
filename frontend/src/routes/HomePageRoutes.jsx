@@ -1,8 +1,8 @@
-import CourseCamPage from "../pages/CourseCamPage.jsx";
-import CourseIeltsPage from "../pages/CourseIeltsPage.jsx";
-import CourseToeicPage from "../pages/CourseToeicPage.jsx";
-import CourseDetailsPage from "../pages/CourseDetailsPage.jsx";
-import CamLessonDetailsPage from "../pages/CamLessonDetailsPage.jsx";
+import CourseCamPage from "../pages/HomePage/CourseCamPage.jsx";
+import CourseIeltsPage from "../pages/HomePage/CourseIeltsPage.jsx";
+import CourseToeicPage from "../pages/HomePage/CourseToeicPage.jsx";
+import CourseDetailsPage from "../pages/HomePage/CourseDetailsPage.jsx";
+import CamLessonDetailsPage from "../pages/HomePage/CamLessonDetailsPage.jsx";
 export const HomePageRoutes = [
     
     // I. User Management

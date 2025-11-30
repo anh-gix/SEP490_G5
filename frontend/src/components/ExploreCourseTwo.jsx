@@ -14,12 +14,12 @@ const ExploreCourseTwo = () => {
             <span className='text-main-600 text-2xl d-flex'>
               <i className='ph-bold ph-book' />
             </span>
-            <h5 className='text-main-600 mb-0'>Popular Courses</h5>
+            <h5 className='text-main-600 mb-0'>Khóa Học Phổ Biến</h5>
           </div>
-          <h2 className='mb-24 wow bounceIn'>Pick A Course To Get Started</h2>
+          <h2 className='mb-24 wow bounceIn'>Chọn Một Khóa Học Để Bắt Đầu</h2>
           <p className=' wow bounceInUp'>
-            Our platform is built on the principles of innovation, quality, and
-            inclusivity, aiming to provide a seamless learning
+            Nền tảng của chúng tôi được xây dựng trên các nguyên tắc đổi mới, chất lượng và
+            toàn diện, nhằm cung cấp trải nghiệm học tập liền mạch
           </p>
         </div>
         <div className='text-center'>
@@ -44,7 +44,7 @@ const ExploreCourseTwo = () => {
                   aria-selected='true'
                 >
                   <i className='text-xl d-flex ph-bold ph-squares-four' />
-                  All Categories
+                  Tất Cả Danh Mục
                 </button>
               </li>
               <li className='nav-item' role='presentation'>
@@ -59,7 +59,7 @@ const ExploreCourseTwo = () => {
                   aria-selected='false'
                 >
                   <i className='text-xl d-flex ph-bold ph-magic-wand' />
-                  Design
+                  Thiết Kế
                 </button>
               </li>
               <li className='nav-item' role='presentation'>
@@ -74,7 +74,7 @@ const ExploreCourseTwo = () => {
                   aria-selected='false'
                 >
                   <i className='text-xl d-flex ph-bold ph-code' />
-                  Programming
+                  Lập Trình
                 </button>
               </li>
               <li className='nav-item' role='presentation'>
@@ -89,7 +89,7 @@ const ExploreCourseTwo = () => {
                   aria-selected='false'
                 >
                   <i className='text-xl d-flex ph-bold ph-code' />
-                  web Design
+                  Thiết Kế Web
                 </button>
               </li>
               <li className='nav-item' role='presentation'>
@@ -104,7 +104,7 @@ const ExploreCourseTwo = () => {
                   aria-selected='false'
                 >
                   <i className='text-xl d-flex ph-bold ph-graduation-cap' />
-                  Academic
+                  Học Thuật
                 </button>
               </li>
               <li className='nav-item' role='presentation'>

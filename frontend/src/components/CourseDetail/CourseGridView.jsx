@@ -1,8 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
+import { courseHomeService } from "../../services/courseHomeService";
 export const COURSE_TYPES = [
   { label: "IELTS", value: "ielts" },
   { label: "TOEIC", value: "toeic" },
@@ -36,17 +34,12 @@ const CourseGridView = ({ initialType }) => {
       try {
         setLoading(true);
         setError(null);
-        const response = await axios.get(
-          `${API_URL}/courseshome/by-type`,
-          {
-            params: { type: selectedType },
-          }
-        );
+        const data = await courseHomeService.getCoursesByType(selectedType);
 
-        if (response.data.success) {
-          setCourses(response.data.data || []);
+        if (data.success) {
+          setCourses(data.data || []);
         } else {
-          setError(response.data.message || "Failed to fetch courses");
+          setError(data.message || "Failed to fetch courses");
         }
       } catch (err) {
         console.error("Error fetching courses:", err);

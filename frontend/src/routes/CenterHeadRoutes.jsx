@@ -11,6 +11,7 @@ import CourseWizardPage from "../pages/CenterHead/CourseWizardPage.jsx";
 import PendingCoursesPage from "../pages/CenterHead/PendingCoursesPage.jsx";
 import CourseDetailPage from "../pages/CenterHead/CourseDetailPage.jsx";
 import CourseFormPage from "../pages/CenterHead/CourseFormPage.jsx";
+import CamSessionPage from "../pages/CenterHead/CamSessionPage.jsx";
 import ClassListPage from "../pages/CenterHead/ClassListPage.jsx";
 import PendingSchedulesPage from "../pages/CenterHead/PendingSchedulesPage.jsx";
 import RoomListPage from "../pages/CenterHead/RoomListPage.jsx";
@@ -49,6 +50,10 @@ export const centerHeadRoutes = [
   // OLD: Full Program Wizard (deprecated - kept for reference)
   { path: '/center-head/programs/wizard/create', element: <ProgramWizardPage /> },
   { path: '/center-head/programs/wizard/:id/edit', element: <ProgramWizardPage /> },
+
+  // CAM Session Management
+  { path: '/center-head/cam-sessions/create', element: <CamSessionPage /> },
+  { path: '/center-head/cam-sessions/:sessionId/edit', element: <CamSessionPage /> },
 
   // Program Detail & Course Management
   { path: '/center-head/programs/:id', element: <ProgramDetailPage /> },

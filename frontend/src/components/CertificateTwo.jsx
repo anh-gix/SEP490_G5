@@ -3,11 +3,11 @@ const CertificateTwo = () => {
     <section className='certificate-two py-120 position-relative z-1 mash-bg-main mash-bg-main-two mash-reverse'>
       <div className='section-heading text-center'>
         <h2 className='mb-24 wow bounceIn'>
-          Skills Certificate from the EduAll
+          Chứng Chỉ Kỹ Năng Từ EduAll
         </h2>
         <p className=' wow bounceInUp'>
-          Online courses certification section design for showcase your
-          certificate program features.
+          Phần thiết kế chứng nhận khóa học trực tuyến để giới thiệu các
+          tính năng chương trình chứng chỉ của bạn.
         </p>
       </div>
       <div className='position-relative'>
@@ -23,11 +23,10 @@ const CertificateTwo = () => {
                   <span className='w-52 h-52 flex-center d-inline-flex bg-main-25 rounded-circle text-main-600 text-2xl'>
                     <i className='animate__wobble ph-bold ph-medal' />
                   </span>
-                  <h5 className='mb-0'>Learn from Industry Experts</h5>
+                  <h5 className='mb-0'>Học Từ Chuyên Gia Trong Ngành</h5>
                 </div>
                 <p className='text-neutral-700 text-line-2'>
-                  Lorem ipsum dolor sit amet, conse ctetur adipisc amus ac
-                  iaculis arcu.
+                  Học từ các chuyên gia hàng đầu trong lĩnh vực với kinh nghiệm thực tế.
                 </p>
               </div>
               <div
@@ -39,11 +38,10 @@ const CertificateTwo = () => {
                   <span className='w-52 h-52 flex-center d-inline-flex bg-main-25 rounded-circle text-main-600 text-2xl'>
                     <i className='animate__wobble ph-bold ph-clock' />
                   </span>
-                  <h5 className='mb-0'>Learn Anytime, Anywhere</h5>
+                  <h5 className='mb-0'>Học Mọi Lúc, Mọi Nơi</h5>
                 </div>
                 <p className='text-neutral-700 text-line-2'>
-                  Lorem ipsum dolor sit amet, conse ctetur adipisc amus ac
-                  iaculis arcu.
+                  Linh hoạt về thời gian và địa điểm, học bất cứ khi nào bạn muốn.
                 </p>
               </div>
               <div
@@ -55,11 +53,10 @@ const CertificateTwo = () => {
                   <span className='w-52 h-52 flex-center d-inline-flex bg-main-25 rounded-circle text-main-600 text-2xl'>
                     <i className='animate__wobble ph-bold ph-star' />
                   </span>
-                  <h5 className='mb-0'>Free Resources</h5>
+                  <h5 className='mb-0'>Tài Nguyên Miễn Phí</h5>
                 </div>
                 <p className='text-neutral-700 text-line-2'>
-                  Lorem ipsum dolor sit amet, conse ctetur adipisc amus ac
-                  iaculis arcu.
+                  Truy cập vào nhiều tài liệu và tài nguyên học tập miễn phí.
                 </p>
               </div>
               <div
@@ -71,11 +68,10 @@ const CertificateTwo = () => {
                   <span className='w-52 h-52 flex-center d-inline-flex bg-main-25 rounded-circle text-main-600 text-2xl'>
                     <i className='animate__wobble ph-bold ph-chart-line-up' />
                   </span>
-                  <h5 className='mb-0'>Skill-based Learning</h5>
+                  <h5 className='mb-0'>Học Tập Dựa Trên Kỹ Năng</h5>
                 </div>
                 <p className='text-neutral-700 text-line-2'>
-                  Lorem ipsum dolor sit amet, conse ctetur adipisc amus ac
-                  iaculis arcu.
+                  Phương pháp học tập tập trung vào việc phát triển kỹ năng thực tế.
                 </p>
               </div>
             </div>

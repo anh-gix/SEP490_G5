@@ -1,6 +1,8 @@
+const e = require("express");
 const mongoose = require("mongoose");
 
 const quizSchema = new mongoose.Schema({
+  Type: { type: String , enum: ['multiple-choice', 'yes-no', 'spell', 'word-from-box'] },
   Img: { type: String },
   Question: { type: String },
   Answer: [{ type: String }],
@@ -9,11 +11,25 @@ const quizSchema = new mongoose.Schema({
 
 const camSessionSchema = new mongoose.Schema(
   {
-    Title: { type: String },
-    Des: { type: String },
-    Order: { type: Number },
+    title: { type: String },
+    // Phân loại kiến thức của các bài học trong khóa online cambridge
+    sessionType: { type: String, enum: ['reading', 'listening', 'speaking', 'writing'] },
+    description: { type: String },
+    // Thứ tự bài học trong khóa học
+    order: { type: Number },
+    // Video bài giảng
     videoURL: { type: String },
-    Quiz: [quizSchema],
+    // Quiz kiến thức trong lesson
+    quizzes: {
+      quiz:[quizSchema]
+    },
+    // Flashcard từ vựng trong lesson
+    vocabulary: {
+      items: [{
+        word: { type: String, required: true },
+        img: { type: String }
+      }]
+    },
   },
   { timestamps: true }
 );

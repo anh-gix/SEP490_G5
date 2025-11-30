@@ -10,6 +10,7 @@ const Session = require('../models/sessionModel');
 const Class = require('../models/classModel');
 const ClassSchedule = require('../models/classScheduleModel');
 const StudentSchedule = require('../models/studentScheduleModel');
+const ChangeRequest = require('../models/changeRequestModel');
 
 // Store created classes for reference
 const seedData = {
@@ -17,11 +18,12 @@ const seedData = {
 };
 
 async function clearDatabase() {
-    console.log('\n🗑️  Clearing existing data for Class, ClassSchedule, StudentSchedule...');
+    console.log('\n🗑️  Clearing existing data for Class, ClassSchedule, StudentSchedule, ChangeRequest...');
     await StudentSchedule.deleteMany({});
     await ClassSchedule.deleteMany({});
     await Class.deleteMany({});
-    console.log('✅ Cleared Class, ClassSchedule, and StudentSchedule tables\n');
+    await ChangeRequest.deleteMany({});
+    console.log('✅ Cleared Class, ClassSchedule, StudentSchedule, and ChangeRequest tables\n');
 }
 
 
@@ -665,10 +667,398 @@ async function seedStudentSchedules() {
     console.log(`✅ Created ${created.length} student schedules for ${classSchedules.length} class schedules\n`);
 }
 
+async function seedChangeRequests() {
+    console.log('📝 Seeding Change Requests...');
+    const changeRequests = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Query existing data from database
+    const classes = await Class.find().lean();
+    const classSchedules = await ClassSchedule.find().lean();
+    const studentSchedules = await StudentSchedule.find().lean();
+    
+    // Find roles
+    const teacherRole = await Role.findOne({ name: 'Teacher' });
+    const studentRole = await Role.findOne({ name: 'Student' });
+    const academicStaffRole = await Role.findOne({ name: 'Academic Staff' });
+    
+    if (!teacherRole || !studentRole) {
+        console.log('⚠️  Không tìm thấy Teacher hoặc Student role. Vui lòng seed roles trước.');
+        return;
+    }
+    
+    // Query users by role
+    const teachers = await User.find({ roleId: teacherRole._id }).lean();
+    const students = await User.find({ roleId: studentRole._id }).lean();
+    let academicStaffUsers = [];
+    if (academicStaffRole) {
+        academicStaffUsers = await User.find({ roleId: academicStaffRole._id }).lean();
+    }
+    
+    // Validate data exists
+    if (classes.length === 0) {
+        console.log('⚠️  Không tìm thấy classes trong database. Vui lòng seed classes trước.');
+        return;
+    }
+    if (classSchedules.length === 0) {
+        console.log('⚠️  Không tìm thấy class schedules trong database. Vui lòng seed class schedules trước.');
+        return;
+    }
+    if (studentSchedules.length === 0) {
+        console.log('⚠️  Không tìm thấy student schedules trong database. Vui lòng seed student schedules trước.');
+        return;
+    }
+    if (teachers.length === 0) {
+        console.log('⚠️  Không tìm thấy teachers trong database.');
+        return;
+    }
+    if (students.length === 0) {
+        console.log('⚠️  Không tìm thấy students trong database.');
+        return;
+    }
+    
+    // Get Academic Staff user for approver (if available)
+    const approver = academicStaffUsers.length > 0 ? academicStaffUsers[0] : null;
+    
+    // Filter past student schedules for makeup_class
+    const pastStudentSchedules = studentSchedules.filter(ss => {
+        const classSchedule = classSchedules.find(cs => cs._id.toString() === ss.classSchedule.toString());
+        if (!classSchedule) return false;
+        const scheduleDate = new Date(classSchedule.date);
+        scheduleDate.setHours(0, 0, 0, 0);
+        return scheduleDate < today;
+    });
+    
+    console.log(`   - Found ${classes.length} classes, ${classSchedules.length} class schedules, ${pastStudentSchedules.length} past student schedules`);
+    console.log(`   - Found ${teachers.length} teachers, ${students.length} students, ${academicStaffUsers.length} academic staff`);
+    
+    // Helper function to generate approved date (1-7 days ago)
+    const getApprovedDate = (daysAgo) => {
+        const date = new Date(today);
+        date.setDate(date.getDate() - daysAgo);
+        date.setHours(14, 0, 0, 0); // Set to 2 PM
+        return date;
+    };
+    
+    // ============================================
+    // 1. CREATE_CLASS requests (6-7 requests)
+    // ============================================
+    const createClassSenders = [];
+    // Collect more senders
+    for (let i = 0; i < Math.min(4, teachers.length); i++) {
+        createClassSenders.push(teachers[i]);
+    }
+    for (let i = 0; i < Math.min(3, academicStaffUsers.length); i++) {
+        createClassSenders.push(academicStaffUsers[i]);
+    }
+    
+    const createClassContents = [
+        'Yêu cầu tạo lớp mới IELTS Foundation A1 với 20 học viên, học vào Thứ 2 và Thứ 4 hàng tuần từ 18:00-20:00',
+        'Đề nghị mở lớp TOEIC Intermediate B1, thời gian học Thứ 3, Thứ 5, Thứ 7 từ 14:00-16:00, số lượng học viên tối đa 25',
+        'Xin phép tạo lớp IELTS Advanced C1, lịch học Thứ 2, Thứ 4, Thứ 6 từ 08:00-10:00, dự kiến 15 học viên',
+        'Yêu cầu mở lớp TOEIC Advanced B2, học vào Thứ 2, Thứ 4, Thứ 6 từ 19:00-21:00, tối đa 20 học viên',
+        'Đề nghị tạo lớp IELTS Intermediate B1, lịch học Thứ 3, Thứ 5 từ 09:00-11:00, dự kiến 18 học viên',
+        'Xin phép mở lớp Business English C1, học Thứ 2, Thứ 3, Thứ 5, Thứ 6 từ 17:00-19:00, tối đa 22 học viên',
+        'Yêu cầu tạo lớp Conversation English A2, lịch học Thứ 4, Thứ 7 từ 10:00-12:00, dự kiến 16 học viên'
+    ];
+    
+    const createClassCount = Math.min(7, createClassSenders.length, createClassContents.length);
+    for (let i = 0; i < createClassCount; i++) {
+        const sender = createClassSenders[i];
+        let status = 'pending';
+        let approverId = null;
+        let approvedDate = null;
+        let responseContent = null;
+        
+        // Distribute status: 2 approved, 2 rejected, rest pending
+        if (i === 0 && approver) {
+            status = 'approved';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(3);
+            responseContent = 'Đơn đã được duyệt. Lớp sẽ được tạo trong tuần tới.';
+        } else if (i === 1 && approver) {
+            status = 'approved';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(1);
+            responseContent = 'Đơn đã được duyệt. Đang sắp xếp giáo viên và phòng học.';
+        } else if (i === 2 && approver) {
+            status = 'rejected';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(5);
+            responseContent = 'Đơn bị từ chối do không đủ số lượng học viên đăng ký tối thiểu.';
+        } else if (i === 3 && approver) {
+            status = 'rejected';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(7);
+            responseContent = 'Đơn bị từ chối do không có phòng học phù hợp trong thời gian yêu cầu.';
+        }
+        // Rest are pending
+        
+        changeRequests.push({
+            sender: sender._id,
+            type: 'create_class',
+            excelFile: (i === 0 || i === 1) ? `uploads/class_template_${i === 0 ? 'ielts_a1' : 'toeic_b1'}.xlsx` : null,
+            content: createClassContents[i],
+            status: status,
+            approver: approverId,
+            approvedDate: approvedDate,
+            responseContent: responseContent
+        });
+    }
+    
+    // ============================================
+    // 2. CHANGE_CLASS requests (6-7 requests)
+    // ============================================
+    const changeClassContents = [
+        'Xin chuyển từ lớp IELTS Foundation A1 - Lớp Đang Học sang lớp IELTS Foundation A1 - Lớp 2 do lịch học phù hợp hơn',
+        'Yêu cầu đổi lớp vì lịch học hiện tại trùng với công việc, muốn chuyển sang lớp có lịch học buổi tối',
+        'Đề nghị chuyển lớp do không theo kịp tiến độ học, muốn chuyển sang lớp có trình độ phù hợp hơn',
+        'Xin chuyển lớp vì muốn học cùng bạn bè ở lớp khác, lớp đích có lịch học tương tự',
+        'Yêu cầu đổi lớp do giáo viên hiện tại không phù hợp với phong cách học của em',
+        'Đề nghị chuyển lớp vì lịch học hiện tại quá sớm, muốn chuyển sang lớp học buổi chiều',
+        'Xin đổi lớp do lớp hiện tại quá đông, muốn chuyển sang lớp có ít học viên hơn để được quan tâm tốt hơn'
+    ];
+    
+    // Use different classes and students - cycle through available data
+    const classesForChange = [];
+    const studentsForChange = [];
+    for (let i = 0; i < Math.min(7, classes.length); i++) {
+        classesForChange.push(classes[i % classes.length]);
+    }
+    for (let i = 0; i < Math.min(7, students.length); i++) {
+        studentsForChange.push(students[i % students.length]);
+    }
+    
+    const changeClassCount = Math.min(7, classesForChange.length, studentsForChange.length, changeClassContents.length);
+    for (let i = 0; i < changeClassCount; i++) {
+        const sender = studentsForChange[i];
+        const classItem = classesForChange[i];
+        let status = 'pending';
+        let approverId = null;
+        let approvedDate = null;
+        let responseContent = null;
+        
+        // Distribute status: 2 approved, 2 rejected, rest pending
+        if (i === 0 && approver) {
+            status = 'approved';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(2);
+            responseContent = 'Đơn đã được duyệt. Học viên sẽ được chuyển lớp trong tuần tới.';
+        } else if (i === 1 && approver) {
+            status = 'approved';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(4);
+            responseContent = 'Đơn đã được duyệt. Việc chuyển lớp sẽ được thực hiện ngay.';
+        } else if (i === 2 && approver) {
+            status = 'rejected';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(4);
+            responseContent = 'Đơn bị từ chối do lớp đích đã đầy. Vui lòng chọn lớp khác.';
+        } else if (i === 3 && approver) {
+            status = 'rejected';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(6);
+            responseContent = 'Đơn bị từ chối do không đủ điều kiện chuyển lớp. Vui lòng liên hệ phòng đào tạo.';
+        }
+        // Rest are pending
+        
+        changeRequests.push({
+            sender: sender._id,
+            type: 'change_class',
+            classId: classItem._id,
+            content: changeClassContents[i],
+            status: status,
+            approver: approverId,
+            approvedDate: approvedDate,
+            responseContent: responseContent
+        });
+    }
+    
+    // ============================================
+    // 3. MAKEUP_CLASS requests (6-7 requests)
+    // ============================================
+    const makeupClassContents = [
+        'Xin học bù buổi học ngày hôm qua do bị ốm, có giấy xác nhận của bác sĩ',
+        'Yêu cầu học bù buổi học đã nghỉ do có việc đột xuất trong gia đình',
+        'Đề nghị học bù buổi học vắng mặt do đi công tác, muốn bù vào buổi học khác trong tuần',
+        'Xin học bù buổi học tuần trước do tham gia kỳ thi quan trọng, có giấy xác nhận',
+        'Yêu cầu học bù do nghỉ phép có phép, muốn bù vào buổi học cuối tuần',
+        'Đề nghị học bù buổi học vắng mặt do đau đầu, muốn bù vào buổi học sớm nhất có thể',
+        'Xin học bù buổi học đã nghỉ do đi khám sức khỏe, có giấy hẹn khám'
+    ];
+    
+    // Use past student schedules - đảm bảo studentSchedule thuộc về sender
+    // Nhóm pastStudentSchedules theo student
+    const studentSchedulesByStudent = {};
+    pastStudentSchedules.forEach(ss => {
+        const studentId = ss.student.toString();
+        if (!studentSchedulesByStudent[studentId]) {
+            studentSchedulesByStudent[studentId] = [];
+        }
+        studentSchedulesByStudent[studentId].push(ss);
+    });
+    
+    // Tìm các học sinh có ít nhất 1 buổi học quá khứ
+    const studentsWithPastSchedules = students.filter(s => {
+        const studentId = s._id.toString();
+        return studentSchedulesByStudent[studentId] && studentSchedulesByStudent[studentId].length > 0;
+    });
+    
+    console.log(`   - Found ${studentsWithPastSchedules.length} students with past schedules`);
+    
+    const makeupClassCount = Math.min(7, studentsWithPastSchedules.length, makeupClassContents.length);
+    for (let i = 0; i < makeupClassCount; i++) {
+        const sender = studentsWithPastSchedules[i];
+        const senderId = sender._id.toString();
+        
+        // Lấy một studentSchedule của học sinh này (đảm bảo khớp)
+        const studentSchedulesForThisStudent = studentSchedulesByStudent[senderId] || [];
+        if (studentSchedulesForThisStudent.length === 0) {
+            console.log(`    ⚠️ Student ${sender.username || sender._id} không có buổi học quá khứ, bỏ qua`);
+            continue;
+        }
+        
+        // Lấy buổi học đầu tiên của học sinh này (hoặc có thể random)
+        const studentSchedule = studentSchedulesForThisStudent[i % studentSchedulesForThisStudent.length];
+        let status = 'pending';
+        let approverId = null;
+        let approvedDate = null;
+        let responseContent = null;
+        
+        // Distribute status: 2 approved, 2 rejected, rest pending
+        if (i === 0 && approver) {
+            status = 'approved';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(1);
+            responseContent = 'Đơn đã được duyệt. Học viên có thể tham gia buổi học bù vào lịch đã sắp xếp.';
+        } else if (i === 1 && approver) {
+            status = 'approved';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(2);
+            responseContent = 'Đơn đã được duyệt. Vui lòng liên hệ giáo viên để sắp xếp lịch học bù.';
+        } else if (i === 2 && approver) {
+            status = 'rejected';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(6);
+            responseContent = 'Đơn bị từ chối do không có lịch học bù phù hợp trong thời gian yêu cầu.';
+        } else if (i === 3 && approver) {
+            status = 'rejected';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(5);
+            responseContent = 'Đơn bị từ chối do đã quá thời hạn yêu cầu học bù (quá 2 tuần).';
+        }
+        // Rest are pending
+        
+        changeRequests.push({
+            sender: sender._id,
+            type: 'makeup_class',
+            studentScheduleId: studentSchedule._id,
+            content: makeupClassContents[i],
+            status: status,
+            approver: approverId,
+            approvedDate: approvedDate,
+            responseContent: responseContent
+        });
+    }
+    
+    // ============================================
+    // 4. REPLACE_TEACHER requests (6-7 requests)
+    // ============================================
+    const replaceTeacherContents = [
+        'Yêu cầu thay giáo viên cho buổi học ngày mai do giáo viên hiện tại có việc đột xuất',
+        'Xin thay giáo viên cho buổi học tuần tới vì giáo viên hiện tại bị ốm',
+        'Đề nghị thay giáo viên cho buổi học sắp tới do giáo viên có lịch trùng với hội thảo',
+        'Yêu cầu thay giáo viên do giáo viên hiện tại có việc gia đình quan trọng',
+        'Xin thay giáo viên cho buổi học cuối tuần do giáo viên có lịch đi công tác',
+        'Đề nghị thay giáo viên do giáo viên hiện tại cần nghỉ phép có phép',
+        'Yêu cầu thay giáo viên cho buổi học tới do giáo viên có lịch khám sức khỏe'
+    ];
+    
+    // Use different class schedules and teachers/academic staff as senders
+    const classSchedulesForReplace = [];
+    for (let i = 0; i < Math.min(7, classSchedules.length); i++) {
+        classSchedulesForReplace.push(classSchedules[i % classSchedules.length]);
+    }
+    const replaceTeacherSenders = [];
+    // Collect more senders
+    for (let i = 0; i < Math.min(4, teachers.length); i++) {
+        replaceTeacherSenders.push(teachers[i]);
+    }
+    for (let i = 0; i < Math.min(3, academicStaffUsers.length); i++) {
+        replaceTeacherSenders.push(academicStaffUsers[i]);
+    }
+    
+    const replaceTeacherCount = Math.min(7, classSchedulesForReplace.length, replaceTeacherSenders.length, replaceTeacherContents.length);
+    for (let i = 0; i < replaceTeacherCount; i++) {
+        const sender = replaceTeacherSenders[i];
+        const classSchedule = classSchedulesForReplace[i];
+        let status = 'pending';
+        let approverId = null;
+        let approvedDate = null;
+        let responseContent = null;
+        
+        // Distribute status: 2 approved, 2 rejected, rest pending
+        if (i === 0 && approver) {
+            status = 'approved';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(2);
+            responseContent = 'Đơn đã được duyệt. Giáo viên thay thế đã được sắp xếp.';
+        } else if (i === 1 && approver) {
+            status = 'approved';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(1);
+            responseContent = 'Đơn đã được duyệt. Giáo viên thay thế sẽ được thông báo sớm nhất.';
+        } else if (i === 2 && approver) {
+            status = 'rejected';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(3);
+            responseContent = 'Đơn bị từ chối do không tìm được giáo viên thay thế phù hợp trong thời gian yêu cầu.';
+        } else if (i === 3 && approver) {
+            status = 'rejected';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(4);
+            responseContent = 'Đơn bị từ chối do thời gian yêu cầu quá gấp, không đủ thời gian sắp xếp.';
+        }
+        // Rest are pending
+        
+        changeRequests.push({
+            sender: sender._id,
+            type: 'replace_teacher',
+            classScheduleId: classSchedule._id,
+            content: replaceTeacherContents[i],
+            status: status,
+            approver: approverId,
+            approvedDate: approvedDate,
+            responseContent: responseContent
+        });
+    }
+    
+    if (changeRequests.length === 0) {
+        console.log('⚠️  No change requests to create!');
+        return;
+    }
+    
+    const created = await ChangeRequest.insertMany(changeRequests);
+    
+    // Log statistics
+    const pendingCount = created.filter(cr => cr.status === 'pending').length;
+    const approvedCount = created.filter(cr => cr.status === 'approved').length;
+    const rejectedCount = created.filter(cr => cr.status === 'rejected').length;
+    
+    const createClassTypeCount = created.filter(cr => cr.type === 'create_class').length;
+    const changeClassTypeCount = created.filter(cr => cr.type === 'change_class').length;
+    const makeupClassTypeCount = created.filter(cr => cr.type === 'makeup_class').length;
+    const replaceTeacherTypeCount = created.filter(cr => cr.type === 'replace_teacher').length;
+    
+    console.log(`✅ Created ${created.length} change requests`);
+    console.log(`   - By type: create_class (${createClassTypeCount}), change_class (${changeClassTypeCount}), makeup_class (${makeupClassTypeCount}), replace_teacher (${replaceTeacherTypeCount})`);
+    console.log(`   - By status: pending (${pendingCount}), approved (${approvedCount}), rejected (${rejectedCount})\n`);
+}
 
 async function seed() {
     try {
-        console.log('🚀 Starting seed for Class, ClassSchedule, StudentSchedule...\n');
+        console.log('🚀 Starting seed for Class, ClassSchedule, StudentSchedule, ChangeRequest...\n');
         
         // Connect to MongoDB
         await mongoose.connect(process.env.MONGODB_URI, {
@@ -685,6 +1075,7 @@ async function seed() {
         await seedClasses();
         await seedClassSchedules();
         await seedStudentSchedules();
+        await seedChangeRequests();
 
         console.log('\n✨ Seed completed successfully!');
         console.log('\n📊 Summary:');
@@ -693,10 +1084,12 @@ async function seed() {
         const classCount = await Class.countDocuments();
         const classScheduleCount = await ClassSchedule.countDocuments();
         const studentScheduleCount = await StudentSchedule.countDocuments();
+        const changeRequestCount = await ChangeRequest.countDocuments();
         
         console.log(`  - Classes: ${classCount}`);
         console.log(`  - Class Schedules: ${classScheduleCount}`);
         console.log(`  - Student Schedules: ${studentScheduleCount}`);
+        console.log(`  - Change Requests: ${changeRequestCount}`);
 
         process.exit(0);
     } catch (error) {

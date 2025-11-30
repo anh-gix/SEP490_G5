@@ -168,14 +168,14 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   const programTypeMap = {
     'IELTS': 'ielts',
     'TOEIC': 'toeic',
-    'Tiếng Anh Giao tiếp': 'cam'
+    'Cambridge': 'cam'
   };
 
   // Type to program name mapping
   const typeProgramMap = {
     'ielts': 'IELTS',
     'toeic': 'TOEIC',
-    'cam': 'Tiếng Anh Giao tiếp'
+    'cam': 'Cambridge'
   };
 
   const daysOfWeek = [

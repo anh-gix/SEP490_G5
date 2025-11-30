@@ -547,6 +547,7 @@ exports.getLevelsByType = async (req, res) => {
 /**
  * Get courses by program name and level
  * GET /api/courses/by-program?programName=IELTS&level=B1
+ * Supports both program_name and type matching
  */
 exports.getCoursesByProgram = async (req, res) => {
     try {
@@ -559,12 +560,33 @@ exports.getCoursesByProgram = async (req, res) => {
             });
         }
         
-        // Find program by program_name and level
-        const program = await Program.findOne({
-            program_name: { $regex: new RegExp(programName, 'i') },
+        // Map program display names to types
+        const programNameToType = {
+            'IELTS': 'ielts',
+            'TOEIC': 'toeic',
+            'Cambridge': 'cam',
+            'Tiếng Anh Giao tiếp': 'cam'
+        };
+        
+        // Normalize programName
+        const normalizedProgramName = programName.trim();
+        const mappedType = programNameToType[normalizedProgramName];
+        
+        // Try to find program by program_name first
+        let program = await Program.findOne({
+            program_name: { $regex: new RegExp(normalizedProgramName, 'i') },
             level: level,
             status: 'active'
         });
+        
+        // If not found by program_name, try by type
+        if (!program && mappedType) {
+            program = await Program.findOne({
+                type: mappedType,
+                level: level,
+                status: 'active'
+            });
+        }
         
         if (!program) {
             return res.status(200).json({

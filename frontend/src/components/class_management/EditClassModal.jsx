@@ -277,7 +277,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           const typeMap = {
             'IELTS': 'ielts',
             'TOEIC': 'toeic',
-            'Tiếng Anh Giao tiếp': 'cam'
+            'Cambridge': 'cam'
           };
           return typeMap[dataToUse.programName] || '';
         })() : '') ||
@@ -291,7 +291,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           const typeMap = {
             'IELTS': 'ielts',
             'TOEIC': 'toeic',
-            'Tiếng Anh Giao tiếp': 'cam'
+            'Cambridge': 'cam'
           };
           return typeMap[dataToUse.program] || '';
         })() : '') ||
@@ -2046,14 +2046,14 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
   const programTypeMap = {
     'IELTS': 'ielts',
     'TOEIC': 'toeic',
-    'Tiếng Anh Giao tiếp': 'cam'
+    'Cambridge': 'cam'
   };
 
   // Reverse mapping: type to program name
   const typeToProgramMap = {
     'ielts': 'IELTS',
     'toeic': 'TOEIC',
-    'cam': 'Tiếng Anh Giao tiếp'
+    'cam': 'Cambridge'
   };
 
   // Map program name to type

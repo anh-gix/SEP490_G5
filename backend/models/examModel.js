@@ -20,13 +20,20 @@ const answerKeySchema = new mongoose.Schema({
   }]
 });
 
+// Phân loại kĩ năng cho các part trong đề thi
 const sectionSchema = new mongoose.Schema({
   type: {
     type: String,
     enum: ["listening", "reading", "writing", "speaking"],
     required: true,
   },
-  fileUrl: String,
+  // Thứ tự part/task trong bài thi tương ứng với kĩ năng 
+  // -> Chia luyện đề theo kĩ năng nhưng cần đúng format của đề
+  // Ví dụ: Listening gồm Part 1,2,3,4; Part 5,6,7 là reading (TOEIC)
+  // Đề Cambridge pre A1 starters, movers mỗi phần kĩ năng có các part lẻ, gồm các câu hỏi lẻ
+  // Đề IELTS tương tự mỗi phần có các part/task lẻ 
+  partOrder: Number,
+  fileUrl: String, 
   audioUrls: [String],
   instructions: String,
   duration: Number,

@@ -62,6 +62,12 @@ app.use('/api/change-requests', require('./routes/changeRequestRoutes'));
 // Academic Staff Routes
 app.use('/api/academic-staff', require('./routes/academicStaffRoutes'));
 
+// Tip Routes
+app.use('/api/tips', require('./routes/tipRoutes'));
+
+// Online Learning Routes
+app.use('/api/online-learning', require('./routes/onlineLearningRoutes'));
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);

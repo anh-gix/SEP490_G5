@@ -18,17 +18,17 @@ const camSessionSchema = new mongoose.Schema(
     // Thứ tự bài học trong khóa học
     order: { type: Number },
     // Video bài giảng
-    videoURL: { type: String },
+    videoURL: { 
+      type: String, 
+    },
     // Quiz kiến thức trong lesson
     quizzes: {
-      quiz:[quizSchema]
+      quiz:[quizSchema],
     },
     // Flashcard từ vựng trong lesson
     vocabulary: {
-      items: [{
-        word: { type: String, required: true },
-        img: { type: String }
-      }]
+      img: { type: String },
+      words: [{ type: String }],
     },
   },
   { timestamps: true }

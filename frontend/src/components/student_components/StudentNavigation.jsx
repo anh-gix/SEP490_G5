@@ -47,18 +47,33 @@ const StudentNavigation = () => {
       path: '/student/courses',
       color: 'success'
     },
+    // {
+    //   title: 'Bài tập',
+    //   icon: 'fa-tasks',
+    //   path: '/student/assignments',
+    //   color: 'warning'
+    // },
+
+    // Tips cho Toeic, Ielts
     {
-      title: 'Bài tập',
-      icon: 'fa-tasks',
-      path: '/student/assignments',
+      title: 'Tips học tập',
+      icon: 'fa-lightbulb',
+      path: '/student/tips',
       color: 'warning'
     },
+    // Online Cam course
     {
-      title: 'Luyện thi TOEIC',
-      icon: 'fa-headphones',
-      path: '/student/toeic',
-      color: 'main'
+      title: 'Khóa học Online',
+      icon: 'fa-lightbulb',
+      path: '/student/online-courses',
+      color: 'warning'
     },
+    // {
+    //   title: 'Luyện thi TOEIC',
+    //   icon: 'fa-headphones',
+    //   path: '/student/toeic',
+    //   color: 'main'
+    // },
     // {
     //   title: 'Tài liệu học tập',
     //   icon: 'fa-file-alt',

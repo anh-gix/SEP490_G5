@@ -44,7 +44,6 @@ import HomePageSix from "./pages/HomePageSix.jsx";
 import { Navigate } from "react-router-dom";
 import { HomePageRoutes } from "./routes/HomePageRoutes.jsx";
 import Profile from "./pages/Profile.jsx";
-
 import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";
 import { academicRoutes } from "./routes/AcademicRoutes.jsx";
 import { teacherRoutes } from "./routes/TeacherRoutes.jsx";

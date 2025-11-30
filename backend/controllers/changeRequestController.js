@@ -261,7 +261,7 @@ exports.approveChangeRequest = async (req, res) => {
       console.log(`📚 Xử lý ${pendingMakeupClasses.length} buổi học bù cho học sinh ${studentId}`);
       
       for (const makeup of pendingMakeupClasses) {
-        const { absentScheduleId, makeupScheduleId, makeupClassId, isNewMakeupClass, newMakeupClassData } = makeup;
+        const { absentScheduleId, makeupScheduleId, makeupClassId, isNewMakeupClass, newMakeupClassData, isSubstituteClass, substituteTeacherId } = makeup;
         
         if (!absentScheduleId) {
           console.warn('⚠️ Thiếu thông tin buổi nghỉ:', makeup);
@@ -277,6 +277,41 @@ exports.approveChangeRequest = async (req, res) => {
         }
         
         let finalMakeupScheduleId = makeupScheduleId;
+        
+        // Xử lý trường hợp giáo viên dạy thay
+        if (isSubstituteClass && substituteTeacherId) {
+          console.log(`👨‍🏫 Xử lý giáo viên dạy thay cho buổi nghỉ: ${absentScheduleId}`);
+          console.log(`   - Giáo viên dạy thay: ${substituteTeacherId}`);
+          
+          // Cập nhật teacher của ClassSchedule buổi nghỉ thành giáo viên dạy thay
+          absentClassSchedule.teacher = new mongoose.Types.ObjectId(substituteTeacherId);
+          await absentClassSchedule.save({ session });
+          
+          console.log(`✅ Đã cập nhật ClassSchedule với giáo viên dạy thay: ${absentScheduleId}`);
+          
+          // Sử dụng chính ClassSchedule của buổi nghỉ làm buổi dạy thay
+          finalMakeupScheduleId = absentScheduleId;
+          
+          // Không cần tạo StudentSchedule mới vì buổi học vẫn diễn ra vào đúng thời gian
+          // Chỉ cần đảm bảo StudentSchedule của buổi nghỉ không bị cancelled
+          const absentStudentSchedule = await StudentSchedule.findOne({
+            student: studentId,
+            classSchedule: absentScheduleId
+          }).session(session);
+          
+          if (absentStudentSchedule) {
+            // Giữ nguyên status, chỉ cập nhật reason nếu cần
+            if (absentStudentSchedule.scheduleStatus === 'cancelled') {
+              absentStudentSchedule.scheduleStatus = 'scheduled';
+              absentStudentSchedule.reason = `Giáo viên dạy thay: ${substituteTeacherId}`;
+              await absentStudentSchedule.save({ session });
+              console.log(`✅ Đã cập nhật StudentSchedule với giáo viên dạy thay: ${absentScheduleId}`);
+            }
+          }
+          
+          // Bỏ qua các bước xử lý buổi học bù thông thường
+          continue;
+        }
         
         // Nếu là buổi học bù mới cần tạo ClassSchedule
         if (isNewMakeupClass && newMakeupClassData) {

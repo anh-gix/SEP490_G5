@@ -1,893 +1,69 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 
-// Import all models
-const Permission = require('../models/permissionModel');
+// Import models needed for seeding class tables
 const Role = require('../models/roleModel');
 const User = require('../models/userModel');
-const Program = require('../models/programModel');
-const PLO = require('../models/ploModel');
 const Room = require('../models/room');
-const CLO = require('../models/cloModel');
 const Course = require('../models/courseModel');
 const Session = require('../models/sessionModel');
 const Class = require('../models/classModel');
 const ClassSchedule = require('../models/classScheduleModel');
 const StudentSchedule = require('../models/studentScheduleModel');
-const Exam = require('../models/examModel');
-const Submission = require('../models/submissionModel');
-const ChangeRequest = require('../models/changeRequestModel');
 
-// Store created IDs for linking
+// Store created classes for reference
 const seedData = {
-    permissions: [],
-    roles: [],
-    users: [],
-    programs: [],
-    programMap: {}, // Map for type_level -> programId
-    plos: [],
-    rooms: [],
-    clos: [],
-    courses: [],
-    sessions: [],
-    classes: [],
-    classSchedules: []
+    classes: []
 };
 
 async function clearDatabase() {
-    console.log('\n🗑️  Clearing existing data...');
-    await ChangeRequest.deleteMany({});
-    await Submission.deleteMany({});
+    console.log('\n🗑️  Clearing existing data for Class, ClassSchedule, StudentSchedule...');
     await StudentSchedule.deleteMany({});
     await ClassSchedule.deleteMany({});
     await Class.deleteMany({});
-    await Exam.deleteMany({});
-    await Session.deleteMany({});
-    await Course.deleteMany({});
-    await CLO.deleteMany({});
-    await Room.deleteMany({});
-    await PLO.deleteMany({});
-    await Program.deleteMany({});
-    await User.deleteMany({});
-    await Role.deleteMany({});
-    await Permission.deleteMany({});
-    
-    // Xóa collection levelbandmappings nếu còn tồn tại (model đã bị xóa)
-    try {
-        await mongoose.connection.db.collection('levelbandmappings').drop();
-        console.log('✅ Dropped levelbandmappings collection');
-    } catch (err) {
-        // Collection không tồn tại hoặc đã bị xóa, bỏ qua lỗi
-        if (err.code !== 26) { // 26 = namespace not found
-            console.log(`⚠️  Could not drop levelbandmappings: ${err.message}`);
-        }
-    }
-    
-    console.log('✅ Database cleared\n');
+    console.log('✅ Cleared Class, ClassSchedule, and StudentSchedule tables\n');
 }
 
-async function seedPermissions() {
-    console.log('📝 Seeding Permissions...');
-    const permissions = [
-        { name: 'Center Head', description: 'Quyền trưởng trung tâm' },
-        { name: 'Subject Leader', description: 'Quyền trưởng bộ môn' },
-        { name: 'Academic Staff', description: 'Quyền giáo vụ' },
-        { name: 'Teacher', description: 'Quyền giảng viên' },
-        { name: 'Student', description: 'Quyền học viên' }
-    ];
-    
-    const created = await Permission.insertMany(permissions);
-    seedData.permissions = created;
-    console.log(`✅ Created ${created.length} permissions\n`);
-}
-
-
-async function seedRoles() {
-    console.log('📝 Seeding Roles...');
-    const roles = [
-        { 
-            name: 'Center Head', 
-            description: 'Quản lý toàn bộ trung tâm',
-            permissionId: seedData.permissions[0]._id
-        },
-        { 
-            name: 'Subject Leader', 
-            description: 'Quản lý bộ môn',
-            permissionId: seedData.permissions[1]._id
-        },
-        { 
-            name: 'Academic Staff', 
-            description: 'Quản lý lớp học và lịch học',
-            permissionId: seedData.permissions[2]._id
-        },
-        { 
-            name: 'Teacher', 
-            description: 'Giảng dạy',
-            permissionId: seedData.permissions[3]._id
-        },
-        { 
-            name: 'Student', 
-            description: 'Học tập',
-            permissionId: seedData.permissions[4]._id
-        }
-    ];
-    
-    const created = await Role.insertMany(roles);
-    seedData.roles = created;
-    console.log(`✅ Created ${created.length} roles\n`);
-}
-
-async function seedUsers() {
-    console.log('📝 Seeding Users...');
-    const plainPassword = '123456';
-    
-    // Hash password trước khi tạo users
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(plainPassword, salt);
-    
-    const users = [
-        // Trưởng trung tâm
-        {
-            email: 'centerhead@example.com',
-            username: 'centerhead',
-            password: hashedPassword,
-            phone: '0900000001',
-            address: '123 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[0]._id
-        },
-        // Trưởng bộ môn
-        {
-            email: 'subjectleader@example.com',
-            username: 'subjectleader',
-            password: hashedPassword,
-            phone: '0900000002',
-            address: '124 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[1]._id
-        },
-        // Giáo vụ
-        {
-            email: 'academicstaff@example.com',
-            username: 'academicstaff',
-            password: hashedPassword,
-            phone: '0900000003',
-            address: '125 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[2]._id
-        },
-        // Giảng viên 1
-        {
-            email: 'teacher1@example.com',
-            username: 'teacher1',
-            password: hashedPassword,
-            phone: '0900000004',
-            address: '126 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[3]._id
-        },
-        // Giảng viên 2
-        {
-            email: 'teacher2@example.com',
-            username: 'teacher2',
-            password: hashedPassword,
-            phone: '0900000005',
-            address: '127 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[3]._id
-        },
-        // 5 Học viên
-        {
-            email: 'student1@example.com',
-            username: 'student1',
-            password: hashedPassword,
-            phone: '0900000006',
-            address: '128 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student2@example.com',
-            username: 'student2',
-            password: hashedPassword,
-            phone: '0900000007',
-            address: '129 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student3@example.com',
-            username: 'student3',
-            password: hashedPassword,
-            phone: '0900000008',
-            address: '130 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student4@example.com',
-            username: 'student4',
-            password: hashedPassword,
-            phone: '0900000009',
-            address: '131 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student5@example.com',
-            username: 'student5',
-            password: hashedPassword,
-            phone: '0900000010',
-            address: '132 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        // Thêm 20 students mới cho 5 lớp cùng course
-        {
-            email: 'student6@example.com',
-            username: 'student6',
-            password: hashedPassword,
-            phone: '0900000011',
-            address: '133 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student7@example.com',
-            username: 'student7',
-            password: hashedPassword,
-            phone: '0900000012',
-            address: '134 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student8@example.com',
-            username: 'student8',
-            password: hashedPassword,
-            phone: '0900000013',
-            address: '135 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student9@example.com',
-            username: 'student9',
-            password: hashedPassword,
-            phone: '0900000014',
-            address: '136 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student10@example.com',
-            username: 'student10',
-            password: hashedPassword,
-            phone: '0900000015',
-            address: '137 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student11@example.com',
-            username: 'student11',
-            password: hashedPassword,
-            phone: '0900000016',
-            address: '138 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student12@example.com',
-            username: 'student12',
-            password: hashedPassword,
-            phone: '0900000017',
-            address: '139 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student13@example.com',
-            username: 'student13',
-            password: hashedPassword,
-            phone: '0900000018',
-            address: '140 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student14@example.com',
-            username: 'student14',
-            password: hashedPassword,
-            phone: '0900000019',
-            address: '141 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student15@example.com',
-            username: 'student15',
-            password: hashedPassword,
-            phone: '0900000020',
-            address: '142 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student16@example.com',
-            username: 'student16',
-            password: hashedPassword,
-            phone: '0900000021',
-            address: '143 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student17@example.com',
-            username: 'student17',
-            password: hashedPassword,
-            phone: '0900000022',
-            address: '144 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student18@example.com',
-            username: 'student18',
-            password: hashedPassword,
-            phone: '0900000023',
-            address: '145 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student19@example.com',
-            username: 'student19',
-            password: hashedPassword,
-            phone: '0900000024',
-            address: '146 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student20@example.com',
-            username: 'student20',
-            password: hashedPassword,
-            phone: '0900000025',
-            address: '147 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student21@example.com',
-            username: 'student21',
-            password: hashedPassword,
-            phone: '0900000026',
-            address: '148 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student22@example.com',
-            username: 'student22',
-            password: hashedPassword,
-            phone: '0900000027',
-            address: '149 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student23@example.com',
-            username: 'student23',
-            password: hashedPassword,
-            phone: '0900000028',
-            address: '150 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student24@example.com',
-            username: 'student24',
-            password: hashedPassword,
-            phone: '0900000029',
-            address: '151 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        },
-        {
-            email: 'student25@example.com',
-            username: 'student25',
-            password: hashedPassword,
-            phone: '0900000030',
-            address: '152 Đường ABC, Quận 1, TP.HCM',
-            roleId: seedData.roles[4]._id
-        }
-    ];
-    
-    const created = await User.insertMany(users);
-    seedData.users = created;
-    console.log(`✅ Created ${created.length} users\n`);
-}
-
-async function seedPrograms() {
-    console.log('📝 Seeding Programs...');
-    
-    // Mapping band values
-    const mappingMap = {
-        'ielts_A1': '0-2.5',
-        'ielts_A2': '3.0-3.5',
-        'ielts_B1': '4.0-5.0',
-        'ielts_B2': '5.5-6.5',
-        'ielts_C1': '7.0-8.0',
-        'ielts_C2': '8.5-9.0',
-        'toeic_A1': '0-250',
-        'toeic_A2': '251-500',
-        'toeic_B1': '501-700',
-        'toeic_B2': '701-900',
-        'toeic_C1': '901-990',
-        'toeic_C2': '990+',
-        'cam_Pre-A1': 'Starter',
-        'cam_A1': 'Mover'
-    };
-    
-    // Tuition fees
-    const tuitionFeeMap = {
-        'ielts_A1': 3000000,
-        'ielts_A2': 3500000,
-        'ielts_B1': 5000000,
-        'ielts_B2': 6000000,
-        'ielts_C1': 7000000,
-        'ielts_C2': 8000000,
-        'toeic_A1': 2500000,
-        'toeic_A2': 3000000,
-        'toeic_B1': 4000000,
-        'toeic_B2': 5000000,
-        'toeic_C1': 6000000,
-        'toeic_C2': 7000000,
-        'cam_Pre-A1': 2000000,
-        'cam_A1': 2500000
-    };
-    
-    const programs = [
-        // IELTS programs
-        {
-            code: 'IELTS_A1',
-            program_name: 'IELTS Foundation A1',
-            description: 'Chương trình IELTS cơ bản - Level A1',
-            type: 'ielts',
-            level: 'A1',
-            band: mappingMap['ielts_A1'],
-            tuitionFee: tuitionFeeMap['ielts_A1'],
-            status: 'active'
-        },
-        {
-            code: 'IELTS_A2',
-            program_name: 'IELTS Elementary A2',
-            description: 'Chương trình IELTS sơ cấp - Level A2',
-            type: 'ielts',
-            level: 'A2',
-            band: mappingMap['ielts_A2'],
-            tuitionFee: tuitionFeeMap['ielts_A2'],
-            status: 'active'
-        },
-        {
-            code: 'IELTS_B1',
-            program_name: 'IELTS Intermediate B1',
-            description: 'Chương trình IELTS trung cấp - Level B1',
-            type: 'ielts',
-            level: 'B1',
-            band: mappingMap['ielts_B1'],
-            tuitionFee: tuitionFeeMap['ielts_B1'],
-            status: 'active'
-        },
-        {
-            code: 'IELTS_B2',
-            program_name: 'IELTS Upper Intermediate B2',
-            description: 'Chương trình IELTS trung cấp cao - Level B2',
-            type: 'ielts',
-            level: 'B2',
-            band: mappingMap['ielts_B2'],
-            tuitionFee: tuitionFeeMap['ielts_B2'],
-            status: 'active'
-        },
-        {
-            code: 'IELTS_C1',
-            program_name: 'IELTS Advanced C1',
-            description: 'Chương trình IELTS nâng cao - Level C1',
-            type: 'ielts',
-            level: 'C1',
-            band: mappingMap['ielts_C1'],
-            tuitionFee: tuitionFeeMap['ielts_C1'],
-            status: 'active'
-        },
-        {
-            code: 'IELTS_C2',
-            program_name: 'IELTS Proficiency C2',
-            description: 'Chương trình IELTS thành thạo - Level C2',
-            type: 'ielts',
-            level: 'C2',
-            band: mappingMap['ielts_C2'],
-            tuitionFee: tuitionFeeMap['ielts_C2'],
-            status: 'active'
-        },
-        // TOEIC programs
-        {
-            code: 'TOEIC_A1',
-            program_name: 'TOEIC Beginner A1',
-            description: 'Chương trình TOEIC cho người mới bắt đầu - Level A1',
-            type: 'toeic',
-            level: 'A1',
-            band: mappingMap['toeic_A1'],
-            tuitionFee: tuitionFeeMap['toeic_A1'],
-            status: 'active'
-        },
-        {
-            code: 'TOEIC_A2',
-            program_name: 'TOEIC Elementary A2',
-            description: 'Chương trình TOEIC sơ cấp - Level A2',
-            type: 'toeic',
-            level: 'A2',
-            band: mappingMap['toeic_A2'],
-            tuitionFee: tuitionFeeMap['toeic_A2'],
-            status: 'active'
-        },
-        {
-            code: 'TOEIC_B1',
-            program_name: 'TOEIC Intermediate B1',
-            description: 'Chương trình TOEIC trung cấp - Level B1',
-            type: 'toeic',
-            level: 'B1',
-            band: mappingMap['toeic_B1'],
-            tuitionFee: tuitionFeeMap['toeic_B1'],
-            status: 'active'
-        },
-        {
-            code: 'TOEIC_B2',
-            program_name: 'TOEIC Upper Intermediate B2',
-            description: 'Chương trình TOEIC trung cấp cao - Level B2',
-            type: 'toeic',
-            level: 'B2',
-            band: mappingMap['toeic_B2'],
-            tuitionFee: tuitionFeeMap['toeic_B2'],
-            status: 'active'
-        },
-        {
-            code: 'TOEIC_C1',
-            program_name: 'TOEIC Advanced C1',
-            description: 'Chương trình TOEIC nâng cao - Level C1',
-            type: 'toeic',
-            level: 'C1',
-            band: mappingMap['toeic_C1'],
-            tuitionFee: tuitionFeeMap['toeic_C1'],
-            status: 'active'
-        },
-        {
-            code: 'TOEIC_C2',
-            program_name: 'TOEIC Proficiency C2',
-            description: 'Chương trình TOEIC thành thạo - Level C2',
-            type: 'toeic',
-            level: 'C2',
-            band: mappingMap['toeic_C2'],
-            tuitionFee: tuitionFeeMap['toeic_C2'],
-            status: 'active'
-        },
-        // CAM programs
-        {
-            code: 'CAM_Pre-A1',
-            program_name: 'CAM Starter Pre-A1',
-            description: 'Chương trình CAM Starter cho trẻ em - Level Pre-A1',
-            type: 'cam',
-            level: 'Pre-A1',
-            band: mappingMap['cam_Pre-A1'],
-            tuitionFee: tuitionFeeMap['cam_Pre-A1'],
-            status: 'active'
-        },
-        {
-            code: 'CAM_A1',
-            program_name: 'CAM Mover A1',
-            description: 'Chương trình CAM Mover cho trẻ em - Level A1',
-            type: 'cam',
-            level: 'A1',
-            band: mappingMap['cam_A1'],
-            tuitionFee: tuitionFeeMap['cam_A1'],
-            status: 'active'
-        }
-    ];
-    
-    const created = await Program.insertMany(programs);
-    seedData.programs = created;
-    
-    // Create a map for easy lookup by type+level
-    seedData.programMap = {};
-    created.forEach(prog => {
-        const key = `${prog.type}_${prog.level}`;
-        seedData.programMap[key] = prog._id;
-    });
-    
-    console.log(`✅ Created ${created.length} programs\n`);
-}
-
-async function seedPLOs() {
-    console.log('📝 Seeding PLOs...');
-    const plos = [
-        // PLOs cho Program 1 (Tiếng Anh Giao tiếp)
-        { code: 'PLO001', name: 'Giao tiếp cơ bản', detail: 'Học viên có thể giao tiếp cơ bản trong các tình huống hàng ngày' },
-        { code: 'PLO002', name: 'Nghe hiểu', detail: 'Học viên có thể nghe và hiểu các đoạn hội thoại đơn giản' },
-        { code: 'PLO003', name: 'Đọc hiểu', detail: 'Học viên có thể đọc và hiểu các văn bản cơ bản' },
-        { code: 'PLO004', name: 'Viết cơ bản', detail: 'Học viên có thể viết các câu và đoạn văn đơn giản' },
-        
-        // PLOs cho Program 2 (TOEIC/IELTS)
-        { code: 'PLO005', name: 'Kỹ năng thi TOEIC', detail: 'Học viên có thể đạt điểm TOEIC từ 500-990' },
-        { code: 'PLO006', name: 'Kỹ năng thi IELTS', detail: 'Học viên có thể đạt band điểm IELTS từ 4.0-9.0' },
-        { code: 'PLO007', name: 'Kỹ năng nghe', detail: 'Học viên có thể nghe hiểu các bài thi TOEIC/IELTS' },
-        { code: 'PLO008', name: 'Kỹ năng đọc', detail: 'Học viên có thể đọc hiểu các bài thi TOEIC/IELTS' }
-    ];
-    
-    const created = await PLO.insertMany(plos);
-    seedData.plos = created;
-    
-    // Update Programs with PLOs - assign to CAM and IELTS/TOEIC programs
-    // CAM programs get PLOs 0-3, IELTS/TOEIC programs get PLOs 4-7
-    const camPrograms = seedData.programs.filter(p => p.type === 'cam');
-    const ieltsToeicPrograms = seedData.programs.filter(p => p.type === 'ielts' || p.type === 'toeic');
-    
-    for (const prog of camPrograms) {
-        await Program.findByIdAndUpdate(prog._id, {
-            plos: [created[0]._id, created[1]._id, created[2]._id, created[3]._id]
-        });
-    }
-    
-    for (const prog of ieltsToeicPrograms) {
-        await Program.findByIdAndUpdate(prog._id, {
-            plos: [created[4]._id, created[5]._id, created[6]._id, created[7]._id]
-        });
-    }
-    
-    console.log(`✅ Created ${created.length} PLOs\n`);
-}
-
-async function seedRooms() {
-    console.log('📝 Seeding Rooms...');
-    const rooms = [
-        {
-            room_name: 'Phòng 101',
-            capacity: 30,
-            location: 'Tầng 1',
-            description: 'Phòng học tiêu chuẩn',
-            status: 'available'
-        },
-        {
-            room_name: 'Phòng 201',
-            capacity: 25,
-            location: 'Tầng 2',
-            description: 'Phòng học nhỏ',
-            status: 'available'
-        },
-        {
-            room_name: 'Phòng 301',
-            capacity: 40,
-            location: 'Tầng 3',
-            description: 'Phòng học lớn',
-            status: 'available'
-        },
-        {
-            room_name: 'Phòng Lab 401',
-            capacity: 20,
-            location: 'Tầng 4',
-            description: 'Phòng lab máy tính',
-            status: 'available'
-        },
-        {
-            room_name: 'Phòng 501',
-            capacity: 35,
-            location: 'Tầng 5',
-            description: 'Phòng học đa năng',
-            status: 'available'
-        }
-    ];
-    
-    const created = await Room.insertMany(rooms);
-    seedData.rooms = created;
-    console.log(`✅ Created ${created.length} rooms\n`);
-}
-
-async function seedCLOs() {
-    console.log('📝 Seeding CLOs...');
-    // CLOs sẽ được tạo và link với courses sau
-    // Tạm thời tạo một số CLOs cơ bản
-    const clos = [
-        // CLOs cho IELTS courses
-        { code: 'CLO001', name: 'Nghe hiểu IELTS', detail: 'Học viên có thể nghe hiểu các bài nghe IELTS', mappedPLOs: [seedData.plos[6]._id] },
-        { code: 'CLO002', name: 'Đọc hiểu IELTS', detail: 'Học viên có thể đọc hiểu các bài đọc IELTS', mappedPLOs: [seedData.plos[7]._id] },
-        { code: 'CLO003', name: 'Viết IELTS', detail: 'Học viên có thể viết bài essay IELTS', mappedPLOs: [seedData.plos[5]._id] },
-        
-        // CLOs cho TOEIC courses
-        { code: 'CLO004', name: 'Nghe hiểu TOEIC', detail: 'Học viên có thể nghe hiểu các bài nghe TOEIC', mappedPLOs: [seedData.plos[6]._id] },
-        { code: 'CLO005', name: 'Đọc hiểu TOEIC', detail: 'Học viên có thể đọc hiểu các bài đọc TOEIC', mappedPLOs: [seedData.plos[7]._id] },
-        
-        // CLOs cho CAM courses
-        { code: 'CLO006', name: 'Giao tiếp cơ bản', detail: 'Học viên có thể giao tiếp cơ bản', mappedPLOs: [seedData.plos[0]._id] },
-        { code: 'CLO007', name: 'Nghe nói cơ bản', detail: 'Học viên có thể nghe và nói cơ bản', mappedPLOs: [seedData.plos[1]._id, seedData.plos[0]._id] }
-    ];
-    
-    const created = await CLO.insertMany(clos);
-    seedData.clos = created;
-    console.log(`✅ Created ${created.length} CLOs\n`);
-}
-
-async function seedCourses() {
-    console.log('📝 Seeding Courses...');
-    
-    const courses = [
-        // IELTS courses - each course references the program by type+level
-        {
-            name: 'IELTS Foundation A1 - Nghe',
-            description: 'Khóa học IELTS cơ bản - Kỹ năng Nghe',
-            program: seedData.programMap['ielts_A1'],
-            clos: [seedData.clos[0]._id, seedData.clos[1]._id],
-            createdBy: seedData.users[1]._id, // Subject Leader
-            status: 'approved',
-            numberOfSessions: 12
-        },
-        {
-            name: 'IELTS Foundation A1 - Nói',
-            description: 'Khóa học IELTS cơ bản - Kỹ năng Nói',
-            program: seedData.programMap['ielts_A1'],
-            clos: [seedData.clos[0]._id, seedData.clos[1]._id],
-            createdBy: seedData.users[1]._id,
-            status: 'approved',
-            numberOfSessions: 12
-        },
-        {
-            name: 'IELTS Intermediate B1 - Nghe',
-            description: 'Khóa học IELTS trung cấp - Kỹ năng Nghe',
-            program: seedData.programMap['ielts_B1'],
-            clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
-            createdBy: seedData.users[1]._id,
-            status: 'approved',
-            numberOfSessions: 12
-        },
-        {
-            name: 'IELTS Intermediate B1 - Viết',
-            description: 'Khóa học IELTS trung cấp - Kỹ năng Viết',
-            program: seedData.programMap['ielts_B1'],
-            type: 'ielts',
-            clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
-            createdBy: seedData.users[1]._id,
-            status: 'approved',
-            numberOfSessions: 12
-        },
-        {
-            name: 'IELTS Advanced C1 - Đọc',
-            description: 'Khóa học IELTS nâng cao - Kỹ năng Đọc',
-            program: seedData.programMap['ielts_C1'],
-            clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
-            createdBy: seedData.users[1]._id,
-            status: 'approved',
-            numberOfSessions: 12
-        },
-        {
-            name: 'IELTS Elementary A2 - Nghe',
-            description: 'Khóa học IELTS sơ cấp - Kỹ năng Nghe',
-            program: seedData.programMap['ielts_A2'],
-            clos: [seedData.clos[0]._id, seedData.clos[1]._id],
-            createdBy: seedData.users[1]._id,
-            status: 'approved',
-            numberOfSessions: 12
-        },
-        {
-            name: 'IELTS Upper Intermediate B2 - Viết',
-            description: 'Khóa học IELTS trung cấp cao - Kỹ năng Viết',
-            program: seedData.programMap['ielts_B2'],
-            clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
-            createdBy: seedData.users[1]._id,
-            status: 'approved',
-            numberOfSessions: 12
-        },
-        {
-            name: 'IELTS Proficiency C2 - Nói',
-            description: 'Khóa học IELTS thành thạo - Kỹ năng Nói',
-            program: seedData.programMap['ielts_C2'],
-            clos: [seedData.clos[0]._id, seedData.clos[1]._id, seedData.clos[2]._id],
-            createdBy: seedData.users[1]._id,
-            status: 'approved',
-            numberOfSessions: 12
-        },
-        // TOEIC courses
-        {
-            name: 'TOEIC Beginner A1 - Nghe',
-            description: 'Khóa học TOEIC cho người mới bắt đầu - Kỹ năng Nghe',
-            program: seedData.programMap['toeic_A1'],
-            clos: [seedData.clos[3]._id, seedData.clos[4]._id],
-            createdBy: seedData.users[1]._id,
-            status: 'approved',
-            numberOfSessions: 10
-        },
-        {
-            name: 'TOEIC Intermediate B1 - Đọc',
-            description: 'Khóa học TOEIC trung cấp - Kỹ năng Đọc',
-            program: seedData.programMap['toeic_B1'],
-            clos: [seedData.clos[3]._id, seedData.clos[4]._id],
-            createdBy: seedData.users[1]._id,
-            status: 'approved',
-            numberOfSessions: 10
-        },
-        {
-            name: 'TOEIC Elementary A2 - Nghe',
-            description: 'Khóa học TOEIC sơ cấp - Kỹ năng Nghe',
-            program: seedData.programMap['toeic_A2'],
-            clos: [seedData.clos[3]._id, seedData.clos[4]._id],
-            createdBy: seedData.users[1]._id,
-            status: 'approved',
-            numberOfSessions: 10
-        },
-        {
-            name: 'TOEIC Upper Intermediate B2 - Đọc',
-            description: 'Khóa học TOEIC trung cấp cao - Kỹ năng Đọc',
-            program: seedData.programMap['toeic_B2'],
-            clos: [seedData.clos[3]._id, seedData.clos[4]._id],
-            createdBy: seedData.users[1]._id,
-            status: 'approved',
-            numberOfSessions: 10
-        },
-        {
-            name: 'TOEIC Advanced C1 - Nghe',
-            description: 'Khóa học TOEIC nâng cao - Kỹ năng Nghe',
-            program: seedData.programMap['toeic_C1'],
-            clos: [seedData.clos[3]._id, seedData.clos[4]._id],
-            createdBy: seedData.users[1]._id,
-            status: 'approved',
-            numberOfSessions: 10
-        },
-        {
-            name: 'TOEIC Proficiency C2 - Đọc',
-            description: 'Khóa học TOEIC thành thạo - Kỹ năng Đọc',
-            program: seedData.programMap['toeic_C2'],
-            clos: [seedData.clos[3]._id, seedData.clos[4]._id],
-            createdBy: seedData.users[1]._id,
-            status: 'approved',
-            numberOfSessions: 10
-        },
-        // CAM courses
-        {
-            name: 'CAM Starter Pre-A1 - Giao tiếp',
-            description: 'Khóa học CAM Starter cho trẻ em - Giao tiếp cơ bản',
-            program: seedData.programMap['cam_Pre-A1'],
-            clos: [seedData.clos[5]._id], // CLO006 - Giao tiếp cơ bản
-            createdBy: seedData.users[1]._id,
-            status: 'approved',
-            numberOfSessions: 8
-        },
-        {
-            name: 'CAM Mover A1 - Nghe nói',
-            description: 'Khóa học CAM Mover cho trẻ em - Nghe và Nói',
-            program: seedData.programMap['cam_A1'],
-            clos: [seedData.clos[5]._id, seedData.clos[6]._id], // CLO006 và CLO007
-            createdBy: seedData.users[1]._id,
-            status: 'approved',
-            numberOfSessions: 8
-        }
-    ];
-    
-    const created = await Course.insertMany(courses);
-    seedData.courses = created;
-    console.log(`✅ Created ${created.length} courses\n`);
-}
-
-async function seedSessions() {
-    console.log('📝 Seeding Sessions...');
-    const sessions = [];
-    
-    // Tạo sessions cho mỗi course dựa trên numberOfSessions
-    const coursesWithProgram = await Course.find({ _id: { $in: seedData.courses.map(c => c._id) } })
-        .populate('program', 'type');
-    
-    for (const course of coursesWithProgram) {
-        // Sử dụng numberOfSessions từ course thay vì logic hardcoded
-        const sessionCount = course.numberOfSessions || 3; // Default to 3 if not set
-        
-        for (let i = 1; i <= sessionCount; i++) {
-            sessions.push({
-                title: `Buổi ${i} - ${course.name}`,
-                order: i,
-                content: `Nội dung buổi học ${i} của khóa ${course.name}`,
-                learningType: i % 2 === 0 ? 'practice' : 'theory',
-                clos: course.clos.slice(0, Math.min(2, course.clos.length)) // Link 1-2 CLOs
-            });
-        }
-    }
-    
-    const created = await Session.insertMany(sessions);
-    seedData.sessions = created;
-    
-    // Update courses with sessions
-    let sessionIndex = 0;
-    for (const course of coursesWithProgram) {
-        const sessionCount = course.numberOfSessions || 3; // Default to 3 if not set
-        const courseSessions = created.slice(sessionIndex, sessionIndex + sessionCount);
-        await Course.findByIdAndUpdate(course._id, {
-            sessions: courseSessions.map(s => s._id)
-        });
-        sessionIndex += sessionCount;
-    }
-    
-    console.log(`✅ Created ${created.length} sessions\n`);
-}
 
 async function seedClasses() {
     console.log('📝 Seeding Classes...');
+    
+    // Query existing data from database
+    const courses = await Course.find({ status: 'approved' }).lean();
+    const rooms = await Room.find().lean();
+    
+    // Find Teacher and Student roles
+    const teacherRole = await Role.findOne({ name: 'Teacher' });
+    const studentRole = await Role.findOne({ name: 'Student' });
+    
+    if (!teacherRole || !studentRole) {
+        console.log('⚠️  Không tìm thấy Teacher hoặc Student role. Vui lòng seed roles trước.');
+        return;
+    }
+    
+    const teachers = await User.find({ roleId: teacherRole._id }).lean();
+    const students = await User.find({ roleId: studentRole._id }).lean();
+    
+    // Validate data exists
+    if (courses.length === 0) {
+        console.log('⚠️  Không tìm thấy courses trong database. Vui lòng seed courses trước.');
+        return;
+    }
+    if (teachers.length === 0) {
+        console.log('⚠️  Không tìm thấy teachers trong database. Vui lòng seed users với role Teacher trước.');
+        return;
+    }
+    if (students.length === 0) {
+        console.log('⚠️  Không tìm thấy students trong database. Vui lòng seed users với role Student trước.');
+        return;
+    }
+    if (rooms.length === 0) {
+        console.log('⚠️  Không tìm thấy rooms trong database. Vui lòng seed rooms trước.');
+        return;
+    }
+    
+    console.log(`   - Found ${courses.length} courses, ${teachers.length} teachers, ${students.length} students, ${rooms.length} rooms`);
+    
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Reset time to start of day for consistent date comparison
     
@@ -930,13 +106,32 @@ async function seedClasses() {
     const class6EndDate = new Date(today);
     class6EndDate.setDate(today.getDate() + 49); // 7 tuần sau
     
+    // Select courses - try to find IELTS Foundation A1 and TOEIC Beginner A1, otherwise use first available
+    const course1 = courses.find(c => c.name && c.name.includes('IELTS Foundation A1')) || courses[0];
+    const course2 = courses.find(c => c.name && c.name.includes('TOEIC Beginner A1')) || (courses.length > 1 ? courses[1] : courses[0]);
+    const course3 = courses.find(c => c.name && c.name.includes('IELTS Elementary A2')) || (courses.length > 2 ? courses[2] : courses[0]);
+    
+    // Ensure we have enough teachers and students
+    if (teachers.length < 2) {
+        console.log('⚠️  Cần ít nhất 2 teachers. Chỉ tìm thấy', teachers.length);
+        return;
+    }
+    if (students.length < 10) {
+        console.log('⚠️  Cần ít nhất 10 students. Chỉ tìm thấy', students.length);
+        return;
+    }
+    if (rooms.length < 5) {
+        console.log('⚠️  Cần ít nhất 5 rooms. Chỉ tìm thấy', rooms.length);
+        return;
+    }
+    
     const classes = [
         {
             name: 'IELTS Foundation A1 - Lớp Đang Học',
-            course: seedData.courses[0]._id, // IELTS Foundation A1 - Nghe (5 sessions)
-            teacher: seedData.users[3]._id, // Teacher 1
-            students: [seedData.users[5]._id, seedData.users[6]._id, seedData.users[7]._id],
-            room: seedData.rooms[0]._id,
+            course: course1._id,
+            teacher: teachers[0]._id,
+            students: [students[0]._id, students[1]._id, students[2]._id],
+            room: rooms[0]._id,
             startDate: activeClassStartDate,
             endDate: activeClassEndDate,
             maxStudents: 25,
@@ -944,10 +139,10 @@ async function seedClasses() {
         },
         {
             name: 'TOEIC Beginner A1 - Lớp Chưa Học',
-            course: seedData.courses[8]._id, // TOEIC Beginner A1 - Nghe (3 sessions)
-            teacher: seedData.users[4]._id, // Teacher 2
-            students: [seedData.users[8]._id, seedData.users[9]._id],
-            room: seedData.rooms[1]._id,
+            course: course2._id,
+            teacher: teachers[1]._id,
+            students: [students[3]._id, students[4]._id],
+            room: rooms[1]._id,
             startDate: pendingClassStartDate,
             endDate: pendingClassEndDate,
             maxStudents: 20,
@@ -955,14 +150,14 @@ async function seedClasses() {
         },
         {
             name: 'IELTS Elementary A2 - Lớp Có Conflict',
-            course: seedData.courses[5]._id, // IELTS Elementary A2 - Nghe (12 sessions)
-            teacher: seedData.users[4]._id, // Teacher 2 (khác teacher để tránh conflict teacher)
+            course: course3._id,
+            teacher: teachers[1]._id, // Teacher 2 (khác teacher để tránh conflict teacher)
             students: [
-                seedData.users[5]._id, // Học viên chung với lớp đang học (sẽ bị conflict)
-                seedData.users[6]._id, // Học viên chung với lớp đang học (sẽ bị conflict)
-                seedData.users[8]._id  // Học viên mới
+                students[0]._id, // Học viên chung với lớp đang học (sẽ bị conflict)
+                students[1]._id, // Học viên chung với lớp đang học (sẽ bị conflict)
+                students[3]._id  // Học viên mới
             ],
-            room: seedData.rooms[2]._id, // Phòng khác để tránh conflict room
+            room: rooms[2]._id, // Phòng khác để tránh conflict room
             startDate: activeClassStartDate, // Cùng thời gian với lớp đang học
             endDate: activeClassEndDate,
             maxStudents: 25,
@@ -971,10 +166,10 @@ async function seedClasses() {
         // 5 lớp mới cùng course với "IELTS Foundation A1 - Lớp Đang Học"
         {
             name: 'IELTS Foundation A1 - Lớp 2',
-            course: seedData.courses[0]._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: seedData.users[3]._id, // Teacher 1
-            students: [seedData.users[10]._id, seedData.users[11]._id, seedData.users[12]._id, seedData.users[13]._id],
-            room: seedData.rooms[1]._id, // Phòng 201
+            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
+            teacher: teachers[0]._id, // Teacher 1
+            students: [students[5]._id, students[6]._id, students[7]._id, students[8]._id],
+            room: rooms[1]._id, // Phòng 201
             startDate: class2StartDate, // 1 tuần trước
             endDate: class2EndDate,
             maxStudents: 25,
@@ -982,10 +177,10 @@ async function seedClasses() {
         },
         {
             name: 'IELTS Foundation A1 - Lớp 3',
-            course: seedData.courses[0]._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: seedData.users[4]._id, // Teacher 2
-            students: [seedData.users[14]._id, seedData.users[15]._id, seedData.users[16]._id, seedData.users[17]._id],
-            room: seedData.rooms[2]._id, // Phòng 301
+            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
+            teacher: teachers[1]._id, // Teacher 2
+            students: [students[9]._id, students[Math.min(10, students.length - 1)]._id, students[Math.min(11, students.length - 1)]._id, students[Math.min(12, students.length - 1)]._id],
+            room: rooms[2]._id, // Phòng 301
             startDate: class3StartDate, // Hôm nay
             endDate: class3EndDate,
             maxStudents: 25,
@@ -993,10 +188,10 @@ async function seedClasses() {
         },
         {
             name: 'IELTS Foundation A1 - Lớp 4',
-            course: seedData.courses[0]._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: seedData.users[3]._id, // Teacher 1
-            students: [seedData.users[18]._id, seedData.users[19]._id, seedData.users[20]._id, seedData.users[21]._id],
-            room: seedData.rooms[3]._id, // Phòng Lab 401
+            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
+            teacher: teachers[0]._id, // Teacher 1
+            students: [students[Math.min(13, students.length - 1)]._id, students[Math.min(14, students.length - 1)]._id, students[Math.min(15, students.length - 1)]._id, students[Math.min(16, students.length - 1)]._id],
+            room: rooms[Math.min(3, rooms.length - 1)]._id, // Phòng Lab 401
             startDate: class4StartDate, // 1 tuần sau
             endDate: class4EndDate,
             maxStudents: 25,
@@ -1004,10 +199,10 @@ async function seedClasses() {
         },
         {
             name: 'IELTS Foundation A1 - Lớp 5',
-            course: seedData.courses[0]._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: seedData.users[4]._id, // Teacher 2
-            students: [seedData.users[22]._id, seedData.users[23]._id, seedData.users[24]._id, seedData.users[25]._id],
-            room: seedData.rooms[4]._id, // Phòng 501
+            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
+            teacher: teachers[1]._id, // Teacher 2
+            students: [students[Math.min(17, students.length - 1)]._id, students[Math.min(18, students.length - 1)]._id, students[Math.min(19, students.length - 1)]._id, students[Math.min(20, students.length - 1)]._id],
+            room: rooms[Math.min(4, rooms.length - 1)]._id, // Phòng 501
             startDate: class5StartDate, // 2 tuần sau
             endDate: class5EndDate,
             maxStudents: 25,
@@ -1015,10 +210,10 @@ async function seedClasses() {
         },
         {
             name: 'IELTS Foundation A1 - Lớp 6',
-            course: seedData.courses[0]._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: seedData.users[3]._id, // Teacher 1
-            students: [seedData.users[10]._id, seedData.users[11]._id], // Dùng lại một số students (không conflict vì lịch khác)
-            room: seedData.rooms[0]._id, // Phòng 101 (có thể dùng lại nếu lịch khác)
+            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
+            teacher: teachers[0]._id, // Teacher 1
+            students: [students[5]._id, students[6]._id], // Dùng lại một số students (không conflict vì lịch khác)
+            room: rooms[0]._id, // Phòng 101 (có thể dùng lại nếu lịch khác)
             startDate: class6StartDate, // 3 tuần sau
             endDate: class6EndDate,
             maxStudents: 25,
@@ -1046,6 +241,29 @@ async function seedClassSchedules() {
     const classSchedules = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Reset time for date comparison
+    
+    // Query existing data from database
+    const classes = await Class.find().lean();
+    const coursesFromDB = await Course.find().populate('sessions').lean();
+    
+    // Find Academic Staff role and get a user with that role for createdBy
+    const academicStaffRole = await Role.findOne({ name: 'Academic Staff' });
+    let academicStaffUser = null;
+    if (academicStaffRole) {
+        const academicStaffUsers = await User.find({ roleId: academicStaffRole._id }).limit(1).lean();
+        if (academicStaffUsers.length > 0) {
+            academicStaffUser = academicStaffUsers[0];
+        }
+    }
+    
+    if (classes.length === 0) {
+        console.log('⚠️  Không tìm thấy classes trong database. Vui lòng seed classes trước.');
+        return;
+    }
+    
+    if (!academicStaffUser) {
+        console.log('⚠️  Không tìm thấy Academic Staff user. Sẽ sử dụng teacher của lớp làm createdBy.');
+    }
     
     // Các pattern lịch học mẫu (mỗi lớp có thể chọn pattern khác nhau)
     // dayOfWeek: 0 = Chủ nhật, 1 = Thứ 2, ..., 6 = Thứ 7
@@ -1108,11 +326,8 @@ async function seedClassSchedules() {
         ]
     ];
     
-    // Reload courses từ database để có sessions đã được update
-    const coursesFromDB = await Course.find().lean();
-    
-    for (let classIndex = 0; classIndex < seedData.classes.length; classIndex++) {
-        const classItem = seedData.classes[classIndex];
+    for (let classIndex = 0; classIndex < classes.length; classIndex++) {
+        const classItem = classes[classIndex];
         console.log(`  📚 Creating schedules for class: ${classItem.name}`);
         
         // Tìm course từ database (có sessions đã được update)
@@ -1122,29 +337,30 @@ async function seedClassSchedules() {
             continue;
         }
         
-        // Lấy sessions từ course
-        const courseSessionIds = course.sessions || [];
-        if (!Array.isArray(courseSessionIds) || courseSessionIds.length === 0) {
+        // Lấy sessions từ course (đã populate)
+        const courseSessions = course.sessions || [];
+        if (!Array.isArray(courseSessions) || courseSessions.length === 0) {
             console.log(`    ⚠️ Course ${course.name} has no sessions`);
             continue;
         }
         
-        // Tìm sessions từ seedData.sessions
-        const courseSessions = seedData.sessions.filter(s => 
-            courseSessionIds.some(csId => {
-                const csIdStr = csId.toString ? csId.toString() : String(csId);
-                const sIdStr = s._id.toString ? s._id.toString() : String(s._id);
-                return csIdStr === sIdStr;
-            })
-        );
+        // Query sessions from database if course.sessions is just IDs
+        let sessions = [];
+        if (courseSessions.length > 0 && typeof courseSessions[0] === 'object' && courseSessions[0]._id) {
+            // Already populated
+            sessions = courseSessions;
+        } else {
+            // Need to query sessions
+            sessions = await Session.find({ _id: { $in: courseSessions } }).sort({ order: 1 }).lean();
+        }
         
-        if (courseSessions.length === 0) {
+        if (sessions.length === 0) {
             console.log(`    ⚠️ No sessions found for course ${course.name}`);
             continue;
         }
         
         // Lấy số buổi học từ course.numberOfSessions
-        const numberOfSessions = course.numberOfSessions || courseSessions.length;
+        const numberOfSessions = course.numberOfSessions || sessions.length;
         
         // Chọn pattern lịch cho lớp này (mỗi lớp có thể khác nhau)
         // Lớp conflict (index 2) sẽ dùng pattern 5 (index 4, trùng với pattern 0) để tạo conflict
@@ -1266,8 +482,8 @@ async function seedClassSchedules() {
         
         firstMonday.setDate(firstMonday.getDate() + daysToMonday);
         
-        // Tạo lịch học
-        let sessionIndex = 0;
+        // Tạo lịch học - Tạo tất cả schedules trước, sau đó sắp xếp theo ngày và gán session
+        const tempSchedules = []; // Tạm thời lưu schedules chưa gán session
         let scheduleCount = 0;
         let currentWeek = 0;
         
@@ -1291,23 +507,20 @@ async function seedClassSchedules() {
                     continue;
                 }
                 
-                // Lấy session tương ứng theo thứ tự
-                const session = courseSessions[sessionIndex % courseSessions.length];
-                
-                classSchedules.push({
+                // Tạo schedule tạm thời (chưa gán session)
+                // Use academicStaffUser if available, otherwise use class teacher
+                const createdByUser = academicStaffUser ? academicStaffUser._id : classItem.teacher;
+                tempSchedules.push({
                     class: classItem._id,
-                    session: session._id,
-                    date: scheduleDate,
+                    date: new Date(scheduleDate), // Tạo copy để tránh reference issue
                     startTime: patternItem.startTime,
                     endTime: patternItem.endTime,
                     room: classItem.room,
                     teacher: classItem.teacher,
-                    createdBy: seedData.users[2]._id, // Academic Staff
-                    reason: `Lịch học buổi ${scheduleCount + 1}`,
+                    createdBy: createdByUser,
                     status: 'fixed'
                 });
                 
-                sessionIndex++;
                 scheduleCount++;
             }
             
@@ -1319,6 +532,26 @@ async function seedClassSchedules() {
             if (nextWeekStart > endDate) {
                 break;
             }
+        }
+        
+        // Sắp xếp schedules theo ngày và giờ (đảm bảo thứ tự đúng)
+        tempSchedules.sort((a, b) => {
+            const dateA = new Date(a.date);
+            const dateB = new Date(b.date);
+            if (dateA.getTime() !== dateB.getTime()) {
+                return dateA - dateB;
+            }
+            // Nếu cùng ngày, sắp xếp theo startTime
+            return (a.startTime || '').localeCompare(b.startTime || '');
+        });
+        
+        // Gán session theo thứ tự đã sắp xếp
+        for (let i = 0; i < tempSchedules.length; i++) {
+            const session = sessions[i % sessions.length];
+            classSchedules.push({
+                ...tempSchedules[i],
+                session: session._id
+            });
         }
         
         // Cảnh báo nếu không tạo đủ số buổi
@@ -1344,12 +577,10 @@ async function seedClassSchedules() {
     
     if (classSchedules.length === 0) {
         console.log('⚠️ No class schedules to create!');
-        seedData.classSchedules = [];
         return;
     }
     
     const created = await ClassSchedule.insertMany(classSchedules);
-    seedData.classSchedules = created;
     console.log(`✅ Created ${created.length} class schedules total\n`);
 }
 
@@ -1359,12 +590,29 @@ async function seedStudentSchedules() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // Tạo student schedules cho TẤT CẢ ClassSchedules của cả 2 lớp
-    for (const classSchedule of seedData.classSchedules) {
-        const classItem = seedData.classes.find(c => 
+    // Query existing data from database
+    const classSchedules = await ClassSchedule.find().lean();
+    const classes = await Class.find().lean();
+    
+    if (classSchedules.length === 0) {
+        console.log('⚠️  Không tìm thấy class schedules trong database. Vui lòng seed class schedules trước.');
+        return;
+    }
+    
+    if (classes.length === 0) {
+        console.log('⚠️  Không tìm thấy classes trong database. Vui lòng seed classes trước.');
+        return;
+    }
+    
+    // Tạo student schedules cho TẤT CẢ ClassSchedules
+    for (const classSchedule of classSchedules) {
+        const classItem = classes.find(c => 
             c._id.toString() === classSchedule.class.toString()
         );
-        if (!classItem) continue;
+        if (!classItem) {
+            console.log(`    ⚠️ Class not found for classSchedule ${classSchedule._id}`);
+            continue;
+        }
         
         // Tạo StudentSchedule cho tất cả học viên trong lớp
         for (const studentId of classItem.students) {
@@ -1408,146 +656,19 @@ async function seedStudentSchedules() {
         }
     }
     
-    const created = await StudentSchedule.insertMany(studentSchedules);
-    console.log(`✅ Created ${created.length} student schedules for ${seedData.classSchedules.length} class schedules\n`);
-}
-
-async function seedChangeRequests() {
-    console.log('📝 Seeding Change Requests...');
-    
-    // Lấy danh sách học sinh và giáo viên
-    const teacherRoleId = seedData.roles[3]._id; // Teacher role
-    const studentRoleId = seedData.roles[4]._id; // Student role
-    
-    const teachers = seedData.users.filter(user => 
-        user.roleId.toString() === teacherRoleId.toString()
-    );
-    const students = seedData.users.filter(user => 
-        user.roleId.toString() === studentRoleId.toString()
-    );
-    
-    console.log(`  - Found ${teachers.length} teachers and ${students.length} students`);
-    
-    // Mảng mẫu nội dung đơn
-    const contentTemplates = [
-        'Xin phép đổi buổi học vì lý do cá nhân',
-        'Xin chuyển sang lớp khác do xung đột lịch học',
-        'Xin đổi buổi học do có việc đột xuất',
-        'Xin phép đổi lịch học vì lý do sức khỏe',
-        'Xin chuyển lớp do không phù hợp với trình độ hiện tại',
-        'Xin đổi buổi học để phù hợp với lịch làm việc',
-        'Xin phép đổi lịch dạy vì có việc gia đình',
-        'Xin đổi buổi dạy do xung đột lịch cá nhân',
-        'Xin chuyển sang lớp khác có thời gian phù hợp hơn',
-        'Xin đổi buổi học để tránh trùng với lịch thi'
-    ];
-    
-    const changeRequests = [];
-    const today = new Date();
-    
-    // Tạo đơn cho mỗi học sinh (ít nhất 1 đơn)
-    const studentRequestTypes = ['change_class', 'makeup_class'];
-    for (const student of students) {
-        const requestCount = Math.random() < 0.3 ? 2 : 1; // 30% có 2 đơn, 70% có 1 đơn
-        
-        for (let i = 0; i < requestCount; i++) {
-            const randomContent = contentTemplates[Math.floor(Math.random() * contentTemplates.length)];
-            const randomType = studentRequestTypes[Math.floor(Math.random() * studentRequestTypes.length)];
-            const daysAgo = Math.floor(Math.random() * 30); // Đơn gửi trong vòng 30 ngày qua
-            const createdAt = new Date(today);
-            createdAt.setDate(createdAt.getDate() - daysAgo);
-            createdAt.setHours(Math.floor(Math.random() * 12) + 8, Math.floor(Math.random() * 60), 0, 0);
-            
-            changeRequests.push({
-                sender: student._id,
-                type: randomType,
-                content: randomContent,
-                status: 'pending',
-                approver: null,
-                approvedDate: null,
-                responseContent: null,
-                createdAt: createdAt,
-                updatedAt: createdAt
-            });
-        }
-    }
-    
-    // Tạo đơn cho mỗi giáo viên (ít nhất 1 đơn)
-    const teacherRequestTypes = ['replace_teacher'];
-    for (const teacher of teachers) {
-        const requestCount = Math.random() < 0.3 ? 2 : 1; // 30% có 2 đơn, 70% có 1 đơn
-        
-        for (let i = 0; i < requestCount; i++) {
-            const randomContent = contentTemplates[Math.floor(Math.random() * contentTemplates.length)];
-            const daysAgo = Math.floor(Math.random() * 30); // Đơn gửi trong vòng 30 ngày qua
-            const createdAt = new Date(today);
-            createdAt.setDate(createdAt.getDate() - daysAgo);
-            createdAt.setHours(Math.floor(Math.random() * 12) + 8, Math.floor(Math.random() * 60), 0, 0);
-            
-            changeRequests.push({
-                sender: teacher._id,
-                type: 'replace_teacher',
-                content: randomContent,
-                status: 'pending',
-                approver: null,
-                approvedDate: null,
-                responseContent: null,
-                createdAt: createdAt,
-                updatedAt: createdAt
-            });
-        }
-    }
-    
-    if (changeRequests.length === 0) {
-        console.log('⚠️  No change requests to create!');
+    if (studentSchedules.length === 0) {
+        console.log('⚠️  No student schedules to create!');
         return;
     }
     
-    const created = await ChangeRequest.insertMany(changeRequests);
-    console.log(`✅ Created ${created.length} change requests`);
-    console.log(`   - From ${students.length} students and ${teachers.length} teachers\n`);
+    const created = await StudentSchedule.insertMany(studentSchedules);
+    console.log(`✅ Created ${created.length} student schedules for ${classSchedules.length} class schedules\n`);
 }
 
-async function seedExams() {
-    console.log('📝 Seeding Exams...');
-    const exams = [
-        {
-            title: 'IELTS Practice Test 1',
-            description: 'Bài thi thử IELTS',
-            createdBy: seedData.users[1]._id, // Subject Leader
-            userId: seedData.users[5]._id, // Student 1
-            examType: 'ielts',
-            level: 'Academic',
-            totalDuration: 180,
-            sections: [
-                {
-                    type: 'listening',
-                    instructions: 'Listen to the audio and answer the questions',
-                    duration: 30,
-                    questionCount: 40,
-                    maxScore: 40,
-                    score: 28
-                },
-                {
-                    type: 'reading',
-                    instructions: 'Read the passages and answer the questions',
-                    duration: 60,
-                    questionCount: 40,
-                    maxScore: 40,
-                    score: 32
-                }
-            ],
-            isPublished: true
-        }
-    ];
-    
-    const created = await Exam.insertMany(exams);
-    console.log(`✅ Created ${created.length} exams\n`);
-}
 
 async function seed() {
     try {
-        console.log('🚀 Starting system seed...\n');
+        console.log('🚀 Starting seed for Class, ClassSchedule, StudentSchedule...\n');
         
         // Connect to MongoDB
         await mongoose.connect(process.env.MONGODB_URI, {
@@ -1557,42 +678,25 @@ async function seed() {
         });
         console.log('✅ Connected to MongoDB\n');
 
-        // Clear existing data
+        // Clear existing data for class tables only
         await clearDatabase();
 
-        // Seed in order
-        await seedPermissions();
-        await seedRoles();
-        await seedUsers();
-        await seedPrograms();
-        await seedPLOs();
-        await seedRooms();
-        await seedCLOs();
-        await seedCourses();
-        await seedSessions();
+        // Seed only class-related tables (using existing data from database)
         await seedClasses();
         await seedClassSchedules();
         await seedStudentSchedules();
-        await seedChangeRequests();
-        await seedExams();
 
         console.log('\n✨ Seed completed successfully!');
         console.log('\n📊 Summary:');
-        console.log(`  - Permissions: ${seedData.permissions.length}`);
-        console.log(`  - Roles: ${seedData.roles.length}`);
-        console.log(`  - Users: ${seedData.users.length}`);
-        console.log(`  - Programs: ${seedData.programs.length}`);
-        console.log(`  - PLOs: ${seedData.plos.length}`);
-        console.log(`  - Rooms: ${seedData.rooms.length}`);
-        console.log(`  - CLOs: ${seedData.clos.length}`);
-        console.log(`  - Courses: ${seedData.courses.length}`);
-        console.log(`  - Sessions: ${seedData.sessions.length}`);
-        console.log(`  - Classes: ${seedData.classes.length}`);
-        console.log(`  - Class Schedules: ${seedData.classSchedules.length}`);
         
-        // Count change requests
-        const changeRequestCount = await ChangeRequest.countDocuments();
-        console.log(`  - Change Requests: ${changeRequestCount}`);
+        // Query counts from database
+        const classCount = await Class.countDocuments();
+        const classScheduleCount = await ClassSchedule.countDocuments();
+        const studentScheduleCount = await StudentSchedule.countDocuments();
+        
+        console.log(`  - Classes: ${classCount}`);
+        console.log(`  - Class Schedules: ${classScheduleCount}`);
+        console.log(`  - Student Schedules: ${studentScheduleCount}`);
 
         process.exit(0);
     } catch (error) {

@@ -52,7 +52,7 @@ const RequestManagementPage = () => {
   const [pendingMakeupClasses, setPendingMakeupClasses] = useState([]); // Lưu danh sách buổi học bù pending
   const [pendingMakeupSessions, setPendingMakeupSessions] = useState([]); // Lưu danh sách sessions cần học bù (trường hợp 2)
   const [showMakeupClassModal, setShowMakeupClassModal] = useState(false); // Modal thêm buổi học bù
-  const [makeupClassOption, setMakeupClassOption] = useState(null); // 'existing' hoặc 'new'
+  const [makeupClassOption, setMakeupClassOption] = useState(null); // Chỉ 'existing' (chọn buổi có sẵn)
   const [selectedMakeupClassId, setSelectedMakeupClassId] = useState(null); // Lớp được chọn cho buổi học bù
   const [selectedMakeupClassInfo, setSelectedMakeupClassInfo] = useState(null); // Thông tin lớp được chọn
   const [availableMakeupClasses, setAvailableMakeupClasses] = useState([]); // Danh sách lớp có sẵn
@@ -69,12 +69,7 @@ const RequestManagementPage = () => {
   const [pendingMakeupData, setPendingMakeupData] = useState(null); // Lưu dữ liệu makeup đang chờ xác nhận khi có conflict
   const [validatingConflict, setValidatingConflict] = useState(false); // Trạng thái đang validate conflict
   const [newClassSchedule, setNewClassSchedule] = useState([]); // Lưu lịch học của lớp mới khi có đổi lớp
-  // State cho tạo lớp mới
-  const [newMakeupDate, setNewMakeupDate] = useState('');
-  const [newMakeupStartTime, setNewMakeupStartTime] = useState('');
-  const [newMakeupEndTime, setNewMakeupEndTime] = useState('');
-  const [newMakeupTeacherId, setNewMakeupTeacherId] = useState('');
-  const [newMakeupRoomId, setNewMakeupRoomId] = useState('');
+  // State cho tạo lớp mới - ĐÃ XÓA (không cho phép tạo lớp mới, chỉ chọn buổi có sẵn)
   const [availableTeachers, setAvailableTeachers] = useState([]);
   const [availableRooms, setAvailableRooms] = useState([]);
   const [loadingTeachers, setLoadingTeachers] = useState(false);
@@ -461,15 +456,37 @@ const RequestManagementPage = () => {
       // Kiểm tra xem có phải buổi học bù không (từ database với scheduleStatus: 'rescheduled')
       const isMakeupFromDB = scheduleStatus === 'rescheduled';
       
+      // Extract classId - đảm bảo luôn là string ID hoặc null
+      let classId = null;
+      if (schedule.class) {
+        if (typeof schedule.class === 'string') {
+          classId = schedule.class;
+        } else if (schedule.class._id) {
+          classId = schedule.class._id.toString();
+        } else if (schedule.class.id) {
+          classId = schedule.class.id.toString();
+        }
+      }
+      // Nếu không có trong schedule.class, thử lấy từ classSchedule
+      if (!classId && schedule.classSchedule?.class) {
+        if (typeof schedule.classSchedule.class === 'string') {
+          classId = schedule.classSchedule.class;
+        } else if (schedule.classSchedule.class._id) {
+          classId = schedule.classSchedule.class._id.toString();
+        } else if (schedule.classSchedule.class.id) {
+          classId = schedule.classSchedule.class.id.toString();
+        }
+      }
+
       return {
         id: scheduleId,
         date: dateStr,
         startTime: schedule.startTime || '',
         endTime: schedule.endTime || '',
-        className: schedule.class?.name || 'N/A',
-        classId: schedule.class?._id || schedule.class || null,
-        courseId: schedule.class?.course?._id || schedule.class?.course || null,
-        courseName: schedule.class?.course?.name || 'N/A',
+        className: schedule.class?.name || schedule.classSchedule?.class?.name || 'N/A',
+        classId: classId,
+        courseId: schedule.class?.course?._id || schedule.class?.course || schedule.classSchedule?.class?.course?._id || schedule.classSchedule?.class?.course || null,
+        courseName: schedule.class?.course?.name || schedule.classSchedule?.class?.course?.name || 'N/A',
         roomName: schedule.room?.room_name || 'N/A',
         topic: schedule.session?.title || schedule.topic || '',
         status: displayStatus,
@@ -987,6 +1004,11 @@ const RequestManagementPage = () => {
         return;
       }
 
+      // Lưu selectedScheduleId hiện tại trước khi fetch để giữ lại nếu hợp lệ
+      // React đảm bảo state updates được áp dụng trước khi effects chạy,
+      // nên selectedMakeupClassInfo sẽ có giá trị mới nhất
+      const currentSelectedScheduleId = selectedMakeupClassInfo?.selectedScheduleId;
+
       try {
         setLoadingMakeupClassInfo(true);
         const response = await classService.getClassById(selectedMakeupClassId);
@@ -1026,6 +1048,18 @@ const RequestManagementPage = () => {
             } : null
           }));
 
+          // Kiểm tra xem selectedScheduleId hiện tại có còn hợp lệ trong danh sách schedules mới không
+          let preservedScheduleId = null;
+          if (currentSelectedScheduleId) {
+            const scheduleIdStr = currentSelectedScheduleId.toString();
+            const isValidSchedule = fixedSchedulesList.some(sch => 
+              (sch.id || sch._id)?.toString() === scheduleIdStr
+            );
+            if (isValidSchedule) {
+              preservedScheduleId = currentSelectedScheduleId;
+            }
+          }
+
           setSelectedMakeupClassInfo({
             className: classData.name || 'N/A',
             courseName: classData.courseName || 'N/A',
@@ -1033,7 +1067,7 @@ const RequestManagementPage = () => {
             schedules: fixedSchedulesList, // Lưu danh sách buổi học để chọn
             studentCount: classData.students?.length || 0,
             roomCapacity: classData.room?.capacity || null,
-            selectedScheduleId: null // Reset khi load lớp mới
+            selectedScheduleId: preservedScheduleId // Giữ lại nếu hợp lệ, null nếu không
           });
         }
       } catch (err) {
@@ -1045,12 +1079,16 @@ const RequestManagementPage = () => {
     };
 
     fetchMakeupClassInfo();
+    // Note: selectedMakeupClassInfo?.selectedScheduleId không được thêm vào dependency array
+    // vì effect chỉ nên chạy khi selectedMakeupClassId thay đổi, không phải khi selectedScheduleId thay đổi.
+    // React đảm bảo state updates được áp dụng trước khi effects chạy, nên selectedMakeupClassInfo
+    // sẽ có giá trị mới nhất khi effect chạy.
   }, [selectedMakeupClassId, classService]);
 
   // Hàm để lấy thông tin lớp khi chọn buổi học (tự động lấy classId từ schedule)
   useEffect(() => {
     const fetchCurrentClassInfo = async () => {
-      if (!selectedCurrentScheduleId || !classService || !calendarSchedules || calendarSchedules.length === 0) {
+      if (!selectedCurrentScheduleId || !classService) {
         if (!selectedCurrentScheduleId) {
           setSelectedCurrentClassInfo(null);
           setSelectedCurrentClassId(null);
@@ -1059,17 +1097,65 @@ const RequestManagementPage = () => {
       }
 
       // Tìm schedule đã chọn trong calendarSchedules để lấy classId
-      const selectedSchedule = calendarSchedules.find(s => 
+      let selectedSchedule = calendarSchedules?.find(s => 
         (s.id || s._id)?.toString() === selectedCurrentScheduleId.toString()
       );
 
-      if (!selectedSchedule || !selectedSchedule.classId) {
+      let classIdToLoad = null;
+
+      // Nếu tìm thấy trong calendarSchedules và có classId
+      if (selectedSchedule && selectedSchedule.classId) {
+        classIdToLoad = selectedSchedule.classId;
+      } else {
+        // Nếu không tìm thấy hoặc không có classId, thử tìm trong senderSchedule gốc
+        const originalSchedule = senderSchedule?.find(s => 
+          (s._id || s.id)?.toString() === selectedCurrentScheduleId.toString()
+        );
+
+        if (originalSchedule) {
+          // Lấy classId từ senderSchedule
+          classIdToLoad = originalSchedule.class?._id || 
+                         originalSchedule.class?.id || 
+                         originalSchedule.class ||
+                         originalSchedule.classSchedule?.class?._id ||
+                         originalSchedule.classSchedule?.class?.id ||
+                         originalSchedule.classSchedule?.class ||
+                         null;
+
+          // Nếu vẫn không có classId, tạo selectedCurrentClassInfo từ thông tin có sẵn
+          if (!classIdToLoad) {
+            const className = originalSchedule.class?.name || 
+                             originalSchedule.classSchedule?.class?.name || 
+                             'N/A';
+            const courseName = originalSchedule.class?.course?.name || 
+                              originalSchedule.classSchedule?.class?.course?.name ||
+                              originalSchedule.class?.courseName ||
+                              'N/A';
+            
+            setSelectedCurrentClassInfo({
+              className: className,
+              courseName: courseName,
+              fixedSchedules: [],
+              roomName: originalSchedule.room?.room_name || 'N/A',
+              schedules: []
+            });
+            setSelectedCurrentClassId(null);
+            return;
+          }
+        } else {
+          // Không tìm thấy schedule ở đâu cả
+          setSelectedCurrentClassInfo(null);
+          setSelectedCurrentClassId(null);
+          return;
+        }
+      }
+
+      if (!classIdToLoad) {
         setSelectedCurrentClassInfo(null);
         setSelectedCurrentClassId(null);
         return;
       }
 
-      const classIdToLoad = selectedSchedule.classId;
       setSelectedCurrentClassId(classIdToLoad);
 
       try {
@@ -1159,7 +1245,7 @@ const RequestManagementPage = () => {
     };
 
     fetchCurrentClassInfo();
-  }, [selectedCurrentScheduleId, classService, calendarSchedules]);
+  }, [selectedCurrentScheduleId, classService, calendarSchedules, senderSchedule]);
 
   // Load danh sách lớp cùng khóa học khi selectedCurrentClassInfo thay đổi
   useEffect(() => {
@@ -1657,9 +1743,78 @@ const RequestManagementPage = () => {
           setProcessing(true);
 
           // Lấy thông tin buổi nghỉ đã chọn từ calendarSchedules
-          const absentScheduleFromCalendar = calendarSchedules?.find(
+          let absentScheduleFromCalendar = calendarSchedules?.find(
             s => (s.id || s._id)?.toString() === selectedCurrentScheduleId.toString()
           );
+
+          // Lưu schedule gốc để lấy thông tin lớp nếu cần
+          let originalSchedule = null;
+
+          // Nếu không tìm thấy trong calendarSchedules, thử tìm trong senderSchedule
+          if (!absentScheduleFromCalendar && senderSchedule && senderSchedule.length > 0) {
+            const scheduleFromSender = senderSchedule.find(
+              s => (s._id || s.id)?.toString() === selectedCurrentScheduleId.toString()
+            );
+            
+            if (scheduleFromSender) {
+              originalSchedule = scheduleFromSender;
+              // Format từ senderSchedule để tương thích với calendarSchedules
+              const scheduleDate = new Date(scheduleFromSender.date);
+              const dateStr = formatDateToYYYYMMDD(scheduleDate);
+              
+              absentScheduleFromCalendar = {
+                id: scheduleFromSender._id || scheduleFromSender.id,
+                date: dateStr,
+                startTime: scheduleFromSender.startTime || '',
+                endTime: scheduleFromSender.endTime || '',
+                sessionName: scheduleFromSender.session?.title || 'N/A',
+                lessonTopic: scheduleFromSender.session?.title || '',
+                sessionOrder: scheduleFromSender.session?.order || '',
+                lessonNumber: scheduleFromSender.session?.order || '',
+                classId: scheduleFromSender.class?._id || scheduleFromSender.class?.id || scheduleFromSender.class,
+                className: scheduleFromSender.class?.name || null,
+                courseName: scheduleFromSender.class?.course?.name || scheduleFromSender.class?.courseName || null
+              };
+            }
+          }
+
+          // Nếu vẫn không tìm thấy, thử lấy từ selectedRequest.studentScheduleId
+          if (!absentScheduleFromCalendar && selectedRequest && selectedRequest.studentScheduleId) {
+            const studentSchedule = selectedRequest.studentScheduleId;
+            const studentScheduleId = (studentSchedule._id || studentSchedule.id)?.toString();
+            
+            if (studentScheduleId === selectedCurrentScheduleId.toString()) {
+              originalSchedule = studentSchedule;
+              const scheduleDate = new Date(studentSchedule.date);
+              const dateStr = formatDateToYYYYMMDD(scheduleDate);
+              
+              absentScheduleFromCalendar = {
+                id: studentScheduleId,
+                date: dateStr,
+                startTime: studentSchedule.startTime || '',
+                endTime: studentSchedule.endTime || '',
+                sessionName: studentSchedule.session?.title || studentSchedule.classSchedule?.session?.title || 'N/A',
+                lessonTopic: studentSchedule.session?.title || studentSchedule.classSchedule?.session?.title || '',
+                sessionOrder: studentSchedule.session?.order || studentSchedule.classSchedule?.session?.order || '',
+                lessonNumber: studentSchedule.session?.order || studentSchedule.classSchedule?.session?.order || '',
+                classId: studentSchedule.classSchedule?.class?._id || studentSchedule.classSchedule?.class?.id || studentSchedule.classSchedule?.class || studentSchedule.class?._id || studentSchedule.class?.id || studentSchedule.class,
+                className: studentSchedule.classSchedule?.class?.name || studentSchedule.class?.name || null,
+                courseName: studentSchedule.classSchedule?.class?.course?.name || studentSchedule.class?.course?.name || studentSchedule.classSchedule?.class?.courseName || null
+              };
+            }
+          }
+
+          // Nếu tìm thấy trong calendarSchedules, lấy thông tin lớp từ đó
+          if (absentScheduleFromCalendar && !originalSchedule) {
+            originalSchedule = calendarSchedules?.find(
+              s => (s.id || s._id)?.toString() === selectedCurrentScheduleId.toString()
+            );
+            if (originalSchedule && !absentScheduleFromCalendar.classId) {
+              absentScheduleFromCalendar.classId = originalSchedule.classId;
+              absentScheduleFromCalendar.className = originalSchedule.className;
+              absentScheduleFromCalendar.courseName = originalSchedule.courseName;
+            }
+          }
 
           if (!absentScheduleFromCalendar) {
             alert('Không tìm thấy thông tin buổi nghỉ');
@@ -1693,12 +1848,21 @@ const RequestManagementPage = () => {
             } : null
           };
 
+          // Lấy thông tin lớp cho absentClassInfo nếu selectedCurrentClassInfo là null
+          let absentClassInfoToUse = selectedCurrentClassInfo;
+          if (!absentClassInfoToUse && (absentScheduleFromCalendar.className || absentScheduleFromCalendar.classId)) {
+            absentClassInfoToUse = {
+              className: absentScheduleFromCalendar.className || 'N/A',
+              courseName: absentScheduleFromCalendar.courseName || 'N/A'
+            };
+          }
+
           // Lưu thông tin buổi dạy thay
           const newMakeupEntry = {
             absentScheduleId: selectedCurrentScheduleId,
             absentSchedule: absentSchedule,
             absentClassId: absentScheduleFromCalendar.classId || selectedCurrentClassId,
-            absentClassInfo: selectedCurrentClassInfo,
+            absentClassInfo: absentClassInfoToUse,
             // Thông tin giáo viên dạy thay
             substituteTeacherId: selectedSubstituteTeacherId,
             substituteTeacherInfo: substituteTeacher,
@@ -1751,9 +1915,78 @@ const RequestManagementPage = () => {
         }
 
         // Lấy thông tin buổi nghỉ đã chọn từ calendarSchedules
-        const absentScheduleFromCalendar = calendarSchedules?.find(
+        let absentScheduleFromCalendar = calendarSchedules?.find(
           s => (s.id || s._id)?.toString() === selectedCurrentScheduleId.toString()
         );
+
+        // Lưu schedule gốc để lấy thông tin lớp nếu cần
+        let originalSchedule = null;
+
+        // Nếu không tìm thấy trong calendarSchedules, thử tìm trong senderSchedule
+        if (!absentScheduleFromCalendar && senderSchedule && senderSchedule.length > 0) {
+          const scheduleFromSender = senderSchedule.find(
+            s => (s._id || s.id)?.toString() === selectedCurrentScheduleId.toString()
+          );
+          
+          if (scheduleFromSender) {
+            originalSchedule = scheduleFromSender;
+            // Format từ senderSchedule để tương thích với calendarSchedules
+            const scheduleDate = new Date(scheduleFromSender.date);
+            const dateStr = formatDateToYYYYMMDD(scheduleDate);
+            
+            absentScheduleFromCalendar = {
+              id: scheduleFromSender._id || scheduleFromSender.id,
+              date: dateStr,
+              startTime: scheduleFromSender.startTime || '',
+              endTime: scheduleFromSender.endTime || '',
+              sessionName: scheduleFromSender.session?.title || 'N/A',
+              lessonTopic: scheduleFromSender.session?.title || '',
+              sessionOrder: scheduleFromSender.session?.order || '',
+              lessonNumber: scheduleFromSender.session?.order || '',
+              classId: scheduleFromSender.class?._id || scheduleFromSender.class?.id || scheduleFromSender.class,
+              className: scheduleFromSender.class?.name || null,
+              courseName: scheduleFromSender.class?.course?.name || scheduleFromSender.class?.courseName || null
+            };
+          }
+        }
+
+        // Nếu vẫn không tìm thấy, thử lấy từ selectedRequest.studentScheduleId
+        if (!absentScheduleFromCalendar && selectedRequest && selectedRequest.studentScheduleId) {
+          const studentSchedule = selectedRequest.studentScheduleId;
+          const studentScheduleId = (studentSchedule._id || studentSchedule.id)?.toString();
+          
+          if (studentScheduleId === selectedCurrentScheduleId.toString()) {
+            originalSchedule = studentSchedule;
+            const scheduleDate = new Date(studentSchedule.date);
+            const dateStr = formatDateToYYYYMMDD(scheduleDate);
+            
+            absentScheduleFromCalendar = {
+              id: studentScheduleId,
+              date: dateStr,
+              startTime: studentSchedule.startTime || '',
+              endTime: studentSchedule.endTime || '',
+              sessionName: studentSchedule.session?.title || studentSchedule.classSchedule?.session?.title || 'N/A',
+              lessonTopic: studentSchedule.session?.title || studentSchedule.classSchedule?.session?.title || '',
+              sessionOrder: studentSchedule.session?.order || studentSchedule.classSchedule?.session?.order || '',
+              lessonNumber: studentSchedule.session?.order || studentSchedule.classSchedule?.session?.order || '',
+              classId: studentSchedule.classSchedule?.class?._id || studentSchedule.classSchedule?.class?.id || studentSchedule.classSchedule?.class || studentSchedule.class?._id || studentSchedule.class?.id || studentSchedule.class,
+              className: studentSchedule.classSchedule?.class?.name || studentSchedule.class?.name || null,
+              courseName: studentSchedule.classSchedule?.class?.course?.name || studentSchedule.class?.course?.name || studentSchedule.classSchedule?.class?.courseName || null
+            };
+          }
+        }
+
+        // Nếu tìm thấy trong calendarSchedules, lấy thông tin lớp từ đó
+        if (absentScheduleFromCalendar && !originalSchedule) {
+          originalSchedule = calendarSchedules?.find(
+            s => (s.id || s._id)?.toString() === selectedCurrentScheduleId.toString()
+          );
+          if (originalSchedule && !absentScheduleFromCalendar.classId) {
+            absentScheduleFromCalendar.classId = originalSchedule.classId;
+            absentScheduleFromCalendar.className = originalSchedule.className;
+            absentScheduleFromCalendar.courseName = originalSchedule.courseName;
+          }
+        }
 
         if (!absentScheduleFromCalendar) {
           alert('Không tìm thấy thông tin buổi nghỉ');
@@ -1776,6 +2009,15 @@ const RequestManagementPage = () => {
           } : null
         };
 
+        // Lấy thông tin lớp cho absentClassInfo nếu selectedCurrentClassInfo là null
+        let absentClassInfoToUse = selectedCurrentClassInfo;
+        if (!absentClassInfoToUse && (absentScheduleFromCalendar.className || absentScheduleFromCalendar.classId)) {
+          absentClassInfoToUse = {
+            className: absentScheduleFromCalendar.className || 'N/A',
+            courseName: absentScheduleFromCalendar.courseName || 'N/A'
+          };
+        }
+
         // Kiểm tra conflict - không cho tiếp tục nếu có conflict với students
         if (conflictInfo && conflictInfo.students && conflictInfo.students.length > 0) {
           alert('Không thể tiếp tục khi có xung đột lịch học. Vui lòng chọn buổi học bù khác.');
@@ -1788,7 +2030,7 @@ const RequestManagementPage = () => {
           absentScheduleId: selectedCurrentScheduleId,
           absentSchedule: absentSchedule,
           absentClassId: absentScheduleFromCalendar.classId || selectedCurrentClassId,
-          absentClassInfo: selectedCurrentClassInfo,
+          absentClassInfo: absentClassInfoToUse,
           makeupScheduleId: selectedMakeupClassInfo.selectedScheduleId,
           makeupSchedule: makeupSchedule,
           makeupClassId: selectedMakeupClassId,
@@ -1823,12 +2065,6 @@ const RequestManagementPage = () => {
     setConflictInfo(null);
     setPendingMakeupData(null);
     setValidatingConflict(false);
-    // Reset form tạo lớp mới
-    setNewMakeupDate('');
-    setNewMakeupStartTime('');
-    setNewMakeupEndTime('');
-    setNewMakeupTeacherId('');
-    setNewMakeupRoomId('');
     // Reset giáo viên dạy thay
     setSelectedSubstituteTeacherId(null);
   };
@@ -1876,9 +2112,6 @@ const RequestManagementPage = () => {
           absentScheduleId: makeup.absentScheduleId,
           makeupScheduleId: makeup.makeupScheduleId,
           makeupClassId: makeup.makeupClassId,
-          // Gửi thông tin để tạo lớp mới nếu có
-          isNewMakeupClass: makeup.isNewMakeupClass || false,
-          newMakeupClassData: makeup.newMakeupClassData || null,
           // Gửi thông tin giáo viên dạy thay nếu có
           isSubstituteClass: makeup.isSubstituteClass || false,
           substituteTeacherId: makeup.substituteTeacherId || null
@@ -2352,12 +2585,6 @@ const RequestManagementPage = () => {
           setAvailableMakeupClasses([]);
           setConflictInfo(null);
           setPendingMakeupData(null);
-          // Reset form tạo lớp mới
-          setNewMakeupDate('');
-          setNewMakeupStartTime('');
-          setNewMakeupEndTime('');
-          setNewMakeupTeacherId('');
-          setNewMakeupRoomId('');
           // Reset giáo viên dạy thay
           setSelectedSubstituteTeacherId(null);
         }} dialogClassName="modal-xl-custom" centered>

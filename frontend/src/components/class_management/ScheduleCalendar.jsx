@@ -374,6 +374,9 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                               {(schedule.isCancelled || schedule.scheduleStatus === 'cancelled') && (
                                 <Badge bg="secondary" style={{ fontSize: '8px', padding: '2px 4px' }}>Đã hủy</Badge>
                               )}
+                              {(schedule.isAbsentSchedule || schedule.status === 'absent') && !(schedule.isCancelled || schedule.scheduleStatus === 'cancelled') && (
+                                <Badge bg="danger" style={{ fontSize: '8px', padding: '2px 4px' }}>Buổi nghỉ</Badge>
+                              )}
                               {(schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled') && (
                                 <Badge bg="warning" text="dark" style={{ fontSize: '8px', padding: '2px 4px' }}>Học bù</Badge>
                               )}

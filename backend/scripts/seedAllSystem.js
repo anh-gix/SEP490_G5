@@ -721,16 +721,20 @@ async function seedChangeRequests() {
     // Get Academic Staff user for approver (if available)
     const approver = academicStaffUsers.length > 0 ? academicStaffUsers[0] : null;
     
-    // Filter past student schedules for makeup_class
-    const pastStudentSchedules = studentSchedules.filter(ss => {
+    // Filter FUTURE student schedules for makeup_class
+    // Chỉ lấy các buổi học TƯƠNG LAI (chưa diễn ra, chưa có attendance)
+    // Các buổi học quá khứ đã bị đánh vắng mặt rồi, không thể xin học bù
+    const futureStudentSchedules = studentSchedules.filter(ss => {
         const classSchedule = classSchedules.find(cs => cs._id.toString() === ss.classSchedule.toString());
         if (!classSchedule) return false;
         const scheduleDate = new Date(classSchedule.date);
         scheduleDate.setHours(0, 0, 0, 0);
-        return scheduleDate < today;
+        // Chỉ lấy các buổi học TƯƠNG LAI (scheduleDate >= today)
+        // Các buổi học này chưa diễn ra, chưa có attendance, nên có thể xin học bù
+        return scheduleDate >= today;
     });
     
-    console.log(`   - Found ${classes.length} classes, ${classSchedules.length} class schedules, ${pastStudentSchedules.length} past student schedules`);
+    console.log(`   - Found ${classes.length} classes, ${classSchedules.length} class schedules, ${futureStudentSchedules.length} future student schedules`);
     console.log(`   - Found ${teachers.length} teachers, ${students.length} students, ${academicStaffUsers.length} academic staff`);
     
     // Helper function to generate approved date (1-7 days ago)
@@ -742,15 +746,15 @@ async function seedChangeRequests() {
     };
     
     // ============================================
-    // 1. CREATE_CLASS requests (6-7 requests)
+    // 1. CREATE_CLASS requests (20-25 requests)
     // ============================================
     const createClassSenders = [];
-    // Collect more senders
-    for (let i = 0; i < Math.min(4, teachers.length); i++) {
-        createClassSenders.push(teachers[i]);
+    // Collect more senders - cycle through all available
+    for (let i = 0; i < teachers.length; i++) {
+        createClassSenders.push(teachers[i % teachers.length]);
     }
-    for (let i = 0; i < Math.min(3, academicStaffUsers.length); i++) {
-        createClassSenders.push(academicStaffUsers[i]);
+    for (let i = 0; i < academicStaffUsers.length; i++) {
+        createClassSenders.push(academicStaffUsers[i % academicStaffUsers.length]);
     }
     
     const createClassContents = [
@@ -760,45 +764,56 @@ async function seedChangeRequests() {
         'Yêu cầu mở lớp TOEIC Advanced B2, học vào Thứ 2, Thứ 4, Thứ 6 từ 19:00-21:00, tối đa 20 học viên',
         'Đề nghị tạo lớp IELTS Intermediate B1, lịch học Thứ 3, Thứ 5 từ 09:00-11:00, dự kiến 18 học viên',
         'Xin phép mở lớp Business English C1, học Thứ 2, Thứ 3, Thứ 5, Thứ 6 từ 17:00-19:00, tối đa 22 học viên',
-        'Yêu cầu tạo lớp Conversation English A2, lịch học Thứ 4, Thứ 7 từ 10:00-12:00, dự kiến 16 học viên'
+        'Yêu cầu tạo lớp Conversation English A2, lịch học Thứ 4, Thứ 7 từ 10:00-12:00, dự kiến 16 học viên',
+        'Đề nghị mở lớp IELTS Foundation A2, học Thứ 2, Thứ 4 từ 14:00-16:00, số lượng học viên tối đa 20',
+        'Xin phép tạo lớp TOEIC Foundation A1, lịch học Thứ 3, Thứ 5, Thứ 7 từ 18:00-20:00, dự kiến 22 học viên',
+        'Yêu cầu mở lớp IELTS Upper Intermediate B2, học vào Thứ 2, Thứ 4, Thứ 6 từ 08:30-10:30, tối đa 18 học viên',
+        'Đề nghị tạo lớp TOEIC Intermediate B2, lịch học Thứ 3, Thứ 5 từ 15:00-17:00, dự kiến 20 học viên',
+        'Xin phép mở lớp Academic Writing B2, học Thứ 2, Thứ 4 từ 19:00-21:00, tối đa 15 học viên',
+        'Yêu cầu tạo lớp Speaking Practice A2, lịch học Thứ 5, Thứ 7 từ 09:00-11:00, dự kiến 16 học viên',
+        'Đề nghị mở lớp Listening Skills B1, học Thứ 2, Thứ 3, Thứ 5 từ 14:00-16:00, số lượng học viên tối đa 24',
+        'Xin phép tạo lớp Reading Comprehension B2, lịch học Thứ 4, Thứ 6 từ 17:00-19:00, dự kiến 18 học viên',
+        'Yêu cầu mở lớp Grammar Advanced C1, học vào Thứ 2, Thứ 4, Thứ 6 từ 08:00-10:00, tối đa 20 học viên',
+        'Đề nghị tạo lớp Vocabulary Building B1, lịch học Thứ 3, Thứ 5 từ 10:00-12:00, dự kiến 22 học viên',
+        'Xin phép mở lớp Pronunciation Practice A2, học Thứ 6, Chủ nhật từ 14:00-16:00, tối đa 16 học viên',
+        'Yêu cầu tạo lớp Exam Preparation IELTS, lịch học Thứ 2, Thứ 4, Thứ 6 từ 18:00-20:00, dự kiến 20 học viên',
+        'Đề nghị mở lớp Exam Preparation TOEIC, học Thứ 3, Thứ 5, Thứ 7 từ 15:00-17:00, số lượng học viên tối đa 25',
+        'Xin phép tạo lớp Kids English A1, lịch học Thứ 7, Chủ nhật từ 09:00-11:00, dự kiến 15 học viên',
+        'Yêu cầu mở lớp Teen English B1, học Thứ 2, Thứ 4 từ 17:00-19:00, tối đa 20 học viên',
+        'Đề nghị tạo lớp Professional English B2, lịch học Thứ 3, Thứ 5 từ 18:30-20:30, dự kiến 18 học viên',
+        'Xin phép mở lớp Medical English C1, học Thứ 2, Thứ 4, Thứ 6 từ 19:00-21:00, tối đa 12 học viên',
+        'Yêu cầu tạo lớp Legal English C1, lịch học Thứ 3, Thứ 5 từ 14:00-16:00, dự kiến 14 học viên'
     ];
     
-    const createClassCount = Math.min(7, createClassSenders.length, createClassContents.length);
+    const createClassCount = Math.min(25, createClassSenders.length, createClassContents.length);
     for (let i = 0; i < createClassCount; i++) {
-        const sender = createClassSenders[i];
+        const sender = createClassSenders[i % createClassSenders.length];
         let status = 'pending';
         let approverId = null;
         let approvedDate = null;
         let responseContent = null;
         
-        // Distribute status: 2 approved, 2 rejected, rest pending
-        if (i === 0 && approver) {
-            status = 'approved';
-            approverId = approver._id;
-            approvedDate = getApprovedDate(3);
-            responseContent = 'Đơn đã được duyệt. Lớp sẽ được tạo trong tuần tới.';
-        } else if (i === 1 && approver) {
-            status = 'approved';
-            approverId = approver._id;
-            approvedDate = getApprovedDate(1);
-            responseContent = 'Đơn đã được duyệt. Đang sắp xếp giáo viên và phòng học.';
-        } else if (i === 2 && approver) {
+        // Distribute status: ~30% rejected, ~70% pending (no approved)
+        // Reject approximately every 3rd request (indices 2, 5, 8, 11, 14, 17, 20, 23)
+        if (approver && (i % 3 === 2 || i === 5 || i === 8 || i === 11 || i === 14 || i === 17 || i === 20 || i === 23)) {
             status = 'rejected';
             approverId = approver._id;
-            approvedDate = getApprovedDate(5);
-            responseContent = 'Đơn bị từ chối do không đủ số lượng học viên đăng ký tối thiểu.';
-        } else if (i === 3 && approver) {
-            status = 'rejected';
-            approverId = approver._id;
-            approvedDate = getApprovedDate(7);
-            responseContent = 'Đơn bị từ chối do không có phòng học phù hợp trong thời gian yêu cầu.';
+            approvedDate = getApprovedDate(Math.floor(Math.random() * 7) + 1); // 1-7 days ago
+            const rejectionReasons = [
+                'Đơn bị từ chối do không đủ số lượng học viên đăng ký tối thiểu.',
+                'Đơn bị từ chối do không có phòng học phù hợp trong thời gian yêu cầu.',
+                'Đơn bị từ chối do không có giáo viên phù hợp trong thời gian yêu cầu.',
+                'Đơn bị từ chối do lịch học trùng với các lớp hiện có.',
+                'Đơn bị từ chối do không đủ điều kiện mở lớp mới tại thời điểm này.'
+            ];
+            responseContent = rejectionReasons[Math.floor(Math.random() * rejectionReasons.length)];
         }
         // Rest are pending
         
         changeRequests.push({
             sender: sender._id,
             type: 'create_class',
-            excelFile: (i === 0 || i === 1) ? `uploads/class_template_${i === 0 ? 'ielts_a1' : 'toeic_b1'}.xlsx` : null,
+            excelFile: null, // No excel files for seed data
             content: createClassContents[i],
             status: status,
             approver: approverId,
@@ -808,7 +823,7 @@ async function seedChangeRequests() {
     }
     
     // ============================================
-    // 2. CHANGE_CLASS requests (6-7 requests)
+    // 2. CHANGE_CLASS requests (20-25 requests)
     // ============================================
     const changeClassContents = [
         'Xin chuyển từ lớp IELTS Foundation A1 - Lớp Đang Học sang lớp IELTS Foundation A1 - Lớp 2 do lịch học phù hợp hơn',
@@ -817,49 +832,60 @@ async function seedChangeRequests() {
         'Xin chuyển lớp vì muốn học cùng bạn bè ở lớp khác, lớp đích có lịch học tương tự',
         'Yêu cầu đổi lớp do giáo viên hiện tại không phù hợp với phong cách học của em',
         'Đề nghị chuyển lớp vì lịch học hiện tại quá sớm, muốn chuyển sang lớp học buổi chiều',
-        'Xin đổi lớp do lớp hiện tại quá đông, muốn chuyển sang lớp có ít học viên hơn để được quan tâm tốt hơn'
+        'Xin đổi lớp do lớp hiện tại quá đông, muốn chuyển sang lớp có ít học viên hơn để được quan tâm tốt hơn',
+        'Yêu cầu chuyển lớp vì muốn học với giáo viên khác có phương pháp dạy phù hợp hơn',
+        'Xin chuyển lớp do lịch học hiện tại không phù hợp với lịch làm việc mới của em',
+        'Đề nghị đổi lớp vì muốn học vào buổi sáng thay vì buổi tối',
+        'Yêu cầu chuyển lớp do lớp hiện tại quá xa nhà, muốn chuyển sang lớp gần hơn',
+        'Xin đổi lớp vì muốn học cùng nhóm bạn mới, lớp đích có trình độ tương đương',
+        'Đề nghị chuyển lớp do không hài lòng với chất lượng giảng dạy của giáo viên hiện tại',
+        'Yêu cầu đổi lớp vì lịch học hiện tại trùng với lịch học của con, cần điều chỉnh',
+        'Xin chuyển lớp do muốn học vào cuối tuần thay vì các ngày trong tuần',
+        'Đề nghị đổi lớp vì lớp hiện tại có quá nhiều học viên, khó tập trung',
+        'Yêu cầu chuyển lớp do muốn học với giáo viên bản ngữ thay vì giáo viên Việt Nam',
+        'Xin đổi lớp vì lịch học hiện tại không phù hợp với lịch thi của em',
+        'Đề nghị chuyển lớp do muốn học lớp có tốc độ nhanh hơn, phù hợp với khả năng',
+        'Yêu cầu đổi lớp vì muốn học lớp có nhiều hoạt động thực hành hơn',
+        'Xin chuyển lớp do lớp hiện tại quá dễ, muốn chuyển sang lớp có trình độ cao hơn',
+        'Đề nghị đổi lớp vì muốn học lớp có ít học viên hơn để được hỗ trợ tốt hơn',
+        'Yêu cầu chuyển lớp do lịch học hiện tại trùng với lịch tập thể thao',
+        'Xin đổi lớp vì muốn học lớp có giáo trình mới hơn, cập nhật hơn',
+        'Đề nghị chuyển lớp do muốn học lớp có môi trường học tập tích cực hơn'
     ];
     
     // Use different classes and students - cycle through available data
     const classesForChange = [];
     const studentsForChange = [];
-    for (let i = 0; i < Math.min(7, classes.length); i++) {
+    for (let i = 0; i < Math.min(25, classes.length * 4); i++) {
         classesForChange.push(classes[i % classes.length]);
     }
-    for (let i = 0; i < Math.min(7, students.length); i++) {
+    for (let i = 0; i < Math.min(25, students.length * 2); i++) {
         studentsForChange.push(students[i % students.length]);
     }
     
-    const changeClassCount = Math.min(7, classesForChange.length, studentsForChange.length, changeClassContents.length);
+    const changeClassCount = Math.min(25, classesForChange.length, studentsForChange.length, changeClassContents.length);
     for (let i = 0; i < changeClassCount; i++) {
-        const sender = studentsForChange[i];
-        const classItem = classesForChange[i];
+        const sender = studentsForChange[i % studentsForChange.length];
+        const classItem = classesForChange[i % classesForChange.length];
         let status = 'pending';
         let approverId = null;
         let approvedDate = null;
         let responseContent = null;
         
-        // Distribute status: 2 approved, 2 rejected, rest pending
-        if (i === 0 && approver) {
-            status = 'approved';
-            approverId = approver._id;
-            approvedDate = getApprovedDate(2);
-            responseContent = 'Đơn đã được duyệt. Học viên sẽ được chuyển lớp trong tuần tới.';
-        } else if (i === 1 && approver) {
-            status = 'approved';
-            approverId = approver._id;
-            approvedDate = getApprovedDate(4);
-            responseContent = 'Đơn đã được duyệt. Việc chuyển lớp sẽ được thực hiện ngay.';
-        } else if (i === 2 && approver) {
+        // Distribute status: ~30% rejected, ~70% pending (no approved)
+        // Reject approximately every 3rd request
+        if (approver && (i % 3 === 2 || i === 5 || i === 8 || i === 11 || i === 14 || i === 17 || i === 20 || i === 23)) {
             status = 'rejected';
             approverId = approver._id;
-            approvedDate = getApprovedDate(4);
-            responseContent = 'Đơn bị từ chối do lớp đích đã đầy. Vui lòng chọn lớp khác.';
-        } else if (i === 3 && approver) {
-            status = 'rejected';
-            approverId = approver._id;
-            approvedDate = getApprovedDate(6);
-            responseContent = 'Đơn bị từ chối do không đủ điều kiện chuyển lớp. Vui lòng liên hệ phòng đào tạo.';
+            approvedDate = getApprovedDate(Math.floor(Math.random() * 7) + 1); // 1-7 days ago
+            const rejectionReasons = [
+                'Đơn bị từ chối do lớp đích đã đầy. Vui lòng chọn lớp khác.',
+                'Đơn bị từ chối do không đủ điều kiện chuyển lớp. Vui lòng liên hệ phòng đào tạo.',
+                'Đơn bị từ chối do lớp đích không phù hợp với trình độ hiện tại của học viên.',
+                'Đơn bị từ chối do lịch học của lớp đích trùng với lịch học khác của học viên.',
+                'Đơn bị từ chối do đã quá thời hạn cho phép chuyển lớp trong học kỳ này.'
+            ];
+            responseContent = rejectionReasons[Math.floor(Math.random() * rejectionReasons.length)];
         }
         // Rest are pending
         
@@ -876,22 +902,40 @@ async function seedChangeRequests() {
     }
     
     // ============================================
-    // 3. MAKEUP_CLASS requests (6-7 requests)
+    // 3. MAKEUP_CLASS requests (20-25 requests)
     // ============================================
     const makeupClassContents = [
-        'Xin học bù buổi học ngày hôm qua do bị ốm, có giấy xác nhận của bác sĩ',
-        'Yêu cầu học bù buổi học đã nghỉ do có việc đột xuất trong gia đình',
-        'Đề nghị học bù buổi học vắng mặt do đi công tác, muốn bù vào buổi học khác trong tuần',
-        'Xin học bù buổi học tuần trước do tham gia kỳ thi quan trọng, có giấy xác nhận',
+        'Xin học bù buổi học sắp tới do sẽ bị ốm, có giấy xác nhận của bác sĩ',
+        'Yêu cầu học bù buổi học tới do có việc đột xuất trong gia đình, không thể tham gia',
+        'Đề nghị học bù buổi học sắp tới do đi công tác, muốn bù vào buổi học khác trong tuần',
+        'Xin học bù buổi học tới do tham gia kỳ thi quan trọng, có giấy xác nhận',
         'Yêu cầu học bù do nghỉ phép có phép, muốn bù vào buổi học cuối tuần',
-        'Đề nghị học bù buổi học vắng mặt do đau đầu, muốn bù vào buổi học sớm nhất có thể',
-        'Xin học bù buổi học đã nghỉ do đi khám sức khỏe, có giấy hẹn khám'
+        'Đề nghị học bù buổi học sắp tới do có việc gia đình quan trọng, không thể tham gia',
+        'Xin học bù buổi học tới do đi khám sức khỏe, có giấy hẹn khám',
+        'Yêu cầu học bù buổi học sắp tới do tham gia sự kiện gia đình quan trọng',
+        'Xin học bù do nghỉ buổi học tới vì đi du lịch cùng gia đình, có giấy xác nhận',
+        'Đề nghị học bù buổi học sắp tới do tham gia cuộc thi thể thao của trường',
+        'Yêu cầu học bù buổi học tới do đi thăm người thân ốm ở bệnh viện',
+        'Xin học bù do nghỉ buổi học tới vì tham gia hoạt động tình nguyện, có giấy xác nhận',
+        'Đề nghị học bù buổi học sắp tới do tham gia kỳ thi học sinh giỏi',
+        'Yêu cầu học bù buổi học tới do đi dự đám cưới người thân',
+        'Xin học bù do nghỉ buổi học tới vì tham gia hội thảo học thuật, có giấy mời',
+        'Đề nghị học bù buổi học sắp tới do tham gia cuộc thi ngoại ngữ',
+        'Yêu cầu học bù buổi học tới do đi khám răng định kỳ',
+        'Xin học bù do nghỉ buổi học tới vì tham gia hoạt động ngoại khóa của trường',
+        'Đề nghị học bù buổi học sắp tới do tham gia kỳ thi chứng chỉ quốc tế',
+        'Yêu cầu học bù buổi học tới do đi thăm ông bà ở quê',
+        'Xin học bù do nghỉ buổi học tới vì tham gia hội thảo về du học',
+        'Đề nghị học bù buổi học sắp tới do tham gia cuộc thi hùng biện tiếng Anh',
+        'Yêu cầu học bù buổi học tới do đi khám mắt định kỳ',
+        'Xin học bù do nghỉ buổi học tới vì tham gia hoạt động từ thiện',
+        'Đề nghị học bù buổi học sắp tới do tham gia kỳ thi tốt nghiệp THPT'
     ];
     
-    // Use past student schedules - đảm bảo studentSchedule thuộc về sender
-    // Nhóm pastStudentSchedules theo student
+    // Use FUTURE student schedules - đảm bảo studentSchedule thuộc về sender
+    // Nhóm futureStudentSchedules theo student
     const studentSchedulesByStudent = {};
-    pastStudentSchedules.forEach(ss => {
+    futureStudentSchedules.forEach(ss => {
         const studentId = ss.student.toString();
         if (!studentSchedulesByStudent[studentId]) {
             studentSchedulesByStudent[studentId] = [];
@@ -899,54 +943,73 @@ async function seedChangeRequests() {
         studentSchedulesByStudent[studentId].push(ss);
     });
     
-    // Tìm các học sinh có ít nhất 1 buổi học quá khứ
-    const studentsWithPastSchedules = students.filter(s => {
+    // Tìm các học sinh có ít nhất 1 buổi học tương lai
+    const studentsWithFutureSchedules = students.filter(s => {
         const studentId = s._id.toString();
         return studentSchedulesByStudent[studentId] && studentSchedulesByStudent[studentId].length > 0;
     });
     
-    console.log(`   - Found ${studentsWithPastSchedules.length} students with past schedules`);
+    console.log(`   - Found ${studentsWithFutureSchedules.length} students with future schedules`);
     
-    const makeupClassCount = Math.min(7, studentsWithPastSchedules.length, makeupClassContents.length);
+    // Expand to use more students by cycling through
+    const expandedStudentsWithFutureSchedules = [];
+    for (let i = 0; i < Math.min(25, studentsWithFutureSchedules.length * 3); i++) {
+        expandedStudentsWithFutureSchedules.push(studentsWithFutureSchedules[i % studentsWithFutureSchedules.length]);
+    }
+    
+    const makeupClassCount = Math.min(25, expandedStudentsWithFutureSchedules.length, makeupClassContents.length);
     for (let i = 0; i < makeupClassCount; i++) {
-        const sender = studentsWithPastSchedules[i];
+        const sender = expandedStudentsWithFutureSchedules[i % expandedStudentsWithFutureSchedules.length];
         const senderId = sender._id.toString();
         
         // Lấy một studentSchedule của học sinh này (đảm bảo khớp)
         const studentSchedulesForThisStudent = studentSchedulesByStudent[senderId] || [];
         if (studentSchedulesForThisStudent.length === 0) {
-            console.log(`    ⚠️ Student ${sender.username || sender._id} không có buổi học quá khứ, bỏ qua`);
+            console.log(`    ⚠️ Student ${sender.username || sender._id} không có buổi học tương lai, bỏ qua`);
             continue;
         }
         
-        // Lấy buổi học đầu tiên của học sinh này (hoặc có thể random)
+        // Lấy buổi học của học sinh này (cycle through available schedules)
         const studentSchedule = studentSchedulesForThisStudent[i % studentSchedulesForThisStudent.length];
+        
+        // Validation: Đảm bảo studentSchedule thực sự là FUTURE schedule (chưa diễn ra)
+        const classScheduleForValidation = classSchedules.find(cs => 
+            cs._id.toString() === studentSchedule.classSchedule.toString()
+        );
+        if (!classScheduleForValidation) {
+            console.log(`    ⚠️ Không tìm thấy classSchedule cho studentSchedule ${studentSchedule._id}, bỏ qua`);
+            continue;
+        }
+        
+        const scheduleDateForValidation = new Date(classScheduleForValidation.date);
+        scheduleDateForValidation.setHours(0, 0, 0, 0);
+        
+        // Đảm bảo buổi học là TƯƠNG LAI (chưa diễn ra, chưa có attendance)
+        // Chỉ cho phép yêu cầu học bù cho các buổi học chưa diễn ra
+        if (scheduleDateForValidation < today) {
+            console.log(`    ⚠️ StudentSchedule ${studentSchedule._id} có ngày ${scheduleDateForValidation.toISOString().split('T')[0]} là quá khứ (cần >= ${today.toISOString().split('T')[0]}), bỏ qua`);
+            continue;
+        }
+        
         let status = 'pending';
         let approverId = null;
         let approvedDate = null;
         let responseContent = null;
         
-        // Distribute status: 2 approved, 2 rejected, rest pending
-        if (i === 0 && approver) {
-            status = 'approved';
-            approverId = approver._id;
-            approvedDate = getApprovedDate(1);
-            responseContent = 'Đơn đã được duyệt. Học viên có thể tham gia buổi học bù vào lịch đã sắp xếp.';
-        } else if (i === 1 && approver) {
-            status = 'approved';
-            approverId = approver._id;
-            approvedDate = getApprovedDate(2);
-            responseContent = 'Đơn đã được duyệt. Vui lòng liên hệ giáo viên để sắp xếp lịch học bù.';
-        } else if (i === 2 && approver) {
+        // Distribute status: ~30% rejected, ~70% pending (no approved)
+        // Reject approximately every 3rd request
+        if (approver && (i % 3 === 2 || i === 5 || i === 8 || i === 11 || i === 14 || i === 17 || i === 20 || i === 23)) {
             status = 'rejected';
             approverId = approver._id;
-            approvedDate = getApprovedDate(6);
-            responseContent = 'Đơn bị từ chối do không có lịch học bù phù hợp trong thời gian yêu cầu.';
-        } else if (i === 3 && approver) {
-            status = 'rejected';
-            approverId = approver._id;
-            approvedDate = getApprovedDate(5);
-            responseContent = 'Đơn bị từ chối do đã quá thời hạn yêu cầu học bù (quá 2 tuần).';
+            approvedDate = getApprovedDate(Math.floor(Math.random() * 7) + 1); // 1-7 days ago
+            const rejectionReasons = [
+                'Đơn bị từ chối do không có lịch học bù phù hợp trong thời gian yêu cầu.',
+                'Đơn bị từ chối do đã quá thời hạn yêu cầu học bù (quá 2 tuần).',
+                'Đơn bị từ chối do không có giấy xác nhận hợp lệ cho lý do nghỉ học.',
+                'Đơn bị từ chối do số lượng buổi học bù đã vượt quá quy định của học kỳ.',
+                'Đơn bị từ chối do không có giáo viên và phòng học phù hợp để sắp xếp học bù.'
+            ];
+            responseContent = rejectionReasons[Math.floor(Math.random() * rejectionReasons.length)];
         }
         // Rest are pending
         
@@ -963,7 +1026,7 @@ async function seedChangeRequests() {
     }
     
     // ============================================
-    // 4. REPLACE_TEACHER requests (6-7 requests)
+    // 4. REPLACE_TEACHER requests (20-25 requests)
     // ============================================
     const replaceTeacherContents = [
         'Yêu cầu thay giáo viên cho buổi học ngày mai do giáo viên hiện tại có việc đột xuất',
@@ -972,53 +1035,64 @@ async function seedChangeRequests() {
         'Yêu cầu thay giáo viên do giáo viên hiện tại có việc gia đình quan trọng',
         'Xin thay giáo viên cho buổi học cuối tuần do giáo viên có lịch đi công tác',
         'Đề nghị thay giáo viên do giáo viên hiện tại cần nghỉ phép có phép',
-        'Yêu cầu thay giáo viên cho buổi học tới do giáo viên có lịch khám sức khỏe'
+        'Yêu cầu thay giáo viên cho buổi học tới do giáo viên có lịch khám sức khỏe',
+        'Xin thay giáo viên cho buổi học ngày mai do giáo viên có việc đột xuất trong gia đình',
+        'Đề nghị thay giáo viên cho buổi học tuần tới vì giáo viên hiện tại đi công tác nước ngoài',
+        'Yêu cầu thay giáo viên do giáo viên hiện tại tham gia hội thảo quốc tế',
+        'Xin thay giáo viên cho buổi học sắp tới do giáo viên có lịch thi chứng chỉ',
+        'Đề nghị thay giáo viên do giáo viên hiện tại cần nghỉ phép để chăm sóc người thân ốm',
+        'Yêu cầu thay giáo viên cho buổi học cuối tuần do giáo viên có lịch đi du lịch đã đặt trước',
+        'Xin thay giáo viên cho buổi học tới do giáo viên có lịch khám răng định kỳ',
+        'Đề nghị thay giáo viên do giáo viên hiện tại tham gia khóa đào tạo nâng cao',
+        'Yêu cầu thay giáo viên cho buổi học ngày mai do giáo viên có việc đột xuất tại cơ quan',
+        'Xin thay giáo viên cho buổi học tuần tới vì giáo viên hiện tại đi dự đám cưới',
+        'Đề nghị thay giáo viên do giáo viên hiện tại cần nghỉ phép để tham gia sự kiện gia đình',
+        'Yêu cầu thay giáo viên cho buổi học sắp tới do giáo viên có lịch họp phụ huynh',
+        'Xin thay giáo viên cho buổi học cuối tuần do giáo viên có lịch đi khám sức khỏe tổng quát',
+        'Đề nghị thay giáo viên do giáo viên hiện tại tham gia cuộc thi giáo viên giỏi',
+        'Yêu cầu thay giáo viên cho buổi học tới do giáo viên có lịch đi công tác đột xuất',
+        'Xin thay giáo viên cho buổi học ngày mai do giáo viên có việc gia đình cần giải quyết gấp',
+        'Đề nghị thay giáo viên do giáo viên hiện tại cần nghỉ phép để đi thăm người thân',
+        'Yêu cầu thay giáo viên cho buổi học tuần tới do giáo viên có lịch trùng với kỳ thi quan trọng'
     ];
     
     // Use different class schedules and teachers/academic staff as senders
     const classSchedulesForReplace = [];
-    for (let i = 0; i < Math.min(7, classSchedules.length); i++) {
+    for (let i = 0; i < Math.min(25, classSchedules.length * 3); i++) {
         classSchedulesForReplace.push(classSchedules[i % classSchedules.length]);
     }
     const replaceTeacherSenders = [];
-    // Collect more senders
-    for (let i = 0; i < Math.min(4, teachers.length); i++) {
-        replaceTeacherSenders.push(teachers[i]);
+    // Collect more senders - cycle through all available
+    for (let i = 0; i < teachers.length; i++) {
+        replaceTeacherSenders.push(teachers[i % teachers.length]);
     }
-    for (let i = 0; i < Math.min(3, academicStaffUsers.length); i++) {
-        replaceTeacherSenders.push(academicStaffUsers[i]);
+    for (let i = 0; i < academicStaffUsers.length; i++) {
+        replaceTeacherSenders.push(academicStaffUsers[i % academicStaffUsers.length]);
     }
     
-    const replaceTeacherCount = Math.min(7, classSchedulesForReplace.length, replaceTeacherSenders.length, replaceTeacherContents.length);
+    const replaceTeacherCount = Math.min(25, classSchedulesForReplace.length, replaceTeacherSenders.length, replaceTeacherContents.length);
     for (let i = 0; i < replaceTeacherCount; i++) {
-        const sender = replaceTeacherSenders[i];
-        const classSchedule = classSchedulesForReplace[i];
+        const sender = replaceTeacherSenders[i % replaceTeacherSenders.length];
+        const classSchedule = classSchedulesForReplace[i % classSchedulesForReplace.length];
         let status = 'pending';
         let approverId = null;
         let approvedDate = null;
         let responseContent = null;
         
-        // Distribute status: 2 approved, 2 rejected, rest pending
-        if (i === 0 && approver) {
-            status = 'approved';
-            approverId = approver._id;
-            approvedDate = getApprovedDate(2);
-            responseContent = 'Đơn đã được duyệt. Giáo viên thay thế đã được sắp xếp.';
-        } else if (i === 1 && approver) {
-            status = 'approved';
-            approverId = approver._id;
-            approvedDate = getApprovedDate(1);
-            responseContent = 'Đơn đã được duyệt. Giáo viên thay thế sẽ được thông báo sớm nhất.';
-        } else if (i === 2 && approver) {
+        // Distribute status: ~30% rejected, ~70% pending (no approved)
+        // Reject approximately every 3rd request
+        if (approver && (i % 3 === 2 || i === 5 || i === 8 || i === 11 || i === 14 || i === 17 || i === 20 || i === 23)) {
             status = 'rejected';
             approverId = approver._id;
-            approvedDate = getApprovedDate(3);
-            responseContent = 'Đơn bị từ chối do không tìm được giáo viên thay thế phù hợp trong thời gian yêu cầu.';
-        } else if (i === 3 && approver) {
-            status = 'rejected';
-            approverId = approver._id;
-            approvedDate = getApprovedDate(4);
-            responseContent = 'Đơn bị từ chối do thời gian yêu cầu quá gấp, không đủ thời gian sắp xếp.';
+            approvedDate = getApprovedDate(Math.floor(Math.random() * 7) + 1); // 1-7 days ago
+            const rejectionReasons = [
+                'Đơn bị từ chối do không tìm được giáo viên thay thế phù hợp trong thời gian yêu cầu.',
+                'Đơn bị từ chối do thời gian yêu cầu quá gấp, không đủ thời gian sắp xếp.',
+                'Đơn bị từ chối do không có giáo viên thay thế có trình độ phù hợp với lớp học.',
+                'Đơn bị từ chối do giáo viên thay thế không có lịch trống trong thời gian yêu cầu.',
+                'Đơn bị từ chối do đã có quá nhiều yêu cầu thay giáo viên trong tuần này.'
+            ];
+            responseContent = rejectionReasons[Math.floor(Math.random() * rejectionReasons.length)];
         }
         // Rest are pending
         

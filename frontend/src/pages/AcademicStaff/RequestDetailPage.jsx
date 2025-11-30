@@ -142,14 +142,59 @@ const RequestDetailPage = ({
       // Lấy scheduleStatus từ StudentSchedule (cancelled, scheduled, etc.)
       const scheduleStatus = schedule.scheduleStatus || 'scheduled';
       
-      // Kiểm tra xem buổi này có phải là buổi nghỉ không (từ pendingMakeupClasses hoặc đã bị cancelled)
+      // Kiểm tra xem buổi này có phải là buổi nghỉ không (từ pendingMakeupClasses, đã bị cancelled, hoặc từ đơn)
       const scheduleId = schedule._id || schedule.id || index;
-      const isAbsentSchedule = pendingMakeupClasses && pendingMakeupClasses.some(makeup => {
+      
+      // Kiểm tra xem có phải buổi nghỉ từ đơn không (cho đơn makeup_class)
+      let isAbsentFromRequest = false;
+      if (selectedRequest?.type === 'makeup_class' && selectedRequest?.studentScheduleId) {
+        const requestStudentSchedule = selectedRequest.studentScheduleId;
+        const requestStudentScheduleId = requestStudentSchedule._id || requestStudentSchedule.id;
+        const requestClassSchedule = requestStudentSchedule.classSchedule;
+        const requestClassScheduleId = requestClassSchedule?._id || requestClassSchedule?.id;
+        
+        // So khớp theo StudentSchedule ID (ưu tiên)
+        if (requestStudentScheduleId) {
+          isAbsentFromRequest = requestStudentScheduleId.toString() === scheduleId.toString() || 
+                               requestStudentScheduleId.toString() === schedule._id?.toString() ||
+                               requestStudentScheduleId.toString() === schedule.id?.toString();
+        }
+        
+        // Nếu không khớp theo StudentSchedule ID, thử so khớp theo ClassSchedule ID
+        if (!isAbsentFromRequest && requestClassScheduleId) {
+          const scheduleClassScheduleId = schedule.classSchedule?._id || schedule.classSchedule?.id;
+          if (scheduleClassScheduleId && scheduleClassScheduleId.toString() === requestClassScheduleId.toString()) {
+            isAbsentFromRequest = true;
+          }
+        }
+        
+        // Nếu vẫn không khớp, thử so khớp theo date, time và class
+        if (!isAbsentFromRequest && requestClassSchedule) {
+          const requestDate = requestClassSchedule.date || requestStudentSchedule.date;
+          const requestStartTime = requestClassSchedule.startTime || requestStudentSchedule.startTime;
+          const requestClassId = requestClassSchedule.class?._id || requestClassSchedule.class?.id || requestClassSchedule.class;
+          
+          if (requestDate && requestStartTime) {
+            const scheduleDateStr = schedule.date ? new Date(schedule.date).toISOString().split('T')[0] : '';
+            const requestDateStr = requestDate ? new Date(requestDate).toISOString().split('T')[0] : '';
+            const scheduleClassId = schedule.class?._id || schedule.class?.id || schedule.class;
+            
+            if (scheduleDateStr === requestDateStr && 
+                schedule.startTime === requestStartTime &&
+                scheduleClassId && requestClassId &&
+                scheduleClassId.toString() === requestClassId.toString()) {
+              isAbsentFromRequest = true;
+            }
+          }
+        }
+      }
+      
+      const isAbsentSchedule = isAbsentFromRequest || (pendingMakeupClasses && pendingMakeupClasses.some(makeup => {
         // Bỏ qua nếu là giáo viên dạy thay (buổi học vẫn diễn ra, chỉ đổi giáo viên)
         if (makeup.isSubstituteClass) return false;
         const absentId = makeup.absentScheduleId || makeup.absentSchedule?.id || makeup.absentSchedule?._id;
         return absentId && (absentId.toString() === scheduleId.toString() || absentId.toString() === schedule._id?.toString());
-      });
+      }));
       
       // Kiểm tra xem buổi này có giáo viên dạy thay không
       const hasSubstituteTeacher = pendingMakeupClasses && pendingMakeupClasses.some(makeup => {
@@ -257,7 +302,7 @@ const RequestDetailPage = ({
       .filter(Boolean);
     
     return [...schedules, ...makeupSchedules];
-  }, [senderSchedule, pendingMakeupClasses]);
+  }, [senderSchedule, pendingMakeupClasses, selectedRequest]);
 
   if (!selectedRequest) {
     return null;
@@ -323,6 +368,15 @@ const RequestDetailPage = ({
                       
                       if (!classSchedule) return null;
                       
+                      // Tìm buổi học bù tương ứng với buổi nghỉ này
+                      const studentScheduleId = studentSchedule?._id || studentSchedule?.id;
+                      const correspondingMakeup = pendingMakeupClasses?.find(makeup => {
+                        const absentId = makeup.absentScheduleId?.toString() || 
+                                        makeup.absentSchedule?.id?.toString() || 
+                                        makeup.absentSchedule?._id?.toString();
+                        return absentId && absentId === studentScheduleId?.toString();
+                      });
+                      
                       // Format ngày thứ mấy
                       const scheduleDate = new Date(classSchedule.date);
                       const dayOfWeek = scheduleDate.getDay();
@@ -330,50 +384,158 @@ const RequestDetailPage = ({
                       const dayName = dayNames[dayOfWeek];
                       const dateStr = scheduleDate.toLocaleDateString('vi-VN');
                       
+                      // Format thông tin buổi học bù (nếu có)
+                      const makeupSchedule = correspondingMakeup?.makeupSchedule;
+                      const makeupClassInfo = correspondingMakeup?.makeupClassInfo;
+                      const isSubstituteClass = correspondingMakeup?.isSubstituteClass || false;
+                      const substituteTeacherInfo = correspondingMakeup?.substituteTeacherInfo;
+                      
+                      const makeupDateStr = makeupSchedule?.date 
+                        ? new Date(makeupSchedule.date).toLocaleDateString('vi-VN') 
+                        : '';
+                      const makeupTimeStr = makeupSchedule?.startTime && makeupSchedule?.endTime
+                        ? `${makeupSchedule.startTime} - ${makeupSchedule.endTime}`
+                        : '';
+                      
+                      // Tìm index của makeup trong pendingMakeupClasses để xóa
+                      const makeupIndex = correspondingMakeup 
+                        ? pendingMakeupClasses.findIndex(m => {
+                            const mAbsentId = m.absentScheduleId?.toString() || 
+                                             m.absentSchedule?.id?.toString() || 
+                                             m.absentSchedule?._id?.toString();
+                            return mAbsentId === studentScheduleId?.toString();
+                          })
+                        : -1;
+                      
                       return (
                         <div className="mb-12">
                           <h6 className="text-neutral-900 fw-bold mb-8 text-14">Buổi xin học bù:</h6>
                           <div className="border border-neutral-200 rounded-6 p-12 bg-white">
                             <div className="d-flex align-items-start justify-content-between gap-12">
                               <div className="flex-grow-1 d-flex flex-column gap-8">
-                                <div>
-                                  <span className="text-neutral-600 text-13">Lớp: </span>
-                                  <span className="text-neutral-900 fw-semibold text-14">{classInfo?.name || 'N/A'}</span>
+                                {/* Buổi nghỉ */}
+                                <div className="d-flex align-items-start gap-8">
+                                  <i className="fas fa-calendar-times text-primary text-14 mt-1"></i>
+                                  <div className="flex-grow-1 d-flex flex-column gap-4">
+                                    <div className="text-primary fw-semibold text-13">Buổi nghỉ:</div>
+                                    <div className="d-flex flex-column gap-2">
+                                      <div>
+                                        <span className="text-neutral-600 text-13">Lớp: </span>
+                                        <span className="text-neutral-900 fw-semibold text-14">{classInfo?.name || 'N/A'}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-neutral-600 text-13">Ngày: </span>
+                                        <span className="text-neutral-700 text-13 fw-medium">{dayName} ({dateStr})</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-neutral-600 text-13">Giờ: </span>
+                                        <span className="text-neutral-700 text-13 fw-medium">
+                                          {classSchedule.startTime || 'N/A'} - {classSchedule.endTime || 'N/A'}
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <span className="text-neutral-600 text-13">Đang học session: </span>
+                                        <span className="text-neutral-700 text-13 fw-medium">
+                                          {session?.title || 'N/A'}
+                                          {session?.order !== null && session?.order !== undefined && (
+                                            <span className="text-neutral-500 ms-4">(Số thứ tự: {session.order})</span>
+                                          )}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div>
-                                  <span className="text-neutral-600 text-13">Ngày: </span>
-                                  <span className="text-neutral-700 text-13 fw-medium">{dayName} ({dateStr})</span>
-                                </div>
-                                <div>
-                                  <span className="text-neutral-600 text-13">Giờ: </span>
-                                  <span className="text-neutral-700 text-13 fw-medium">
-                                    {classSchedule.startTime || 'N/A'} - {classSchedule.endTime || 'N/A'}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="text-neutral-600 text-13">Đang học session: </span>
-                                  <span className="text-neutral-700 text-13 fw-medium">
-                                    {session?.title || 'N/A'}
-                                    {session?.order !== null && session?.order !== undefined && (
-                                      <span className="text-neutral-500 ms-4">(Số thứ tự: {session.order})</span>
-                                    )}
-                                  </span>
-                                </div>
+                                
+                                {/* Buổi bù hoặc giáo viên dạy thay (nếu đã xếp) */}
+                                {correspondingMakeup && (
+                                  <>
+                                    <div className="border-top border-neutral-200 pt-8 mt-4">
+                                      {isSubstituteClass ? (
+                                        // Hiển thị giáo viên dạy thay
+                                        <div className="d-flex align-items-start gap-8">
+                                          <i className="fas fa-user-tie text-success text-14 mt-1"></i>
+                                          <div className="flex-grow-1 d-flex flex-column gap-2">
+                                            <div className="text-success fw-semibold text-13">Giáo viên dạy thay:</div>
+                                            <div className="text-neutral-700 text-13">
+                                              <span className="fw-medium">
+                                                {substituteTeacherInfo?.username || substituteTeacherInfo?.fullName || substituteTeacherInfo?.name || 'N/A'}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        // Hiển thị buổi bù
+                                        <div className="d-flex align-items-start gap-8">
+                                          <i className="fas fa-calendar-check text-success text-14 mt-1"></i>
+                                          <div className="flex-grow-1 d-flex flex-column gap-2">
+                                            <div className="text-success fw-semibold text-13">Buổi bù:</div>
+                                            <div className="d-flex flex-column gap-2">
+                                              <div>
+                                                <span className="text-neutral-600 text-13">Lớp: </span>
+                                                <span className="text-neutral-900 fw-semibold text-14">{makeupClassInfo?.className || 'N/A'}</span>
+                                              </div>
+                                              {makeupSchedule?.title && (
+                                                <div>
+                                                  <span className="text-neutral-600 text-13">Buổi học: </span>
+                                                  <span className="text-neutral-700 text-13 fw-medium">
+                                                    {makeupSchedule.title}
+                                                    {makeupSchedule.order && (
+                                                      <span className="text-neutral-500 ms-4">(STT: {makeupSchedule.order})</span>
+                                                    )}
+                                                  </span>
+                                                </div>
+                                              )}
+                                              {makeupDateStr && (
+                                                <div>
+                                                  <span className="text-neutral-600 text-13">Ngày: </span>
+                                                  <span className="text-neutral-700 text-13 fw-medium">{makeupDateStr}</span>
+                                                </div>
+                                              )}
+                                              {makeupTimeStr && (
+                                                <div>
+                                                  <span className="text-neutral-600 text-13">Giờ: </span>
+                                                  <span className="text-neutral-700 text-13 fw-medium">{makeupTimeStr}</span>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </>
+                                )}
                               </div>
-                              <div className="d-flex align-items-center">
-                                <Button
-                                  variant="outline-primary"
-                                  size="sm"
-                                  onClick={() => {
-                                    // Truyền studentScheduleId để tự động chọn buổi học bù từ đơn
-                                    const studentScheduleId = studentSchedule?._id || studentSchedule?.id;
-                                    onAddMakeupClass(studentScheduleId);
-                                  }}
-                                  className="d-flex align-items-center gap-2"
-                                >
-                                  <i className="fas fa-plus"></i>
-                                  {isStudent ? 'Xếp buổi học bù' : isTeacher ? 'Xếp lịch dạy thay' : 'Xếp buổi học bù'}
-                                </Button>
+                              <div className="d-flex flex-column gap-2 align-items-end">
+                                {!correspondingMakeup ? (
+                                  <Button
+                                    variant="outline-primary"
+                                    size="sm"
+                                    onClick={() => {
+                                      // Truyền studentScheduleId để tự động chọn buổi học bù từ đơn
+                                      const studentScheduleId = studentSchedule?._id || studentSchedule?.id;
+                                      onAddMakeupClass(studentScheduleId);
+                                    }}
+                                    className="d-flex align-items-center gap-2"
+                                  >
+                                    <i className="fas fa-plus"></i>
+                                    {isStudent ? 'Xếp buổi học bù' : isTeacher ? 'Xếp lịch dạy thay' : 'Xếp buổi học bù'}
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="outline-danger"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (onRemoveMakeupClass && makeupIndex >= 0) {
+                                        onRemoveMakeupClass(makeupIndex);
+                                      }
+                                    }}
+                                    className="d-flex align-items-center gap-2"
+                                    title="Xóa buổi học bù này"
+                                  >
+                                    <i className="fas fa-trash"></i>
+                                    Xóa
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -681,180 +843,6 @@ const RequestDetailPage = ({
                 </div>
               )}
 
-              {/* Danh sách các buổi học bù đã chọn */}
-              {pendingMakeupClasses && pendingMakeupClasses.length > 0 && (
-                <div className="mt-16">
-                  <h6 className="text-neutral-900 fw-bold mb-8 text-14">
-                    {isStudent 
-                      ? 'Danh sách buổi học bù đã chọn:' 
-                      : isTeacher 
-                        ? (pendingMakeupClasses.some(m => m.isSubstituteClass) 
-                            ? 'Danh sách buổi dạy thay đã chọn:' 
-                            : 'Danh sách buổi dạy bù đã chọn:')
-                        : 'Danh sách buổi học bù đã chọn:'}
-                  </h6>
-                  <div className="d-flex flex-column gap-4">
-                    {pendingMakeupClasses.map((makeup, index) => {
-                      const absentSchedule = makeup.absentSchedule;
-                      const makeupSchedule = makeup.makeupSchedule;
-                      const absentClassInfo = makeup.absentClassInfo;
-                      const makeupClassInfo = makeup.makeupClassInfo;
-                      const isSubstituteClass = makeup.isSubstituteClass || false;
-                      const substituteTeacherInfo = makeup.substituteTeacherInfo;
-
-                      const absentDateStr = absentSchedule?.date 
-                        ? new Date(absentSchedule.date).toLocaleDateString('vi-VN') 
-                        : '';
-                      const absentTimeStr = absentSchedule?.startTime && absentSchedule?.endTime
-                        ? `${absentSchedule.startTime} - ${absentSchedule.endTime}`
-                        : '';
-                      
-                      const makeupDateStr = makeupSchedule?.date 
-                        ? new Date(makeupSchedule.date).toLocaleDateString('vi-VN') 
-                        : '';
-                      const makeupTimeStr = makeupSchedule?.startTime && makeupSchedule?.endTime
-                        ? `${makeupSchedule.startTime} - ${makeupSchedule.endTime}`
-                        : '';
-
-                      // Hiển thị khác nhau cho giáo viên dạy thay
-                      if (isSubstituteClass) {
-                        return (
-                          <div 
-                            key={index} 
-                            className="border border-neutral-200 rounded-6 p-8 bg-white d-flex align-items-center justify-content-between gap-8"
-                          >
-                            <div className="flex-grow-1 d-flex align-items-center gap-6">
-                              <i className="fas fa-user-tie text-success text-12"></i>
-                              <div className="d-flex flex-column gap-1">
-                                <div className="text-success fw-semibold text-12">Buổi học với giáo viên dạy thay:</div>
-                                <div className="text-neutral-700 text-12">
-                                  <span className="fw-medium">{absentClassInfo?.className || 'N/A'}</span>
-                                  {' • '}
-                                  <span>{absentSchedule?.title || `Buổi ${absentSchedule?.order || 'N/A'}`}</span>
-                                  {absentSchedule?.order && (
-                                    <span className="text-neutral-500"> (STT: {absentSchedule.order})</span>
-                                  )}
-                                  {absentDateStr && (
-                                    <>
-                                      {' • '}
-                                      <span>{absentDateStr}</span>
-                                    </>
-                                  )}
-                                  {absentTimeStr && (
-                                    <>
-                                      {' • '}
-                                      <span>{absentTimeStr}</span>
-                                    </>
-                                  )}
-                                  {' • '}
-                                  <span className="text-success fw-semibold">
-                                    Giáo viên dạy thay: {substituteTeacherInfo?.username || substituteTeacherInfo?.fullName || substituteTeacherInfo?.name || 'N/A'}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* Nút xóa */}
-                            <Button
-                              variant="outline-danger"
-                              size="sm"
-                              onClick={() => onRemoveMakeupClass && onRemoveMakeupClass(index)}
-                              className="d-flex align-items-center gap-1 px-8 py-4"
-                              title="Xóa buổi dạy thay này"
-                            >
-                              <i className="fas fa-trash text-11"></i>
-                              <span className="text-11">Xóa</span>
-                            </Button>
-                          </div>
-                        );
-                      }
-
-                      // Hiển thị bình thường cho học sinh
-                      return (
-                        <div 
-                          key={index} 
-                          className="border border-neutral-200 rounded-6 p-8 bg-white d-flex align-items-center justify-content-between gap-8"
-                        >
-                          <div className="flex-grow-1 d-flex align-items-center gap-12 flex-wrap">
-                            {/* Buổi nghỉ */}
-                            <div className="d-flex align-items-center gap-6">
-                              <i className="fas fa-calendar-times text-primary text-12"></i>
-                              <div className="d-flex flex-column gap-1">
-                                <div className="text-primary fw-semibold text-12">Buổi nghỉ:</div>
-                                <div className="text-neutral-700 text-12">
-                                  <span className="fw-medium">{absentClassInfo?.className || 'N/A'}</span>
-                                  {' • '}
-                                  <span>{absentSchedule?.title || `Buổi ${absentSchedule?.order || 'N/A'}`}</span>
-                                  {absentSchedule?.order && (
-                                    <span className="text-neutral-500"> (STT: {absentSchedule.order})</span>
-                                  )}
-                                  {absentDateStr && (
-                                    <>
-                                      {' • '}
-                                      <span>{absentDateStr}</span>
-                                    </>
-                                  )}
-                                  {absentTimeStr && (
-                                    <>
-                                      {' • '}
-                                      <span>{absentTimeStr}</span>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Mũi tên */}
-                            <div className="text-neutral-400">
-                              <i className="fas fa-arrow-right"></i>
-                            </div>
-
-                            {/* Buổi bù */}
-                            <div className="d-flex align-items-center gap-6">
-                              <i className="fas fa-calendar-check text-success text-12"></i>
-                              <div className="d-flex flex-column gap-1">
-                                <div className="text-success fw-semibold text-12">Buổi bù:</div>
-                                <div className="text-neutral-700 text-12">
-                                  <span className="fw-medium">{makeupClassInfo?.className || 'N/A'}</span>
-                                  {' • '}
-                                  <span>{makeupSchedule?.title || `Buổi ${makeupSchedule?.order || 'N/A'}`}</span>
-                                  {makeupSchedule?.order && (
-                                    <span className="text-neutral-500"> (STT: {makeupSchedule.order})</span>
-                                  )}
-                                  {makeupDateStr && (
-                                    <>
-                                      {' • '}
-                                      <span>{makeupDateStr}</span>
-                                    </>
-                                  )}
-                                  {makeupTimeStr && (
-                                    <>
-                                      {' • '}
-                                      <span>{makeupTimeStr}</span>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Nút xóa */}
-                          <Button
-                            variant="outline-danger"
-                            size="sm"
-                            onClick={() => onRemoveMakeupClass && onRemoveMakeupClass(index)}
-                            className="d-flex align-items-center gap-1 px-8 py-4"
-                            title="Xóa buổi học bù này"
-                          >
-                            <i className="fas fa-trash text-11"></i>
-                            <span className="text-11">Xóa</span>
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </Card.Body>
           </Card>
 

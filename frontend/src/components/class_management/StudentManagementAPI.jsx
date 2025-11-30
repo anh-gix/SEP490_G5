@@ -89,25 +89,21 @@ const StudentManagementAPI = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Chỉ cho phép tạo mới, không cho phép cập nhật
+    if (editingStudent) {
+      alert('Không được phép cập nhật thông tin học viên');
+      return;
+    }
+    
     try {
       setLoading(true);
-      if (editingStudent) {
-        // Update: Xóa password nếu không thay đổi
-        const updateData = { ...formData };
-        if (!updateData.password) {
-          delete updateData.password;
-        }
-        await studentService.updateStudent(editingStudent._id, updateData);
-        alert('Cập nhật Học viên thành công!');
-      } else {
-        // Create: Yêu cầu password
-        if (!formData.password) {
-          alert('Vui lòng nhập mật khẩu!');
-          return;
-        }
-        await studentService.createStudent(formData);
-        alert('Thêm Học viên thành công!');
+      // Create: Yêu cầu password
+      if (!formData.password) {
+        alert('Vui lòng nhập mật khẩu!');
+        return;
       }
+      await studentService.createStudent(formData);
+      alert('Thêm Học viên thành công!');
       
       handleCloseModal();
       fetchStudents();
@@ -120,34 +116,36 @@ const StudentManagementAPI = () => {
     }
   };
 
-  const handleEdit = (student) => {
-    setEditingStudent(student);
-    setFormData({
-      username: student.username,
-      email: student.email,
-      password: '', // Leave empty for update
-      phone: student.phone || '',
-      address: student.address || ''
-    });
-    setShowModal(true);
-  };
+  // Disabled: Không cho phép chỉnh sửa thông tin học viên
+  // const handleEdit = (student) => {
+  //   setEditingStudent(student);
+  //   setFormData({
+  //     username: student.username,
+  //     email: student.email,
+  //     password: '', // Leave empty for update
+  //     phone: student.phone || '',
+  //     address: student.address || ''
+  //   });
+  //   setShowModal(true);
+  // };
 
-  const handleDelete = async (studentId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa Học viên này?')) return;
-    
-    try {
-      setLoading(true);
-      await studentService.deleteStudent(studentId);
-      alert('Xóa Học viên thành công!');
-      fetchStudents();
-      fetchStats();
-    } catch (err) {
-      console.error('Error deleting student:', err);
-      alert(err.message || 'Không thể xóa Học viên');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Disabled: Không cho phép xóa thông tin học viên
+  // const handleDelete = async (studentId) => {
+  //   if (!window.confirm('Bạn có chắc chắn muốn xóa Học viên này?')) return;
+  //   
+  //   try {
+  //     setLoading(true);
+  //     await studentService.deleteStudent(studentId);
+  //     alert('Xóa Học viên thành công!');
+  //     fetchStudents();
+  //     fetchStats();
+  //   } catch (err) {
+  //     console.error('Error deleting student:', err);
+  //     alert(err.message || 'Không thể xóa Học viên');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const handleViewDetail = async (student) => {
     try {
@@ -624,20 +622,6 @@ const StudentManagementAPI = () => {
                       <i className="fas fa-eye me-1"></i>
                       Chi tiết
                     </Button>
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={() => handleEdit(student)}
-                    >
-                      <i className="fas fa-edit"></i>
-                    </Button>
-                    <Button
-                      variant="outline-danger"
-                      size="sm"
-                      onClick={() => handleDelete(student._id)}
-                    >
-                      <i className="fas fa-trash"></i>
-                    </Button>
                   </div>
                 </Card.Body>
               </Card>
@@ -689,20 +673,6 @@ const StudentManagementAPI = () => {
                           <i className="fas fa-eye me-1"></i>
                           Chi tiết
                         </Button>
-                        <Button
-                          variant="outline-secondary"
-                          size="sm"
-                          onClick={() => handleEdit(student)}
-                        >
-                          <i className="fas fa-edit"></i>
-                        </Button>
-                        <Button
-                          variant="outline-danger"
-                          size="sm"
-                          onClick={() => handleDelete(student._id)}
-                        >
-                          <i className="fas fa-trash"></i>
-                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -713,10 +683,10 @@ const StudentManagementAPI = () => {
         </Card>
       )}
 
-      {/* Add/Edit Modal */}
+      {/* Add Modal - Chỉ cho phép thêm mới */}
       <Modal show={showModal} onHide={handleCloseModal} size="lg">
         <Modal.Header closeButton>
-          <Modal.Title>{editingStudent ? 'Cập nhật Học viên' : 'Thêm Học viên mới'}</Modal.Title>
+          <Modal.Title>Thêm Học viên mới</Modal.Title>
         </Modal.Header>
         <Form onSubmit={handleSubmit}>
           <Modal.Body>
@@ -801,7 +771,7 @@ const StudentManagementAPI = () => {
               Hủy
             </Button>
             <Button variant="primary" type="submit" disabled={loading}>
-              {loading ? 'Đang lưu...' : (editingStudent ? 'Cập nhật' : 'Thêm mới')}
+              {loading ? 'Đang lưu...' : 'Thêm mới'}
             </Button>
           </Modal.Footer>
         </Form>

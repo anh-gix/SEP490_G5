@@ -1337,6 +1337,101 @@ exports.saveAttendance = async (req, res) => {
 };
 
 // =========================
+// 📥 IMPORT GIẢNG VIÊN HÀNG LOẠT
+// =========================
+exports.importTeachers = async (req, res) => {
+  try {
+    const { teachers } = req.body;
+    
+    if (!teachers || !Array.isArray(teachers) || teachers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Danh sách giảng viên không hợp lệ'
+      });
+    }
+    
+    // Find Teacher role
+    const teacherRole = await Role.findOne({ name: 'Teacher' });
+    if (!teacherRole) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy role giảng viên'
+      });
+    }
+    
+    const results = {
+      success: [],
+      failed: []
+    };
+    
+    // Process each teacher
+    for (const teacherData of teachers) {
+      try {
+        // Check if email exists
+        const emailExists = await User.findOne({ email: teacherData.email });
+        if (emailExists) {
+          results.failed.push({
+            email: teacherData.email,
+            username: teacherData.username,
+            reason: 'Email đã tồn tại trong hệ thống'
+          });
+          continue;
+        }
+        
+        // Check if username exists
+        const usernameExists = await User.findOne({ username: teacherData.username });
+        if (usernameExists) {
+          results.failed.push({
+            email: teacherData.email,
+            username: teacherData.username,
+            reason: 'Username đã tồn tại trong hệ thống'
+          });
+          continue;
+        }
+        
+        // Create teacher
+        const newTeacher = await User.create({
+          email: teacherData.email,
+          username: teacherData.username,
+          phone: teacherData.phone || '',
+          address: teacherData.address || '',
+          password: teacherData.password || '123456', // Default password
+          roleId: teacherRole._id
+        });
+        
+        results.success.push({
+          _id: newTeacher._id,
+          email: newTeacher.email,
+          username: newTeacher.username
+        });
+      } catch (error) {
+        results.failed.push({
+          email: teacherData.email,
+          username: teacherData.username,
+          reason: error.message || 'Lỗi không xác định'
+        });
+      }
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: `Import thành công ${results.success.length} giảng viên, thất bại ${results.failed.length} giảng viên`,
+      total: teachers.length,
+      successCount: results.success.length,
+      failedCount: results.failed.length,
+      results
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi import giảng viên:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi import giảng viên',
+      error: error.message
+    });
+  }
+};
+
+// =========================
 // 📊 THỐNG KÊ GIẢNG VIÊN
 // =========================
 exports.getTeacherStats = async (req, res) => {

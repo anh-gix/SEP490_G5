@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Nav, Tabs, Tab, Pagination, ButtonGroup } from 'react-bootstrap';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Nav, Tabs, Tab, Pagination, ButtonGroup, Alert } from 'react-bootstrap';
 import teacherService from '../../services/teacherService';
 import ScheduleCalendar from './ScheduleCalendar';
+import * as XLSX from 'xlsx';
 
 /**
  * Teacher Management Component with API Integration
@@ -13,6 +14,7 @@ const TeacherManagementAPI = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('grid');
+  const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [teacherSchedule, setTeacherSchedule] = useState([]);
@@ -20,6 +22,20 @@ const TeacherManagementAPI = () => {
   const [scheduleViewMode, setScheduleViewMode] = useState('calendar'); // 'table' or 'calendar'
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    phone: '',
+    address: ''
+  });
+  
+  // Import Excel states
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [previewTeachers, setPreviewTeachers] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetchTeachers();
@@ -52,6 +68,231 @@ const TeacherManagementAPI = () => {
     } catch (err) {
       console.error('Error fetching stats:', err);
     }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      setLoading(true);
+      if (!formData.password) {
+        alert('Vui lòng nhập mật khẩu!');
+        return;
+      }
+      await teacherService.createTeacher(formData);
+      alert('Thêm Giảng viên thành công!');
+      
+      handleCloseModal();
+      fetchTeachers();
+      fetchStats();
+    } catch (err) {
+      console.error('Error saving teacher:', err);
+      alert(err.message || 'Không thể lưu thông tin Giảng viên');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setFormData({
+      username: '',
+      email: '',
+      password: '',
+      phone: '',
+      address: ''
+    });
+  };
+
+  // Import Excel handlers
+  const handleOpenImportModal = () => {
+    setShowImportModal(true);
+    setImportFile(null);
+    setPreviewTeachers([]);
+    setImporting(false);
+  };
+
+  const handleCloseImportModal = () => {
+    setShowImportModal(false);
+    setImportFile(null);
+    setPreviewTeachers([]);
+    setImporting(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
+    const isValidType = validTypes.includes(file.type) || 
+                       file.name.endsWith('.xlsx') || 
+                       file.name.endsWith('.xls');
+
+    if (!isValidType) {
+      alert('Vui lòng chọn file Excel (.xlsx hoặc .xls)');
+      e.target.value = '';
+      return;
+    }
+
+    setImportFile(file);
+    setPreviewTeachers([]);
+  };
+
+  const handlePreviewExcel = async () => {
+    if (!importFile) {
+      alert('Vui lòng chọn file Excel');
+      return;
+    }
+
+    setImporting(true);
+    try {
+      // Read file as array buffer
+      const data = await importFile.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+
+      // Get first sheet
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        alert('File Excel không có sheet nào');
+        setImporting(false);
+        return;
+      }
+
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+
+      if (!worksheet) {
+        alert('Sheet đầu tiên không có dữ liệu');
+        setImporting(false);
+        return;
+      }
+
+      // Convert to JSON (array of objects)
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      if (!jsonData || jsonData.length === 0) {
+        alert('File Excel không có dữ liệu');
+        setImporting(false);
+        return;
+      }
+
+      // Parse and validate each row
+      const previewData = [];
+      jsonData.forEach((row, index) => {
+        const rowNumber = index + 2; // +2 vì có header và index bắt đầu từ 0
+        const errors = [];
+
+        // Get data from Excel (support both Vietnamese and English)
+        const username = row.username || row.Username || row['Tên đăng nhập'] || row['username'] || '';
+        const email = row.email || row.Email || row['Email'] || '';
+        const phone = row.phone || row.Phone || row['Số điện thoại'] || row['Điện thoại'] || '';
+        const address = row.address || row.Address || row['Địa chỉ'] || '';
+
+        // Validate
+        if (!username || !username.toString().trim()) {
+          errors.push('Username không được để trống');
+        }
+
+        if (!email || !email.toString().trim()) {
+          errors.push('Email không được để trống');
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.toString())) {
+          errors.push('Email không hợp lệ');
+        }
+
+        if (!phone || !phone.toString().trim()) {
+          errors.push('Số điện thoại không được để trống');
+        }
+
+        if (!address || !address.toString().trim()) {
+          errors.push('Địa chỉ không được để trống');
+        }
+
+        previewData.push({
+          rowNumber,
+          username: username.toString().trim(),
+          email: email.toString().trim(),
+          phone: phone.toString().trim(),
+          address: address.toString().trim(),
+          hasError: errors.length > 0,
+          errors
+        });
+      });
+
+      setPreviewTeachers(previewData);
+    } catch (error) {
+      console.error('Error reading Excel file:', error);
+      alert('Lỗi khi đọc file Excel: ' + (error.message || 'Vui lòng thử lại'));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    const validTeachers = previewTeachers.filter(t => !t.hasError);
+    
+    if (validTeachers.length === 0) {
+      alert('Không có giảng viên hợp lệ để import');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const result = await teacherService.importTeachers(validTeachers);
+      
+      alert(`Import thành công: ${result.successCount} giảng viên\nThất bại: ${result.failedCount} giảng viên`);
+      
+      handleCloseImportModal();
+      fetchTeachers();
+      fetchStats();
+    } catch (err) {
+      console.error('Error importing teachers:', err);
+      const errorMessage = err.message || (typeof err === 'string' ? err : 'Không thể import giảng viên');
+      alert(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    // Create sample data
+    const sampleData = [
+      {
+        username: 'teacher1',
+        email: 'teacher1@email.com',
+        phone: '0123456789',
+        address: '123 Đường ABC, Quận 1, TP.HCM'
+      },
+      {
+        username: 'teacher2',
+        email: 'teacher2@email.com',
+        phone: '0987654321',
+        address: '456 Đường XYZ, Quận 2, TP.HCM'
+      }
+    ];
+
+    // Create worksheet
+    const ws = XLSX.utils.json_to_sheet(sampleData);
+    
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Danh sách giảng viên');
+
+    // Generate file name with timestamp
+    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const fileName = `Mau_Import_Giang_Vien_${timestamp}.xlsx`;
+
+    // Write and download
+    XLSX.writeFile(wb, fileName);
   };
 
   const handleViewDetail = async (teacher) => {
@@ -107,7 +348,7 @@ const TeacherManagementAPI = () => {
         status: schedule.status === 'fixed' ? 'scheduled' : schedule.status === 'temporary' ? 'makeup' : 'scheduled',
         attendanceStatus: null, // Teachers don't have attendance status
         hasAttendance: false,
-        teacherName: selectedTeacher?.fullName || 'N/A',
+        teacherName: selectedTeacher?.username || 'N/A',
         lessonNumber: schedule.session?.order || '',
         lessonTopic: schedule.topic || ''
       };
@@ -121,6 +362,25 @@ const TeacherManagementAPI = () => {
         <div>
           <h4 className="text-neutral-900 fw-bold mb-8">Quản lý Giảng viên</h4>
           <p className="text-neutral-600 mb-0">Quản lý thông tin và lịch giảng dạy</p>
+        </div>
+        <div className="d-flex gap-2">
+          <Button 
+            className="btn-main px-20 py-10 radius-8"
+            onClick={() => setShowModal(true)}
+            disabled={loading}
+          >
+            <i className="fas fa-plus me-2"></i>
+            Thêm Giảng viên
+          </Button>
+          <Button 
+            variant="success"
+            className="px-20 py-10 radius-8"
+            onClick={handleOpenImportModal}
+            disabled={loading}
+          >
+            <i className="fas fa-file-excel me-2"></i>
+            Import từ Excel
+          </Button>
         </div>
       </div>
 
@@ -305,7 +565,7 @@ const TeacherManagementAPI = () => {
                       <i className="fas fa-user-tie text-primary" style={{ fontSize: '24px' }}></i>
                     </div>
                     <div className="flex-grow-1">
-                      <h6 className="text-neutral-900 fw-semibold mb-4">{teacher.fullName}</h6>
+                      <h6 className="text-neutral-900 fw-semibold mb-4">{teacher.username}</h6>
                       <p className="text-neutral-600 text-13 mb-0">{teacher.email}</p>
                     </div>
                     {getStatusBadge(teacher.status)}
@@ -370,7 +630,7 @@ const TeacherManagementAPI = () => {
                         >
                           <i className="fas fa-user-tie text-primary"></i>
                         </div>
-                        <div className="text-neutral-900 fw-semibold text-14">{teacher.fullName}</div>
+                        <div className="text-neutral-900 fw-semibold text-14">{teacher.username}</div>
                       </div>
                     </td>
                     <td className="px-20 py-16 text-neutral-700 text-14">{teacher.email}</td>
@@ -401,11 +661,293 @@ const TeacherManagementAPI = () => {
         </Card>
       )}
 
+      {/* Add Modal */}
+      <Modal show={showModal} onHide={handleCloseModal} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Thêm Giảng viên mới</Modal.Title>
+        </Modal.Header>
+        <Form onSubmit={handleSubmit}>
+          <Modal.Body>
+            <Row className="g-3">
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Tên đăng nhập <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleInputChange}
+                    placeholder="Username"
+                    required
+                  />
+                </Form.Group>
+              </Col>
+
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Email <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="email@example.com"
+                    required
+                  />
+                </Form.Group>
+              </Col>
+
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>
+                    Mật khẩu <span className="text-danger">*</span>
+                  </Form.Label>
+                  <Form.Control
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    placeholder="Nhập mật khẩu"
+                    required
+                  />
+                </Form.Group>
+              </Col>
+
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Số điện thoại <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    placeholder="0123456789"
+                    required
+                  />
+                </Form.Group>
+              </Col>
+
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>Địa chỉ <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={2}
+                    name="address"
+                    value={formData.address}
+                    onChange={handleInputChange}
+                    placeholder="Địa chỉ liên hệ..."
+                    required
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={handleCloseModal} disabled={loading}>
+              Hủy
+            </Button>
+            <Button variant="primary" type="submit" disabled={loading}>
+              {loading ? 'Đang lưu...' : 'Thêm mới'}
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
+
+      {/* Import Excel Modal */}
+      <Modal show={showImportModal} onHide={handleCloseImportModal} size="xl">
+        <Modal.Header closeButton>
+          <Modal.Title>Import Giảng viên từ Excel</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {/* Phần 1: Hướng dẫn Format Excel */}
+          <Card className="mb-3 border-info">
+            <Card.Body className="bg-info bg-opacity-10">
+              <h6 className="mb-3">
+                <i className="fas fa-info-circle me-2"></i>
+                Hướng dẫn Format Excel
+              </h6>
+              <p className="mb-2">Vui lòng đảm bảo file Excel của bạn có đúng format như bảng trên</p>
+              <p className="mb-3 text-muted">
+                <i className="fas fa-key me-1"></i>
+                Lưu ý: Password sẽ tự động được tạo cho mỗi giảng viên (mặc định: 123456)
+              </p>
+              
+              <div className="mb-3">
+                <Button
+                  variant="outline-success"
+                  size="sm"
+                  onClick={handleDownloadTemplate}
+                >
+                  <i className="fas fa-download me-2"></i>
+                  Tải file mẫu
+                </Button>
+              </div>
+              
+              <Table striped bordered size="sm" className="mb-0">
+                <thead className="table-info">
+                  <tr>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Address</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>teacher1</td>
+                    <td>teacher1@email.com</td>
+                    <td>0123456789</td>
+                    <td>123 Đường ABC</td>
+                  </tr>
+                  <tr>
+                    <td>teacher2</td>
+                    <td>teacher2@email.com</td>
+                    <td>0987654321</td>
+                    <td>456 Đường XYZ</td>
+                  </tr>
+                </tbody>
+              </Table>
+            </Card.Body>
+          </Card>
+
+          {/* Phần 2: Upload File */}
+          <Card className="mb-3">
+            <Card.Body>
+              <h6 className="mb-3">Upload File Excel</h6>
+              <div className="d-flex align-items-center gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  onChange={handleFileSelect}
+                  style={{ display: 'none' }}
+                />
+                <Button
+                  variant="outline-primary"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={importing}
+                >
+                  <i className="fas fa-folder-open me-2"></i>
+                  Chọn file Excel
+                </Button>
+                {importFile && (
+                  <span className="text-muted">
+                    <i className="fas fa-file-excel me-2 text-success"></i>
+                    {importFile.name}
+                  </span>
+                )}
+                <Button
+                  variant="primary"
+                  onClick={handlePreviewExcel}
+                  disabled={!importFile || importing}
+                >
+                  {importing ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-upload me-2"></i>
+                      Tải lên và xem trước
+                    </>
+                  )}
+                </Button>
+              </div>
+            </Card.Body>
+          </Card>
+
+          {/* Phần 3: Bảng Preview */}
+          {previewTeachers.length > 0 && (
+            <Card>
+              <Card.Body>
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <h6 className="mb-0">Preview dữ liệu</h6>
+                  <div>
+                    <Badge bg="secondary" className="me-2">
+                      Tổng số: {previewTeachers.length}
+                    </Badge>
+                    <Badge bg="success" className="me-2">
+                      Hợp lệ: {previewTeachers.filter(t => !t.hasError).length}
+                    </Badge>
+                    <Badge bg="danger">
+                      Lỗi: {previewTeachers.filter(t => t.hasError).length}
+                    </Badge>
+                  </div>
+                </div>
+                
+                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                  <Table striped bordered hover size="sm">
+                    <thead className="table-light sticky-top">
+                      <tr>
+                        <th>STT</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Address</th>
+                        <th>Trạng thái</th>
+                        <th>Lỗi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewTeachers.map((teacher, index) => (
+                        <tr 
+                          key={index}
+                          className={teacher.hasError ? 'table-danger' : 'table-success'}
+                        >
+                          <td>{teacher.rowNumber}</td>
+                          <td>{teacher.username}</td>
+                          <td>{teacher.email}</td>
+                          <td>{teacher.phone}</td>
+                          <td>{teacher.address}</td>
+                          <td>
+                            {teacher.hasError ? (
+                              <Badge bg="danger">Lỗi</Badge>
+                            ) : (
+                              <Badge bg="success">Hợp lệ</Badge>
+                            )}
+                          </td>
+                          <td>
+                            {teacher.errors.length > 0 ? (
+                              <ul className="mb-0" style={{ fontSize: '12px', paddingLeft: '20px' }}>
+                                {teacher.errors.map((error, i) => (
+                                  <li key={i} className="text-danger">{error}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <span className="text-muted">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </div>
+              </Card.Body>
+            </Card>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseImportModal} disabled={loading || importing}>
+            Hủy
+          </Button>
+          <Button
+            variant="success"
+            onClick={handleConfirmImport}
+            disabled={previewTeachers.filter(t => !t.hasError).length === 0 || loading || importing}
+          >
+            <i className="fas fa-check me-2"></i>
+            Xác nhận và Import
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
       {/* Teacher Detail Modal */}
       <Modal show={showDetailModal} onHide={() => { setShowDetailModal(false); setSchedulePage(1); }} size="xl">
         <Modal.Header closeButton>
           <Modal.Title>
-            Chi tiết giảng viên - {selectedTeacher?.fullName}
+            Chi tiết giảng viên - {selectedTeacher?.username}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>

@@ -1,17 +1,17 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Container, Card, Button, Form, Row, Col, Spinner, Alert } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 import ClassList from './ClassList';
 import CreateClassModal from './CreateClassModal';
 import EditClassModal from './EditClassModal';
-import ClassDetails from './ClassDetails';
 import classService from '../../services/classService';
 
 const ClassManagement = () => {
+  const navigate = useNavigate();
   const [classes, setClasses] = useState([]);
   const [selectedClass, setSelectedClass] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
@@ -118,8 +118,7 @@ const ClassManagement = () => {
   };
 
   const handleViewDetails = (classItem) => {
-    setSelectedClass(classItem);
-    setShowDetails(true);
+    navigate(`/academic/class-management/${classItem.id}`);
   };
 
   const handleFilterChange = (e) => {
@@ -332,16 +331,6 @@ const ClassManagement = () => {
             setSelectedClass(null);
           }}
           onSubmit={handleEditClass}
-        />
-      )}
-
-      {showDetails && selectedClass && (
-        <ClassDetails
-          classData={selectedClass}
-          onClose={() => {
-            setShowDetails(false);
-            setSelectedClass(null);
-          }}
         />
       )}
     </Container>

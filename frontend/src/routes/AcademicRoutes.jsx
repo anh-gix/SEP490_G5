@@ -1,6 +1,7 @@
 import AcademicDashboardPage from "../pages/AcademicStaff/AcademicDashboardPage.jsx";
 import ScheduleManagementPage from "../pages/AcademicStaff/ScheduleManagementPage.jsx";
 import ClassManagementPage from "../pages/AcademicStaff/ClassManagementPage.jsx";
+import ClassDetailPage from "../pages/AcademicStaff/ClassDetailPage.jsx";
 import RoomManagementPage from "../pages/AcademicStaff/RoomManagementPage.jsx";
 import TeacherManagementPage from "../pages/AcademicStaff/TeacherManagementPage.jsx";
 import StudentManagementPage from "../pages/AcademicStaff/StudentManagementPage.jsx";
@@ -27,6 +28,7 @@ export const academicRoutes = [
 
   // II. Class Management
   { path: '/academic/class-management', element: <ClassManagementPage /> },
+  { path: '/academic/class-management/:classId', element: <ClassDetailPage /> },
 
   // III. Room Management
   { path: '/academic/room-management', element: <RoomManagementPage /> },

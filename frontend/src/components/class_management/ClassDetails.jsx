@@ -1,23 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Card, ListGroup, Badge, ProgressBar, Button, Tabs, Tab, Spinner } from 'react-bootstrap';
+import { Container, Card, ListGroup, Badge, ProgressBar, Button, Tabs, Tab, Spinner, Alert } from 'react-bootstrap';
+import { useParams, useNavigate } from 'react-router-dom';
 import classService from '../../services/classService';
 
-const ClassDetails = ({ classData, onClose }) => {
+const ClassDetails = () => {
+  const { classId } = useParams();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('info');
   const [students, setStudents] = useState([]);
   const [detailedClassData, setDetailedClassData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [newStudent, setNewStudent] = useState({ name: '', email: '', phone: '' });
   const [clos, setClos] = useState([]);
 
   useEffect(() => {
     const fetchClassDetails = async () => {
-      if (!classData?.id) return;
+      if (!classId) {
+        setError('Không tìm thấy ID lớp học');
+        setLoading(false);
+        return;
+      }
       
       try {
         setLoading(true);
-        const response = await classService.getClassById(classData.id);
+        setError(null);
+        const response = await classService.getClassById(classId);
         if (response.success && response.class) {
           setDetailedClassData(response.class);
           // Transform students from API to component format
@@ -26,7 +35,7 @@ const ClassDetails = ({ classData, onClose }) => {
             name: student.username || 'N/A',
             email: student.email || 'N/A',
             phone: student.phone || 'N/A',
-            joinDate: classData.startDate || new Date().toISOString().split('T')[0],
+            joinDate: response.class.startDate ? new Date(response.class.startDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
             attendance: student.attendance || 0
           }));
           setStudents(transformedStudents);
@@ -36,18 +45,19 @@ const ClassDetails = ({ classData, onClose }) => {
           } else {
             setClos([]);
           }
+        } else {
+          setError('Không tìm thấy thông tin lớp học');
         }
       } catch (error) {
         console.error('Error fetching class details:', error);
-        // Fallback to classData from props if API fails
-        setDetailedClassData(classData);
+        setError('Không thể tải thông tin lớp học. Vui lòng thử lại sau.');
       } finally {
         setLoading(false);
       }
     };
 
     fetchClassDetails();
-  }, [classData]);
+  }, [classId]);
 
   const handleAddStudent = () => {
     if (!newStudent.name || !newStudent.email) {
@@ -72,8 +82,8 @@ const ClassDetails = ({ classData, onClose }) => {
     }
   };
 
-  // Use detailedClassData if available, otherwise fallback to classData from props
-  const displayData = detailedClassData || classData;
+  // Use detailedClassData
+  const displayData = detailedClassData;
 
   const renderInfoTab = () => (
     <div className="p-4">
@@ -501,40 +511,72 @@ const ClassDetails = ({ classData, onClose }) => {
     </div>
   );
 
-  return (
-    <Modal 
-      show={true} 
-      onHide={onClose} 
-      size="xl"
-      centered
-      className="class-details-modal"
-    >
-      <Modal.Header closeButton>
-        <Modal.Title>Chi tiết lớp học: {displayData.name}</Modal.Title>
-      </Modal.Header>
+  if (loading) {
+    return (
+      <Container fluid className="py-24 px-24">
+        <div className="text-center py-5">
+          <Spinner animation="border" variant="primary" />
+          <p className="mt-3 text-neutral-500">Đang tải thông tin lớp học...</p>
+        </div>
+      </Container>
+    );
+  }
 
-      <Modal.Body className="p-0">
-        <Tabs
-          activeKey={activeTab}
-          onSelect={(k) => setActiveTab(k)}
-          className="mb-0"
-          fill
-        >
-          <Tab eventKey="info" title={<><i className="fas fa-info-circle me-2"></i>Thông tin</>}>
-            {renderInfoTab()}
-          </Tab>
-          <Tab eventKey="students" title={<><i className="fas fa-users me-2"></i>Học viên</>}>
-            {renderStudentsTab()}
-          </Tab>
-          <Tab eventKey="program" title={<><i className="fas fa-book me-2"></i>Chương trình</>}>
-            {renderProgramTab()}
-          </Tab>
-          <Tab eventKey="stats" title={<><i className="fas fa-chart-bar me-2"></i>Thống kê</>}>
-            {renderStatsTab()}
-          </Tab>
-        </Tabs>
-      </Modal.Body>
-    </Modal>
+  if (error || !displayData) {
+    return (
+      <Container fluid className="py-24 px-24">
+        <Alert variant="danger" className="mb-3">
+          <Alert.Heading>Lỗi!</Alert.Heading>
+          <p>{error || 'Không tìm thấy thông tin lớp học'}</p>
+        </Alert>
+        <Button variant="primary" onClick={() => navigate('/academic/class-management')}>
+          <i className="fas fa-arrow-left me-2"></i>
+          Quay lại danh sách lớp học
+        </Button>
+      </Container>
+    );
+  }
+
+  return (
+    <Container fluid className="py-24 px-24">
+      <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+        <Card.Header className="bg-white border-bottom border-neutral-30 d-flex justify-content-between align-items-center p-24">
+          <div>
+            <h2 className="text-neutral-900 fw-bold mb-0">Chi tiết lớp học: {displayData.name}</h2>
+          </div>
+          <Button 
+            variant="outline-secondary"
+            onClick={() => navigate('/academic/class-management')}
+            className="d-flex align-items-center"
+          >
+            <i className="fas fa-arrow-left me-2"></i>
+            Quay lại
+          </Button>
+        </Card.Header>
+
+        <Card.Body className="p-0">
+          <Tabs
+            activeKey={activeTab}
+            onSelect={(k) => setActiveTab(k)}
+            className="mb-0"
+            fill
+          >
+            <Tab eventKey="info" title={<><i className="fas fa-info-circle me-2"></i>Thông tin</>}>
+              {renderInfoTab()}
+            </Tab>
+            <Tab eventKey="students" title={<><i className="fas fa-users me-2"></i>Học viên</>}>
+              {renderStudentsTab()}
+            </Tab>
+            <Tab eventKey="program" title={<><i className="fas fa-book me-2"></i>Chương trình</>}>
+              {renderProgramTab()}
+            </Tab>
+            <Tab eventKey="stats" title={<><i className="fas fa-chart-bar me-2"></i>Thống kê</>}>
+              {renderStatsTab()}
+            </Tab>
+          </Tabs>
+        </Card.Body>
+      </Card>
+    </Container>
   );
 };
 

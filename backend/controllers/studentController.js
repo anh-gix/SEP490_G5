@@ -1330,134 +1330,25 @@ exports.createStudent = async (req, res) => {
 };
 
 // =========================
-// ✏️ CẬP NHẬT HỌC VIÊN
+// ✏️ CẬP NHẬT HỌC VIÊN - ĐÃ VÔ HIỆU HÓA
 // =========================
 exports.updateStudent = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { email, password, username, phone, address } = req.body;
-    
-    // Find Student role
-    const studentRole = await Role.findOne({ name: 'Student' });
-    if (!studentRole) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy role học viên'
-      });
-    }
-    
-    const student = await User.findOne({
-      _id: id,
-      roleId: studentRole._id
-    });
-    
-    if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy học viên'
-      });
-    }
-    
-    // Check email uniqueness if changed
-    if (email && email !== student.email) {
-      const emailExists = await User.findOne({ email, _id: { $ne: id } });
-      if (emailExists) {
-        return res.status(400).json({
-          success: false,
-          message: 'Email đã tồn tại trong hệ thống'
-        });
-      }
-      student.email = email;
-    }
-    
-    // Check username uniqueness if changed
-    if (username && username !== student.username) {
-      const usernameExists = await User.findOne({ username, _id: { $ne: id } });
-      if (usernameExists) {
-        return res.status(400).json({
-          success: false,
-          message: 'Username đã tồn tại trong hệ thống'
-        });
-      }
-      student.username = username;
-    }
-    
-    if (phone) student.phone = phone;
-    if (address) student.address = address;
-    if (password) student.password = password; // Will be hashed by pre-save hook
-    
-    await student.save();
-    
-    const updatedStudent = await User.findById(id)
-      .select('-password -token')
-      .populate('roleId', 'name');
-    
-    res.status(200).json({
-      success: true,
-      message: 'Cập nhật học viên thành công',
-      student: updatedStudent
-    });
-  } catch (error) {
-    console.error('❌ Lỗi khi cập nhật học viên:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi server khi cập nhật học viên',
-      error: error.message
-    });
-  }
+  // Không cho phép cập nhật thông tin học viên
+  return res.status(403).json({
+    success: false,
+    message: 'Không được phép cập nhật thông tin học viên'
+  });
 };
 
 // =========================
-// 🗑️ XÓA HỌC VIÊN
+// 🗑️ XÓA HỌC VIÊN - ĐÃ VÔ HIỆU HÓA
 // =========================
 exports.deleteStudent = async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // Find Student role
-    const studentRole = await Role.findOne({ name: 'Student' });
-    if (!studentRole) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy role học viên'
-      });
-    }
-    
-    const student = await User.findOne({
-      _id: id,
-      roleId: studentRole._id
-    });
-    
-    if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy học viên'
-      });
-    }
-    
-    // Check if student is enrolled in any classes
-    const classesWithStudent = await Class.find({ students: id });
-    if (classesWithStudent.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `Không thể xóa học viên vì đang tham gia ${classesWithStudent.length} lớp học. Vui lòng xóa học viên khỏi các lớp trước.`
-      });
-    }
-    
-    await User.findByIdAndDelete(id);
-    
-    res.status(200).json({
-      success: true,
-      message: 'Xóa học viên thành công'
-    });
-  } catch (error) {
-    console.error('❌ Lỗi khi xóa học viên:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi server khi xóa học viên',
-      error: error.message
-    });
-  }
+  // Không cho phép xóa thông tin học viên
+  return res.status(403).json({
+    success: false,
+    message: 'Không được phép xóa học viên'
+  });
 };
 
 // =========================

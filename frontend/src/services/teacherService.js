@@ -153,6 +153,18 @@ const teacherService = {
     }
   },
 
+  // Import teachers (bulk)
+  importTeachers: async (teachers) => {
+    try {
+      const response = await axios.post(`${API_URL}/teachers/import`, { teachers }, {
+        headers: getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
   // Add homework to ClassSchedule
   addHomework: async (scheduleId, formData) => {
     try {

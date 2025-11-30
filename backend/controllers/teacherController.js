@@ -207,6 +207,14 @@ exports.createTeacher = async (req, res) => {
       });
     }
     
+    // Check if phone number already exists
+    const phoneExists = await User.findOne({ phone });
+    if (phoneExists) {
+      return res.status(400).json({ 
+        message: "Số điện thoại đã tồn tại trong hệ thống" 
+      });
+    }
+    
     // Find teacher role
     const teacherRole = await Role.findOne({ name: 'Teacher' });
     if (!teacherRole) {
@@ -1373,6 +1381,7 @@ exports.importTeachers = async (req, res) => {
           results.failed.push({
             email: teacherData.email,
             username: teacherData.username,
+            phone: teacherData.phone || '',
             reason: 'Email đã tồn tại trong hệ thống'
           });
           continue;
@@ -1384,9 +1393,24 @@ exports.importTeachers = async (req, res) => {
           results.failed.push({
             email: teacherData.email,
             username: teacherData.username,
+            phone: teacherData.phone || '',
             reason: 'Username đã tồn tại trong hệ thống'
           });
           continue;
+        }
+        
+        // Check if phone number exists
+        if (teacherData.phone) {
+          const phoneExists = await User.findOne({ phone: teacherData.phone });
+          if (phoneExists) {
+            results.failed.push({
+              email: teacherData.email,
+              username: teacherData.username,
+              phone: teacherData.phone,
+              reason: 'Số điện thoại đã tồn tại trong hệ thống'
+            });
+            continue;
+          }
         }
         
         // Create teacher
@@ -1408,6 +1432,7 @@ exports.importTeachers = async (req, res) => {
         results.failed.push({
           email: teacherData.email,
           username: teacherData.username,
+          phone: teacherData.phone || '',
           reason: error.message || 'Lỗi không xác định'
         });
       }

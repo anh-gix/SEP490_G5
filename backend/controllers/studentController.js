@@ -1300,6 +1300,17 @@ exports.createStudent = async (req, res) => {
       });
     }
     
+    // Check if phone number already exists
+    if (phone) {
+      const phoneExists = await User.findOne({ phone });
+      if (phoneExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'Số điện thoại đã tồn tại trong hệ thống'
+        });
+      }
+    }
+    
     // Create student
     const student = await User.create({
       email,
@@ -1388,6 +1399,7 @@ exports.importStudents = async (req, res) => {
           results.failed.push({
             email: studentData.email,
             username: studentData.username,
+            phone: studentData.phone || '',
             reason: 'Email đã tồn tại trong hệ thống'
           });
           continue;
@@ -1399,9 +1411,24 @@ exports.importStudents = async (req, res) => {
           results.failed.push({
             email: studentData.email,
             username: studentData.username,
+            phone: studentData.phone || '',
             reason: 'Username đã tồn tại trong hệ thống'
           });
           continue;
+        }
+        
+        // Check if phone number exists
+        if (studentData.phone) {
+          const phoneExists = await User.findOne({ phone: studentData.phone });
+          if (phoneExists) {
+            results.failed.push({
+              email: studentData.email,
+              username: studentData.username,
+              phone: studentData.phone,
+              reason: 'Số điện thoại đã tồn tại trong hệ thống'
+            });
+            continue;
+          }
         }
         
         // Create student
@@ -1423,6 +1450,7 @@ exports.importStudents = async (req, res) => {
         results.failed.push({
           email: studentData.email,
           username: studentData.username,
+          phone: studentData.phone || '',
           reason: error.message || 'Lỗi không xác định'
         });
       }

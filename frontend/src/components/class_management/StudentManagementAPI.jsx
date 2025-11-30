@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Nav, Tabs, Tab, Pagination, ButtonGroup, Alert } from 'react-bootstrap';
 import studentService from '../../services/studentService';
+import teacherService from '../../services/teacherService';
 import ScheduleCalendar from './ScheduleCalendar';
 import * as XLSX from 'xlsx';
 
@@ -29,6 +30,7 @@ const StudentManagementAPI = () => {
     phone: '',
     address: ''
   });
+  const [formErrors, setFormErrors] = useState({});
   
   // Import Excel states
   const [showImportModal, setShowImportModal] = useState(false);
@@ -84,6 +86,37 @@ const StudentManagementAPI = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    // Clear error when user starts typing
+    if (formErrors[name]) {
+      setFormErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const parseErrorToField = (errorMessage) => {
+    const errors = {};
+    if (!errorMessage) return errors;
+    
+    const message = typeof errorMessage === 'string' ? errorMessage : errorMessage.message || '';
+    
+    // Map error messages to form fields (check most specific first)
+    if (message.includes('Số điện thoại đã tồn tại')) {
+      errors.phone = message;
+    } else if (message.includes('Email đã tồn tại')) {
+      errors.email = message;
+    } else if (message.includes('Username đã tồn tại')) {
+      errors.username = message;
+    } else if (message.toLowerCase().includes('số điện thoại') || message.toLowerCase().includes('phone')) {
+      errors.phone = message;
+    } else if (message.toLowerCase().includes('email')) {
+      errors.email = message;
+    } else if (message.toLowerCase().includes('username')) {
+      errors.username = message;
+    } else {
+      // General error - show on submit
+      errors.submit = message;
+    }
+    
+    return errors;
   };
 
   const handleSubmit = async (e) => {
@@ -91,26 +124,32 @@ const StudentManagementAPI = () => {
     
     // Chỉ cho phép tạo mới, không cho phép cập nhật
     if (editingStudent) {
-      alert('Không được phép cập nhật thông tin học viên');
+      setFormErrors({ submit: 'Không được phép cập nhật thông tin học viên' });
+      return;
+    }
+    
+    // Clear previous errors
+    setFormErrors({});
+    
+    // Validate password
+    if (!formData.password) {
+      setFormErrors({ password: 'Vui lòng nhập mật khẩu!' });
       return;
     }
     
     try {
       setLoading(true);
-      // Create: Yêu cầu password
-      if (!formData.password) {
-        alert('Vui lòng nhập mật khẩu!');
-        return;
-      }
       await studentService.createStudent(formData);
-      alert('Thêm Học viên thành công!');
       
+      // Success - close modal and refresh
       handleCloseModal();
       fetchStudents();
       fetchStats();
     } catch (err) {
       console.error('Error saving student:', err);
-      alert(err.message || 'Không thể lưu thông tin Học viên');
+      const errorMessage = err?.message || err?.response?.data?.message || 'Không thể lưu thông tin Học viên';
+      const parsedErrors = parseErrorToField(errorMessage);
+      setFormErrors(parsedErrors);
     } finally {
       setLoading(false);
     }
@@ -177,6 +216,7 @@ const StudentManagementAPI = () => {
       phone: '',
       address: ''
     });
+    setFormErrors({});
   };
 
   // Import Excel handlers
@@ -247,8 +287,28 @@ const StudentManagementAPI = () => {
         return;
       }
 
-      // Convert to JSON (array of objects)
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      // Get range of worksheet
+      const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+      
+      // First, get headers to find phone column index
+      const headerRow = [];
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+        const cell = worksheet[cellAddress];
+        headerRow.push(cell ? (cell.w || cell.v || '') : '');
+      }
+      
+      const phoneHeaderIndex = headerRow.findIndex(h => 
+        h && (h.toString().toLowerCase().includes('phone') || 
+              h.toString().toLowerCase().includes('số điện thoại') ||
+              h.toString().toLowerCase().includes('điện thoại'))
+      );
+
+      // Convert to JSON (array of objects) - use raw: true to get raw values
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+        raw: true, 
+        defval: ''
+      });
 
       if (!jsonData || jsonData.length === 0) {
         alert('File Excel không có dữ liệu');
@@ -265,7 +325,21 @@ const StudentManagementAPI = () => {
         // Get data from Excel (support both Vietnamese and English)
         const username = row.username || row.Username || row['Tên đăng nhập'] || row['username'] || '';
         const email = row.email || row.Email || row['Email'] || '';
-        const phone = row.phone || row.Phone || row['Số điện thoại'] || row['Điện thoại'] || '';
+        let phone = row.phone || row.Phone || row['Số điện thoại'] || row['Điện thoại'] || '';
+        
+        // Convert phone to string first
+        phone = phone ? String(phone) : '';
+        phone = phone.trim();
+        
+        // Remove any non-digit characters (spaces, dashes, etc.)
+        phone = phone.replace(/\D/g, '');
+        
+        // Always add leading zero if phone doesn't start with 0
+        // This handles the case where Excel removes leading zeros from phone numbers
+        if (phone && phone.length > 0 && phone[0] !== '0') {
+          phone = '0' + phone;
+        }
+        
         const address = row.address || row.Address || row['Địa chỉ'] || '';
 
         // Validate
@@ -297,6 +371,119 @@ const StudentManagementAPI = () => {
           errors
         });
       });
+
+      // Normalize phone numbers - ensure they all have leading zero for comparison
+      const normalizePhone = (phone) => {
+        if (!phone) return '';
+        const phoneStr = String(phone).replace(/\D/g, ''); // Remove all non-digits
+        if (phoneStr && phoneStr.length > 0 && phoneStr[0] !== '0') {
+          return '0' + phoneStr;
+        }
+        return phoneStr;
+      };
+
+      // Check for duplicates within the Excel file
+      const emailMap = new Map();
+      const phoneMap = new Map();
+      
+      console.log('=== Checking duplicates in Excel file ===');
+      console.log('Total rows:', previewData.length);
+      
+      previewData.forEach((item, index) => {
+        const email = item.email.toLowerCase();
+        // Normalize phone before checking duplicates
+        const phone = normalizePhone(item.phone);
+        
+        console.log(`Row ${index + 1}: email="${email}", phone="${item.phone}" -> normalized="${phone}"`);
+        
+        // Check duplicate email in file
+        if (email && emailMap.has(email)) {
+          const firstIndex = emailMap.get(email);
+          console.log(`  -> Email duplicate found! First at row ${firstIndex + 1}`);
+          if (!previewData[firstIndex].errors.includes('Email trùng lặp trong file Excel')) {
+            previewData[firstIndex].errors.push('Email trùng lặp trong file Excel');
+            previewData[firstIndex].hasError = true;
+          }
+          if (!item.errors.includes('Email trùng lặp trong file Excel')) {
+            item.errors.push('Email trùng lặp trong file Excel');
+            item.hasError = true;
+          }
+        } else if (email) {
+          emailMap.set(email, index);
+        }
+        
+        // Check duplicate phone in file
+        if (phone && phoneMap.has(phone)) {
+          const firstIndex = phoneMap.get(phone);
+          console.log(`  -> Phone duplicate found! First at row ${firstIndex + 1}, phone="${phone}"`);
+          if (!previewData[firstIndex].errors.includes('Số điện thoại trùng lặp trong file Excel')) {
+            previewData[firstIndex].errors.push('Số điện thoại trùng lặp trong file Excel');
+            previewData[firstIndex].hasError = true;
+          }
+          if (!item.errors.includes('Số điện thoại trùng lặp trong file Excel')) {
+            item.errors.push('Số điện thoại trùng lặp trong file Excel');
+            item.hasError = true;
+          }
+        } else if (phone) {
+          phoneMap.set(phone, index);
+        }
+      });
+      
+      console.log('Email map:', Array.from(emailMap.keys()));
+      console.log('Phone map:', Array.from(phoneMap.keys()));
+      console.log('=== End checking duplicates ===');
+
+      // Check for duplicates with existing data in database
+      try {
+        // Get all students and teachers from database
+        const [studentsResponse, teachersResponse] = await Promise.all([
+          studentService.getAllStudents().catch(() => ({ students: [] })),
+          teacherService.getAllTeachers().catch(() => ({ teachers: [] }))
+        ]);
+        
+        const allStudents = studentsResponse.students || [];
+        const allTeachers = teachersResponse.teachers || [];
+        const allUsers = [...allStudents, ...allTeachers];
+        
+        console.log('=== Checking duplicates with database ===');
+        console.log('Students in DB:', allStudents.length);
+        console.log('Teachers in DB:', allTeachers.length);
+        console.log('Total users in DB:', allUsers.length);
+        
+        const existingEmails = new Set(allUsers.map(u => u.email?.toLowerCase()).filter(Boolean));
+        
+        const existingPhones = new Set(
+          allUsers
+            .map(u => normalizePhone(u.phone))
+            .filter(Boolean)
+        );
+        
+        console.log('Existing emails in DB:', Array.from(existingEmails));
+        console.log('Existing phones in DB:', Array.from(existingPhones));
+        
+        previewData.forEach((item) => {
+          const email = item.email.toLowerCase();
+          const phone = normalizePhone(item.phone);
+          
+          console.log(`Checking row: email="${email}", phone="${phone}"`);
+          
+          if (email && existingEmails.has(email)) {
+            console.log(`  -> Email "${email}" found in DB!`);
+            item.errors.push('Email đã tồn tại trong hệ thống');
+            item.hasError = true;
+          }
+          
+          if (phone && existingPhones.has(phone)) {
+            console.log(`  -> Phone "${phone}" found in DB!`);
+            item.errors.push('Số điện thoại đã tồn tại trong hệ thống');
+            item.hasError = true;
+          }
+        });
+        
+        console.log('=== End checking duplicates with database ===');
+      } catch (err) {
+        console.error('Error checking existing users:', err);
+      }
 
       setPreviewStudents(previewData);
     } catch (error) {
@@ -690,6 +877,11 @@ const StudentManagementAPI = () => {
         </Modal.Header>
         <Form onSubmit={handleSubmit}>
           <Modal.Body>
+            {formErrors.submit && (
+              <Alert variant="danger" className="mb-3">
+                {formErrors.submit}
+              </Alert>
+            )}
             <Row className="g-3">
               <Col md={6}>
                 <Form.Group>
@@ -702,7 +894,13 @@ const StudentManagementAPI = () => {
                     placeholder="Username"
                     required
                     disabled={!!editingStudent}
+                    isInvalid={!!formErrors.username}
                   />
+                  {formErrors.username && (
+                    <Form.Control.Feedback type="invalid">
+                      {formErrors.username}
+                    </Form.Control.Feedback>
+                  )}
                 </Form.Group>
               </Col>
 
@@ -716,7 +914,13 @@ const StudentManagementAPI = () => {
                     onChange={handleInputChange}
                     placeholder="email@example.com"
                     required
+                    isInvalid={!!formErrors.email}
                   />
+                  {formErrors.email && (
+                    <Form.Control.Feedback type="invalid">
+                      {formErrors.email}
+                    </Form.Control.Feedback>
+                  )}
                 </Form.Group>
               </Col>
 
@@ -732,7 +936,13 @@ const StudentManagementAPI = () => {
                     onChange={handleInputChange}
                     placeholder={editingStudent ? "Để trống nếu không đổi" : "Nhập mật khẩu"}
                     required={!editingStudent}
+                    isInvalid={!!formErrors.password}
                   />
+                  {formErrors.password && (
+                    <Form.Control.Feedback type="invalid">
+                      {formErrors.password}
+                    </Form.Control.Feedback>
+                  )}
                 </Form.Group>
               </Col>
 
@@ -746,7 +956,13 @@ const StudentManagementAPI = () => {
                     onChange={handleInputChange}
                     placeholder="0123456789"
                     required
+                    isInvalid={!!formErrors.phone}
                   />
+                  {formErrors.phone && (
+                    <Form.Control.Feedback type="invalid">
+                      {formErrors.phone}
+                    </Form.Control.Feedback>
+                  )}
                 </Form.Group>
               </Col>
 

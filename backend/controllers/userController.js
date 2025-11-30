@@ -47,6 +47,14 @@ const createUser = async (req, res) => {
       return res.status(400).json({ message: 'Username already exists' });
     }
 
+    // Check if phone number already exists
+    if (phone) {
+      const phoneExists = await User.findOne({ phone });
+      if (phoneExists) {
+        return res.status(400).json({ message: 'Số điện thoại đã tồn tại trong hệ thống' });
+      }
+    }
+
     // Check if role exists
     const role = await Role.findById(roleId);
     if (!role) {
@@ -326,6 +334,7 @@ const saveBulkUsers = async (req, res) => {
           results.failed.push({
             email: userData.email,
             username: userData.username,
+            phone: userData.phone || '',
             reason: 'Email đã tồn tại trong hệ thống'
           });
           continue;
@@ -337,9 +346,24 @@ const saveBulkUsers = async (req, res) => {
           results.failed.push({
             email: userData.email,
             username: userData.username,
+            phone: userData.phone || '',
             reason: 'Username đã tồn tại trong hệ thống'
           });
           continue;
+        }
+
+        // Kiểm tra phone number đã tồn tại chưa
+        if (userData.phone) {
+          const existingPhone = await User.findOne({ phone: userData.phone });
+          if (existingPhone) {
+            results.failed.push({
+              email: userData.email,
+              username: userData.username,
+              phone: userData.phone,
+              reason: 'Số điện thoại đã tồn tại trong hệ thống'
+            });
+            continue;
+          }
         }
 
         // Sử dụng password từ frontend nếu có, nếu không thì generate mới
@@ -367,6 +391,7 @@ const saveBulkUsers = async (req, res) => {
         results.failed.push({
           email: userData.email,
           username: userData.username,
+          phone: userData.phone || '',
           reason: error.message || 'Lỗi không xác định'
         });
       }

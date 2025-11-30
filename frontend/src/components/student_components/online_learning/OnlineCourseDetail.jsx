@@ -1,14 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import {
-  onlineCourses,
-//   camSessions,
-  getCourseProgress,
-  calculateCompletionPercentage,
-  calculateSkillProgress,
-  getSessionWithProgress,
-  mockApiDelay
-} from '../student_mockdata';
+import onlineLearningService from '../../../services/onlineLearningService';
 
 /**
  * OnlineCourseDetail Component
@@ -18,54 +10,34 @@ import {
 const OnlineCourseDetail = () => {
   const { courseId } = useParams();
   const [course, setCourse] = useState(null);
-  const [progress, setProgress] = useState(null);
-  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview'); // overview | lessons
-
-  const studentId = 'student_001';
 
   useEffect(() => {
     const fetchCourseDetail = async () => {
       try {
         setLoading(true);
-        await mockApiDelay(800);
 
-        // Find course
-        const foundCourse = onlineCourses.find(c => c._id === courseId);
-        if (!foundCourse) {
-          setError('Không tìm thấy khóa học');
-          setLoading(false);
-          return;
+        // Fetch course detail from API
+        const response = await onlineLearningService.getCourseDetail(courseId);
+        
+        if (response.success) {
+          setCourse(response.course);
+        } else {
+          setError(response.message || 'Không tìm thấy khóa học');
         }
-
-        // Get progress
-        const courseProgress = getCourseProgress(courseId, studentId);
-        if (!courseProgress) {
-          setError('Không tìm thấy tiến độ học tập');
-          setLoading(false);
-          return;
-        }
-
-        // Get sessions with progress
-        const sessionsWithProgress = foundCourse.camSessions.map(sessionId => {
-          return getSessionWithProgress(sessionId, courseProgress);
-        }).filter(Boolean);
-
-        setCourse(foundCourse);
-        setProgress(courseProgress);
-        setSessions(sessionsWithProgress);
+        
         setLoading(false);
       } catch (err) {
         console.error('Error fetching course detail:', err);
-        setError('Không thể tải thông tin khóa học');
+        setError(err.message || 'Không thể tải thông tin khóa học');
         setLoading(false);
       }
     };
 
     fetchCourseDetail();
-  }, [courseId, studentId]);
+  }, [courseId]);
 
   if (loading) {
     return (
@@ -76,7 +48,7 @@ const OnlineCourseDetail = () => {
     );
   }
 
-  if (error || !course || !progress) {
+  if (error || !course) {
     return (
       <div className="py-40 px-32">
         <div className="text-center">
@@ -92,8 +64,25 @@ const OnlineCourseDetail = () => {
     );
   }
 
-  const completionPercentage = calculateCompletionPercentage(progress);
-  const skillProgress = calculateSkillProgress(course, progress);
+  const completionPercentage = course.progress?.completionPercentage || 0;
+  const sessions = course.sessions || [];
+  
+  // Calculate skill progress from sessions
+  const skillProgress = {
+    listening: { completed: 0, total: 0 },
+    reading: { completed: 0, total: 0 },
+    speaking: { completed: 0, total: 0 },
+    writing: { completed: 0, total: 0 }
+  };
+
+  sessions.forEach(session => {
+    if (session.sessionType) {
+      skillProgress[session.sessionType].total++;
+      if (session.isCompleted) {
+        skillProgress[session.sessionType].completed++;
+      }
+    }
+  });
 
   const getSessionStatus = (session) => {
     const { video, quiz, vocabulary } = session.progress;
@@ -207,7 +196,7 @@ const OnlineCourseDetail = () => {
                 </div>
                 <p className="text-xs text-neutral-600 mt-8 mb-0">
                   <i className="fas fa-check-circle text-success-600 me-1"></i>
-                  {progress.sessionProgress.filter(s => s.isCompleted.video && s.isCompleted.quiz && s.isCompleted.vocabulary).length} / {course.numberOfSessions} bài học hoàn thành
+                  {course.progress?.completedSessions || 0} / {course.numberOfSessions} bài học hoàn thành
                 </p>
               </div>
             </div>
@@ -226,11 +215,11 @@ const OnlineCourseDetail = () => {
                 <div className="progress bg-white bg-opacity-25" style={{ height: '6px' }}>
                   <div 
                     className="progress-bar bg-white"
-                    style={{ width: `${(progress.sessionProgress.filter(s => s.isCompleted.video).length / course.numberOfSessions) * 100}%` }}
+                    style={{ width: `${(sessions.filter(s => s.progress.video).length / course.numberOfSessions) * 100}%` }}
                   ></div>
                 </div>
                 <p className="text-xs text-white-75 mt-4 mb-0">
-                  {progress.sessionProgress.filter(s => s.isCompleted.video).length} / {course.numberOfSessions}
+                  {sessions.filter(s => s.progress.video).length} / {course.numberOfSessions}
                 </p>
               </div>
 
@@ -242,11 +231,11 @@ const OnlineCourseDetail = () => {
                 <div className="progress bg-white bg-opacity-25" style={{ height: '6px' }}>
                   <div 
                     className="progress-bar bg-white"
-                    style={{ width: `${(progress.sessionProgress.filter(s => s.isCompleted.quiz).length / course.numberOfSessions) * 100}%` }}
+                    style={{ width: `${(sessions.filter(s => s.progress.quiz).length / course.numberOfSessions) * 100}%` }}
                   ></div>
                 </div>
                 <p className="text-xs text-white-75 mt-4 mb-0">
-                  {progress.sessionProgress.filter(s => s.isCompleted.quiz).length} / {course.numberOfSessions}
+                  {sessions.filter(s => s.progress.quiz).length} / {course.numberOfSessions}
                 </p>
               </div>
 
@@ -258,11 +247,11 @@ const OnlineCourseDetail = () => {
                 <div className="progress bg-white bg-opacity-25" style={{ height: '6px' }}>
                   <div 
                     className="progress-bar bg-white"
-                    style={{ width: `${(progress.sessionProgress.filter(s => s.isCompleted.vocabulary).length / course.numberOfSessions) * 100}%` }}
+                    style={{ width: `${(sessions.filter(s => s.progress.vocabulary).length / course.numberOfSessions) * 100}%` }}
                   ></div>
                 </div>
                 <p className="text-xs text-white-75 mt-4 mb-0">
-                  {progress.sessionProgress.filter(s => s.isCompleted.vocabulary).length} / {course.numberOfSessions}
+                  {sessions.filter(s => s.progress.vocabulary).length} / {course.numberOfSessions}
                 </p>
               </div>
             </div>

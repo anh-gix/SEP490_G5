@@ -71,7 +71,8 @@ export const camSessions = {
     sessionType: 'listening',
     description: 'Learn animal names and sounds. Practice listening to simple descriptions.',
     order: 1,
-    videoURL: 'https://cdn.example.com/cambridge/starters/lesson1-animals.mp4',
+    // videoURL: 'https://cdn.example.com/cambridge/starters/lesson1-animals.mp4',
+    videoURL: 'https://goldenkids-data.tienganh123.com/file/learn/child/preschool/data/video/unit1/letter/letter_non_vip.mp4',
     quizzes: {
       quiz: [
         {
@@ -115,7 +116,7 @@ export const camSessions = {
     sessionType: 'reading',
     description: 'Identify and name different colors. Read simple color descriptions.',
     order: 2,
-    videoURL: 'https://cdn.example.com/cambridge/starters/lesson2-colors.mp4',
+    videoURL: 'https://goldenkids-data.tienganh123.com/file/learn/child/preschool/data/video/unit1/letter/letter_non_vip.mp4',
     quizzes: {
       quiz: [
         {
@@ -355,7 +356,7 @@ export const studentOnlineLearning = [
       {
         sessionId: 'session_002',
         isCompleted: {
-          video: true,
+          video: false,
           quiz: true,
           vocabulary: false // Not completed yet
         }

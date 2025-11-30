@@ -1,12 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import {
-  onlineCourses,
-  camSessions,
-  getCourseProgress,
-  getSessionWithProgress,
-  mockApiDelay
-} from '../student_mockdata';
+import onlineLearningService from '../../../services/onlineLearningService';
 import VideoPlayer from './VideoPlayer';
 import VocabularyFlashcard from './VocabularyFlashcard';
 import CambridgeQuiz from './CambridgeQuiz';
@@ -20,88 +14,78 @@ const SessionLearning = () => {
   const { courseId, sessionId } = useParams();
   const [course, setCourse] = useState(null);
   const [session, setSession] = useState(null);
-  const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('video'); // video | vocabulary | quiz
-
-  const studentId = 'student_001';
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        await mockApiDelay(600);
 
-        // Find course
-        const foundCourse = onlineCourses.find(c => c._id === courseId);
-        if (!foundCourse) {
-          setError('Không tìm thấy khóa học');
-          setLoading(false);
-          return;
+        // Fetch both course detail and session content in parallel
+        const [courseResponse, sessionResponse] = await Promise.all([
+          onlineLearningService.getCourseDetail(courseId),
+          onlineLearningService.getSessionContent(courseId, sessionId)
+        ]);
+
+        if (courseResponse.success && sessionResponse.success) {
+          setCourse(courseResponse.course);
+          setSession(sessionResponse.session);
+        } else {
+          setError(courseResponse.message || sessionResponse.message || 'Không thể tải bài học');
         }
 
-        // Get progress
-        const courseProgress = getCourseProgress(courseId, studentId);
-        if (!courseProgress) {
-          setError('Không tìm thấy tiến độ học tập');
-          setLoading(false);
-          return;
-        }
-
-        // Get session with progress
-        const sessionWithProgress = getSessionWithProgress(sessionId, courseProgress);
-        if (!sessionWithProgress) {
-          setError('Không tìm thấy bài học');
-          setLoading(false);
-          return;
-        }
-
-        setCourse(foundCourse);
-        setSession(sessionWithProgress);
-        setProgress(courseProgress);
         setLoading(false);
       } catch (err) {
         console.error('Error fetching session:', err);
-        setError('Không thể tải bài học');
+        setError(err.message || 'Không thể tải bài học');
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [courseId, sessionId, studentId]);
+  }, [courseId, sessionId]);
 
-  const handleCompleteVideo = () => {
-    // Update progress (in real app, call API)
-    if (progress && session) {
-      const sessionProgress = progress.sessionProgress.find(p => p.sessionId === sessionId);
-      if (sessionProgress) {
-        sessionProgress.isCompleted.video = true;
-        setProgress({ ...progress });
-        setSession({ ...session, progress: { ...session.progress, video: true } });
-      }
+  const handleCompleteVideo = async () => {
+    try {
+      await onlineLearningService.markVideoCompleted(courseId, sessionId);
+      
+      // Update local state
+      setSession(prev => ({
+        ...prev,
+        progress: { ...prev.progress, video: true }
+      }));
+    } catch (err) {
+      console.error('Error marking video as completed:', err);
     }
   };
 
-  const handleCompleteVocabulary = () => {
-    if (progress && session) {
-      const sessionProgress = progress.sessionProgress.find(p => p.sessionId === sessionId);
-      if (sessionProgress) {
-        sessionProgress.isCompleted.vocabulary = true;
-        setProgress({ ...progress });
-        setSession({ ...session, progress: { ...session.progress, vocabulary: true } });
-      }
+  const handleCompleteVocabulary = async () => {
+    try {
+      await onlineLearningService.markVocabularyCompleted(courseId, sessionId);
+      
+      // Update local state
+      setSession(prev => ({
+        ...prev,
+        progress: { ...prev.progress, vocabulary: true }
+      }));
+    } catch (err) {
+      console.error('Error marking vocabulary as completed:', err);
     }
   };
 
-  const handleCompleteQuiz = () => {
-    if (progress && session) {
-      const sessionProgress = progress.sessionProgress.find(p => p.sessionId === sessionId);
-      if (sessionProgress) {
-        sessionProgress.isCompleted.quiz = true;
-        setProgress({ ...progress });
-        setSession({ ...session, progress: { ...session.progress, quiz: true } });
-      }
+  const handleCompleteQuiz = async () => {
+    try {
+      await onlineLearningService.markQuizCompleted(courseId, sessionId);
+      
+      // Update local state
+      setSession(prev => ({
+        ...prev,
+        progress: { ...prev.progress, quiz: true }
+      }));
+    } catch (err) {
+      console.error('Error marking quiz as completed:', err);
     }
   };
 
@@ -318,27 +302,20 @@ const SessionLearning = () => {
             </div>
             <div className="card-body p-0">
               <div className="list-group list-group-flush" style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                {course.camSessions.map((sid) => {
-                  const s = camSessions[sid];
-                  if (!s) return null;
-                  
-                  const sessionProgress = progress.sessionProgress.find(p => p.sessionId === sid);
-                  const isCompleted = sessionProgress?.isCompleted.video && 
-                                     sessionProgress?.isCompleted.quiz && 
-                                     sessionProgress?.isCompleted.vocabulary;
-                  const isCurrent = sid === sessionId;
+                {course.sessions.map((s) => {
+                  const isCurrent = s._id === sessionId;
 
                   return (
                     <Link
-                      key={sid}
-                      to={`/student/online-courses/${courseId}/sessions/${sid}`}
+                      key={s._id}
+                      to={`/student/online-courses/${courseId}/sessions/${s._id}`}
                       className={`list-group-item list-group-item-action border-0 ${
                         isCurrent ? 'bg-main-50 border-start border-main-600 border-3' : ''
                       }`}
                     >
                       <div className="d-flex align-items-center gap-12">
                         <div className={`text-center ${isCurrent ? 'text-main-600' : 'text-neutral-600'}`} style={{ width: '30px' }}>
-                          {isCompleted ? (
+                          {s.isCompleted ? (
                             <i className="fas fa-check-circle text-success-600"></i>
                           ) : isCurrent ? (
                             <i className="fas fa-play-circle"></i>

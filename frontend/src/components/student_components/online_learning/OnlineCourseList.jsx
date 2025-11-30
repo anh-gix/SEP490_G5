@@ -1,11 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  getStudentOnlineCourses,
-  getCourseProgress,
-  calculateCompletionPercentage,
-  mockApiDelay
-} from '../student_mockdata';
+import onlineLearningService from '../../../services/onlineLearningService';
 
 /**
  * OnlineCourseList Component
@@ -17,41 +12,45 @@ const OnlineCourseList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Mock student ID (in real app, get from auth context)
-  const studentId = 'student_001';
-
   useEffect(() => {
     const fetchEnrolledCourses = async () => {
       try {
         setLoading(true);
-        await mockApiDelay(800);
 
-        // Get student's enrolled online courses
-        const enrolledCourses = getStudentOnlineCourses(studentId);
+        // Fetch enrolled online courses from API
+        const response = await onlineLearningService.getMyOnlineCourses();
+        
+        if (response.success) {
+          // Map API response to component format
+          const coursesData = response.courses.map(course => ({
+            _id: course._id,
+            courseCode: course.courseCode,
+            name: course.name,
+            description: course.description,
+            numberOfSessions: course.numberOfSessions,
+            program: course.program,
+            materials: course.materials,
+            preRequisite: course.preRequisite,
+            createdAt: course.createdAt,
+            completionPercentage: course.progress.completionPercentage,
+            progress: course.progress
+          }));
 
-        // Attach progress data to each course
-        const coursesWithProgress = enrolledCourses.map(course => {
-          const progress = getCourseProgress(course._id, studentId);
-          const completionPercentage = calculateCompletionPercentage(progress);
-
-          return {
-            ...course,
-            progress,
-            completionPercentage
-          };
-        });
-
-        setCourses(coursesWithProgress);
+          setCourses(coursesData);
+        } else {
+          setError(response.message || 'Không thể tải danh sách khóa học');
+        }
+        
         setLoading(false);
       } catch (err) {
         console.error('Error fetching online courses:', err);
-        setError('Không thể tải danh sách khóa học. Vui lòng thử lại sau.');
+        setError(err.message || 'Không thể tải danh sách khóa học. Vui lòng thử lại sau.');
         setLoading(false);
       }
     };
 
     fetchEnrolledCourses();
-  }, [studentId]);
+  }, []);
 
   const getProgressColor = (percentage) => {
     if (percentage === 0) return 'bg-neutral-300';

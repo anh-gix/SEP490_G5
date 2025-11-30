@@ -20,20 +20,16 @@ const camSessionSchema = new mongoose.Schema(
     // Video bài giảng
     videoURL: { 
       type: String, 
-      isCompleted: { type: Boolean, default: false }
     },
     // Quiz kiến thức trong lesson
     quizzes: {
       quiz:[quizSchema],
-      isCompleted: { type: Boolean, default: false }
     },
     // Flashcard từ vựng trong lesson
     vocabulary: {
       img: { type: String },
       words: [{ type: String }],
-      isCompleted: { type: Boolean, default: false }
     },
-    isSessionCompleted: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

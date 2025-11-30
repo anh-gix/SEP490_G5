@@ -463,17 +463,23 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
         console.log('✅ API Response:', response);
 
-        if (response && response.success && response.band) {
-          console.log('✅ Setting band to:', response.band);
-          setFormData(prev => ({ ...prev, band: response.band }));
+        if (response && response.success) {
+          if (response.band && response.band.trim() !== '') {
+            console.log('✅ Setting band to:', response.band);
+            setFormData(prev => ({ ...prev, band: response.band }));
+          } else {
+            console.warn('⚠️ No band found in response (band is null or empty), clearing band');
+            setFormData(prev => ({ ...prev, band: '' }));
+          }
         } else {
-          console.warn('⚠️ No band found in response, clearing band');
-          // Clear band if no mapping found
+          console.warn('⚠️ API response not successful, clearing band');
           setFormData(prev => ({ ...prev, band: '' }));
         }
       } catch (error) {
         console.error('❌ Error fetching band:', error);
-        // Don't clear band on error, keep existing value
+        console.error('❌ Error details:', error.response?.data || error.message);
+        // Clear band on error to avoid showing stale data
+        setFormData(prev => ({ ...prev, band: '' }));
       }
     };
 

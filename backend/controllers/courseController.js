@@ -610,11 +610,22 @@ exports.getBandByTypeAndLevel = async (req, res) => {
             });
         }
         
+        // Normalize type to lowercase for case-insensitive matching
+        const normalizedType = type.toLowerCase().trim();
+        
+        console.log('🔍 Searching for band:', { type: normalizedType, level, originalType: type });
+        
         const program = await Program.findOne({
-            type: type,
-            level: level,
+            type: normalizedType,
+            level: level.trim(),
             status: 'active'
         });
+        
+        console.log('📋 Found program:', program ? { 
+            type: program.type, 
+            level: program.level, 
+            band: program.band 
+        } : 'null');
         
         if (!program || !program.band) {
             return res.status(200).json({
@@ -628,6 +639,7 @@ exports.getBandByTypeAndLevel = async (req, res) => {
             band: program.band
         });
     } catch (err) {
+        console.error('❌ Error in getBandByTypeAndLevel:', err);
         res.status(500).json({
             success: false,
             message: 'Lỗi máy chủ',

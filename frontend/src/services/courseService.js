@@ -167,6 +167,18 @@ export const courseService = {
       throw error.response?.data || { message: 'Không thể lấy levels theo type' };
     }
   },
+
+  // Get band by type and level
+  getBandByTypeAndLevel: async (type, level) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/band`, {
+        params: { type, level }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy band theo type và level' };
+    }
+  },
 };
 
 export default courseService;

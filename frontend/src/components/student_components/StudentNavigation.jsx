@@ -53,10 +53,19 @@ const StudentNavigation = () => {
     //   path: '/student/assignments',
     //   color: 'warning'
     // },
+
+    // Tips cho Toeic, Ielts
     {
       title: 'Tips học tập',
       icon: 'fa-lightbulb',
       path: '/student/tips',
+      color: 'warning'
+    },
+    // Online Cam course
+    {
+      title: 'Khóa học Online',
+      icon: 'fa-lightbulb',
+      path: '/student/online-courses',
       color: 'warning'
     },
     // {

@@ -44,9 +44,6 @@ import HomePageSix from "./pages/HomePageSix.jsx";
 import { Navigate } from "react-router-dom";
 import { HomePageRoutes } from "./routes/HomePageRoutes.jsx";
 import Profile from "./pages/Profile.jsx";
-
-import CambridgeQuiz from "./components/student_components/CambridgeQuiz.jsx";
-
 import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";
 import { academicRoutes } from "./routes/AcademicRoutes.jsx";
 import { teacherRoutes } from "./routes/TeacherRoutes.jsx";
@@ -96,9 +93,6 @@ function App() {
 
           <Route exact path="/" element={<HomePageTwo />} />
           <Route exact path="/index-2" element={<HomePageOne />} />
-
-          <Route exact path="/cambridge-quiz/" element={<CambridgeQuiz />} />
-          
           <Route exact path="/index-3" element={<HomePageThree />} />
           <Route exact path="/index-4" element={<HomePageFour />} />
           <Route exact path="/index-5" element={<HomePageFive />} />

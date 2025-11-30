@@ -11,6 +11,9 @@ import ToeicTestTaking from "../components/student_components/ToeicTestTaking.js
 import ToeicTestResult from "../components/student_components/ToeicTestResult.jsx";
 import ToeicTestHistory from "../components/student_components/ToeicTestHistory.jsx";
 import StudentTipsPage from "../pages/StudentPages/StudentTipsPage.jsx";
+import StudentOnlineCoursesPage from "../pages/StudentPages/StudentOnlineCoursesPage.jsx";
+import StudentOnlineCourseDetailPage from "../pages/StudentPages/StudentOnlineCourseDetailPage.jsx";
+import StudentSessionLearningPage from "../pages/StudentPages/StudentSessionLearningPage.jsx";
 
 /**
  * StudentRoutes
@@ -38,19 +41,24 @@ export const studentRoutes = [
   // IV. Tips học tập
   { path: '/student/tips', element: <StudentTipsPage /> },
 
-  // V. TOEIC Practice
+  // V. Cambridge Online Courses
+  { path: '/student/online-courses', element: <StudentOnlineCoursesPage /> },
+  { path: '/student/online-courses/:courseId', element: <StudentOnlineCourseDetailPage /> },
+  { path: '/student/online-courses/:courseId/sessions/:sessionId', element: <StudentSessionLearningPage /> },
+
+  // VI. TOEIC Practice
   { path: '/student/toeic', element: <ToeicPractice /> },
   { path: '/student/toeic/test/:testId', element: <ToeicTestTaking /> },
   { path: '/student/toeic/result/:testId', element: <ToeicTestResult /> },
   { path: '/student/toeic/history', element: <ToeicTestHistory /> },
 
-  // VI. Materials (future)
+  // VII. Materials (future)
   // { path: '/student/materials', element: <StudentMaterialsPage /> },
 
-  // VII. Grades (future)
+  // VIII. Grades (future)
   // { path: '/student/grades', element: <StudentGradesPage /> },
 
-  // VIII. Leave Request (future)
+  // IX. Leave Request (future)
   // { path: '/student/leave-request', element: <StudentLeaveRequestPage /> },
 
  

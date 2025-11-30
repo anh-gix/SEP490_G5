@@ -1,68 +1,17 @@
-import { Link, useParams } from "react-router-dom";
-import { useEffect, useMemo, useState, useRef } from "react";
-import { getCambridgeQuizMock } from "./student_mockdata";
+import { useMemo, useState, useRef } from "react";
 
 /**
  * Cambridge Quiz Component
- * Trang quiz cho Cambridge sessions - Pre-A1 cho trẻ em
+ * Component quiz cho Cambridge sessions - Pre-A1 cho trẻ em
+ * Used with quizData prop from SessionLearning parent component
  */
-const CambridgeQuiz = () => {
-  const { courseId, sessionId } = useParams();
-  const [course, setCourse] = useState(null);
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const CambridgeQuiz = ({ quizData = null, onComplete = null, isCompleted = false }) => {
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [spellAnswers, setSpellAnswers] = useState({}); // For spell type questions
   const [wordFromBoxAnswers, setWordFromBoxAnswers] = useState({}); // For word-from-box type
   const scrollPositionRef = useRef(0);
 
-  useEffect(() => {
-    const fetchCamSession = async () => {
-    //   if (!courseId || !sessionId) {
-    //     setError("Thiếu thông tin khóa học hoặc Cam Session.");
-    //     setLoading(false);
-    //     return;
-    //   }
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Use mock data instead of API
-        const response = await getCambridgeQuizMock();
-
-        if (!response.success) {
-          setError(
-            response.message || "Không thể tải thông tin Cam Session."
-          );
-          setLoading(false);
-          return;
-        }
-
-        const { course: fetchedCourse, camSession } = response.data || {};
-
-        if (!camSession) {
-          setError("Không tìm thấy Cam Session tương ứng.");
-        } else {
-          setCourse(fetchedCourse || null);
-          setSession(camSession);
-        }
-      } catch (err) {
-        console.error("Error loading cam session:", err);
-        setError(
-          err.response?.data?.message ||
-            "Có lỗi xảy ra khi tải thông tin Cam Session."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCamSession();
-  }, [courseId, sessionId]);
-
-  const quizList = useMemo(() => session?.Quiz || [], [session]);
+  const quizList = useMemo(() => quizData || [], [quizData]);
 
   const handleSelectAnswer = (quizId, answer) => {
     // Save current scroll position
@@ -447,190 +396,75 @@ const CambridgeQuiz = () => {
     }
   };
 
-  if (loading) {
+  if (!quizData || quizList.length === 0) {
     return (
-      <section className='course-details py-120'>
-        <div className='container'>
-          <div className='text-center py-5'>
-            <div className='spinner-border text-main-600' role='status'>
-              <span className='visually-hidden'>Đang tải...</span>
-            </div>
-            <p className='text-neutral-500 mt-3'>Đang tải Cambridge Quiz...</p>
-          </div>
-        </div>
-      </section>
+      <div className='text-center py-5'>
+        <i className='fas fa-question-circle text-neutral-400 mb-16' style={{ fontSize: '48px' }}></i>
+        <p className='text-neutral-500'>Không có câu hỏi trong bài học này</p>
+      </div>
     );
   }
-
-  if (error || !session) {
-    return (
-      <section className='course-details py-120'>
-        <div className='container'>
-          <div className='text-center'>
-            <div className='mb-3'>
-              <i className='ph ph-warning-circle text-danger' style={{ fontSize: '64px' }}></i>
-            </div>
-            <p className='text-danger-600 mb-3'>{error || "Không tìm thấy Cam Session."}</p>
-            {courseId && (
-              <Link
-                to={`/course-details/${courseId}`}
-                className='btn btn-main rounded-pill mt-24'
-              >
-                <i className='ph ph-arrow-left me-2'></i>
-                Quay lại khóa học
-              </Link>
-            )}
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  const sessionTitle =
-    session?.Title || `Cam Session ${session?.Order ? `#${session.Order}` : ""}`;
 
   return (
-    <section className='course-details py-120'>
-      <div className='container'>
-        {/* Row 1: Video + Course Info Sidebar */}
-        <div className='row gy-4 mb-4'>
-          <div className='col-xl-8'>
-            <div className='course-details__content border border-neutral-30 rounded-12 bg-white p-12'>
-              <div className='rounded-12 overflow-hidden'>
-                {session?.videoURL ? (
-                  <video
-                    id='cam-player'
-                    className='w-100 rounded-12'
-                    controls
-                    playsInline
-                  >
-                    <source src={session.videoURL} type='video/mp4' />
-                  </video>
-                ) : (
-                  <div className='ratio ratio-16x9 bg-neutral-100 rounded-12 flex-center text-neutral-500'>
-                    <div className='text-center'>
-                      <i className='ph ph-video-camera' style={{ fontSize: '48px' }}></i>
-                      <p className='mt-2 mb-0'>Chưa có video cho Cam Session này.</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className='p-20'>
-                <div className='flex-between flex-wrap gap-16 mb-16'>
-                  <h2 className='mb-0'>{sessionTitle}</h2>
-                  {course && (
-                    <Link
-                      to={`/course-details/${course._id}`}
-                      className='btn btn-outline-main rounded-pill'
-                    >
-                      <i className='ph ph-book-open me-2'></i>
-                      Xem khóa học
-                    </Link>
-                  )}
-                </div>
-                {session?.Des && (
-                  <p className='text-neutral-700'>{session.Des}</p>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          <div className='col-xl-4'>
-            <div className='course-details__sidebar border border-neutral-30 rounded-12 bg-white p-24'>
-              <div className='border-bottom border-neutral-40 pb-20 mb-20'>
-                <p className='text-neutral-500 text-sm mb-4'>
-                  <i className='ph ph-book-open me-2'></i>
-                  Thông tin khóa học
-                </p>
-                <h5 className='mb-4'>{course?.name || "Không có tên"}</h5>
-                <p className='text-neutral-600 mb-2'>
-                  <strong>Chương trình:</strong>{" "}
-                  {course?.program?.program_name || course?.program?.code || "N/A"}
-                </p>
-                <p className='text-neutral-600 mb-0'>
-                  <strong>Loại khóa:</strong>{" "}
-                  <span className='badge bg-main-100 text-main-600'>
-                    {course?.program?.type?.toUpperCase() || "CAM"}
-                  </span>
-                </p>
-              </div>
-
-              <div className='border-bottom border-neutral-40 pb-20 mb-20'>
-                <p className='text-neutral-500 text-sm mb-2'>
-                  <i className='ph ph-hash me-2'></i>
-                  Thứ tự buổi học
-                </p>
-                <h6 className='text-main-600 mb-0'>
-                  Session #{session?.Order || "-"}
-                </h6>
-              </div>
-
-              <div className='border-bottom border-neutral-40 pb-20 mb-20'>
-                <p className='text-neutral-500 text-sm mb-2'>
-                  <i className='ph ph-video me-2'></i>
-                  Video URL
-                </p>
-                {session?.videoURL ? (
-                  <a
-                    className='text-main-600 text-sm fw-semibold text-line-2 text-decoration-none hover-text-decoration-underline'
-                    href={session.videoURL}
-                    target='_blank'
-                    rel='noreferrer'
-                  >
-                    {session.videoURL}
-                  </a>
-                ) : (
-                  <span className='text-neutral-600'>Chưa cập nhật</span>
-                )}
-              </div>
-
-              <div className='mb-20'>
-                <p className='text-neutral-500 text-sm mb-2'>
-                  <i className='ph ph-question me-2'></i>
-                  Số câu hỏi
-                </p>
-                <h6 className='text-neutral-700 mb-0'>
-                  {quizList.length} câu
-                </h6>
-              </div>
-
-              {quizList.length > 0 && (
-                <div className='bg-main-25 border border-main-100 rounded-8 p-16'>
-                  <p className='text-sm text-neutral-700 mb-2'>
-                    <i className='ph ph-info me-2'></i>
-                    <strong>Hướng dẫn:</strong>
-                  </p>
-                  <ul className='text-sm text-neutral-600 mb-0 ps-3'>
-                    <li>Click vào đáp án để chọn</li>
-                    <li>Đáp án đúng sẽ hiển thị màu xanh</li>
-                    <li>Đáp án sai sẽ hiển thị màu đỏ</li>
-                  </ul>
-                </div>
-              )}
-            </div>
-          </div>
+    <div>
+      {/* Quiz Content */}
+      <div className='cam-quiz border border-neutral-30 rounded-12 bg-white p-24'>
+        <h3 className='mb-4 text-center text-main-600'>
+          <i className='ph-fill ph-star me-2'></i>
+          Let's Practice! ({quizList.length} questions)
+        </h3>
+        <div className='d-flex flex-column gap-4'>
+          {quizList.map((quiz, index) => renderQuizByType(quiz, index))}
         </div>
 
-        {/* Row 2: Practice Section - Full Width */}
-        {quizList.length > 0 && (
-          <div className='row'>
-            <div className='col-12'>
-              <div className='cam-quiz border border-neutral-30 rounded-12 bg-white p-24'>
-                <h3 className='mb-4 text-center text-main-600'>
-                  <i className='ph-fill ph-star me-2'></i>
-                  Let's Practice! ({quizList.length} questions)
-                </h3>
-                <div className='d-flex flex-column gap-4'>
-                  {quizList.map((quiz, index) => renderQuizByType(quiz, index))}
+        {/* Complete Button */}
+        {onComplete && (
+          <div className='mt-32 pt-24 border-top border-neutral-100'>
+            <div className='card border-0 bg-main-50 rounded-12'>
+              <div className='card-body p-20'>
+                <div className='d-flex align-items-center justify-content-between'>
+                  <div className='d-flex align-items-center gap-12'>
+                    <i className={`fas ${isCompleted ? 'fa-check-circle text-success-600' : 'fa-info-circle text-main-600'}`}></i>
+                    <div>
+                      <p className='mb-0 fw-medium'>
+                        {isCompleted ? 'Bạn đã hoàn thành quiz này' : 'Hoàn thành quiz để tiếp tục'}
+                      </p>
+                      <p className='text-xs text-neutral-600 mb-0'>
+                        {isCompleted ? 'Bạn có thể làm lại bất cứ lúc nào' : 'Hãy trả lời tất cả các câu hỏi'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <button 
+                    className={`btn ${isCompleted ? 'btn-outline-success' : 'btn-success'} rounded-pill`}
+                    onClick={() => {
+                      if (window.confirm('Bạn đã hoàn thành quiz chưa?')) {
+                        onComplete();
+                      }
+                    }}
+                    disabled={isCompleted}
+                  >
+                    {isCompleted ? (
+                      <>
+                        <i className='fas fa-check-double me-2'></i>
+                        Đã hoàn thành
+                      </>
+                    ) : (
+                      <>
+                        <i className='fas fa-check me-2'></i>
+                        Hoàn thành
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
           </div>
         )}
       </div>
-    </section>
+    </div>
   );
 };
 
 export default CambridgeQuiz;
+

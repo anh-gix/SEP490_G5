@@ -799,8 +799,8 @@ const RequestDetailPage = ({
                 <h6 className="text-neutral-900 fw-bold mb-0">
                   {isStudent ? 'Lịch học:' : isTeacher ? 'Lịch dạy:' : 'Lịch học/dạy:'}
                 </h6>
-                {/* Chỉ hiển thị nút khi không phải đơn makeup_class (vì đã có nút ở phần "Buổi xin học bù:") */}
-                {selectedRequest?.type !== 'makeup_class' && (
+                {/* Chỉ hiển thị nút khi không phải đơn makeup_class và không phải đơn create_class */}
+                {selectedRequest?.type !== 'makeup_class' && selectedRequest?.type !== 'create_class' && (
                   <Button
                     variant="outline-primary"
                     size="sm"

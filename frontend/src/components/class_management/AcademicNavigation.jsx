@@ -48,12 +48,6 @@ const AcademicNavigation = () => {
       icon: 'fa-user-graduate',
       path: '/academic/student-management',
       color: 'success'
-    },
-    {
-      title: 'Báo cáo',
-      icon: 'fa-chart-bar',
-      path: '/academic/reports',
-      color: 'info'
     }
   ];
 

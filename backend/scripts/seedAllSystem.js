@@ -682,6 +682,7 @@ async function seedChangeRequests() {
     const teacherRole = await Role.findOne({ name: 'Teacher' });
     const studentRole = await Role.findOne({ name: 'Student' });
     const academicStaffRole = await Role.findOne({ name: 'Academic Staff' });
+    const centerHeadRole = await Role.findOne({ name: 'Center Head' });
     
     if (!teacherRole || !studentRole) {
         console.log('⚠️  Không tìm thấy Teacher hoặc Student role. Vui lòng seed roles trước.');
@@ -694,6 +695,10 @@ async function seedChangeRequests() {
     let academicStaffUsers = [];
     if (academicStaffRole) {
         academicStaffUsers = await User.find({ roleId: academicStaffRole._id }).lean();
+    }
+    let centerHeadUsers = [];
+    if (centerHeadRole) {
+        centerHeadUsers = await User.find({ roleId: centerHeadRole._id }).lean();
     }
     
     // Validate data exists
@@ -735,7 +740,7 @@ async function seedChangeRequests() {
     });
     
     console.log(`   - Found ${classes.length} classes, ${classSchedules.length} class schedules, ${futureStudentSchedules.length} future student schedules`);
-    console.log(`   - Found ${teachers.length} teachers, ${students.length} students, ${academicStaffUsers.length} academic staff`);
+    console.log(`   - Found ${teachers.length} teachers, ${students.length} students, ${academicStaffUsers.length} academic staff, ${centerHeadUsers.length} center heads`);
     
     // Helper function to generate approved date (1-7 days ago)
     const getApprovedDate = (daysAgo) => {
@@ -748,15 +753,6 @@ async function seedChangeRequests() {
     // ============================================
     // 1. CREATE_CLASS requests (20-25 requests)
     // ============================================
-    const createClassSenders = [];
-    // Collect more senders - cycle through all available
-    for (let i = 0; i < teachers.length; i++) {
-        createClassSenders.push(teachers[i % teachers.length]);
-    }
-    for (let i = 0; i < academicStaffUsers.length; i++) {
-        createClassSenders.push(academicStaffUsers[i % academicStaffUsers.length]);
-    }
-    
     const createClassContents = [
         'Yêu cầu tạo lớp mới IELTS Foundation A1 với 20 học viên, học vào Thứ 2 và Thứ 4 hàng tuần từ 18:00-20:00',
         'Đề nghị mở lớp TOEIC Intermediate B1, thời gian học Thứ 3, Thứ 5, Thứ 7 từ 14:00-16:00, số lượng học viên tối đa 25',
@@ -784,6 +780,22 @@ async function seedChangeRequests() {
         'Xin phép mở lớp Medical English C1, học Thứ 2, Thứ 4, Thứ 6 từ 19:00-21:00, tối đa 12 học viên',
         'Yêu cầu tạo lớp Legal English C1, lịch học Thứ 3, Thứ 5 từ 14:00-16:00, dự kiến 14 học viên'
     ];
+    
+    // Chỉ cho phép Center Head gửi yêu cầu tạo lớp
+    const createClassSenders = [];
+    if (centerHeadUsers.length === 0) {
+        console.log('⚠️  Không tìm thấy Center Head users. Không thể tạo CREATE_CLASS requests.');
+    } else {
+        // Chỉ lấy Center Head users làm senders
+        for (let i = 0; i < centerHeadUsers.length; i++) {
+            createClassSenders.push(centerHeadUsers[i % centerHeadUsers.length]);
+        }
+        // Nếu cần nhiều requests hơn số Center Head, cycle through
+        const neededSenders = Math.min(25, createClassContents.length);
+        while (createClassSenders.length < neededSenders && centerHeadUsers.length > 0) {
+            createClassSenders.push(centerHeadUsers[createClassSenders.length % centerHeadUsers.length]);
+        }
+    }
     
     const createClassCount = Math.min(25, createClassSenders.length, createClassContents.length);
     for (let i = 0; i < createClassCount; i++) {

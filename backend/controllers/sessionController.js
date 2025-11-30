@@ -12,7 +12,6 @@ const Course = require('../models/courseModel');
 const getAllSessions = async (req, res) => {
   try {
     const sessions = await Session.find()
-      .populate('clos', 'code description')
       .sort({ order: 1 });
 
     res.status(200).json({
@@ -38,7 +37,7 @@ const getSessionById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const session = await Session.findById(id).populate('clos');
+    const session = await Session.findById(id);
 
     if (!session) {
       return res.status(404).json({
@@ -85,12 +84,10 @@ const createSession = async (req, res) => {
       clos: clos || []
     });
 
-    const populatedSession = await Session.findById(session._id).populate('clos');
-
     res.status(201).json({
       success: true,
       message: 'Tạo buổi học thành công',
-      data: populatedSession
+      data: session
     });
   } catch (error) {
     console.error('Error creating session:', error);
@@ -128,12 +125,10 @@ const updateSession = async (req, res) => {
 
     await session.save();
 
-    const updatedSession = await Session.findById(id).populate('clos');
-
     res.status(200).json({
       success: true,
       message: 'Cập nhật buổi học thành công',
-      data: updatedSession
+      data: session
     });
   } catch (error) {
     console.error('Error updating session:', error);
@@ -196,7 +191,6 @@ const getSessionsByCourseId = async (req, res) => {
 
     const course = await Course.findById(courseId).populate({
       path: 'sessions',
-      populate: { path: 'clos', select: 'code description' },
       options: { sort: { order: 1 } }
     });
 
@@ -207,10 +201,26 @@ const getSessionsByCourseId = async (req, res) => {
       });
     }
 
+    // Map CLO details vào mỗi session
+    // Vì CLO giờ là embedded trong Course, ta cần filter từ course.clos
+    const sessionsWithCLOs = course.sessions.map(session => {
+      const sessionObj = session.toObject();
+
+      // Lọc CLOs từ course dựa trên session.clos array (array of ObjectIds)
+      const sessionCLOs = course.clos.filter(clo =>
+        session.clos.some(cloId => cloId.equals(clo._id))
+      );
+
+      // Replace ObjectId array với full CLO objects
+      sessionObj.closDetails = sessionCLOs;
+
+      return sessionObj;
+    });
+
     res.status(200).json({
       success: true,
-      data: course.sessions,
-      count: course.sessions.length
+      data: sessionsWithCLOs,
+      count: sessionsWithCLOs.length
     });
   } catch (error) {
     console.error('Error getting sessions by course:', error);

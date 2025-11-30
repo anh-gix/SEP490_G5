@@ -31,14 +31,18 @@ router.get('/mappings', courseController.getCourseMappings);
 // Lấy types theo level - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
 router.get('/types-by-level', courseController.getTypesByLevel);
 
-//lấy chi tiết giáo trình
-router.get('/:id/details', courseController.getCourseDetails);
-router.patch('/:id/approve', courseController.approveCourse);
-router.patch('/:id/revise', courseController.requestRevision);
+// PLO MAPPING ROUTES - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
+router.get('/:id/program-plos', courseController.getProgramPLOs);
+router.put('/:id/map-plos', courseController.updateCoursePLOMapping);
 
-// PROGRAM HEAD: ACCEPT/REJECT COURSE TO PROGRAM
-router.patch('/:id/accept', courseController.acceptCourseToProgram);
-router.patch('/:id/reject', courseController.rejectCourseFromProgram);
+//lấy chi tiết giáo trình
+router.get('/:id/details', courseController.getCourseById);
+
+// COURSE APPROVAL WORKFLOW ROUTES
+router.patch('/:id/submit', courseController.submitCourse);
+router.patch('/:id/approve', courseController.approveCourse);
+router.patch('/:id/reject', courseController.rejectCourse);
+router.patch('/:id/archive', courseController.archiveCourse);
 
 // COURSE CRUD ROUTES (dynamic routes come after)
 router.get('/', courseController.getAllCourses);

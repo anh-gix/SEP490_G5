@@ -63,6 +63,57 @@ export const programService = {
       throw error.response?.data || { message: 'Không thể lấy danh sách PLOs' };
     }
   },
+
+  // Approval workflow
+  // Submit program for approval
+  submitProgram: async (id, data) => {
+    try {
+      const response = await axios.patch(`${API_BASE_URL}/${id}/submit`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Nộp chương trình thất bại' };
+    }
+  },
+
+  // Approve program
+  approveProgram: async (id, data) => {
+    try {
+      const response = await axios.patch(`${API_BASE_URL}/${id}/approve`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Duyệt chương trình thất bại' };
+    }
+  },
+
+  // Reject program
+  rejectProgram: async (id, data) => {
+    try {
+      const response = await axios.patch(`${API_BASE_URL}/${id}/reject`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Từ chối chương trình thất bại' };
+    }
+  },
+
+  // Activate program
+  activateProgram: async (id) => {
+    try {
+      const response = await axios.patch(`${API_BASE_URL}/${id}/activate`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Kích hoạt chương trình thất bại' };
+    }
+  },
+
+  // Archive program
+  archiveProgram: async (id) => {
+    try {
+      const response = await axios.patch(`${API_BASE_URL}/${id}/archive`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Lưu trữ chương trình thất bại' };
+    }
+  },
 };
 
 export default programService;

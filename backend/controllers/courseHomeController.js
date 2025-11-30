@@ -40,7 +40,6 @@ exports.getCoursesByType = async (req, res) => {
         })
         .populate('program', 'program_name code type level')
         .populate('createdBy', 'name fullname email')
-        .populate('clos', 'code name')
         .select('name description program createdBy status materials numberOfSessions sessions camSessions createdAt updatedAt');
 
         // Nếu type là CAM thì populate camSessions, còn lại populate sessions

@@ -6,6 +6,8 @@ import RoleManagementPage from "../pages/CenterHead/RoleManagementPage.jsx";
 import ProgramListPage from "../pages/CenterHead/ProgramListPage.jsx";
 import ProgramDetailPage from "../pages/CenterHead/ProgramDetailPage.jsx";
 import ProgramFormPage from "../pages/CenterHead/ProgramFormPage.jsx";
+import ProgramWizardPage from "../pages/CenterHead/ProgramWizardPage.jsx";
+import CourseWizardPage from "../pages/CenterHead/CourseWizardPage.jsx";
 import PendingCoursesPage from "../pages/CenterHead/PendingCoursesPage.jsx";
 import CourseDetailPage from "../pages/CenterHead/CourseDetailPage.jsx";
 import CourseFormPage from "../pages/CenterHead/CourseFormPage.jsx";
@@ -36,13 +38,17 @@ export const centerHeadRoutes = [
   // II. Program & Course Management
   { path: '/center-head/programs', element: <ProgramListPage /> },
 
-  // Tạo/Sửa Program (với PLO, Course, CLO, Session)
+  // Tạo Program (Simple Form) - NEW STRUCTURE
   { path: '/center-head/programs/create', element: <ProgramFormPage /> },
   { path: '/center-head/programs/:id/edit', element: <ProgramFormPage /> },
 
-  // Tạo/Sửa Course trong Program
-  { path: '/center-head/programs/:programId/courses/create', element: <CourseFormPage /> },
-  { path: '/center-head/programs/:programId/courses/:courseId/edit', element: <CourseFormPage /> },
+  // Tạo Course (Wizard - 4 steps) - NEW STRUCTURE
+  { path: '/center-head/programs/:programId/courses/create', element: <CourseWizardPage /> },
+  { path: '/center-head/programs/:programId/courses/:courseId/edit', element: <CourseWizardPage /> },
+
+  // OLD: Full Program Wizard (deprecated - kept for reference)
+  { path: '/center-head/programs/wizard/create', element: <ProgramWizardPage /> },
+  { path: '/center-head/programs/wizard/:id/edit', element: <ProgramWizardPage /> },
 
   // Program Detail & Course Management
   { path: '/center-head/programs/:id', element: <ProgramDetailPage /> },

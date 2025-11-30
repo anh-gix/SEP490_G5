@@ -170,16 +170,47 @@ const CourseDetails = () => {
             {course.materials && course.materials.length > 0 ? (
               <div className="bg-neutral-20 p-16 radius-8">
                 {course.materials.map((material, index) => (
-                  <div key={index} className="d-flex align-items-center mb-2">
-                    <i className="ph ph-link text-main-600 me-2"></i>
-                    <a
-                      href={material}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-main-600 text-sm"
-                    >
-                      {material}
-                    </a>
+                  <div key={material._id || index} className="mb-12 pb-12 border-bottom border-neutral-100 last-child-no-border">
+                    <div className="mb-4">
+                      <strong className="text-neutral-900">{material.description}</strong>
+                    </div>
+                    {material.author && (
+                      <div className="text-sm text-neutral-600 mb-2">
+                        <i className="ph ph-user me-2"></i>
+                        Tác giả: {material.author}
+                      </div>
+                    )}
+                    {material.publisher && (
+                      <div className="text-sm text-neutral-600 mb-2">
+                        <i className="ph ph-building me-2"></i>
+                        NXB: {material.publisher}
+                      </div>
+                    )}
+                    {material.publishedDate && (
+                      <div className="text-sm text-neutral-600 mb-2">
+                        <i className="ph ph-calendar me-2"></i>
+                        Năm: {material.publishedDate}
+                      </div>
+                    )}
+                    {material.onlineUrl && (
+                      <div className="text-sm mb-2">
+                        <i className="ph ph-link text-main-600 me-2"></i>
+                        <a
+                          href={material.onlineUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-main-600"
+                        >
+                          {material.onlineUrl}
+                        </a>
+                      </div>
+                    )}
+                    {material.note && (
+                      <div className="text-sm text-neutral-500 mt-2">
+                        <i className="ph ph-note me-2"></i>
+                        {material.note}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

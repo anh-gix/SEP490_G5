@@ -40,10 +40,8 @@ exports.getCourseById = async (req, res) => {
         const course = await Course.findById(req.params.id)
             .populate('program', 'program_name code')
             .populate('createdBy', 'fullname email')
-            .populate('clos')
             .populate({
                 path: 'sessions',
-                populate: { path: 'clos', select: 'code description' },
                 options: { sort: { order: 1 } }
             });
 
@@ -83,6 +81,7 @@ exports.createCourse = async (req, res) => {
             studentTasks,
             program,
             clos,
+            mappedPLOs,
             sessions,
             materials,
             mocktestSessionOrders,
@@ -123,6 +122,29 @@ exports.createCourse = async (req, res) => {
             });
         }
 
+        // Validate CLOs if provided
+        if (clos && clos.length > 0) {
+            // Check for duplicate CLO codes within this course
+            const cloCodes = clos.map(c => c.code);
+            const duplicates = cloCodes.filter((code, index) => cloCodes.indexOf(code) !== index);
+            if (duplicates.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Mã CLO bị trùng trong giáo trình: ${duplicates.join(', ')}`
+                });
+            }
+
+            // Validate each CLO has required fields
+            for (const clo of clos) {
+                if (!clo.code || !clo.name || !clo.detail) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Mỗi CLO phải có đầy đủ code, name và detail'
+                    });
+                }
+            }
+        }
+
         const courseData = {
             courseCode,
             name,
@@ -133,6 +155,7 @@ exports.createCourse = async (req, res) => {
             studentTasks,
             program,
             clos: clos || [],
+            mappedPLOs: mappedPLOs || [],
             sessions: sessions || [],
             materials: materials || [],
             mocktestSessionOrders: mocktestSessionOrders || [],
@@ -145,7 +168,6 @@ exports.createCourse = async (req, res) => {
         const populatedCourse = await Course.findById(course._id)
             .populate('program', 'program_name code')
             .populate('createdBy', 'fullname email')
-            .populate('clos')
             .populate('sessions');
 
         res.status(201).json({
@@ -178,6 +200,7 @@ exports.updateCourse = async (req, res) => {
             studentTasks,
             program,
             clos,
+            mappedPLOs,
             sessions,
             materials,
             mocktestSessionOrders,
@@ -203,6 +226,55 @@ exports.updateCourse = async (req, res) => {
             }
         }
 
+        // Validate CLOs if provided
+        if (clos && clos.length > 0) {
+            // Check for duplicate CLO codes within this course
+            const cloCodes = clos.map(c => c.code);
+            const duplicates = cloCodes.filter((code, index) => cloCodes.indexOf(code) !== index);
+            if (duplicates.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Mã CLO bị trùng trong giáo trình: ${duplicates.join(', ')}`
+                });
+            }
+
+            // Validate each CLO has required fields
+            for (const clo of clos) {
+                if (!clo.code || !clo.name || !clo.detail) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Mỗi CLO phải có đầy đủ code, name và detail'
+                    });
+                }
+            }
+        }
+
+        // Validate session count does not exceed numberOfSessions
+        if (sessions !== undefined && numberOfSessions !== undefined) {
+            if (sessions.length > numberOfSessions) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Số lượng buổi học (${sessions.length}) không được vượt quá số lượng buổi học đã định (${numberOfSessions})`
+                });
+            }
+        } else if (sessions !== undefined && course.numberOfSessions) {
+            // If only sessions is being updated, check against existing numberOfSessions
+            if (sessions.length > course.numberOfSessions) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Số lượng buổi học (${sessions.length}) không được vượt quá số lượng buổi học đã định (${course.numberOfSessions})`
+                });
+            }
+        } else if (numberOfSessions !== undefined && course.sessions && course.sessions.length > 0) {
+            // If only numberOfSessions is being updated, check against existing sessions count
+            if (course.sessions.length > numberOfSessions) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Không thể giảm số lượng buổi học xuống ${numberOfSessions} vì đã có ${course.sessions.length} buổi học được tạo`
+                });
+            }
+        }
+
         // Update fields
         if (courseCode) course.courseCode = courseCode;
         if (name) course.name = name;
@@ -212,7 +284,8 @@ exports.updateCourse = async (req, res) => {
         if (preRequisite !== undefined) course.preRequisite = preRequisite;
         if (studentTasks !== undefined) course.studentTasks = studentTasks;
         if (program) course.program = program;
-        if (clos) course.clos = clos;
+        if (clos !== undefined) course.clos = clos;
+        if (mappedPLOs !== undefined) course.mappedPLOs = mappedPLOs;
         if (sessions) course.sessions = sessions;
         if (materials) course.materials = materials;
         if (mocktestSessionOrders) course.mocktestSessionOrders = mocktestSessionOrders;
@@ -223,7 +296,6 @@ exports.updateCourse = async (req, res) => {
         const updatedCourse = await Course.findById(req.params.id)
             .populate('program', 'program_name code')
             .populate('createdBy', 'fullname email')
-            .populate('clos')
             .populate('sessions');
 
         res.status(200).json({
@@ -273,154 +345,109 @@ exports.deleteCourse = async (req, res) => {
 // COURSE APPROVAL WORKFLOW
 // =========================
 
-// Lấy tất cả courses đã được phê duyệt (cho student view)
-exports.getAllCourses = async (req, res) => {
+/**
+ * Submit course for approval
+ * PATCH /api/courses/:id/submit
+ */
+exports.submitCourse = async (req, res) => {
     try {
-        const courses = await Course.find({ status: 'approved' })
-            .populate('createdBy', 'name fullname email')
-            .populate('program', 'program_name code')
-            .select('name description program createdBy status createdAt updatedAt')
-            .sort({ createdAt: -1 });
+        const { id } = req.params;
+        const { submittedBy } = req.body;
 
-        res.status(200).json({
-            success: true,
-            count: courses.length,
-            data: courses
-        });
-
-    } catch (err) {
-        res.status(500).json({ success: false, message: 'Lỗi máy chủ', error: err.message });
-    }
-};
-
-// [Màn 2] Lấy danh sách Giáo trình chờ duyệt
-exports.getPendingCourses = async (req, res) => {
-    try {
-        const pendingCourses = await Course.find({ status: 'pending_approval' })
-            .populate('createdBy', 'fullname') // Lấy tên người tạo
-            .select('name createdBy sentAt status') // Chọn các trường cần thiết
-            .sort({ sentAt: -1 }); // Sắp xếp mới nhất lên đầu
-
-        res.status(200).json({
-            success: true,
-            count: pendingCourses.length,
-            data: pendingCourses
-        });
-
-    } catch (err) {
-        res.status(500).json({ success: false, message: 'Lỗi máy chủ', error: err.message });
-    }
-};
-
-// [Màn 3] Lấy chi tiết Giáo trình
-exports.getCourseDetails = async (req, res) => {
-    try {
-        console.log(req.params.id);
-        
-        const course = await Course.findById(req.params.id)
-            .populate('program', 'program_name code') // Thông tin chung
-            .populate('createdBy', 'name email')      // Thông tin người tạo
-            .populate({ // Lấy thông tin chi tiết các buổi học
-                path: 'sessions',
-                options: { sort: { order: 1 } } // Sắp xếp theo thứ tự
-            }) 
-            .populate({ // Lấy thông tin CLO và PLO đã map
-                path: 'clos',
-                populate: {
-                    path: 'mappedPLOs',
-                    select: 'code name' // Lấy thông tin PLO đã map
-                }
+        if (!submittedBy) {
+            return res.status(400).json({
+                success: false,
+                message: 'Thiếu thông tin người nộp (submittedBy)'
             });
-
-        if (!course) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy giáo trình' });
         }
+
+        const course = await Course.findById(id);
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy giáo trình'
+            });
+        }
+
+        // Check if course is in draft or needs_revision status
+        if (course.status !== 'draft' && course.status !== 'needs_revision') {
+            return res.status(400).json({
+                success: false,
+                message: `Không thể nộp giáo trình có trạng thái ${course.status}`
+            });
+        }
+
+        // Validate course has required data
+        if (!course.clos || course.clos.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Giáo trình phải có ít nhất 1 CLO trước khi nộp'
+            });
+        }
+
+        if (!course.sessions || course.sessions.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Giáo trình phải có ít nhất 1 session trước khi nộp'
+            });
+        }
+
+        // Validate course has mapped PLOs
+        if (!course.mappedPLOs || course.mappedPLOs.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Giáo trình phải mapping với ít nhất 1 PLO của chương trình trước khi nộp'
+            });
+        }
+
+        // Update status and tracking fields
+        course.status = 'pending_approval';
+        course.submittedAt = new Date();
+        course.submittedBy = submittedBy;
+
+        // Add to revision history
+        course.revisionHistory.push({
+            action: course.status === 'needs_revision' ? 'resubmitted' : 'submitted',
+            performedBy: submittedBy,
+            performedAt: new Date(),
+            note: 'Nộp giáo trình để Center Head duyệt'
+        });
+
+        await course.save();
 
         res.status(200).json({
             success: true,
+            message: 'Nộp giáo trình thành công',
             data: course
         });
-
     } catch (err) {
-        res.status(500).json({ success: false, message: 'Lỗi máy chủ', error: err.message });
-    }
-};
-
-// [Màn 3 - Nút] Phê duyệt giáo trình
-exports.approveCourse = async (req, res) => {
-    try {
-        const course = await Course.findByIdAndUpdate(
-            req.params.id,
-            { 
-                status: 'approved',
-                revisionReason: null // Xóa lý do cũ (nếu có)
-            },
-            { new: true, runValidators: true }
-        );
-
-        if (!course) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy giáo trình' });
-        }
-
-        // Logic phụ (nếu có): Gửi email thông báo cho Subject Leader...
-
-        res.status(200).json({
-            success: true,
-            message: 'Đã phê duyệt giáo trình thành công.',
-            data: course
+        console.error('Error submitting course:', err);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi nộp giáo trình',
+            error: err.message
         });
-
-    } catch (err) {
-        res.status(500).json({ success: false, message: 'Lỗi máy chủ', error: err.message });
     }
 };
-
-// [Màn 3 - Nút] Yêu cầu chỉnh sửa
-exports.requestRevision = async (req, res) => {
-    const { reason } = req.body;
-
-    if (!reason) {
-        return res.status(400).json({ success: false, message: 'Vui lòng cung cấp lý do yêu cầu chỉnh sửa.' });
-    }
-
-    try {
-        const course = await Course.findByIdAndUpdate(
-            req.params.id,
-            {
-                status: 'needs_revision',
-                revisionReason: reason
-            },
-            { new: true, runValidators: true }
-        );
-
-        if (!course) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy giáo trình' });
-        }
-
-        res.status(200).json({
-            success: true,
-            message: 'Đã gửi yêu cầu chỉnh sửa thành công.',
-            data: course
-        });
-
-    } catch (err) {
-        res.status(500).json({ success: false, message: 'Lỗi máy chủ', error: err.message });
-    }
-};
-
-// =========================
-// PROGRAM HEAD: ACCEPT/REJECT COURSE
-// =========================
 
 /**
- * Accept course to add to program (Center Head)
- * PATCH /api/courses/:id/accept
+ * Approve course
+ * PATCH /api/courses/:id/approve
  */
-exports.acceptCourseToProgram = async (req, res) => {
-    const { approvalNote } = req.body;
-
+exports.approveCourse = async (req, res) => {
     try {
-        const course = await Course.findById(req.params.id);
+        const { id } = req.params;
+        const { approvedBy, approvalNote } = req.body;
+
+        if (!approvedBy) {
+            return res.status(400).json({
+                success: false,
+                message: 'Thiếu thông tin người duyệt (approvedBy)'
+            });
+        }
+
+        const course = await Course.findById(id)
+            .populate('createdBy', 'username email');
 
         if (!course) {
             return res.status(404).json({
@@ -429,27 +456,144 @@ exports.acceptCourseToProgram = async (req, res) => {
             });
         }
 
-        // Only accept courses that are pending approval
+        // Check if course is in pending_approval status
         if (course.status !== 'pending_approval') {
             return res.status(400).json({
                 success: false,
-                message: 'Chỉ có thể chấp nhận giáo trình đang chờ phê duyệt'
+                message: `Không thể duyệt giáo trình có trạng thái ${course.status}`
             });
         }
 
-        // Update course status to approved
+        // Update status and tracking fields
         course.status = 'approved';
         course.approvedAt = new Date();
+        course.approvedBy = approvedBy;
         course.approvalNote = approvalNote || '';
+
+        // Clear rejection fields if any
+        course.rejectedAt = undefined;
+        course.rejectedBy = undefined;
+        course.rejectionReason = undefined;
+
+        // Add to revision history
+        course.revisionHistory.push({
+            action: 'approved',
+            performedBy: approvedBy,
+            performedAt: new Date(),
+            note: approvalNote || 'Đã duyệt giáo trình'
+        });
 
         await course.save();
 
         res.status(200).json({
             success: true,
-            message: 'Đã chấp nhận giáo trình vào chương trình thành công',
+            message: 'Duyệt giáo trình thành công',
             data: course
         });
+    } catch (err) {
+        console.error('Error approving course:', err);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi duyệt giáo trình',
+            error: err.message
+        });
+    }
+};
 
+/**
+ * Reject course
+ * PATCH /api/courses/:id/reject
+ */
+exports.rejectCourse = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { rejectedBy, rejectionReason } = req.body;
+
+        if (!rejectedBy) {
+            return res.status(400).json({
+                success: false,
+                message: 'Thiếu thông tin người từ chối (rejectedBy)'
+            });
+        }
+
+        if (!rejectionReason) {
+            return res.status(400).json({
+                success: false,
+                message: 'Vui lòng nhập lý do từ chối'
+            });
+        }
+
+        const course = await Course.findById(id)
+            .populate('createdBy', 'username email');
+
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy giáo trình'
+            });
+        }
+
+        // Check if course is in pending_approval status
+        if (course.status !== 'pending_approval') {
+            return res.status(400).json({
+                success: false,
+                message: `Không thể từ chối giáo trình có trạng thái ${course.status}`
+            });
+        }
+
+        // Update status and tracking fields
+        course.status = 'needs_revision';
+        course.rejectedAt = new Date();
+        course.rejectedBy = rejectedBy;
+        course.rejectionReason = rejectionReason;
+
+        // Clear approval fields if any
+        course.approvedAt = undefined;
+        course.approvedBy = undefined;
+        course.approvalNote = undefined;
+
+        // Add to revision history
+        course.revisionHistory.push({
+            action: 'rejected',
+            performedBy: rejectedBy,
+            performedAt: new Date(),
+            note: rejectionReason
+        });
+
+        await course.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Đã yêu cầu chỉnh sửa giáo trình',
+            data: course
+        });
+    } catch (err) {
+        console.error('Error rejecting course:', err);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi khi từ chối giáo trình',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Get pending courses (for Center Head review)
+ * GET /api/courses/pending
+ */
+exports.getPendingCourses = async (req, res) => {
+    try {
+        const pendingCourses = await Course.find({ status: 'pending_approval' })
+            .populate('createdBy', 'username email')
+            .populate('program', 'program_name code')
+            .select('name courseCode createdBy submittedAt status program')
+            .sort({ submittedAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            count: pendingCourses.length,
+            data: pendingCourses
+        });
     } catch (err) {
         res.status(500).json({
             success: false,
@@ -460,22 +604,14 @@ exports.acceptCourseToProgram = async (req, res) => {
 };
 
 /**
- * Reject course from program (Center Head)
- * PATCH /api/courses/:id/reject
+ * Archive course
+ * PATCH /api/courses/:id/archive
  */
-exports.rejectCourseFromProgram = async (req, res) => {
-    const { rejectionReason } = req.body;
-
-    if (!rejectionReason) {
-        return res.status(400).json({
-            success: false,
-            message: 'Vui lòng cung cấp lý do từ chối'
-        });
-    }
-
+exports.archiveCourse = async (req, res) => {
     try {
-        const course = await Course.findById(req.params.id);
+        const { id } = req.params;
 
+        const course = await Course.findById(id);
         if (!course) {
             return res.status(404).json({
                 success: false,
@@ -483,31 +619,19 @@ exports.rejectCourseFromProgram = async (req, res) => {
             });
         }
 
-        // Only reject courses that are pending approval
-        if (course.status !== 'pending_approval') {
-            return res.status(400).json({
-                success: false,
-                message: 'Chỉ có thể từ chối giáo trình đang chờ phê duyệt'
-            });
-        }
-
-        // Update course status to needs_revision
-        course.status = 'needs_revision';
-        course.rejectedAt = new Date();
-        course.rejectionReason = rejectionReason;
-
+        course.status = 'archived';
         await course.save();
 
         res.status(200).json({
             success: true,
-            message: 'Đã từ chối giáo trình thành công',
+            message: 'Lưu trữ giáo trình thành công',
             data: course
         });
-
     } catch (err) {
+        console.error('Error archiving course:', err);
         res.status(500).json({
             success: false,
-            message: 'Lỗi máy chủ',
+            message: 'Lỗi khi lưu trữ giáo trình',
             error: err.message
         });
     }
@@ -738,19 +862,19 @@ exports.getCourseMappings = async (req, res) => {
 exports.getTypesByLevel = async (req, res) => {
     try {
         const { level } = req.query;
-        
+
         if (!level) {
             return res.status(400).json({
                 success: false,
                 message: 'Thiếu tham số level'
             });
         }
-        
+
         const programs = await Program.find({
             level: level,
             status: 'active'
         }).distinct('type');
-        
+
         res.status(200).json({
             success: true,
             types: programs
@@ -759,6 +883,124 @@ exports.getTypesByLevel = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Lỗi máy chủ khi lấy types theo level',
+            error: err.message
+        });
+    }
+};
+
+// =========================
+// PLO MAPPING FUNCTIONS
+// =========================
+
+/**
+ * Get PLOs of a Course's Program
+ * GET /api/courses/:id/program-plos
+ */
+exports.getProgramPLOs = async (req, res) => {
+    try {
+        const course = await Course.findById(req.params.id).populate({
+            path: 'program',
+            populate: {
+                path: 'plos',
+                select: 'code name detail'
+            }
+        });
+
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy giáo trình'
+            });
+        }
+
+        if (!course.program) {
+            return res.status(404).json({
+                success: false,
+                message: 'Giáo trình chưa được gán vào chương trình'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: {
+                programId: course.program._id,
+                programName: course.program.program_name,
+                programCode: course.program.code,
+                plos: course.program.plos || []
+            }
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Update Course PLO Mapping
+ * PUT /api/courses/:id/map-plos
+ */
+exports.updateCoursePLOMapping = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { mappedPLOs } = req.body;
+
+        if (!mappedPLOs || !Array.isArray(mappedPLOs)) {
+            return res.status(400).json({
+                success: false,
+                message: 'mappedPLOs phải là một mảng'
+            });
+        }
+
+        // Tìm course và populate program
+        const course = await Course.findById(id).populate('program');
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy giáo trình'
+            });
+        }
+
+        if (!course.program) {
+            return res.status(404).json({
+                success: false,
+                message: 'Giáo trình chưa được gán vào chương trình'
+            });
+        }
+
+        // Validate: Tất cả PLO phải thuộc về Program của Course
+        const programPLOIds = course.program.plos.map(plo => plo._id.toString());
+        const invalidPLOs = mappedPLOs.filter(ploId => !programPLOIds.includes(ploId.toString()));
+
+        if (invalidPLOs.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Có PLO không thuộc chương trình của giáo trình này',
+                invalidPLOs
+            });
+        }
+
+        // Update mappedPLOs
+        course.mappedPLOs = mappedPLOs;
+        await course.save();
+
+        // Populate và trả về
+        const updatedCourse = await Course.findById(id)
+            .populate('program', 'program_name code')
+            .populate('mappedPLOs', 'code name detail')
+            .populate('clos');
+
+        res.status(200).json({
+            success: true,
+            message: 'Cập nhật PLO mapping thành công',
+            data: updatedCourse
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
             error: err.message
         });
     }

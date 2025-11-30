@@ -59,8 +59,18 @@ const ProgramList = () => {
     }
   };
 
-  const handleDeleteExam = async (programId, programName) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa chương trình "${programName}"? Hành động này không thể hoàn tác.`)) {
+  const handleDeleteProgram = async (programId, programName) => {
+    const confirmMessage = `⚠️ CẢNH BÁO: Bạn có chắc muốn xóa chương trình "${programName}"?\n\n` +
+      `Hành động này sẽ XÓA TOÀN BỘ:\n` +
+      `• Tất cả PLO trong chương trình\n` +
+      `• Tất cả Course (học phần)\n` +
+      `• Tất cả CLO trong các course\n` +
+      `• Tất cả Session trong các course\n` +
+      `• Tất cả Materials trong các course\n\n` +
+      `Hành động này KHÔNG THỂ HOÀN TÁC!\n\n` +
+      `Nhấn OK để xác nhận xóa.`;
+
+    if (!window.confirm(confirmMessage)) {
       return;
     }
 
@@ -70,7 +80,7 @@ const ProgramList = () => {
       // Reload programs after deletion
       await fetchPrograms();
 
-      alert('Xóa chương trình thành công!');
+      alert('Đã xóa chương trình và toàn bộ dữ liệu liên quan thành công!');
     } catch (err) {
       console.error('Error deleting program:', err);
       alert(err.message || 'Có lỗi xảy ra khi xóa chương trình.');
@@ -175,22 +185,12 @@ const ProgramList = () => {
             <i className="ph ph-pencil"></i>
           </button>
           <button
-            className="btn btn-sm btn-outline-info"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/center-head/programs/${row._id}/plos`);
-            }}
-            title="Xem PLOs"
-          >
-            <i className="ph ph-list-bullets"></i>
-          </button>
-          <button
             className="btn btn-sm btn-outline-danger"
             onClick={(e) => {
               e.stopPropagation();
-              handleDeleteExam(row._id, row.program_name);
+              handleDeleteProgram(row._id, row.program_name);
             }}
-            title="Xóa"
+            title="Xóa chương trình"
           >
             <i className="ph ph-trash"></i>
           </button>
@@ -216,8 +216,12 @@ const ProgramList = () => {
           <h4 className="mb-8 text-neutral-900 fw-bold">Chương trình đào tạo</h4>
           <p className="text-neutral-600 mb-0">Quản lý các chương trình và PLOs</p>
         </div>
-        <Button variant="primary" icon="ph ph-plus" onClick={() => navigate('/center-head/programs/create')}>
-          Thêm chương trình
+        <Button
+          variant="primary"
+          icon="ph ph-plus"
+          onClick={() => navigate('/center-head/programs/create')}
+        >
+          Tạo chương trình mới
         </Button>
       </div>
 

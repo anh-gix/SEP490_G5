@@ -18,8 +18,13 @@ const ProgramDetail = () => {
   const [cloMapping, setCloMapping] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showRejectProgramModal, setShowRejectProgramModal] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
+
+  // Get user role from localStorage
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const userRole = user.role;
 
   useEffect(() => {
     fetchProgramDetail();
@@ -41,16 +46,26 @@ const ProgramDetail = () => {
 
         // Build CLO → PLO mapping from courses
         const cloMappingData = [];
+        const programPLOs = programData.plos || [];
+
         programCourses.forEach(course => {
           if (course.clos && Array.isArray(course.clos)) {
             course.clos.forEach(clo => {
+              // Map CLO's mappedPLOs (array of IDs) to actual PLO objects from program
+              const mappedPLOObjects = (clo.mappedPLOs || [])
+                .map(ploId => {
+                  const ploIdStr = typeof ploId === 'object' ? ploId._id : ploId;
+                  return programPLOs.find(p => p._id.toString() === ploIdStr.toString());
+                })
+                .filter(plo => plo !== undefined);
+
               cloMappingData.push({
                 _id: clo._id,
                 code: clo.code,
-                name: clo.name || clo.description,
-                detail: clo.description || clo.detail,
+                name: clo.name,
+                detail: clo.detail,
                 courseName: course.name,
-                mappedPLOs: clo.mappedPLOs || []
+                mappedPLOs: mappedPLOObjects
               });
             });
           }
@@ -209,22 +224,106 @@ const ProgramDetail = () => {
     // END OF MOCK DATA
   };
 
-  const handleAcceptCourse = async (courseId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn chấp nhận giáo trình này vào chương trình?')) {
+  // ===== PROGRAM WORKFLOW HANDLERS =====
+  const handleSubmitProgram = async () => {
+    if (!window.confirm('Bạn có chắc chắn muốn nộp chương trình này để phê duyệt?')) {
       return;
     }
 
     try {
       setActionLoading(true);
-      await courseService.acceptCourseToProgram(courseId, {
-        approvalNote: 'Đã được chấp nhận bởi Program Head'
-      });
-
-      alert('Đã chấp nhận giáo trình thành công!');
-      fetchProgramDetail(); // Refresh data
+      await programService.submitProgram(id, {});
+      alert('Đã nộp chương trình thành công!');
+      fetchProgramDetail();
     } catch (err) {
-      console.error('Error accepting course:', err);
-      alert(err.message || 'Có lỗi xảy ra khi chấp nhận giáo trình');
+      console.error('Error submitting program:', err);
+      alert(err.message || 'Có lỗi xảy ra khi nộp chương trình');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleApproveProgram = async () => {
+    if (!window.confirm('Bạn có chắc chắn muốn duyệt chương trình này?\n\nLưu ý: Tất cả các môn học trong chương trình sẽ được duyệt cùng lúc.')) {
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await programService.approveProgram(id, {
+        approvalNote: 'Đã được phê duyệt bởi Center Head'
+      });
+      alert('Đã duyệt chương trình và toàn bộ môn học thành công!');
+      fetchProgramDetail();
+    } catch (err) {
+      console.error('Error approving program:', err);
+      alert(err.message || 'Có lỗi xảy ra khi duyệt chương trình');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectProgram = () => {
+    setShowRejectProgramModal(true);
+  };
+
+  const handleConfirmRejectProgram = async () => {
+    if (!rejectionReason.trim()) {
+      alert('Vui lòng nhập lý do từ chối');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await programService.rejectProgram(id, {
+        rejectionReason
+      });
+      alert('Đã từ chối chương trình thành công!');
+      setShowRejectProgramModal(false);
+      setRejectionReason('');
+      fetchProgramDetail();
+    } catch (err) {
+      console.error('Error rejecting program:', err);
+      alert(err.message || 'Có lỗi xảy ra khi từ chối chương trình');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // ===== COURSE WORKFLOW HANDLERS =====
+  const handleSubmitCourse = async (courseId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn nộp môn học này để phê duyệt?')) {
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await courseService.submitCourse(courseId, {});
+      alert('Đã nộp môn học thành công!');
+      fetchProgramDetail();
+    } catch (err) {
+      console.error('Error submitting course:', err);
+      alert(err.message || 'Có lỗi xảy ra khi nộp môn học');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleApproveCourse = async (courseId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn duyệt môn học này?')) {
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await courseService.approveCourse(courseId, {
+        approvalNote: 'Đã được phê duyệt bởi Center Head'
+      });
+      alert('Đã duyệt môn học thành công!');
+      fetchProgramDetail();
+    } catch (err) {
+      console.error('Error approving course:', err);
+      alert(err.message || 'Có lỗi xảy ra khi duyệt môn học');
     } finally {
       setActionLoading(false);
     }
@@ -235,7 +334,7 @@ const ProgramDetail = () => {
     setShowRejectModal(true);
   };
 
-  const handleConfirmReject = async () => {
+  const handleConfirmRejectCourse = async () => {
     if (!rejectionReason.trim()) {
       alert('Vui lòng nhập lý do từ chối');
       return;
@@ -243,18 +342,17 @@ const ProgramDetail = () => {
 
     try {
       setActionLoading(true);
-      await courseService.rejectCourseFromProgram(selectedCourseId, {
+      await courseService.rejectCourse(selectedCourseId, {
         rejectionReason
       });
-
-      alert('Đã từ chối giáo trình thành công!');
+      alert('Đã từ chối môn học thành công!');
       setShowRejectModal(false);
       setRejectionReason('');
       setSelectedCourseId(null);
-      fetchProgramDetail(); // Refresh data
+      fetchProgramDetail();
     } catch (err) {
       console.error('Error rejecting course:', err);
-      alert(err.message || 'Có lỗi xảy ra khi từ chối giáo trình');
+      alert(err.message || 'Có lỗi xảy ra khi từ chối môn học');
     } finally {
       setActionLoading(false);
     }
@@ -336,7 +434,25 @@ const ProgramDetail = () => {
       field: 'actions',
       render: (row) => (
         <div className="d-flex flex-wrap gap-2">
-          {row.status === 'pending_approval' ? (
+          {/* Draft: Subject Leader can submit */}
+          {row.status === 'draft' && (
+            <Button
+              variant="primary"
+              size="sm"
+              icon="ph ph-paper-plane-tilt"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSubmitCourse(row._id);
+              }}
+              disabled={actionLoading}
+            >
+              <span className="d-none d-md-inline">Nộp</span>
+              <span className="d-inline d-md-none">Nộp</span>
+            </Button>
+          )}
+
+          {/* Pending Approval: Center Head can approve/reject */}
+          {row.status === 'pending_approval' && userRole === 'centerhead' && (
             <>
               <Button
                 variant="success"
@@ -344,12 +460,12 @@ const ProgramDetail = () => {
                 icon="ph ph-check"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleAcceptCourse(row._id);
+                  handleApproveCourse(row._id);
                 }}
                 disabled={actionLoading}
               >
-                <span className="d-none d-md-inline">Chấp nhận</span>
-                <span className="d-inline d-md-none">OK</span>
+                <span className="d-none d-md-inline">Duyệt</span>
+                <span className="d-inline d-md-none">✓</span>
               </Button>
               <Button
                 variant="danger"
@@ -362,22 +478,41 @@ const ProgramDetail = () => {
                 disabled={actionLoading}
               >
                 <span className="d-none d-md-inline">Từ chối</span>
-                <span className="d-inline d-md-none">X</span>
+                <span className="d-inline d-md-none">✗</span>
               </Button>
             </>
-          ) : (
+          )}
+
+          {/* Needs Revision: Can resubmit */}
+          {row.status === 'needs_revision' && (
             <Button
-              variant="outline"
+              variant="warning"
               size="sm"
-              icon="ph ph-eye"
+              icon="ph ph-arrow-clockwise"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/center-head/courses/${row._id}/details`);
+                handleSubmitCourse(row._id);
               }}
+              disabled={actionLoading}
             >
-              Xem
+              <span className="d-none d-md-inline">Nộp lại</span>
+              <span className="d-inline d-md-none">Nộp lại</span>
             </Button>
           )}
+
+          {/* View button for all statuses */}
+          <Button
+            variant="outline"
+            size="sm"
+            icon="ph ph-eye"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/courses/${row._id}/details`);
+            }}
+          >
+            <span className="d-none d-md-inline">Xem</span>
+            <span className="d-inline d-md-none">👁</span>
+          </Button>
         </div>
       ),
     },
@@ -406,7 +541,41 @@ const ProgramDetail = () => {
             <span className="text-neutral-600">Mã: <strong>{program.code}</strong></span>
           </div>
         </div>
-        <div className="d-flex gap-2">
+        <div className="d-flex flex-wrap gap-2">
+          {/* Draft or Needs Revision: Subject Leader can submit */}
+          {(program.status === 'draft' || program.status === 'needs_revision') && (
+            <Button
+              variant="primary"
+              icon="ph ph-paper-plane-tilt"
+              onClick={handleSubmitProgram}
+              disabled={actionLoading}
+            >
+              {program.status === 'needs_revision' ? 'Nộp lại Program' : 'Nộp Program'}
+            </Button>
+          )}
+
+          {/* Pending Approval: Center Head can approve/reject */}
+          {program.status === 'pending_approval' && userRole === 'centerhead' && (
+            <>
+              <Button
+                variant="success"
+                icon="ph ph-check"
+                onClick={handleApproveProgram}
+                disabled={actionLoading}
+              >
+                Duyệt Program
+              </Button>
+              <Button
+                variant="danger"
+                icon="ph ph-x"
+                onClick={handleRejectProgram}
+                disabled={actionLoading}
+              >
+                Từ chối Program
+              </Button>
+            </>
+          )}
+
           <Button
             variant="outline"
             icon="ph ph-pencil-simple"
@@ -416,6 +585,25 @@ const ProgramDetail = () => {
           </Button>
         </div>
       </div>
+
+      {/* Program Rejection Warning */}
+      {program.status === 'needs_revision' && program.rejectionReason && (
+        <div className="alert alert-warning mb-24" role="alert" style={{ borderLeft: '4px solid #f59e0b' }}>
+          <div className="d-flex align-items-start">
+            <i className="ph ph-warning-circle" style={{ fontSize: '24px', marginRight: '12px', color: '#f59e0b' }}></i>
+            <div>
+              <h6 className="mb-2 fw-bold">Program bị từ chối - Cần chỉnh sửa</h6>
+              <p className="mb-1"><strong>Lý do từ chối:</strong></p>
+              <p className="mb-0">{program.rejectionReason}</p>
+              {program.rejectedBy && (
+                <p className="mb-0 mt-2 text-sm text-muted">
+                  Từ chối bởi: {program.rejectedBy.username || program.rejectedBy.email} - {formatDate(program.rejectedAt)}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="row g-3 g-md-4 mb-24">
@@ -468,7 +656,10 @@ const ProgramDetail = () => {
                         {plo.code}
                       </span>
                     </td>
-                    <td className="text-neutral-700" style={{ padding: '16px' }}>{plo.description || 'N/A'}</td>
+                    <td className="text-neutral-700" style={{ padding: '16px' }}>
+                      <div className="fw-semibold mb-1">{plo.name}</div>
+                      <div className="text-sm text-neutral-600">{plo.detail}</div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -588,6 +779,35 @@ const ProgramDetail = () => {
           </div>
         </div>
 
+        {/* Course Rejection Warnings */}
+        {courses.filter(c => c.status === 'needs_revision' && c.rejectionReason).length > 0 && (
+          <div className="mb-3">
+            {courses
+              .filter(c => c.status === 'needs_revision' && c.rejectionReason)
+              .map((course) => (
+                <div
+                  key={course._id}
+                  className="alert alert-danger mb-2"
+                  role="alert"
+                  style={{ borderLeft: '4px solid #ef4444' }}
+                >
+                  <div className="d-flex align-items-start">
+                    <i className="ph ph-x-circle" style={{ fontSize: '20px', marginRight: '12px', color: '#ef4444' }}></i>
+                    <div className="flex-grow-1">
+                      <h6 className="mb-1 fw-bold">{course.name} - Bị từ chối</h6>
+                      <p className="mb-1 text-sm"><strong>Lý do:</strong> {course.rejectionReason}</p>
+                      {course.rejectedBy && (
+                        <p className="mb-0 text-xs text-muted">
+                          Từ chối bởi: {course.rejectedBy.username || course.rejectedBy.email} - {formatDate(course.rejectedAt)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+
         {courses.length > 0 ? (
           <Table
             columns={courseColumns}
@@ -602,13 +822,13 @@ const ProgramDetail = () => {
         )}
       </Card>
 
-      {/* Reject Modal */}
+      {/* Reject Course Modal */}
       {showRejectModal && (
         <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Từ chối giáo trình</h5>
+                <h5 className="modal-title">Từ chối môn học</h5>
                 <button
                   type="button"
                   className="btn-close"
@@ -625,7 +845,7 @@ const ProgramDetail = () => {
                 <textarea
                   className="form-control"
                   rows="4"
-                  placeholder="Nhập lý do từ chối giáo trình..."
+                  placeholder="Nhập lý do từ chối môn học..."
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   disabled={actionLoading}
@@ -645,7 +865,59 @@ const ProgramDetail = () => {
                 </Button>
                 <Button
                   variant="danger"
-                  onClick={handleConfirmReject}
+                  onClick={handleConfirmRejectCourse}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Program Modal */}
+      {showRejectProgramModal && (
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Từ chối chương trình</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowRejectProgramModal(false);
+                    setRejectionReason('');
+                  }}
+                  disabled={actionLoading}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <label className="form-label">Lý do từ chối *</label>
+                <textarea
+                  className="form-control"
+                  rows="4"
+                  placeholder="Nhập lý do từ chối chương trình..."
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  disabled={actionLoading}
+                ></textarea>
+              </div>
+              <div className="modal-footer">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowRejectProgramModal(false);
+                    setRejectionReason('');
+                  }}
+                  disabled={actionLoading}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={handleConfirmRejectProgram}
                   disabled={actionLoading}
                 >
                   {actionLoading ? 'Đang xử lý...' : 'Xác nhận từ chối'}

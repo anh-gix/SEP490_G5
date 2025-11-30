@@ -179,6 +179,18 @@ export const courseService = {
       throw error.response?.data || { message: 'Không thể lấy band theo type và level' };
     }
   },
+
+  // Get courses by program name and level
+  getCoursesByProgram: async (programName, level) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/by-program`, {
+        params: { programName, level }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy danh sách courses theo program và level' };
+    }
+  },
 };
 
 export default courseService;

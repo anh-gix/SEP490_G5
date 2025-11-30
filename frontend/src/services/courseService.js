@@ -135,6 +135,38 @@ export const courseService = {
       throw error.response?.data || { message: 'Không thể lấy types theo level' };
     }
   },
+
+  // Get all types from Program collection
+  getAllTypes: async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/all-types`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy danh sách types' };
+    }
+  },
+
+  // Get all levels from Program collection
+  getAllLevels: async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/all-levels`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy danh sách levels' };
+    }
+  },
+
+  // Get levels by type
+  getLevelsByType: async (type) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/levels`, {
+        params: { type }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy levels theo type' };
+    }
+  },
 };
 
 export default courseService;

@@ -5,6 +5,7 @@ import classService from '../../services/classService';
 import scheduleService from '../../services/scheduleService';
 import roomService from '../../services/roomService';
 import academicStaffService from '../../services/academicStaffService';
+import changeRequestService from '../../services/changeRequestService';
 
 /**
  * Academic Dashboard Component
@@ -72,20 +73,24 @@ const AcademicDashboard = () => {
           const attendances = attendanceResponse.attendances || attendanceResponse || [];
           
           for (const att of attendances) {
+            const scheduleId = schedule._id || schedule.id;
+            const studentId = att.student?._id || att.student;
+            const uniqueId = `${studentId}-${scheduleId}`;
+            
             if (att.attendance?.status === 'absent') {
               absentStudents.push({
-                id: att.student?._id || att.student,
+                id: uniqueId,
                 name: att.student?.username || 'N/A',
-                studentId: att.student?._id || att.student,
+                studentId: studentId,
                 class: schedule.class?.name || schedule.className || 'N/A',
                 time: schedule.startTime || 'N/A',
                 status: 'absent'
               });
             } else if (att.attendance?.status === 'late') {
               lateStudents.push({
-                id: att.student?._id || att.student,
+                id: uniqueId,
                 name: att.student?.username || 'N/A',
-                studentId: att.student?._id || att.student,
+                studentId: studentId,
                 class: schedule.class?.name || schedule.className || 'N/A',
                 time: schedule.startTime || 'N/A',
                 status: 'late'
@@ -182,9 +187,96 @@ const AcademicDashboard = () => {
 
       setAbsentStudentsList([...absentStudents, ...lateStudents].slice(0, 10));
       setRoomSchedule(roomScheduleData);
-      setRecentActivities([]); // TODO: Implement activity log endpoint
       setTodaySchedule(transformedTodaySchedule);
       setClassProgress(classProgressData);
+
+      // Fetch recent change requests (5 newest pending only)
+      try {
+        const requestsResponse = await changeRequestService.getAllChangeRequests({ 
+          limit: 100,
+          status: 'pending' // Only fetch pending requests
+        });
+        
+        if (requestsResponse.success) {
+          const requests = requestsResponse.changeRequests || [];
+          // Filter only pending requests (double check)
+          const pendingRequests = requests.filter(req => req.status === 'pending');
+          // Sort by createdAt descending (newest first) and take top 5
+          const sortedRequests = [...pendingRequests].sort((a, b) => {
+            const dateA = new Date(a.createdAt);
+            const dateB = new Date(b.createdAt);
+            return dateB - dateA; // Descending order (newest first)
+          });
+          
+          const recentRequests = sortedRequests.slice(0, 5).map(request => {
+            const createdAt = new Date(request.createdAt);
+            const now = new Date();
+            const diffMs = now - createdAt;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            let timeText = '';
+            if (diffMins < 1) {
+              timeText = 'Vừa xong';
+            } else if (diffMins < 60) {
+              timeText = `${diffMins} phút trước`;
+            } else if (diffHours < 24) {
+              timeText = `${diffHours} giờ trước`;
+            } else if (diffDays < 7) {
+              timeText = `${diffDays} ngày trước`;
+            } else {
+              timeText = createdAt.toLocaleDateString('vi-VN', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+              });
+            }
+
+            const senderName = request.sender?.username || request.senderName || 'Người dùng';
+            const requestType = request.type || 'change_class';
+            let message = '';
+            let icon = 'fa-file-alt';
+            let color = 'info';
+
+            if (requestType === 'change_class') {
+              message = `${senderName} đã gửi đơn xin đổi lớp học`;
+              icon = 'fa-exchange-alt';
+              color = 'primary';
+            } else if (requestType === 'makeup_class') {
+              message = `${senderName} đã gửi đơn xin học bù`;
+              icon = 'fa-calendar-plus';
+              color = 'warning';
+            } else if (requestType === 'create_class') {
+              message = `${senderName} đã gửi đơn tạo lớp mới`;
+              icon = 'fa-plus-circle';
+              color = 'success';
+            } else if (requestType === 'replace_teacher') {
+              message = `${senderName} đã gửi đơn thay giáo viên`;
+              icon = 'fa-user-tie';
+              color = 'info';
+            } else {
+              message = `${senderName} đã gửi đơn mới`;
+              icon = 'fa-file-alt';
+              color = 'info';
+            }
+
+            return {
+              id: request._id || request.id,
+              message,
+              time: timeText,
+              icon,
+              color
+            };
+          });
+          setRecentActivities(recentRequests);
+        } else {
+          setRecentActivities([]);
+        }
+      } catch (err) {
+        console.warn('Could not fetch recent requests:', err);
+        setRecentActivities([]);
+      }
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -650,44 +742,6 @@ const AcademicDashboard = () => {
                     </Card>
                   </Col>
                 ))}
-              </Row>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Quick Actions */}
-      <Row className="mt-20">
-        <Col>
-          <Card className="bg-gradient border-0 rounded-12" 
-                style={{ 
-                  background: 'linear-gradient(135deg, var(--main-600) 0%, var(--main-700) 100%)',
-                  boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)'
-                }}>
-            <Card.Body className="p-20">
-              <Row className="align-items-center">
-                <Col lg={8}>
-                  <h5 className="text-white fw-bold mb-8">Thao tác nhanh</h5>
-                  <p className="text-white mb-0 text-14" style={{ opacity: 0.9 }}>
-                    Truy cập nhanh các chức năng thường dùng
-                  </p>
-                </Col>
-                <Col lg={4}>
-                  <div className="d-flex gap-8 flex-wrap justify-content-lg-end">
-                    <Link to="/academic/class-management">
-                      <Button className="bg-white text-main-600 fw-medium px-16 py-8 radius-8 border-0 text-13">
-                        <i className="fas fa-plus me-2"></i>
-                        Tạo lớp
-                      </Button>
-                    </Link>
-                    <Link to="/academic/schedule-management">
-                      <Button className="bg-white text-main-600 fw-medium px-16 py-8 radius-8 border-0 text-13">
-                        <i className="fas fa-calendar-plus me-2"></i>
-                        Tạo lịch học
-                      </Button>
-                    </Link>
-                  </div>
-                </Col>
               </Row>
             </Card.Body>
           </Card>

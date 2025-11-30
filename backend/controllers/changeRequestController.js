@@ -11,13 +11,18 @@ const mongoose = require('mongoose');
 // =========================
 exports.getAllChangeRequests = async (req, res) => {
   try {
-    const { status, search, page = 1, limit = 10 } = req.query;
+    const { status, type, search, page = 1, limit = 10 } = req.query;
     
     let query = {};
     
     // Filter by status
     if (status && status !== 'all') {
       query.status = status;
+    }
+    
+    // Filter by type
+    if (type && type !== 'all') {
+      query.type = type;
     }
     
     // Search by content or sender name/email
@@ -56,10 +61,165 @@ exports.getAllChangeRequests = async (req, res) => {
     const changeRequests = await ChangeRequest.find(query)
       .populate('sender', 'username email phone')
       .populate('approver', 'username email')
+      .populate({
+        path: 'studentScheduleId',
+        // Không dùng select để đảm bảo tất cả field (bao gồm student) được include
+        populate: {
+          path: 'classSchedule',
+          select: 'date startTime endTime session class room',
+          populate: [
+            {
+              path: 'session',
+              select: 'title order'
+            },
+            {
+              path: 'class',
+              select: 'name',
+              populate: {
+                path: 'course',
+                select: 'name'
+              }
+            },
+            {
+              path: 'room',
+              select: 'room_name'
+            }
+          ]
+        }
+      })
+      .populate({
+        path: 'classScheduleId',
+        select: 'date startTime endTime session class',
+        populate: [
+          {
+            path: 'session',
+            select: 'title order'
+          },
+          {
+            path: 'class',
+            select: 'name',
+            populate: {
+              path: 'course',
+              select: 'name'
+            }
+          }
+        ]
+      })
+      .populate({
+        path: 'classId',
+        select: 'name course',
+        populate: {
+          path: 'course',
+          select: 'name'
+        }
+      })
       .sort({ createdAt: 1 })
       .skip(skip)
       .limit(limitNum)
       .lean();
+    
+    // Đảm bảo field student được include trong studentScheduleId
+    // Lấy đầy đủ thông tin StudentSchedule từ database cho tất cả request có studentScheduleId
+    for (let i = 0; i < changeRequests.length; i++) {
+      const request = changeRequests[i];
+      if (request.studentScheduleId && request.studentScheduleId._id) {
+        // Lấy đầy đủ thông tin StudentSchedule từ database
+        const studentScheduleId = request.studentScheduleId._id;
+        const fullStudentSchedule = await StudentSchedule.findById(studentScheduleId)
+          .select('student classSchedule attendance scheduleStatus reason')
+          .lean();
+        
+        if (fullStudentSchedule) {
+          // Merge thông tin từ database vào studentScheduleId (đảm bảo có field student)
+          request.studentScheduleId.student = fullStudentSchedule.student;
+          // Giữ nguyên classSchedule đã populate, nhưng đảm bảo các field khác cũng có
+          if (!request.studentScheduleId.attendance) {
+            request.studentScheduleId.attendance = fullStudentSchedule.attendance;
+          }
+          if (!request.studentScheduleId.scheduleStatus) {
+            request.studentScheduleId.scheduleStatus = fullStudentSchedule.scheduleStatus;
+          }
+          if (!request.studentScheduleId.reason) {
+            request.studentScheduleId.reason = fullStudentSchedule.reason;
+          }
+        }
+      }
+    }
+    
+    // Thêm thông tin lịch học và session hiện tại cho các request có classId (change_class)
+    const classIdsToEnrich = changeRequests
+      .filter(req => req.type === 'change_class' && req.classId)
+      .map(req => req.classId._id || req.classId);
+    
+    if (classIdsToEnrich.length > 0) {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      
+      // Lấy tất cả fixed schedules của các lớp này
+      const classSchedules = await ClassSchedule.find({
+        class: { $in: classIdsToEnrich },
+        status: 'fixed'
+      })
+        .populate('session', 'title order')
+        .populate('room', 'room_name')
+        .sort({ date: 1, startTime: 1 })
+        .lean();
+      
+      // Nhóm schedules theo classId
+      const schedulesByClass = {};
+      classSchedules.forEach(schedule => {
+        const classId = schedule.class?.toString() || schedule.class;
+        if (!schedulesByClass[classId]) {
+          schedulesByClass[classId] = [];
+        }
+        schedulesByClass[classId].push(schedule);
+      });
+      
+      // Tìm session hiện tại và attach vào từng request
+      changeRequests.forEach(request => {
+        if (request.type === 'change_class' && request.classId) {
+          const classId = request.classId._id?.toString() || request.classId.toString();
+          const schedules = schedulesByClass[classId] || [];
+          
+          // Tìm session hiện tại (session gần nhất đã học hoặc sắp học)
+          let currentSession = null;
+          const pastSessions = schedules.filter(s => {
+            const scheduleDate = new Date(s.date);
+            scheduleDate.setHours(0, 0, 0, 0);
+            return scheduleDate < now;
+          });
+          
+          if (pastSessions.length > 0) {
+            // Lấy session đã học gần nhất
+            currentSession = pastSessions[pastSessions.length - 1];
+          } else if (schedules.length > 0) {
+            // Nếu chưa có session nào đã học, lấy session đầu tiên (sắp học)
+            currentSession = schedules[0];
+          }
+          
+          // Attach thông tin vào classId
+          if (request.classId) {
+            request.classId.fixedSchedules = schedules.map(s => ({
+              id: s._id,
+              date: s.date,
+              startTime: s.startTime,
+              endTime: s.endTime,
+              session: s.session,
+              room: s.room,
+              roomName: s.room?.room_name || 'N/A',
+              status: s.status || 'fixed' // Đảm bảo có field status
+            }));
+            
+            if (currentSession && currentSession.session) {
+              request.classId.currentSession = {
+                title: currentSession.session.title,
+                order: currentSession.session.order
+              };
+            }
+          }
+        }
+      });
+    }
     
     res.status(200).json({
       success: true,

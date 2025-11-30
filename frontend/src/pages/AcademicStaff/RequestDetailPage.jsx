@@ -301,103 +301,334 @@ const RequestDetailPage = ({
                     <strong>Nội dung đơn:</strong> {selectedRequest.content}
                   </p>
                   
-                  {/* Danh sách lớp học viên đang học / đang dạy */}
-                  {studentClasses.length > 0 && (
-                    <div className="mb-12">
-                      <h6 className="text-neutral-900 fw-bold mb-8 text-14">
-                        {isStudent ? 'Các lớp học viên đang học:' : isTeacher ? 'Các lớp đang dạy:' : 'Các lớp học viên đang học:'}
-                      </h6>
-                      <div className="border border-neutral-200 rounded-6 p-8 bg-neutral-25">
-                        <div className="d-flex flex-column" style={{ gap: '12px' }}>
-                          {studentClasses.map((classItem, index) => {
-                            // Kiểm tra xem lớp này có đang pending đổi không
-                            const isPendingChange = pendingClassChange && 
-                              pendingClassChange.oldClassId === classItem.classId;
-                            
-                            if (isPendingChange) {
-                              // Hiển thị layout 2 cột cho lớp đang pending đổi
-                              return (
-                                <div key={index} className="row g-3">
-                                  <div className="col-md-6">
-                                    {renderClassInfo(pendingClassChange.oldClassInfo, true)}
-                                  </div>
-                                  <div className="col-md-6">
-                                    {renderClassInfo(pendingClassChange.newClassInfo, false)}
-                                  </div>
-                                </div>
-                              );
-                            } else {
-                              // Hiển thị bình thường cho các lớp khác
-                              return (
-                                <div 
-                                  key={index}
-                                  className="d-flex align-items-start justify-content-between gap-12 p-12 bg-white rounded-8 border border-neutral-100"
-                                >
-                                  <div className="flex-grow-1">
-                                    <div className="d-flex align-items-center gap-8 mb-4">
-                                      <i className="fas fa-book text-main-600"></i>
-                                      <span className="text-neutral-900 fw-semibold text-14">{classItem.className}</span>
-                                    </div>
-                                    <div className="ps-20 mb-4">
-                                      <span className="text-neutral-600 text-13">Khóa học: </span>
-                                      <span className="text-neutral-700 text-13">{classItem.courseName}</span>
-                                    </div>
-                                    <div className="ps-20">
-                                      <span className="text-neutral-600 text-13">
-                                        {isStudent ? 'Session đang học: ' : isTeacher ? 'Session đang dạy: ' : 'Session đang học: '}
-                                      </span>
-                                      <span className="text-neutral-700 text-13 fw-medium">
-                                        {classItem.currentSessionTitle}
-                                        {classItem.currentSessionOrder !== null && (
-                                          <span className="text-neutral-500 ms-4">(Số thứ tự: {classItem.currentSessionOrder})</span>
-                                        )}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  {isStudent && (
-                                    <div className="d-flex align-items-center">
-                                      <Button
-                                        variant="outline-primary"
-                                        size="sm"
-                                        onClick={() => onChangeClass(classItem)}
-                                        className="d-flex align-items-center gap-2"
-                                      >
-                                        <i className="fas fa-exchange-alt"></i>
-                                        Đổi lớp
-                                      </Button>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            }
-                          })}
-                        </div>
-                      </div>
+                  {/* Hiển thị thông tin request dựa trên type */}
+                  {(() => {
+                    const requestType = selectedRequest?.type;
+                    // Chỉ hiển thị phần này cho 3 loại đơn: makeup_class, replace_teacher, change_class
+                    const shouldShowSection = requestType === 'makeup_class' || 
+                                            requestType === 'replace_teacher' || 
+                                            requestType === 'change_class';
+                    
+                    if (!shouldShowSection) return null;
+                    
+                    // ============================================
+                    // 1. MAKEUP_CLASS: Hiển thị từ studentScheduleId
+                    // ============================================
+                    if (requestType === 'makeup_class' && selectedRequest?.studentScheduleId) {
+                      const studentSchedule = selectedRequest.studentScheduleId;
+                      const classSchedule = studentSchedule?.classSchedule;
+                      const session = classSchedule?.session;
+                      const classInfo = classSchedule?.class;
+                      const courseInfo = classInfo?.course;
                       
-                      {/* Cảnh báo các buổi cần học bù (trường hợp 2) */}
-                      {pendingClassChange && filteredPendingMakeupSessions && filteredPendingMakeupSessions.length > 0 && (
-                        <Alert variant="warning" className="mt-12 mb-0">
-                          <div className="d-flex align-items-start gap-8">
-                            <i className="fas fa-exclamation-triangle text-warning mt-1"></i>
-                            <div className="flex-grow-1">
-                              <strong className="text-warning-dark">Cảnh báo: Học sinh cần học bù các buổi sau:</strong>
-                              <ul className="mb-0 mt-8 ps-20">
-                                {filteredPendingMakeupSessions.map((session, idx) => (
-                                  <li key={idx} className="mb-4">
-                                    <strong>Buổi {session.sessionOrder}:</strong> {session.sessionTitle}
-                                    {session.date && (
-                                      <span className="text-neutral-600 ms-8">
-                                        ({new Date(session.date).toLocaleDateString('vi-VN')} {session.startTime}-{session.endTime})
-                                      </span>
+                      if (!classSchedule) return null;
+                      
+                      // Format ngày thứ mấy
+                      const scheduleDate = new Date(classSchedule.date);
+                      const dayOfWeek = scheduleDate.getDay();
+                      const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+                      const dayName = dayNames[dayOfWeek];
+                      const dateStr = scheduleDate.toLocaleDateString('vi-VN');
+                      
+                      return (
+                        <div className="mb-12">
+                          <h6 className="text-neutral-900 fw-bold mb-8 text-14">Buổi xin học bù:</h6>
+                          <div className="border border-neutral-200 rounded-6 p-12 bg-white">
+                            <div className="d-flex align-items-start justify-content-between gap-12">
+                              <div className="flex-grow-1 d-flex flex-column gap-8">
+                                <div>
+                                  <span className="text-neutral-600 text-13">Lớp: </span>
+                                  <span className="text-neutral-900 fw-semibold text-14">{classInfo?.name || 'N/A'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-neutral-600 text-13">Ngày: </span>
+                                  <span className="text-neutral-700 text-13 fw-medium">{dayName} ({dateStr})</span>
+                                </div>
+                                <div>
+                                  <span className="text-neutral-600 text-13">Giờ: </span>
+                                  <span className="text-neutral-700 text-13 fw-medium">
+                                    {classSchedule.startTime || 'N/A'} - {classSchedule.endTime || 'N/A'}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-neutral-600 text-13">Đang học session: </span>
+                                  <span className="text-neutral-700 text-13 fw-medium">
+                                    {session?.title || 'N/A'}
+                                    {session?.order !== null && session?.order !== undefined && (
+                                      <span className="text-neutral-500 ms-4">(Số thứ tự: {session.order})</span>
                                     )}
-                                  </li>
-                                ))}
-                              </ul>
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="d-flex align-items-center">
+                                <Button
+                                  variant="outline-primary"
+                                  size="sm"
+                                  onClick={() => {
+                                    // Truyền studentScheduleId để tự động chọn buổi học bù từ đơn
+                                    const studentScheduleId = studentSchedule?._id || studentSchedule?.id;
+                                    onAddMakeupClass(studentScheduleId);
+                                  }}
+                                  className="d-flex align-items-center gap-2"
+                                >
+                                  <i className="fas fa-plus"></i>
+                                  {isStudent ? 'Xếp buổi học bù' : isTeacher ? 'Xếp lịch dạy thay' : 'Xếp buổi học bù'}
+                                </Button>
+                              </div>
                             </div>
                           </div>
-                        </Alert>
-                      )}
-                    </div>
+                        </div>
+                      );
+                    }
+                    
+                    // ============================================
+                    // 2. REPLACE_TEACHER: Hiển thị từ classScheduleId
+                    // ============================================
+                    if (requestType === 'replace_teacher' && selectedRequest?.classScheduleId) {
+                      const classSchedule = selectedRequest.classScheduleId;
+                      const session = classSchedule?.session;
+                      const classInfo = classSchedule?.class;
+                      const courseInfo = classInfo?.course;
+                      
+                      if (!classSchedule) return null;
+                      
+                      // Format ngày thứ mấy
+                      const scheduleDate = new Date(classSchedule.date);
+                      const dayOfWeek = scheduleDate.getDay();
+                      const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+                      const dayName = dayNames[dayOfWeek];
+                      const dateStr = scheduleDate.toLocaleDateString('vi-VN');
+                      
+                      return (
+                        <div className="mb-12">
+                          <h6 className="text-neutral-900 fw-bold mb-8 text-14">Buổi xin xếp người dạy thay:</h6>
+                          <div className="border border-neutral-200 rounded-6 p-12 bg-white">
+                            <div className="d-flex flex-column gap-8">
+                              <div>
+                                <span className="text-neutral-600 text-13">Lớp: </span>
+                                <span className="text-neutral-900 fw-semibold text-14">{classInfo?.name || 'N/A'}</span>
+                              </div>
+                              <div>
+                                <span className="text-neutral-600 text-13">Thứ mấy: </span>
+                                <span className="text-neutral-700 text-13 fw-medium">{dayName} ({dateStr})</span>
+                              </div>
+                              <div>
+                                <span className="text-neutral-600 text-13">Giờ nào: </span>
+                                <span className="text-neutral-700 text-13 fw-medium">
+                                  {classSchedule.startTime || 'N/A'} - {classSchedule.endTime || 'N/A'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-neutral-600 text-13">Đang học session nào: </span>
+                                <span className="text-neutral-700 text-13 fw-medium">
+                                  {session?.title || 'N/A'}
+                                  {session?.order !== null && session?.order !== undefined && (
+                                    <span className="text-neutral-500 ms-4">(Số thứ tự: {session.order})</span>
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    // ============================================
+                    // 3. CHANGE_CLASS: Hiển thị từ classId
+                    // ============================================
+                    if (requestType === 'change_class' && selectedRequest?.classId) {
+                      const classInfo = selectedRequest.classId;
+                      const courseInfo = classInfo?.course;
+                      // Chỉ lấy các buổi cố định (status='fixed'), không lấy buổi tạm
+                      const allSchedules = classInfo?.fixedSchedules || [];
+                      const fixedSchedules = allSchedules.filter(schedule => 
+                        schedule.status === 'fixed' || !schedule.status // Nếu không có status thì coi như fixed
+                      );
+                      const currentSession = classInfo?.currentSession;
+                      
+                      // Format thời khóa biểu
+                      const formatSchedule = (schedules) => {
+                        if (!schedules || schedules.length === 0) return 'Chưa có lịch học';
+                        
+                        // Nhóm theo thứ trong tuần
+                        const scheduleGroups = {};
+                        schedules.forEach(schedule => {
+                          const date = new Date(schedule.date);
+                          const dayOfWeek = date.getDay();
+                          const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+                          const dayName = dayNames[dayOfWeek];
+                          const key = `${dayOfWeek}-${schedule.startTime}-${schedule.endTime}`;
+                          
+                          if (!scheduleGroups[key]) {
+                            scheduleGroups[key] = {
+                              dayName,
+                              startTime: schedule.startTime,
+                              endTime: schedule.endTime
+                            };
+                          }
+                        });
+                        
+                        return Object.values(scheduleGroups).map(group => 
+                          `${group.dayName} | ${group.startTime}-${group.endTime}`
+                        ).join(', ');
+                      };
+                      
+                      // Tạo classItem để truyền vào onChangeClass
+                      const classItemForChange = {
+                        classId: classInfo?._id || classInfo,
+                        className: classInfo?.name || 'N/A',
+                        courseName: courseInfo?.name || 'N/A',
+                        currentSessionTitle: currentSession?.title || 'Chưa có thông tin session',
+                        currentSessionOrder: currentSession?.order || null,
+                        fixedSchedules: fixedSchedules
+                      };
+                      
+                      return (
+                        <div className="mb-12">
+                          <h6 className="text-neutral-900 fw-bold mb-8 text-14">Lớp xin đổi:</h6>
+                          <div className="border border-neutral-200 rounded-6 p-12 bg-white">
+                            <div className="d-flex align-items-start justify-content-between gap-12">
+                              <div className="flex-grow-1 d-flex flex-column gap-8">
+                                <div>
+                                  <span className="text-neutral-600 text-13">Lớp: </span>
+                                  <span className="text-neutral-900 fw-semibold text-14">{classInfo?.name || 'N/A'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-neutral-600 text-13">Thời khóa biểu hiện tại: </span>
+                                  <div className="text-neutral-700 text-13 fw-medium mt-2">
+                                    {formatSchedule(fixedSchedules)}
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-neutral-600 text-13">Đang học session nào: </span>
+                                  <span className="text-neutral-700 text-13 fw-medium">
+                                    {currentSession?.title || 'Chưa có thông tin session'}
+                                    {currentSession?.order !== null && currentSession?.order !== undefined && (
+                                      <span className="text-neutral-500 ms-4">(Số thứ tự: {currentSession.order})</span>
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                              {isStudent && (
+                                <div className="d-flex align-items-center">
+                                  <Button
+                                    variant="outline-primary"
+                                    size="sm"
+                                    onClick={() => onChangeClass(classItemForChange)}
+                                    className="d-flex align-items-center gap-2"
+                                  >
+                                    <i className="fas fa-exchange-alt"></i>
+                                    Đổi lớp
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    // Fallback: Hiển thị từ studentClasses (cho các trường hợp khác)
+                    return shouldShowSection && studentClasses.length > 0 && (
+                      <div className="mb-12">
+                        <h6 className="text-neutral-900 fw-bold mb-8 text-14">
+                          {requestType === 'makeup_class' 
+                            ? 'Buổi xin học bù:' 
+                            : requestType === 'replace_teacher' 
+                            ? 'Buổi xin xếp buổi dạy thay:' 
+                            : requestType === 'change_class' 
+                            ? 'Lớp yêu cầu đổi:' 
+                            : ''}
+                        </h6>
+                        <div className="border border-neutral-200 rounded-6 p-8 bg-neutral-25">
+                          <div className="d-flex flex-column" style={{ gap: '12px' }}>
+                            {studentClasses.map((classItem, index) => {
+                              const isPendingChange = pendingClassChange && 
+                                pendingClassChange.oldClassId === classItem.classId;
+                              
+                              if (isPendingChange) {
+                                return (
+                                  <div key={index} className="row g-3">
+                                    <div className="col-md-6">
+                                      {renderClassInfo(pendingClassChange.oldClassInfo, true)}
+                                    </div>
+                                    <div className="col-md-6">
+                                      {renderClassInfo(pendingClassChange.newClassInfo, false)}
+                                    </div>
+                                  </div>
+                                );
+                              } else {
+                                return (
+                                  <div 
+                                    key={index}
+                                    className="d-flex align-items-start justify-content-between gap-12 p-12 bg-white rounded-8 border border-neutral-100"
+                                  >
+                                    <div className="flex-grow-1">
+                                      <div className="d-flex align-items-center gap-8 mb-4">
+                                        <i className="fas fa-book text-main-600"></i>
+                                        <span className="text-neutral-900 fw-semibold text-14">{classItem.className}</span>
+                                      </div>
+                                      <div className="ps-20 mb-4">
+                                        <span className="text-neutral-600 text-13">Khóa học: </span>
+                                        <span className="text-neutral-700 text-13">{classItem.courseName}</span>
+                                      </div>
+                                      <div className="ps-20">
+                                        <span className="text-neutral-600 text-13">
+                                          {isStudent ? 'Session đang học: ' : isTeacher ? 'Session đang dạy: ' : 'Session đang học: '}
+                                        </span>
+                                        <span className="text-neutral-700 text-13 fw-medium">
+                                          {classItem.currentSessionTitle}
+                                          {classItem.currentSessionOrder !== null && (
+                                            <span className="text-neutral-500 ms-4">(Số thứ tự: {classItem.currentSessionOrder})</span>
+                                          )}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {isStudent && (
+                                      <div className="d-flex align-items-center">
+                                        <Button
+                                          variant="outline-primary"
+                                          size="sm"
+                                          onClick={() => onChangeClass(classItem)}
+                                          className="d-flex align-items-center gap-2"
+                                        >
+                                          <i className="fas fa-exchange-alt"></i>
+                                          Đổi lớp
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  
+                  {/* Cảnh báo các buổi cần học bù (trường hợp 2) */}
+                  {pendingClassChange && filteredPendingMakeupSessions && filteredPendingMakeupSessions.length > 0 && (
+                    <Alert variant="warning" className="mt-12 mb-0">
+                      <div className="d-flex align-items-start gap-8">
+                        <i className="fas fa-exclamation-triangle text-warning mt-1"></i>
+                        <div className="flex-grow-1">
+                          <strong className="text-warning-dark">Cảnh báo: Học sinh cần học bù các buổi sau:</strong>
+                          <ul className="mb-0 mt-8 ps-20">
+                            {filteredPendingMakeupSessions.map((session, idx) => (
+                              <li key={idx} className="mb-4">
+                                <strong>Buổi {session.sessionOrder}:</strong> {session.sessionTitle}
+                                {session.date && (
+                                  <span className="text-neutral-600 ms-8">
+                                    ({new Date(session.date).toLocaleDateString('vi-VN')} {session.startTime}-{session.endTime})
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </Alert>
                   )}
                 </div>
               )}
@@ -406,15 +637,18 @@ const RequestDetailPage = ({
                 <h6 className="text-neutral-900 fw-bold mb-0">
                   {isStudent ? 'Lịch học:' : isTeacher ? 'Lịch dạy:' : 'Lịch học/dạy:'}
                 </h6>
-                <Button
-                  variant="outline-primary"
-                  size="sm"
-                  onClick={onAddMakeupClass}
-                  className="d-flex align-items-center gap-2"
-                >
-                  <i className="fas fa-plus"></i>
-                  {isStudent ? 'Thêm buổi học bù' : isTeacher ? 'Xếp lịch dạy thay' : 'Thêm buổi học bù'}
-                </Button>
+                {/* Chỉ hiển thị nút khi không phải đơn makeup_class (vì đã có nút ở phần "Buổi xin học bù:") */}
+                {selectedRequest?.type !== 'makeup_class' && (
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={onAddMakeupClass}
+                    className="d-flex align-items-center gap-2"
+                  >
+                    <i className="fas fa-plus"></i>
+                    {isStudent ? 'Thêm buổi học bù' : isTeacher ? 'Xếp lịch dạy thay' : 'Thêm buổi học bù'}
+                  </Button>
+                )}
               </div>
               
               {loadingSchedule ? (

@@ -202,6 +202,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     return programTypeMap[programName] || null;
   };
 
+  // Map type to program name (case-insensitive)
+  const getProgramFromType = (type) => {
+    if (!type) return null;
+    const normalizedType = type.toLowerCase();
+    return typeProgramMap[normalizedType] || null;
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
@@ -806,9 +813,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         
         if (typesResponse?.success && typesResponse.types) {
           const allTypes = typesResponse.types;
-          const allPrograms = allTypes.map(type => typeProgramMap[type]).filter(Boolean);
+          console.log('📋 Types from API:', allTypes);
+          const allPrograms = allTypes.map(type => getProgramFromType(type)).filter(Boolean);
           setAvailablePrograms(allPrograms);
           console.log('✅ Loaded types from program table:', allTypes.length);
+          console.log('✅ Available programs:', allPrograms);
+        } else {
+          console.warn('⚠️ Types response:', typesResponse);
         }
         
         if (levelsResponse?.success && levelsResponse.levels) {
@@ -884,7 +895,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           const response = await courseService.getAllTypes();
           if (response?.success && response.types) {
             const allTypes = response.types;
-            const allPrograms = allTypes.map(type => typeProgramMap[type]).filter(Boolean);
+            const allPrograms = allTypes.map(type => getProgramFromType(type)).filter(Boolean);
             setAvailablePrograms(allPrograms);
           }
         } catch (error) {
@@ -898,7 +909,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         const response = await courseService.getTypesByLevel(formData.level);
         if (response?.success && response.types) {
           const programsForLevel = response.types
-            .map(type => typeProgramMap[type])
+            .map(type => getProgramFromType(type))
             .filter(Boolean);
           setAvailablePrograms(programsForLevel);
 
@@ -1707,7 +1718,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               <div className="col-md-6">
                 <Form.Group>
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
-                    Chương trình <span className="text-danger-600">*</span>
+                    Loại Chương trình <span className="text-danger-600">*</span>
                   </Form.Label>
                   <Form.Select
                     name="program"
@@ -1716,7 +1727,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     required
                     className="border-neutral-30 radius-8 px-16 py-10"
                   >
-                    <option value="">-- Chọn chương trình --</option>
+                    <option value="">-- Chọn loại chương trình --</option>
                     {availablePrograms.map(program => (
                       <option key={program} value={program}>{program}</option>
                     ))}
@@ -1778,7 +1789,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                   >
                     <option value="">
                       {!formData.program 
-                        ? '-- Chọn chương trình trước --'
+                        ? '-- Chọn loại chương trình trước --'
                         : coursesLoading 
                         ? 'Đang tải danh sách course...'
                         : '-- Chọn course --'}

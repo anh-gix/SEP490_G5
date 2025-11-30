@@ -1518,6 +1518,72 @@ exports.getStudentSchedule = async (req, res) => {
 };
 
 // =========================
+// 📚 LẤY DANH SÁCH CLASS SCHEDULE CÓ CÙNG SESSION VÀ SAU HÔM NAY
+// =========================
+exports.getClassSchedulesBySession = async (req, res) => {
+  try {
+    const { sessionId, sessionOrder, dateAfter } = req.query;
+    
+    if (!sessionId && !sessionOrder) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp sessionId hoặc sessionOrder'
+      });
+    }
+
+    const today = dateAfter ? new Date(dateAfter) : new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Tạo query để tìm ClassSchedule
+    const query = {
+      date: { $gte: today },
+      status: { $in: ['fixed', 'temporary'] }
+    };
+
+    // Nếu có sessionId, tìm theo session ID
+    if (sessionId) {
+      query.session = sessionId;
+    }
+
+    // Tìm tất cả ClassSchedule thỏa mãn điều kiện
+    let classSchedules = await ClassSchedule.find(query)
+      .populate('session', 'title order')
+      .populate('class', 'name')
+      .populate('room', 'room_name')
+      .populate({
+        path: 'class',
+        populate: {
+          path: 'course',
+          select: 'name'
+        }
+      })
+      .sort({ date: 1, startTime: 1 })
+      .lean();
+
+    // Nếu có sessionOrder, filter thêm theo order
+    if (sessionOrder !== undefined && sessionOrder !== null) {
+      classSchedules = classSchedules.filter(schedule => {
+        return schedule.session && schedule.session.order === parseInt(sessionOrder);
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Lấy danh sách ClassSchedule thành công',
+      total: classSchedules.length,
+      classSchedules
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi lấy danh sách ClassSchedule:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy danh sách ClassSchedule',
+      error: error.message
+    });
+  }
+};
+
+// =========================
 // 👨‍🏫 LẤY LỊCH DẠY CỦA GIÁO VIÊN
 // =========================
 exports.getTeacherSchedule = async (req, res) => {

@@ -39,4 +39,7 @@ router.patch("/:studentScheduleId/attendance", classScheduleController.markAtten
 // ✅ Xem tất cả các phòng học
 router.get("/rooms", ministryController.getAllRooms); // 🆕 thêm dòng này
 
+// ✅ Lấy danh sách ClassSchedule có cùng session và sau hôm nay
+router.get("/by-session", classScheduleController.getClassSchedulesBySession);
+
 module.exports = router;

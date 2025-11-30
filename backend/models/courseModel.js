@@ -62,6 +62,11 @@ const courseSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'CamSession'
     }],
+    // Danh sách học viên đã đăng ký khóa học
+    studentEnrollments: [{
+        type: Schema.Types.ObjectId,
+        ref: 'Student'
+    }],
     createdBy: {
         type: Schema.Types.ObjectId,
         ref: 'User',

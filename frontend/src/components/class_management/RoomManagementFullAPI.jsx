@@ -14,7 +14,7 @@ const RoomManagementFull = () => {
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState('calendar'); // calendar, grid, or list
+  const [viewMode, setViewMode] = useState('calendar'); // calendar or list
   const [showModal, setShowModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [editingRoom, setEditingRoom] = useState(null);
@@ -382,14 +382,6 @@ const RoomManagementFull = () => {
                   Calendar
                 </Button>
                 <Button
-                  variant={viewMode === 'grid' ? 'primary' : 'outline-secondary'}
-                  onClick={() => setViewMode('grid')}
-                  className="px-16"
-                >
-                  <i className="fas fa-th me-2"></i>
-                  Grid
-                </Button>
-                <Button
                   variant={viewMode === 'list' ? 'primary' : 'outline-secondary'}
                   onClick={() => setViewMode('list')}
                   className="px-16"
@@ -418,64 +410,6 @@ const RoomManagementFull = () => {
           <i className="fas fa-exclamation-triangle me-2"></i>
           {error}
         </div>
-      )}
-
-      {/* Grid View */}
-      {!loading && !error && viewMode === 'grid' && (
-        <Row className="g-3">
-          {filteredRooms.map(room => (
-            <Col key={room._id} lg={4} md={6}>
-              <Card className="bg-white border-0 rounded-12 box-shadow-sm h-100">
-                <Card.Body className="p-20">
-                  <div className="d-flex justify-content-between align-items-start mb-16">
-                    <div>
-                      <h6 className="text-neutral-900 fw-semibold mb-4">{room.room_name}</h6>
-                      <p className="text-neutral-600 text-13 mb-0">{room.location}</p>
-                    </div>
-                    {getStatusBadge(room.status)}
-                  </div>
-
-                  <div className="mb-16">
-                    <div className="d-flex align-items-center gap-8 mb-8">
-                      <i className="fas fa-users text-neutral-400"></i>
-                      <span className="text-neutral-700 text-14">Sức chứa: {room.capacity} người</span>
-                    </div>
-                  </div>
-
-                  {room.description && (
-                    <p className="text-neutral-600 text-13 mb-16">{room.description}</p>
-                  )}
-
-                  <div className="d-flex gap-8">
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={() => handleViewSchedule(room)}
-                      className="flex-grow-1"
-                    >
-                      <i className="fas fa-calendar me-1"></i>
-                      Lịch sử dụng
-                    </Button>
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={() => handleEdit(room)}
-                    >
-                      <i className="fas fa-edit"></i>
-                    </Button>
-                    <Button
-                      variant="outline-danger"
-                      size="sm"
-                      onClick={() => handleDelete(room._id)}
-                    >
-                      <i className="fas fa-trash"></i>
-                    </Button>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          ))}
-        </Row>
       )}
 
       {/* List View */}

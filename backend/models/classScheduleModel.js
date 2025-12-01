@@ -20,6 +20,11 @@ const classScheduleSchema = new Schema({
         ref: 'User',
         required: true
     },
+    // Thêm teacher dạy thay (id)
+    substituteTeacher: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+    },
     
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     

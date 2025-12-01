@@ -23,6 +23,7 @@ const RequestDetailPage = ({
   onChangeClass,
   onAddMakeupClass,
   onRemoveMakeupClass,
+  onRemoveClassChange,
   processing,
   formatDate,
   renderClassInfo
@@ -636,14 +637,28 @@ const RequestDetailPage = ({
                       };
                       
                       // Tạo classItem để truyền vào onChangeClass
+                      console.log('=== DEBUG RequestDetailPage: classId từ đơn ===');
+                      console.log('classInfo:', classInfo);
+                      console.log('classInfo._id:', classInfo?._id);
+                      console.log('classInfo._id type:', typeof classInfo?._id);
+                      console.log('classInfo._id toString:', classInfo?._id?.toString());
+                      
                       const classItemForChange = {
-                        classId: classInfo?._id || classInfo,
+                        classId: String(classInfo?._id || classInfo),
                         className: classInfo?.name || 'N/A',
                         courseName: courseInfo?.name || 'N/A',
+                        courseId: courseInfo?._id || courseInfo || null,
                         currentSessionTitle: currentSession?.title || 'Chưa có thông tin session',
                         currentSessionOrder: currentSession?.order || null,
                         fixedSchedules: fixedSchedules
                       };
+                      
+                      console.log('classItemForChange.classId:', classItemForChange.classId);
+                      console.log('classItemForChange.classId type:', typeof classItemForChange.classId);
+                      
+                      // Kiểm tra xem có pendingClassChange không
+                      const isPendingChange = pendingClassChange && 
+                        String(pendingClassChange.oldClassId) === String(classItemForChange.classId);
                       
                       return (
                         <div className="mb-12">
@@ -651,28 +666,74 @@ const RequestDetailPage = ({
                           <div className="border border-neutral-200 rounded-6 p-12 bg-white">
                             <div className="d-flex align-items-start justify-content-between gap-12">
                               <div className="flex-grow-1 d-flex flex-column gap-8">
-                                <div>
-                                  <span className="text-neutral-600 text-13">Lớp: </span>
-                                  <span className="text-neutral-900 fw-semibold text-14">{classInfo?.name || 'N/A'}</span>
-                                </div>
-                                <div>
-                                  <span className="text-neutral-600 text-13">Thời khóa biểu hiện tại: </span>
-                                  <div className="text-neutral-700 text-13 fw-medium mt-2">
-                                    {formatSchedule(fixedSchedules)}
+                                {/* Lớp cũ (lớp xin đổi) */}
+                                <div className="d-flex align-items-start gap-8">
+                                  <i className="fas fa-book text-primary text-14 mt-1"></i>
+                                  <div className="flex-grow-1 d-flex flex-column gap-4">
+                                    <div className="text-primary fw-semibold text-13">Lớp đang học:</div>
+                                    <div className="d-flex flex-column gap-2">
+                                      <div>
+                                        <span className="text-neutral-600 text-13">Lớp: </span>
+                                        <span className="text-neutral-900 fw-semibold text-14">{classInfo?.name || 'N/A'}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-neutral-600 text-13">Thời khóa biểu hiện tại: </span>
+                                        <div className="text-neutral-700 text-13 fw-medium mt-2">
+                                          {formatSchedule(fixedSchedules)}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <span className="text-neutral-600 text-13">Đang học session: </span>
+                                        <span className="text-neutral-700 text-13 fw-medium">
+                                          {currentSession?.title || 'Chưa có thông tin session'}
+                                          {currentSession?.order !== null && currentSession?.order !== undefined && (
+                                            <span className="text-neutral-500 ms-4">(Số thứ tự: {currentSession.order})</span>
+                                          )}
+                                        </span>
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
-                                <div>
-                                  <span className="text-neutral-600 text-13">Đang học session nào: </span>
-                                  <span className="text-neutral-700 text-13 fw-medium">
-                                    {currentSession?.title || 'Chưa có thông tin session'}
-                                    {currentSession?.order !== null && currentSession?.order !== undefined && (
-                                      <span className="text-neutral-500 ms-4">(Số thứ tự: {currentSession.order})</span>
-                                    )}
-                                  </span>
-                                </div>
+                                
+                                {/* Lớp mới (lớp muốn đổi) - nếu đã chọn */}
+                                {isPendingChange && pendingClassChange.newClassInfo && (
+                                  <>
+                                    <div className="border-top border-neutral-200 pt-8 mt-4">
+                                      <div className="d-flex align-items-start gap-8">
+                                        <i className="fas fa-exchange-alt text-success text-14 mt-1"></i>
+                                        <div className="flex-grow-1 d-flex flex-column gap-2">
+                                          <div className="text-success fw-semibold text-13">Lớp muốn đổi:</div>
+                                          <div className="d-flex flex-column gap-2">
+                                            <div>
+                                              <span className="text-neutral-600 text-13">Lớp: </span>
+                                              <span className="text-neutral-900 fw-semibold text-14">{pendingClassChange.newClassInfo.className || 'N/A'}</span>
+                                            </div>
+                                            {pendingClassChange.newClassInfo.fixedSchedules && pendingClassChange.newClassInfo.fixedSchedules.length > 0 && (
+                                              <div>
+                                                <span className="text-neutral-600 text-13">Thời khóa biểu: </span>
+                                                <div className="text-neutral-700 text-13 fw-medium mt-2">
+                                                  {formatSchedule(pendingClassChange.newClassInfo.fixedSchedules)}
+                                                </div>
+                                              </div>
+                                            )}
+                                            <div>
+                                              <span className="text-neutral-600 text-13">Đang học session: </span>
+                                              <span className="text-neutral-700 text-13 fw-medium">
+                                                {pendingClassChange.newClassInfo.currentSessionTitle || 'Chưa có thông tin session'}
+                                                {pendingClassChange.newClassInfo.currentSessionOrder !== null && (
+                                                  <span className="text-neutral-500 ms-4">(Số thứ tự: {pendingClassChange.newClassInfo.currentSessionOrder})</span>
+                                                )}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
                               </div>
-                              {isStudent && (
-                                <div className="d-flex align-items-center">
+                              <div className="d-flex flex-column gap-2 align-items-end">
+                                {!isPendingChange ? (
                                   <Button
                                     variant="outline-primary"
                                     size="sm"
@@ -682,8 +743,19 @@ const RequestDetailPage = ({
                                     <i className="fas fa-exchange-alt"></i>
                                     Đổi lớp
                                   </Button>
-                                </div>
-                              )}
+                                ) : (
+                                  <Button
+                                    variant="outline-danger"
+                                    size="sm"
+                                    onClick={onRemoveClassChange}
+                                    className="d-flex align-items-center gap-2"
+                                    title="Xóa thông tin đổi lớp"
+                                  >
+                                    <i className="fas fa-trash"></i>
+                                    Xóa
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -799,8 +871,8 @@ const RequestDetailPage = ({
                 <h6 className="text-neutral-900 fw-bold mb-0">
                   {isStudent ? 'Lịch học:' : isTeacher ? 'Lịch dạy:' : 'Lịch học/dạy:'}
                 </h6>
-                {/* Chỉ hiển thị nút khi không phải đơn makeup_class và không phải đơn create_class */}
-                {selectedRequest?.type !== 'makeup_class' && selectedRequest?.type !== 'create_class' && (
+                {/* Chỉ hiển thị nút khi không phải đơn makeup_class, không phải đơn create_class và không phải đơn change_class */}
+                {selectedRequest?.type !== 'makeup_class' && selectedRequest?.type !== 'create_class' && selectedRequest?.type !== 'change_class' && (
                   <Button
                     variant="outline-primary"
                     size="sm"

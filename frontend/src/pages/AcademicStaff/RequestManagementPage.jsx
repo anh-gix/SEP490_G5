@@ -820,49 +820,153 @@ const RequestManagementPage = () => {
 
   // Hàm để mở modal đổi lớp
   const handleChangeClassClick = async (classItem) => {
+    console.log('=== DEBUG handleChangeClassClick ===');
+    console.log('classItem nhận được:', classItem);
+    console.log('classItem.classId:', classItem.classId);
+    console.log('classItem.classId type:', typeof classItem.classId);
+    console.log('senderSchedule:', senderSchedule);
+    console.log('senderSchedule length:', senderSchedule.length);
+    
+    // Log tất cả classId trong senderSchedule
+    console.log('--- Tất cả classId trong senderSchedule ---');
+    senderSchedule.forEach((sch, index) => {
+      const classId = sch.class?._id?.toString() || sch.class?.toString();
+      console.log(`Schedule ${index}:`, {
+        classId: classId,
+        classIdType: typeof classId,
+        class: sch.class,
+        class_id: sch.class?._id,
+        class_idType: typeof sch.class?._id
+      });
+    });
+    
     // Lấy thông tin đầy đủ của lớp đang học từ senderSchedule
     const classSchedules = senderSchedule.filter(sch => {
       const classId = sch.class?._id?.toString() || sch.class?.toString();
-      return classId === classItem.classId;
+      const targetClassId = (classItem.classId?._id?.toString() || classItem.classId?.toString() || String(classItem.classId));
+      
+      console.log('--- So sánh ---');
+      console.log('classId từ senderSchedule:', classId, 'type:', typeof classId);
+      console.log('targetClassId từ classItem:', targetClassId, 'type:', typeof targetClassId);
+      console.log('sch.class:', sch.class);
+      console.log('sch.class._id:', sch.class?._id);
+      console.log('Kết quả so sánh:', classId === targetClassId);
+      
+      return classId === targetClassId;
     });
 
-    if (classSchedules.length === 0) {
-      alert('Không tìm thấy thông tin lớp học');
-      return;
-    }
+    console.log('classSchedules tìm được:', classSchedules.length);
+    console.log('classSchedules:', classSchedules);
 
-    // Lọc chỉ lấy các buổi học cố định (fixed), bỏ qua buổi tạm (temporary)
-    const fixedSchedules = classSchedules.filter(sch => {
-      const status = sch.status || 'fixed';
-      return status === 'fixed';
-    });
-    
-    // Sắp xếp schedules theo date và startTime
-    const sortedSchedules = [...fixedSchedules].sort((a, b) => {
-      const dateA = new Date(a.date);
-      const dateB = new Date(b.date);
-      if (dateA.getTime() !== dateB.getTime()) {
-        return dateA - dateB;
+    let fixedSchedulesList = [];
+    let courseId = null;
+
+    // Nếu tìm thấy trong senderSchedule, sử dụng thông tin từ đó
+    if (classSchedules.length > 0) {
+      // Lọc chỉ lấy các buổi học cố định (fixed), bỏ qua buổi tạm (temporary)
+      const fixedSchedules = classSchedules.filter(sch => {
+        const status = sch.status || 'fixed';
+        return status === 'fixed';
+      });
+      
+      // Sắp xếp schedules theo date và startTime
+      const sortedSchedules = [...fixedSchedules].sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        if (dateA.getTime() !== dateB.getTime()) {
+          return dateA - dateB;
+        }
+        return (a.startTime || '').localeCompare(b.startTime || '');
+      });
+
+      // Tạo danh sách các buổi học cố định
+      fixedSchedulesList = sortedSchedules.map(sch => ({
+        title: sch.session?.title || 'N/A',
+        order: sch.session?.order || null,
+        date: sch.date || null,
+        startTime: sch.startTime || 'N/A',
+        endTime: sch.endTime || 'N/A',
+        roomName: sch.room?.room_name || 'N/A'
+      }));
+
+      courseId = classSchedules[0]?.class?.course?._id || classSchedules[0]?.class?.course || null;
+    } else {
+      // Nếu không tìm thấy trong senderSchedule, sử dụng thông tin từ classItem (từ request)
+      // classItem đã có fixedSchedules từ request
+      console.log('Không tìm thấy trong senderSchedule, sử dụng thông tin từ classItem');
+      console.log('classItem.fixedSchedules:', classItem.fixedSchedules);
+      
+      if (classItem.fixedSchedules && Array.isArray(classItem.fixedSchedules) && classItem.fixedSchedules.length > 0) {
+        // Sắp xếp schedules theo date và startTime
+        const sortedSchedules = [...classItem.fixedSchedules].sort((a, b) => {
+          const dateA = new Date(a.date);
+          const dateB = new Date(b.date);
+          if (dateA.getTime() !== dateB.getTime()) {
+            return dateA - dateB;
+          }
+          return (a.startTime || '').localeCompare(b.startTime || '');
+        });
+
+        fixedSchedulesList = sortedSchedules.map(sch => ({
+          title: sch.session?.title || sch.title || 'N/A',
+          order: sch.session?.order || sch.order || null,
+          date: sch.date || null,
+          startTime: sch.startTime || 'N/A',
+          endTime: sch.endTime || 'N/A',
+          roomName: sch.roomName || sch.room?.room_name || 'N/A'
+        }));
+
+        // Lấy courseId từ classItem nếu có
+        courseId = classItem.courseId || null;
+      } else {
+        // Nếu không có fixedSchedules trong classItem, thử lấy từ API
+        console.log('Không có fixedSchedules trong classItem, thử lấy từ API');
+        try {
+          const classResponse = await classService.getClassById(classItem.classId);
+          if (classResponse.success && classResponse.class) {
+            const classData = classResponse.class;
+            courseId = classData.course?._id || classData.course || null;
+            
+            // Lấy schedules từ API
+            const schedulesResponse = await classService.getClassSchedules(classItem.classId);
+            if (schedulesResponse.success && schedulesResponse.schedules) {
+              const fixedSchedules = schedulesResponse.schedules.filter(sch => {
+                const status = sch.status || 'fixed';
+                return status === 'fixed';
+              });
+              
+              const sortedSchedules = [...fixedSchedules].sort((a, b) => {
+                const dateA = new Date(a.date);
+                const dateB = new Date(b.date);
+                if (dateA.getTime() !== dateB.getTime()) {
+                  return dateA - dateB;
+                }
+                return (a.startTime || '').localeCompare(b.startTime || '');
+              });
+
+              fixedSchedulesList = sortedSchedules.map(sch => ({
+                title: sch.session?.title || 'N/A',
+                order: sch.session?.order || null,
+                date: sch.date || null,
+                startTime: sch.startTime || 'N/A',
+                endTime: sch.endTime || 'N/A',
+                roomName: sch.room?.room_name || 'N/A'
+              }));
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching class info from API:', err);
+          // Nếu không lấy được từ API, vẫn tiếp tục với thông tin có sẵn
+        }
       }
-      return (a.startTime || '').localeCompare(b.startTime || '');
-    });
-
-    // Tạo danh sách các buổi học cố định
-    const fixedSchedulesList = sortedSchedules.map(sch => ({
-      title: sch.session?.title || 'N/A',
-      order: sch.session?.order || null,
-      date: sch.date || null,
-      startTime: sch.startTime || 'N/A',
-      endTime: sch.endTime || 'N/A',
-      roomName: sch.room?.room_name || 'N/A'
-    }));
+    }
 
     // Tạo object thông tin lớp đang học đầy đủ
     const currentClassInfo = {
       classId: classItem.classId,
       className: classItem.className,
       courseName: classItem.courseName,
-      courseId: classSchedules[0]?.class?.course?._id || classSchedules[0]?.class?.course || null,
+      courseId: courseId,
       fixedSchedules: fixedSchedulesList,
       roomName: fixedSchedulesList.length > 0 ? fixedSchedulesList[0].roomName : null,
       currentSessionTitle: classItem.currentSessionTitle || 'Chưa có session',
@@ -2175,6 +2279,11 @@ const RequestManagementPage = () => {
     });
   };
 
+  // Hàm xử lý xóa thông tin đổi lớp
+  const handleRemoveClassChange = () => {
+    setPendingClassChange(null);
+  };
+
 
   // Nếu đang hiển thị chi tiết đơn, render component RequestDetailPage
   if (showDetailModal && selectedRequest) {
@@ -2216,6 +2325,7 @@ const RequestManagementPage = () => {
             }
           }}
           onRemoveMakeupClass={handleRemoveMakeupClass}
+          onRemoveClassChange={handleRemoveClassChange}
           processing={processing}
           formatDate={formatDate}
           renderClassInfo={renderClassInfo}

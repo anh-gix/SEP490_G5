@@ -865,52 +865,84 @@ async function seedChangeRequests() {
         'Đề nghị chuyển lớp do muốn học lớp có môi trường học tập tích cực hơn'
     ];
     
-    // Use different classes and students - cycle through available data
-    const classesForChange = [];
-    const studentsForChange = [];
-    for (let i = 0; i < Math.min(25, classes.length * 4); i++) {
-        classesForChange.push(classes[i % classes.length]);
-    }
-    for (let i = 0; i < Math.min(25, students.length * 2); i++) {
-        studentsForChange.push(students[i % students.length]);
+    // Tạo mapping: studentId -> [classes that student is enrolled in]
+    // Chỉ lấy các học sinh đang học ít nhất 1 lớp
+    const studentClassesMap = {};
+    const studentsWithClasses = [];
+    
+    for (const student of students) {
+        const studentId = student._id.toString();
+        const enrolledClasses = classes.filter(classItem => {
+            // Kiểm tra xem student có trong danh sách students của lớp không
+            return classItem.students && classItem.students.some(s => s.toString() === studentId);
+        });
+        
+        if (enrolledClasses.length > 0) {
+            studentClassesMap[studentId] = enrolledClasses;
+            studentsWithClasses.push(student);
+        }
     }
     
-    const changeClassCount = Math.min(25, classesForChange.length, studentsForChange.length, changeClassContents.length);
-    for (let i = 0; i < changeClassCount; i++) {
-        const sender = studentsForChange[i % studentsForChange.length];
-        const classItem = classesForChange[i % classesForChange.length];
-        let status = 'pending';
-        let approverId = null;
-        let approvedDate = null;
-        let responseContent = null;
-        
-        // Distribute status: ~30% rejected, ~70% pending (no approved)
-        // Reject approximately every 3rd request
-        if (approver && (i % 3 === 2 || i === 5 || i === 8 || i === 11 || i === 14 || i === 17 || i === 20 || i === 23)) {
-            status = 'rejected';
-            approverId = approver._id;
-            approvedDate = getApprovedDate(Math.floor(Math.random() * 7) + 1); // 1-7 days ago
-            const rejectionReasons = [
-                'Đơn bị từ chối do lớp đích đã đầy. Vui lòng chọn lớp khác.',
-                'Đơn bị từ chối do không đủ điều kiện chuyển lớp. Vui lòng liên hệ phòng đào tạo.',
-                'Đơn bị từ chối do lớp đích không phù hợp với trình độ hiện tại của học viên.',
-                'Đơn bị từ chối do lịch học của lớp đích trùng với lịch học khác của học viên.',
-                'Đơn bị từ chối do đã quá thời hạn cho phép chuyển lớp trong học kỳ này.'
-            ];
-            responseContent = rejectionReasons[Math.floor(Math.random() * rejectionReasons.length)];
+    console.log(`   - Found ${studentsWithClasses.length} students enrolled in classes`);
+    
+    if (studentsWithClasses.length === 0) {
+        console.log('⚠️  Không tìm thấy học sinh nào đang học lớp. Không thể tạo CHANGE_CLASS requests.');
+    } else {
+        // Mở rộng danh sách học sinh bằng cách lặp lại để có đủ số lượng requests
+        const expandedStudentsWithClasses = [];
+        for (let i = 0; i < Math.min(25, studentsWithClasses.length * 3); i++) {
+            expandedStudentsWithClasses.push(studentsWithClasses[i % studentsWithClasses.length]);
         }
-        // Rest are pending
         
-        changeRequests.push({
-            sender: sender._id,
-            type: 'change_class',
-            classId: classItem._id,
-            content: changeClassContents[i],
-            status: status,
-            approver: approverId,
-            approvedDate: approvedDate,
-            responseContent: responseContent
-        });
+        const changeClassCount = Math.min(25, expandedStudentsWithClasses.length, changeClassContents.length);
+        for (let i = 0; i < changeClassCount; i++) {
+            const sender = expandedStudentsWithClasses[i % expandedStudentsWithClasses.length];
+            const senderId = sender._id.toString();
+            
+            // Lấy danh sách lớp mà học sinh này đang học
+            const enrolledClasses = studentClassesMap[senderId] || [];
+            if (enrolledClasses.length === 0) {
+                console.log(`    ⚠️ Student ${sender.username || sender._id} không có lớp đang học, bỏ qua`);
+                continue;
+            }
+            
+            // Chọn một lớp từ danh sách lớp mà học sinh đang học
+            // Sử dụng modulo để phân bổ đều các lớp
+            const classItem = enrolledClasses[i % enrolledClasses.length];
+            
+            let status = 'pending';
+            let approverId = null;
+            let approvedDate = null;
+            let responseContent = null;
+            
+            // Distribute status: ~30% rejected, ~70% pending (no approved)
+            // Reject approximately every 3rd request
+            if (approver && (i % 3 === 2 || i === 5 || i === 8 || i === 11 || i === 14 || i === 17 || i === 20 || i === 23)) {
+                status = 'rejected';
+                approverId = approver._id;
+                approvedDate = getApprovedDate(Math.floor(Math.random() * 7) + 1); // 1-7 days ago
+                const rejectionReasons = [
+                    'Đơn bị từ chối do lớp đích đã đầy. Vui lòng chọn lớp khác.',
+                    'Đơn bị từ chối do không đủ điều kiện chuyển lớp. Vui lòng liên hệ phòng đào tạo.',
+                    'Đơn bị từ chối do lớp đích không phù hợp với trình độ hiện tại của học viên.',
+                    'Đơn bị từ chối do lịch học của lớp đích trùng với lịch học khác của học viên.',
+                    'Đơn bị từ chối do đã quá thời hạn cho phép chuyển lớp trong học kỳ này.'
+                ];
+                responseContent = rejectionReasons[Math.floor(Math.random() * rejectionReasons.length)];
+            }
+            // Rest are pending
+            
+            changeRequests.push({
+                sender: sender._id,
+                type: 'change_class',
+                classId: classItem._id,
+                content: changeClassContents[i],
+                status: status,
+                approver: approverId,
+                approvedDate: approvedDate,
+                responseContent: responseContent
+            });
+        }
     }
     
     // ============================================

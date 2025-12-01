@@ -180,88 +180,383 @@ const RequestManagementPage = () => {
     return () => clearTimeout(timeoutId);
   }, [showMakeupClassModal, senderRole, selectedMakeupClassInfo?.selectedScheduleId, selectedRequest, availableClassSchedulesBySession]);
 
+  // Tự động tính toán pendingMakeupSessions khi có pendingClassChange
+  useEffect(() => {
+    // Chỉ tính toán cho đơn change_class
+    if (!selectedRequest || selectedRequest.type !== 'change_class') {
+      setPendingMakeupSessions([]);
+      return;
+    }
+    
+    // Chỉ tính toán khi có pendingClassChange
+    if (!pendingClassChange) {
+      setPendingMakeupSessions([]);
+      return;
+    }
+    
+    // Lấy thông tin session order từ oldClassInfo và newClassInfo
+    const oldClassInfo = pendingClassChange.oldClassInfo;
+    const newClassInfo = pendingClassChange.newClassInfo;
+    const oldSessionOrder = oldClassInfo?.currentSessionOrder;
+    const newSessionOrder = newClassInfo?.currentSessionOrder;
+    const makeupSessions = [];
+    
+    // Log thông tin lớp đang học và lớp muốn đổi
+    console.log('========================================');
+    console.log('Lớp đang học:');
+    console.log('  - Tên lớp:', oldClassInfo?.className || 'N/A');
+    console.log('  - Khóa học:', oldClassInfo?.courseName || 'N/A');
+    console.log('  - Session hiện tại:', oldClassInfo?.currentSessionTitle || 'N/A');
+    console.log('  - Số thứ tự session:', oldSessionOrder);
+    console.log('  - Class ID:', pendingClassChange.oldClassId);
+    console.log('');
+    console.log('Lớp muốn đổi:');
+    console.log('  - Tên lớp:', newClassInfo?.className || 'N/A');
+    console.log('  - Khóa học:', newClassInfo?.courseName || 'N/A');
+    console.log('  - Session hiện tại:', newClassInfo?.currentSessionTitle || 'N/A');
+    console.log('  - Số thứ tự session:', newSessionOrder);
+    console.log('  - Class ID:', pendingClassChange.newClassId);
+    console.log('========================================');
+    
+    // Chỉ tính toán khi lớp mới học nhanh hơn lớp cũ (newSessionOrder > oldSessionOrder)
+    if (oldSessionOrder !== null && newSessionOrder !== null && newSessionOrder > oldSessionOrder) {
+      // Tìm các sessions chưa học của lớp cũ có session order < newSessionOrder
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const oldClassId = pendingClassChange.oldClassId?.toString();
+      
+      // Tìm trong senderSchedule trước (có thông tin attendance)
+      let oldClassSchedules = [];
+      if (senderSchedule && senderSchedule.length > 0) {
+        oldClassSchedules = senderSchedule.filter(sch => {
+          const classId = sch.class?._id?.toString() || sch.class?.toString();
+          return classId === oldClassId;
+        });
+      }
+      
+      // Nếu không tìm thấy trong senderSchedule, lấy từ fixedSchedules của lớp cũ (từ request data)
+      if (oldClassSchedules.length === 0 && oldClassInfo?.fixedSchedules && oldClassInfo.fixedSchedules.length > 0) {
+        // Lấy từ fixedSchedules và tìm studentSchedule tương ứng từ senderSchedule
+        const fixedSchedules = oldClassInfo.fixedSchedules.filter(sch => sch.status === 'fixed' || !sch.status);
+        
+        fixedSchedules.forEach(fixedSch => {
+          const fixedClassScheduleId = fixedSch._id || fixedSch.id || null;
+          
+          // Tìm studentSchedule từ senderSchedule - thử nhiều cách
+          let matchingStudentSchedule = null;
+          
+          // Cách 1: Tìm theo classScheduleId (nếu có)
+          if (fixedClassScheduleId) {
+            matchingStudentSchedule = senderSchedule.find(sch => {
+              const classScheduleId = sch.classSchedule?._id?.toString() || sch.classSchedule?.id?.toString();
+              return classScheduleId === fixedClassScheduleId.toString();
+            });
+          }
+          
+          // Cách 2: Tìm theo ngày, giờ, và lớp (nếu cách 1 không tìm thấy)
+          if (!matchingStudentSchedule) {
+            matchingStudentSchedule = senderSchedule.find(sch => {
+              const schDate = new Date(sch.date);
+              const fixedDate = new Date(fixedSch.date);
+              schDate.setHours(0, 0, 0, 0);
+              fixedDate.setHours(0, 0, 0, 0);
+              
+              const classId = sch.class?._id?.toString() || sch.class?.toString();
+              return classId === oldClassId &&
+                     schDate.getTime() === fixedDate.getTime() &&
+                     sch.startTime === fixedSch.startTime &&
+                     sch.endTime === fixedSch.endTime;
+            });
+          }
+          
+          if (matchingStudentSchedule) {
+            oldClassSchedules.push({
+              _id: matchingStudentSchedule._id,
+              id: matchingStudentSchedule.id,
+              date: matchingStudentSchedule.date,
+              startTime: matchingStudentSchedule.startTime,
+              endTime: matchingStudentSchedule.endTime,
+              session: matchingStudentSchedule.session,
+              attendance: matchingStudentSchedule.attendance,
+              classSchedule: matchingStudentSchedule.classSchedule
+            });
+          } else {
+            // Nếu không tìm thấy studentSchedule, vẫn thêm vào và lưu classScheduleId để tìm sau
+            oldClassSchedules.push({
+              date: fixedSch.date,
+              startTime: fixedSch.startTime,
+              endTime: fixedSch.endTime,
+              session: fixedSch.session || { order: fixedSch.order, title: fixedSch.title },
+              attendance: null,
+              classScheduleId: fixedClassScheduleId,
+              classId: oldClassId // Lưu thêm classId để tìm sau
+            });
+          }
+        });
+      }
+      
+      console.log(`Tìm thấy ${oldClassSchedules.length} buổi học của lớp cũ`);
+      
+      // Debug: Log thông tin về việc tìm studentSchedule
+      const schedulesWithStudentScheduleId = oldClassSchedules.filter(s => s._id || s.id);
+      const schedulesWithoutStudentScheduleId = oldClassSchedules.filter(s => !s._id && !s.id);
+      if (schedulesWithoutStudentScheduleId.length > 0) {
+        console.log(`⚠️ Có ${schedulesWithoutStudentScheduleId.length} buổi không tìm thấy studentScheduleId từ senderSchedule`);
+        schedulesWithoutStudentScheduleId.forEach(s => {
+          console.log('  - Buổi:', {
+            date: s.date,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            classScheduleId: s.classScheduleId,
+            classId: s.classId
+          });
+        });
+      }
+      
+      oldClassSchedules.forEach(schedule => {
+        const scheduleDate = new Date(schedule.date);
+        scheduleDate.setHours(0, 0, 0, 0);
+        const sessionOrder = schedule.session?.order;
+        const attendanceStatus = schedule.attendance?.status;
+        
+        // Kiểm tra session chưa học và có order < newSessionOrder
+        const isFutureDate = scheduleDate > today;
+        const hasNoAttendance = attendanceStatus === null || attendanceStatus === undefined;
+        const isFutureOrNoAttendance = isFutureDate || hasNoAttendance;
+        const needsMakeup = sessionOrder !== null && sessionOrder !== undefined && 
+            sessionOrder < newSessionOrder &&
+            isFutureOrNoAttendance;
+        
+        // Debug log cho từng buổi
+        if (sessionOrder !== null && sessionOrder !== undefined) {
+          console.log(`📅 Buổi ${sessionOrder}:`, {
+            date: schedule.date ? new Date(schedule.date).toLocaleDateString('vi-VN') : 'N/A',
+            sessionOrder: sessionOrder,
+            newSessionOrder: newSessionOrder,
+            isFutureDate: isFutureDate,
+            hasNoAttendance: hasNoAttendance,
+            attendanceStatus: attendanceStatus,
+            isFutureOrNoAttendance: isFutureOrNoAttendance,
+            needsMakeup: needsMakeup,
+            reason: !needsMakeup ? (
+              sessionOrder >= newSessionOrder ? 'Session order >= newSessionOrder' :
+              !isFutureOrNoAttendance ? 'Đã học và đã có điểm danh' :
+              'Không xác định'
+            ) : 'Cần học bù'
+          });
+        }
+        
+        if (needsMakeup) {
+          // Ưu tiên dùng _id hoặc id từ schedule (studentScheduleId)
+          // Nếu không có, dùng classScheduleId
+          const studentScheduleId = schedule._id || schedule.id;
+          const classScheduleId = schedule.classSchedule?._id || schedule.classSchedule?.id || schedule.classScheduleId;
+          
+          // Debug log
+          if (!studentScheduleId) {
+            console.log(`⚠️ Buổi ${sessionOrder} không có studentScheduleId, sẽ tìm sau từ classScheduleId:`, classScheduleId);
+          }
+          
+          makeupSessions.push({
+            sessionOrder: sessionOrder,
+            sessionTitle: schedule.session?.title || `Session ${sessionOrder}`,
+            date: schedule.date,
+            startTime: schedule.startTime,
+            endTime: schedule.endTime,
+            studentScheduleId: studentScheduleId || null, // Lưu studentScheduleId riêng
+            classScheduleId: classScheduleId || null
+          });
+        }
+      });
+      
+      // Sắp xếp theo session order
+      makeupSessions.sort((a, b) => a.sessionOrder - b.sessionOrder);
+      
+      // Log các session cần học bù
+      console.log('========================================');
+      console.log('Các session cần học bù:');
+      if (makeupSessions.length === 0) {
+        console.log('  (Không có session nào cần học bù)');
+      } else {
+        makeupSessions.forEach((session, index) => {
+          const dateStr = session.date ? new Date(session.date).toLocaleDateString('vi-VN') : 'N/A';
+          console.log(`  ${index + 1}. Buổi ${session.sessionOrder}: ${session.sessionTitle}`);
+          console.log(`     Ngày: ${dateStr} ${session.startTime}-${session.endTime}`);
+        });
+      }
+      console.log(`Tổng số: ${makeupSessions.length} buổi`);
+      console.log('========================================');
+    } else {
+      console.log('========================================');
+      console.log('Không cần học bù vì:');
+      if (oldSessionOrder === null || newSessionOrder === null) {
+        console.log('  - Thiếu thông tin session order (old:', oldSessionOrder, ', new:', newSessionOrder, ')');
+      } else if (newSessionOrder <= oldSessionOrder) {
+        console.log('  - Lớp mới không học nhanh hơn lớp cũ (new:', newSessionOrder, '<= old:', oldSessionOrder, ')');
+      }
+      console.log('========================================');
+    }
+    
+    // Cập nhật pendingMakeupSessions
+    setPendingMakeupSessions(makeupSessions);
+  }, [selectedRequest, pendingClassChange, senderSchedule]);
+
   // useEffect để lấy danh sách ClassSchedule có cùng session và debug logs
   useEffect(() => {
     // Chỉ chạy khi có selectedCurrentScheduleId và selectedRequest
-    if (!selectedCurrentScheduleId || !selectedRequest || !selectedRequest.studentScheduleId) {
+    if (!selectedCurrentScheduleId || !selectedRequest) {
+      console.log('⚠️ useEffect không chạy vì thiếu selectedCurrentScheduleId hoặc selectedRequest');
       return;
     }
 
-    const studentSchedule = selectedRequest.studentScheduleId;
-    const studentScheduleId = (studentSchedule._id || studentSchedule.id)?.toString();
+    // Tìm studentSchedule từ senderSchedule dựa trên selectedCurrentScheduleId
+    let studentSchedule = null;
     const targetId = selectedCurrentScheduleId.toString();
     
-    // Kiểm tra xem có khớp với selectedCurrentScheduleId không
-    if (studentScheduleId !== targetId) {
-      return;
-    }
-
-    // DEBUG: Thông tin debug mới
-    console.log('=== DEBUG: Thông tin buổi nghỉ ===');
+    console.log('🔍 Tìm studentSchedule với selectedCurrentScheduleId:', targetId);
+    console.log('📋 senderSchedule length:', senderSchedule?.length || 0);
     
-    // 1. Hiển thị id studentschedule gửi đơn
-    console.log('1. studentScheduleId từ đơn:', selectedCurrentScheduleId);
-    
-    // 2. Hiển thị id classschedule của đơn
-    const classSchedule = studentSchedule.classSchedule;
-    const classScheduleId = classSchedule ? (classSchedule._id || classSchedule.id)?.toString() : null;
-    console.log('2. classScheduleId từ đơn:', classScheduleId);
-    
-    // 3. Query hiển thị tất cả thông tin của studentschedule đó theo classschedule
-    console.log('3. Tất cả thông tin StudentSchedule:', JSON.stringify(studentSchedule, null, 2));
-    
-    // 4. Hiển thị thông tin classSchedule đó
-    if (classSchedule) {
-      console.log('4. Tất cả thông tin ClassSchedule:', JSON.stringify(classSchedule, null, 2));
+    // Cách 1: Tìm từ senderSchedule (cho đơn change_class)
+    if (senderSchedule && senderSchedule.length > 0) {
+      studentSchedule = senderSchedule.find(sch => {
+        const scheduleId = (sch._id || sch.id)?.toString();
+        return scheduleId === targetId;
+      });
       
-      // 5. Lấy tất cả thông tin của session đó
-      const session = classSchedule.session;
-      if (session) {
-        console.log('5. Tất cả thông tin Session:', JSON.stringify(session, null, 2));
-        
-        // 6. List ra tất cả các classSchedule sau hôm nay có cùng session
-        (async () => {
-          try {
-            setLoadingClassSchedulesBySession(true);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            
-            // Lấy session order hoặc session ID
-            const sessionOrder = session.order;
-            const sessionId = session._id || session.id;
-            
-            // Gọi API để lấy danh sách ClassSchedule
-            const apiPort = import.meta.env.VITE_API_PORT || 8080;
-            const response = await fetch(`http://localhost:${apiPort}/api/class-schedules/by-session?sessionId=${sessionId}&sessionOrder=${sessionOrder}&dateAfter=${today.toISOString()}`, {
-              headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                'Content-Type': 'application/json'
-              }
-            });
-            
-            if (response.ok) {
-              const data = await response.json();
-              console.log('6. Danh sách ClassSchedules sau hôm nay có cùng session:', JSON.stringify(data, null, 2));
-              
-              // Lưu vào state để hiển thị trong UI
-              if (data.classSchedules && Array.isArray(data.classSchedules)) {
-                setAvailableClassSchedulesBySession(data.classSchedules);
-              }
-            } else {
-              const errorData = await response.json().catch(() => ({}));
-              console.error('6. Lỗi API:', response.status, errorData);
-              setAvailableClassSchedulesBySession([]);
-            }
-          } catch (error) {
-            console.error('6. Lỗi khi lấy danh sách ClassSchedule:', error);
-            setAvailableClassSchedulesBySession([]);
-          } finally {
-            setLoadingClassSchedulesBySession(false);
-          }
-        })();
+      if (studentSchedule) {
+        console.log('✅ Tìm thấy studentSchedule từ senderSchedule');
+      } else {
+        console.log('⚠️ Không tìm thấy studentSchedule từ senderSchedule');
       }
     }
-  }, [selectedCurrentScheduleId, selectedRequest]);
+    
+    // Cách 2: Lấy từ selectedRequest.studentScheduleId (cho đơn makeup_class - fallback)
+    if (!studentSchedule && selectedRequest.studentScheduleId) {
+      const requestStudentSchedule = selectedRequest.studentScheduleId;
+      const requestStudentScheduleId = (requestStudentSchedule._id || requestStudentSchedule.id)?.toString();
+      if (requestStudentScheduleId === targetId) {
+        studentSchedule = requestStudentSchedule;
+        console.log('✅ Tìm thấy studentSchedule từ selectedRequest.studentScheduleId');
+      }
+    }
+    
+    // Nếu không tìm thấy studentSchedule, không làm gì
+    if (!studentSchedule) {
+      console.log('❌ Không tìm thấy studentSchedule');
+      return;
+    }
+    
+    console.log('✅ Tìm thấy studentSchedule:', {
+      studentScheduleId: studentSchedule._id || studentSchedule.id,
+      hasClassSchedule: !!studentSchedule.classSchedule,
+      classSchedule: studentSchedule.classSchedule
+    });
+    
+    // Thử lấy session từ nhiều nguồn
+    let session = null;
+    let classSchedule = null;
+    
+    // Cách 1: Từ classSchedule trong studentSchedule
+    if (studentSchedule.classSchedule) {
+      classSchedule = studentSchedule.classSchedule;
+      session = classSchedule.session;
+    }
+    
+    // Cách 2: Từ session trực tiếp trong studentSchedule (nếu có)
+    if (!session && studentSchedule.session) {
+      session = studentSchedule.session;
+      console.log('⚠️ Tìm thấy session trực tiếp trong studentSchedule (không có classSchedule)');
+    }
+    
+    // Log thông tin session nếu tìm thấy
+    if (session) {
+      const sessionOrder = session.order;
+      const sessionId = session._id || session.id;
+      
+      console.log('📚 Thông tin session của buổi được chọn:');
+      console.log('  - Session ID:', sessionId);
+      console.log('  - Session Order:', sessionOrder);
+      console.log('  - Session Title:', session.title || 'N/A');
+      if (classSchedule) {
+        console.log('  - ClassSchedule ID:', classSchedule._id || classSchedule.id);
+        console.log('  - ClassSchedule Date:', classSchedule.date);
+      }
+    } else {
+      console.log('❌ Không tìm thấy session từ bất kỳ nguồn nào');
+      console.log('📋 Cấu trúc studentSchedule:', JSON.stringify({
+        _id: studentSchedule._id,
+        id: studentSchedule.id,
+        date: studentSchedule.date,
+        startTime: studentSchedule.startTime,
+        endTime: studentSchedule.endTime,
+        hasClassSchedule: !!studentSchedule.classSchedule,
+        hasSession: !!studentSchedule.session,
+        classSchedule: studentSchedule.classSchedule,
+        session: studentSchedule.session
+      }, null, 2));
+      return;
+    }
+    
+    // Lấy session order và session ID để gọi API
+    const sessionOrder = session.order;
+    const sessionId = session._id || session.id;
+    
+    if (!sessionId) {
+      console.log('❌ Không có session ID, không thể load danh sách ClassSchedule');
+      return;
+    }
+    
+    // List ra tất cả các classSchedule sau hôm nay có cùng session (không thể về quá khứ học)
+    (async () => {
+      try {
+        setLoadingClassSchedulesBySession(true);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        console.log('🔄 Bắt đầu gọi API để lấy danh sách ClassSchedule:');
+        console.log('  - Session ID:', sessionId);
+        console.log('  - Session Order:', sessionOrder);
+        console.log('  - Date After:', today.toISOString());
+        
+        // Gọi API để lấy danh sách ClassSchedule
+        const apiPort = import.meta.env.VITE_API_PORT || 8080;
+        const response = await fetch(`http://localhost:${apiPort}/api/class-schedules/by-session?sessionId=${sessionId}&sessionOrder=${sessionOrder}&dateAfter=${today.toISOString()}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Danh sách ClassSchedules sau hôm nay có cùng session:', data.classSchedules?.length || 0, 'buổi');
+          if (data.classSchedules && data.classSchedules.length > 0) {
+            console.log('📋 Chi tiết các buổi học bù:');
+            data.classSchedules.forEach((cs, idx) => {
+              console.log(`  ${idx + 1}. ${cs.class?.name || 'N/A'} - ${new Date(cs.date).toLocaleDateString('vi-VN')} ${cs.startTime}-${cs.endTime}`);
+            });
+          }
+          
+          // Lưu vào state để hiển thị trong UI
+          if (data.classSchedules && Array.isArray(data.classSchedules)) {
+            setAvailableClassSchedulesBySession(data.classSchedules);
+          } else {
+            setAvailableClassSchedulesBySession([]);
+          }
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('❌ Lỗi API:', response.status, errorData);
+          setAvailableClassSchedulesBySession([]);
+        }
+      } catch (error) {
+        console.error('6. Lỗi khi lấy danh sách ClassSchedule:', error);
+        setAvailableClassSchedulesBySession([]);
+      } finally {
+        setLoadingClassSchedulesBySession(false);
+      }
+    })();
+  }, [selectedCurrentScheduleId, selectedRequest, senderSchedule]);
 
 
   // Helper function để so sánh tên với số một cách thông minh (natural sort)
@@ -820,43 +1115,12 @@ const RequestManagementPage = () => {
 
   // Hàm để mở modal đổi lớp
   const handleChangeClassClick = async (classItem) => {
-    console.log('=== DEBUG handleChangeClassClick ===');
-    console.log('classItem nhận được:', classItem);
-    console.log('classItem.classId:', classItem.classId);
-    console.log('classItem.classId type:', typeof classItem.classId);
-    console.log('senderSchedule:', senderSchedule);
-    console.log('senderSchedule length:', senderSchedule.length);
-    
-    // Log tất cả classId trong senderSchedule
-    console.log('--- Tất cả classId trong senderSchedule ---');
-    senderSchedule.forEach((sch, index) => {
-      const classId = sch.class?._id?.toString() || sch.class?.toString();
-      console.log(`Schedule ${index}:`, {
-        classId: classId,
-        classIdType: typeof classId,
-        class: sch.class,
-        class_id: sch.class?._id,
-        class_idType: typeof sch.class?._id
-      });
-    });
-    
     // Lấy thông tin đầy đủ của lớp đang học từ senderSchedule
     const classSchedules = senderSchedule.filter(sch => {
       const classId = sch.class?._id?.toString() || sch.class?.toString();
       const targetClassId = (classItem.classId?._id?.toString() || classItem.classId?.toString() || String(classItem.classId));
-      
-      console.log('--- So sánh ---');
-      console.log('classId từ senderSchedule:', classId, 'type:', typeof classId);
-      console.log('targetClassId từ classItem:', targetClassId, 'type:', typeof targetClassId);
-      console.log('sch.class:', sch.class);
-      console.log('sch.class._id:', sch.class?._id);
-      console.log('Kết quả so sánh:', classId === targetClassId);
-      
       return classId === targetClassId;
     });
-
-    console.log('classSchedules tìm được:', classSchedules.length);
-    console.log('classSchedules:', classSchedules);
 
     let fixedSchedulesList = [];
     let courseId = null;
@@ -3297,7 +3561,7 @@ const RequestManagementPage = () => {
                           )}
                           
                           {/* Hiển thị danh sách ClassSchedule có cùng session từ API */}
-                          {availableClassSchedulesBySession && availableClassSchedulesBySession.length > 0 && (
+                          {selectedCurrentScheduleId && (
                             <div className="mb-3">
                               <small className="text-muted d-block mb-1">Chọn buổi học bù:</small>
                               {loadingClassSchedulesBySession ? (
@@ -3305,7 +3569,7 @@ const RequestManagementPage = () => {
                                   <Spinner animation="border" size="sm" />
                                   <p className="text-neutral-600 mt-4 text-12">Đang tải...</p>
                                 </div>
-                              ) : (() => {
+                              ) : availableClassSchedulesBySession && availableClassSchedulesBySession.length > 0 ? (() => {
                                 // Filter các ClassSchedule không có conflict với lịch học của sinh viên
                                 const filteredClassSchedules = availableClassSchedulesBySession.filter(schedule => {
                                   // Nếu không có senderSchedule, không filter
@@ -3424,7 +3688,11 @@ const RequestManagementPage = () => {
                                     })}
                                   </Form.Select>
                                 );
-                              })()}
+                              })() : (
+                                <div className="text-neutral-500 text-13">
+                                  Không có buổi học bù phù hợp. Vui lòng thử lại sau.
+                                </div>
+                              )}
                             </div>
                           )}
                           

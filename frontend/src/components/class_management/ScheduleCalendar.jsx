@@ -161,6 +161,16 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
   };
 
   const getStatusColor = (schedule) => {
+    // Kiểm tra buổi của lớp cũ (khi đổi lớp)
+    if (schedule.isOldClassSchedule) {
+      return '#9C27B0'; // Màu tím cho buổi lớp cũ
+    }
+    
+    // Kiểm tra buổi của lớp mới (khi đổi lớp)
+    if (schedule.isNewClassSchedule) {
+      return '#2196F3'; // Màu xanh dương cho buổi lớp mới
+    }
+    
     // Kiểm tra buổi bị hủy (cancelled)
     if (schedule.isCancelled || schedule.scheduleStatus === 'cancelled') {
       return '#9e9e9e'; // Màu xám đậm cho buổi bị hủy
@@ -272,8 +282,12 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                         // Màu nền khác nhau theo trạng thái
                         let backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt mặc định
                         
-                        // Kiểm tra buổi bị hủy trước
-                        if (schedule.isCancelled || schedule.scheduleStatus === 'cancelled') {
+                        // Kiểm tra buổi của lớp cũ và lớp mới trước (khi đổi lớp)
+                        if (schedule.isOldClassSchedule) {
+                          backgroundColor = 'rgba(156, 39, 176, 0.15)'; // Tím nhạt cho buổi lớp cũ
+                        } else if (schedule.isNewClassSchedule) {
+                          backgroundColor = 'rgba(33, 150, 243, 0.15)'; // Xanh dương nhạt cho buổi lớp mới
+                        } else if (schedule.isCancelled || schedule.scheduleStatus === 'cancelled') {
                           backgroundColor = 'rgba(158, 158, 158, 0.2)'; // Xám đậm cho buổi bị hủy
                         } else if (schedule.isAbsentSchedule || schedule.status === 'absent') {
                           backgroundColor = 'rgba(244, 67, 54, 0.15)'; // Đỏ nhạt cho buổi nghỉ
@@ -305,7 +319,11 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                         
                         // Tooltip text
                         let tooltipText = 'Buổi chưa học';
-                        if (schedule.isCancelled || schedule.scheduleStatus === 'cancelled') {
+                        if (schedule.isOldClassSchedule) {
+                          tooltipText = `Buổi lớp cũ: ${schedule.className}`;
+                        } else if (schedule.isNewClassSchedule) {
+                          tooltipText = `Buổi lớp mới: ${schedule.className}`;
+                        } else if (schedule.isCancelled || schedule.scheduleStatus === 'cancelled') {
                           tooltipText = schedule.cancellationReason 
                             ? `Buổi đã hủy: ${schedule.cancellationReason}` 
                             : 'Buổi đã hủy';
@@ -350,9 +368,11 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                           >
                             <div className="fw-bold d-flex align-items-center justify-content-between">
                               <span>{schedule.startTime}</span>
-                              {(schedule.isCancelled || schedule.isAbsentSchedule || schedule.isMakeupSchedule || schedule.status === 'absent' || schedule.status === 'makeup' || schedule.scheduleStatus === 'cancelled' || schedule.scheduleStatus === 'rescheduled' || timeStatus || hasAttendance) && (
+                              {(schedule.isOldClassSchedule || schedule.isNewClassSchedule || schedule.isCancelled || schedule.isAbsentSchedule || schedule.isMakeupSchedule || schedule.status === 'absent' || schedule.status === 'makeup' || schedule.scheduleStatus === 'cancelled' || schedule.scheduleStatus === 'rescheduled' || timeStatus || hasAttendance) && (
                                 <i 
                                   className={`fas ${
+                                    schedule.isOldClassSchedule ? 'fa-arrow-left' :
+                                    schedule.isNewClassSchedule ? 'fa-arrow-right' :
                                     schedule.isCancelled || schedule.scheduleStatus === 'cancelled' ? 'fa-ban' :
                                     schedule.isAbsentSchedule || schedule.status === 'absent' ? 'fa-times-circle' :
                                     schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled' ? 'fa-calendar-plus' :
@@ -369,8 +389,14 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                                 ></i>
                               )}
                             </div>
-                            <div className="text-truncate d-flex align-items-center gap-1">
+                            <div className="text-truncate d-flex align-items-center gap-1 flex-wrap">
                               <span>{schedule.className}</span>
+                              {schedule.isOldClassSchedule && (
+                                <Badge bg="secondary" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#9C27B0' }}>Lớp cũ</Badge>
+                              )}
+                              {schedule.isNewClassSchedule && (
+                                <Badge bg="primary" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#2196F3' }}>Lớp mới</Badge>
+                              )}
                               {(schedule.isCancelled || schedule.scheduleStatus === 'cancelled') && (
                                 <Badge bg="secondary" style={{ fontSize: '8px', padding: '2px 4px' }}>Đã hủy</Badge>
                               )}

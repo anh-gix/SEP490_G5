@@ -4,6 +4,8 @@ const Class = require("../models/classModel");
 const ClassSchedule = require("../models/classScheduleModel");
 const StudentSchedule = require("../models/studentScheduleModel");
 const HomeworkSubmission = require("../models/homeworkSubmissionModel");
+const Program = require("../models/programModel");
+const Course = require("../models/courseModel");
 
 // =========================
 // 👤 LẤY THÔNG TIN HỌC VIÊN HIỆN TẠI (từ token)
@@ -1100,7 +1102,7 @@ exports.getDashboardData = async (req, res) => {
 // =========================
 exports.getAllStudents = async (req, res) => {
   try {
-    const { search, status, page = 1, limit = 50 } = req.query;
+    const { search, status, programType, level, page = 1, limit = 50 } = req.query;
     
     // Find Student role
     const studentRole = await Role.findOne({ name: 'Student' });
@@ -1121,6 +1123,58 @@ exports.getAllStudents = async (req, res) => {
         { email: { $regex: search, $options: 'i' } },
         { phone: { $regex: search, $options: 'i' } }
       ];
+    }
+    
+    // Filter by program type and/or level
+    let studentIdsToFilter = null;
+    if (programType || level) {
+      // Build program query
+      const programQuery = {};
+      if (programType) programQuery.type = programType;
+      if (level) programQuery.level = level;
+      
+      // Find programs matching the criteria
+      const programs = await Program.find(programQuery).select('_id');
+      const programIds = programs.map(p => p._id);
+      
+      if (programIds.length > 0) {
+        // Find courses belonging to these programs
+        const courses = await Course.find({ program: { $in: programIds } }).select('_id');
+        const courseIds = courses.map(c => c._id);
+        
+        if (courseIds.length > 0) {
+          // Find classes with these courses
+          const classes = await Class.find({ course: { $in: courseIds } }).select('students');
+          // Get all unique student IDs from these classes
+          const studentIdSet = new Set();
+          classes.forEach(cls => {
+            if (cls.students && Array.isArray(cls.students)) {
+              cls.students.forEach(studentId => {
+                // Keep as ObjectId, not string
+                studentIdSet.add(studentId);
+              });
+            }
+          });
+          studentIdsToFilter = Array.from(studentIdSet);
+        }
+      }
+      
+      // If no students found matching the filter, return empty result
+      if (studentIdsToFilter && studentIdsToFilter.length === 0) {
+        return res.status(200).json({
+          success: true,
+          students: [],
+          total: 0,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: 0
+        });
+      }
+    }
+    
+    // Apply filter to student query if needed
+    if (studentIdsToFilter && studentIdsToFilter.length > 0) {
+      query._id = { $in: studentIdsToFilter };
     }
     
     // Pagination
@@ -1146,7 +1200,9 @@ exports.getAllStudents = async (req, res) => {
         const classCount = await Class.countDocuments({ students: student._id });
         return {
           ...student,
-          classCount
+          stats: {
+            classCount
+          }
         };
       })
     );

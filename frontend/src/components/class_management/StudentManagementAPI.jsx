@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Nav, Tabs, Tab, Pagination, ButtonGroup, Alert } from 'react-bootstrap';
 import studentService from '../../services/studentService';
 import teacherService from '../../services/teacherService';
+import { courseService } from '../../services/courseService';
 import ScheduleCalendar from './ScheduleCalendar';
 import * as XLSX from 'xlsx';
 
@@ -14,7 +15,7 @@ const StudentManagementAPI = () => {
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState('grid');
+  const [viewMode, setViewMode] = useState('list');
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
@@ -23,6 +24,13 @@ const StudentManagementAPI = () => {
   const [schedulePage, setSchedulePage] = useState(1);
   const [scheduleViewMode, setScheduleViewMode] = useState('calendar'); // 'table' or 'calendar'
   const [searchTerm, setSearchTerm] = useState('');
+  const [programType, setProgramType] = useState('');
+  const [level, setLevel] = useState('');
+  const [availableTypes, setAvailableTypes] = useState([]);
+  const [availableLevels, setAvailableLevels] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -39,21 +47,58 @@ const StudentManagementAPI = () => {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef(null);
 
+  // Fetch program types and levels on mount
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      try {
+        const [typesResponse, levelsResponse] = await Promise.all([
+          courseService.getAllTypes(),
+          courseService.getAllLevels()
+        ]);
+        
+        if (typesResponse?.success && typesResponse.types) {
+          setAvailableTypes(typesResponse.types);
+        }
+        
+        if (levelsResponse?.success && levelsResponse.levels) {
+          setAvailableLevels(levelsResponse.levels);
+        }
+      } catch (err) {
+        console.error('Error fetching filter options:', err);
+      }
+    };
+    
+    fetchFilterOptions();
+  }, []);
+
+  // Reset page when filters change (but not when page itself changes)
+  useEffect(() => {
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, programType, level]);
+
   useEffect(() => {
     fetchStudents();
     fetchStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
+  }, [searchTerm, programType, level, page]);
 
   const fetchStudents = async () => {
     try {
       setLoading(true);
       setError(null);
-      const params = {};
+      const params = {
+        page,
+        limit: 10
+      };
       if (searchTerm) params.search = searchTerm;
+      if (programType) params.programType = programType;
+      if (level) params.level = level;
       
       const data = await studentService.getAllStudents(params);
       setStudents(data.students || []);
+      setTotal(data.total || 0);
+      setTotalPages(data.totalPages || 1);
     } catch (err) {
       console.error('Error fetching students:', err);
       // Handle 404 errors more gracefully
@@ -709,7 +754,7 @@ const StudentManagementAPI = () => {
       <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24">
         <Card.Body className="p-20">
           <Row className="g-3 align-items-center">
-            <Col md={4}>
+            <Col md={3}>
               <InputGroup>
                 <InputGroup.Text className="bg-neutral-50 border-neutral-200">
                   <i className="fas fa-search text-neutral-600"></i>
@@ -723,7 +768,35 @@ const StudentManagementAPI = () => {
               </InputGroup>
             </Col>
 
-            <Col md={8} className="text-end">
+            <Col md={3}>
+              <Form.Select
+                value={programType}
+                onChange={(e) => setProgramType(e.target.value)}
+                className="border-neutral-200"
+              >
+                <option value="">Tất cả chương trình</option>
+                {availableTypes.map(type => (
+                  <option key={type} value={type}>
+                    {type === 'ielts' ? 'IELTS' : type === 'toeic' ? 'TOEIC' : type === 'cam' ? 'Cambridge' : type}
+                  </option>
+                ))}
+              </Form.Select>
+            </Col>
+
+            <Col md={3}>
+              <Form.Select
+                value={level}
+                onChange={(e) => setLevel(e.target.value)}
+                className="border-neutral-200"
+              >
+                <option value="">Tất cả cấp độ</option>
+                {availableLevels.map(lev => (
+                  <option key={lev} value={lev}>{lev}</option>
+                ))}
+              </Form.Select>
+            </Col>
+
+            <Col md={3} className="text-end">
               <div className="btn-group">
                 <Button
                   variant={viewMode === 'grid' ? 'primary' : 'outline-secondary'}
@@ -785,16 +858,10 @@ const StudentManagementAPI = () => {
                   </div>
 
                   <div className="mb-16">
-                    <div className="d-flex align-items-center gap-8 mb-8">
+                    <div className="d-flex align-items-center gap-8">
                       <i className="fas fa-door-open text-neutral-400"></i>
                       <span className="text-neutral-700 text-14">
                         Lớp: {student.stats?.classCount || 0} lớp
-                      </span>
-                    </div>
-                    <div className="d-flex align-items-center gap-8">
-                      <i className="fas fa-users text-neutral-400"></i>
-                      <span className="text-neutral-700 text-14">
-                        Học viên: {student.stats?.totalStudents || 0} người
                       </span>
                     </div>
                   </div>
@@ -867,6 +934,56 @@ const StudentManagementAPI = () => {
               </tbody>
             </Table>
           </Card.Body>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Card.Footer className="bg-neutral-25 border-0 px-20 py-16">
+              <div className="d-flex justify-content-center">
+                <Pagination className="mb-0">
+                  <Pagination.First 
+                    onClick={() => setPage(1)} 
+                    disabled={page === 1}
+                  />
+                  <Pagination.Prev 
+                    onClick={() => setPage(prev => Math.max(1, prev - 1))} 
+                    disabled={page === 1}
+                  />
+                  {[...Array(totalPages)].map((_, i) => {
+                    const pageNum = i + 1;
+                    // Show first page, last page, current page, and pages around current
+                    if (
+                      pageNum === 1 ||
+                      pageNum === totalPages ||
+                      (pageNum >= page - 1 && pageNum <= page + 1)
+                    ) {
+                      return (
+                        <Pagination.Item
+                          key={pageNum}
+                          active={pageNum === page}
+                          onClick={() => setPage(pageNum)}
+                        >
+                          {pageNum}
+                        </Pagination.Item>
+                      );
+                    } else if (
+                      pageNum === page - 2 ||
+                      pageNum === page + 2
+                    ) {
+                      return <Pagination.Ellipsis key={pageNum} />;
+                    }
+                    return null;
+                  })}
+                  <Pagination.Next 
+                    onClick={() => setPage(prev => Math.min(totalPages, prev + 1))} 
+                    disabled={page === totalPages}
+                  />
+                  <Pagination.Last 
+                    onClick={() => setPage(totalPages)} 
+                    disabled={page === totalPages}
+                  />
+                </Pagination>
+              </div>
+            </Card.Footer>
+          )}
         </Card>
       )}
 

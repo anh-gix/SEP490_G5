@@ -2,13 +2,15 @@ const User = require("../models/userModel");
 const Role = require("../models/roleModel");
 const Class = require("../models/classModel");
 const ClassSchedule = require("../models/classScheduleModel");
+const Program = require("../models/programModel");
+const Course = require("../models/courseModel");
 
 // =========================
 // 📋 LẤY DANH SÁCH GIẢNG VIÊN
 // =========================
 exports.getAllTeachers = async (req, res) => {
   try {
-    const { status, search } = req.query;
+    const { status, search, programType, level, page = 1, limit = 50 } = req.query;
     
     // First, find the teacher role
     const teacherRole = await Role.findOne({ name: 'Teacher' });
@@ -37,10 +39,72 @@ exports.getAllTeachers = async (req, res) => {
       ];
     }
     
+    // Filter by program type and/or level
+    let teacherIdsToFilter = null;
+    if (programType || level) {
+      // Build program query
+      const programQuery = {};
+      if (programType) programQuery.type = programType;
+      if (level) programQuery.level = level;
+      
+      // Find programs matching the criteria
+      const programs = await Program.find(programQuery).select('_id');
+      const programIds = programs.map(p => p._id);
+      
+      if (programIds.length > 0) {
+        // Find courses belonging to these programs
+        const courses = await Course.find({ program: { $in: programIds } }).select('_id');
+        const courseIds = courses.map(c => c._id);
+        
+        if (courseIds.length > 0) {
+          // Find classes with these courses and get their teachers
+          const classes = await Class.find({ course: { $in: courseIds } }).select('teacher');
+          // Get all unique teacher IDs from these classes
+          const teacherIdSet = new Set();
+          classes.forEach(cls => {
+            if (cls.teacher) {
+              teacherIdSet.add(cls.teacher);
+            }
+          });
+          teacherIdsToFilter = Array.from(teacherIdSet);
+        }
+      }
+      
+      // If no teachers found matching the filter, return empty result
+      if (teacherIdsToFilter && teacherIdsToFilter.length === 0) {
+        return res.status(200).json({
+          success: true,
+          message: "Lấy danh sách giảng viên thành công",
+          teachers: [],
+          total: 0,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: 0
+        });
+      }
+    }
+    
+    // Apply filter to teacher query if needed
+    if (teacherIdsToFilter && teacherIdsToFilter.length > 0) {
+      query._id = { $in: teacherIdsToFilter };
+    }
+    
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+    
+    // Get total count
+    const total = await User.countDocuments(query);
+    
+    // Get teachers
     const teachers = await User.find(query)
       .select('-password -token')
       .populate('roleId', 'name description')
-      .sort({ username: 1 });
+      .sort({ username: 1 })
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
     
     console.log(`📋 Found ${teachers.length} users with roleId: ${teacherRole._id} (${teacherRole.name})`);
     
@@ -53,7 +117,7 @@ exports.getAllTeachers = async (req, res) => {
         const totalStudents = classes.reduce((sum, cls) => sum + (cls.students?.length || 0), 0);
         
         return {
-          ...teacher.toObject(),
+          ...teacher,
           stats: {
             classCount,
             totalStudents
@@ -67,12 +131,16 @@ exports.getAllTeachers = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Lấy danh sách giảng viên thành công",
-      total: teachersWithStats.length,
-      teachers: teachersWithStats
+      teachers: teachersWithStats,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum)
     });
   } catch (error) {
     console.error("❌ Lỗi khi lấy danh sách giảng viên:", error);
     res.status(500).json({ 
+      success: false,
       message: "Lỗi server khi lấy danh sách giảng viên",
       error: error.message 
     });

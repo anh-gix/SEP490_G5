@@ -18,7 +18,7 @@ const RoomManagementFull = () => {
   const [editingRoom, setEditingRoom] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [roomSchedule, setRoomSchedule] = useState([]);
-  const [scheduleViewMode, setScheduleViewMode] = useState('table'); // table or calendar
+  const [scheduleViewMode, setScheduleViewMode] = useState('calendar'); // table or calendar
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [formData, setFormData] = useState({
@@ -122,7 +122,7 @@ const RoomManagementFull = () => {
 
   const handleViewSchedule = async (room) => {
     setSelectedRoom(room);
-    setScheduleViewMode('table'); // Reset to table view when opening modal
+    setScheduleViewMode('calendar'); // Reset to calendar view when opening modal
     try {
       setLoading(true);
       const data = await roomService.getRoomSchedule(room._id);
@@ -526,20 +526,20 @@ const RoomManagementFull = () => {
           <div className="d-flex justify-content-end mb-3">
             <div className="btn-group">
               <Button
-                variant={scheduleViewMode === 'table' ? 'primary' : 'outline-secondary'}
-                size="sm"
-                onClick={() => setScheduleViewMode('table')}
-              >
-                <i className="fas fa-list me-2"></i>
-                Bảng
-              </Button>
-              <Button
                 variant={scheduleViewMode === 'calendar' ? 'primary' : 'outline-secondary'}
                 size="sm"
                 onClick={() => setScheduleViewMode('calendar')}
               >
                 <i className="fas fa-calendar me-2"></i>
                 Calendar
+              </Button>
+              <Button
+                variant={scheduleViewMode === 'table' ? 'primary' : 'outline-secondary'}
+                size="sm"
+                onClick={() => setScheduleViewMode('table')}
+              >
+                <i className="fas fa-list me-2"></i>
+                Bảng
               </Button>
             </div>
           </div>

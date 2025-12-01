@@ -822,10 +822,17 @@ async function seedChangeRequests() {
         }
         // Rest are pending
         
+        // Tạo đường dẫn file Excel mẫu cho mỗi yêu cầu tạo lớp
+        // Format: excel-{timestamp}-{random}.xlsx (giống với format lưu file trong hệ thống)
+        const excelTimestamp = Date.now() - (createClassCount - i) * 1000; // Tạo timestamp khác nhau cho mỗi file
+        const excelRandom = Math.round(Math.random() * 1E9);
+        const excelFileName = `excel-${excelTimestamp}-${excelRandom}.xlsx`;
+        const excelFilePath = `uploads/${excelFileName}`;
+        
         changeRequests.push({
             sender: sender._id,
             type: 'create_class',
-            excelFile: null, // No excel files for seed data
+            excelFile: excelFilePath, // File Excel bắt buộc cho yêu cầu tạo lớp
             content: createClassContents[i],
             status: status,
             approver: approverId,
@@ -1100,24 +1107,48 @@ async function seedChangeRequests() {
         'Yêu cầu thay giáo viên cho buổi học tuần tới do giáo viên có lịch trùng với kỳ thi quan trọng'
     ];
     
-    // Use different class schedules and teachers/academic staff as senders
-    const classSchedulesForReplace = [];
-    for (let i = 0; i < Math.min(25, classSchedules.length * 3); i++) {
-        classSchedulesForReplace.push(classSchedules[i % classSchedules.length]);
-    }
-    const replaceTeacherSenders = [];
-    // Collect more senders - cycle through all available
-    for (let i = 0; i < teachers.length; i++) {
-        replaceTeacherSenders.push(teachers[i % teachers.length]);
-    }
-    for (let i = 0; i < academicStaffUsers.length; i++) {
-        replaceTeacherSenders.push(academicStaffUsers[i % academicStaffUsers.length]);
+    // Tạo mapping giữa teacher và các classSchedules của họ
+    // Chỉ cho phép giáo viên gửi đơn cho buổi dạy của chính họ
+    const teacherClassSchedulesMap = {};
+    
+    // Nhóm các classSchedules theo teacher
+    for (const classSchedule of classSchedules) {
+        const teacherId = classSchedule.teacher?.toString();
+        if (teacherId) {
+            if (!teacherClassSchedulesMap[teacherId]) {
+                teacherClassSchedulesMap[teacherId] = [];
+            }
+            teacherClassSchedulesMap[teacherId].push(classSchedule);
+        }
     }
     
-    const replaceTeacherCount = Math.min(25, classSchedulesForReplace.length, replaceTeacherSenders.length, replaceTeacherContents.length);
+    // Tạo danh sách các cặp (teacher, classSchedule) hợp lệ
+    // Mỗi giáo viên chỉ có thể gửi đơn cho buổi dạy của chính họ
+    const validTeacherSchedulePairs = [];
+    for (const teacher of teachers) {
+        const teacherId = teacher._id.toString();
+        const teacherSchedules = teacherClassSchedulesMap[teacherId] || [];
+        
+        // Thêm tất cả các classSchedules của giáo viên này vào danh sách hợp lệ
+        for (const classSchedule of teacherSchedules) {
+            validTeacherSchedulePairs.push({
+                teacher: teacher,
+                classSchedule: classSchedule
+            });
+        }
+    }
+    
+    console.log(`   - Found ${validTeacherSchedulePairs.length} valid teacher-schedule pairs for replace_teacher requests`);
+    
+    // Tạo đơn replace_teacher từ các cặp hợp lệ
+    // Giới hạn tối đa 25 đơn hoặc số lượng có thể tạo được
+    const replaceTeacherCount = Math.min(25, validTeacherSchedulePairs.length, replaceTeacherContents.length);
+    
     for (let i = 0; i < replaceTeacherCount; i++) {
-        const sender = replaceTeacherSenders[i % replaceTeacherSenders.length];
-        const classSchedule = classSchedulesForReplace[i % classSchedulesForReplace.length];
+        const pair = validTeacherSchedulePairs[i % validTeacherSchedulePairs.length];
+        const sender = pair.teacher;
+        const classSchedule = pair.classSchedule;
+        
         let status = 'pending';
         let approverId = null;
         let approvedDate = null;

@@ -33,6 +33,8 @@ const RequestDetailPage = ({
   const [rejectReason, setRejectReason] = useState('');
   const [loadingStudentScheduleIds, setLoadingStudentScheduleIds] = useState({}); // Map session index -> loading state
   const [resolvedStudentScheduleIds, setResolvedStudentScheduleIds] = useState({}); // Map session index -> studentScheduleId
+  const [replaceTeacherStudentScheduleId, setReplaceTeacherStudentScheduleId] = useState(null); // studentScheduleId cho đơn replace_teacher
+  const [loadingReplaceTeacherScheduleId, setLoadingReplaceTeacherScheduleId] = useState(false); // Loading state cho replace_teacher
   // Xác định role của người gửi đơn
   const isStudent = senderRole === 'Student';
   const isTeacher = senderRole === 'Teacher';
@@ -267,6 +269,68 @@ const RequestDetailPage = ({
       }
     });
   }, [filteredPendingMakeupSessions, selectedRequest, pendingClassChange, senderSchedule, resolvedStudentScheduleIds, loadingStudentScheduleIds]);
+
+  // useEffect để gọi API lấy studentScheduleId cho đơn replace_teacher
+  useEffect(() => {
+    // Chỉ chạy cho đơn replace_teacher
+    if (selectedRequest?.type !== 'replace_teacher' || !selectedRequest?.classScheduleId) {
+      return;
+    }
+
+    // Nếu đã có studentScheduleId, không cần gọi lại
+    if (replaceTeacherStudentScheduleId) {
+      return;
+    }
+
+    // Nếu đang loading, không gọi lại
+    if (loadingReplaceTeacherScheduleId) {
+      return;
+    }
+
+    const classSchedule = selectedRequest.classScheduleId;
+    const classScheduleId = classSchedule?._id || classSchedule?.id;
+    
+    if (!classScheduleId) {
+      return;
+    }
+
+    // Kiểm tra xem có tìm thấy trong senderSchedule không
+    const matchingStudentSchedule = senderSchedule?.find(sch => {
+      const schClassScheduleId = sch.classSchedule?._id?.toString() || sch.classSchedule?.id?.toString();
+      return schClassScheduleId === classScheduleId?.toString();
+    });
+
+    if (matchingStudentSchedule) {
+      // Đã tìm thấy trong senderSchedule, lưu vào state
+      const foundId = matchingStudentSchedule._id || matchingStudentSchedule.id;
+      setReplaceTeacherStudentScheduleId(foundId);
+      return;
+    }
+
+    // Nếu không tìm thấy trong senderSchedule, gọi API
+    const fetchStudentScheduleId = async () => {
+      setLoadingReplaceTeacherScheduleId(true);
+      try {
+        const response = await studentScheduleService.getStudentSchedulesByClassSchedules([classScheduleId]);
+        
+        if (response.success && response.studentSchedules && response.studentSchedules.length > 0) {
+          // Lấy studentScheduleId đầu tiên (bất kỳ học sinh nào trong lớp)
+          const firstStudentSchedule = response.studentSchedules[0];
+          const foundStudentScheduleId = firstStudentSchedule._id || firstStudentSchedule.id;
+          setReplaceTeacherStudentScheduleId(foundStudentScheduleId);
+          console.log('✅ Tìm thấy studentScheduleId từ API cho đơn replace_teacher:', foundStudentScheduleId);
+        } else {
+          console.log('⚠️ Không tìm thấy studentSchedule cho classScheduleId:', classScheduleId);
+        }
+      } catch (error) {
+        console.error('❌ Lỗi khi gọi API lấy studentSchedule cho đơn replace_teacher:', error);
+      } finally {
+        setLoadingReplaceTeacherScheduleId(false);
+      }
+    };
+
+    fetchStudentScheduleId();
+  }, [selectedRequest, senderSchedule, replaceTeacherStudentScheduleId, loadingReplaceTeacherScheduleId]);
 
   // Tính toán calendarSchedules từ senderSchedule
   const calendarSchedules = useMemo(() => {
@@ -512,7 +576,18 @@ const RequestDetailPage = ({
               </Button>
             </div>
             <h4 className="text-neutral-900 fw-bold mb-8">
-              {isStudent ? 'Chi tiết đơn - Lịch học' : isTeacher ? 'Chi tiết đơn - Lịch dạy' : 'Chi tiết đơn - Lịch học/dạy'}
+              {(() => {
+                const requestType = selectedRequest?.type;
+                if (requestType === 'create_class') {
+                  return 'Chi tiết đơn - Yêu cầu tạo lớp';
+                } else if (requestType === 'replace_teacher') {
+                  return 'Chi tiết đơn - Lịch dạy';
+                } else if (requestType === 'makeup_class' || requestType === 'change_class') {
+                  return isStudent ? 'Chi tiết đơn - Lịch học' : isTeacher ? 'Chi tiết đơn - Lịch dạy' : 'Chi tiết đơn - Lịch học/dạy';
+                } else {
+                  return isStudent ? 'Chi tiết đơn - Lịch học' : isTeacher ? 'Chi tiết đơn - Lịch dạy' : 'Chi tiết đơn - Lịch học/dạy';
+                }
+              })()}
             </h4>
           </div>
 
@@ -739,6 +814,18 @@ const RequestDetailPage = ({
                       
                       if (!classSchedule) return null;
                       
+                      // Sử dụng studentScheduleId đã lấy được (từ senderSchedule hoặc API)
+                      const studentScheduleId = replaceTeacherStudentScheduleId;
+                      
+                      // Tìm buổi giáo viên dạy thay tương ứng với buổi này
+                      const correspondingSubstitute = pendingMakeupClasses?.find(makeup => {
+                        if (!makeup.isSubstituteClass) return false;
+                        const absentId = makeup.absentScheduleId?.toString() || 
+                                        makeup.absentSchedule?.id?.toString() || 
+                                        makeup.absentSchedule?._id?.toString();
+                        return absentId && studentScheduleId && absentId === studentScheduleId.toString();
+                      });
+                      
                       // Format ngày thứ mấy
                       const scheduleDate = new Date(classSchedule.date);
                       const dayOfWeek = scheduleDate.getDay();
@@ -746,33 +833,108 @@ const RequestDetailPage = ({
                       const dayName = dayNames[dayOfWeek];
                       const dateStr = scheduleDate.toLocaleDateString('vi-VN');
                       
+                      const substituteTeacherInfo = correspondingSubstitute?.substituteTeacherInfo;
+                      
+                      // Tìm index của substitute trong pendingMakeupClasses để xóa
+                      const substituteIndex = correspondingSubstitute 
+                        ? pendingMakeupClasses.findIndex(m => {
+                            if (!m.isSubstituteClass) return false;
+                            const mAbsentId = m.absentScheduleId?.toString() || 
+                                             m.absentSchedule?.id?.toString() || 
+                                             m.absentSchedule?._id?.toString();
+                            return mAbsentId === studentScheduleId?.toString();
+                          })
+                        : -1;
+                      
                       return (
                         <div className="mb-12">
                           <h6 className="text-neutral-900 fw-bold mb-8 text-14">Buổi xin xếp người dạy thay:</h6>
                           <div className="border border-neutral-200 rounded-6 p-12 bg-white">
-                            <div className="d-flex flex-column gap-8">
-                              <div>
-                                <span className="text-neutral-600 text-13">Lớp: </span>
-                                <span className="text-neutral-900 fw-semibold text-14">{classInfo?.name || 'N/A'}</span>
+                            <div className="d-flex align-items-start justify-content-between gap-12">
+                              <div className="flex-grow-1 d-flex flex-column gap-8">
+                                <div>
+                                  <span className="text-neutral-600 text-13">Lớp: </span>
+                                  <span className="text-neutral-900 fw-semibold text-14">{classInfo?.name || 'N/A'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-neutral-600 text-13">Ngày: </span>
+                                  <span className="text-neutral-700 text-13 fw-medium">{dayName} ({dateStr})</span>
+                                </div>
+                                <div>
+                                  <span className="text-neutral-600 text-13">Giờ: </span>
+                                  <span className="text-neutral-700 text-13 fw-medium">
+                                    {classSchedule.startTime || 'N/A'} - {classSchedule.endTime || 'N/A'}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-neutral-600 text-13">Đang học session: </span>
+                                  <span className="text-neutral-700 text-13 fw-medium">
+                                    {session?.title || 'N/A'}
+                                    {session?.order !== null && session?.order !== undefined && (
+                                      <span className="text-neutral-500 ms-4">(Số thứ tự: {session.order})</span>
+                                    )}
+                                  </span>
+                                </div>
+                                
+                                {/* Giáo viên dạy thay (nếu đã xếp) */}
+                                {correspondingSubstitute && (
+                                  <div className="border-top border-neutral-200 pt-8 mt-4">
+                                    <div className="d-flex align-items-start gap-8">
+                                      <i className="fas fa-user-tie text-success text-14 mt-1"></i>
+                                      <div className="flex-grow-1 d-flex flex-column gap-2">
+                                        <div className="text-success fw-semibold text-13">Giáo viên dạy thay:</div>
+                                        <div className="text-neutral-700 text-13">
+                                          <span className="fw-medium">
+                                            {substituteTeacherInfo?.username || substituteTeacherInfo?.fullName || substituteTeacherInfo?.name || 'N/A'}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                              <div>
-                                <span className="text-neutral-600 text-13">Thứ mấy: </span>
-                                <span className="text-neutral-700 text-13 fw-medium">{dayName} ({dateStr})</span>
-                              </div>
-                              <div>
-                                <span className="text-neutral-600 text-13">Giờ nào: </span>
-                                <span className="text-neutral-700 text-13 fw-medium">
-                                  {classSchedule.startTime || 'N/A'} - {classSchedule.endTime || 'N/A'}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-neutral-600 text-13">Đang học session nào: </span>
-                                <span className="text-neutral-700 text-13 fw-medium">
-                                  {session?.title || 'N/A'}
-                                  {session?.order !== null && session?.order !== undefined && (
-                                    <span className="text-neutral-500 ms-4">(Số thứ tự: {session.order})</span>
-                                  )}
-                                </span>
+                              <div className="d-flex flex-column gap-2 align-items-end">
+                                {!correspondingSubstitute ? (
+                                  <Button
+                                    variant="outline-primary"
+                                    size="sm"
+                                    onClick={() => {
+                                      // Truyền studentScheduleId để tự động chọn giáo viên dạy thay từ đơn
+                                      if (onAddMakeupClass && studentScheduleId) {
+                                        onAddMakeupClass(studentScheduleId);
+                                      }
+                                    }}
+                                    className="d-flex align-items-center gap-2"
+                                    disabled={!onAddMakeupClass || !studentScheduleId || loadingReplaceTeacherScheduleId}
+                                  >
+                                    {loadingReplaceTeacherScheduleId ? (
+                                      <>
+                                        <Spinner animation="border" size="sm" />
+                                        <span>Đang tải...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <i className="fas fa-plus"></i>
+                                        Xếp người dạy thay
+                                      </>
+                                    )}
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="outline-danger"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (onRemoveMakeupClass && substituteIndex >= 0) {
+                                        onRemoveMakeupClass(substituteIndex);
+                                      }
+                                    }}
+                                    className="d-flex align-items-center gap-2"
+                                    title="Xóa giáo viên dạy thay này"
+                                  >
+                                    <i className="fas fa-trash"></i>
+                                    Xóa
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1207,52 +1369,83 @@ const RequestDetailPage = ({
                 </div>
               )}
               
-              <div className="d-flex align-items-center justify-content-between mb-12">
-                <h6 className="text-neutral-900 fw-bold mb-0">
-                  {isStudent ? 'Lịch học:' : isTeacher ? 'Lịch dạy:' : 'Lịch học/dạy:'}
-                </h6>
-                {/* Chỉ hiển thị nút khi không phải đơn makeup_class, không phải đơn create_class và không phải đơn change_class */}
-                {selectedRequest?.type !== 'makeup_class' && selectedRequest?.type !== 'create_class' && selectedRequest?.type !== 'change_class' && (
-                  <Button
-                    variant="outline-primary"
-                    size="sm"
-                    onClick={onAddMakeupClass}
-                    className="d-flex align-items-center gap-2"
-                  >
-                    <i className="fas fa-plus"></i>
-                    {isStudent ? 'Thêm buổi học bù' : isTeacher ? 'Xếp lịch dạy thay' : 'Thêm buổi học bù'}
-                  </Button>
-                )}
-              </div>
-              
-              {loadingSchedule ? (
-                <div className="text-center py-20">
-                  <Spinner animation="border" size="sm" />
-                  <p className="text-neutral-600 mt-8">Đang tải lịch...</p>
-                </div>
-              ) : calendarSchedules.length === 0 ? (
-                <p className="text-neutral-500 text-center py-20">
-                  {isStudent ? 'Không có lịch học' : isTeacher ? 'Không có lịch dạy' : 'Không có lịch học/dạy'}
-                </p>
+              {/* Hiển thị file đính kèm cho đơn create_class, hoặc lịch học/dạy cho các đơn khác */}
+              {selectedRequest?.type === 'create_class' ? (
+                <>
+                  <div className="d-flex align-items-center justify-content-between mb-12">
+                    <h6 className="text-neutral-900 fw-bold mb-0">
+                      File đính kèm:
+                    </h6>
+                  </div>
+                  
+                  {selectedRequest.excelFile ? (
+                    <div className="border border-neutral-100 rounded-12 p-16 bg-white mb-16">
+                      <div className="d-flex align-items-center gap-12">
+                        <i className="fas fa-file-excel text-success" style={{ fontSize: '24px' }}></i>
+                        <div className="flex-grow-1">
+                          <div className="text-neutral-900 fw-medium mb-2">
+                            File Excel đính kèm
+                          </div>
+                          <div className="text-neutral-600 text-13 mb-8">
+                            {selectedRequest.excelFile.split('/').pop() || selectedRequest.excelFile}
+                          </div>
+                          <a
+                            href={`http://localhost:${import.meta.env.VITE_API_PORT || 8080}${selectedRequest.excelFile.startsWith('/') ? selectedRequest.excelFile : '/' + selectedRequest.excelFile}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-sm btn-outline-primary"
+                            download
+                          >
+                            <i className="fas fa-download me-2"></i>
+                            Tải xuống
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-neutral-500 text-center py-20">
+                      Không có file đính kèm
+                    </p>
+                  )}
+                </>
               ) : (
-                <div className="border border-neutral-100 rounded-12 p-16 bg-white mb-16">
-                  <ScheduleCalendar
-                    schedules={calendarSchedules}
-                    onEditSchedule={() => {}} // Read-only
-                    onDeleteSchedule={() => {}} // Read-only
-                    onCreateMakeup={() => {}} // Read-only
-                    classService={classService}
-                    studentSchedule={senderSchedule.map(sch => {
-                      const scheduleDate = new Date(sch.date);
-                      const dateStr = formatDateToYYYYMMDD(scheduleDate);
-                      return {
-                        date: dateStr,
-                        startTime: sch.startTime || '',
-                        endTime: sch.endTime || ''
-                      };
-                    })}
-                  />
-                </div>
+                <>
+                  <div className="d-flex align-items-center justify-content-between mb-12">
+                    <h6 className="text-neutral-900 fw-bold mb-0">
+                      {isStudent ? 'Lịch học:' : isTeacher ? 'Lịch dạy:' : 'Lịch học/dạy:'}
+                    </h6>
+                  </div>
+                  
+                  {loadingSchedule ? (
+                    <div className="text-center py-20">
+                      <Spinner animation="border" size="sm" />
+                      <p className="text-neutral-600 mt-8">Đang tải lịch...</p>
+                    </div>
+                  ) : calendarSchedules.length === 0 ? (
+                    <p className="text-neutral-500 text-center py-20">
+                      {isStudent ? 'Không có lịch học' : isTeacher ? 'Không có lịch dạy' : 'Không có lịch học/dạy'}
+                    </p>
+                  ) : (
+                    <div className="border border-neutral-100 rounded-12 p-16 bg-white mb-16">
+                      <ScheduleCalendar
+                        schedules={calendarSchedules}
+                        onEditSchedule={() => {}} // Read-only
+                        onDeleteSchedule={() => {}} // Read-only
+                        onCreateMakeup={() => {}} // Read-only
+                        classService={classService}
+                        studentSchedule={senderSchedule.map(sch => {
+                          const scheduleDate = new Date(sch.date);
+                          const dateStr = formatDateToYYYYMMDD(scheduleDate);
+                          return {
+                            date: dateStr,
+                            startTime: sch.startTime || '',
+                            endTime: sch.endTime || ''
+                          };
+                        })}
+                      />
+                    </div>
+                  )}
+                </>
               )}
 
             </Card.Body>

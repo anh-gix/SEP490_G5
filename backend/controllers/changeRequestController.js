@@ -89,7 +89,7 @@ exports.getAllChangeRequests = async (req, res) => {
       })
       .populate({
         path: 'classScheduleId',
-        select: 'date startTime endTime session class',
+        select: 'date startTime endTime session class room teacher',
         populate: [
           {
             path: 'session',
@@ -97,11 +97,25 @@ exports.getAllChangeRequests = async (req, res) => {
           },
           {
             path: 'class',
-            select: 'name',
-            populate: {
-              path: 'course',
-              select: 'name'
-            }
+            select: 'name teacher',
+            populate: [
+              {
+                path: 'course',
+                select: 'name'
+              },
+              {
+                path: 'teacher',
+                select: 'username email'
+              }
+            ]
+          },
+          {
+            path: 'room',
+            select: 'room_name location'
+          },
+          {
+            path: 'teacher',
+            select: 'username email'
           }
         ]
       })
@@ -456,31 +470,32 @@ exports.approveChangeRequest = async (req, res) => {
           console.log(`👨‍🏫 Xử lý giáo viên dạy thay cho buổi nghỉ: ${absentScheduleId}`);
           console.log(`   - Giáo viên dạy thay: ${substituteTeacherId}`);
           
+          // Lưu giáo viên gốc vào substituteTeacher (nếu chưa có)
+          const originalTeacher = absentClassSchedule.teacher;
+          if (!absentClassSchedule.substituteTeacher) {
+            absentClassSchedule.substituteTeacher = originalTeacher;
+          }
+          
           // Cập nhật teacher của ClassSchedule buổi nghỉ thành giáo viên dạy thay
           absentClassSchedule.teacher = new mongoose.Types.ObjectId(substituteTeacherId);
+          
+          // Thêm note để ghi nhận việc có giáo viên dạy thay
+          const substituteNote = `Giáo viên dạy thay: ${substituteTeacherId} (Giáo viên gốc: ${originalTeacher})`;
+          if (absentClassSchedule.note) {
+            absentClassSchedule.note += `\n${substituteNote}`;
+          } else {
+            absentClassSchedule.note = substituteNote;
+          }
+          
           await absentClassSchedule.save({ session });
           
           console.log(`✅ Đã cập nhật ClassSchedule với giáo viên dạy thay: ${absentScheduleId}`);
+          console.log(`   - Giáo viên gốc (đã lưu vào substituteTeacher): ${originalTeacher}`);
+          console.log(`   - Giáo viên dạy thay (đã cập nhật vào teacher): ${substituteTeacherId}`);
           
-          // Sử dụng chính ClassSchedule của buổi nghỉ làm buổi dạy thay
-          finalMakeupScheduleId = actualAbsentClassScheduleId;
-          
-          // Không cần tạo StudentSchedule mới vì buổi học vẫn diễn ra vào đúng thời gian
-          // Chỉ cần đảm bảo StudentSchedule của buổi nghỉ không bị cancelled
-          const absentStudentSchedule = await StudentSchedule.findOne({
-            student: studentId,
-            classSchedule: actualAbsentClassScheduleId
-          }).session(session);
-          
-          if (absentStudentSchedule) {
-            // Giữ nguyên status, chỉ cập nhật reason nếu cần
-            if (absentStudentSchedule.scheduleStatus === 'cancelled') {
-              absentStudentSchedule.scheduleStatus = 'scheduled';
-              absentStudentSchedule.reason = `Giáo viên dạy thay: ${substituteTeacherId}`;
-              await absentStudentSchedule.save({ session });
-              console.log(`✅ Đã cập nhật StudentSchedule với giáo viên dạy thay: ${absentScheduleId}`);
-            }
-          }
+          // Với đơn replace_teacher, buổi học vẫn diễn ra bình thường
+          // Học sinh vẫn đi học, không cần xử lý StudentSchedule
+          // StudentSchedule giữ nguyên trạng thái (scheduled) vì buổi học không bị hủy
           
           // Bỏ qua các bước xử lý buổi học bù thông thường
           continue;

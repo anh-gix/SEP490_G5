@@ -65,11 +65,9 @@ export const examService = {
   },
 
   // Nộp đáp án Reading
-  submitReadingAnswers: async (examId, submissionId, answers) => {
+  submitReadingAnswers: async (examId, submissionId, data) => {
     try {
-      const response = await api.post(`/${examId}/submissions/${submissionId}/reading/submit`, {
-        answers,
-      });
+      const response = await api.post(`/${examId}/submissions/${submissionId}/reading/submit`, data);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể nộp đáp án' };
@@ -97,11 +95,9 @@ export const examService = {
   },
 
   // Nộp đáp án Listening
-  submitListeningAnswers: async (examId, submissionId, answers) => {
+  submitListeningAnswers: async (examId, submissionId, data) => {
     try {
-      const response = await api.post(`/${examId}/submissions/${submissionId}/listening/submit`, {
-        answers,
-      });
+      const response = await api.post(`/${examId}/submissions/${submissionId}/listening/submit`, data);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể nộp đáp án' };
@@ -129,11 +125,9 @@ export const examService = {
   },
 
   // Nộp đáp án Writing
-  submitWritingAnswers: async (examId, submissionId, answers) => {
+  submitWritingAnswers: async (examId, submissionId, data) => {
     try {
-      const response = await api.post(`/${examId}/submissions/${submissionId}/writing/submit`, {
-        answers,
-      });
+      const response = await api.post(`/${examId}/submissions/${submissionId}/writing/submit`, data);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể nộp đáp án' };
@@ -163,6 +157,7 @@ export const examService = {
   // Nộp đáp án Speaking (với file upload)
   submitSpeakingAnswers: async (examId, submissionId, formData) => {
     try {
+      // formData should already contain parts and files
       const response = await api.post(`/${examId}/submissions/${submissionId}/speaking/submit`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',

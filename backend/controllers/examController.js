@@ -516,6 +516,7 @@ exports.startExam = async (req, res) => {
     // Tạo submission mới với các sections từ exam
     const sections = exam.sections.map((section) => ({
       sectionType: section.type,
+      part: section.part || 1,
       answers: [],
       sectionScore: 0,
     }));
@@ -539,28 +540,90 @@ exports.startExam = async (req, res) => {
   }
 };
 
-// ================== HELPER FUNCTIONS ==================
-const getSectionName = (sectionType) => {
-  const names = {
-    reading: "Reading",
-    listening: "Listening",
-    writing: "Writing",
-    speaking: "Speaking",
-  };
-  return names[sectionType] || sectionType;
+// Helper function để tìm exam section
+const findExamSection = (exam, sectionType, part = null) => {
+  if (part !== null) {
+    return exam.sections.find(
+      (section) => section.type === sectionType && (section.part || 1) === part
+    );
+  } else {
+    return exam.sections.find((section) => section.type === sectionType);
+  }
 };
 
-// ================== 4. LẤY THÔNG TIN SECTION (GENERIC - CHO TẤT CẢ CÁC PHẦN THI) ==================
-exports.getSection = async (req, res) => {
-  try {
-    const { examId, submissionId, sectionType } = req.params;
-    const studentId = req.user._id;
+// Helper function để so sánh hai array không phân biệt thứ tự
+const compareArraysUnordered = (arr1, arr2, compareFn) => {
+  const sorted1 = [...arr1].map(item => compareFn(String(item)));
+  const sorted2 = [...arr2].map(item => compareFn(String(item)));
+  sorted1.sort();
+  sorted2.sort();
+  return sorted1.length === sorted2.length && 
+         sorted1.every((val, idx) => val === sorted2[idx]);
+};
 
-    // Validate section type
-    const validSectionTypes = ["reading", "listening", "writing", "speaking"];
-    if (!validSectionTypes.includes(sectionType)) {
-      return res.status(400).json({ message: "Loại phần thi không hợp lệ" });
-    }
+// Helper function để chấm điểm cho reading/listening
+const gradeAnswer = (answer, correctAnswer) => {
+  if (!correctAnswer) {
+    return { score: 0, isCorrect: false };
+  }
+
+  let studentAnswers = answer.selectedOption || answer.answerText || "";
+  if (typeof studentAnswers === "string") {
+    studentAnswers = [studentAnswers];
+  } else if (!Array.isArray(studentAnswers)) {
+    studentAnswers = [];
+  }
+
+  const correctAnswers = Array.isArray(correctAnswer.correctAnswer) 
+    ? correctAnswer.correctAnswer 
+    : [correctAnswer.correctAnswer || ""];
+
+  if (studentAnswers.length !== correctAnswers.length) {
+    return { score: 0, isCorrect: false };
+  }
+
+  let isCorrect = false;
+  switch (correctAnswer.questionType) {
+    case "multiple_choice":
+      isCorrect = compareArraysUnordered(
+        correctAnswers,
+        studentAnswers,
+        (val) => val.trim().toUpperCase()
+      );
+      break;
+    case "input":
+      isCorrect = compareArraysUnordered(
+        correctAnswers,
+        studentAnswers,
+        (val) => val.trim().toLowerCase()
+      );
+      break;
+    case "true_false":
+      isCorrect = compareArraysUnordered(
+        correctAnswers,
+        studentAnswers,
+        (val) => val.trim().toLowerCase()
+      );
+      break;
+    default:
+      isCorrect = compareArraysUnordered(
+        correctAnswers,
+        studentAnswers,
+        (val) => val.trim()
+      );
+  }
+
+  return {
+    score: isCorrect ? (correctAnswer.maxScore || 1) : 0,
+    isCorrect: isCorrect
+  };
+};
+
+// ================== 4. LẤY THÔNG TIN SECTION READING ==================
+exports.getReadingSection = async (req, res) => {
+  try {
+    const { examId, submissionId } = req.params;
+    const studentId = req.user._id;
 
     // Kiểm tra exam
     const exam = await Exam.findById(examId);
@@ -568,14 +631,14 @@ exports.getSection = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy bài thi" });
     }
 
-    // Tìm section
-    const examSection = exam.sections.find(
-      (section) => section.type === sectionType
-    );
+    // Tìm tất cả các section Reading (tất cả các part)
+    const readingSections = exam.sections.filter(
+      (section) => section.type === "reading"
+    ).sort((a, b) => (a.part || 1) - (b.part || 1));
 
-    if (!examSection) {
+    if (readingSections.length === 0) {
       return res.status(404).json({
-        message: `Không tìm thấy phần ${getSectionName(sectionType)}`,
+        message: "Không tìm thấy phần Reading",
       });
     }
 
@@ -590,86 +653,78 @@ exports.getSection = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy bài làm" });
     }
 
-    // Tìm section submission tương ứng
-    let sectionSubmission = submission.sections.find(
-      (s) => s.sectionType === sectionType
-    );
+    // Xử lý từng part
+    const partsData = readingSections.map((examSection) => {
+      const sectionPart = examSection.part || 1;
+      let sectionSubmission = submission.sections.find(
+        (s) => s.sectionType === "reading" && (s.part || 1) === sectionPart
+      );
 
-    // Nếu chưa có, tạo mới
-    if (!sectionSubmission) {
-      sectionSubmission = {
-        sectionType: sectionType,
-        submittedAt: null,
-        answers: [],
-        sectionScore: 0,
+      // Nếu chưa có, tạo mới
+      if (!sectionSubmission) {
+        sectionSubmission = {
+          sectionType: "reading",
+          part: sectionPart,
+          submittedAt: null,
+          answers: [],
+          sectionScore: 0,
+        };
+        submission.sections.push(sectionSubmission);
+        sectionSubmission = submission.sections[submission.sections.length - 1];
+      }
+
+      const questions = examSection.answerKey?.map((key) => ({
+        questionNumber: key.questionNumber,
+        questionTitle: key.questionTitle,
+        questionType: key.questionType,
+        questionAnswer: key.questionAnswer || [],
+      })) || [];
+
+      return {
+        part: sectionPart,
+        section: {
+          type: examSection.type,
+          part: sectionPart,
+          fileUrl: examSection.fileUrl,
+          instructions: examSection.instructions,
+          duration: examSection.duration,
+          questionCount: examSection.questionCount,
+          maxScore: examSection.maxScore,
+          questions: questions,
+        },
+        submission: {
+          submittedAt: sectionSubmission.submittedAt,
+          answers: sectionSubmission.answers,
+          sectionScore: sectionSubmission.sectionScore,
+        },
       };
-      submission.sections.push(sectionSubmission);
-      await submission.save();
-      sectionSubmission = submission.sections[submission.sections.length - 1];
-    }
+    });
 
-    // Trả về thông tin section với questionType, questionTitle và questionAnswer cho mỗi câu hỏi (không bao gồm answer key)
-    const questions = examSection.answerKey?.map((key) => ({
-      questionNumber: key.questionNumber,
-      questionTitle: key.questionTitle,
-      questionType: key.questionType,
-      questionAnswer: key.questionAnswer || [],
-    })) || [];
+    // Lưu submission nếu có thay đổi
+    await submission.save();
 
-    // Build response object
-    const sectionData = {
-      type: examSection.type,
-      fileUrl: examSection.fileUrl,
-      instructions: examSection.instructions,
-      duration: examSection.duration,
-      questionCount: examSection.questionCount,
-      maxScore: examSection.maxScore,
-      questions: questions,
-    };
-
-    // Add audioUrls for listening section
-    if (sectionType === "listening" && examSection.audioUrls) {
-      sectionData.audioUrls = examSection.audioUrls;
-    }
+    // Tính tổng
+    const totalMaxScore = readingSections.reduce((sum, s) => sum + (s.maxScore || 0), 0);
+    const totalQuestionCount = readingSections.reduce((sum, s) => sum + (s.questionCount || 0), 0);
+    const totalDuration = readingSections.reduce((sum, s) => sum + (s.duration || 0), 0);
 
     res.json({
-      section: sectionData,
-      submission: {
-        submittedAt: sectionSubmission.submittedAt,
-        answers: sectionSubmission.answers,
-        sectionScore: sectionSubmission.sectionScore,
-      },
+      sectionType: "reading",
+      parts: partsData,
+      totalMaxScore,
+      totalQuestionCount,
+      totalDuration,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// ================== 5. NỘP ĐÁP ÁN SECTION (GENERIC - CHO TẤT CẢ CÁC PHẦN THI) ==================
-exports.submitSectionAnswers = async (req, res) => {
+// ================== LẤY THÔNG TIN SECTION LISTENING ==================
+exports.getListeningSection = async (req, res) => {
   try {
-    const { examId, submissionId, sectionType } = req.params;
-    let { answers } = req.body; // answers là mảng: [{ questionNumber: 1, selectedOption: "A" hoặc answerText: "text" }, ...]
+    const { examId, submissionId } = req.params;
     const studentId = req.user._id;
-
-    // Validate section type
-    const validSectionTypes = ["reading", "listening", "writing", "speaking"];
-    if (!validSectionTypes.includes(sectionType)) {
-      return res.status(400).json({ message: "Loại phần thi không hợp lệ" });
-    }
-
-    // Parse answers nếu là string (khi gửi qua form-data)
-    if (typeof answers === "string") {
-      try {
-        answers = JSON.parse(answers);
-      } catch (e) {
-        return res.status(400).json({ message: "Định dạng đáp án không hợp lệ" });
-      }
-    }
-
-    if (!answers || !Array.isArray(answers)) {
-      return res.status(400).json({ message: "Vui lòng cung cấp đáp án" });
-    }
 
     // Kiểm tra exam
     const exam = await Exam.findById(examId);
@@ -677,14 +732,14 @@ exports.submitSectionAnswers = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy bài thi" });
     }
 
-    // Tìm section và answer key
-    const examSection = exam.sections.find(
-      (section) => section.type === sectionType
-    );
+    // Tìm tất cả các section Listening (tất cả các part)
+    const listeningSections = exam.sections.filter(
+      (section) => section.type === "listening"
+    ).sort((a, b) => (a.part || 1) - (b.part || 1));
 
-    if (!examSection) {
+    if (listeningSections.length === 0) {
       return res.status(404).json({
-        message: `Không tìm thấy phần ${getSectionName(sectionType)}`,
+        message: "Không tìm thấy phần Listening",
       });
     }
 
@@ -699,34 +754,753 @@ exports.submitSectionAnswers = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy bài làm" });
     }
 
-    // Tìm section submission
-    const sectionIndex = submission.sections.findIndex(
-      (s) => s.sectionType === sectionType
-    );
+    // Xử lý từng part
+    const partsData = listeningSections.map((examSection) => {
+      const sectionPart = examSection.part || 1;
+      let sectionSubmission = submission.sections.find(
+        (s) => s.sectionType === "listening" && (s.part || 1) === sectionPart
+      );
 
-    if (sectionIndex === -1) {
+      // Nếu chưa có, tạo mới
+      if (!sectionSubmission) {
+        sectionSubmission = {
+          sectionType: "listening",
+          part: sectionPart,
+          submittedAt: null,
+          answers: [],
+          sectionScore: 0,
+        };
+        submission.sections.push(sectionSubmission);
+        sectionSubmission = submission.sections[submission.sections.length - 1];
+      }
+
+      const questions = examSection.answerKey?.map((key) => ({
+        questionNumber: key.questionNumber,
+        questionTitle: key.questionTitle,
+        questionType: key.questionType,
+        questionAnswer: key.questionAnswer || [],
+      })) || [];
+
+      const sectionData = {
+        type: examSection.type,
+        part: sectionPart,
+        fileUrl: examSection.fileUrl,
+        instructions: examSection.instructions,
+        duration: examSection.duration,
+        questionCount: examSection.questionCount,
+        maxScore: examSection.maxScore,
+        questions: questions,
+      };
+
+      // Add audioUrls for listening section
+      if (examSection.audioUrls) {
+        sectionData.audioUrls = examSection.audioUrls;
+      }
+
+      return {
+        part: sectionPart,
+        section: sectionData,
+        submission: {
+          submittedAt: sectionSubmission.submittedAt,
+          answers: sectionSubmission.answers,
+          sectionScore: sectionSubmission.sectionScore,
+        },
+      };
+    });
+
+    // Lưu submission nếu có thay đổi
+    await submission.save();
+
+    // Tính tổng
+    const totalMaxScore = listeningSections.reduce((sum, s) => sum + (s.maxScore || 0), 0);
+    const totalQuestionCount = listeningSections.reduce((sum, s) => sum + (s.questionCount || 0), 0);
+    const totalDuration = listeningSections.reduce((sum, s) => sum + (s.duration || 0), 0);
+
+    res.json({
+      sectionType: "listening",
+      parts: partsData,
+      totalMaxScore,
+      totalQuestionCount,
+      totalDuration,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ================== LẤY THÔNG TIN SECTION WRITING ==================
+exports.getWritingSection = async (req, res) => {
+  try {
+    const { examId, submissionId } = req.params;
+    const studentId = req.user._id;
+
+    // Kiểm tra exam
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+      return res.status(404).json({ message: "Không tìm thấy bài thi" });
+    }
+
+    // Tìm tất cả các section Writing (tất cả các part)
+    const writingSections = exam.sections.filter(
+      (section) => section.type === "writing"
+    ).sort((a, b) => (a.part || 1) - (b.part || 1));
+
+    if (writingSections.length === 0) {
       return res.status(404).json({
-        message: `Không tìm thấy phần ${getSectionName(sectionType)} trong bài làm`,
+        message: "Không tìm thấy phần Writing",
       });
     }
 
-    // Xử lý file upload cho Writing và Speaking
-    // req.file: single file upload
-    // req.files: multiple files upload (nếu dùng upload.array, upload.fields, hoặc upload.any)
+    // Kiểm tra submission
+    const submission = await Submission.findOne({
+      _id: submissionId,
+      examId: examId,
+      studentId: studentId,
+    });
+
+    if (!submission) {
+      return res.status(404).json({ message: "Không tìm thấy bài làm" });
+    }
+
+    // Xử lý từng part
+    const partsData = writingSections.map((examSection) => {
+      const sectionPart = examSection.part || 1;
+      let sectionSubmission = submission.sections.find(
+        (s) => s.sectionType === "writing" && (s.part || 1) === sectionPart
+      );
+
+      // Nếu chưa có, tạo mới
+      if (!sectionSubmission) {
+        sectionSubmission = {
+          sectionType: "writing",
+          part: sectionPart,
+          submittedAt: null,
+          answers: [],
+          sectionScore: 0,
+        };
+        submission.sections.push(sectionSubmission);
+        sectionSubmission = submission.sections[submission.sections.length - 1];
+      }
+
+      const questions = examSection.answerKey?.map((key) => ({
+        questionNumber: key.questionNumber,
+        questionTitle: key.questionTitle,
+        questionType: key.questionType,
+        questionAnswer: key.questionAnswer || [],
+      })) || [];
+
+      return {
+        part: sectionPart,
+        section: {
+          type: examSection.type,
+          part: sectionPart,
+          fileUrl: examSection.fileUrl,
+          instructions: examSection.instructions,
+          duration: examSection.duration,
+          questionCount: examSection.questionCount,
+          maxScore: examSection.maxScore,
+          questions: questions,
+        },
+        submission: {
+          submittedAt: sectionSubmission.submittedAt,
+          answers: sectionSubmission.answers,
+          sectionScore: sectionSubmission.sectionScore,
+        },
+      };
+    });
+
+    // Lưu submission nếu có thay đổi
+    await submission.save();
+
+    // Tính tổng
+    const totalMaxScore = writingSections.reduce((sum, s) => sum + (s.maxScore || 0), 0);
+    const totalQuestionCount = writingSections.reduce((sum, s) => sum + (s.questionCount || 0), 0);
+    const totalDuration = writingSections.reduce((sum, s) => sum + (s.duration || 0), 0);
+
+    res.json({
+      sectionType: "writing",
+      parts: partsData,
+      totalMaxScore,
+      totalQuestionCount,
+      totalDuration,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ================== LẤY THÔNG TIN SECTION SPEAKING ==================
+exports.getSpeakingSection = async (req, res) => {
+  try {
+    const { examId, submissionId } = req.params;
+    const studentId = req.user._id;
+
+    // Kiểm tra exam
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+      return res.status(404).json({ message: "Không tìm thấy bài thi" });
+    }
+
+    // Tìm tất cả các section Speaking (tất cả các part)
+    const speakingSections = exam.sections.filter(
+      (section) => section.type === "speaking"
+    ).sort((a, b) => (a.part || 1) - (b.part || 1));
+
+    if (speakingSections.length === 0) {
+      return res.status(404).json({
+        message: "Không tìm thấy phần Speaking",
+      });
+    }
+
+    // Kiểm tra submission
+    const submission = await Submission.findOne({
+      _id: submissionId,
+      examId: examId,
+      studentId: studentId,
+    });
+
+    if (!submission) {
+      return res.status(404).json({ message: "Không tìm thấy bài làm" });
+    }
+
+    // Xử lý từng part
+    const partsData = speakingSections.map((examSection) => {
+      const sectionPart = examSection.part || 1;
+      let sectionSubmission = submission.sections.find(
+        (s) => s.sectionType === "speaking" && (s.part || 1) === sectionPart
+      );
+
+      // Nếu chưa có, tạo mới
+      if (!sectionSubmission) {
+        sectionSubmission = {
+          sectionType: "speaking",
+          part: sectionPart,
+          submittedAt: null,
+          answers: [],
+          sectionScore: 0,
+        };
+        submission.sections.push(sectionSubmission);
+        sectionSubmission = submission.sections[submission.sections.length - 1];
+      }
+
+      const questions = examSection.answerKey?.map((key) => ({
+        questionNumber: key.questionNumber,
+        questionTitle: key.questionTitle,
+        questionType: key.questionType,
+        questionAnswer: key.questionAnswer || [],
+      })) || [];
+
+      return {
+        part: sectionPart,
+        section: {
+          type: examSection.type,
+          part: sectionPart,
+          fileUrl: examSection.fileUrl,
+          instructions: examSection.instructions,
+          duration: examSection.duration,
+          questionCount: examSection.questionCount,
+          maxScore: examSection.maxScore,
+          questions: questions,
+        },
+        submission: {
+          submittedAt: sectionSubmission.submittedAt,
+          answers: sectionSubmission.answers,
+          sectionScore: sectionSubmission.sectionScore,
+        },
+      };
+    });
+
+    // Lưu submission nếu có thay đổi
+    await submission.save();
+
+    // Tính tổng
+    const totalMaxScore = speakingSections.reduce((sum, s) => sum + (s.maxScore || 0), 0);
+    const totalQuestionCount = speakingSections.reduce((sum, s) => sum + (s.questionCount || 0), 0);
+    const totalDuration = speakingSections.reduce((sum, s) => sum + (s.duration || 0), 0);
+
+    res.json({
+      sectionType: "speaking",
+      parts: partsData,
+      totalMaxScore,
+      totalQuestionCount,
+      totalDuration,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ================== 5. NỘP ĐÁP ÁN SECTION READING ==================
+exports.submitReadingAnswers = async (req, res) => {
+  try {
+    const { examId, submissionId } = req.params;
+    let { parts } = req.body; // parts: [{ part: 1, answers: [...] }, { part: 2, answers: [...] }]
+    const studentId = req.user._id;
+
+    // Parse parts nếu là string
+    if (typeof parts === "string") {
+      try {
+        parts = JSON.parse(parts);
+      } catch (e) {
+        return res.status(400).json({ message: "Định dạng đáp án không hợp lệ" });
+      }
+    }
+
+    if (!parts || !Array.isArray(parts)) {
+      return res.status(400).json({ message: "Vui lòng cung cấp đáp án cho tất cả các part" });
+    }
+
+    // Kiểm tra exam
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+      return res.status(404).json({ message: "Không tìm thấy bài thi" });
+    }
+
+    // Tìm tất cả các section Reading
+    const readingSections = exam.sections.filter(
+      (section) => section.type === "reading"
+    ).sort((a, b) => (a.part || 1) - (b.part || 1));
+
+    if (readingSections.length === 0) {
+      return res.status(404).json({
+        message: "Không tìm thấy phần Reading",
+      });
+    }
+
+    // Kiểm tra submission
+    const submission = await Submission.findOne({
+      _id: submissionId,
+      examId: examId,
+      studentId: studentId,
+    });
+
+    if (!submission) {
+      return res.status(404).json({ message: "Không tìm thấy bài làm" });
+    }
+
+    let totalSectionScore = 0;
+    const partsResults = [];
+
+    // Xử lý từng part
+    for (const partData of parts) {
+      const { part, answers } = partData;
+      const sectionPart = part || 1;
+
+      if (!answers || !Array.isArray(answers)) {
+        continue; // Bỏ qua part không có answers
+      }
+
+      // Tìm exam section tương ứng
+      const examSection = readingSections.find(
+        (s) => (s.part || 1) === sectionPart
+      );
+
+      if (!examSection) {
+        continue; // Bỏ qua nếu không tìm thấy section
+      }
+
+      // Tìm hoặc tạo section submission
+      let sectionIndex = submission.sections.findIndex(
+        (s) => s.sectionType === "reading" && (s.part || 1) === sectionPart
+      );
+
+      if (sectionIndex === -1) {
+        submission.sections.push({
+          sectionType: "reading",
+          part: sectionPart,
+          submittedAt: null,
+          answers: [],
+          sectionScore: 0,
+        });
+        sectionIndex = submission.sections.length - 1;
+      }
+
+      // Chấm điểm tự động
+      const answerKey = examSection.answerKey || [];
+      let sectionScore = 0;
+      const gradedAnswers = answers.map((answer) => {
+        const correctAnswer = answerKey.find(
+          (key) => key.questionNumber === answer.questionNumber
+        );
+        const grading = gradeAnswer(answer, correctAnswer);
+        sectionScore += grading.score;
+        return {
+          questionNumber: answer.questionNumber,
+          selectedOption: answer.selectedOption || answer.answerText || "",
+          score: grading.score,
+        };
+      });
+
+      // Cập nhật section submission
+      submission.sections[sectionIndex].answers = gradedAnswers;
+      submission.sections[sectionIndex].sectionScore = sectionScore;
+      submission.sections[sectionIndex].submittedAt = new Date();
+
+      totalSectionScore += sectionScore;
+      partsResults.push({
+        part: sectionPart,
+        sectionScore,
+        answers: gradedAnswers,
+      });
+    }
+
+    // Cập nhật tổng điểm và status
+    let totalScore = 0;
+    submission.sections.forEach((section) => {
+      totalScore += section.sectionScore || 0;
+    });
+    submission.totalScore = totalScore;
+
+    // Kiểm tra xem tất cả các section (của tất cả các type) đã được nộp chưa
+    const allSectionsSubmitted = submission.sections.every(
+      (section) => section.submittedAt !== null
+    );
+    submission.status = allSectionsSubmitted ? "completed" : "partially-submitted";
+
+    await submission.save();
+
+    res.json({
+      message: "Nộp bài Reading thành công",
+      sectionScore: totalSectionScore,
+      totalScore: submission.totalScore,
+      parts: partsResults,
+      status: submission.status,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ================== NỘP ĐÁP ÁN SECTION LISTENING ==================
+exports.submitListeningAnswers = async (req, res) => {
+  try {
+    const { examId, submissionId } = req.params;
+    let { parts } = req.body; // parts: [{ part: 1, answers: [...] }, { part: 2, answers: [...] }]
+    const studentId = req.user._id;
+
+    // Parse parts nếu là string
+    if (typeof parts === "string") {
+      try {
+        parts = JSON.parse(parts);
+      } catch (e) {
+        return res.status(400).json({ message: "Định dạng đáp án không hợp lệ" });
+      }
+    }
+
+    if (!parts || !Array.isArray(parts)) {
+      return res.status(400).json({ message: "Vui lòng cung cấp đáp án cho tất cả các part" });
+    }
+
+    // Kiểm tra exam
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+      return res.status(404).json({ message: "Không tìm thấy bài thi" });
+    }
+
+    // Tìm tất cả các section Listening
+    const listeningSections = exam.sections.filter(
+      (section) => section.type === "listening"
+    ).sort((a, b) => (a.part || 1) - (b.part || 1));
+
+    if (listeningSections.length === 0) {
+      return res.status(404).json({
+        message: "Không tìm thấy phần Listening",
+      });
+    }
+
+    // Kiểm tra submission
+    const submission = await Submission.findOne({
+      _id: submissionId,
+      examId: examId,
+      studentId: studentId,
+    });
+
+    if (!submission) {
+      return res.status(404).json({ message: "Không tìm thấy bài làm" });
+    }
+
+    let totalSectionScore = 0;
+    const partsResults = [];
+
+    // Xử lý từng part
+    for (const partData of parts) {
+      const { part, answers } = partData;
+      const sectionPart = part || 1;
+
+      if (!answers || !Array.isArray(answers)) {
+        continue; // Bỏ qua part không có answers
+      }
+
+      // Tìm exam section tương ứng
+      const examSection = listeningSections.find(
+        (s) => (s.part || 1) === sectionPart
+      );
+
+      if (!examSection) {
+        continue; // Bỏ qua nếu không tìm thấy section
+      }
+
+      // Tìm hoặc tạo section submission
+      let sectionIndex = submission.sections.findIndex(
+        (s) => s.sectionType === "listening" && (s.part || 1) === sectionPart
+      );
+
+      if (sectionIndex === -1) {
+        submission.sections.push({
+          sectionType: "listening",
+          part: sectionPart,
+          submittedAt: null,
+          answers: [],
+          sectionScore: 0,
+        });
+        sectionIndex = submission.sections.length - 1;
+      }
+
+      // Chấm điểm tự động
+      const answerKey = examSection.answerKey || [];
+      let sectionScore = 0;
+      const gradedAnswers = answers.map((answer) => {
+        const correctAnswer = answerKey.find(
+          (key) => key.questionNumber === answer.questionNumber
+        );
+        const grading = gradeAnswer(answer, correctAnswer);
+        sectionScore += grading.score;
+        return {
+          questionNumber: answer.questionNumber,
+          selectedOption: answer.selectedOption || answer.answerText || "",
+          score: grading.score,
+        };
+      });
+
+      // Cập nhật section submission
+      submission.sections[sectionIndex].answers = gradedAnswers;
+      submission.sections[sectionIndex].sectionScore = sectionScore;
+      submission.sections[sectionIndex].submittedAt = new Date();
+
+      totalSectionScore += sectionScore;
+      partsResults.push({
+        part: sectionPart,
+        sectionScore,
+        answers: gradedAnswers,
+      });
+    }
+
+    // Cập nhật tổng điểm và status
+    let totalScore = 0;
+    submission.sections.forEach((section) => {
+      totalScore += section.sectionScore || 0;
+    });
+    submission.totalScore = totalScore;
+
+    // Kiểm tra xem tất cả các section (của tất cả các type) đã được nộp chưa
+    const allSectionsSubmitted = submission.sections.every(
+      (section) => section.submittedAt !== null
+    );
+    submission.status = allSectionsSubmitted ? "completed" : "partially-submitted";
+
+    await submission.save();
+
+    res.json({
+      message: "Nộp bài Listening thành công",
+      sectionScore: totalSectionScore,
+      totalScore: submission.totalScore,
+      parts: partsResults,
+      status: submission.status,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ================== NỘP ĐÁP ÁN SECTION WRITING ==================
+exports.submitWritingAnswers = async (req, res) => {
+  try {
+    const { examId, submissionId } = req.params;
+    let { parts } = req.body; // parts: [{ part: 1, answers: [...] }, { part: 2, answers: [...] }]
+    const studentId = req.user._id;
+
+    // Parse parts nếu là string
+    if (typeof parts === "string") {
+      try {
+        parts = JSON.parse(parts);
+      } catch (e) {
+        return res.status(400).json({ message: "Định dạng đáp án không hợp lệ" });
+      }
+    }
+
+    if (!parts || !Array.isArray(parts)) {
+      return res.status(400).json({ message: "Vui lòng cung cấp đáp án cho tất cả các part" });
+    }
+
+    // Kiểm tra exam
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+      return res.status(404).json({ message: "Không tìm thấy bài thi" });
+    }
+
+    // Tìm tất cả các section Writing
+    const writingSections = exam.sections.filter(
+      (section) => section.type === "writing"
+    ).sort((a, b) => (a.part || 1) - (b.part || 1));
+
+    if (writingSections.length === 0) {
+      return res.status(404).json({
+        message: "Không tìm thấy phần Writing",
+      });
+    }
+
+    // Kiểm tra submission
+    const submission = await Submission.findOne({
+      _id: submissionId,
+      examId: examId,
+      studentId: studentId,
+    });
+
+    if (!submission) {
+      return res.status(404).json({ message: "Không tìm thấy bài làm" });
+    }
+
+    const partsResults = [];
+
+    // Xử lý từng part
+    for (const partData of parts) {
+      const { part, answers } = partData;
+      const sectionPart = part || 1;
+
+      if (!answers || !Array.isArray(answers)) {
+        continue; // Bỏ qua part không có answers
+      }
+
+      // Tìm exam section tương ứng
+      const examSection = writingSections.find(
+        (s) => (s.part || 1) === sectionPart
+      );
+
+      if (!examSection) {
+        continue; // Bỏ qua nếu không tìm thấy section
+      }
+
+      // Tìm hoặc tạo section submission
+      let sectionIndex = submission.sections.findIndex(
+        (s) => s.sectionType === "writing" && (s.part || 1) === sectionPart
+      );
+
+      if (sectionIndex === -1) {
+        submission.sections.push({
+          sectionType: "writing",
+          part: sectionPart,
+          submittedAt: null,
+          answers: [],
+          sectionScore: 0,
+        });
+        sectionIndex = submission.sections.length - 1;
+      }
+
+      // Writing: chỉ lưu đáp án text (không có file upload, không chấm tự động)
+      const gradedAnswers = answers.map((answer) => ({
+        questionNumber: answer.questionNumber,
+        answerText: answer.answerText || "",
+        score: 0, // Sẽ được cập nhật khi giáo viên chấm
+      }));
+
+      // Cập nhật section submission
+      submission.sections[sectionIndex].answers = gradedAnswers;
+      submission.sections[sectionIndex].sectionScore = 0;
+      submission.sections[sectionIndex].submittedAt = new Date();
+
+      partsResults.push({
+        part: sectionPart,
+        sectionScore: 0,
+        answers: gradedAnswers,
+      });
+    }
+
+    // Cập nhật tổng điểm và status
+    let totalScore = 0;
+    submission.sections.forEach((section) => {
+      totalScore += section.sectionScore || 0;
+    });
+    submission.totalScore = totalScore;
+
+    // Kiểm tra xem tất cả các section (của tất cả các type) đã được nộp chưa
+    const allSectionsSubmitted = submission.sections.every(
+      (section) => section.submittedAt !== null
+    );
+    submission.status = allSectionsSubmitted ? "completed" : "partially-submitted";
+
+    await submission.save();
+
+    res.json({
+      message: "Nộp bài Writing thành công",
+      sectionScore: 0,
+      totalScore: submission.totalScore,
+      parts: partsResults,
+      status: submission.status,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ================== NỘP ĐÁP ÁN SECTION SPEAKING ==================
+exports.submitSpeakingAnswers = async (req, res) => {
+  try {
+    const { examId, submissionId } = req.params;
+    let { parts } = req.body; // parts: [{ part: 1, answers: [...] }, { part: 2, answers: [...] }]
+    const studentId = req.user._id;
+
+    // Parse parts nếu là string
+    if (typeof parts === "string") {
+      try {
+        parts = JSON.parse(parts);
+      } catch (e) {
+        return res.status(400).json({ message: "Định dạng đáp án không hợp lệ" });
+      }
+    }
+
+    if (!parts || !Array.isArray(parts)) {
+      return res.status(400).json({ message: "Vui lòng cung cấp đáp án cho tất cả các part" });
+    }
+
+    // Kiểm tra exam
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+      return res.status(404).json({ message: "Không tìm thấy bài thi" });
+    }
+
+    // Tìm tất cả các section Speaking
+    const speakingSections = exam.sections.filter(
+      (section) => section.type === "speaking"
+    ).sort((a, b) => (a.part || 1) - (b.part || 1));
+
+    if (speakingSections.length === 0) {
+      return res.status(404).json({
+        message: "Không tìm thấy phần Speaking",
+      });
+    }
+
+    // Kiểm tra submission
+    const submission = await Submission.findOne({
+      _id: submissionId,
+      examId: examId,
+      studentId: studentId,
+    });
+
+    if (!submission) {
+      return res.status(404).json({ message: "Không tìm thấy bài làm" });
+    }
+
+    // Xử lý file upload cho Speaking
+    // File names format: "part_{part}_question_{questionNumber}" hoặc "question_{questionNumber}" (backward compatible)
     const uploadedFiles = {};
     if (req.file) {
-      // Single file upload
       uploadedFiles.default = `/uploads/${req.file.filename}`;
     } else if (req.files) {
-      // Multiple files upload
       if (Array.isArray(req.files)) {
-        // upload.any() hoặc upload.array() trả về array
         req.files.forEach((file) => {
-          // file.fieldname chứa tên field (ví dụ: "question_1")
           uploadedFiles[file.fieldname] = `/uploads/${file.filename}`;
         });
       } else {
-        // req.files là object với các field names (upload.fields())
         Object.keys(req.files).forEach((fieldName) => {
           const files = Array.isArray(req.files[fieldName]) 
             ? req.files[fieldName] 
@@ -738,113 +1512,53 @@ exports.submitSectionAnswers = async (req, res) => {
       }
     }
 
-    // Chấm điểm tự động theo questionType (chỉ cho reading và listening)
-    // Writing và Speaking sẽ được chấm thủ công sau
-    let sectionScore = 0;
-    let gradedAnswers = [];
+    const partsResults = [];
 
-    if (sectionType === "reading" || sectionType === "listening") {
-      const answerKey = examSection.answerKey || [];
-      gradedAnswers = answers.map((answer) => {
-        const correctAnswer = answerKey.find(
-          (key) => key.questionNumber === answer.questionNumber
-        );
+    // Xử lý từng part
+    for (const partData of parts) {
+      const { part, answers } = partData;
+      const sectionPart = part || 1;
 
-        let score = 0;
-        let isCorrect = false;
+      if (!answers || !Array.isArray(answers)) {
+        continue; // Bỏ qua part không có answers
+      }
 
-        if (correctAnswer) {
-          // Xử lý studentAnswer - có thể là string hoặc array
-          let studentAnswers = answer.selectedOption || answer.answerText || "";
-          if (typeof studentAnswers === "string") {
-            // Nếu là string, chuyển thành array có 1 phần tử
-            studentAnswers = [studentAnswers];
-          } else if (!Array.isArray(studentAnswers)) {
-            // Nếu không phải array và không phải string, chuyển thành array rỗng
-            studentAnswers = [];
-          }
+      // Tìm exam section tương ứng
+      const examSection = speakingSections.find(
+        (s) => (s.part || 1) === sectionPart
+      );
 
-          const correctAnswers = Array.isArray(correctAnswer.correctAnswer) 
-            ? correctAnswer.correctAnswer 
-            : [correctAnswer.correctAnswer || ""];
+      if (!examSection) {
+        continue; // Bỏ qua nếu không tìm thấy section
+      }
 
-          // Phải khớp hết: số lượng phần tử phải bằng nhau và tất cả phần tử đều khớp (không phân biệt thứ tự)
-          if (studentAnswers.length !== correctAnswers.length) {
-            isCorrect = false;
-          } else {
-            // Helper function để so sánh hai array không phân biệt thứ tự
-            const compareArraysUnordered = (arr1, arr2, compareFn) => {
-              // Tạo bản sao để không ảnh hưởng đến array gốc
-              const sorted1 = [...arr1].map(item => compareFn(String(item)));
-              const sorted2 = [...arr2].map(item => compareFn(String(item)));
-              // Sắp xếp và so sánh
-              sorted1.sort();
-              sorted2.sort();
-              return sorted1.length === sorted2.length && 
-                     sorted1.every((val, idx) => val === sorted2[idx]);
-            };
+      // Tìm hoặc tạo section submission
+      let sectionIndex = submission.sections.findIndex(
+        (s) => s.sectionType === "speaking" && (s.part || 1) === sectionPart
+      );
 
-            // Chấm điểm theo loại câu hỏi - kiểm tra tất cả phần tử đều khớp (không phân biệt thứ tự)
-            switch (correctAnswer.questionType) {
-              case "multiple_choice":
-                // So sánh chính xác (case-insensitive) - phải khớp hết, không phân biệt thứ tự
-                isCorrect = compareArraysUnordered(
-                  correctAnswers,
-                  studentAnswers,
-                  (val) => val.trim().toUpperCase()
-                );
-                break;
-              case "input":
-                // So sánh text (case-insensitive, trim whitespace) - phải khớp hết, không phân biệt thứ tự
-                isCorrect = compareArraysUnordered(
-                  correctAnswers,
-                  studentAnswers,
-                  (val) => val.trim().toLowerCase()
-                );
-                break;
-              case "true_false":
-                // So sánh True/False (case-insensitive) - phải khớp hết, không phân biệt thứ tự
-                isCorrect = compareArraysUnordered(
-                  correctAnswers,
-                  studentAnswers,
-                  (val) => val.trim().toLowerCase()
-                );
-                break;
-              default:
-                // Mặc định so sánh chính xác - phải khớp hết, không phân biệt thứ tự
-                isCorrect = compareArraysUnordered(
-                  correctAnswers,
-                  studentAnswers,
-                  (val) => val.trim()
-                );
-            }
-          }
+      if (sectionIndex === -1) {
+        submission.sections.push({
+          sectionType: "speaking",
+          part: sectionPart,
+          submittedAt: null,
+          answers: [],
+          sectionScore: 0,
+        });
+        sectionIndex = submission.sections.length - 1;
+      }
 
-          if (isCorrect) {
-            score = correctAnswer.maxScore || 1;
-            sectionScore += score;
-          }
-        }
-
-        return {
-          questionNumber: answer.questionNumber,
-          selectedOption: answer.selectedOption || answer.answerText || "",
-          score: score,
-        };
-      });
-    } else if (sectionType === "writing") {
-      // Writing: chỉ lưu đáp án text từ textarea (không có file upload)
-      gradedAnswers = answers.map((answer) => ({
-        questionNumber: answer.questionNumber,
-        answerText: answer.answerText || "",
-        score: 0, // Sẽ được cập nhật khi giáo viên chấm
-      }));
-    } else if (sectionType === "speaking") {
-      // Speaking: lưu đáp án text và recording (nếu có)
-      gradedAnswers = answers.map((answer) => {
-        // Tìm recording tương ứng với questionNumber hoặc dùng default
-        const recordingKey = `question_${answer.questionNumber}`;
-        const recordingUrl = uploadedFiles[recordingKey] || uploadedFiles.default || uploadedFiles.recording || answer.recordingUrl || "";
+      // Speaking: lưu đáp án text và recording (không chấm tự động)
+      const gradedAnswers = answers.map((answer) => {
+        // Tìm recording: ưu tiên part-specific, sau đó là generic
+        const partSpecificKey = `part_${sectionPart}_question_${answer.questionNumber}`;
+        const genericKey = `question_${answer.questionNumber}`;
+        const recordingUrl = uploadedFiles[partSpecificKey] 
+          || uploadedFiles[genericKey] 
+          || uploadedFiles.default 
+          || uploadedFiles.recording 
+          || answer.recordingUrl 
+          || "";
         
         return {
           questionNumber: answer.questionNumber,
@@ -853,37 +1567,39 @@ exports.submitSectionAnswers = async (req, res) => {
           score: 0, // Sẽ được cập nhật khi giáo viên chấm
         };
       });
+
+      // Cập nhật section submission
+      submission.sections[sectionIndex].answers = gradedAnswers;
+      submission.sections[sectionIndex].sectionScore = 0;
+      submission.sections[sectionIndex].submittedAt = new Date();
+
+      partsResults.push({
+        part: sectionPart,
+        sectionScore: 0,
+        answers: gradedAnswers,
+      });
     }
 
-    // Cập nhật section submission
-    submission.sections[sectionIndex].answers = gradedAnswers;
-    submission.sections[sectionIndex].sectionScore = sectionScore;
-    submission.sections[sectionIndex].submittedAt = new Date();
-
-    // Cập nhật tổng điểm
+    // Cập nhật tổng điểm và status
     let totalScore = 0;
     submission.sections.forEach((section) => {
       totalScore += section.sectionScore || 0;
     });
     submission.totalScore = totalScore;
 
-    // Cập nhật status nếu đã nộp hết
+    // Kiểm tra xem tất cả các section (của tất cả các type) đã được nộp chưa
     const allSectionsSubmitted = submission.sections.every(
       (section) => section.submittedAt !== null
     );
-    if (allSectionsSubmitted) {
-      submission.status = "completed";
-    } else {
-      submission.status = "partially-submitted";
-    }
+    submission.status = allSectionsSubmitted ? "completed" : "partially-submitted";
 
     await submission.save();
 
     res.json({
-      message: `Nộp bài ${getSectionName(sectionType)} thành công`,
-      sectionScore: sectionScore,
+      message: "Nộp bài Speaking thành công",
+      sectionScore: 0,
       totalScore: submission.totalScore,
-      answers: gradedAnswers,
+      parts: partsResults,
       status: submission.status,
     });
   } catch (err) {
@@ -891,17 +1607,11 @@ exports.submitSectionAnswers = async (req, res) => {
   }
 };
 
-// ================== 6. XEM KẾT QUẢ SECTION (GENERIC - CHO TẤT CẢ CÁC PHẦN THI) ==================
-exports.getSectionResult = async (req, res) => {
+// ================== 6. XEM KẾT QUẢ SECTION READING ==================
+exports.getReadingResult = async (req, res) => {
   try {
-    const { examId, submissionId, sectionType } = req.params;
+    const { examId, submissionId } = req.params;
     const studentId = req.user._id;
-
-    // Validate section type
-    const validSectionTypes = ["reading", "listening", "writing", "speaking"];
-    if (!validSectionTypes.includes(sectionType)) {
-      return res.status(400).json({ message: "Loại phần thi không hợp lệ" });
-    }
 
     // Kiểm tra exam
     const exam = await Exam.findById(examId);
@@ -909,14 +1619,14 @@ exports.getSectionResult = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy bài thi" });
     }
 
-    // Tìm section và answer key
-    const examSection = exam.sections.find(
-      (section) => section.type === sectionType
-    );
+    // Tìm tất cả các section Reading
+    const readingSections = exam.sections.filter(
+      (section) => section.type === "reading"
+    ).sort((a, b) => (a.part || 1) - (b.part || 1));
 
-    if (!examSection) {
+    if (readingSections.length === 0) {
       return res.status(404).json({
-        message: `Không tìm thấy phần ${getSectionName(sectionType)}`,
+        message: "Không tìm thấy phần Reading",
       });
     }
 
@@ -931,30 +1641,30 @@ exports.getSectionResult = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy bài làm" });
     }
 
-    // Tìm section submission
-    const sectionSubmission = submission.sections.find(
-      (s) => s.sectionType === sectionType
-    );
+    let totalSectionScore = 0;
+    let totalMaxScore = 0;
+    const partsResults = [];
+    let earliestSubmittedAt = null;
 
-    if (!sectionSubmission) {
-      return res.status(404).json({
-        message: `Chưa có bài làm cho phần ${getSectionName(sectionType)}`,
-      });
-    }
+    // Xử lý từng part
+    for (const examSection of readingSections) {
+      const sectionPart = examSection.part || 1;
+      const sectionSubmission = submission.sections.find(
+        (s) => s.sectionType === "reading" && (s.part || 1) === sectionPart
+      );
 
-    if (!sectionSubmission.submittedAt) {
-      return res.status(400).json({
-        message: `Chưa nộp bài ${getSectionName(sectionType)}`,
-      });
-    }
+      if (!sectionSubmission || !sectionSubmission.submittedAt) {
+        continue; // Bỏ qua part chưa nộp
+      }
 
-    // Tạo kết quả chi tiết
-    let detailedResults = [];
+      // Tìm submittedAt sớm nhất
+      if (!earliestSubmittedAt || sectionSubmission.submittedAt < earliestSubmittedAt) {
+        earliestSubmittedAt = sectionSubmission.submittedAt;
+      }
 
-    if (sectionType === "reading" || sectionType === "listening") {
-      // Reading và Listening: có answer key để so sánh
+      // Tạo kết quả chi tiết cho part này
       const answerKey = examSection.answerKey || [];
-      detailedResults = sectionSubmission.answers.map((answer) => {
+      const detailedResults = sectionSubmission.answers.map((answer) => {
         const correctAnswer = answerKey.find(
           (key) => key.questionNumber === answer.questionNumber
         );
@@ -974,10 +1684,207 @@ exports.getSectionResult = async (req, res) => {
           isCorrect: answer.score > 0,
         };
       });
-    } else if (sectionType === "writing") {
-      // Writing: hiển thị đáp án text và điểm (nếu đã chấm)
+
+      totalSectionScore += sectionSubmission.sectionScore || 0;
+      totalMaxScore += examSection.maxScore || 0;
+
+      partsResults.push({
+        part: sectionPart,
+        sectionScore: sectionSubmission.sectionScore || 0,
+        maxScore: examSection.maxScore || 0,
+        results: detailedResults,
+        submittedAt: sectionSubmission.submittedAt,
+        feedback: sectionSubmission.feedback || null,
+      });
+    }
+
+    if (partsResults.length === 0) {
+      return res.status(400).json({
+        message: "Chưa nộp bài Reading",
+      });
+    }
+
+    res.json({
+      sectionType: "reading",
+      sectionScore: totalSectionScore,
+      maxScore: totalMaxScore,
+      totalScore: submission.totalScore,
+      submittedAt: earliestSubmittedAt,
+      parts: partsResults,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ================== XEM KẾT QUẢ SECTION LISTENING ==================
+exports.getListeningResult = async (req, res) => {
+  try {
+    const { examId, submissionId } = req.params;
+    const studentId = req.user._id;
+
+    // Kiểm tra exam
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+      return res.status(404).json({ message: "Không tìm thấy bài thi" });
+    }
+
+    // Tìm tất cả các section Listening
+    const listeningSections = exam.sections.filter(
+      (section) => section.type === "listening"
+    ).sort((a, b) => (a.part || 1) - (b.part || 1));
+
+    if (listeningSections.length === 0) {
+      return res.status(404).json({
+        message: "Không tìm thấy phần Listening",
+      });
+    }
+
+    // Kiểm tra submission
+    const submission = await Submission.findOne({
+      _id: submissionId,
+      examId: examId,
+      studentId: studentId,
+    });
+
+    if (!submission) {
+      return res.status(404).json({ message: "Không tìm thấy bài làm" });
+    }
+
+    let totalSectionScore = 0;
+    let totalMaxScore = 0;
+    const partsResults = [];
+    let earliestSubmittedAt = null;
+
+    // Xử lý từng part
+    for (const examSection of listeningSections) {
+      const sectionPart = examSection.part || 1;
+      const sectionSubmission = submission.sections.find(
+        (s) => s.sectionType === "listening" && (s.part || 1) === sectionPart
+      );
+
+      if (!sectionSubmission || !sectionSubmission.submittedAt) {
+        continue; // Bỏ qua part chưa nộp
+      }
+
+      // Tìm submittedAt sớm nhất
+      if (!earliestSubmittedAt || sectionSubmission.submittedAt < earliestSubmittedAt) {
+        earliestSubmittedAt = sectionSubmission.submittedAt;
+      }
+
+      // Tạo kết quả chi tiết cho part này
       const answerKey = examSection.answerKey || [];
-      detailedResults = sectionSubmission.answers.map((answer) => {
+      const detailedResults = sectionSubmission.answers.map((answer) => {
+        const correctAnswer = answerKey.find(
+          (key) => key.questionNumber === answer.questionNumber
+        );
+
+        return {
+          questionNumber: answer.questionNumber,
+          questionTitle: correctAnswer ? correctAnswer.questionTitle || "" : "",
+          questionAnswer: correctAnswer ? correctAnswer.questionAnswer || [] : [],
+          studentAnswer: answer.selectedOption,
+          correctAnswer: correctAnswer 
+            ? (Array.isArray(correctAnswer.correctAnswer) 
+                ? correctAnswer.correctAnswer 
+                : [correctAnswer.correctAnswer || ""])
+            : null,
+          score: answer.score,
+          maxScore: correctAnswer ? correctAnswer.maxScore || 1 : 0,
+          isCorrect: answer.score > 0,
+        };
+      });
+
+      totalSectionScore += sectionSubmission.sectionScore || 0;
+      totalMaxScore += examSection.maxScore || 0;
+
+      partsResults.push({
+        part: sectionPart,
+        sectionScore: sectionSubmission.sectionScore || 0,
+        maxScore: examSection.maxScore || 0,
+        results: detailedResults,
+        submittedAt: sectionSubmission.submittedAt,
+        feedback: sectionSubmission.feedback || null,
+      });
+    }
+
+    if (partsResults.length === 0) {
+      return res.status(400).json({
+        message: "Chưa nộp bài Listening",
+      });
+    }
+
+    res.json({
+      sectionType: "listening",
+      sectionScore: totalSectionScore,
+      maxScore: totalMaxScore,
+      totalScore: submission.totalScore,
+      submittedAt: earliestSubmittedAt,
+      parts: partsResults,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ================== XEM KẾT QUẢ SECTION WRITING ==================
+exports.getWritingResult = async (req, res) => {
+  try {
+    const { examId, submissionId } = req.params;
+    const studentId = req.user._id;
+
+    // Kiểm tra exam
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+      return res.status(404).json({ message: "Không tìm thấy bài thi" });
+    }
+
+    // Tìm tất cả các section Writing
+    const writingSections = exam.sections.filter(
+      (section) => section.type === "writing"
+    ).sort((a, b) => (a.part || 1) - (b.part || 1));
+
+    if (writingSections.length === 0) {
+      return res.status(404).json({
+        message: "Không tìm thấy phần Writing",
+      });
+    }
+
+    // Kiểm tra submission
+    const submission = await Submission.findOne({
+      _id: submissionId,
+      examId: examId,
+      studentId: studentId,
+    });
+
+    if (!submission) {
+      return res.status(404).json({ message: "Không tìm thấy bài làm" });
+    }
+
+    let totalSectionScore = 0;
+    let totalMaxScore = 0;
+    const partsResults = [];
+    let earliestSubmittedAt = null;
+
+    // Xử lý từng part
+    for (const examSection of writingSections) {
+      const sectionPart = examSection.part || 1;
+      const sectionSubmission = submission.sections.find(
+        (s) => s.sectionType === "writing" && (s.part || 1) === sectionPart
+      );
+
+      if (!sectionSubmission || !sectionSubmission.submittedAt) {
+        continue; // Bỏ qua part chưa nộp
+      }
+
+      // Tìm submittedAt sớm nhất
+      if (!earliestSubmittedAt || sectionSubmission.submittedAt < earliestSubmittedAt) {
+        earliestSubmittedAt = sectionSubmission.submittedAt;
+      }
+
+      // Tạo kết quả chi tiết cho part này
+      const answerKey = examSection.answerKey || [];
+      const detailedResults = sectionSubmission.answers.map((answer) => {
         const correctAnswer = answerKey.find(
           (key) => key.questionNumber === answer.questionNumber
         );
@@ -991,10 +1898,97 @@ exports.getSectionResult = async (req, res) => {
           isCorrect: null, // Không áp dụng cho writing
         };
       });
-    } else if (sectionType === "speaking") {
-      // Speaking: hiển thị đáp án text, recording và điểm (nếu đã chấm)
+
+      totalSectionScore += sectionSubmission.sectionScore || 0;
+      totalMaxScore += examSection.maxScore || 0;
+
+      partsResults.push({
+        part: sectionPart,
+        sectionScore: sectionSubmission.sectionScore || 0,
+        maxScore: examSection.maxScore || 0,
+        results: detailedResults,
+        submittedAt: sectionSubmission.submittedAt,
+        feedback: sectionSubmission.feedback || null,
+      });
+    }
+
+    if (partsResults.length === 0) {
+      return res.status(400).json({
+        message: "Chưa nộp bài Writing",
+      });
+    }
+
+    res.json({
+      sectionType: "writing",
+      sectionScore: totalSectionScore,
+      maxScore: totalMaxScore,
+      totalScore: submission.totalScore,
+      submittedAt: earliestSubmittedAt,
+      parts: partsResults,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ================== XEM KẾT QUẢ SECTION SPEAKING ==================
+exports.getSpeakingResult = async (req, res) => {
+  try {
+    const { examId, submissionId } = req.params;
+    const studentId = req.user._id;
+
+    // Kiểm tra exam
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+      return res.status(404).json({ message: "Không tìm thấy bài thi" });
+    }
+
+    // Tìm tất cả các section Speaking
+    const speakingSections = exam.sections.filter(
+      (section) => section.type === "speaking"
+    ).sort((a, b) => (a.part || 1) - (b.part || 1));
+
+    if (speakingSections.length === 0) {
+      return res.status(404).json({
+        message: "Không tìm thấy phần Speaking",
+      });
+    }
+
+    // Kiểm tra submission
+    const submission = await Submission.findOne({
+      _id: submissionId,
+      examId: examId,
+      studentId: studentId,
+    });
+
+    if (!submission) {
+      return res.status(404).json({ message: "Không tìm thấy bài làm" });
+    }
+
+    let totalSectionScore = 0;
+    let totalMaxScore = 0;
+    const partsResults = [];
+    let earliestSubmittedAt = null;
+
+    // Xử lý từng part
+    for (const examSection of speakingSections) {
+      const sectionPart = examSection.part || 1;
+      const sectionSubmission = submission.sections.find(
+        (s) => s.sectionType === "speaking" && (s.part || 1) === sectionPart
+      );
+
+      if (!sectionSubmission || !sectionSubmission.submittedAt) {
+        continue; // Bỏ qua part chưa nộp
+      }
+
+      // Tìm submittedAt sớm nhất
+      if (!earliestSubmittedAt || sectionSubmission.submittedAt < earliestSubmittedAt) {
+        earliestSubmittedAt = sectionSubmission.submittedAt;
+      }
+
+      // Tạo kết quả chi tiết cho part này
       const answerKey = examSection.answerKey || [];
-      detailedResults = sectionSubmission.answers.map((answer) => {
+      const detailedResults = sectionSubmission.answers.map((answer) => {
         const correctAnswer = answerKey.find(
           (key) => key.questionNumber === answer.questionNumber
         );
@@ -1009,82 +2003,39 @@ exports.getSectionResult = async (req, res) => {
           isCorrect: null, // Không áp dụng cho speaking
         };
       });
+
+      totalSectionScore += sectionSubmission.sectionScore || 0;
+      totalMaxScore += examSection.maxScore || 0;
+
+      partsResults.push({
+        part: sectionPart,
+        sectionScore: sectionSubmission.sectionScore || 0,
+        maxScore: examSection.maxScore || 0,
+        results: detailedResults,
+        submittedAt: sectionSubmission.submittedAt,
+        feedback: sectionSubmission.feedback || null,
+      });
+    }
+
+    if (partsResults.length === 0) {
+      return res.status(400).json({
+        message: "Chưa nộp bài Speaking",
+      });
     }
 
     res.json({
-      sectionType: sectionType,
-      sectionScore: sectionSubmission.sectionScore,
-      maxScore: examSection.maxScore || 0,
+      sectionType: "speaking",
+      sectionScore: totalSectionScore,
+      maxScore: totalMaxScore,
       totalScore: submission.totalScore,
-      submittedAt: sectionSubmission.submittedAt,
-      results: detailedResults,
-      feedback: sectionSubmission.feedback || null,
+      submittedAt: earliestSubmittedAt,
+      parts: partsResults,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// ================== BACKWARD COMPATIBILITY - Giữ lại các hàm cũ để tương thích ==================
-exports.getReadingSection = async (req, res) => {
-  req.params.sectionType = "reading";
-  return exports.getSection(req, res);
-};
-
-exports.submitReadingAnswers = async (req, res) => {
-  req.params.sectionType = "reading";
-  return exports.submitSectionAnswers(req, res);
-};
-
-exports.getReadingResult = async (req, res) => {
-  req.params.sectionType = "reading";
-  return exports.getSectionResult(req, res);
-};
-
-exports.getListeningSection = async (req, res) => {
-  req.params.sectionType = "listening";
-  return exports.getSection(req, res);
-};
-
-exports.submitListeningAnswers = async (req, res) => {
-  req.params.sectionType = "listening";
-  return exports.submitSectionAnswers(req, res);
-};
-
-exports.getListeningResult = async (req, res) => {
-  req.params.sectionType = "listening";
-  return exports.getSectionResult(req, res);
-};
-
-exports.getWritingSection = async (req, res) => {
-  req.params.sectionType = "writing";
-  return exports.getSection(req, res);
-};
-
-exports.submitWritingAnswers = async (req, res) => {
-  req.params.sectionType = "writing";
-  return exports.submitSectionAnswers(req, res);
-};
-
-exports.getWritingResult = async (req, res) => {
-  req.params.sectionType = "writing";
-  return exports.getSectionResult(req, res);
-};
-
-exports.getSpeakingSection = async (req, res) => {
-  req.params.sectionType = "speaking";
-  return exports.getSection(req, res);
-};
-
-exports.submitSpeakingAnswers = async (req, res) => {
-  req.params.sectionType = "speaking";
-  return exports.submitSectionAnswers(req, res);
-};
-
-exports.getSpeakingResult = async (req, res) => {
-  req.params.sectionType = "speaking";
-  return exports.getSectionResult(req, res);
-};
 
 
 

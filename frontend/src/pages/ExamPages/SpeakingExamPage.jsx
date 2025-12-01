@@ -10,19 +10,20 @@ const SpeakingExamPage = () => {
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [sectionData, setSectionData] = useState(null);
-  const [recordings, setRecordings] = useState({}); // { questionNumber: blob }
-  const [recordingUrls, setRecordingUrls] = useState({}); // { questionNumber: url }
-  const [recordingStates, setRecordingStates] = useState({}); // { questionNumber: 'idle' | 'recording' | 'recorded' }
+  const [recordings, setRecordings] = useState({}); // { part_1: { questionNumber: blob }, part_2: { ... } }
+  const [recordingUrls, setRecordingUrls] = useState({}); // { part_1: { questionNumber: url }, part_2: { ... } }
+  const [recordingStates, setRecordingStates] = useState({}); // { part_1: { questionNumber: 'idle' | 'recording' | 'recorded' }, part_2: { ... } }
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(1);
+  const [currentPart, setCurrentPart] = useState(1);
   const [leftWidth, setLeftWidth] = useState(50);
   const timerRef = useRef(null);
-  const mediaRecorderRefs = useRef({}); // { questionNumber: MediaRecorder }
-  const audioChunksRefs = useRef({}); // { questionNumber: Blob[] }
+  const mediaRecorderRefs = useRef({}); // { part_1_question_1: MediaRecorder, part_2_question_1: MediaRecorder, ... }
+  const audioChunksRefs = useRef({}); // { part_1_question_1: Blob[], part_2_question_1: Blob[], ... }
   const containerRef = useRef(null);
   const isResizingRef = useRef(false);
   const questionRefs = useRef({});
@@ -36,8 +37,8 @@ const SpeakingExamPage = () => {
       }
 
       // Stop all recordings
-      Object.keys(mediaRecorderRefs.current).forEach((qNum) => {
-        const recorder = mediaRecorderRefs.current[qNum];
+      Object.keys(mediaRecorderRefs.current).forEach((key) => {
+        const recorder = mediaRecorderRefs.current[key];
         if (recorder && recorder.state !== "inactive") {
           recorder.stop();
         }
@@ -51,23 +52,40 @@ const SpeakingExamPage = () => {
 
         // Create FormData for file upload
         const formData = new FormData();
-        const answersArray = Object.keys(recordings).map((qNum) => {
-          const recordingBlob = recordings[qNum];
+        const partsData = [];
+        
+        if (sectionData?.parts) {
+          for (const partData of sectionData.parts) {
+            const part = partData.part;
+            const partRecordings = recordings[`part_${part}`] || {};
+            const answersArray = [];
+            
+            Object.keys(partRecordings).forEach((qNum) => {
+              const recordingBlob = partRecordings[qNum];
 
-          // Add recording file if exists
-          if (recordingBlob) {
-            const fileName = `question_${qNum}_${Date.now()}.webm`;
-            formData.append(`question_${qNum}`, recordingBlob, fileName);
+              // Add recording file if exists
+              if (recordingBlob) {
+                const fileName = `part_${part}_question_${qNum}_${Date.now()}.webm`;
+                formData.append(`part_${part}_question_${qNum}`, recordingBlob, fileName);
+              }
+
+              answersArray.push({
+                questionNumber: parseInt(qNum),
+                answerText: "", // Không có text answer cho Speaking
+                recordingUrl: recordingBlob ? `part_${part}_question_${qNum}` : "",
+              });
+            });
+
+            if (answersArray.length > 0) {
+              partsData.push({
+                part: part,
+                answers: answersArray,
+              });
+            }
           }
+        }
 
-          return {
-            questionNumber: parseInt(qNum),
-            answerText: "", // Không có text answer cho Speaking
-            recordingUrl: recordingBlob ? `question_${qNum}` : "",
-          };
-        });
-
-        formData.append("answers", JSON.stringify(answersArray));
+        formData.append("parts", JSON.stringify(partsData));
 
         await examService.submitSpeakingAnswers(examId, submissionId, formData);
 
@@ -78,7 +96,7 @@ const SpeakingExamPage = () => {
         setSubmitting(false);
       }
     },
-    [submitting, recordings, examId, submissionId, navigate]
+    [submitting, recordings, examId, submissionId, navigate, sectionData]
   );
 
   // Fetch section + initialize state
@@ -103,15 +121,28 @@ const SpeakingExamPage = () => {
 
         setSectionData(data);
 
-        // Initialize recording states as empty
-        setRecordings({});
-        setRecordingStates({});
+        // Initialize recording states as empty for all parts
+        const initialRecordings = {};
+        const initialRecordingStates = {};
+        if (data.parts) {
+          data.parts.forEach((partData) => {
+            initialRecordings[`part_${partData.part}`] = {};
+            initialRecordingStates[`part_${partData.part}`] = {};
+          });
+        }
+        setRecordings(initialRecordings);
+        setRecordingStates(initialRecordingStates);
 
-        // Initialize timer if duration exists
-        if (data.section?.duration) {
-          setTimeRemaining(data.section.duration * 60); // minutes -> seconds
+        // Initialize timer if totalDuration exists
+        if (data.totalDuration) {
+          setTimeRemaining(data.totalDuration * 60); // minutes -> seconds
         } else {
           setTimeRemaining(null);
+        }
+
+        // Set current part to first part
+        if (data.parts && data.parts.length > 0) {
+          setCurrentPart(data.parts[0].part);
         }
 
         setError(null);
@@ -171,16 +202,20 @@ const SpeakingExamPage = () => {
         timerRef.current = null;
       }
       // Stop all recordings
-      Object.keys(mediaRecorderRefs.current).forEach((qNum) => {
-        const recorder = mediaRecorderRefs.current[qNum];
+      Object.keys(mediaRecorderRefs.current).forEach((key) => {
+        const recorder = mediaRecorderRefs.current[key];
         if (recorder && recorder.state !== "inactive") {
           recorder.stop();
         }
       });
       // Cleanup all recording URLs
-      Object.values(recordingUrls).forEach((url) => {
-        if (url) {
-          URL.revokeObjectURL(url);
+      Object.values(recordingUrls).forEach((partUrls) => {
+        if (partUrls && typeof partUrls === 'object') {
+          Object.values(partUrls).forEach((url) => {
+            if (url) {
+              URL.revokeObjectURL(url);
+            }
+          });
         }
       });
     };
@@ -194,31 +229,44 @@ const SpeakingExamPage = () => {
   };
 
 //Hàm bắt đầu ghi âm
-  const startRecording = async (questionNumber) => {
+  const startRecording = async (part, questionNumber) => {
     try {
+      const partKey = `part_${part}`;
+      const recorderKey = `${partKey}_question_${questionNumber}`;
+      
       // Xóa audio cũ của câu đó (nếu có)
       setRecordingUrls((prev) => {
-        if (prev[questionNumber]) {
-          URL.revokeObjectURL(prev[questionNumber]);
+        const partUrls = prev[partKey] || {};
+        if (partUrls[questionNumber]) {
+          URL.revokeObjectURL(partUrls[questionNumber]);
         }
-        const newUrls = { ...prev };
-        delete newUrls[questionNumber];
-        return newUrls;
+        return {
+          ...prev,
+          [partKey]: {
+            ...partUrls,
+            [questionNumber]: undefined,
+          },
+        };
       });
       
       // Cleanup old recording blob
       setRecordings((prev) => {
-        const newRecordings = { ...prev };
-        delete newRecordings[questionNumber];
-        return newRecordings;
+        const partRecordings = prev[partKey] || {};
+        return {
+          ...prev,
+          [partKey]: {
+            ...partRecordings,
+            [questionNumber]: undefined,
+          },
+        };
       });
       
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       const audioChunks = [];
 
-      mediaRecorderRefs.current[questionNumber] = mediaRecorder;
-      audioChunksRefs.current[questionNumber] = audioChunks;
+      mediaRecorderRefs.current[recorderKey] = mediaRecorder;
+      audioChunksRefs.current[recorderKey] = audioChunks;
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -232,22 +280,32 @@ const SpeakingExamPage = () => {
         
         // Cleanup old URL if exists
         setRecordingUrls((prev) => {
-          if (prev[questionNumber]) {
-            URL.revokeObjectURL(prev[questionNumber]);
+          const partUrls = prev[partKey] || {};
+          if (partUrls[questionNumber]) {
+            URL.revokeObjectURL(partUrls[questionNumber]);
           }
           return {
             ...prev,
-            [questionNumber]: audioUrl,
+            [partKey]: {
+              ...partUrls,
+              [questionNumber]: audioUrl,
+            },
           };
         });
         
         setRecordings((prev) => ({
           ...prev,
-          [questionNumber]: audioBlob,
+          [partKey]: {
+            ...(prev[partKey] || {}),
+            [questionNumber]: audioBlob,
+          },
         }));
         setRecordingStates((prev) => ({
           ...prev,
-          [questionNumber]: "recorded",
+          [partKey]: {
+            ...(prev[partKey] || {}),
+            [questionNumber]: "recorded",
+          },
         }));
         stream.getTracks().forEach((track) => track.stop());
       };
@@ -255,7 +313,10 @@ const SpeakingExamPage = () => {
       mediaRecorder.start();
       setRecordingStates((prev) => ({
         ...prev,
-        [questionNumber]: "recording",
+        [partKey]: {
+          ...(prev[partKey] || {}),
+          [questionNumber]: "recording",
+        },
       }));
     } catch (err) {
       setError("Không thể truy cập microphone. Vui lòng kiểm tra quyền truy cập.");
@@ -263,54 +324,77 @@ const SpeakingExamPage = () => {
     }
   };
 
-  const stopRecording = (questionNumber) => {
-    const recorder = mediaRecorderRefs.current[questionNumber];
+  const stopRecording = (part, questionNumber) => {
+    const recorderKey = `part_${part}_question_${questionNumber}`;
+    const recorder = mediaRecorderRefs.current[recorderKey];
     if (recorder && recorder.state === "recording") {
       recorder.stop();
     }
   };
 
-  const deleteRecording = (questionNumber) => {
+  const deleteRecording = (part, questionNumber) => {
+    const partKey = `part_${part}`;
+    const recorderKey = `${partKey}_question_${questionNumber}`;
+    
     // Cleanup URL
     setRecordingUrls((prev) => {
-      if (prev[questionNumber]) {
-        URL.revokeObjectURL(prev[questionNumber]);
+      const partUrls = prev[partKey] || {};
+      if (partUrls[questionNumber]) {
+        URL.revokeObjectURL(partUrls[questionNumber]);
       }
-      const newUrls = { ...prev };
-      delete newUrls[questionNumber];
-      return newUrls;
+      return {
+        ...prev,
+        [partKey]: {
+          ...partUrls,
+          [questionNumber]: undefined,
+        },
+      };
     });
     
     setRecordings((prev) => {
-      const newRecordings = { ...prev };
-      delete newRecordings[questionNumber];
-      return newRecordings;
+      const partRecordings = prev[partKey] || {};
+      return {
+        ...prev,
+        [partKey]: {
+          ...partRecordings,
+          [questionNumber]: undefined,
+        },
+      };
     });
     setRecordingStates((prev) => ({
       ...prev,
-      [questionNumber]: "idle",
+      [partKey]: {
+        ...(prev[partKey] || {}),
+        [questionNumber]: "idle",
+      },
     }));
-    delete mediaRecorderRefs.current[questionNumber];
-    delete audioChunksRefs.current[questionNumber];
+    delete mediaRecorderRefs.current[recorderKey];
+    delete audioChunksRefs.current[recorderKey];
   };
 
-  const getPDFUrl = () => {
-    if (!sectionData?.section?.fileUrl) return null;
-    if (sectionData.section.fileUrl.startsWith("http")) {
-      return sectionData.section.fileUrl;
+  const getPDFUrl = (part) => {
+    if (!sectionData?.parts) return null;
+    const partData = sectionData.parts.find((p) => p.part === part);
+    if (!partData?.section?.fileUrl) return null;
+    
+    const fileUrl = partData.section.fileUrl;
+    if (fileUrl.startsWith("http")) {
+      return fileUrl;
     }
-    if (sectionData.section.fileUrl.startsWith("/")) {
+    if (fileUrl.startsWith("/")) {
       const API_PORT = import.meta.env.VITE_API_PORT;
-      return `http://localhost:${API_PORT}${sectionData.section.fileUrl}`;
+      return `http://localhost:${API_PORT}${fileUrl}`;
     }
     const API_PORT = import.meta.env.VITE_API_PORT;
-    return `http://localhost:${API_PORT}/uploads/${sectionData.section.fileUrl}`;
+    return `http://localhost:${API_PORT}/uploads/${fileUrl}`;
   };
 
   const getQuestionData = useCallback(
-    (questionNumber) => {
-      if (!sectionData?.section?.questions) return { questionTitle: "", questionAnswer: [] };
-      const question = sectionData.section.questions.find(
+    (part, questionNumber) => {
+      if (!sectionData?.parts) return { questionTitle: "", questionAnswer: [] };
+      const partData = sectionData.parts.find((p) => p.part === part);
+      if (!partData?.section?.questions) return { questionTitle: "", questionAnswer: [] };
+      const question = partData.section.questions.find(
         (q) => q.questionNumber === questionNumber
       );
       return {
@@ -321,9 +405,11 @@ const SpeakingExamPage = () => {
     [sectionData]
   );
 
-  const generateQuestionNumbers = () => {
-    if (!sectionData?.section?.questionCount) return [];
-    return Array.from({ length: sectionData.section.questionCount }, (_, i) => i + 1);
+  const generateQuestionNumbers = (part) => {
+    if (!sectionData?.parts) return [];
+    const partData = sectionData.parts.find((p) => p.part === part);
+    if (!partData?.section?.questionCount) return [];
+    return Array.from({ length: partData.section.questionCount }, (_, i) => i + 1);
   };
 
   // Fullscreen functionality
@@ -358,11 +444,11 @@ const SpeakingExamPage = () => {
   // Scroll to question
   const scrollToQuestion = useCallback((questionNumber) => {
     setCurrentQuestion(questionNumber);
-    const questionElement = questionRefs.current[questionNumber];
+    const questionElement = questionRefs.current[`part_${currentPart}_q_${questionNumber}`];
     if (questionElement) {
       questionElement.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, []);
+  }, [currentPart]);
 
   // Resize handlers
   const handleMouseMove = useCallback((e) => {
@@ -561,7 +647,13 @@ const SpeakingExamPage = () => {
               onClick={() => handleSubmit()}
               disabled={
                 submitting ||
-                Object.keys(recordings).filter((qNum) => recordings[qNum]).length === 0
+                (() => {
+                  // Check if at least one part has recordings
+                  return !sectionData?.parts?.some((partData) => {
+                    const partRecordings = recordings[`part_${partData.part}`] || {};
+                    return Object.keys(partRecordings).some((qNum) => partRecordings[qNum]);
+                  });
+                })()
               }
               className="btn btn-main rounded-pill px-32 py-12 flex-align gap-8"
             >
@@ -583,7 +675,7 @@ const SpeakingExamPage = () => {
         {/* Main Content: PDF and Speaking Area */}
         <div className="speaking-exam-main" ref={containerRef}>
           {/* Left side - PDF Viewer (if available) */}
-          {getPDFUrl() && (
+          {getPDFUrl(currentPart) && (
             <>
               <div
                 className="resizable-panel bg-white"
@@ -597,7 +689,7 @@ const SpeakingExamPage = () => {
                   }}
                 >
                   <iframe
-                    src={getPDFUrl()}
+                    src={getPDFUrl(currentPart)}
                     className="w-100 h-100 border-0 rounded-8"
                     title="Speaking PDF"
                     style={{ minHeight: "600px" }}
@@ -619,7 +711,7 @@ const SpeakingExamPage = () => {
           {/* Right side - Speaking Area */}
           <div
             className="resizable-panel bg-main-25"
-            style={{ width: getPDFUrl() ? `${100 - leftWidth}%` : "100%" }}
+            style={{ width: getPDFUrl(currentPart) ? `${100 - leftWidth}%` : "100%" }}
           >
             <div className="p-24" style={{ height: "100%", overflow: "auto" }}>
               {error && (
@@ -628,140 +720,175 @@ const SpeakingExamPage = () => {
                 </div>
               )}
 
-              {sectionData?.section?.instructions && (
+              {/* Part Selector */}
+              {sectionData?.parts && sectionData.parts.length > 1 && (
                 <div className="bg-white rounded-12 p-16 mb-24 border border-neutral-30">
-                  <p className="text-neutral-700 mb-0 fw-semibold">Hướng dẫn:</p>
-                  <p className="text-neutral-600 text-sm mb-0 mt-8">{sectionData.section.instructions}</p>
+                  <div className="d-flex flex-wrap gap-8 align-items-center">
+                    <span className="fw-semibold text-neutral-700 text-sm mb-0">Chọn phần:</span>
+                    {sectionData.parts.map((partData) => (
+                      <button
+                        key={partData.part}
+                        onClick={() => {
+                          setCurrentPart(partData.part);
+                          setCurrentQuestion(1);
+                        }}
+                        className={`btn ${
+                          currentPart === partData.part ? "btn-main" : "btn-outline-main"
+                        } px-12 py-4 rounded-pill text-sm`}
+                      >
+                        Part {partData.part}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              <div className="mb-24">
-                {generateQuestionNumbers().map((qNum) => {
-                  const recordingState = recordingStates[qNum] || "idle";
-                  const recordingUrl = recordingUrls[qNum] || null;
-                  const questionData = getQuestionData(qNum);
-                  const hasRecording = recordings[qNum] !== undefined;
-                  
-                  return (
-                    <div
-                      key={qNum}
-                      ref={(el) => (questionRefs.current[qNum] = el)}
-                      className="bg-white rounded-12 p-24 mb-24 border border-neutral-30"
-                    >
-                      <div className="flex-between gap-16 mb-16 flex-wrap">
-                        <label className="fw-semibold text-neutral-700 text-lg">
-                          Câu {qNum}
-                        </label>
-                        <div className="flex-align gap-8">
-                          {recordingState === "recorded" && (
-                            <span className="badge bg-success text-white px-12 py-4 rounded-pill">
-                              <i className="ph ph-check me-4" />
-                              Đã ghi âm
-                            </span>
-                          )}
-                          {recordingState === "recording" && (
-                            <span className="badge bg-danger text-white px-12 py-4 rounded-pill">
-                              <i className="ph ph-record me-4" />
-                              Đang ghi âm...
-                            </span>
-                          )}
-                        </div>
+              {(() => {
+                const currentPartData = sectionData?.parts?.find((p) => p.part === currentPart);
+                const partRecordings = recordings[`part_${currentPart}`] || {};
+                const partRecordingUrls = recordingUrls[`part_${currentPart}`] || {};
+                const partRecordingStates = recordingStates[`part_${currentPart}`] || {};
+                
+                return (
+                  <>
+                    {currentPartData?.section?.instructions && (
+                      <div className="bg-white rounded-12 p-16 mb-24 border border-neutral-30">
+                        <p className="text-neutral-700 mb-0 fw-semibold">Hướng dẫn:</p>
+                        <p className="text-neutral-600 text-sm mb-0 mt-8">{currentPartData.section.instructions}</p>
                       </div>
+                    )}
 
-                      {/* Question Title */}
-                      {questionData.questionTitle && (
-                        <div className="mb-16">
-                          <p className="text-neutral-700 fw-semibold mb-0">{questionData.questionTitle}</p>
-                        </div>
-                      )}
-
-                      {/* Question Answers (if any) */}
-                      {questionData.questionAnswer && questionData.questionAnswer.length > 0 && (
-                        <div className="mb-16">
-                          <p className="text-neutral-600 text-sm mb-8">Các đáp án:</p>
-                          <div className="d-flex flex-column gap-4">
-                            {questionData.questionAnswer.map((option, idx) => (
-                              <div key={idx} className="text-neutral-600 text-sm">
-                                <span className="fw-semibold">{option.key}.</span> {option.text}
+                    <div className="mb-24">
+                      {generateQuestionNumbers(currentPart).map((qNum) => {
+                        const recordingState = partRecordingStates[qNum] || "idle";
+                        const recordingUrl = partRecordingUrls[qNum] || null;
+                        const questionData = getQuestionData(currentPart, qNum);
+                        const hasRecording = partRecordings[qNum] !== undefined;
+                        
+                        return (
+                          <div
+                            key={qNum}
+                            ref={(el) => (questionRefs.current[`part_${currentPart}_q_${qNum}`] = el)}
+                            className="bg-white rounded-12 p-24 mb-24 border border-neutral-30"
+                          >
+                            <div className="flex-between gap-16 mb-16 flex-wrap">
+                              <label className="fw-semibold text-neutral-700 text-lg">
+                                Câu {qNum}
+                              </label>
+                              <div className="flex-align gap-8">
+                                {recordingState === "recorded" && (
+                                  <span className="badge bg-success text-white px-12 py-4 rounded-pill">
+                                    <i className="ph ph-check me-4" />
+                                    Đã ghi âm
+                                  </span>
+                                )}
+                                {recordingState === "recording" && (
+                                  <span className="badge bg-danger text-white px-12 py-4 rounded-pill">
+                                    <i className="ph ph-record me-4" />
+                                    Đang ghi âm...
+                                  </span>
+                                )}
                               </div>
-                            ))}
+                            </div>
+
+                            {/* Question Title */}
+                            {questionData.questionTitle && (
+                              <div className="mb-16">
+                                <p className="text-neutral-700 fw-semibold mb-0">{questionData.questionTitle}</p>
+                              </div>
+                            )}
+
+                            {/* Question Answers (if any) */}
+                            {questionData.questionAnswer && questionData.questionAnswer.length > 0 && (
+                              <div className="mb-16">
+                                <p className="text-neutral-600 text-sm mb-8">Các đáp án:</p>
+                                <div className="d-flex flex-column gap-4">
+                                  {questionData.questionAnswer.map((option, idx) => (
+                                    <div key={idx} className="text-neutral-600 text-sm">
+                                      <span className="fw-semibold">{option.key}.</span> {option.text}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Recording Controls */}
+                            <div className="mb-16">
+                              <div className="d-flex gap-8 flex-wrap">
+                                {recordingState === "idle" && (
+                                  <button
+                                    onClick={() => startRecording(currentPart, qNum)}
+                                    className="btn btn-danger px-24 py-12 rounded-pill"
+                                  >
+                                    <i className="ph ph-microphone me-8" />
+                                    Bắt đầu ghi âm
+                                  </button>
+                                )}
+                                {recordingState === "recording" && (
+                                  <button
+                                    onClick={() => stopRecording(currentPart, qNum)}
+                                    className="btn btn-danger px-24 py-12 rounded-pill"
+                                  >
+                                    <i className="ph ph-stop me-8" />
+                                    Dừng ghi âm
+                                  </button>
+                                )}
+                                {recordingState === "recorded" && (
+                                  <>
+                                    <button
+                                      onClick={() => deleteRecording(currentPart, qNum)}
+                                      className="btn btn-outline-danger px-24 py-12 rounded-pill"
+                                    >
+                                      <i className="ph ph-trash me-8" />
+                                      Xóa
+                                    </button>
+                                    <button
+                                      onClick={() => startRecording(currentPart, qNum)}
+                                      className="btn btn-outline-primary px-24 py-12 rounded-pill"
+                                    >
+                                      <i className="ph ph-microphone me-8" />
+                                      Ghi lại
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Audio Player for recorded audio */}
+                            {recordingUrl && recordingState === "recorded" && (
+                              <div className="mb-16">
+                                <audio
+                                  src={recordingUrl}
+                                  controls
+                                  className="w-100"
+                                  style={{ maxWidth: "100%" }}
+                                />
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      )}
-
-                      {/* Recording Controls */}
-                      <div className="mb-16">
-                        <div className="d-flex gap-8 flex-wrap">
-                          {recordingState === "idle" && (
-                            <button
-                              onClick={() => startRecording(qNum)}
-                              className="btn btn-danger px-24 py-12 rounded-pill"
-                            >
-                              <i className="ph ph-microphone me-8" />
-                              Bắt đầu ghi âm
-                            </button>
-                          )}
-                          {recordingState === "recording" && (
-                            <button
-                              onClick={() => stopRecording(qNum)}
-                              className="btn btn-danger px-24 py-12 rounded-pill"
-                            >
-                              <i className="ph ph-stop me-8" />
-                              Dừng ghi âm
-                            </button>
-                          )}
-                          {recordingState === "recorded" && (
-                            <>
-                              <button
-                                onClick={() => deleteRecording(qNum)}
-                                className="btn btn-outline-danger px-24 py-12 rounded-pill"
-                              >
-                                <i className="ph ph-trash me-8" />
-                                Xóa
-                              </button>
-                              <button
-                                onClick={() => startRecording(qNum)}
-                                className="btn btn-outline-primary px-24 py-12 rounded-pill"
-                              >
-                                <i className="ph ph-microphone me-8" />
-                                Ghi lại
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Audio Player for recorded audio */}
-                      {recordingUrl && recordingState === "recorded" && (
-                        <div className="mb-16">
-                          <audio
-                            src={recordingUrl}
-                            controls
-                            className="w-100"
-                            style={{ maxWidth: "100%" }}
-                          />
-                        </div>
-                      )}
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
 
-              <div className="bg-white rounded-12 p-16 border border-neutral-30">
-                <p className="text-neutral-600 text-sm mb-0 text-center">
-                  Đã ghi âm: <strong className="text-main-600">
-                    {Object.keys(recordings).filter((qNum) => recordings[qNum]).length}
-                  </strong> / {sectionData?.section?.questionCount || 0} câu
-                </p>
-              </div>
+                    <div className="bg-white rounded-12 p-16 border border-neutral-30">
+                      <p className="text-neutral-600 text-sm mb-0 text-center">
+                        Đã ghi âm: <strong className="text-main-600">
+                          {Object.keys(partRecordings).filter((qNum) => partRecordings[qNum]).length}
+                        </strong> / {currentPartData?.section?.questionCount || 0} câu
+                      </p>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
 
         {/* Question Navigation at Bottom */}
         <div className="question-navigation">
-          {generateQuestionNumbers().map((qNum) => {
-            const hasRecording = recordings[qNum] !== undefined;
+          {generateQuestionNumbers(currentPart).map((qNum) => {
+            const partRecordings = recordings[`part_${currentPart}`] || {};
+            const hasRecording = partRecordings[qNum] !== undefined;
             const isActive = currentQuestion === qNum;
             
             return (

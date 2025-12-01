@@ -13,6 +13,7 @@ const sectionSubmissionSchema = new mongoose.Schema({
     type: String,
     enum: ["reading", "listening", "writing", "speaking"],
   },
+  part: { type: Number, default: 1 },
   submittedAt: Date,
   answers: [answerSchema],
   sectionScore: { type: Number, default: 0 },

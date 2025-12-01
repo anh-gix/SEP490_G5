@@ -115,9 +115,16 @@ const ReadingResultPage = () => {
     return 3;
   };
 
-  const getPDFUrl = () => {
+  const getPDFUrl = (part) => {
     if (!examData?.sections) return null;
-    const readingSection = examData.sections.find(s => s.type === "reading");
+    const readingSections = examData.sections.filter(s => s.type === "reading");
+    if (readingSections.length === 0) return null;
+    
+    // If part is specified, find that part, otherwise use first part
+    const readingSection = part 
+      ? readingSections.find(s => (s.part || 1) === part)
+      : readingSections[0];
+    
     if (!readingSection?.fileUrl) return null;
     
     if (readingSection.fileUrl.startsWith("http")) {
@@ -380,7 +387,7 @@ const ReadingResultPage = () => {
               `}</style>
               <div className="resizable-container mb-40" ref={containerRef}>
                 {/* Left side - PDF Viewer */}
-                {getPDFUrl() && (
+                {result.parts && result.parts.length > 0 && getPDFUrl(result.parts[0].part) && (
                   <>
                     <div
                       className="resizable-panel bg-white border-end border-neutral-30"
@@ -397,7 +404,7 @@ const ReadingResultPage = () => {
                         }}
                       >
                         <iframe
-                          src={getPDFUrl()}
+                          src={getPDFUrl(result.parts[0].part)}
                           className="w-100 h-100 border-0 rounded-8"
                           title="Reading PDF"
                           style={{ 
@@ -431,8 +438,15 @@ const ReadingResultPage = () => {
                         </div>
                       </div>
                       <div className="p-16" style={{ height: "calc(100vh - 400px)", overflow: "auto" }}>
-                        <div className='row gy-2'>
-                          {result.results?.map((item, index) => (
+                        {result.parts?.map((partData, partIndex) => (
+                          <div key={partIndex} className="mb-24">
+                            {result.parts.length > 1 && (
+                              <div className="mb-16">
+                                <h5 className="text-main-600 fw-semibold">Part {partData.part}</h5>
+                              </div>
+                            )}
+                            <div className='row gy-2'>
+                              {partData.results?.map((item, index) => (
                             <div key={index} className='col-12'>
                               <div
                                 className={`rounded-8 p-12 border ${
@@ -497,15 +511,17 @@ const ReadingResultPage = () => {
                                 </div>
                               </div>
                             </div>
-                          ))}
-                        </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </>
                 )}
 
                 {/* If no PDF, show results in full width */}
-                {!getPDFUrl() && (
+                {(!result.parts || result.parts.length === 0 || !getPDFUrl(result.parts[0]?.part)) && (
                   <div className="resizable-panel bg-white" style={{ width: "100%" }}>
                     <div className="p-24 border-bottom border-neutral-30">
                       <div className='flex-align gap-12'>
@@ -516,72 +532,81 @@ const ReadingResultPage = () => {
                       </div>
                     </div>
                     <div className="p-16" style={{ minHeight: "400px", overflow: "auto" }}>
-                      <div className='row gy-2'>
-                        {result.results?.map((item, index) => (
-                          <div key={index} className='col-md-6 col-lg-4'>
-                            <div
-                              className={`rounded-8 p-10 border h-100 ${
-                                item.isCorrect
-                                  ? "border-success bg-success-25"
-                                  : "border-danger bg-danger-25"
-                              }`}
-                            >
-                              <div className='flex-between gap-8 mb-6'>
-                                <span className='fw-semibold text-neutral-700 text-sm'>
-                                  Câu {item.questionNumber}
-                                </span>
-                                {item.isCorrect ? (
-                                  <span className='badge bg-success text-white px-8 py-2 rounded-pill text-xs'>
-                                    <i className='ph ph-check-circle me-2' />
-                                    Đúng
-                                  </span>
-                                ) : (
-                                  <span className='badge bg-danger text-white px-8 py-2 rounded-pill text-xs'>
-                                    <i className='ph ph-x-circle me-2' />
-                                    Sai
-                                  </span>
-                                )}
-                              </div>
-                              {/* Question Title */}
-                              {item.questionTitle && (
-                                <div className='mb-6'>
-                                  <p className='text-neutral-700 fw-semibold mb-0 text-xs'>{item.questionTitle}</p>
-                                </div>
-                              )}
-
-                              <div className='mb-0'>
-                                <p className='text-neutral-600 text-xs mb-3'>
-                                  <span className='fw-semibold'>Đáp án của bạn:</span>{" "}
-                                  <span
-                                    className={`fw-medium ${
-                                      item.isCorrect ? "text-success" : "text-danger"
-                                    }`}
-                                  >
-                                    {item.studentAnswer 
-                                      ? getAnswerText(item.studentAnswer, item.questionAnswer)
-                                      : "Chưa trả lời"}
-                                  </span>
-                                </p>
-                                {!item.isCorrect && item.correctAnswer && (
-                                  <p className='text-neutral-600 text-xs mb-0'>
-                                    <span className='fw-semibold'>Đáp án đúng:</span>{" "}
-                                    <span className='fw-medium text-success'>
-                                      {getAnswerText(item.correctAnswer, item.questionAnswer)}
-                                    </span>
-                                  </p>
-                                )}
-                              </div>
+                      {result.parts?.map((partData, partIndex) => (
+                        <div key={partIndex} className="mb-24">
+                          {result.parts.length > 1 && (
+                            <div className="mb-16">
+                              <h5 className="text-main-600 fw-semibold">Part {partData.part}</h5>
                             </div>
+                          )}
+                          <div className='row gy-2'>
+                            {partData.results?.map((item, index) => (
+                              <div key={index} className='col-md-6 col-lg-4'>
+                                <div
+                                  className={`rounded-8 p-10 border h-100 ${
+                                    item.isCorrect
+                                      ? "border-success bg-success-25"
+                                      : "border-danger bg-danger-25"
+                                  }`}
+                                >
+                                  <div className='flex-between gap-8 mb-6'>
+                                    <span className='fw-semibold text-neutral-700 text-sm'>
+                                      Câu {item.questionNumber}
+                                    </span>
+                                    {item.isCorrect ? (
+                                      <span className='badge bg-success text-white px-8 py-2 rounded-pill text-xs'>
+                                        <i className='ph ph-check-circle me-2' />
+                                        Đúng
+                                      </span>
+                                    ) : (
+                                      <span className='badge bg-danger text-white px-8 py-2 rounded-pill text-xs'>
+                                        <i className='ph ph-x-circle me-2' />
+                                        Sai
+                                      </span>
+                                    )}
+                                  </div>
+                                  {/* Question Title */}
+                                  {item.questionTitle && (
+                                    <div className='mb-6'>
+                                      <p className='text-neutral-700 fw-semibold mb-0 text-xs'>{item.questionTitle}</p>
+                                    </div>
+                                  )}
+
+                                  <div className='mb-0'>
+                                    <p className='text-neutral-600 text-xs mb-3'>
+                                      <span className='fw-semibold'>Đáp án của bạn:</span>{" "}
+                                      <span
+                                        className={`fw-medium ${
+                                          item.isCorrect ? "text-success" : "text-danger"
+                                        }`}
+                                      >
+                                        {item.studentAnswer 
+                                          ? getAnswerText(item.studentAnswer, item.questionAnswer)
+                                          : "Chưa trả lời"}
+                                      </span>
+                                    </p>
+                                    {!item.isCorrect && item.correctAnswer && (
+                                      <p className='text-neutral-600 text-xs mb-0'>
+                                        <span className='fw-semibold'>Đáp án đúng:</span>{" "}
+                                        <span className='fw-medium text-success'>
+                                          {getAnswerText(item.correctAnswer, item.questionAnswer)}
+                                        </span>
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Feedback */}
-              {result.feedback && (
+              {/* Feedback - Show feedback from all parts */}
+              {result.parts?.some((part) => part.feedback) && (
                 <div className='bg-warning-25 rounded-16 p-32 mb-40 border border-warning box-shadow-sm'>
                   <div className='flex-align gap-12 mb-16'>
                     <span className='text-warning-600 text-xl'>
@@ -589,9 +614,18 @@ const ReadingResultPage = () => {
                     </span>
                     <h4 className='mb-0'>Nhận xét từ giáo viên</h4>
                   </div>
-                  <p className='text-neutral-700 mb-0' style={{ whiteSpace: "pre-wrap", lineHeight: "1.8" }}>
-                    {result.feedback}
-                  </p>
+                  {result.parts.map((partData, index) => (
+                    partData.feedback && (
+                      <div key={index} className={index > 0 ? "mt-16 pt-16 border-top border-warning" : ""}>
+                        {result.parts.length > 1 && (
+                          <p className='fw-semibold text-warning-600 mb-8'>Part {partData.part}:</p>
+                        )}
+                        <p className='text-neutral-700 mb-0' style={{ whiteSpace: "pre-wrap", lineHeight: "1.8" }}>
+                          {partData.feedback}
+                        </p>
+                      </div>
+                    )
+                  ))}
                 </div>
               )}
 

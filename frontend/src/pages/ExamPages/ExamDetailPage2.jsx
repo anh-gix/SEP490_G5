@@ -314,43 +314,68 @@ const ExamDetailPage2 = () => {
             {/* Title */}
             <h1 className="mb-40 text-neutral-900">{exam.title}</h1>
 
-            {/* Sections Grid */}
+            {/* Sections Grid - Group by section type */}
             <div className="row gy-4 mb-40">
-              {exam.sections?.map((section, index) => {
-                const config = getSectionConfig(section.type);
-                const isCompleted = isSectionCompleted(section.type);
-                return (
-                  <div key={index} className="col-lg-3 col-md-6 col-sm-6">
-                    <div
-                      className="bg-white rounded-12 p-24 border border-neutral-30 box-shadow-sm transition-2 h-100 d-flex flex-column text-center"
-                      style={{ cursor: "pointer" }}
-                      onClick={() => handleSectionClick(section.type)}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.1)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.boxShadow = "";
-                      }}
-                    >
-                      {/* Icon */}
+              {(() => {
+                // Group sections by type
+                const sectionsByType = {};
+                exam.sections?.forEach((section) => {
+                  const type = section.type;
+                  if (!sectionsByType[type]) {
+                    sectionsByType[type] = [];
+                  }
+                  sectionsByType[type].push(section);
+                });
+
+                // Get unique section types
+                const uniqueTypes = Object.keys(sectionsByType);
+
+                return uniqueTypes.map((sectionType, index) => {
+                  const config = getSectionConfig(sectionType);
+                  const isCompleted = isSectionCompleted(sectionType);
+                  const sectionsOfType = sectionsByType[sectionType];
+                  const totalQuestions = sectionsOfType.reduce((sum, s) => sum + (s.questionCount || 0), 0);
+                  const totalDuration = sectionsOfType.reduce((sum, s) => sum + (s.duration || 0), 0);
+                  
+                  return (
+                    <div key={index} className="col-lg-3 col-md-6 col-sm-6">
                       <div
-                        className="mb-16 flex-center rounded-12 mx-auto"
-                        style={{
-                          width: "64px",
-                          height: "64px",
-                          backgroundColor: config.bgColor,
+                        className="bg-white rounded-12 p-24 border border-neutral-30 box-shadow-sm transition-2 h-100 d-flex flex-column text-center"
+                        style={{ cursor: "pointer" }}
+                        onClick={() => handleSectionClick(sectionType)}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.1)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.boxShadow = "";
                         }}
                       >
-                        <i
-                          className={`ph ${config.icon} text-3xl`}
-                          style={{ color: config.iconColor }}
-                        />
-                      </div>
+                        {/* Icon */}
+                        <div
+                          className="mb-16 flex-center rounded-12 mx-auto"
+                          style={{
+                            width: "64px",
+                            height: "64px",
+                            backgroundColor: config.bgColor,
+                          }}
+                        >
+                          <i
+                            className={`ph ${config.icon} text-3xl`}
+                            style={{ color: config.iconColor }}
+                          />
+                        </div>
 
-                      {/* Section Name */}
-                      <h4 className="mb-16 text-neutral-900 text-center">
-                        {config.name}
-                      </h4>
+                        {/* Section Name */}
+                        <h4 className="mb-16 text-neutral-900 text-center">
+                          {config.name}
+                        </h4>
+                        
+                        {/* Part count info */}
+                        {sectionsOfType.length > 1 && (
+                          <p className="text-neutral-600 text-sm mb-8">
+                            {sectionsOfType.length} phần
+                          </p>
+                        )}
 
                       {/* Take Test / Làm lại Button */}
                       <button
@@ -364,7 +389,7 @@ const ExamDetailPage2 = () => {
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleSectionClick(section.type);
+                          handleSectionClick(sectionType);
                         }}
                         disabled={startingExam}
                       >
@@ -422,9 +447,10 @@ const ExamDetailPage2 = () => {
                     </div>
                   </div>
                 );
-              })}
+                });
+              })()}
             </div>
-
+              
             {/* Full Test Section */}
             <div
               className="bg-main-25 rounded-12 p-24 border border-neutral-30 position-relative"

@@ -10,13 +10,14 @@ const WritingExamPage = () => {
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [sectionData, setSectionData] = useState(null);
-  const [answers, setAnswers] = useState({});
+  const [answers, setAnswers] = useState({}); // { part_1: { questionNumber: answerText }, part_2: { ... } }
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(1);
+  const [currentPart, setCurrentPart] = useState(1);
   const [leftWidth, setLeftWidth] = useState(50);
   const timerRef = useRef(null);
   const containerRef = useRef(null);
@@ -36,12 +37,30 @@ const WritingExamPage = () => {
 
       try {
         setSubmitting(true);
-        const answersArray = Object.keys(answers).map((qNum) => ({
-          questionNumber: parseInt(qNum),
-          answerText: answers[qNum] || "",
-        }));
+        
+        // Xử lý answers cho tất cả các part
+        const partsData = [];
+        
+        if (sectionData?.parts) {
+          for (const partData of sectionData.parts) {
+            const part = partData.part;
+            const partAnswers = answers[`part_${part}`] || {};
+            
+            const answersArray = Object.keys(partAnswers).map((qNum) => ({
+              questionNumber: parseInt(qNum),
+              answerText: partAnswers[qNum] || "",
+            }));
 
-        await examService.submitWritingAnswers(examId, submissionId, answersArray);
+            if (answersArray.length > 0) {
+              partsData.push({
+                part: part,
+                answers: answersArray,
+              });
+            }
+          }
+        }
+
+        await examService.submitWritingAnswers(examId, submissionId, { parts: partsData });
 
         // Navigate to result page
         navigate(`/exams/${examId}/submissions/${submissionId}/writing/result`);
@@ -50,7 +69,7 @@ const WritingExamPage = () => {
         setSubmitting(false);
       }
     },
-    [submitting, answers, examId, submissionId, navigate]
+    [submitting, answers, examId, submissionId, navigate, sectionData]
   );
 
   // Fetch section + initialize state
@@ -75,14 +94,25 @@ const WritingExamPage = () => {
 
         setSectionData(data);
 
-        // Initialize answers as empty
-        setAnswers({});
+        // Initialize answers as empty for all parts
+        const initialAnswers = {};
+        if (data.parts) {
+          data.parts.forEach((partData) => {
+            initialAnswers[`part_${partData.part}`] = {};
+          });
+        }
+        setAnswers(initialAnswers);
 
-        // Initialize timer if duration exists
-        if (data.section?.duration) {
-          setTimeRemaining(data.section.duration * 60); // minutes -> seconds
+        // Initialize timer if totalDuration exists
+        if (data.totalDuration) {
+          setTimeRemaining(data.totalDuration * 60); // minutes -> seconds
         } else {
           setTimeRemaining(null);
+        }
+
+        // Set current part to first part
+        if (data.parts && data.parts.length > 0) {
+          setCurrentPart(data.parts[0].part);
         }
 
         setError(null);
@@ -150,30 +180,40 @@ const WritingExamPage = () => {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const handleAnswerChange = (questionNumber, value) => {
+  const handleAnswerChange = (part, questionNumber, value) => {
+    const partKey = `part_${part}`;
     setAnswers((prev) => ({
       ...prev,
-      [questionNumber]: value,
+      [partKey]: {
+        ...(prev[partKey] || {}),
+        [questionNumber]: value,
+      },
     }));
   };
 
-  const getPDFUrl = () => {
-    if (!sectionData?.section?.fileUrl) return null;
-    if (sectionData.section.fileUrl.startsWith("http")) {
-      return sectionData.section.fileUrl;
+  const getPDFUrl = (part) => {
+    if (!sectionData?.parts) return null;
+    const partData = sectionData.parts.find((p) => p.part === part);
+    if (!partData?.section?.fileUrl) return null;
+    
+    const fileUrl = partData.section.fileUrl;
+    if (fileUrl.startsWith("http")) {
+      return fileUrl;
     }
-    if (sectionData.section.fileUrl.startsWith("/")) {
+    if (fileUrl.startsWith("/")) {
       const API_PORT = import.meta.env.VITE_API_PORT;
-      return `http://localhost:${API_PORT}${sectionData.section.fileUrl}`;
+      return `http://localhost:${API_PORT}${fileUrl}`;
     }
     const API_PORT = import.meta.env.VITE_API_PORT;
-    return `http://localhost:${API_PORT}/uploads/${sectionData.section.fileUrl}`;
+    return `http://localhost:${API_PORT}/uploads/${fileUrl}`;
   };
 
   const getQuestionData = useCallback(
-    (questionNumber) => {
-      if (!sectionData?.section?.questions) return { questionTitle: "", questionAnswer: [] };
-      const question = sectionData.section.questions.find(
+    (part, questionNumber) => {
+      if (!sectionData?.parts) return { questionTitle: "", questionAnswer: [] };
+      const partData = sectionData.parts.find((p) => p.part === part);
+      if (!partData?.section?.questions) return { questionTitle: "", questionAnswer: [] };
+      const question = partData.section.questions.find(
         (q) => q.questionNumber === questionNumber
       );
       return {
@@ -184,9 +224,11 @@ const WritingExamPage = () => {
     [sectionData]
   );
 
-  const generateQuestionNumbers = () => {
-    if (!sectionData?.section?.questionCount) return [];
-    return Array.from({ length: sectionData.section.questionCount }, (_, i) => i + 1);
+  const generateQuestionNumbers = (part) => {
+    if (!sectionData?.parts) return [];
+    const partData = sectionData.parts.find((p) => p.part === part);
+    if (!partData?.section?.questionCount) return [];
+    return Array.from({ length: partData.section.questionCount }, (_, i) => i + 1);
   };
 
   const getWordCount = (text) => {
@@ -426,7 +468,13 @@ const WritingExamPage = () => {
             </button>
             <button
               onClick={() => handleSubmit()}
-              disabled={submitting || Object.keys(answers).filter((qNum) => answers[qNum]?.trim()).length === 0}
+              disabled={submitting || (() => {
+                // Check if at least one part has answers
+                return !sectionData?.parts?.some((partData) => {
+                  const partAnswers = answers[`part_${partData.part}`] || {};
+                  return Object.keys(partAnswers).some((qNum) => partAnswers[qNum]?.trim());
+                });
+              })()}
               className="btn btn-main rounded-pill px-32 py-12 flex-align gap-8"
             >
               {submitting ? (
@@ -447,7 +495,7 @@ const WritingExamPage = () => {
         {/* Main Content: PDF and Writing Area */}
         <div className="writing-exam-main" ref={containerRef}>
           {/* Left side - PDF Viewer (if available) */}
-          {getPDFUrl() && (
+          {getPDFUrl(currentPart) && (
             <>
               <div
                 className="resizable-panel bg-white"
@@ -461,7 +509,7 @@ const WritingExamPage = () => {
                   }}
                 >
                   <iframe
-                    src={getPDFUrl()}
+                    src={getPDFUrl(currentPart)}
                     className="w-100 h-100 border-0 rounded-8"
                     title="Writing PDF"
                     style={{ minHeight: "600px" }}
@@ -483,7 +531,7 @@ const WritingExamPage = () => {
           {/* Right side - Writing Area */}
           <div
             className="resizable-panel bg-main-25"
-            style={{ width: getPDFUrl() ? `${100 - leftWidth}%` : "100%" }}
+            style={{ width: getPDFUrl(currentPart) ? `${100 - leftWidth}%` : "100%" }}
           >
             <div className="p-24" style={{ height: "100%", overflow: "auto" }}>
               {error && (
@@ -492,89 +540,121 @@ const WritingExamPage = () => {
                 </div>
               )}
 
-              {sectionData?.section?.instructions && (
+              {/* Part Selector */}
+              {sectionData?.parts && sectionData.parts.length > 1 && (
                 <div className="bg-white rounded-12 p-16 mb-24 border border-neutral-30">
-                  <p className="text-neutral-700 mb-0 fw-semibold">Hướng dẫn:</p>
-                  <p className="text-neutral-600 text-sm mb-0 mt-8">{sectionData.section.instructions}</p>
+                  <div className="d-flex flex-wrap gap-8 align-items-center">
+                    <span className="fw-semibold text-neutral-700 text-sm mb-0">Chọn phần:</span>
+                    {sectionData.parts.map((partData) => (
+                      <button
+                        key={partData.part}
+                        onClick={() => {
+                          setCurrentPart(partData.part);
+                          setCurrentQuestion(1);
+                        }}
+                        className={`btn ${
+                          currentPart === partData.part ? "btn-main" : "btn-outline-main"
+                        } px-12 py-4 rounded-pill text-sm`}
+                      >
+                        Part {partData.part}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              <div className="mb-24">
-                {generateQuestionNumbers().map((qNum) => {
-                  const answerText = answers[qNum] || "";
-                  const wordCount = getWordCount(answerText);
-                  const questionData = getQuestionData(qNum);
-                  const hasAnswer = answerText && answerText.trim();
-                  
-                  return (
-                    <div
-                      key={qNum}
-                      ref={(el) => (questionRefs.current[qNum] = el)}
-                      className="bg-white rounded-12 p-24 mb-24 border border-neutral-30"
-                    >
-                      <div className="flex-between gap-16 mb-16">
-                        <label className="fw-semibold text-neutral-700 text-lg">
-                          Câu {qNum}
-                        </label>
-                        <div className="flex-align gap-16">
-                          {hasAnswer && (
-                            <span className="badge bg-main-600 text-white px-12 py-4 rounded-pill">
-                              Đã viết ({wordCount} từ)
-                            </span>
-                          )}
-                        </div>
+              {(() => {
+                const currentPartData = sectionData?.parts?.find((p) => p.part === currentPart);
+                const partAnswers = answers[`part_${currentPart}`] || {};
+                
+                return (
+                  <>
+                    {currentPartData?.section?.instructions && (
+                      <div className="bg-white rounded-12 p-16 mb-24 border border-neutral-30">
+                        <p className="text-neutral-700 mb-0 fw-semibold">Hướng dẫn:</p>
+                        <p className="text-neutral-600 text-sm mb-0 mt-8">{currentPartData.section.instructions}</p>
                       </div>
+                    )}
 
-                      {/* Question Title */}
-                      {questionData.questionTitle && (
-                        <div className="mb-16">
-                          <p className="text-neutral-700 fw-semibold mb-0">{questionData.questionTitle}</p>
-                        </div>
-                      )}
-
-                      {/* Question Answers (if any) */}
-                      {questionData.questionAnswer && questionData.questionAnswer.length > 0 && (
-                        <div className="mb-16">
-                          <p className="text-neutral-600 text-sm mb-8">Các đáp án:</p>
-                          <div className="d-flex flex-column gap-4">
-                            {questionData.questionAnswer.map((option, idx) => (
-                              <div key={idx} className="text-neutral-600 text-sm">
-                                <span className="fw-semibold">{option.key}.</span> {option.text}
+                    <div className="mb-24">
+                      {generateQuestionNumbers(currentPart).map((qNum) => {
+                        const answerText = partAnswers[qNum] || "";
+                        const wordCount = getWordCount(answerText);
+                        const questionData = getQuestionData(currentPart, qNum);
+                        const hasAnswer = answerText && answerText.trim();
+                        
+                        return (
+                          <div
+                            key={qNum}
+                            ref={(el) => (questionRefs.current[`part_${currentPart}_q_${qNum}`] = el)}
+                            className="bg-white rounded-12 p-24 mb-24 border border-neutral-30"
+                          >
+                            <div className="flex-between gap-16 mb-16">
+                              <label className="fw-semibold text-neutral-700 text-lg">
+                                Câu {qNum}
+                              </label>
+                              <div className="flex-align gap-16">
+                                {hasAnswer && (
+                                  <span className="badge bg-main-600 text-white px-12 py-4 rounded-pill">
+                                    Đã viết ({wordCount} từ)
+                                  </span>
+                                )}
                               </div>
-                            ))}
+                            </div>
+
+                            {/* Question Title */}
+                            {questionData.questionTitle && (
+                              <div className="mb-16">
+                                <p className="text-neutral-700 fw-semibold mb-0">{questionData.questionTitle}</p>
+                              </div>
+                            )}
+
+                            {/* Question Answers (if any) */}
+                            {questionData.questionAnswer && questionData.questionAnswer.length > 0 && (
+                              <div className="mb-16">
+                                <p className="text-neutral-600 text-sm mb-8">Các đáp án:</p>
+                                <div className="d-flex flex-column gap-4">
+                                  {questionData.questionAnswer.map((option, idx) => (
+                                    <div key={idx} className="text-neutral-600 text-sm">
+                                      <span className="fw-semibold">{option.key}.</span> {option.text}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            <textarea
+                              className="form-control"
+                              rows={12}
+                              placeholder="Viết câu trả lời của bạn ở đây..."
+                              value={answerText}
+                              onChange={(e) => handleAnswerChange(currentPart, qNum, e.target.value)}
+                              style={{
+                                fontSize: "16px",
+                                lineHeight: "1.6",
+                                resize: "vertical",
+                              }}
+                            />
+                            <div className="mt-8 text-end">
+                              <span className="text-neutral-500 text-sm">
+                                Số từ: {wordCount}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      )}
-
-                      <textarea
-                        className="form-control"
-                        rows={12}
-                        placeholder="Viết câu trả lời của bạn ở đây..."
-                        value={answerText}
-                        onChange={(e) => handleAnswerChange(qNum, e.target.value)}
-                        style={{
-                          fontSize: "16px",
-                          lineHeight: "1.6",
-                          resize: "vertical",
-                        }}
-                      />
-                      <div className="mt-8 text-end">
-                        <span className="text-neutral-500 text-sm">
-                          Số từ: {wordCount}
-                        </span>
-                      </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
 
-              <div className="bg-white rounded-12 p-16 border border-neutral-30">
-                <p className="text-neutral-600 text-sm mb-0 text-center">
-                  Đã viết: <strong className="text-main-600">
-                    {Object.keys(answers).filter((qNum) => answers[qNum]?.trim()).length}
-                  </strong> / {sectionData?.section?.questionCount || 0} câu
-                </p>
-              </div>
+                    <div className="bg-white rounded-12 p-16 border border-neutral-30">
+                      <p className="text-neutral-600 text-sm mb-0 text-center">
+                        Đã viết: <strong className="text-main-600">
+                          {Object.keys(partAnswers).filter((qNum) => partAnswers[qNum]?.trim()).length}
+                        </strong> / {currentPartData?.section?.questionCount || 0} câu
+                      </p>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>

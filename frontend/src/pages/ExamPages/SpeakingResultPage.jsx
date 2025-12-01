@@ -296,101 +296,110 @@ const SpeakingResultPage = () => {
                   </span>
                   <h3 className="mb-0">Chi tiết bài làm</h3>
                 </div>
-                <div className="row gy-4">
-                  {result.results?.map((item, index) => {
-                    const recordingUrl = getRecordingUrl(item.recordingUrl);
-                    return (
-                      <div key={index} className="col-12">
-                        <div className="rounded-16 p-24 border border-neutral-30 box-shadow-sm">
-                          <div className="flex-between gap-16 mb-16 flex-wrap">
-                            <div className="flex-align gap-12">
-                              <span className="w-40 h-40 flex-center bg-main-25 text-main-600 rounded-circle flex-shrink-0">
-                                <i className="ph-bold ph-question" />
-                              </span>
-                              <span className="fw-semibold text-neutral-700 text-lg">
-                                Câu {item.questionNumber}
-                              </span>
-                            </div>
-                            <div className="flex-align gap-16">
-                              {item.score > 0 && (
-                                <span className="badge bg-success text-white px-16 py-6 rounded-pill">
-                                  <i className="ph ph-check-circle me-4" />
-                                  Đã chấm: {item.score} điểm
-                                </span>
+                {result.parts?.map((partData, partIndex) => (
+                  <div key={partIndex} className={partIndex > 0 ? "mt-32 pt-32 border-top border-neutral-30" : ""}>
+                    {result.parts.length > 1 && (
+                      <div className="mb-24">
+                        <h4 className="text-main-600 fw-semibold">Part {partData.part}</h4>
+                      </div>
+                    )}
+                    <div className="row gy-4">
+                      {partData.results?.map((item, index) => {
+                        const recordingUrl = getRecordingUrl(item.recordingUrl);
+                        return (
+                          <div key={index} className="col-12">
+                            <div className="rounded-16 p-24 border border-neutral-30 box-shadow-sm">
+                              <div className="flex-between gap-16 mb-16 flex-wrap">
+                                <div className="flex-align gap-12">
+                                  <span className="w-40 h-40 flex-center bg-main-25 text-main-600 rounded-circle flex-shrink-0">
+                                    <i className="ph-bold ph-question" />
+                                  </span>
+                                  <span className="fw-semibold text-neutral-700 text-lg">
+                                    Câu {item.questionNumber}
+                                  </span>
+                                </div>
+                                <div className="flex-align gap-16">
+                                  {item.score > 0 && (
+                                    <span className="badge bg-success text-white px-16 py-6 rounded-pill">
+                                      <i className="ph ph-check-circle me-4" />
+                                      Đã chấm: {item.score} điểm
+                                    </span>
+                                  )}
+                                  {item.score === 0 && (
+                                    <span className="badge bg-warning text-white px-16 py-6 rounded-pill">
+                                      <i className="ph ph-clock me-4" />
+                                      Chờ chấm
+                                    </span>
+                                  )}
+                                  {recordingUrl && (
+                                    <span className="badge bg-main-600 text-white px-16 py-6 rounded-pill">
+                                      <i className="ph ph-microphone me-4" />
+                                      Đã ghi âm
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Question Title */}
+                              {item.questionTitle && (
+                                <div className="mb-16">
+                                  <p className="text-neutral-700 fw-semibold mb-0">{item.questionTitle}</p>
+                                </div>
                               )}
-                              {item.score === 0 && (
-                                <span className="badge bg-warning text-white px-16 py-6 rounded-pill">
-                                  <i className="ph ph-clock me-4" />
-                                  Chờ chấm
-                                </span>
-                              )}
+
+                              {/* Recording Player */}
                               {recordingUrl && (
-                                <span className="badge bg-main-600 text-white px-16 py-6 rounded-pill">
-                                  <i className="ph ph-microphone me-4" />
-                                  Đã ghi âm
-                                </span>
+                                <div className="mb-16">
+                                  <p className="text-neutral-600 text-sm mb-12 fw-semibold">
+                                    <i className="ph ph-microphone me-8" />
+                                    Recording của bạn:
+                                  </p>
+                                  <div className="bg-main-25 rounded-12 p-16 border border-neutral-30">
+                                    <audio src={recordingUrl} controls className="w-100" />
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Text Answer (if any) */}
+                              {item.studentAnswer && (
+                                <div className="mb-16">
+                                  <p className="text-neutral-600 text-sm mb-12 fw-semibold">
+                                    <i className="ph ph-note me-8" />
+                                    Ghi chú của bạn:
+                                  </p>
+                                  <div className="bg-main-25 rounded-12 p-16 border border-neutral-30">
+                                    <p
+                                      className="text-neutral-700 mb-0"
+                                      style={{
+                                        whiteSpace: "pre-wrap",
+                                        lineHeight: "1.8",
+                                      }}
+                                    >
+                                      {item.studentAnswer}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+
+                              {item.score > 0 && (
+                                <div className="pt-16 border-top border-neutral-30">
+                                  <span className="text-neutral-600 text-sm">
+                                    Điểm: <span className="fw-bold text-main-600">{item.score}</span> /{" "}
+                                    {item.maxScore || "N/A"}
+                                  </span>
+                                </div>
                               )}
                             </div>
                           </div>
-
-                          {/* Question Title */}
-                          {item.questionTitle && (
-                            <div className="mb-16">
-                              <p className="text-neutral-700 fw-semibold mb-0">{item.questionTitle}</p>
-                            </div>
-                          )}
-
-                          {/* Recording Player */}
-                          {recordingUrl && (
-                            <div className="mb-16">
-                              <p className="text-neutral-600 text-sm mb-12 fw-semibold">
-                                <i className="ph ph-microphone me-8" />
-                                Recording của bạn:
-                              </p>
-                              <div className="bg-main-25 rounded-12 p-16 border border-neutral-30">
-                                <audio src={recordingUrl} controls className="w-100" />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Text Answer (if any) */}
-                          {item.studentAnswer && (
-                            <div className="mb-16">
-                              <p className="text-neutral-600 text-sm mb-12 fw-semibold">
-                                <i className="ph ph-note me-8" />
-                                Ghi chú của bạn:
-                              </p>
-                              <div className="bg-main-25 rounded-12 p-16 border border-neutral-30">
-                                <p
-                                  className="text-neutral-700 mb-0"
-                                  style={{
-                                    whiteSpace: "pre-wrap",
-                                    lineHeight: "1.8",
-                                  }}
-                                >
-                                  {item.studentAnswer}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-
-                          {item.score > 0 && (
-                            <div className="pt-16 border-top border-neutral-30">
-                              <span className="text-neutral-600 text-sm">
-                                Điểm: <span className="fw-bold text-main-600">{item.score}</span> /{" "}
-                                {item.maxScore || "N/A"}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              {/* Feedback */}
-              {result.feedback && (
+              {/* Feedback - Show feedback from all parts */}
+              {result.parts?.some((part) => part.feedback) && (
                 <div className="bg-warning-25 rounded-16 p-32 mb-40 border border-warning box-shadow-sm">
                   <div className="flex-align gap-12 mb-16">
                     <span className="text-warning-600 text-xl">
@@ -398,9 +407,18 @@ const SpeakingResultPage = () => {
                     </span>
                     <h4 className="mb-0">Nhận xét từ giáo viên</h4>
                   </div>
-                  <p className="text-neutral-700 mb-0" style={{ whiteSpace: "pre-wrap", lineHeight: "1.8" }}>
-                    {result.feedback}
-                  </p>
+                  {result.parts.map((partData, index) => (
+                    partData.feedback && (
+                      <div key={index} className={index > 0 ? "mt-16 pt-16 border-top border-warning" : ""}>
+                        {result.parts.length > 1 && (
+                          <p className="fw-semibold text-warning-600 mb-8">Part {partData.part}:</p>
+                        )}
+                        <p className="text-neutral-700 mb-0" style={{ whiteSpace: "pre-wrap", lineHeight: "1.8" }}>
+                          {partData.feedback}
+                        </p>
+                      </div>
+                    )
+                  ))}
                 </div>
               )}
 

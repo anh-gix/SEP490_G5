@@ -21,17 +21,7 @@ router.get("/", examController.getAllExams);
 // 🧩 Bắt đầu làm bài (protected - cần đăng nhập)
 router.post("/start", verifyToken, examController.startExam);
 
-// ================== GENERIC ROUTES - Hỗ trợ tất cả các phần thi (reading, listening, writing, speaking) ==================
-// 📖 Lấy thông tin section (protected) - Generic route
-router.get("/:examId/submissions/:submissionId/sections/:sectionType", verifyToken, examController.getSection);
-
-// 📝 Nộp đáp án section (protected) - Generic route
-router.post("/:examId/submissions/:submissionId/sections/:sectionType/submit", verifyToken, examController.submitSectionAnswers);
-
-// 📊 Xem kết quả section (protected) - Generic route
-router.get("/:examId/submissions/:submissionId/sections/:sectionType/result", verifyToken, examController.getSectionResult);
-
-// ================== BACKWARD COMPATIBILITY - Giữ lại các routes cũ ==================
+// ================== SECTION ROUTES - Mỗi section type có route riêng ==================
 // 📖 Lấy thông tin section Reading (protected) - phải đặt trước route /:id
 router.get("/:examId/submissions/:submissionId/reading", verifyToken, examController.getReadingSection);
 

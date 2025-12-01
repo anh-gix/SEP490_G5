@@ -1,6 +1,7 @@
 const Program = require('../models/programModel');
 const Course = require('../models/courseModel');
 const Session = require('../models/sessionModel');
+const CamSession = require('../models/camSession');
 
 // =========================
 // PROGRAM CRUD OPERATIONS
@@ -271,6 +272,10 @@ const deleteProgram = async (req, res) => {
     console.log(`Found ${courses.length} courses to delete`);
 
     // Step 2: Delete all related data for each course
+    let totalSessions = 0;
+    let totalCamSessions = 0;
+    let totalCLOs = 0;
+
     for (const course of courses) {
       // Delete all sessions in this course
       if (course.sessions && course.sessions.length > 0) {
@@ -278,15 +283,22 @@ const deleteProgram = async (req, res) => {
           _id: { $in: course.sessions }
         });
         console.log(`Deleted ${sessionDeleteResult.deletedCount} sessions for course ${course.name}`);
+        totalSessions += sessionDeleteResult.deletedCount;
       }
 
-      // Delete all CLOs in this course
-      if (course.clos && course.clos.length > 0) {
-        const cloDeleteResult = await CLO.deleteMany({
-          _id: { $in: course.clos }
+      // Delete all CamSessions in this course
+      if (course.camSessions && course.camSessions.length > 0) {
+        const camSessionDeleteResult = await CamSession.deleteMany({
+          _id: { $in: course.camSessions }
         });
-        console.log(`Deleted ${cloDeleteResult.deletedCount} CLOs for course ${course.name}`);
+        console.log(`Deleted ${camSessionDeleteResult.deletedCount} CAM sessions for course ${course.name}`);
+        totalCamSessions += camSessionDeleteResult.deletedCount;
       }
+
+      // CLOs are now embedded in the course, so they will be deleted automatically with the course
+      const cloCount = course.clos?.length || 0;
+      console.log(`CLOs (${cloCount}) will be deleted with the course ${course.name}`);
+      totalCLOs += cloCount;
 
       // Delete the course itself
       await Course.findByIdAndDelete(course._id);
@@ -304,8 +316,12 @@ const deleteProgram = async (req, res) => {
       success: true,
       message: 'Đã xóa chương trình và toàn bộ dữ liệu liên quan thành công',
       deletedData: {
+        program: program.program_name,
         courses: courses.length,
-        program: program.program_name
+        sessions: totalSessions,
+        camSessions: totalCamSessions,
+        clos: totalCLOs,
+        plos: program.plos.length
       }
     });
   } catch (error) {

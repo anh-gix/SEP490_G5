@@ -74,10 +74,26 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
         response = await courseService.createCourse(dataToSave);
       }
 
+      // Update courseData with the newly created course data
+      // Preserve local state fields that might not be in response.data
       setCourseData(prev => ({
         ...prev,
         _id: response.data._id,
-        ...response.data
+        courseCode: response.data.courseCode,
+        name: response.data.name,
+        description: response.data.description || '',
+        numberOfSessions: response.data.numberOfSessions || 0,
+        timeAllocation: response.data.timeAllocation || '',
+        preRequisite: response.data.preRequisite || 'None',
+        studentTasks: response.data.studentTasks || '',
+        learningType: response.data.learningType || prev.learningType || 'offline',
+        program: response.data.program,
+        mappedPLOs: response.data.mappedPLOs || [],
+        materials: response.data.materials || [],
+        clos: response.data.clos || [],
+        sessions: response.data.sessions || [],
+        mocktestSessionOrders: response.data.mocktestSessionOrders || [],
+        status: response.data.status || 'draft'
       }));
 
       alert(isEdit ? 'Cập nhật thông tin học phần thành công!' : 'Tạo học phần thành công!');

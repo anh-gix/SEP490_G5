@@ -79,6 +79,7 @@ exports.createCourse = async (req, res) => {
             timeAllocation,
             preRequisite,
             studentTasks,
+            learningType,
             program,
             clos,
             mappedPLOs,
@@ -153,6 +154,7 @@ exports.createCourse = async (req, res) => {
             timeAllocation,
             preRequisite,
             studentTasks,
+            learningType: learningType || 'offline',
             program,
             clos: clos || [],
             mappedPLOs: mappedPLOs || [],
@@ -198,6 +200,7 @@ exports.updateCourse = async (req, res) => {
             timeAllocation,
             preRequisite,
             studentTasks,
+            learningType,
             program,
             clos,
             mappedPLOs,
@@ -283,6 +286,7 @@ exports.updateCourse = async (req, res) => {
         if (timeAllocation !== undefined) course.timeAllocation = timeAllocation;
         if (preRequisite !== undefined) course.preRequisite = preRequisite;
         if (studentTasks !== undefined) course.studentTasks = studentTasks;
+        if (learningType !== undefined) course.learningType = learningType;
         if (program) course.program = program;
         if (clos !== undefined) course.clos = clos;
         if (mappedPLOs !== undefined) course.mappedPLOs = mappedPLOs;

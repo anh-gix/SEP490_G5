@@ -4,6 +4,7 @@ import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
 import programService from '../../../services/programService';
+import courseService from '../../../services/courseService';
 
 // Import step components
 import CourseStep1BasicInfo from './course-wizard-steps/CourseStep1BasicInfo';
@@ -11,6 +12,7 @@ import CourseStep2PLOMapping from './course-wizard-steps/CourseStep2PLOMapping';
 import CourseStep3Materials from './course-wizard-steps/CourseStep2Materials';
 import CourseStep4CLOMapping from './course-wizard-steps/CourseStep3CLOMapping';
 import CourseStep5Sessions from './course-wizard-steps/CourseStep4Sessions';
+import CamSession from './CamSession';
 
 const CourseWizard = () => {
   const navigate = useNavigate();
@@ -41,6 +43,23 @@ const CourseWizard = () => {
     status: 'draft'
   });
 
+    // Dynamic step 5 title and description based on conditions
+    const getStep5Title = () => {
+      console.log(program);
+      console.log(courseData);
+      
+      if (program?.type === 'cam' && courseData?.learningType === 'online') {
+        return 'CAM Sessions';
+      }
+      return 'Sessions';
+    };
+  
+    const getStep5Description = () => {
+      if (program?.type === 'cam' && courseData?.learningType === 'online') {
+        return 'Tạo nội dung CAM Sessions với quiz và từ vựng';
+      }
+      return 'Tạo kế hoạch giảng dạy';
+    };
   // Step configuration
   const steps = [
     {
@@ -69,9 +88,9 @@ const CourseWizard = () => {
     },
     {
       number: 5,
-      title: 'Sessions',
+      title: getStep5Title(),
       icon: 'ph ph-calendar-blank',
-      description: 'Tạo kế hoạch giảng dạy'
+      description: getStep5Description()
     }
   ];
 
@@ -106,30 +125,40 @@ const CourseWizard = () => {
 
   // Load existing course if editing
   useEffect(() => {
-    if (isEdit && courseId && program) {
-      const existingCourse = program.courses?.find(c => c._id === courseId);
-      if (existingCourse) {
-        setCourseData({
-          _id: existingCourse._id,
-          courseCode: existingCourse.courseCode,
-          name: existingCourse.name,
-          description: existingCourse.description || '',
-          numberOfSessions: existingCourse.numberOfSessions || 0,
-          timeAllocation: existingCourse.timeAllocation || '',
-          preRequisite: existingCourse.preRequisite || 'None',
-          studentTasks: existingCourse.studentTasks || '',
-          learningType: existingCourse.learningType || 'offline',
-          program: programId,
-          mappedPLOs: existingCourse.mappedPLOs || [],
-          materials: existingCourse.materials || [],
-          clos: existingCourse.clos || [],
-          sessions: existingCourse.sessions || [],
-          mocktestSessionOrders: existingCourse.mocktestSessionOrders || [],
-          status: existingCourse.status || 'draft'
-        });
+    const fetchExistingCourse = async () => {
+      if (isEdit && courseId) {
+        try {
+          const response = await courseService.getCourseById(courseId);
+          const existingCourse = response.data;
+          if (existingCourse) {
+            setCourseData({
+              _id: existingCourse._id,
+              courseCode: existingCourse.courseCode,
+              name: existingCourse.name,
+              description: existingCourse.description || '',
+              numberOfSessions: existingCourse.numberOfSessions || 0,
+              timeAllocation: existingCourse.timeAllocation || '',
+              preRequisite: existingCourse.preRequisite || 'None',
+              studentTasks: existingCourse.studentTasks || '',
+              learningType: existingCourse.learningType || 'offline',
+              program: programId,
+              mappedPLOs: existingCourse.mappedPLOs || [],
+              materials: existingCourse.materials || [],
+              clos: existingCourse.clos || [],
+              sessions: existingCourse.sessions || [],
+              mocktestSessionOrders: existingCourse.mocktestSessionOrders || [],
+              status: existingCourse.status || 'draft'
+            });
+          }
+        } catch (error) {
+          console.error('Error loading existing course:', error);
+          alert('Không thể tải thông tin học phần hiện tại!');
+        }
       }
-    }
-  }, [isEdit, courseId, program]);
+    };
+
+    fetchExistingCourse();
+  }, [isEdit, courseId, programId]);
 
   // Handle step navigation
   const handleNext = () => {
@@ -173,13 +202,45 @@ const CourseWizard = () => {
       case 4:
         return <CourseStep4CLOMapping {...commonProps} />;
       case 5:
-        return <CourseStep5Sessions {...commonProps} />;
+        // Check if program type is 'cam' and course learning type is 'online'
+        if (program?.type === 'cam' && courseData?.learningType === 'online') {
+          // Render CamSession component for Cambridge online courses
+          // Pass isWizardMode=true to hide breadcrumb and default navigation
+          return (
+            <div className="cam-session-wizard-wrapper">
+              <CamSession isWizardMode={true} />
+              {/* Custom navigation for wizard mode */}
+              <div className="d-flex justify-content-between gap-3 mt-4 pt-4 border-top">
+                <Button variant="outline" onClick={handlePrevious} icon="ph ph-arrow-left">
+                  Quay lại
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    alert('Hoàn thành tạo học phần với CAM Sessions!');
+                    const programId = typeof courseData.program === 'object'
+                      ? (courseData.program._id || courseData.program.id)
+                      : courseData.program;
+                    navigate(`/center-head/programs/${programId}`);
+                  }}
+                  icon="ph ph-check-circle"
+                  iconPosition="right"
+                >
+                  Hoàn thành
+                </Button>
+              </div>
+            </div>
+          );
+        } else {
+          // Render regular sessions component
+          return <CourseStep5Sessions {...commonProps} />;
+        }
       default:
         return null;
     }
   };
 
-  if (loading) {
+  if (loading || !program) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
         <div className="spinner-border text-primary" role="status">

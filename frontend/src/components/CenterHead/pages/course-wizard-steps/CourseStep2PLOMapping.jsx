@@ -147,7 +147,7 @@ const CourseStep2PLOMapping = ({ courseData, setCourseData, program, onNext, onP
                   </div>
                   <div className="flex-grow-1">
                     <div className="d-flex align-items-center gap-2 mb-2">
-                      <Badge variant={selectedPLOs.includes(plo._id) ? 'primary' : 'neutral'}>
+                      <Badge variant={selectedPLOs.includes(plo._id) ? 'primary' : 'primary'}>
                         {plo.code}
                       </Badge>
                       <h6 className="text-sm fw-semibold mb-0">{plo.name}</h6>

@@ -8,7 +8,7 @@ import Tabs from '../compo/Tabs';
 import Badge from '../compo/Badge';
 import { camSessionService } from '../../../services/camSessionService';
 
-const CamSession = () => {
+const CamSession = ({ isWizardMode = false }) => {
   const navigate = useNavigate();
   const { sessionId } = useParams();
   const isEdit = Boolean(sessionId);
@@ -508,7 +508,11 @@ const CamSession = () => {
         await camSessionService.createCamSession(submitData);
         alert('Tạo CAM Session thành công!');
       }
-      navigate('/center-head/dashboard');
+
+      // Only navigate in standalone mode, not in wizard mode
+      if (!isWizardMode) {
+        navigate('/center-head/dashboard');
+      }
     } catch (error) {
       console.error('Error saving cam session:', error);
       alert(error.message || 'Có lỗi xảy ra khi lưu CAM Session!');
@@ -549,33 +553,38 @@ const CamSession = () => {
 
   return (
     <div className="cam-session-container">
-      <Breadcrumb items={breadcrumbItems} />
+      {/* Hide breadcrumb and header in wizard mode */}
+      {!isWizardMode && <Breadcrumb items={breadcrumbItems} />}
 
-      {/* Header */}
-      <div className="d-flex justify-content-between align-items-start mb-24">
-        <div>
-          <h4 className="mb-8 text-neutral-900 fw-bold">
-            {isEdit ? 'Chỉnh sửa CAM Session' : 'Tạo CAM Session mới'}
-          </h4>
-        </div>
-        <div className="d-flex gap-2">
-          <Button
-            variant="outline"
-            icon="ph ph-x-circle"
-            onClick={() => navigate('/center-head/dashboard')}
-          >
-            Hủy
-          </Button>
-          <Button
-            variant="primary"
-            icon="ph ph-check-circle"
-            onClick={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? 'Đang lưu...' : 'Lưu CAM Session'}
-          </Button>
-        </div>
-      </div>
+      {!isWizardMode && (
+        <>
+          {/* Header */}
+          <div className="d-flex justify-content-between align-items-start mb-24">
+            <div>
+              <h4 className="mb-8 text-neutral-900 fw-bold">
+                {isEdit ? 'Chỉnh sửa CAM Session' : 'Tạo CAM Session mới'}
+              </h4>
+            </div>
+            <div className="d-flex gap-2">
+              <Button
+                variant="outline"
+                icon="ph ph-x-circle"
+                onClick={() => navigate('/center-head/dashboard')}
+              >
+                Hủy
+              </Button>
+              <Button
+                variant="primary"
+                icon="ph ph-check-circle"
+                onClick={handleSubmit}
+                disabled={loading}
+              >
+                {loading ? 'Đang lưu...' : 'Lưu CAM Session'}
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Tabs */}
       <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />

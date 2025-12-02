@@ -47,24 +47,24 @@ const TeacherNavigation = () => {
       path: '/teacher/classes',
       color: 'success'
     },
-    {
-      title: 'Bài tập',
-      icon: 'fa-tasks',
-      path: '/teacher/assignments',
-      color: 'warning'
-    },
+    // {
+    //   title: 'Bài tập',
+    //   icon: 'fa-tasks',
+    //   path: '/teacher/assignments',
+    //   color: 'warning'
+    // },
     {
       title: 'Điểm danh',
       icon: 'fa-user-check',
       path: '/teacher/attendance',
       color: 'main'
     },
-    {
-      title: 'Tài liệu giảng dạy',
-      icon: 'fa-file-alt',
-      path: '/teacher/materials',
-      color: 'info'
-    }
+    // {
+    //   title: 'Tài liệu giảng dạy',
+    //   icon: 'fa-file-alt',
+    //   path: '/teacher/materials',
+    //   color: 'info'
+    // }
   ];
 
   const userInfo = {

@@ -13,15 +13,19 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Cấu hình multer cho student homework submissions
+const homeworkUploadsDir = path.join(__dirname, '../uploads/homeworks');
+if (!fs.existsSync(homeworkUploadsDir)) {
+  fs.mkdirSync(homeworkUploadsDir, { recursive: true });
+}
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, uploadsDir);
+    cb(null, homeworkUploadsDir);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
-    const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    cb(null, `student-hw-${uniqueSuffix}-${safeName}`);
+    cb(null, `submission-${uniqueSuffix}${ext}`);
   }
 });
 
@@ -65,8 +69,15 @@ router.get('/me/classes/:classId/progress', verifyToken, isStudent, studentContr
 router.post('/me/classes/:classId/schedules/:scheduleId/homework/:homeworkId/submit', 
   verifyToken, 
   isStudent, 
-  upload.array('files', 5), // Allow up to 5 files
+  upload.array('submissionFile', 5), // Allow up to 5 files
   studentController.submitHomework
+);
+
+// Get student's own submission for a homework
+router.get('/me/classes/:classId/schedules/:scheduleId/homework/:homeworkId/submission',
+  verifyToken,
+  isStudent,
+  studentController.getMySubmission
 );
 
 // ==========================================

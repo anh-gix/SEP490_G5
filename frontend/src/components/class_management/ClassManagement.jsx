@@ -3,15 +3,12 @@ import { Container, Card, Button, Form, Row, Col, Spinner, Alert } from 'react-b
 import { useNavigate } from 'react-router-dom';
 import ClassList from './ClassList';
 import CreateClassModal from './CreateClassModal';
-import EditClassModal from './EditClassModal';
 import classService from '../../services/classService';
 
 const ClassManagement = () => {
   const navigate = useNavigate();
   const [classes, setClasses] = useState([]);
-  const [selectedClass, setSelectedClass] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
@@ -39,7 +36,7 @@ const ClassManagement = () => {
         program: cls.courseName || cls.course?.name || 'N/A',
         band: cls.band || cls.course?.band || 'N/A', // Band từ course
         courseType: cls.courseType || cls.course?.program?.type || 'N/A',
-        course: cls.course?._id || cls.course || null, // Keep course ID for EditClassModal
+        course: cls.course?._id || cls.course || null, // Keep course ID for EditClassForm
         status: cls.status,
         startDate: cls.startDate ? new Date(cls.startDate).toISOString().split('T')[0] : 'N/A',
         endDate: cls.endDate ? new Date(cls.endDate).toISOString().split('T')[0] : 'N/A',
@@ -85,20 +82,8 @@ const ClassManagement = () => {
     }
   };
 
-  const handleEditClass = async (classData) => {
-    try {
-      setLoading(true);
-      await classService.updateClass(classData.id, classData);
-      setShowEditModal(false);
-      setSelectedClass(null);
-      alert('Cập nhật lớp học thành công!');
-      await fetchClasses();
-    } catch (err) {
-      console.error('Error updating class:', err);
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật lớp học!');
-    } finally {
-      setLoading(false);
-    }
+  const handleEditClass = (classItem) => {
+    navigate(`/academic/class-management/${classItem.id}/edit`);
   };
 
   const handleDeleteClass = async (classId) => {
@@ -308,10 +293,7 @@ const ClassManagement = () => {
 
       <ClassList
         classes={classes}
-        onEdit={(classItem) => {
-          setSelectedClass(classItem);
-          setShowEditModal(true);
-        }}
+        onEdit={handleEditClass}
         onDelete={handleDeleteClass}
         onViewDetails={handleViewDetails}
       />
@@ -320,17 +302,6 @@ const ClassManagement = () => {
         <CreateClassModal
           onClose={() => setShowCreateModal(false)}
           onSubmit={handleCreateClass}
-        />
-      )}
-
-      {showEditModal && selectedClass && (
-        <EditClassModal
-          classData={selectedClass}
-          onClose={() => {
-            setShowEditModal(false);
-            setSelectedClass(null);
-          }}
-          onSubmit={handleEditClass}
         />
       )}
     </Container>

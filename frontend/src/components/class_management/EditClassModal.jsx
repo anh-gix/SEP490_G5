@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Modal, Button, Form, Alert, ButtonGroup } from 'react-bootstrap';
+import { Container, Card, Modal, Button, Form, Alert, ButtonGroup } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import classService from '../../services/classService';
 import teacherService from '../../services/teacherService';
@@ -20,7 +21,8 @@ const createEmptyScheduleEntry = () => ({
   endTime: '10:00'
 });
 
-const EditClassModal = ({ classData, onClose, onSubmit }) => {
+const EditClassForm = ({ classData, onSubmit }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     id: '',
     name: '',
@@ -3011,17 +3013,40 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
     onSubmit(submitData);
   };
 
+  const handleBack = () => {
+    navigate('/academic/class-management');
+  };
+
   return (
-    <Modal show={true} onHide={onClose} size="xl" centered>
-      <Modal.Header closeButton className="bg-warning-600 text-white border-0 p-24">
-        <Modal.Title className="fw-bold">
-          <i className="fas fa-edit me-2"></i>
-          Chỉnh sửa thông tin lớp học
-        </Modal.Title>
-      </Modal.Header>
+    <Container fluid className="py-24 px-24">
+      {/* Page Header */}
+      <div className="mb-24">
+        <div className="d-flex align-items-center gap-12 mb-16">
+          <Button
+            variant="outline-secondary"
+            size="sm"
+            onClick={handleBack}
+            className="d-flex align-items-center gap-2"
+          >
+            <i className="fas fa-arrow-left"></i>
+            Quay lại
+          </Button>
+        </div>
+        <div className="d-flex align-items-center gap-12 mb-8">
+          <div className="bg-warning-600 text-white rounded-8 d-flex align-items-center justify-content-center"
+               style={{ width: '48px', height: '48px', minWidth: '48px' }}>
+            <i className="fas fa-edit fa-lg"></i>
+          </div>
+          <div>
+            <h2 className="text-neutral-900 fw-bold mb-0">Chỉnh sửa thông tin lớp học</h2>
+            <p className="text-neutral-500 mb-0 text-14 mt-4">Cập nhật thông tin và cài đặt cho lớp học</p>
+          </div>
+        </div>
+      </div>
 
       <Form onSubmit={handleSubmit}>
-        <Modal.Body className="p-24" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+        <Card className="bg-white border-0 rounded-12 mb-24" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+          <Card.Body className="p-32">
           {/* Basic Information */}
           <div className="mb-24">
             <h5 className="text-neutral-900 fw-semibold mb-16 pb-12 border-bottom border-neutral-100">
@@ -3781,24 +3806,28 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
               </Form.Text>
             </div>
           </div>
-        </Modal.Body>
+          </Card.Body>
+        </Card>
 
-        <Modal.Footer className="bg-neutral-25 border-0 p-20">
+        {/* Action Buttons */}
+        <div className="d-flex justify-content-end gap-12 mt-24">
           <Button 
-            className="btn-outline-neutral text-15 fw-medium px-20 py-10 radius-8"
-            onClick={onClose}
+            variant="outline-secondary"
+            className="text-15 fw-medium px-24 py-12 radius-8"
+            onClick={handleBack}
           >
             <i className="fas fa-times me-2"></i>
             Hủy
           </Button>
           <Button 
-            className="btn-warning text-white text-15 fw-semibold px-24 py-10 radius-8"
+            variant="warning"
+            className="text-white text-15 fw-semibold px-24 py-12 radius-8"
             type="submit"
           >
             <i className="fas fa-save me-2"></i>
             Lưu thay đổi
           </Button>
-        </Modal.Footer>
+        </div>
       </Form>
 
       {/* Select Student Modal */}
@@ -4794,9 +4823,9 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           </Button>
         </Modal.Footer>
       </Modal>
-    </Modal>
+    </Container>
   );
 };
 
-export default EditClassModal;
+export default EditClassForm;
 

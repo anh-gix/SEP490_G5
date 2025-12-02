@@ -77,6 +77,7 @@ const validateExamBeforeSubmit = async (examId) => {
 /**
  * Submit program for approval
  * POST /api/approval-requests/submit/program/:programId
+ * Body: { userId, note }
  */
 exports.submitProgram = async (req, res) => {
   const session = await mongoose.startSession();
@@ -84,8 +85,17 @@ exports.submitProgram = async (req, res) => {
 
   try {
     const { programId } = req.params;
-    const { note } = req.body;
-    const submitterId = req.user._id;
+    const { userId, note } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    const submitterId = userId;
 
     // Validate
     await validateProgramBeforeSubmit(programId);
@@ -189,6 +199,7 @@ exports.submitProgram = async (req, res) => {
 /**
  * Submit exam for approval
  * POST /api/approval-requests/submit/exam/:examId
+ * Body: { userId, note }
  */
 exports.submitExam = async (req, res) => {
   const session = await mongoose.startSession();
@@ -196,8 +207,17 @@ exports.submitExam = async (req, res) => {
 
   try {
     const { examId } = req.params;
-    const { note } = req.body;
-    const submitterId = req.user._id;
+    const { userId, note } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    const submitterId = userId;
 
     // Validate
     await validateExamBeforeSubmit(examId);
@@ -337,12 +357,18 @@ exports.getPendingRequests = async (req, res) => {
 
 /**
  * Get my submitted requests (Subject Leader)
- * GET /api/approval-requests/my-requests
+ * GET /api/approval-requests/my-requests?userId=xxx&status=xxx&type=xxx
  */
 exports.getMyRequests = async (req, res) => {
   try {
-    const userId = req.user._id;
-    const { status, type } = req.query;
+    const { userId, status, type } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in query parameters'
+      });
+    }
 
     const query = { submittedBy: userId };
     if (status) {
@@ -408,12 +434,20 @@ exports.getRequestById = async (req, res) => {
 
 /**
  * Get approval history (Center Head)
- * GET /api/approval-requests/history
+ * GET /api/approval-requests/history?userId=xxx&limit=xxx
  */
 exports.getApprovalHistory = async (req, res) => {
   try {
-    const centerHeadId = req.user._id;
-    const { limit = 20 } = req.query;
+    const { userId, limit = 20 } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in query parameters'
+      });
+    }
+
+    const centerHeadId = userId;
 
     const requests = await ApprovalRequest.find({
       reviewedBy: centerHeadId,
@@ -446,6 +480,7 @@ exports.getApprovalHistory = async (req, res) => {
 /**
  * Approve request
  * POST /api/approval-requests/:id/approve
+ * Body: { userId, note }
  */
 exports.approveRequest = async (req, res) => {
   const session = await mongoose.startSession();
@@ -453,8 +488,17 @@ exports.approveRequest = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { note } = req.body;
-    const centerHeadId = req.user._id;
+    const { userId, note } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    const centerHeadId = userId;
 
     const request = await ApprovalRequest.findById(id).session(session);
 
@@ -521,6 +565,7 @@ exports.approveRequest = async (req, res) => {
 /**
  * Reject request
  * POST /api/approval-requests/:id/reject
+ * Body: { userId, reason }
  */
 exports.rejectRequest = async (req, res) => {
   const session = await mongoose.startSession();
@@ -528,8 +573,17 @@ exports.rejectRequest = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { reason } = req.body;
-    const centerHeadId = req.user._id;
+    const { userId, reason } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    const centerHeadId = userId;
 
     if (!reason || reason.trim() === '') {
       await session.abortTransaction();
@@ -608,6 +662,7 @@ exports.rejectRequest = async (req, res) => {
 /**
  * Cancel pending request
  * DELETE /api/approval-requests/:id/cancel
+ * Body: { userId }
  */
 exports.cancelRequest = async (req, res) => {
   const session = await mongoose.startSession();
@@ -615,7 +670,15 @@ exports.cancelRequest = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const userId = req.user._id;
+    const { userId } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
 
     const request = await ApprovalRequest.findById(id).session(session);
 

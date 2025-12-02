@@ -16,6 +16,10 @@ const CourseDetails = () => {
   const [error, setError] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  // Get user role from localStorage
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const userRole = user.roleId?.name || user.role;
+
   useEffect(() => {
     fetchCourseDetails();
   }, [id]);
@@ -413,21 +417,26 @@ const CourseDetails = () => {
           >
             Quay lại
           </Button>
-          <Button
-            variant="primary"
-            icon="ph ph-pencil"
-            onClick={() => navigate(`/center-head/programs/${course.program?._id || course.program}/courses/${id}/edit-form`)}
-          >
-            Sửa
-          </Button>
-          <Button
-            variant="danger"
-            icon="ph ph-trash"
-            onClick={handleDeleteCourse}
-            disabled={deleteLoading}
-          >
-            {deleteLoading ? 'Đang xóa...' : 'Xóa'}
-          </Button>
+          {/* Edit and Delete buttons - only for non-Center Head */}
+          {userRole !== 'Center Head' && (
+            <>
+              <Button
+                variant="primary"
+                icon="ph ph-pencil"
+                onClick={() => navigate(`/center-head/programs/${course.program?._id || course.program}/courses/${id}/edit-form`)}
+              >
+                Sửa
+              </Button>
+              <Button
+                variant="danger"
+                icon="ph ph-trash"
+                onClick={handleDeleteCourse}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? 'Đang xóa...' : 'Xóa'}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

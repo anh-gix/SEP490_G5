@@ -19,6 +19,7 @@ import ExamCreatePage from "../pages/CenterHead/ExamCreatePage.jsx";
 import ExamViewPage from "../pages/CenterHead/ExamViewPage.jsx";
 import ExamEditPage from "../pages/CenterHead/ExamEditPage.jsx";
 import ReportsOverviewPage from "../pages/CenterHead/ReportsOverviewPage.jsx";
+import ApprovalRequestsPage from "../pages/CenterHead/ApprovalRequestsPage.jsx";
 
 /**
  * CenterHeadRoutes
@@ -57,19 +58,22 @@ export const centerHeadRoutes = [
   { path: '/center-head/courses/pending', element: <PendingCoursesPage /> },
   { path: '/center-head/courses/:id/details', element: <CourseDetailPage /> },
 
-  // III. Class & Schedule Management
+  // III. Approval Requests Management
+  { path: '/center-head/approval-requests', element: <ApprovalRequestsPage /> },
+
+  // IV. Class & Schedule Management
   { path: '/center-head/classes', element: <ClassListPage /> },
   { path: '/schedules/pending', element: <PendingSchedulesPage /> },
 
-  // IV. Room Management
+  // V. Room Management
   { path: '/center-head/rooms', element: <RoomListPage /> },
 
-  // V. Exam Management
+  // VI. Exam Management
   { path: '/center-head/exams', element: <ExamListPage /> },
   { path: '/center-head/exams/create', element: <ExamCreatePage /> },
   { path: '/center-head/exams/:id', element: <ExamViewPage /> },
   { path: '/center-head/exams/:id/edit', element: <ExamEditPage /> },
 
-  // VI. Reports & Analytics
+  // VII. Reports & Analytics
   { path: '/center-head/reports', element: <ReportsOverviewPage /> },
 ];

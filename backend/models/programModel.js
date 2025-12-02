@@ -64,56 +64,8 @@ const programSchema = new Schema({
         required: true
     },
 
-    // Submission tracking
-    submittedAt: {
-        type: Date
-    },
-    submittedBy: {
-        type: Schema.Types.ObjectId,
-        ref: 'User'
-    },
-
-    // Approval tracking
-    approvedAt: {
-        type: Date
-    },
-    approvedBy: {
-        type: Schema.Types.ObjectId,
-        ref: 'User'
-    },
-    approvalNote: {
-        type: String
-    },
-
-    // Rejection tracking
-    rejectedAt: {
-        type: Date
-    },
-    rejectedBy: {
-        type: Schema.Types.ObjectId,
-        ref: 'User'
-    },
-    rejectionReason: {
-        type: String
-    },
-
-    // Revision history
-    revisionHistory: [{
-        action: {
-            type: String,
-            enum: ['submitted', 'approved', 'rejected', 'resubmitted']
-        },
-        performedBy: {
-            type: Schema.Types.ObjectId,
-            ref: 'User'
-        },
-        performedAt: {
-            type: Date,
-            default: Date.now
-        },
-        note: String
-    }],
-
+    // ===== STATUS ĐỂ XEM PROGRAM ĐÃ ĐƯỢC DUYỆT CHƯA =====
+    // Tất cả thông tin chi tiết về submission, approval, rejection được lưu trong ApprovalRequest model
     status: {
         type: String,
         enum: [
@@ -122,10 +74,10 @@ const programSchema = new Schema({
             'approved',           // Center Head đã duyệt
             'needs_revision',     // Center Head yêu cầu chỉnh sửa
             'active',             // Đang sử dụng (sau khi approved)
-            'archived',           // Đã lưu trữ
-            'disabled'            // Không dùng nữa
+            'archived'            // Đã lưu trữ
         ],
-        default: 'draft'
+        default: 'draft',
+        index: true
     }
 }, { timestamps: true });
 

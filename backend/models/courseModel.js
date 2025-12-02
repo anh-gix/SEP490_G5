@@ -96,56 +96,6 @@ const courseSchema = new Schema({
         required: true
     },
 
-    // Submission tracking
-    submittedAt: {
-        type: Date
-    },
-    submittedBy: {
-        type: Schema.Types.ObjectId,
-        ref: 'User'
-    },
-
-    // Approval tracking
-    approvedAt: {
-        type: Date
-    },
-    approvedBy: {
-        type: Schema.Types.ObjectId,
-        ref: 'User'
-    },
-    approvalNote: {
-        type: String
-    },
-
-    // Rejection tracking
-    rejectedAt: {
-        type: Date
-    },
-    rejectedBy: {
-        type: Schema.Types.ObjectId,
-        ref: 'User'
-    },
-    rejectionReason: {
-        type: String
-    },
-
-    // Revision history
-    revisionHistory: [{
-        action: {
-            type: String,
-            enum: ['submitted', 'approved', 'rejected', 'resubmitted']
-        },
-        performedBy: {
-            type: Schema.Types.ObjectId,
-            ref: 'User'
-        },
-        performedAt: {
-            type: Date,
-            default: Date.now
-        },
-        note: String
-    }],
-
     // Learning Type - để phân biệt course online/offline hiển thị trên web
     learningType: {
         type: String,
@@ -191,16 +141,25 @@ const courseSchema = new Schema({
     mocktestSessionOrders: [{
         type: Number
     }],
+
+    // ===== STATUS VÀ TRACKING =====
     status: {
         type: String,
         enum: [
-            'draft',              // Subject Leader đang soạn
-            'pending_approval',   // Đã submit, chờ Center Head duyệt
-            'approved',           // Center Head đã duyệt
-            'needs_revision',     // Center Head yêu cầu chỉnh sửa
-            'archived'            // Đã lưu trữ
+            'draft',       // Đang tạo, chưa hoàn thiện (thiếu CLO, session, materials...)
+            'completed'    // Đã tạo xong (đủ thông tin để submit program)
         ],
-        default: 'draft'
+        default: 'draft',
+        index: true
+    },
+
+    // Track wizard progress - step cuối cùng đã hoàn thành (0-5)
+    // 0 = chưa bắt đầu, 1 = step 1 done, ..., 5 = tất cả steps done
+    lastCompletedStep: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 5
     }
 }, { timestamps: true });
 

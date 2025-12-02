@@ -128,6 +128,13 @@ const CourseFormNew = () => {
           const response = await courseService.getCourseById(courseId);
           const courseData = response.data;
 
+          // Redirect draft courses to wizard
+          if (courseData.status === 'draft') {
+            alert('Học phần chưa hoàn thành! Vui lòng tiếp tục tạo theo wizard.');
+            navigate(`/center-head/programs/${programId}/courses/${courseId}/edit`);
+            return;
+          }
+
           setFormData({
             courseCode: courseData.courseCode,
             name: courseData.name,
@@ -658,7 +665,7 @@ const CourseFormNew = () => {
           <Button
             variant="outline"
             icon="ph ph-x-circle"
-            onClick={() => navigate(`/center-head/programs/${programId}/edit`)}
+            onClick={() => navigate(`/center-head/programs/${programId}`)}
           >
             Hủy
           </Button>

@@ -14,5 +14,6 @@ module.exports = {
     Exam: require('./examModel'),
     Submission: require('./submissionModel'),
     HomeworkSubmission: require('./homeworkSubmissionModel'),
-    ChangeRequest: require('./changeRequestModel')
+    ChangeRequest: require('./changeRequestModel'),
+    ApprovalRequest: require('./approvalRequestModel')
 };

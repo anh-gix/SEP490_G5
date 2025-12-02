@@ -1,5 +1,6 @@
 const Exam = require("../models/examModel");
 const Submission = require("../models/submissionModel");
+const ApprovalRequest = require("../models/approvalRequestModel");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
@@ -174,11 +175,21 @@ exports.getExamByIdForManagement = async (req, res) => {
     // Get submission count
     const submissionCount = await Submission.countDocuments({ examId: id });
 
+    // Get approval request info if exists
+    const approvalRequest = await ApprovalRequest.findOne({
+      entityId: id,
+      entityType: 'Exam'
+    })
+      .populate('submittedBy', 'username email')
+      .populate('reviewedBy', 'username email')
+      .sort({ submittedAt: -1 });
+
     res.status(200).json({
       success: true,
       data: {
         ...exam.toObject(),
-        submissionCount
+        submissionCount,
+        approvalInfo: approvalRequest
       }
     });
   } catch (err) {
@@ -450,6 +461,47 @@ exports.deleteExamForManagement = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Lỗi khi xóa bài thi',
+      error: err.message
+    });
+  }
+};
+
+// ================== 9. HELPER - KIỂM TRA TRẠNG THÁI SUBMIT EXAM ==================
+exports.getExamSubmissionStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const exam = await Exam.findById(id);
+    if (!exam) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bài thi'
+      });
+    }
+
+    // Validate exam has required data
+    const hasSections = exam.sections && exam.sections.length > 0;
+    const canSubmit =
+      ['draft', 'needs_revision'].includes(exam.status) &&
+      hasSections;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        examStatus: exam.status,
+        canSubmit,
+        hasSections,
+        sectionCount: exam.sections ? exam.sections.length : 0,
+        validationMessages: !canSubmit ? [
+          !['draft', 'needs_revision'].includes(exam.status) ? `Exam status is ${exam.status}` : null,
+          !hasSections ? 'Exam must have at least 1 section' : null
+        ].filter(Boolean) : []
+      }
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi kiểm tra trạng thái nộp đề thi',
       error: err.message
     });
   }

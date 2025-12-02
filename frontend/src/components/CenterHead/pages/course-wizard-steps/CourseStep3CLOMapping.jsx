@@ -112,7 +112,25 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
       alert('Vui lòng thêm ít nhất 1 CLO!');
       return;
     }
-    onNext();
+
+    try {
+      // Update lastCompletedStep to mark step 4 as completed
+      await courseService.updateCourse(courseData._id, {
+        lastCompletedStep: 4
+      });
+
+      // Update local state
+      setCourseData(prev => ({
+        ...prev,
+        lastCompletedStep: 4
+      }));
+
+      onNext();
+    } catch (error) {
+      console.error('Error updating lastCompletedStep:', error);
+      // Continue to next step even if update fails
+      onNext();
+    }
   };
 
   const getPLODetails = (ploId) => {

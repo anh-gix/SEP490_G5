@@ -64,8 +64,16 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
     try {
       setLoading(true);
       await courseService.updateCourse(courseData._id, {
-        materials: courseData.materials
+        materials: courseData.materials,
+        lastCompletedStep: 3 // Mark step 3 as completed
       });
+
+      // Update local state
+      setCourseData(prev => ({
+        ...prev,
+        lastCompletedStep: 3
+      }));
+
       alert('Lưu tài liệu thành công!');
       onNext();
     } catch (error) {

@@ -2,6 +2,7 @@ const Program = require('../models/programModel');
 const Course = require('../models/courseModel');
 const Session = require('../models/sessionModel');
 const CamSession = require('../models/camSession');
+const ApprovalRequest = require('../models/approvalRequestModel');
 
 // =========================
 // PROGRAM CRUD OPERATIONS
@@ -53,9 +54,6 @@ const getProgramById = async (req, res) => {
     const { id } = req.params;
 
     const program = await Program.findById(id)
-      .populate('rejectedBy', 'username email')
-      .populate('approvedBy', 'username email')
-      .populate('submittedBy', 'username email')
       .populate('createdBy', 'username email');
 
     if (!program) {
@@ -69,14 +67,23 @@ const getProgramById = async (req, res) => {
     const courses = await Course.find({ program: id })
       .populate('createdBy', 'username email')
       .populate('sessions', 'title order')
-      .populate('rejectedBy', 'username email')
-      .select('_id courseCode name description status createdAt updatedAt clos sessions mappedPLOs rejectionReason rejectedBy rejectedAt');
+      .select('_id courseCode name description status createdAt updatedAt clos sessions mappedPLOs');
+
+    // Get approval request info if exists
+    const approvalRequest = await ApprovalRequest.findOne({
+      entityId: id,
+      entityType: 'Program'
+    })
+      .populate('submittedBy', 'username email')
+      .populate('reviewedBy', 'username email')
+      .sort({ submittedAt: -1 });
 
     res.status(200).json({
       success: true,
       data: {
         ...program.toObject(),
-        courses
+        courses,
+        approvalInfo: approvalRequest
       }
     });
   } catch (error) {
@@ -366,24 +373,16 @@ const getProgramPLOs = async (req, res) => {
 };
 
 // =========================
-// APPROVAL WORKFLOW
+// HELPER FUNCTIONS FOR APPROVAL
 // =========================
 
 /**
- * Submit program for approval
- * PATCH /api/programs/:id/submit
+ * Get program submission status (check if can submit)
+ * GET /api/programs/:id/submission-status
  */
-const submitProgram = async (req, res) => {
+const getProgramSubmissionStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { submittedBy } = req.body;
-
-    if (!submittedBy) {
-      return res.status(400).json({
-        success: false,
-        message: 'Thiếu thông tin người nộp (submittedBy)'
-      });
-    }
 
     const program = await Program.findById(id);
     if (!program) {
@@ -393,194 +392,53 @@ const submitProgram = async (req, res) => {
       });
     }
 
-    // Check if program is in draft or needs_revision status
-    if (program.status !== 'draft' && program.status !== 'needs_revision') {
-      return res.status(400).json({
-        success: false,
-        message: `Không thể nộp chương trình có trạng thái ${program.status}`
-      });
-    }
-
-    // Validate program has required data
-    if (!program.plos || program.plos.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Chương trình phải có ít nhất 1 PLO trước khi nộp'
-      });
-    }
-
-    // Update status and tracking fields
-    program.status = 'pending_approval';
-    program.submittedAt = new Date();
-    program.submittedBy = submittedBy;
-
-    // Add to revision history
-    program.revisionHistory.push({
-      action: program.status === 'needs_revision' ? 'resubmitted' : 'submitted',
-      performedBy: submittedBy,
-      performedAt: new Date(),
-      note: 'Nộp chương trình để Center Head duyệt'
+    // Get courses status
+    const totalCourses = await Course.countDocuments({ program: id });
+    const completedCourses = await Course.countDocuments({
+      program: id,
+      status: 'completed'
     });
 
-    await program.save();
+    const canSubmit =
+      ['draft', 'needs_revision'].includes(program.status) &&
+      program.plos && program.plos.length > 0 &&
+      totalCourses > 0 &&
+      totalCourses === completedCourses;
+
+    const draftCourses = await Course.find({
+      program: id,
+      status: 'draft'
+    }).select('courseCode name');
 
     res.status(200).json({
       success: true,
-      message: 'Nộp chương trình thành công',
-      data: program
+      data: {
+        programStatus: program.status,
+        canSubmit,
+        totalCourses,
+        completedCourses,
+        draftCourses,
+        hasPLOs: program.plos && program.plos.length > 0,
+        validationMessages: !canSubmit ? [
+          !['draft', 'needs_revision'].includes(program.status) ? `Program status is ${program.status}` : null,
+          !(program.plos && program.plos.length > 0) ? 'Program must have at least 1 PLO' : null,
+          totalCourses === 0 ? 'Program must have at least 1 course' : null,
+          totalCourses !== completedCourses ? `${totalCourses - completedCourses} courses are still in draft` : null
+        ].filter(Boolean) : []
+      }
     });
   } catch (error) {
-    console.error('Error submitting program:', error);
+    console.error('Error getting submission status:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi nộp chương trình',
+      message: 'Lỗi khi kiểm tra trạng thái nộp chương trình',
       error: error.message
     });
   }
 };
 
-/**
- * Approve program
- * PATCH /api/programs/:id/approve
- */
-const approveProgram = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { approvedBy, approvalNote } = req.body;
-
-    if (!approvedBy) {
-      return res.status(400).json({
-        success: false,
-        message: 'Thiếu thông tin người duyệt (approvedBy)'
-      });
-    }
-
-    const program = await Program.findById(id).populate('createdBy', 'username email');
-    if (!program) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy chương trình'
-      });
-    }
-
-    // Check if program is in pending_approval status
-    if (program.status !== 'pending_approval') {
-      return res.status(400).json({
-        success: false,
-        message: `Không thể duyệt chương trình có trạng thái ${program.status}`
-      });
-    }
-
-    // Update status and tracking fields
-    program.status = 'approved';
-    program.approvedAt = new Date();
-    program.approvedBy = approvedBy;
-    program.approvalNote = approvalNote || '';
-
-    // Clear rejection fields if any
-    program.rejectedAt = undefined;
-    program.rejectedBy = undefined;
-    program.rejectionReason = undefined;
-
-    // Add to revision history
-    program.revisionHistory.push({
-      action: 'approved',
-      performedBy: approvedBy,
-      performedAt: new Date(),
-      note: approvalNote || 'Đã duyệt chương trình'
-    });
-
-    await program.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Duyệt chương trình thành công',
-      data: program
-    });
-  } catch (error) {
-    console.error('Error approving program:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi duyệt chương trình',
-      error: error.message
-    });
-  }
-};
-
-/**
- * Reject program
- * PATCH /api/programs/:id/reject
- */
-const rejectProgram = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { rejectedBy, rejectionReason } = req.body;
-
-    if (!rejectedBy) {
-      return res.status(400).json({
-        success: false,
-        message: 'Thiếu thông tin người từ chối (rejectedBy)'
-      });
-    }
-
-    if (!rejectionReason) {
-      return res.status(400).json({
-        success: false,
-        message: 'Vui lòng nhập lý do từ chối'
-      });
-    }
-
-    const program = await Program.findById(id).populate('createdBy', 'username email');
-    if (!program) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy chương trình'
-      });
-    }
-
-    // Check if program is in pending_approval status
-    if (program.status !== 'pending_approval') {
-      return res.status(400).json({
-        success: false,
-        message: `Không thể từ chối chương trình có trạng thái ${program.status}`
-      });
-    }
-
-    // Update status and tracking fields
-    program.status = 'needs_revision';
-    program.rejectedAt = new Date();
-    program.rejectedBy = rejectedBy;
-    program.rejectionReason = rejectionReason;
-
-    // Clear approval fields if any
-    program.approvedAt = undefined;
-    program.approvedBy = undefined;
-    program.approvalNote = undefined;
-
-    // Add to revision history
-    program.revisionHistory.push({
-      action: 'rejected',
-      performedBy: rejectedBy,
-      performedAt: new Date(),
-      note: rejectionReason
-    });
-
-    await program.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Đã yêu cầu chỉnh sửa chương trình',
-      data: program
-    });
-  } catch (error) {
-    console.error('Error rejecting program:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi từ chối chương trình',
-      error: error.message
-    });
-  }
-};
+// NOTE: Submit, Approve, Reject functions are now handled by approvalRequestController
+// These functions are DEPRECATED and kept for backward compatibility only
 
 /**
  * Activate approved program
@@ -665,10 +523,9 @@ module.exports = {
   updateProgram,
   deleteProgram,
   getProgramPLOs,
-  // Approval workflow
-  submitProgram,
-  approveProgram,
-  rejectProgram,
+  // Helper functions
+  getProgramSubmissionStatus,
+  // Program management
   activateProgram,
   archiveProgram
 };

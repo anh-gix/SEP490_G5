@@ -64,7 +64,8 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
         learningType: courseData.learningType,
         program: program._id,
         createdBy: userId,
-        status: 'draft'
+        status: 'draft',
+        lastCompletedStep: 1 // Mark step 1 as completed
       };
 
       let response;

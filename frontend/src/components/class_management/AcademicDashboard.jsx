@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, ProgressBar, Table, Spinner, Alert } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import classService from '../../services/classService';
-import scheduleService from '../../services/scheduleService';
-import roomService from '../../services/roomService';
 import academicStaffService from '../../services/academicStaffService';
-import changeRequestService from '../../services/changeRequestService';
 
 /**
  * Academic Dashboard Component
@@ -39,243 +35,29 @@ const AcademicDashboard = () => {
       setLoading(true);
       setError(null);
 
-      const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
-      const startOfDay = new Date(today);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(today);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      // Fetch today's schedules
-      const schedulesResponse = await scheduleService.getAllSchedules({ 
-        date: todayStr
-        // Không filter theo status cũ nữa, lấy tất cả schedules
-      });
-      const todaySchedules = schedulesResponse.schedules || schedulesResponse || [];
-
-      // Fetch all classes for progress
-      const classesResponse = await classService.getAllClasses();
-      const classes = classesResponse.classes || [];
-
-      // Fetch rooms
-      const roomsResponse = await roomService.getAllRooms();
-      const rooms = roomsResponse.rooms || roomsResponse || [];
-
-      // Fetch absent/late students from today's schedules
-      const absentStudents = [];
-      const lateStudents = [];
+      // Single API call to get all dashboard data
+      const response = await academicStaffService.getDashboardData();
       
-      for (const schedule of todaySchedules) {
-        try {
-          const attendanceResponse = await academicStaffService.getAttendance(
-            schedule._id || schedule.id
-          );
-          const attendances = attendanceResponse.attendances || attendanceResponse || [];
-          
-          for (const att of attendances) {
-            const scheduleId = schedule._id || schedule.id;
-            const studentId = att.student?._id || att.student;
-            const uniqueId = `${studentId}-${scheduleId}`;
-            
-            if (att.attendance?.status === 'absent') {
-              absentStudents.push({
-                id: uniqueId,
-                name: att.student?.username || 'N/A',
-                studentId: studentId,
-                class: schedule.class?.name || schedule.className || 'N/A',
-                time: schedule.startTime || 'N/A',
-                status: 'absent'
-              });
-            } else if (att.attendance?.status === 'late') {
-              lateStudents.push({
-                id: uniqueId,
-                name: att.student?.username || 'N/A',
-                studentId: studentId,
-                class: schedule.class?.name || schedule.className || 'N/A',
-                time: schedule.startTime || 'N/A',
-                status: 'late'
-              });
-            }
-          }
-        } catch (err) {
-          // Skip if attendance endpoint doesn't exist or fails
-          console.warn(`Could not fetch attendance for schedule ${schedule._id}:`, err);
-        }
-      }
-
-      // Transform today's schedules
-      const transformedTodaySchedule = todaySchedules.slice(0, 10).map((schedule, index) => {
-        const startTime = new Date(`${schedule.date}T${schedule.startTime}`);
-        const endTime = new Date(`${schedule.date}T${schedule.endTime}`);
-        const now = new Date();
+      if (response.success && response.data) {
+        const data = response.data;
         
-        let status = 'upcoming';
-        if (startTime <= now && now <= endTime) {
-          status = 'ongoing';
-        } else if (endTime < now) {
-          status = 'completed';
-        }
-
-        return {
-          id: schedule._id || schedule.id || index,
-          time: `${schedule.startTime || 'N/A'} - ${schedule.endTime || 'N/A'}`,
-          className: schedule.class?.name || schedule.className || 'N/A',
-          teacher: schedule.teacher?.username || schedule.teacherName || 'N/A',
-          room: schedule.room?.room_name || schedule.roomName || 'N/A',
-          status
-        };
-      });
-
-      // Build room schedule
-      const timeSlots = ['08:00-10:00', '10:30-12:30', '14:00-16:00', '18:00-20:00'];
-      const roomScheduleData = rooms.slice(0, 4).map(room => {
-        const schedules = timeSlots.map(timeSlot => {
-          const [startTime, endTime] = timeSlot.split('-');
-          const matchingSchedule = todaySchedules.find(s => 
-            s.room?._id?.toString() === room._id?.toString() &&
-            s.startTime === startTime &&
-            s.endTime === endTime
-          );
-          
-          if (matchingSchedule) {
-            return {
-              time: timeSlot,
-              class: matchingSchedule.class?.name || matchingSchedule.className || 'N/A',
-              status: 'occupied'
-            };
-          }
-          return {
-            time: timeSlot,
-            class: 'Free',
-            status: 'available'
-          };
-        });
-
-        return {
-          room: room.room_name || room.name || 'N/A',
-          location: room.location || 'N/A',
-          schedules
-        };
-      });
-
-      // Calculate class progress
-      const classProgressData = classes.slice(0, 3).map(cls => {
-        const totalSchedules = cls.totalSchedules || 0;
-        const completedSchedules = cls.completedSchedules || 0;
-        const progress = totalSchedules > 0 ? Math.round((completedSchedules / totalSchedules) * 100) : 0;
-
-        return {
-          id: cls._id || cls.id,
-          name: cls.name || 'N/A',
-          level: cls.level || cls.course?.level || 'N/A',
-          progress,
-          students: cls.totalStudents || cls.students?.length || 0,
-          completedLessons: completedSchedules,
-          totalLessons: totalSchedules
-        };
-      });
-
-      // Set overview stats
-      setTodayOverview({
-        todaySchedules: todaySchedules.length,
-        absentStudents: absentStudents.length,
-        lateStudents: lateStudents.length,
-        pendingLeaveRequests: 0, // TODO: Implement when leave request feature is added
-        pendingMakeupClasses: 0, // TODO: Implement when makeup class feature is added
-        newClassRequests: 0 // TODO: Implement when class request feature is added
-      });
-
-      setAbsentStudentsList([...absentStudents, ...lateStudents].slice(0, 10));
-      setRoomSchedule(roomScheduleData);
-      setTodaySchedule(transformedTodaySchedule);
-      setClassProgress(classProgressData);
-
-      // Fetch recent change requests (5 newest pending only)
-      try {
-        const requestsResponse = await changeRequestService.getAllChangeRequests({ 
-          limit: 100,
-          status: 'pending' // Only fetch pending requests
+        // Set all state from the aggregated response
+        setTodayOverview(data.todayOverview || {
+          todaySchedules: 0,
+          absentStudents: 0,
+          lateStudents: 0,
+          pendingLeaveRequests: 0,
+          pendingMakeupClasses: 0,
+          newClassRequests: 0
         });
         
-        if (requestsResponse.success) {
-          const requests = requestsResponse.changeRequests || [];
-          // Filter only pending requests (double check)
-          const pendingRequests = requests.filter(req => req.status === 'pending');
-          // Sort by createdAt descending (newest first) and take top 5
-          const sortedRequests = [...pendingRequests].sort((a, b) => {
-            const dateA = new Date(a.createdAt);
-            const dateB = new Date(b.createdAt);
-            return dateB - dateA; // Descending order (newest first)
-          });
-          
-          const recentRequests = sortedRequests.slice(0, 5).map(request => {
-            const createdAt = new Date(request.createdAt);
-            const now = new Date();
-            const diffMs = now - createdAt;
-            const diffMins = Math.floor(diffMs / 60000);
-            const diffHours = Math.floor(diffMs / 3600000);
-            const diffDays = Math.floor(diffMs / 86400000);
-
-            let timeText = '';
-            if (diffMins < 1) {
-              timeText = 'Vừa xong';
-            } else if (diffMins < 60) {
-              timeText = `${diffMins} phút trước`;
-            } else if (diffHours < 24) {
-              timeText = `${diffHours} giờ trước`;
-            } else if (diffDays < 7) {
-              timeText = `${diffDays} ngày trước`;
-            } else {
-              timeText = createdAt.toLocaleDateString('vi-VN', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-              });
-            }
-
-            const senderName = request.sender?.username || request.senderName || 'Người dùng';
-            const requestType = request.type || 'change_class';
-            let message = '';
-            let icon = 'fa-file-alt';
-            let color = 'info';
-
-            if (requestType === 'change_class') {
-              message = `${senderName} đã gửi đơn xin đổi lớp học`;
-              icon = 'fa-exchange-alt';
-              color = 'primary';
-            } else if (requestType === 'makeup_class') {
-              message = `${senderName} đã gửi đơn xin học bù`;
-              icon = 'fa-calendar-plus';
-              color = 'warning';
-            } else if (requestType === 'create_class') {
-              message = `${senderName} đã gửi đơn tạo lớp mới`;
-              icon = 'fa-plus-circle';
-              color = 'success';
-            } else if (requestType === 'replace_teacher') {
-              message = `${senderName} đã gửi đơn thay giáo viên`;
-              icon = 'fa-user-tie';
-              color = 'info';
-            } else {
-              message = `${senderName} đã gửi đơn mới`;
-              icon = 'fa-file-alt';
-              color = 'info';
-            }
-
-            return {
-              id: request._id || request.id,
-              message,
-              time: timeText,
-              icon,
-              color
-            };
-          });
-          setRecentActivities(recentRequests);
-        } else {
-          setRecentActivities([]);
-        }
-      } catch (err) {
-        console.warn('Could not fetch recent requests:', err);
-        setRecentActivities([]);
+        setTodaySchedule(data.todaySchedule || []);
+        setAbsentStudentsList(data.absentStudentsList || []);
+        setRoomSchedule(data.roomSchedule || []);
+        setClassProgress(data.classProgress || []);
+        setRecentActivities(data.recentActivities || []);
+      } else {
+        throw new Error(response.message || 'Không thể tải dữ liệu dashboard');
       }
 
     } catch (error) {

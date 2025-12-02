@@ -9,6 +9,21 @@ const getAuthHeader = () => {
 };
 
 const academicStaffService = {
+  // Get dashboard data
+  getDashboardData: async () => {
+    try {
+      const response = await axios.get(
+        `${API_URL}/academic-staff/dashboard`,
+        {
+          headers: getAuthHeader()
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
   // Get attendance for a schedule
   getAttendance: async (scheduleId) => {
     try {

@@ -445,9 +445,14 @@ const CamSession = ({ isWizardMode = false }) => {
 
     try {
       setLoading(true);
-      
+
+      // Chuẩn hóa quizzes trước khi submit
+      const finalQuizzes = Array.isArray(formData.quizzes?.quiz)
+        ? formData.quizzes.quiz
+        : [];
+
       // Handle image file uploads if any
-      let finalVocabulary = formData.vocabulary;
+      let finalVocabulary = formData.vocabulary || { items: [] };
       if (formData.vocabulary?.files && formData.vocabulary.files.length > 0) {
         // TODO: Upload files to server and get URLs
         // For now, we'll use the preview URLs (blob URLs)
@@ -485,7 +490,7 @@ const CamSession = ({ isWizardMode = false }) => {
         ...formData,
         videoURL: formData.videoURL || undefined,
         quizzes: {
-          quiz: finalQuizzes.map(quiz => ({
+          quiz: finalQuizzes.map((quiz) => ({
             Type: quiz.Type,
             Img: quiz.Img,
             Question: quiz.Question,
@@ -494,10 +499,12 @@ const CamSession = ({ isWizardMode = false }) => {
           }))
         },
         vocabulary: {
-          items: finalVocabulary.items.map(item => ({
-            word: item.word,
-            img: item.img
-          }))
+          items: Array.isArray(finalVocabulary.items)
+            ? finalVocabulary.items.map((item) => ({
+                word: item.word,
+                img: item.img
+              }))
+            : []
         }
       };
       

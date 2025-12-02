@@ -12,7 +12,7 @@ const Course = require('../models/courseModel');
 const getAllCamSessions = async (req, res) => {
   try {
     const camSessions = await CamSession.find()
-      .sort({ Order: 1 });
+      .sort({ order: 1 });
 
     res.status(200).json({
       success: true,
@@ -66,22 +66,50 @@ const getCamSessionById = async (req, res) => {
  */
 const createCamSession = async (req, res) => {
   try {
-    const { Title, Des, Order, videoURL, Quiz } = req.body;
+    const {
+      title,
+      description,
+      order,
+      sessionType,
+      videoURL,
+      quizzes,
+      vocabulary,
+    } = req.body;
 
     // Validation
-    if (!Title || Order === undefined) {
+    if (!title || order === undefined) {
       return res.status(400).json({
         success: false,
         message: 'Tiêu đề và thứ tự buổi học là bắt buộc'
       });
     }
 
+    // Chuẩn hóa vocabulary (giữ tương thích với schema hiện tại: img + words)
+    let vocabularyData = undefined;
+    if (vocabulary) {
+      if (Array.isArray(vocabulary.items)) {
+        vocabularyData = {
+          img: vocabulary.img || '',
+          words: vocabulary.items
+            .map((item) => item.word)
+            .filter((w) => typeof w === 'string' && w.trim() !== ''),
+        };
+      } else if (Array.isArray(vocabulary.words)) {
+        vocabularyData = {
+          img: vocabulary.img || '',
+          words: vocabulary.words,
+        };
+      }
+    }
+
     const camSession = await CamSession.create({
-      Title,
-      Des,
-      Order,
+      title,
+      description,
+      order,
+      sessionType,
       videoURL,
-      Quiz: Quiz || []
+      quizzes: quizzes || { quiz: [] },
+      ...(vocabularyData ? { vocabulary: vocabularyData } : {}),
     });
 
     res.status(201).json({
@@ -106,7 +134,15 @@ const createCamSession = async (req, res) => {
 const updateCamSession = async (req, res) => {
   try {
     const { id } = req.params;
-    const { Title, Des, Order, videoURL, Quiz } = req.body;
+    const {
+      title,
+      description,
+      order,
+      sessionType,
+      videoURL,
+      quizzes,
+      vocabulary,
+    } = req.body;
 
     const camSession = await CamSession.findById(id);
     if (!camSession) {
@@ -117,11 +153,38 @@ const updateCamSession = async (req, res) => {
     }
 
     // Update fields
-    if (Title !== undefined) camSession.Title = Title;
-    if (Des !== undefined) camSession.Des = Des;
-    if (Order !== undefined) camSession.Order = Order;
+    if (title !== undefined) camSession.title = title;
+    if (description !== undefined) camSession.description = description;
+    if (order !== undefined) camSession.order = order;
+    if (sessionType !== undefined) camSession.sessionType = sessionType;
     if (videoURL !== undefined) camSession.videoURL = videoURL;
-    if (Quiz !== undefined) camSession.Quiz = Quiz;
+    if (quizzes !== undefined) camSession.quizzes = quizzes;
+
+    // Chuẩn hóa vocabulary
+    if (vocabulary !== undefined) {
+      let vocabularyData = undefined;
+      if (vocabulary) {
+        if (Array.isArray(vocabulary.items)) {
+          vocabularyData = {
+            img: vocabulary.img || '',
+            words: vocabulary.items
+              .map((item) => item.word)
+              .filter((w) => typeof w === 'string' && w.trim() !== ''),
+          };
+        } else if (Array.isArray(vocabulary.words)) {
+          vocabularyData = {
+            img: vocabulary.img || '',
+            words: vocabulary.words,
+          };
+        }
+      }
+
+      if (vocabularyData) {
+        camSession.vocabulary = vocabularyData;
+      } else {
+        camSession.vocabulary = undefined;
+      }
+    }
 
     await camSession.save();
 

@@ -58,7 +58,7 @@ const RequestManagementPage = () => {
   const [pendingMakeupClasses, setPendingMakeupClasses] = useState([]); // Lưu danh sách buổi học bù pending
   const [pendingMakeupSessions, setPendingMakeupSessions] = useState([]); // Lưu danh sách sessions cần học bù (trường hợp 2)
   const [showMakeupClassModal, setShowMakeupClassModal] = useState(false); // Modal thêm buổi học bù
-  const [makeupClassOption, setMakeupClassOption] = useState(null); // Chỉ 'existing' (chọn buổi có sẵn)
+  const [makeupClassOption, setMakeupClassOption] = useState(null); // 'existing' (chọn buổi có sẵn) hoặc 'new' (tạo buổi học bù mới)
   const [selectedMakeupClassId, setSelectedMakeupClassId] = useState(null); // Lớp được chọn cho buổi học bù
   const [selectedMakeupClassInfo, setSelectedMakeupClassInfo] = useState(null); // Thông tin lớp được chọn
   const [availableMakeupClasses, setAvailableMakeupClasses] = useState([]); // Danh sách lớp có sẵn
@@ -75,11 +75,19 @@ const RequestManagementPage = () => {
   const [pendingMakeupData, setPendingMakeupData] = useState(null); // Lưu dữ liệu makeup đang chờ xác nhận khi có conflict
   const [validatingConflict, setValidatingConflict] = useState(false); // Trạng thái đang validate conflict
   const [newClassSchedule, setNewClassSchedule] = useState([]); // Lưu lịch học của lớp mới khi có đổi lớp
-  // State cho tạo lớp mới - ĐÃ XÓA (không cho phép tạo lớp mới, chỉ chọn buổi có sẵn)
+  // State cho tạo buổi học bù mới
   const [availableTeachers, setAvailableTeachers] = useState([]);
   const [availableRooms, setAvailableRooms] = useState([]);
   const [loadingTeachers, setLoadingTeachers] = useState(false);
   const [loadingRooms, setLoadingRooms] = useState(false);
+  const [newMakeupDate, setNewMakeupDate] = useState(''); // Ngày học bù (YYYY-MM-DD)
+  const [newMakeupStartTime, setNewMakeupStartTime] = useState(''); // Giờ bắt đầu
+  const [newMakeupEndTime, setNewMakeupEndTime] = useState(''); // Giờ kết thúc
+  const [newMakeupRoomId, setNewMakeupRoomId] = useState(null); // ID phòng học
+  const [newMakeupTeacherId, setNewMakeupTeacherId] = useState(null); // ID giáo viên
+  const [newMakeupSessionId, setNewMakeupSessionId] = useState(null); // ID session (tự động lấy từ buổi nghỉ nếu có)
+  const [studentSchedulesOnSelectedDate, setStudentSchedulesOnSelectedDate] = useState([]); // Lưu lịch học của học sinh vào ngày được chọn
+  const [makeupConflictInfo, setMakeupConflictInfo] = useState(null); // Lưu thông tin conflict của buổi học bù
   // State cho giáo viên dạy thay (chỉ dùng khi senderRole === 'Teacher')
   const [selectedSubstituteTeacherId, setSelectedSubstituteTeacherId] = useState(null);
   const [availableSubstituteTeachers, setAvailableSubstituteTeachers] = useState([]);
@@ -89,6 +97,98 @@ const RequestManagementPage = () => {
   useEffect(() => {
     fetchChangeRequests();
   }, [page, searchTerm, filterStatus, filterType]);
+
+  // Hàm helper để kiểm tra conflict với lịch học của học sinh
+  const checkMakeupTimeConflict = async (date, startTime, endTime) => {
+    if (!selectedRequest || !selectedRequest.sender || !date || !startTime || !endTime) {
+      setMakeupConflictInfo(null);
+      return;
+    }
+
+    try {
+      const studentId = selectedRequest.sender._id || selectedRequest.sender;
+      
+      // Lấy lịch học của học sinh vào ngày được chọn
+      const scheduleResponse = await studentScheduleService.getStudentSchedule(studentId);
+      const allSchedules = scheduleResponse.schedules || scheduleResponse.data || [];
+      
+      // Lọc các buổi học vào ngày được chọn
+      const selectedDateObj = new Date(date);
+      selectedDateObj.setHours(0, 0, 0, 0);
+      
+      const schedulesToCheck = allSchedules.filter(schedule => {
+        if (!schedule.date && !schedule.classSchedule?.date) return false;
+        
+        const scheduleDate = new Date(schedule.date || schedule.classSchedule?.date);
+        scheduleDate.setHours(0, 0, 0, 0);
+        
+        return scheduleDate.getTime() === selectedDateObj.getTime();
+      });
+      
+      // Lưu vào state để dùng lại nếu cần
+      setStudentSchedulesOnSelectedDate(schedulesToCheck);
+      
+      // Hàm kiểm tra overlap
+      const hasTimeOverlap = (start1, end1, start2, end2) => {
+        const timeToMinutes = (timeStr) => {
+          if (!timeStr) return null;
+          const parts = timeStr.split(':');
+          if (parts.length !== 2) return null;
+          const hours = parseInt(parts[0], 10);
+          const minutes = parseInt(parts[1], 10);
+          if (isNaN(hours) || isNaN(minutes)) return null;
+          return hours * 60 + minutes;
+        };
+        
+        const start1Min = timeToMinutes(start1);
+        const end1Min = timeToMinutes(end1);
+        const start2Min = timeToMinutes(start2);
+        const end2Min = timeToMinutes(end2);
+        
+        if (start1Min === null || end1Min === null || start2Min === null || end2Min === null) {
+          return false;
+        }
+        
+        // Hai khoảng thời gian overlap nếu: start1 < end2 VÀ end1 > start2
+        return start1Min < end2Min && end1Min > start2Min;
+      };
+      
+      // Kiểm tra conflict với từng buổi học
+      const conflicts = [];
+      schedulesToCheck.forEach((schedule) => {
+        const classSchedule = schedule.classSchedule || schedule;
+        const existingStartTime = classSchedule.startTime || schedule.startTime;
+        const existingEndTime = classSchedule.endTime || schedule.endTime;
+        
+        if (existingStartTime && existingEndTime) {
+          if (hasTimeOverlap(startTime, endTime, existingStartTime, existingEndTime)) {
+            const className = classSchedule.class?.name || schedule.className || 'N/A';
+            const roomName = classSchedule.room?.room_name || schedule.roomName || 'N/A';
+            
+            conflicts.push({
+              className,
+              time: `${existingStartTime} - ${existingEndTime}`,
+              roomName,
+              status: schedule.scheduleStatus || classSchedule.status || 'N/A'
+            });
+          }
+        }
+      });
+      
+      if (conflicts.length > 0) {
+        setMakeupConflictInfo({
+          hasConflict: true,
+          conflicts: conflicts,
+          message: `Học sinh đã có ${conflicts.length} buổi học trùng thời gian với buổi học bù`
+        });
+      } else {
+        setMakeupConflictInfo(null);
+      }
+    } catch (error) {
+      console.error('❌ Lỗi khi kiểm tra conflict:', error);
+      setMakeupConflictInfo(null);
+    }
+  };
 
   // Tự động validate conflict khi chọn buổi học bù (chỉ cho học sinh)
   useEffect(() => {
@@ -2128,117 +2228,394 @@ const RequestManagementPage = () => {
     loadNewClassSchedule();
   }, [pendingClassChange]);
 
-  // Load danh sách giáo viên và phòng khi mở modal tạo lớp mới
-  // Đã xóa vì không còn sử dụng tùy chọn "Tạo lớp mới"
-  // useEffect(() => {
-  //   const loadTeachersAndRooms = async () => {
-  //     if (showMakeupClassModal && makeupClassOption === 'new') {
-  //       // Load teachers
-  //       setLoadingTeachers(true);
-  //       try {
-  //         const teachersResponse = await teacherService.getAllTeachers();
-  //         if (teachersResponse.success) {
-  //           setAvailableTeachers(teachersResponse.teachers || []);
-  //         }
-  //       } catch (err) {
-  //         console.error('Error loading teachers:', err);
-  //         setAvailableTeachers([]);
-  //       } finally {
-  //         setLoadingTeachers(false);
-  //       }
+  // Load danh sách giáo viên và phòng khi chọn "Tạo buổi học bù mới"
+  useEffect(() => {
+    const loadTeachersAndRooms = async () => {
+      if (showMakeupClassModal && makeupClassOption === 'new') {
+        // Load teachers
+        setLoadingTeachers(true);
+        try {
+          const teachersResponse = await teacherService.getAllTeachers();
+          if (teachersResponse && (teachersResponse.teachers || teachersResponse.data)) {
+            setAvailableTeachers(teachersResponse.teachers || teachersResponse.data || []);
+          } else {
+            setAvailableTeachers([]);
+          }
+        } catch (err) {
+          console.error('Error loading teachers:', err);
+          setAvailableTeachers([]);
+        } finally {
+          setLoadingTeachers(false);
+        }
 
-  //       // Load rooms
-  //       setLoadingRooms(true);
-  //       try {
-  //         const roomsResponse = await roomService.getAllRooms();
-  //         console.log('Rooms response:', roomsResponse);
-  //         // API trả về { message, total, rooms } hoặc { success, data }
-  //         if (roomsResponse.rooms) {
-  //           setAvailableRooms(roomsResponse.rooms || []);
-  //         } else if (roomsResponse.data) {
-  //           setAvailableRooms(roomsResponse.data || []);
-  //         } else if (roomsResponse.success && roomsResponse.data) {
-  //           setAvailableRooms(roomsResponse.data || []);
-  //         } else {
-  //           console.warn('Unexpected rooms response format:', roomsResponse);
-  //           setAvailableRooms([]);
-  //         }
-  //       } catch (err) {
-  //         console.error('Error loading rooms:', err);
-  //         setAvailableRooms([]);
-  //       } finally {
-  //         setLoadingRooms(false);
-  //       }
-  //     }
-  //   };
+        // Load rooms
+        setLoadingRooms(true);
+        try {
+          const roomsResponse = await roomService.getAllRooms();
+          // API trả về { message, total, rooms } hoặc { success, data }
+          if (roomsResponse.rooms) {
+            setAvailableRooms(roomsResponse.rooms || []);
+          } else if (roomsResponse.data) {
+            setAvailableRooms(roomsResponse.data || []);
+          } else if (roomsResponse.success && roomsResponse.data) {
+            setAvailableRooms(roomsResponse.data || []);
+          } else {
+            console.warn('Unexpected rooms response format:', roomsResponse);
+            setAvailableRooms([]);
+          }
+        } catch (err) {
+          console.error('Error loading rooms:', err);
+          setAvailableRooms([]);
+        } finally {
+          setLoadingRooms(false);
+        }
+      } else {
+        // Reset khi không chọn "new"
+        setAvailableTeachers([]);
+        setAvailableRooms([]);
+      }
+    };
 
-  //   loadTeachersAndRooms();
-  // }, [showMakeupClassModal, makeupClassOption]);
+    loadTeachersAndRooms();
+  }, [showMakeupClassModal, makeupClassOption]);
 
-  // Validate conflict khi chọn giáo viên/phòng học trong phần tạo lớp mới
-  // Đã xóa vì không còn sử dụng tùy chọn "Tạo lớp mới"
-  // useEffect(() => {
-  //   const validateNewMakeupConflict = async () => {
-  //     // Chỉ validate khi:
-  //     // 1. Modal đang mở và chọn "Tạo lớp mới"
-  //     // 2. Đã có đủ thông tin: date, startTime, endTime, teacher, room
-  //     if (!showMakeupClassModal || 
-  //         makeupClassOption !== 'new' ||
-  //         !newMakeupDate || 
-  //         !newMakeupStartTime || 
-  //         !newMakeupEndTime || 
-  //         !newMakeupTeacherId || 
-  //         !newMakeupRoomId) {
-  //       setConflictInfo(null);
-  //       return;
-  //     }
+  // Tính minDate cho input date (ngày nghỉ + 1 ngày)
+  const minMakeupDate = useMemo(() => {
+    if (!selectedCurrentScheduleId) return null;
+    
+    // Tìm ngày nghỉ từ các nguồn
+    let absentDate = null;
+    
+    // 1. Tìm từ calendarSchedules
+    const scheduleFromCalendar = calendarSchedules?.find(
+      s => (s.id || s._id)?.toString() === selectedCurrentScheduleId.toString()
+    );
+    if (scheduleFromCalendar && scheduleFromCalendar.date) {
+      absentDate = new Date(scheduleFromCalendar.date);
+    }
+    
+    // 2. Nếu không có, tìm từ senderSchedule
+    if (!absentDate && senderSchedule && senderSchedule.length > 0) {
+      const scheduleFromSender = senderSchedule.find(
+        s => (s._id || s.id)?.toString() === selectedCurrentScheduleId.toString()
+      );
+      if (scheduleFromSender && scheduleFromSender.date) {
+        absentDate = new Date(scheduleFromSender.date);
+      }
+    }
+    
+    // 3. Nếu không có, tìm từ selectedRequest.studentScheduleId
+    if (!absentDate && selectedRequest && selectedRequest.studentScheduleId) {
+      const studentSchedule = selectedRequest.studentScheduleId;
+      const studentScheduleId = (studentSchedule._id || studentSchedule.id)?.toString();
+      if (studentScheduleId === selectedCurrentScheduleId.toString()) {
+        if (studentSchedule.date) {
+          absentDate = new Date(studentSchedule.date);
+        } else if (studentSchedule.classSchedule?.date) {
+          absentDate = new Date(studentSchedule.classSchedule.date);
+        }
+      }
+    }
+    
+    // 4. Nếu không có, tìm từ filteredAbsentSchedules
+    if (!absentDate && filteredAbsentSchedules && filteredAbsentSchedules.length > 0) {
+      const scheduleFromFiltered = filteredAbsentSchedules.find(
+        s => (s.id || s._id)?.toString() === selectedCurrentScheduleId.toString()
+      );
+      if (scheduleFromFiltered && scheduleFromFiltered.date) {
+        absentDate = new Date(scheduleFromFiltered.date);
+      }
+    }
+    
+    if (!absentDate) return null;
+    
+    // Tính minDate = ngày nghỉ + 1 ngày
+    const minDate = new Date(absentDate);
+    minDate.setDate(minDate.getDate() + 1);
+    minDate.setHours(0, 0, 0, 0);
+    
+    return formatDateToYYYYMMDD(minDate);
+  }, [selectedCurrentScheduleId, calendarSchedules, senderSchedule, selectedRequest, filteredAbsentSchedules]);
 
-  //     try {
-  //       setValidatingConflict(true);
+  // Validate conflict khi tạo buổi học bù mới
+  useEffect(() => {
+    const validateNewMakeupConflict = async () => {
+      // Chỉ validate khi:
+      // 1. Modal đang mở và chọn "Tạo buổi học bù mới"
+      // 2. Đã có đủ thông tin: date, startTime, endTime, teacher, room
+      if (!showMakeupClassModal || 
+          makeupClassOption !== 'new' ||
+          !newMakeupDate || 
+          !newMakeupStartTime || 
+          !newMakeupEndTime || 
+          !newMakeupTeacherId || 
+          !newMakeupRoomId) {
+        setConflictInfo(null);
+        return;
+      }
+
+      try {
+        setValidatingConflict(true);
         
-  //       // Gọi API validate conflict đơn giản (không cần classId)
-  //       const validateResponse = await classScheduleService.validateScheduleConflictSimple({
-  //         date: newMakeupDate,
-  //         startTime: newMakeupStartTime,
-  //         endTime: newMakeupEndTime,
-  //         room: newMakeupRoomId,
-  //         teacher: newMakeupTeacherId
-  //       });
+        // Lấy studentId từ selectedRequest (chỉ cho học sinh, không cho giáo viên)
+        const studentId = senderRole !== 'Teacher' && selectedRequest?.sender?._id 
+          ? selectedRequest.sender._id 
+          : senderRole !== 'Teacher' && selectedRequest?.sender?.id 
+            ? selectedRequest.sender.id 
+            : null;
+        
+        // Gọi API validate conflict đơn giản (không cần classId)
+        const validateResponse = await classScheduleService.validateScheduleConflictSimple({
+          date: newMakeupDate,
+          startTime: newMakeupStartTime,
+          endTime: newMakeupEndTime,
+          room: newMakeupRoomId,
+          teacher: newMakeupTeacherId,
+          studentId: studentId
+        });
 
-  //       if (validateResponse.success) {
-  //         if (validateResponse.hasConflict) {
-  //           // Format conflict info để hiển thị
-  //           const conflictInfo = {
-  //             teacher: validateResponse.conflicts?.teacher || [],
-  //             room: validateResponse.conflicts?.room || [],
-  //             students: validateResponse.conflicts?.students || []
-  //           };
-  //           setConflictInfo(conflictInfo);
-  //         } else {
-  //           setConflictInfo(null);
-  //         }
-  //       } else {
-  //         setConflictInfo(null);
-  //       }
-  //     } catch (err) {
-  //       console.error('Error validating new makeup conflict:', err);
-  //       // Không hiển thị lỗi, chỉ log
-  //       setConflictInfo(null);
-  //     } finally {
-  //       setValidatingConflict(false);
-  //     }
-  //   };
+        if (validateResponse.success) {
+          if (validateResponse.hasConflict) {
+            // Format conflict info để hiển thị
+            const conflictInfo = {
+              teacher: validateResponse.conflicts?.teacher || [],
+              room: validateResponse.conflicts?.room || [],
+              students: validateResponse.conflicts?.students || []
+            };
+            setConflictInfo(conflictInfo);
+          } else {
+            setConflictInfo(null);
+          }
+        } else {
+          setConflictInfo(null);
+        }
+      } catch (err) {
+        console.error('Error validating new makeup conflict:', err);
+        // Không hiển thị lỗi, chỉ log
+        setConflictInfo(null);
+      } finally {
+        setValidatingConflict(false);
+      }
+    };
 
-  //   // Debounce để tránh gọi API quá nhiều
-  //   const timeoutId = setTimeout(() => {
-  //     validateNewMakeupConflict();
-  //   }, 500);
+    // Debounce để tránh gọi API quá nhiều
+    const timeoutId = setTimeout(() => {
+      validateNewMakeupConflict();
+    }, 500);
 
-  //   return () => clearTimeout(timeoutId);
-  // }, [showMakeupClassModal, makeupClassOption, newMakeupDate, newMakeupStartTime, newMakeupEndTime, newMakeupTeacherId, newMakeupRoomId]);
+    return () => clearTimeout(timeoutId);
+  }, [showMakeupClassModal, makeupClassOption, newMakeupDate, newMakeupStartTime, newMakeupEndTime, newMakeupTeacherId, newMakeupRoomId, selectedRequest, senderRole]);
 
   // Hàm xử lý lưu buổi học bù
   const handleSaveMakeupClass = async () => {
+    // Xử lý trường hợp tạo buổi học bù mới
+    if (makeupClassOption === 'new') {
+      if (!selectedCurrentScheduleId || !newMakeupDate || !newMakeupStartTime || !newMakeupEndTime || !newMakeupRoomId || !newMakeupTeacherId) {
+        alert('Vui lòng điền đầy đủ thông tin buổi học bù');
+        return;
+      }
+
+      // Kiểm tra conflict - không cho tiếp tục nếu có conflict
+      if (conflictInfo && (conflictInfo.teacher?.length > 0 || conflictInfo.room?.length > 0 || conflictInfo.students?.length > 0)) {
+        alert('Không thể tiếp tục khi có xung đột lịch học. Vui lòng chọn thời gian/phòng/giáo viên khác.');
+        return;
+      }
+      
+      // Kiểm tra conflict với lịch học của học sinh
+      if (makeupConflictInfo && makeupConflictInfo.hasConflict) {
+        alert(`Không thể tạo buổi học bù vì học sinh đã có lịch học trùng thời gian:\n${makeupConflictInfo.conflicts.map(c => `- ${c.className} (${c.time})`).join('\n')}`);
+        return;
+      }
+
+      try {
+        setProcessing(true);
+
+        // Lấy thông tin buổi nghỉ đã chọn
+        let absentScheduleFromCalendar = calendarSchedules?.find(
+          s => (s.id || s._id)?.toString() === selectedCurrentScheduleId.toString()
+        );
+
+        // Nếu không tìm thấy trong calendarSchedules, thử tìm trong senderSchedule
+        if (!absentScheduleFromCalendar && senderSchedule && senderSchedule.length > 0) {
+          const scheduleFromSender = senderSchedule.find(
+            s => (s._id || s.id)?.toString() === selectedCurrentScheduleId.toString()
+          );
+          
+          if (scheduleFromSender) {
+            const scheduleDate = new Date(scheduleFromSender.date);
+            const dateStr = formatDateToYYYYMMDD(scheduleDate);
+            
+            absentScheduleFromCalendar = {
+              id: scheduleFromSender._id || scheduleFromSender.id,
+              date: dateStr,
+              startTime: scheduleFromSender.startTime || '',
+              endTime: scheduleFromSender.endTime || '',
+              sessionName: scheduleFromSender.session?.title || 'N/A',
+              lessonTopic: scheduleFromSender.session?.title || '',
+              sessionOrder: scheduleFromSender.session?.order || '',
+              lessonNumber: scheduleFromSender.session?.order || '',
+              classId: scheduleFromSender.class?._id || scheduleFromSender.class?.id || scheduleFromSender.class,
+              className: scheduleFromSender.class?.name || null,
+              courseName: scheduleFromSender.class?.course?.name || scheduleFromSender.class?.courseName || null
+            };
+          }
+        }
+
+        // Nếu vẫn không tìm thấy, thử lấy từ selectedRequest.studentScheduleId
+        if (!absentScheduleFromCalendar && selectedRequest && selectedRequest.studentScheduleId) {
+          const studentSchedule = selectedRequest.studentScheduleId;
+          const studentScheduleId = (studentSchedule._id || studentSchedule.id)?.toString();
+          
+          if (studentScheduleId === selectedCurrentScheduleId.toString()) {
+            const scheduleDate = new Date(studentSchedule.date);
+            const dateStr = formatDateToYYYYMMDD(scheduleDate);
+            
+            absentScheduleFromCalendar = {
+              id: studentScheduleId,
+              date: dateStr,
+              startTime: studentSchedule.startTime || '',
+              endTime: studentSchedule.endTime || '',
+              sessionName: studentSchedule.session?.title || studentSchedule.classSchedule?.session?.title || 'N/A',
+              lessonTopic: studentSchedule.session?.title || studentSchedule.classSchedule?.session?.title || '',
+              sessionOrder: studentSchedule.session?.order || studentSchedule.classSchedule?.session?.order || '',
+              lessonNumber: studentSchedule.session?.order || studentSchedule.classSchedule?.session?.order || '',
+              classId: studentSchedule.classSchedule?.class?._id || studentSchedule.classSchedule?.class?.id || studentSchedule.classSchedule?.class || studentSchedule.class?._id || studentSchedule.class?.id || studentSchedule.class,
+              className: studentSchedule.classSchedule?.class?.name || studentSchedule.class?.name || null,
+              courseName: studentSchedule.classSchedule?.class?.course?.name || studentSchedule.class?.course?.name || studentSchedule.classSchedule?.class?.courseName || null
+            };
+          }
+        }
+
+        if (!absentScheduleFromCalendar) {
+          alert('Không tìm thấy thông tin buổi nghỉ');
+          setProcessing(false);
+          return;
+        }
+
+        // Lấy session ID từ buổi nghỉ nếu có - tìm từ nhiều nguồn
+        let sessionId = newMakeupSessionId;
+        
+        // Nếu chưa có sessionId, thử tìm từ các nguồn khác
+        if (!sessionId) {
+          // 1. Tìm từ senderSchedule
+          if (senderSchedule && senderSchedule.length > 0) {
+            const originalSchedule = senderSchedule.find(
+              s => (s._id || s.id)?.toString() === selectedCurrentScheduleId.toString()
+            );
+            if (originalSchedule) {
+              sessionId = originalSchedule.session?._id || originalSchedule.session?.id || originalSchedule.session;
+            }
+          }
+          
+          // 2. Nếu vẫn chưa có, thử tìm từ selectedRequest.studentScheduleId
+          if (!sessionId && selectedRequest && selectedRequest.studentScheduleId) {
+            const studentSchedule = selectedRequest.studentScheduleId;
+            const studentScheduleId = (studentSchedule._id || studentSchedule.id)?.toString();
+            
+            if (studentScheduleId === selectedCurrentScheduleId.toString()) {
+              // Lấy session ID từ studentSchedule
+              sessionId = studentSchedule.session?._id || 
+                         studentSchedule.session?.id || 
+                         studentSchedule.session ||
+                         studentSchedule.classSchedule?.session?._id ||
+                         studentSchedule.classSchedule?.session?.id ||
+                         studentSchedule.classSchedule?.session;
+            }
+          }
+          
+          // 3. Nếu vẫn chưa có, thử tìm từ calendarSchedules (nếu absentScheduleFromCalendar lấy từ đó)
+          if (!sessionId && absentScheduleFromCalendar) {
+            const calendarSchedule = calendarSchedules?.find(
+              s => (s.id || s._id)?.toString() === selectedCurrentScheduleId.toString()
+            );
+            if (calendarSchedule) {
+              sessionId = calendarSchedule.session?._id || 
+                         calendarSchedule.session?.id || 
+                         calendarSchedule.session;
+            }
+          }
+        }
+
+        // Format absentSchedule để tương thích với code hiện tại
+        const absentSchedule = {
+          id: absentScheduleFromCalendar.id,
+          _id: absentScheduleFromCalendar.id,
+          date: absentScheduleFromCalendar.date,
+          startTime: absentScheduleFromCalendar.startTime,
+          endTime: absentScheduleFromCalendar.endTime,
+          title: absentScheduleFromCalendar.sessionName || absentScheduleFromCalendar.lessonTopic,
+          order: absentScheduleFromCalendar.sessionOrder || absentScheduleFromCalendar.lessonNumber,
+          session: absentScheduleFromCalendar.sessionOrder ? {
+            order: absentScheduleFromCalendar.sessionOrder,
+            title: absentScheduleFromCalendar.sessionName
+          } : null
+        };
+
+        // Lấy thông tin lớp cho absentClassInfo
+        let absentClassInfoToUse = selectedCurrentClassInfo;
+        if (!absentClassInfoToUse && (absentScheduleFromCalendar.className || absentScheduleFromCalendar.classId)) {
+          absentClassInfoToUse = {
+            className: absentScheduleFromCalendar.className || 'N/A',
+            courseName: absentScheduleFromCalendar.courseName || 'N/A'
+          };
+        }
+
+        // Lấy thông tin phòng và giáo viên để hiển thị
+        const roomInfo = availableRooms.find(r => (r._id || r.id)?.toString() === newMakeupRoomId.toString());
+        const teacherInfo = availableTeachers.find(t => (t._id || t.id)?.toString() === newMakeupTeacherId.toString());
+
+        // Format makeup schedule để hiển thị (chưa tạo trong DB)
+        const scheduleDate = newMakeupDate ? new Date(newMakeupDate) : null;
+        const dateStr = scheduleDate ? formatDateToYYYYMMDD(scheduleDate) : null;
+
+        const formattedMakeupSchedule = {
+          date: dateStr || newMakeupDate,
+          startTime: newMakeupStartTime,
+          endTime: newMakeupEndTime,
+          roomName: roomInfo?.room_name || roomInfo?.name || 'N/A',
+          title: absentSchedule.title || 'N/A',
+          order: absentSchedule.order || null
+        };
+
+        // Lưu thông tin buổi học bù (KHÔNG gọi API tạo ClassSchedule, chỉ lưu thông tin)
+        const newMakeupEntry = {
+          absentScheduleId: selectedCurrentScheduleId,
+          absentSchedule: absentSchedule,
+          absentClassId: absentScheduleFromCalendar.classId || selectedCurrentClassId,
+          absentClassInfo: absentClassInfoToUse,
+          // Không có makeupScheduleId vì chưa tạo ClassSchedule
+          makeupScheduleId: null,
+          makeupSchedule: formattedMakeupSchedule,
+          makeupClassId: null, // Không có classId cho buổi học bù mới
+          makeupClassInfo: {
+            className: 'Buổi học bù mới',
+            courseName: absentClassInfoToUse?.courseName || 'N/A'
+          },
+          // Thông tin để tạo ClassSchedule khi approve
+          isNewMakeup: true,
+          newMakeupDate: newMakeupDate,
+          newMakeupStartTime: newMakeupStartTime,
+          newMakeupEndTime: newMakeupEndTime,
+          newMakeupRoomId: newMakeupRoomId,
+          newMakeupTeacherId: newMakeupTeacherId,
+          newMakeupSessionId: sessionId
+        };
+
+        setPendingMakeupClasses(prev => [...prev, newMakeupEntry]);
+        
+        // Reset và đóng modal
+        resetMakeupModalState();
+        
+      } catch (err) {
+        console.error('Error creating new makeup class:', err);
+        alert(err.message || 'Có lỗi xảy ra khi tạo buổi học bù');
+      } finally {
+        setProcessing(false);
+      }
+      return;
+    }
+
+    // Xử lý trường hợp chọn từ lớp có sẵn
     if (makeupClassOption === 'existing') {
       // Xử lý trường hợp giáo viên dạy thay
       if (senderRole === 'Teacher') {
@@ -2635,6 +3012,13 @@ const RequestManagementPage = () => {
     setValidatingConflict(false);
     // Reset giáo viên dạy thay
     setSelectedSubstituteTeacherId(null);
+    // Reset form tạo buổi học bù mới
+    setNewMakeupDate('');
+    setNewMakeupStartTime('');
+    setNewMakeupEndTime('');
+    setNewMakeupRoomId(null);
+    setNewMakeupTeacherId(null);
+    setNewMakeupSessionId(null);
   };
 
   // Hàm để mở modal chi tiết khi chấp nhận
@@ -2682,7 +3066,15 @@ const RequestManagementPage = () => {
           makeupClassId: makeup.makeupClassId,
           // Gửi thông tin giáo viên dạy thay nếu có
           isSubstituteClass: makeup.isSubstituteClass || false,
-          substituteTeacherId: makeup.substituteTeacherId || null
+          substituteTeacherId: makeup.substituteTeacherId || null,
+          // Gửi thông tin tạo buổi học bù mới nếu có
+          isNewMakeup: makeup.isNewMakeup || false,
+          newMakeupDate: makeup.newMakeupDate || null,
+          newMakeupStartTime: makeup.newMakeupStartTime || null,
+          newMakeupEndTime: makeup.newMakeupEndTime || null,
+          newMakeupRoomId: makeup.newMakeupRoomId || null,
+          newMakeupTeacherId: makeup.newMakeupTeacherId || null,
+          newMakeupSessionId: makeup.newMakeupSessionId || null
         })),
         pendingClassChange: pendingClassChange ? {
           oldClassId: pendingClassChange.oldClassId,
@@ -3161,14 +3553,120 @@ const RequestManagementPage = () => {
           setPendingMakeupData(null);
           // Reset giáo viên dạy thay
           setSelectedSubstituteTeacherId(null);
+          // Reset form tạo buổi học bù mới
+          setNewMakeupDate('');
+          setNewMakeupStartTime('');
+          setNewMakeupEndTime('');
+          setNewMakeupRoomId(null);
+          setNewMakeupTeacherId(null);
+          setNewMakeupSessionId(null);
         }} dialogClassName="modal-xl-custom" centered>
           <Modal.Header closeButton>
             <Modal.Title>{senderRole === 'Teacher' ? 'Xếp lịch dạy thay' : 'Thêm buổi học bù'}</Modal.Title>
           </Modal.Header>
           <Modal.Body className="py-16">
+            {/* Radio buttons để chọn phương án */}
+            {senderRole !== 'Teacher' && (
+              <div className="mb-16">
+                <Form.Label className="fw-bold mb-8">Chọn phương án:</Form.Label>
+                <div className="d-flex gap-16">
+                  <Form.Check
+                    type="radio"
+                    id="makeup-option-existing"
+                    label="Chọn từ lớp có sẵn"
+                    name="makeupClassOption"
+                    checked={makeupClassOption === 'existing'}
+                    onChange={() => {
+                      setMakeupClassOption('existing');
+                      // Reset form tạo mới khi chuyển sang existing
+                      setNewMakeupDate('');
+                      setNewMakeupStartTime('');
+                      setNewMakeupEndTime('');
+                      setNewMakeupRoomId(null);
+                      setNewMakeupTeacherId(null);
+                      setNewMakeupSessionId(null);
+                      setConflictInfo(null);
+                    }}
+                  />
+                  <Form.Check
+                    type="radio"
+                    id="makeup-option-new"
+                    label="Tạo buổi học bù mới"
+                    name="makeupClassOption"
+                    checked={makeupClassOption === 'new'}
+                    onChange={() => {
+                      setMakeupClassOption('new');
+                      // Reset form chọn từ lớp có sẵn khi chuyển sang new
+                      setSelectedMakeupClassId(null);
+                      setSelectedMakeupClassInfo(null);
+                      setConflictInfo(null);
+                      // Tự động điền thời gian từ buổi nghỉ nếu đã chọn
+                      if (selectedCurrentScheduleId) {
+                        const selectedSchedule = calendarSchedules?.find(
+                          s => (s.id || s._id)?.toString() === selectedCurrentScheduleId.toString()
+                        ) || filteredAbsentSchedules?.find(
+                          s => (s.id || s._id)?.toString() === selectedCurrentScheduleId.toString()
+                        );
+                        if (selectedSchedule) {
+                          if (selectedSchedule.date) {
+                            const date = new Date(selectedSchedule.date);
+                            setNewMakeupDate(formatDateToYYYYMMDD(date));
+                          }
+                          if (selectedSchedule.startTime) {
+                            setNewMakeupStartTime(selectedSchedule.startTime);
+                          }
+                          if (selectedSchedule.endTime) {
+                            setNewMakeupEndTime(selectedSchedule.endTime);
+                          }
+                        }
+                        
+                        // Lấy session ID từ nhiều nguồn nếu có
+                        let sessionIdToSet = null;
+                        
+                        // 1. Tìm từ senderSchedule
+                        if (senderSchedule && senderSchedule.length > 0) {
+                          const originalSchedule = senderSchedule.find(
+                            s => (s._id || s.id)?.toString() === selectedCurrentScheduleId.toString()
+                          );
+                          if (originalSchedule && originalSchedule.session) {
+                            sessionIdToSet = originalSchedule.session._id || originalSchedule.session.id || originalSchedule.session;
+                          }
+                        }
+                        
+                        // 2. Nếu chưa có, thử tìm từ selectedRequest.studentScheduleId
+                        if (!sessionIdToSet && selectedRequest && selectedRequest.studentScheduleId) {
+                          const studentSchedule = selectedRequest.studentScheduleId;
+                          const studentScheduleId = (studentSchedule._id || studentSchedule.id)?.toString();
+                          
+                          if (studentScheduleId === selectedCurrentScheduleId.toString()) {
+                            sessionIdToSet = studentSchedule.session?._id || 
+                                           studentSchedule.session?.id || 
+                                           studentSchedule.session ||
+                                           studentSchedule.classSchedule?.session?._id ||
+                                           studentSchedule.classSchedule?.session?.id ||
+                                           studentSchedule.classSchedule?.session;
+                          }
+                        }
+                        
+                        // 3. Nếu chưa có, thử tìm từ calendarSchedules hoặc filteredAbsentSchedules
+                        if (!sessionIdToSet && selectedSchedule) {
+                          sessionIdToSet = selectedSchedule.session?._id || 
+                                         selectedSchedule.session?.id || 
+                                         selectedSchedule.session;
+                        }
+                        
+                        if (sessionIdToSet) {
+                          setNewMakeupSessionId(sessionIdToSet);
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            )}
             {/* Hiển thị conflict nếu có */}
-            {/* Chỉ hiển thị conflict ở trên khi chọn "existing" */}
-            {makeupClassOption === 'existing' && validatingConflict && (
+            {/* Hiển thị loading khi validate conflict */}
+            {validatingConflict && (
               <Alert variant="info" className="mb-16">
                 <Spinner animation="border" size="sm" className="me-2" />
                 Đang kiểm tra xung đột...
@@ -3285,7 +3783,7 @@ const RequestManagementPage = () => {
             )}
 
             {/* Hiển thị nội dung khi đã chọn option */}
-            {makeupClassOption === 'existing' && (
+            {(makeupClassOption === 'existing' || makeupClassOption === 'new') && (
               <div className="row g-3 mt-16">
                 {/* Cột trái: Buổi nghỉ - hiển thị cho cả existing và new */}
                 <div className="col-md-6">
@@ -3655,7 +4153,7 @@ const RequestManagementPage = () => {
                   </div>
                 </div>
 
-                {/* Cột phải: Buổi học bù / Giáo viên dạy thay */}
+                {/* Cột phải: Buổi học bù / Giáo viên dạy thay (cho existing) */}
                 {makeupClassOption === 'existing' && (
                   <div className="col-md-6">
                   <div className="border border-success rounded-8 p-12 bg-success-25">
@@ -3923,7 +4421,7 @@ const RequestManagementPage = () => {
                           
                           {/* Hiển thị thông tin chi tiết của buổi học bù đã chọn */}
                           {selectedMakeupClassInfo?.selectedScheduleId && (
-                            <div className="mt-3">
+                            <div className="mb-12">
                               {(() => {
                                 // Tìm selectedSchedule từ availableClassSchedulesBySession
                                 let selectedSchedule = null;
@@ -3961,45 +4459,66 @@ const RequestManagementPage = () => {
                                 
                                 return (
                                   <>
-                                    <div>
-                                      <small className="text-muted d-block mb-1">Buổi học:</small>
-                                      <div className="fw-semibold">
-                                        {selectedSchedule.title || 'N/A'}
-                                        {selectedSchedule.order !== null && (
-                                          <span className="text-neutral-500 ms-2">(Số thứ tự: {selectedSchedule.order})</span>
+                                    <div className="mb-8">
+                                      <h6 className="text-success fw-bold mb-0 text-13">Thông tin buổi học bù đã chọn</h6>
+                                    </div>
+                                    <div className="border border-success rounded-8 p-12 bg-white">
+                                      <div className="row g-2 text-12">
+                                        <div className="col-12">
+                                          <div className="d-flex align-items-center gap-2">
+                                            <i className="fas fa-book text-success"></i>
+                                            <span className="text-muted">Buổi học:</span>
+                                            <span className="fw-semibold">{selectedSchedule.title || 'N/A'}</span>
+                                            {selectedSchedule.order !== null && (
+                                              <span className="text-neutral-500">(STT: {selectedSchedule.order})</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        {selectedSchedule.date && (
+                                          <div className="col-6">
+                                            <div className="d-flex align-items-center gap-2">
+                                              <i className="fas fa-calendar-alt text-success"></i>
+                                              <span className="text-muted">Ngày:</span>
+                                              <span className="fw-semibold">{new Date(selectedSchedule.date).toLocaleDateString('vi-VN')}</span>
+                                            </div>
+                                          </div>
+                                        )}
+                                        <div className="col-6">
+                                          <div className="d-flex align-items-center gap-2">
+                                            <i className="fas fa-clock text-success"></i>
+                                            <span className="text-muted">Giờ:</span>
+                                            <span className="fw-semibold">{selectedSchedule.startTime} - {selectedSchedule.endTime}</span>
+                                          </div>
+                                        </div>
+                                        {selectedSchedule.roomName && (
+                                          <div className="col-6">
+                                            <div className="d-flex align-items-center gap-2">
+                                              <i className="fas fa-door-open text-success"></i>
+                                              <span className="text-muted">Phòng:</span>
+                                              <span className="fw-semibold">{selectedSchedule.roomName || 'N/A'}</span>
+                                            </div>
+                                          </div>
+                                        )}
+                                        {selectedSchedule.className && (
+                                          <div className="col-6">
+                                            <div className="d-flex align-items-center gap-2">
+                                              <i className="fas fa-users text-success"></i>
+                                              <span className="text-muted">Lớp:</span>
+                                              <span className="fw-semibold text-truncate">{selectedSchedule.className || 'N/A'}</span>
+                                            </div>
+                                          </div>
+                                        )}
+                                        {selectedSchedule.courseName && (
+                                          <div className="col-12">
+                                            <div className="d-flex align-items-center gap-2">
+                                              <i className="fas fa-graduation-cap text-success"></i>
+                                              <span className="text-muted">Khóa học:</span>
+                                              <span className="fw-semibold text-truncate">{selectedSchedule.courseName || 'N/A'}</span>
+                                            </div>
+                                          </div>
                                         )}
                                       </div>
                                     </div>
-                                    {selectedSchedule.date && (
-                                      <div>
-                                        <small className="text-muted d-block mb-1">Ngày học:</small>
-                                        <div className="fw-semibold">
-                                          {new Date(selectedSchedule.date).toLocaleDateString('vi-VN')}
-                                        </div>
-                                      </div>
-                                    )}
-                                    <div>
-                                      <small className="text-muted d-block mb-1">Thời gian:</small>
-                                      <div className="fw-semibold">
-                                        {selectedSchedule.startTime} - {selectedSchedule.endTime}
-                                      </div>
-                                    </div>
-                                    {selectedSchedule.roomName && (
-                                      <div>
-                                        <small className="text-muted d-block mb-1">Phòng học:</small>
-                                        <div className="fw-semibold">
-                                          {selectedSchedule.roomName || 'N/A'}
-                                        </div>
-                                      </div>
-                                    )}
-                                    {selectedSchedule.className && (
-                                      <div>
-                                        <small className="text-muted d-block mb-1">Lớp:</small>
-                                        <div className="fw-semibold">
-                                          {selectedSchedule.className || 'N/A'}
-                                        </div>
-                                      </div>
-                                    )}
                                   </>
                                 );
                               })()}
@@ -4010,6 +4529,242 @@ const RequestManagementPage = () => {
                     </div>
                   </div>
                 </div>
+                )}
+
+                {/* Cột phải: Form tạo buổi học bù mới */}
+                {makeupClassOption === 'new' && senderRole !== 'Teacher' && (
+                  <div className="col-md-6">
+                    <div className="border border-success rounded-8 p-12 bg-success-25">
+                      <h6 className="text-success fw-bold mb-12 text-14">Tạo buổi học bù mới</h6>
+                      <div className="d-flex flex-column gap-3">
+                        {/* Ngày học bù */}
+                        <Form.Group>
+                          <Form.Label className="text-13">Ngày học bù <span className="text-danger">*</span></Form.Label>
+                          <Form.Control
+                            type="date"
+                            value={newMakeupDate}
+                            onChange={async (e) => {
+                              const selectedDate = e.target.value;
+                              // Validate: ngày được chọn phải sau ngày nghỉ
+                              if (minMakeupDate && selectedDate < minMakeupDate) {
+                                alert(`Ngày học bù phải sau ngày nghỉ (tối thiểu: ${minMakeupDate})`);
+                                return;
+                              }
+                              setNewMakeupDate(selectedDate);
+                              // Reset conflict info khi đổi ngày
+                              setStudentSchedulesOnSelectedDate([]);
+                              // Kiểm tra conflict nếu đã có giờ
+                              if (newMakeupStartTime && newMakeupEndTime) {
+                                checkMakeupTimeConflict(selectedDate, newMakeupStartTime, newMakeupEndTime);
+                              }
+                            }}
+                            min={minMakeupDate || undefined}
+                            required
+                            size="sm"
+                          />
+                          {minMakeupDate && (
+                            <Form.Text className="text-muted text-11">
+                              Ngày học bù phải sau ngày nghỉ (tối thiểu: {minMakeupDate})
+                            </Form.Text>
+                          )}
+                        </Form.Group>
+
+                        {/* Giờ bắt đầu và kết thúc */}
+                        <div className="row g-2">
+                          <div className="col-6">
+                            <Form.Group>
+                              <Form.Label className="text-13">Giờ bắt đầu <span className="text-danger">*</span></Form.Label>
+                              <Form.Control
+                                type="time"
+                                value={newMakeupStartTime}
+                                onChange={(e) => {
+                                  const newStartTime = e.target.value;
+                                  setNewMakeupStartTime(newStartTime);
+                                  // Kiểm tra conflict khi nhập giờ
+                                  if (newMakeupDate && newStartTime && newMakeupEndTime) {
+                                    checkMakeupTimeConflict(newMakeupDate, newStartTime, newMakeupEndTime);
+                                  }
+                                }}
+                                required
+                                size="sm"
+                                className={makeupConflictInfo?.hasConflict ? 'border-danger' : ''}
+                              />
+                            </Form.Group>
+                          </div>
+                          <div className="col-6">
+                            <Form.Group>
+                              <Form.Label className="text-13">Giờ kết thúc <span className="text-danger">*</span></Form.Label>
+                              <Form.Control
+                                type="time"
+                                value={newMakeupEndTime}
+                                onChange={(e) => {
+                                  const newEndTime = e.target.value;
+                                  setNewMakeupEndTime(newEndTime);
+                                  // Kiểm tra conflict khi nhập giờ
+                                  if (newMakeupDate && newMakeupStartTime && newEndTime) {
+                                    checkMakeupTimeConflict(newMakeupDate, newMakeupStartTime, newEndTime);
+                                  }
+                                }}
+                                required
+                                size="sm"
+                                className={makeupConflictInfo?.hasConflict ? 'border-danger' : ''}
+                              />
+                            </Form.Group>
+                          </div>
+                        </div>
+                        
+                        {/* Hiển thị cảnh báo conflict */}
+                        {makeupConflictInfo?.hasConflict && (
+                          <Alert variant="danger" className="mt-2 mb-0">
+                            <Alert.Heading className="text-13 mb-2">
+                              <i className="fas fa-exclamation-triangle me-2"></i>
+                              Cảnh báo: Trùng lịch học!
+                            </Alert.Heading>
+                            <div className="text-12">
+                              <strong>{makeupConflictInfo.message}</strong>
+                              <ul className="mb-0 mt-2">
+                                {makeupConflictInfo.conflicts.map((conflict, index) => (
+                                  <li key={index}>
+                                    <strong>{conflict.className}</strong> - {conflict.time} (Phòng: {conflict.roomName})
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </Alert>
+                        )}
+
+                        {/* Phòng học */}
+                        <Form.Group>
+                          <Form.Label className="text-13">Phòng học <span className="text-danger">*</span></Form.Label>
+                          {loadingRooms ? (
+                            <div className="text-center py-4">
+                              <Spinner animation="border" size="sm" />
+                            </div>
+                          ) : (
+                            <Form.Select
+                              value={newMakeupRoomId || ''}
+                              onChange={(e) => setNewMakeupRoomId(e.target.value || null)}
+                              required
+                              size="sm"
+                            >
+                              <option value="">-- Chọn phòng học --</option>
+                              {availableRooms.map((room) => {
+                                const roomId = room._id || room.id;
+                                const roomName = room.room_name || room.name || 'N/A';
+                                const capacity = room.capacity || '';
+                                return (
+                                  <option key={roomId} value={roomId}>
+                                    {roomName} {capacity ? `(Sức chứa: ${capacity})` : ''}
+                                  </option>
+                                );
+                              })}
+                            </Form.Select>
+                          )}
+                        </Form.Group>
+
+                        {/* Giáo viên */}
+                        <Form.Group>
+                          <Form.Label className="text-13">Giáo viên <span className="text-danger">*</span></Form.Label>
+                          {loadingTeachers ? (
+                            <div className="text-center py-4">
+                              <Spinner animation="border" size="sm" />
+                            </div>
+                          ) : (
+                            <Form.Select
+                              value={newMakeupTeacherId || ''}
+                              onChange={(e) => setNewMakeupTeacherId(e.target.value || null)}
+                              required
+                              size="sm"
+                            >
+                              <option value="">-- Chọn giáo viên --</option>
+                              {availableTeachers.map((teacher) => {
+                                const teacherId = teacher._id || teacher.id;
+                                const teacherName = teacher.username || teacher.fullName || teacher.name || 'N/A';
+                                return (
+                                  <option key={teacherId} value={teacherId}>
+                                    {teacherName}
+                                  </option>
+                                );
+                              })}
+                            </Form.Select>
+                          )}
+                        </Form.Group>
+
+                        {/* Hiển thị session từ buổi nghỉ (read-only) */}
+                        {selectedCurrentScheduleId && (() => {
+                          const selectedSchedule = calendarSchedules?.find(
+                            s => (s.id || s._id)?.toString() === selectedCurrentScheduleId.toString()
+                          ) || filteredAbsentSchedules?.find(
+                            s => (s.id || s._id)?.toString() === selectedCurrentScheduleId.toString()
+                          );
+                          
+                          if (selectedSchedule && selectedSchedule.order !== null && selectedSchedule.order !== undefined) {
+                            return (
+                              <Form.Group>
+                                <Form.Label className="text-13">Session (từ buổi nghỉ)</Form.Label>
+                                <Form.Control
+                                  type="text"
+                                  value={`${selectedSchedule.title || 'N/A'} (STT: ${selectedSchedule.order})`}
+                                  readOnly
+                                  size="sm"
+                                  className="bg-light"
+                                />
+                              </Form.Group>
+                            );
+                          }
+                          return null;
+                        })()}
+
+                        {/* Hiển thị conflict nếu có */}
+                        {makeupClassOption === 'new' && conflictInfo && (
+                          <Alert variant="warning" className="mb-0 mt-2">
+                            <Alert.Heading className="text-13">
+                              <i className="fas fa-exclamation-triangle me-2"></i>
+                              Có xung đột lịch học
+                            </Alert.Heading>
+                            <div className="mt-8 text-12">
+                              {conflictInfo.teacher && conflictInfo.teacher.length > 0 && (
+                                <div className="mb-2">
+                                  <strong className="text-danger">⚠️ Xung đột Giảng viên:</strong>
+                                  <ul className="mb-0 mt-2">
+                                    {conflictInfo.teacher.map((c, idx) => (
+                                      <li key={idx}>
+                                        Lớp {c.className} - Ngày {c.date} - {c.time}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {conflictInfo.room && conflictInfo.room.length > 0 && (
+                                <div className="mb-2">
+                                  <strong className="text-danger">⚠️ Xung đột Phòng học:</strong>
+                                  <ul className="mb-0 mt-2">
+                                    {conflictInfo.room.map((c, idx) => (
+                                      <li key={idx}>
+                                        Lớp {c.className} - Ngày {c.date} - {c.time}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {conflictInfo.students && conflictInfo.students.length > 0 && (
+                                <div className="mb-2">
+                                  <strong className="text-danger">⚠️ Xung đột Lịch học của Học sinh:</strong>
+                                  <ul className="mb-0 mt-2">
+                                    {conflictInfo.students.map((c, idx) => (
+                                      <li key={idx}>
+                                        Lớp {c.className} - Ngày {c.date} - {c.time}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          </Alert>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             )}
@@ -4028,7 +4783,9 @@ const RequestManagementPage = () => {
                   validatingConflict ||
                   (senderRole === 'Teacher' 
                     ? (!selectedCurrentScheduleId || !selectedSubstituteTeacherId || (conflictInfo && conflictInfo.teacher?.length > 0))
-                    : (!selectedCurrentScheduleId || !selectedMakeupClassInfo?.selectedScheduleId || (conflictInfo && conflictInfo.students && conflictInfo.students.length > 0)))
+                    : makeupClassOption === 'new'
+                      ? (!selectedCurrentScheduleId || !newMakeupDate || !newMakeupStartTime || !newMakeupEndTime || !newMakeupRoomId || !newMakeupTeacherId || (conflictInfo && (conflictInfo.teacher?.length > 0 || conflictInfo.room?.length > 0 || conflictInfo.students?.length > 0)) || (makeupConflictInfo && makeupConflictInfo.hasConflict))
+                      : (!selectedCurrentScheduleId || !selectedMakeupClassInfo?.selectedScheduleId || (conflictInfo && conflictInfo.students && conflictInfo.students.length > 0)))
                 }
               onClick={handleSaveMakeupClass}
             >

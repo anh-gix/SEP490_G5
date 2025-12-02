@@ -1680,7 +1680,7 @@ exports.getTeacherSchedule = async (req, res) => {
 // =========================
 exports.validateScheduleConflictSimple = async (req, res) => {
   try {
-    const { date, startTime, endTime, room, teacher } = req.body;
+    const { date, startTime, endTime, room, teacher, studentId } = req.body;
 
     if (!date || !startTime || !endTime || !room) {
       return res.status(400).json({ 
@@ -1692,6 +1692,7 @@ exports.validateScheduleConflictSimple = async (req, res) => {
     const conflicts = {
       teacher: [],
       room: [],
+      students: [],
       hasConflict: false
     };
 
@@ -1815,6 +1816,45 @@ exports.validateScheduleConflictSimple = async (req, res) => {
           }
         });
       }
+    }
+
+    // 3. Kiểm tra conflict với LỊCH HỌC CỦA HỌC SINH (nếu có studentId)
+    if (studentId) {
+      const studentSchedules = await StudentSchedule.find({ student: studentId })
+        .populate({
+          path: 'classSchedule',
+          select: 'date startTime endTime class',
+          populate: {
+            path: 'class',
+            select: 'name'
+          }
+        })
+        .lean();
+
+      // Format date của buổi học bù mới
+      const makeupDateStr = formatDateLocal(scheduleDateStart);
+
+      studentSchedules.forEach(studentSchedule => {
+        if (!studentSchedule.classSchedule) return;
+        
+        const scheduleDate = new Date(studentSchedule.classSchedule.date);
+        const scheduleDateStr = formatDateLocal(scheduleDate);
+        
+        // Kiểm tra cùng ngày và trùng giờ
+        if (scheduleDateStr === makeupDateStr &&
+            hasTimeOverlap(startTime, endTime, 
+              studentSchedule.classSchedule.startTime, 
+              studentSchedule.classSchedule.endTime)) {
+          conflicts.students.push({
+            studentId: studentId.toString(),
+            className: studentSchedule.classSchedule.class?.name || 'N/A',
+            date: scheduleDateStr,
+            time: `${studentSchedule.classSchedule.startTime} - ${studentSchedule.classSchedule.endTime}`,
+            conflictingTime: `${startTime} - ${endTime}`
+          });
+          conflicts.hasConflict = true;
+        }
+      });
     }
 
     return res.status(200).json({

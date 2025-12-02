@@ -292,9 +292,10 @@ exports.updateCourse = async (req, res) => {
         if (program) course.program = program;
         if (clos !== undefined) course.clos = clos;
         if (mappedPLOs !== undefined) course.mappedPLOs = mappedPLOs;
-        if (sessions) course.sessions = sessions;
-        if (materials) course.materials = materials;
-        if (mocktestSessionOrders) course.mocktestSessionOrders = mocktestSessionOrders;
+        if (sessions !== undefined) course.sessions = sessions;
+        if (req.body.camSessions !== undefined) course.camSessions = req.body.camSessions;
+        if (materials !== undefined) course.materials = materials;
+        if (mocktestSessionOrders !== undefined) course.mocktestSessionOrders = mocktestSessionOrders;
         if (status) course.status = status;
         if (lastCompletedStep !== undefined) {
             // Validate lastCompletedStep range (0-5)

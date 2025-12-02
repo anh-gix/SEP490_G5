@@ -12,7 +12,7 @@ const Course = require('../models/courseModel');
 const getAllCamSessions = async (req, res) => {
   try {
     const camSessions = await CamSession.find()
-      .sort({ order: 1 });
+      .sort({ Order: 1 });
 
     res.status(200).json({
       success: true,
@@ -66,15 +66,10 @@ const getCamSessionById = async (req, res) => {
  */
 const createCamSession = async (req, res) => {
   try {
-    const {
-      title,
-      description,
-      order,
-      sessionType,
-      videoURL,
-      quizzes,
-      vocabulary,
-    } = req.body;
+    const { title, sessionType, description, order, videoURL, quizzes, vocabulary } = req.body;
+
+    console.log('=== Create CamSession Request ===');
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
 
     // Validation
     if (!title || order === undefined) {
@@ -84,33 +79,21 @@ const createCamSession = async (req, res) => {
       });
     }
 
-    // Chuẩn hóa vocabulary (giữ tương thích với schema hiện tại: img + words)
-    let vocabularyData = undefined;
-    if (vocabulary) {
-      if (Array.isArray(vocabulary.items)) {
-        vocabularyData = {
-          img: vocabulary.img || '',
-          words: vocabulary.items
-            .map((item) => item.word)
-            .filter((w) => typeof w === 'string' && w.trim() !== ''),
-        };
-      } else if (Array.isArray(vocabulary.words)) {
-        vocabularyData = {
-          img: vocabulary.img || '',
-          words: vocabulary.words,
-        };
-      }
-    }
-
-    const camSession = await CamSession.create({
+    const camSessionData = {
       title,
+      sessionType: sessionType || 'reading',
       description,
       order,
-      sessionType,
       videoURL,
       quizzes: quizzes || { quiz: [] },
-      ...(vocabularyData ? { vocabulary: vocabularyData } : {}),
-    });
+      vocabulary: vocabulary || { items: [] }
+    };
+
+    console.log('Creating camSession with data:', JSON.stringify(camSessionData, null, 2));
+
+    const camSession = await CamSession.create(camSessionData);
+
+    console.log('CamSession created successfully:', camSession._id);
 
     res.status(201).json({
       success: true,
@@ -119,6 +102,7 @@ const createCamSession = async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating cam session:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Lỗi khi tạo buổi học CAM',
@@ -134,15 +118,7 @@ const createCamSession = async (req, res) => {
 const updateCamSession = async (req, res) => {
   try {
     const { id } = req.params;
-    const {
-      title,
-      description,
-      order,
-      sessionType,
-      videoURL,
-      quizzes,
-      vocabulary,
-    } = req.body;
+    const { title, sessionType, description, order, videoURL, quizzes, vocabulary } = req.body;
 
     const camSession = await CamSession.findById(id);
     if (!camSession) {
@@ -154,37 +130,12 @@ const updateCamSession = async (req, res) => {
 
     // Update fields
     if (title !== undefined) camSession.title = title;
+    if (sessionType !== undefined) camSession.sessionType = sessionType;
     if (description !== undefined) camSession.description = description;
     if (order !== undefined) camSession.order = order;
-    if (sessionType !== undefined) camSession.sessionType = sessionType;
     if (videoURL !== undefined) camSession.videoURL = videoURL;
     if (quizzes !== undefined) camSession.quizzes = quizzes;
-
-    // Chuẩn hóa vocabulary
-    if (vocabulary !== undefined) {
-      let vocabularyData = undefined;
-      if (vocabulary) {
-        if (Array.isArray(vocabulary.items)) {
-          vocabularyData = {
-            img: vocabulary.img || '',
-            words: vocabulary.items
-              .map((item) => item.word)
-              .filter((w) => typeof w === 'string' && w.trim() !== ''),
-          };
-        } else if (Array.isArray(vocabulary.words)) {
-          vocabularyData = {
-            img: vocabulary.img || '',
-            words: vocabulary.words,
-          };
-        }
-      }
-
-      if (vocabularyData) {
-        camSession.vocabulary = vocabularyData;
-      } else {
-        camSession.vocabulary = undefined;
-      }
-    }
+    if (vocabulary !== undefined) camSession.vocabulary = vocabulary;
 
     await camSession.save();
 

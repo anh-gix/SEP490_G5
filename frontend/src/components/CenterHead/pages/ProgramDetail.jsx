@@ -6,6 +6,7 @@ import Button from '../compo/Button';
 import StatusBadge from '../compo/StatusBadge';
 import Table from '../compo/Table';
 import programService from '../../../services/programService';
+import { courseService } from '../../../services/courseService';
 import { formatDate } from '../../../helper/helper';
 
 const ProgramDetail = () => {
@@ -52,6 +53,31 @@ const ProgramDetail = () => {
     }
   };
 
+
+  // ===== COURSE DELETE HANDLER =====
+  const handleDeleteCourse = async (courseId, courseName) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa môn học "${courseName}"?\n\nHành động này không thể hoàn tác.`)) {
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      const response = await courseService.deleteCourse(courseId);
+
+      if (response.success) {
+        alert('Xóa môn học thành công!');
+        // Refresh the courses list
+        setCourses(courses.filter(c => c._id !== courseId));
+      } else {
+        alert(response.message || 'Xóa môn học thất bại!');
+      }
+    } catch (error) {
+      console.error('Error deleting course:', error);
+      alert(error.message || 'Không thể xóa môn học. Vui lòng thử lại sau.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   // ===== PROGRAM WORKFLOW HANDLERS =====
   const handleSubmitProgram = async () => {
@@ -244,6 +270,20 @@ const ProgramDetail = () => {
             <span className="d-none d-md-inline">Xem</span>
             <span className="d-inline d-md-none">👁</span>
           </Button>
+
+          {/* Delete button */}
+          <Button
+            variant="danger"
+            size="sm"
+            icon="ph ph-trash"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteCourse(row._id, row.name);
+            }}
+          >
+            <span className="d-none d-md-inline">Xóa</span>
+            <span className="d-inline d-md-none">🗑</span>
+          </Button>
         </div>
       ),
     },
@@ -367,10 +407,10 @@ const ProgramDetail = () => {
             <h4 className="text-success-600 fw-bold mb-0">{courses.length}</h4>
           </Card>
         </div>
-        <div className="col-12 col-md-4">
+        <div className="col-6 col-md-4">
           <Card>
             <h6 className="text-neutral-600 mb-8">Cập nhật lần cuối</h6>
-            <h6 className="text-neutral-700 fw-semibold mb-0">{formatDate(program.updatedAt)}</h6>
+            <h6 className="text-neutral-600 fw-bold mb-0">{formatDate(program.updatedAt)}</h6>
           </Card>
         </div>
       </div>

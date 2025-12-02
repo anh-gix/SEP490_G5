@@ -216,7 +216,11 @@ const CourseWizard = () => {
           // Pass isWizardMode=true to hide breadcrumb and default navigation
           return (
             <div className="cam-session-wizard-wrapper">
-              <CamSession isWizardMode={true} />
+              <CamSession
+                isWizardMode={true}
+                courseData={courseData}
+                setCourseData={setCourseData}
+              />
               {/* Custom navigation for wizard mode */}
               <div className="d-flex justify-content-between gap-3 mt-4 pt-4 border-top">
                 <Button variant="outline" onClick={handlePrevious} icon="ph ph-arrow-left">
@@ -224,12 +228,24 @@ const CourseWizard = () => {
                 </Button>
                 <Button
                   variant="primary"
-                  onClick={() => {
-                    alert('Hoàn thành tạo học phần với CAM Sessions!');
-                    const programId = typeof courseData.program === 'object'
-                      ? (courseData.program._id || courseData.program.id)
-                      : courseData.program;
-                    navigate(`/center-head/programs/${programId}`);
+                  onClick={async () => {
+                    try {
+                      // Update course status to 'completed' and mark all steps as done
+                      if (courseData._id) {
+                        await courseService.updateCourse(courseData._id, {
+                          status: 'completed',
+                          lastCompletedStep: 5
+                        });
+                      }
+                      alert('Hoàn thành tạo học phần với CAM Sessions!');
+                      const programId = typeof courseData.program === 'object'
+                        ? (courseData.program._id || courseData.program.id)
+                        : courseData.program;
+                      navigate(`/center-head/programs/${programId}`);
+                    } catch (error) {
+                      console.error('Error updating course status:', error);
+                      alert('Có lỗi khi cập nhật trạng thái học phần!');
+                    }
                   }}
                   icon="ph ph-check-circle"
                   iconPosition="right"

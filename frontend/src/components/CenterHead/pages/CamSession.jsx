@@ -7,8 +7,9 @@ import Modal from '../compo/Modal';
 import Tabs from '../compo/Tabs';
 import Badge from '../compo/Badge';
 import { camSessionService } from '../../../services/camSessionService';
+import courseService from '../../../services/courseService';
 
-const CamSession = ({ isWizardMode = false }) => {
+const CamSession = ({ isWizardMode = false, courseData = null, setCourseData = null }) => {
   const navigate = useNavigate();
   const { sessionId } = useParams();
   const isEdit = Boolean(sessionId);
@@ -446,19 +447,14 @@ const CamSession = ({ isWizardMode = false }) => {
     try {
       setLoading(true);
 
-      // Chuẩn hóa quizzes trước khi submit
-      const finalQuizzes = Array.isArray(formData.quizzes?.quiz)
-        ? formData.quizzes.quiz
-        : [];
-
       // Handle image file uploads if any
-      let finalVocabulary = formData.vocabulary || { items: [] };
+      let finalVocabulary = formData.vocabulary;
       if (formData.vocabulary?.files && formData.vocabulary.files.length > 0) {
         // TODO: Upload files to server and get URLs
         // For now, we'll use the preview URLs (blob URLs)
         // In production, you should upload files to a storage service (S3, Cloudinary, etc.)
         // and replace preview URLs with actual URLs
-        
+
         // Example upload logic (uncomment when API is ready):
         /*
         const uploadPromises = formData.vocabulary.files.map(async ({ index, file }) => {
@@ -471,7 +467,7 @@ const CamSession = ({ isWizardMode = false }) => {
           const data = await response.json();
           return { index, url: data.url };
         });
-        
+
         const uploadResults = await Promise.all(uploadPromises);
         finalVocabulary = {
           items: formData.vocabulary.items.map((item, idx) => {
@@ -484,13 +480,19 @@ const CamSession = ({ isWizardMode = false }) => {
         };
         */
       }
-      
+
+      // Handle quizzes - use formData.quizzes.quiz directly
+      const finalQuizzes = formData.quizzes?.quiz || [];
+
       // Prepare data for API
       const submitData = {
-        ...formData,
+        title: formData.title,
+        sessionType: formData.sessionType,
+        description: formData.description || undefined,
+        order: formData.order,
         videoURL: formData.videoURL || undefined,
         quizzes: {
-          quiz: finalQuizzes.map((quiz) => ({
+          quiz: finalQuizzes.map(quiz => ({
             Type: quiz.Type,
             Img: quiz.Img,
             Question: quiz.Question,
@@ -499,26 +501,101 @@ const CamSession = ({ isWizardMode = false }) => {
           }))
         },
         vocabulary: {
-          items: Array.isArray(finalVocabulary.items)
-            ? finalVocabulary.items.map((item) => ({
-                word: item.word,
-                img: item.img
-              }))
-            : []
+          items: finalVocabulary.items.map(item => ({
+            word: item.word,
+            img: item.img
+          }))
         }
       };
-      
+
+      console.log('=== Submitting CamSession ===');
+      console.log('Submit Data:', JSON.stringify(submitData, null, 2));
+      console.log('Is Wizard Mode:', isWizardMode);
+      console.log('Course Data:', courseData);
+
+      let camSessionResponse;
+
       if (isEdit) {
-        await camSessionService.updateCamSession(sessionId, submitData);
+        camSessionResponse = await camSessionService.updateCamSession(sessionId, submitData);
+        console.log('Update Response:', camSessionResponse);
         alert('Cập nhật CAM Session thành công!');
       } else {
-        await camSessionService.createCamSession(submitData);
+        camSessionResponse = await camSessionService.createCamSession(submitData);
+        console.log('Create Response:', camSessionResponse);
         alert('Tạo CAM Session thành công!');
+      }
+
+      // If in wizard mode and courseData exists, update course with new camSession ID
+      if (isWizardMode && courseData && setCourseData && camSessionResponse?.data?._id) {
+        const newCamSessionId = camSessionResponse.data._id;
+
+        console.log('=== Updating Course with CamSession ===');
+        console.log('New CamSession ID:', newCamSessionId);
+        console.log('Current Course camSessions:', courseData.camSessions);
+
+        // Add camSession ID to course's camSessions array if not already exists
+        const updatedCamSessions = [...(courseData.camSessions || [])];
+        if (!updatedCamSessions.includes(newCamSessionId)) {
+          updatedCamSessions.push(newCamSessionId);
+          console.log('Added new camSession to array');
+        } else {
+          console.log('CamSession already exists in array');
+        }
+
+        console.log('Updated camSessions array:', updatedCamSessions);
+
+        // Update courseData state
+        setCourseData(prev => ({
+          ...prev,
+          camSessions: updatedCamSessions
+        }));
+        console.log('Updated courseData state');
+
+        // If course already exists in database, update it
+        if (courseData._id) {
+          try {
+            console.log('Updating course in database, course ID:', courseData._id);
+            const updateResult = await courseService.updateCourse(courseData._id, {
+              camSessions: updatedCamSessions
+            });
+            console.log('Course updated successfully:', updateResult);
+          } catch (courseUpdateError) {
+            console.error('Error updating course with camSession:', courseUpdateError);
+            console.error('Error details:', courseUpdateError.response?.data);
+            // Don't show error to user as camSession was created successfully
+          }
+        } else {
+          console.log('Course not yet created in database, skipping DB update');
+        }
+      } else {
+        console.log('=== Skipping Course Update ===');
+        console.log('isWizardMode:', isWizardMode);
+        console.log('courseData exists:', !!courseData);
+        console.log('setCourseData exists:', !!setCourseData);
+        console.log('camSessionResponse._id exists:', !!camSessionResponse?.data?._id);
       }
 
       // Only navigate in standalone mode, not in wizard mode
       if (!isWizardMode) {
         navigate('/center-head/dashboard');
+      } else {
+        // Reset form in wizard mode to allow creating another session
+        setFormData({
+          title: '',
+          sessionType: 'reading',
+          description: '',
+          order: (courseData?.camSessions?.length || 0) + 1, // Auto-increment order
+          videoURL: '',
+          quizzes: {
+            quiz: []
+          },
+          vocabulary: {
+            items: []
+          }
+        });
+        // Reset to first tab
+        setActiveTab('info');
+        console.log('Form reset for next camSession');
       }
     } catch (error) {
       console.error('Error saving cam session:', error);
@@ -593,8 +670,35 @@ const CamSession = ({ isWizardMode = false }) => {
         </>
       )}
 
+      {/* Show created camSessions list in wizard mode */}
+      {isWizardMode && courseData?.camSessions && courseData.camSessions.length > 0 && (
+        <div className="alert alert-success mb-3">
+          <i className="ph ph-check-circle me-2"></i>
+          <strong>Đã tạo {courseData.camSessions.length} CAM Session(s)</strong>
+          <div className="mt-2 text-sm">
+            {courseData.camSessions.map((sessionId, index) => (
+              <div key={sessionId}>• Session {index + 1}: ID {sessionId}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+
+      {/* Submit button for wizard mode */}
+      {isWizardMode && (
+        <div className="d-flex justify-content-end gap-2 mt-3">
+          <Button
+            variant="primary"
+            icon="ph ph-check-circle"
+            onClick={handleSubmit}
+            disabled={loading}
+          >
+            {loading ? 'Đang lưu...' : 'Lưu CAM Session'}
+          </Button>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="mt-24">
         {/* Tab 1: Thông tin cơ bản */}

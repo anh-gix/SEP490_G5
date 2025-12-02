@@ -3573,7 +3573,7 @@ const RequestManagementPage = () => {
                   <Form.Check
                     type="radio"
                     id="makeup-option-existing"
-                    label="Chọn từ lớp có sẵn"
+                    label="Ghép vào lớp có sẵn"
                     name="makeupClassOption"
                     checked={makeupClassOption === 'existing'}
                     onChange={() => {

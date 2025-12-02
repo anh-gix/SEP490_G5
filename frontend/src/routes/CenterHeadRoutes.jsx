@@ -6,7 +6,6 @@ import RoleManagementPage from "../pages/CenterHead/RoleManagementPage.jsx";
 import ProgramListPage from "../pages/CenterHead/ProgramListPage.jsx";
 import ProgramDetailPage from "../pages/CenterHead/ProgramDetailPage.jsx";
 import ProgramFormPage from "../pages/CenterHead/ProgramFormPage.jsx";
-import ProgramWizardPage from "../pages/CenterHead/ProgramWizardPage.jsx";
 import CourseWizardPage from "../pages/CenterHead/CourseWizardPage.jsx";
 import PendingCoursesPage from "../pages/CenterHead/PendingCoursesPage.jsx";
 import CourseDetailPage from "../pages/CenterHead/CourseDetailPage.jsx";
@@ -45,11 +44,9 @@ export const centerHeadRoutes = [
 
   // Tạo Course (Wizard - 4 steps) - NEW STRUCTURE
   { path: '/center-head/programs/:programId/courses/create', element: <CourseWizardPage /> },
-  { path: '/center-head/programs/:programId/courses/:courseId/edit', element: <CourseWizardPage /> },
-
-  // OLD: Full Program Wizard (deprecated - kept for reference)
-  { path: '/center-head/programs/wizard/create', element: <ProgramWizardPage /> },
-  { path: '/center-head/programs/wizard/:id/edit', element: <ProgramWizardPage /> },
+  // Edit Course - Route dựa trên status
+  { path: '/center-head/programs/:programId/courses/:courseId/edit', element: <CourseWizardPage /> }, // For draft courses
+  { path: '/center-head/programs/:programId/courses/:courseId/edit-form', element: <CourseFormPage /> }, // For completed courses
 
   // CAM Session Management
   { path: '/center-head/cam-sessions/create', element: <CamSessionPage /> },

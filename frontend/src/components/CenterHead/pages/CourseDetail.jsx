@@ -14,9 +14,6 @@ const CourseDetails = () => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [revisionNote, setRevisionNote] = useState('');
-  const [showRevisionModal, setShowRevisionModal] = useState(false);
 
   useEffect(() => {
     fetchCourseDetails();
@@ -41,51 +38,10 @@ const CourseDetails = () => {
     }
   };
 
-  const handleApprove = async () => {
-    if (!window.confirm('Bạn có chắc chắn muốn phê duyệt giáo trình này?')) {
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      await courseService.approveCourse(id);
-
-      alert('Đã phê duyệt giáo trình thành công!');
-      navigate('/courses/pending');
-    } catch (err) {
-      console.error('Error approving course:', err);
-      alert('Có lỗi xảy ra khi phê duyệt giáo trình. Vui lòng thử lại.');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleRequestRevision = async () => {
-    if (!revisionNote.trim()) {
-      alert('Vui lòng nhập lý do yêu cầu chỉnh sửa');
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      await courseService.requestRevision(id, { reason: revisionNote });
-
-      alert('Đã gửi yêu cầu chỉnh sửa thành công!');
-      navigate('/courses/pending');
-    } catch (err) {
-      console.error('Error requesting revision:', err);
-      alert('Có lỗi xảy ra khi gửi yêu cầu. Vui lòng thử lại.');
-    } finally {
-      setActionLoading(false);
-      setShowRevisionModal(false);
-      setRevisionNote('');
-    }
-  };
-
   const breadcrumbItems = [
     { label: 'Dashboard', path: '/center-head/dashboard' },
-    { label: 'Giáo trình chờ duyệt', path: '/courses/pending' },
-    { label: 'Chi tiết giáo trình', path: `/courses/${id}/details` },
+    { label: 'Danh sách môn học', path: '/center-head/courses' },
+    { label: 'Chi tiết môn học', path: `/center-head/courses/${id}/details` },
   ];
 
   if (loading) {
@@ -163,60 +119,64 @@ const CourseDetails = () => {
         {/* Materials */}
         <div className="col-12">
           <div className="info-item mb-24">
-            <label className="text-neutral-600 text-sm mb-8 d-block">
+            <h6 className="text-neutral-900 fw-semibold mb-16">
               <i className="ph ph-file-text me-2"></i>
-              Tài liệu khóa học
-            </label>
+              Tài liệu khóa học ({course.materials?.length || 0} material(s))
+            </h6>
             {course.materials && course.materials.length > 0 ? (
-              <div className="bg-neutral-20 p-16 radius-8">
-                {course.materials.map((material, index) => (
-                  <div key={material._id || index} className="mb-12 pb-12 border-bottom border-neutral-100 last-child-no-border">
-                    <div className="mb-4">
-                      <strong className="text-neutral-900">{material.description}</strong>
-                    </div>
-                    {material.author && (
-                      <div className="text-sm text-neutral-600 mb-2">
-                        <i className="ph ph-user me-2"></i>
-                        Tác giả: {material.author}
-                      </div>
-                    )}
-                    {material.publisher && (
-                      <div className="text-sm text-neutral-600 mb-2">
-                        <i className="ph ph-building me-2"></i>
-                        NXB: {material.publisher}
-                      </div>
-                    )}
-                    {material.publishedDate && (
-                      <div className="text-sm text-neutral-600 mb-2">
-                        <i className="ph ph-calendar me-2"></i>
-                        Năm: {material.publishedDate}
-                      </div>
-                    )}
-                    {material.onlineUrl && (
-                      <div className="text-sm mb-2">
-                        <i className="ph ph-link text-main-600 me-2"></i>
-                        <a
-                          href={material.onlineUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-main-600"
-                        >
-                          {material.onlineUrl}
-                        </a>
-                      </div>
-                    )}
-                    {material.note && (
-                      <div className="text-sm text-neutral-500 mt-2">
-                        <i className="ph ph-note me-2"></i>
-                        {material.note}
-                      </div>
-                    )}
-                  </div>
-                ))}
+              <div className="table-responsive">
+                <table className="table table-hover border border-neutral-40">
+                  <thead className="bg-neutral-20">
+                    <tr>
+                      <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '30%' }}>Description</th>
+                      <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '15%' }}>Author</th>
+                      <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '15%' }}>Publisher</th>
+                      <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '10%' }}>Published Date</th>
+                      <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '15%' }}>Online URL</th>
+                      <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '15%' }}>Note</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {course.materials.map((material, index) => (
+                      <tr key={material._id || index}>
+                        <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top' }}>
+                          {material.description || '-'}
+                        </td>
+                        <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top' }}>
+                          {material.author || '-'}
+                        </td>
+                        <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top' }}>
+                          {material.publisher || '-'}
+                        </td>
+                        <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top' }}>
+                          {material.publishedDate || '-'}
+                        </td>
+                        <td className="px-24 py-16" style={{ verticalAlign: 'top' }}>
+                          {material.onlineUrl ? (
+                            <a
+                              href={material.onlineUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-main-600"
+                              style={{ wordBreak: 'break-all' }}
+                            >
+                              <i className="ph ph-link me-1"></i>
+                              Link
+                            </a>
+                          ) : '-'}
+                        </td>
+                        <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top' }}>
+                          {material.note || '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             ) : (
-              <div className="bg-neutral-20 p-16 radius-8">
-                <p className="text-neutral-600 text-sm mb-0">Chưa có tài liệu</p>
+              <div className="text-center py-5 text-neutral-600">
+                <i className="ph ph-file-text text-neutral-400" style={{ fontSize: '48px' }}></i>
+                <p className="mt-3 mb-0">Chưa có tài liệu</p>
               </div>
             )}
           </div>
@@ -258,33 +218,57 @@ const CourseDetails = () => {
   const syllabusTab = (
     <div className="syllabus">
       {course.sessions && course.sessions.length > 0 ? (
-        <div className="sessions-list">
-          {course.sessions.map((session, index) => (
-            <Card key={session._id} className="mb-16">
-              <div className="d-flex align-items-start gap-3">
-                <div className="w-40 h-40 bg-main-600 text-white d-flex align-items-center justify-content-center radius-8 fw-bold flex-shrink-0">
-                  {index + 1}
-                </div>
-                <div className="flex-grow-1">
-                  <h6 className="mb-8 text-neutral-900 fw-semibold">
-                    {session.name || session.topic || `Buổi ${index + 1}`}
-                  </h6>
-                  
-                  {/* CLOs */}
-                  {session.clos && session.clos.length > 0 && (
-                    <div className="mb-12">
-                      <span className="text-neutral-600 text-sm me-2">CLO:</span>
-                      {session.clos.map((clo, cloIndex) => (
-                        <Badge key={cloIndex} variant="info" size="sm" className="me-2">
-                          {clo.code}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Card>
-          ))}
+        <div className="table-responsive">
+          <table className="table table-hover border border-neutral-40">
+            <thead className="bg-neutral-20">
+              <tr>
+                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '10%' }}>Order</th>
+                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '25%' }}>Title</th>
+                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '40%' }}>Content</th>
+                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '15%' }}>Learning Type</th>
+                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '10%' }}>CLOs</th>
+              </tr>
+            </thead>
+            <tbody>
+              {course.sessions.map((session) => (
+                <tr key={session._id}>
+                  <td className="px-24 py-16" style={{ verticalAlign: 'top' }}>
+                    <span className="fw-semibold text-neutral-900">{session.order}</span>
+                  </td>
+                  <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top' }}>
+                    {session.title || '-'}
+                  </td>
+                  <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top', whiteSpace: 'pre-wrap' }}>
+                    {session.content || '-'}
+                  </td>
+                  <td className="px-24 py-16" style={{ verticalAlign: 'top' }}>
+                    {session.learningType === 'mocktest' ? (
+                      <Badge variant="warning" size="sm">
+                        <i className="ph ph-exam me-1"></i>
+                        Mock Test
+                      </Badge>
+                    ) : (
+                      <Badge variant="info" size="sm">
+                        <i className="ph ph-book-open me-1"></i>
+                        Theory
+                      </Badge>
+                    )}
+                  </td>
+                  <td className="px-24 py-16" style={{ verticalAlign: 'top' }}>
+                    {session.clos && session.clos.length > 0 ? (
+                      <div className="d-flex flex-wrap gap-1">
+                        {session.clos.map((clo, cloIndex) => (
+                          <Badge key={cloIndex} variant="success" size="sm">
+                            {typeof clo === 'object' ? clo.code : clo}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : '-'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
         <div className="text-center py-5 text-neutral-500">
@@ -298,44 +282,79 @@ const CourseDetails = () => {
   // Tab 3: CLO/PLO Mapping
   const cloTab = (
     <div className="clo-mapping">
+      <h5 className="mb-16 text-neutral-900 fw-bold">Course Learning Outcomes (CLO)</h5>
+      <p className="text-neutral-600 text-sm mb-24">Chuẩn đầu ra của học phần và ánh xạ với PLO</p>
+
       {course.clos && course.clos.length > 0 ? (
-        <div className="clos-list">
-          {course.clos.map((clo, index) => (
-            <Card key={clo._id} className="mb-16">
-              <div className="d-flex align-items-start gap-3">
-                <Badge variant="success" size="md" className="flex-shrink-0">
-                  {clo.code}
-                </Badge>
-                <div className="flex-grow-1">
-                  <p className="text-neutral-900 mb-12">{clo.detail}</p>
-                  
-                  {/* Mapped PLOs */}
-                  {clo.mappedPLOs && clo.mappedPLOs.length > 0 && (
-                    <div>
-                      <span className="text-neutral-600 text-sm fw-medium">
-                        <i className="ph ph-arrow-right me-2"></i>
-                        Ánh xạ tới:
-                      </span>
-                      <div className="d-flex flex-wrap gap-2 mt-8">
-                        {clo.mappedPLOs.map((plo, ploIndex) => (
-                          <div 
-                            key={ploIndex}
-                            className="bg-main-50 px-12 py-6 radius-4 text-sm"
-                          >
-                            <span className="fw-semibold text-main-600">{plo.code}</span>
-                            {plo.name && (
-                              <span className="text-neutral-700"> - {plo.name}</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <>
+          {/* CLO Table */}
+          <div className="table-responsive mb-32">
+            <table className="table table-hover border border-neutral-40">
+              <thead className="bg-neutral-20">
+                <tr>
+                  <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '15%' }}>Mã CLO</th>
+                  <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '25%' }}>Tên CLO</th>
+                  <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '60%' }}>Chi tiết</th>
+                </tr>
+              </thead>
+              <tbody>
+                {course.clos.map((clo) => (
+                  <tr key={clo._id}>
+                    <td className="px-24 py-16" style={{ verticalAlign: 'top' }}>
+                      <span className="fw-semibold text-neutral-900">{clo.code}</span>
+                    </td>
+                    <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top' }}>
+                      {clo.name || '-'}
+                    </td>
+                    <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top', whiteSpace: 'pre-wrap' }}>
+                      {clo.detail || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* CLO-PLO Mapping Matrix */}
+          <h5 className="mb-16 text-neutral-900 fw-bold">Ma trận CLO-PLO</h5>
+          <div className="table-responsive">
+            <table className="table table-bordered border border-neutral-40">
+              <thead className="bg-neutral-20">
+                <tr>
+                  <th className="px-24 py-16 text-neutral-700 fw-semibold">CLO / PLO</th>
+                  {course.program?.plos && course.program.plos.map((plo) => (
+                    <th key={plo._id} className="px-24 py-16 text-neutral-700 fw-semibold text-center">
+                      {plo.code}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {course.clos.map((clo) => (
+                  <tr key={clo._id}>
+                    <td className="px-24 py-16 fw-semibold text-neutral-900">
+                      {clo.code}
+                    </td>
+                    {course.program?.plos && course.program.plos.map((plo) => {
+                      const isMapped = clo.mappedPLOs && clo.mappedPLOs.some(
+                        mappedPlo => (typeof mappedPlo === 'object' ? mappedPlo._id : mappedPlo) === plo._id
+                      );
+                      return (
+                        <td key={plo._id} className="px-24 py-16 text-center">
+                          {isMapped ? (
+                            <i className="ph ph-check-circle text-success-600" style={{ fontSize: '20px' }}></i>
+                          ) : (
+                            <span className="text-neutral-300">-</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       ) : (
         <div className="text-center py-5 text-neutral-500">
           <i className="ph ph-target text-6xl mb-3 d-block"></i>
@@ -359,28 +378,22 @@ const CourseDetails = () => {
       {/* Header */}
       <div className="d-flex justify-content-between align-items-start mb-24">
         <div className="flex-grow-1">
-          <h4 className="mb-8 text-neutral-900 fw-bold">Chi tiết: {course.name}</h4>
-          <Badge variant="warning">
-            <i className="ph ph-clock me-1"></i>
-            Chờ phê duyệt
-          </Badge>
+          <h4 className="mb-8 text-neutral-900 fw-bold">Chi tiết môn học: {course.name}</h4>
         </div>
         <div className="d-flex gap-2">
           <Button
             variant="outline"
-            icon="ph ph-pencil"
-            onClick={() => setShowRevisionModal(true)}
-            disabled={actionLoading}
+            icon="ph ph-arrow-left"
+            onClick={() => navigate(-1)}
           >
-            Yêu cầu chỉnh sửa
+            Quay lại
           </Button>
           <Button
-            variant="success"
-            icon="ph ph-check"
-            onClick={handleApprove}
-            disabled={actionLoading}
+            variant="primary"
+            icon="ph ph-pencil"
+            onClick={() => navigate(`/center-head/programs/${course.program?._id || course.program}/courses/${id}/edit-form`)}
           >
-            {actionLoading ? 'Đang xử lý...' : 'Phê duyệt'}
+            Sửa
           </Button>
         </div>
       </div>
@@ -389,52 +402,6 @@ const CourseDetails = () => {
       <Card>
         <Tabs tabs={tabs} />
       </Card>
-
-      {/* Revision Modal */}
-      {showRevisionModal && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Yêu cầu chỉnh sửa</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setShowRevisionModal(false)}
-                  disabled={actionLoading}
-                ></button>
-              </div>
-              <div className="modal-body">
-                <label className="form-label">Lý do yêu cầu chỉnh sửa *</label>
-                <textarea
-                  className="form-control"
-                  rows="4"
-                  placeholder="Nhập lý do yêu cầu chỉnh sửa..."
-                  value={revisionNote}
-                  onChange={(e) => setRevisionNote(e.target.value)}
-                  disabled={actionLoading}
-                ></textarea>
-              </div>
-              <div className="modal-footer">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowRevisionModal(false)}
-                  disabled={actionLoading}
-                >
-                  Hủy
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={handleRequestRevision}
-                  disabled={actionLoading}
-                >
-                  {actionLoading ? 'Đang gửi...' : 'Gửi yêu cầu'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

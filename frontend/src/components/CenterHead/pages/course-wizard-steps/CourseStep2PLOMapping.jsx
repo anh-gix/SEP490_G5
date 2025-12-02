@@ -61,10 +61,16 @@ const CourseStep2PLOMapping = ({ courseData, setCourseData, program, onNext, onP
       setLoading(true);
       const response = await courseService.updateCoursePLOMapping(courseData._id, selectedPLOs);
 
-      // Update courseData with mappedPLOs
+      // Also update lastCompletedStep to mark step 2 as completed
+      await courseService.updateCourse(courseData._id, {
+        lastCompletedStep: 2
+      });
+
+      // Update courseData with mappedPLOs and lastCompletedStep
       setCourseData(prev => ({
         ...prev,
-        mappedPLOs: response.data.mappedPLOs || selectedPLOs
+        mappedPLOs: response.data.mappedPLOs || selectedPLOs,
+        lastCompletedStep: 2
       }));
 
       alert('Cập nhật PLO mapping thành công!');

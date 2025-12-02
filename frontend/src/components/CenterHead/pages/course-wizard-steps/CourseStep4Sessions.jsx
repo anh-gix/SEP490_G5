@@ -117,13 +117,29 @@ const CourseStep4Sessions = ({ courseData, onPrevious, navigate }) => {
     }
   };
 
-  const handleFinish = () => {
-    alert('Hoàn thành tạo học phần!');
-    // Extract program ID from object or string
-    const programId = typeof courseData.program === 'object'
-      ? (courseData.program._id || courseData.program.id)
-      : courseData.program;
-    navigate(`/center-head/programs/${programId}`);
+  const handleFinish = async () => {
+    try {
+      setLoading(true);
+
+      // Update course status to 'completed' and mark all steps as done
+      await courseService.updateCourse(courseData._id, {
+        status: 'completed',
+        lastCompletedStep: 5
+      });
+
+      alert('Hoàn thành tạo học phần! Bạn có thể chỉnh sửa học phần này bằng form.');
+
+      // Extract program ID from object or string
+      const programId = typeof courseData.program === 'object'
+        ? (courseData.program._id || courseData.program.id)
+        : courseData.program;
+      navigate(`/center-head/programs/${programId}`);
+    } catch (error) {
+      console.error('Error updating course status:', error);
+      alert('Lỗi khi hoàn thành học phần!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

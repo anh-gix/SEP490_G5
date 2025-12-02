@@ -59,6 +59,9 @@ app.use('/api/homework', require('./routes/homeworkRoutes'));
 // Change Request Routes
 app.use('/api/change-requests', require('./routes/changeRequestRoutes'));
 
+// Approval Request Routes
+app.use('/api/approval-requests', require('./routes/approvalRequestRoutes'));
+
 // Academic Staff Routes
 app.use('/api/academic-staff', require('./routes/academicStaffRoutes'));
 

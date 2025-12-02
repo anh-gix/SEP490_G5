@@ -52,6 +52,22 @@ const examSchema = new mongoose.Schema(
     level: { type: String, enum: ["Academic", "General"], required: true },
     totalDuration: Number,
     sections: [sectionSchema],
+
+    // ===== STATUS ĐỂ XEM EXAM ĐÃ ĐƯỢC DUYỆT CHƯA =====
+    // Tất cả thông tin chi tiết về submission, approval, rejection được lưu trong ApprovalRequest model
+    status: {
+      type: String,
+      enum: [
+        'draft',              // Đang soạn
+        'pending_approval',   // Đã submit, chờ Center Head duyệt
+        'approved',           // Center Head đã duyệt
+        'needs_revision',     // Center Head yêu cầu chỉnh sửa
+        'archived'            // Đã lưu trữ
+      ],
+      default: 'draft'
+    },
+
+    // Giữ lại isPublished để quản lý việc publish exam cho học viên
     isPublished: { type: Boolean, default: false },
     publishedAt: { type: Date },
     unpublishedAt: { type: Date },

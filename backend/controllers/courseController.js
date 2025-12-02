@@ -162,7 +162,8 @@ exports.createCourse = async (req, res) => {
             materials: materials || [],
             mocktestSessionOrders: mocktestSessionOrders || [],
             createdBy,
-            status: 'draft'
+            status: 'draft',
+            lastCompletedStep: req.body.lastCompletedStep || 0 // Support wizard progress tracking
         };
 
         const course = await Course.create(courseData);
@@ -207,7 +208,8 @@ exports.updateCourse = async (req, res) => {
             sessions,
             materials,
             mocktestSessionOrders,
-            status
+            status,
+            lastCompletedStep
         } = req.body;
 
         const course = await Course.findById(req.params.id);
@@ -294,6 +296,16 @@ exports.updateCourse = async (req, res) => {
         if (materials) course.materials = materials;
         if (mocktestSessionOrders) course.mocktestSessionOrders = mocktestSessionOrders;
         if (status) course.status = status;
+        if (lastCompletedStep !== undefined) {
+            // Validate lastCompletedStep range (0-5)
+            if (lastCompletedStep < 0 || lastCompletedStep > 5) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'lastCompletedStep phải từ 0 đến 5'
+                });
+            }
+            course.lastCompletedStep = lastCompletedStep;
+        }
 
         await course.save();
 

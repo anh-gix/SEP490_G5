@@ -40,13 +40,14 @@ const CourseWizard = () => {
     clos: [],
     sessions: [],
     mocktestSessionOrders: [],
-    status: 'draft'
+    status: 'draft',
+    lastCompletedStep: 0 // Track the last completed step (0 = not started, 1-5 = completed steps)
   });
 
     // Dynamic step 5 title and description based on conditions
     const getStep5Title = () => {
-      console.log(program);
-      console.log(courseData);
+      // console.log(program);
+      // console.log(courseData);
       
       if (program?.type === 'cam' && courseData?.learningType === 'online') {
         return 'CAM Sessions';
@@ -147,8 +148,15 @@ const CourseWizard = () => {
               clos: existingCourse.clos || [],
               sessions: existingCourse.sessions || [],
               mocktestSessionOrders: existingCourse.mocktestSessionOrders || [],
-              status: existingCourse.status || 'draft'
+              status: existingCourse.status || 'draft',
+              lastCompletedStep: existingCourse.lastCompletedStep || 0
             });
+
+            // Restore current step to continue from where user left off
+            // If lastCompletedStep exists, set currentStep to lastCompletedStep + 1 (next step)
+            const resumeStep = (existingCourse.lastCompletedStep || 0) + 1;
+            // Make sure we don't exceed total steps
+            setCurrentStep(Math.min(resumeStep, 5));
           }
         } catch (error) {
           console.error('Error loading existing course:', error);

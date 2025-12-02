@@ -12,10 +12,11 @@ router.delete('/:id', programController.deleteProgram);
 // PROGRAM PLOs ROUTES
 router.get('/:id/plos', programController.getProgramPLOs);
 
-// PROGRAM APPROVAL WORKFLOW ROUTES
-router.patch('/:id/submit', programController.submitProgram);
-router.patch('/:id/approve', programController.approveProgram);
-router.patch('/:id/reject', programController.rejectProgram);
+// PROGRAM HELPER ROUTES
+router.get('/:id/submission-status', programController.getProgramSubmissionStatus);
+
+// PROGRAM MANAGEMENT ROUTES
+// NOTE: Submit/Approve/Reject are now handled by /api/approval-requests routes
 router.patch('/:id/activate', programController.activateProgram);
 router.patch('/:id/archive', programController.archiveProgram);
 

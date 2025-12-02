@@ -12,9 +12,6 @@ import ClassAssignments from './ClassAssignments';
 
 // Import modals
 import MaterialModal from './modals/MaterialModal';
-import AssignmentDetailModal from './modals/AssignmentDetailModal';
-import GradingModal from './modals/GradingModal';
-import AddHomeworkModal from './modals/AddHomeworkModal';
 import StudentDetailModal from './modals/StudentDetailModal';
 
 /**
@@ -29,30 +26,12 @@ const TeacherClassDetailLayout = () => {
   const [classInfo, setClassInfo] = useState(null);
   const [students, setStudents] = useState([]);
   const [materials, setMaterials] = useState([]);
-  const [assignments, setAssignments] = useState([]);
   const [lessons, setLessons] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
   // Modal states
   const [showMaterialModal, setShowMaterialModal] = useState(false);
-  const [showAssignmentDetail, setShowAssignmentDetail] = useState(false);
-  const [selectedAssignment, setSelectedAssignment] = useState(null);
-  const [showGradingModal, setShowGradingModal] = useState(false);
-  const [selectedSubmission, setSelectedSubmission] = useState(null);
-  const [gradeScore, setGradeScore] = useState('');
-  const [gradeComment, setGradeComment] = useState('');
-  const [showAddHomeworkModal, setShowAddHomeworkModal] = useState(false);
-  const [homeworkFormData, setHomeworkFormData] = useState({
-    lessonId: '',
-    title: '',
-    deadline: '',
-    assignmentFiles: [],
-    answerFiles: []
-  });
-  const [submitting, setSubmitting] = useState(false);
-  const [editingAssignment, setEditingAssignment] = useState(null);
-  const [uploadingFiles, setUploadingFiles] = useState({ assignment: false, answer: false });
   const [showStudentDetail, setShowStudentDetail] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
 
@@ -83,7 +62,6 @@ const TeacherClassDetailLayout = () => {
         setClassInfo(response.data.classInfo);
         setStudents(response.data.students || []);
         setMaterials(response.data.materials || []);
-        setAssignments(response.data.assignments || []);
         setLessons(response.data.lessons || []);
       }
     } catch (error) {
@@ -91,18 +69,6 @@ const TeacherClassDetailLayout = () => {
       setError(error.message || 'Không thể tải thông tin lớp học');
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Fetch only assignments - for refreshing after CRUD operations
-  const fetchAssignments = async () => {
-    try {
-      const response = await teacherService.getMyClassDetail(classId);
-      if (response.success) {
-        setAssignments(response.data.assignments || []);
-      }
-    } catch (error) {
-      console.error('Error fetching assignments:', error);
     }
   };
 
@@ -146,244 +112,6 @@ const TeacherClassDetailLayout = () => {
     };
     const config = statusConfig[status] || statusConfig.scheduled;
     return <Badge className={`${config.bg} text-white px-10 py-4 text-11`}>{config.text}</Badge>;
-  };
-
-  const handleViewAssignment = (assignment) => {
-    setSelectedAssignment(assignment);
-    setEditingAssignment(assignment);
-    setShowAssignmentDetail(true);
-  };
-
-  const handleGradeSubmission = (submission) => {
-    setSelectedSubmission(submission);
-    setGradeScore(submission.score || '');
-    setGradeComment('');
-    setShowGradingModal(true);
-  };
-
-  const handleSaveGrade = async () => {
-    try {
-      console.log('Saving grade:', {
-        submissionId: selectedSubmission.studentId,
-        score: gradeScore,
-        comment: gradeComment
-      });
-      setShowGradingModal(false);
-      setGradeScore('');
-      setGradeComment('');
-      // Refresh assignments to update grading statistics
-      await fetchAssignments();
-    } catch (error) {
-      console.error('Error saving grade:', error);
-    }
-  };
-
-  const handleDownloadSubmission = (submission) => {
-    console.log('Downloading submission for:', submission.studentName);
-  };
-
-  const handleDownloadAllSubmissions = () => {
-    console.log('Downloading all submissions for assignment:', selectedAssignment.title);
-  };
-
-  const handleAddHomeworkClick = () => {
-    const availableLesson = lessons.length > 0 ? lessons[0] : null;
-    setHomeworkFormData({
-      lessonId: availableLesson?._id || '',
-      lessonTitle: '',
-      title: '',
-      deadline: '',
-      assignmentFiles: [],
-      answerFiles: []
-    });
-    setEditingAssignment(null);
-    setShowAddHomeworkModal(true);
-  };
-
-  const handleUpdateAssignmentFile = async (field) => {
-    if (!editingAssignment) return;
-    
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx';
-    fileInput.multiple = true;
-    
-    fileInput.onchange = async (e) => {
-      const files = Array.from(e.target.files);
-      if (files.length === 0) return;
-      
-      try {
-        setUploadingFiles(prev => ({ ...prev, [field]: true }));
-        
-        const formData = new FormData();
-        files.forEach(file => {
-          formData.append(field === 'assignment' ? 'assignmentFile' : 'answerFile', file);
-        });
-        
-        await teacherService.updateHomework(
-          editingAssignment.classScheduleId,
-          editingAssignment._id,
-          formData
-        );
-        
-        alert(`Thêm ${files.length} file thành công!`);
-        fetchAssignments();
-        
-      } catch (error) {
-        console.error('Error uploading files:', error);
-        alert(error.message || 'Có lỗi xảy ra khi tải file');
-      } finally {
-        setUploadingFiles(prev => ({ ...prev, [field]: false }));
-      }
-    };
-    
-    fileInput.click();
-  };
-
-  const handleDeleteAssignmentFile = async (field, fileToDelete) => {
-    if (!editingAssignment) return;
-    
-    const fileName = fileToDelete.split('/').pop();
-    if (!confirm(`Bạn có chắc muốn xóa file "${fileName}"?`)) {
-      return;
-    }
-    
-    try {
-      setUploadingFiles(prev => ({ ...prev, [field]: true }));
-      
-      const formData = new FormData();
-      formData.append(field === 'assignment' ? 'deleteAssignmentFile' : 'deleteAnswerFile', fileToDelete);
-      
-      await teacherService.updateHomework(
-        editingAssignment.classScheduleId,
-        editingAssignment._id,
-        formData
-      );
-      
-      alert('Xóa file thành công!');
-      fetchAssignments();
-      
-    } catch (error) {
-      console.error('Error deleting file:', error);
-      alert(error.message || 'Có lỗi xảy ra khi xóa file');
-    } finally {
-      setUploadingFiles(prev => ({ ...prev, [field]: false }));
-    }
-  };
-
-  const handleHomeworkFormChange = (field, value) => {
-    setHomeworkFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleHomeworkFileChange = (field, files) => {
-    if (files && files.length > 0) {
-      const fileArray = Array.from(files);
-      setHomeworkFormData(prev => ({
-        ...prev,
-        [field]: [...(prev[field] || []), ...fileArray]
-      }));
-    }
-  };
-
-  const handleRemoveFileFromForm = (field, index) => {
-    setHomeworkFormData(prev => ({
-      ...prev,
-      [field]: prev[field].filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleSubmitHomework = async () => {
-    try {
-      setSubmitting(true);
-      
-      if (!homeworkFormData.lessonId) {
-        alert('Vui lòng chọn buổi học');
-        return;
-      }
-      if (!homeworkFormData.title || !homeworkFormData.deadline) {
-        alert('Vui lòng nhập đầy đủ thông tin');
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append('title', homeworkFormData.title);
-      formData.append('deadline', homeworkFormData.deadline);
-      
-      if (homeworkFormData.assignmentFiles && homeworkFormData.assignmentFiles.length > 0) {
-        homeworkFormData.assignmentFiles.forEach(file => {
-          formData.append('assignmentFile', file);
-        });
-      }
-      
-      if (homeworkFormData.answerFiles && homeworkFormData.answerFiles.length > 0) {
-        homeworkFormData.answerFiles.forEach(file => {
-          formData.append('answerFile', file);
-        });
-      }
-
-      const result = await teacherService.addHomework(homeworkFormData.lessonId, formData);
-      
-      if (result.success) {
-        alert('Thêm bài tập thành công!');
-        setShowAddHomeworkModal(false);
-        setHomeworkFormData({
-          lessonId: '',
-          title: '',
-          deadline: '',
-          assignmentFiles: [],
-          answerFiles: []
-        });
-        await fetchAssignments();
-      }
-    } catch (error) {
-      console.error('Error adding homework:', error);
-      const errorMsg = error.message || error.error || 'Có lỗi xảy ra khi thêm bài tập';
-      if (errorMsg.includes('insertMany') || errorMsg.includes('students')) {
-        alert('Bài tập đã được tạo thành công!');
-        setShowAddHomeworkModal(false);
-        setHomeworkFormData({
-          lessonId: '',
-          title: '',
-          deadline: '',
-          assignmentFiles: [],
-          answerFiles: []
-        });
-        await fetchAssignments();
-      } else {
-        alert(errorMsg);
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeleteHomework = async (assignment) => {
-    if (!confirm(`Bạn có chắc muốn xóa bài tập "${assignment.title}"?\n\nLưu ý: Tất cả bài nộp của học viên cũng sẽ bị xóa.`)) {
-      return;
-    }
-
-    try {
-      const scheduleId = assignment.classScheduleId || assignment.scheduleId;
-      if (!scheduleId) {
-        throw new Error('Không tìm thấy ID buổi học');
-      }
-      
-      await teacherService.deleteHomework(scheduleId, assignment._id);
-      alert('Xóa bài tập thành công!');
-      
-      if (showAssignmentDetail) {
-        setShowAssignmentDetail(false);
-        setSelectedAssignment(null);
-      }
-      
-      await fetchAssignments();
-    } catch (error) {
-      console.error('Error deleting homework:', error);
-      alert(error.message || 'Có lỗi xảy ra khi xóa bài tập');
-    }
   };
 
   const handleTabSelect = (tab) => {
@@ -570,7 +298,6 @@ const TeacherClassDetailLayout = () => {
             >
               <ClassOverview 
                 classInfo={classInfo}
-                assignments={assignments}
                 materials={materials}
                 setShowMaterialModal={setShowMaterialModal}
               />
@@ -628,15 +355,13 @@ const TeacherClassDetailLayout = () => {
               title={
                 <span className="px-8">
                   <i className="fas fa-tasks me-2"></i>
-                  Bài tập ({assignments.length})
+                  Bài tập
                 </span>
               }
             >
               <ClassAssignments 
-                assignments={assignments}
-                handleViewAssignment={handleViewAssignment}
-                handleDeleteHomework={handleDeleteHomework}
-                handleAddHomeworkClick={handleAddHomeworkClick}
+                classId={classId}
+                onAssignmentUpdate={fetchClassDetails}
               />
             </Tab>
           </Tabs>
@@ -647,42 +372,6 @@ const TeacherClassDetailLayout = () => {
       <MaterialModal 
         show={showMaterialModal}
         onHide={() => setShowMaterialModal(false)}
-      />
-
-      <AssignmentDetailModal 
-        show={showAssignmentDetail}
-        onHide={() => setShowAssignmentDetail(false)}
-        assignment={selectedAssignment}
-        handleUpdateAssignmentFile={handleUpdateAssignmentFile}
-        handleDeleteAssignmentFile={handleDeleteAssignmentFile}
-        handleDeleteHomework={handleDeleteHomework}
-        handleGradeSubmission={handleGradeSubmission}
-        handleDownloadSubmission={handleDownloadSubmission}
-        handleDownloadAllSubmissions={handleDownloadAllSubmissions}
-        uploadingFiles={uploadingFiles}
-      />
-
-      <GradingModal 
-        show={showGradingModal}
-        onHide={() => setShowGradingModal(false)}
-        submission={selectedSubmission}
-        gradeScore={gradeScore}
-        setGradeScore={setGradeScore}
-        gradeComment={gradeComment}
-        setGradeComment={setGradeComment}
-        handleSaveGrade={handleSaveGrade}
-      />
-
-      <AddHomeworkModal 
-        show={showAddHomeworkModal}
-        onHide={() => setShowAddHomeworkModal(false)}
-        lessons={lessons}
-        homeworkFormData={homeworkFormData}
-        handleHomeworkFormChange={handleHomeworkFormChange}
-        handleHomeworkFileChange={handleHomeworkFileChange}
-        handleRemoveFileFromForm={handleRemoveFileFromForm}
-        handleSubmitHomework={handleSubmitHomework}
-        submitting={submitting}
       />
 
       <StudentDetailModal 

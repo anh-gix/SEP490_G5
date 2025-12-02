@@ -1328,6 +1328,53 @@ const TeacherManagementAPI = () => {
                       </Card.Body>
                     </Card>
                   </Col>
+                  {selectedTeacher.stats && (
+                    <>
+                      <Col md={6}>
+                        <Card className="border-0 bg-neutral-25">
+                          <Card.Body className="p-16">
+                            <h6 className="text-13 text-neutral-500 mb-8">Số lớp đang dạy</h6>
+                            <p className="text-14 text-neutral-900 mb-0 fw-semibold">{selectedTeacher.stats.classCount || 0}</p>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                      <Col md={6}>
+                        <Card className="border-0 bg-neutral-25">
+                          <Card.Body className="p-16">
+                            <h6 className="text-13 text-neutral-500 mb-8">Tổng số học viên</h6>
+                            <p className="text-14 text-neutral-900 mb-0 fw-semibold">{selectedTeacher.stats.totalStudents || 0}</p>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                      <Col md={6}>
+                        <Card className="border-0 bg-neutral-25">
+                          <Card.Body className="p-16">
+                            <h6 className="text-13 text-neutral-500 mb-8">Số buổi dạy / Tổng số buổi</h6>
+                            <p className="text-14 text-neutral-900 mb-0 fw-semibold">
+                              {selectedTeacher.stats.actualTeachingSessions || 0} / {selectedTeacher.stats.totalSessions || 0}
+                            </p>
+                            {selectedTeacher.stats.totalSessions > 0 && (
+                              <p className="text-12 text-neutral-600 mb-0 mt-1">
+                                Tỷ lệ: {((selectedTeacher.stats.actualTeachingSessions / selectedTeacher.stats.totalSessions) * 100).toFixed(1)}%
+                              </p>
+                            )}
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                      {selectedTeacher.stats.absentSessions > 0 && (
+                        <Col md={6}>
+                          <Card className="border-0 bg-warning-50">
+                            <Card.Body className="p-16">
+                              <h6 className="text-13 text-neutral-500 mb-8">Số buổi nghỉ (có người dạy thay)</h6>
+                              <p className="text-14 text-neutral-900 mb-0 fw-semibold text-warning-700">
+                                {selectedTeacher.stats.absentSessions}
+                              </p>
+                            </Card.Body>
+                          </Card>
+                        </Col>
+                      )}
+                    </>
+                  )}
                 </Row>
               </Tab>
 
@@ -1341,6 +1388,7 @@ const TeacherManagementAPI = () => {
                         <th className="px-16 py-12 text-13">Khóa học</th>
                         <th className="px-16 py-12 text-13">Trình độ</th>
                         <th className="px-16 py-12 text-13">Học viên</th>
+                        <th className="px-16 py-12 text-13">Số buổi dạy</th>
                         <th className="px-16 py-12 text-13">Trạng thái</th>
                       </tr>
                     </thead>
@@ -1353,6 +1401,23 @@ const TeacherManagementAPI = () => {
                             <Badge bg="info">{cls.level}</Badge>
                           </td>
                           <td className="px-16 py-12">{cls.students?.length || 0}</td>
+                          <td className="px-16 py-12">
+                            {cls.stats ? (
+                              <div>
+                                <span className="fw-semibold">
+                                  {cls.stats.actualTeachingSessions || 0} / {cls.stats.totalSessions || 0}
+                                </span>
+                                {cls.stats.absentSessions > 0 && (
+                                  <div className="text-11 text-warning-600 mt-1">
+                                    <i className="fas fa-exclamation-triangle me-1"></i>
+                                    Nghỉ: {cls.stats.absentSessions}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-muted">-</span>
+                            )}
+                          </td>
                           <td className="px-16 py-12">
                             <Badge bg={cls.status === 'active' ? 'success' : 'secondary'}>
                               {cls.status}

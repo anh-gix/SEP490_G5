@@ -28,7 +28,11 @@ const RequestManagementPage = () => {
   const [stats, setStats] = useState({
     pending: 0,
     approved: 0,
-    rejected: 0
+    rejected: 0,
+    createClass: 0,
+    changeClass: 0,
+    makeupClass: 0,
+    replaceTeacher: 0
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -642,7 +646,11 @@ const RequestManagementPage = () => {
         setStats({
           pending: requests.filter(r => r.status === 'pending').length,
           approved: requests.filter(r => r.status === 'approved').length,
-          rejected: requests.filter(r => r.status === 'rejected').length
+          rejected: requests.filter(r => r.status === 'rejected').length,
+          createClass: requests.filter(r => r.type === 'create_class').length,
+          changeClass: requests.filter(r => r.type === 'change_class').length,
+          makeupClass: requests.filter(r => r.type === 'makeup_class').length,
+          replaceTeacher: requests.filter(r => r.type === 'replace_teacher').length
         });
       } else {
         setError(response.message || 'Không thể tải danh sách đơn');
@@ -4043,29 +4051,200 @@ const RequestManagementPage = () => {
             <p className="text-neutral-600 mb-0">Quản lý đơn xin đổi buổi/lớp học từ học viên và giảng viên</p>
           </div>
 
-          {/* Summary Card */}
-          <Card className="bg-white border-0 rounded-12 mb-24" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-            <Card.Body className="p-20">
-              <div className="d-flex gap-24">
-                <div>
-                  <p className="text-neutral-600 text-12 mb-4">Tổng số đơn</p>
-                  <h3 className="text-neutral-900 fw-bold mb-0">{total}</h3>
-                </div>
-                <div>
-                  <p className="text-neutral-600 text-12 mb-4">Chờ duyệt</p>
-                  <h3 className="text-warning fw-bold mb-0">{stats.pending}</h3>
-                </div>
-                <div>
-                  <p className="text-neutral-600 text-12 mb-4">Đã duyệt</p>
-                  <h3 className="text-success fw-bold mb-0">{stats.approved}</h3>
-                </div>
-                <div>
-                  <p className="text-neutral-600 text-12 mb-4">Từ chối</p>
-                  <h3 className="text-danger fw-bold mb-0">{stats.rejected}</h3>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
+          {/* Summary Cards */}
+          <Row className="g-3 mb-24">
+            {/* Tổng số đơn */}
+            <Col md={6} lg={3}>
+              <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+                <Card.Body className="p-20">
+                  <div className="d-flex align-items-center gap-16">
+                    <div 
+                      className="rounded-12 d-flex align-items-center justify-content-center"
+                      style={{ 
+                        width: '56px',
+                        height: '56px',
+                        background: 'linear-gradient(135deg, #0D74FF 0%, #0A5FD9 100%)'
+                      }}
+                    >
+                      <i className="fas fa-clipboard-list text-white" style={{ fontSize: '24px' }}></i>
+                    </div>
+                    <div>
+                      <div className="text-neutral-500 text-13 mb-4">Tổng số đơn</div>
+                      <div className="text-neutral-900 fw-bold text-32">{total}</div>
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+
+            {/* Chờ duyệt */}
+            <Col md={6} lg={3}>
+              <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+                <Card.Body className="p-20">
+                  <div className="d-flex align-items-center gap-16">
+                    <div 
+                      className="rounded-12 d-flex align-items-center justify-content-center"
+                      style={{ 
+                        width: '56px',
+                        height: '56px',
+                        background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                      }}
+                    >
+                      <i className="fas fa-clock text-white" style={{ fontSize: '24px' }}></i>
+                    </div>
+                    <div>
+                      <div className="text-neutral-500 text-13 mb-4">Chờ duyệt</div>
+                      <div className="text-neutral-900 fw-bold text-32">{stats.pending}</div>
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+
+            {/* Đã duyệt */}
+            <Col md={6} lg={3}>
+              <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+                <Card.Body className="p-20">
+                  <div className="d-flex align-items-center gap-16">
+                    <div 
+                      className="rounded-12 d-flex align-items-center justify-content-center"
+                      style={{ 
+                        width: '56px',
+                        height: '56px',
+                        background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
+                      }}
+                    >
+                      <i className="fas fa-check-circle text-white" style={{ fontSize: '24px' }}></i>
+                    </div>
+                    <div>
+                      <div className="text-neutral-500 text-13 mb-4">Đã duyệt</div>
+                      <div className="text-neutral-900 fw-bold text-32">{stats.approved}</div>
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+
+            {/* Từ chối */}
+            <Col md={6} lg={3}>
+              <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+                <Card.Body className="p-20">
+                  <div className="d-flex align-items-center gap-16">
+                    <div 
+                      className="rounded-12 d-flex align-items-center justify-content-center"
+                      style={{ 
+                        width: '56px',
+                        height: '56px',
+                        background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)'
+                      }}
+                    >
+                      <i className="fas fa-times-circle text-white" style={{ fontSize: '24px' }}></i>
+                    </div>
+                    <div>
+                      <div className="text-neutral-500 text-13 mb-4">Từ chối</div>
+                      <div className="text-neutral-900 fw-bold text-32">{stats.rejected}</div>
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+
+            {/* Tạo lớp */}
+            <Col md={6} lg={3}>
+              <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+                <Card.Body className="p-20">
+                  <div className="d-flex align-items-center gap-16">
+                    <div 
+                      className="rounded-12 d-flex align-items-center justify-content-center"
+                      style={{ 
+                        width: '56px',
+                        height: '56px',
+                        background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)'
+                      }}
+                    >
+                      <i className="fas fa-plus-circle text-white" style={{ fontSize: '24px' }}></i>
+                    </div>
+                    <div>
+                      <div className="text-neutral-500 text-13 mb-4">Tạo lớp</div>
+                      <div className="text-neutral-900 fw-bold text-32">{stats.createClass}</div>
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+
+            {/* Đổi lớp */}
+            <Col md={6} lg={3}>
+              <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+                <Card.Body className="p-20">
+                  <div className="d-flex align-items-center gap-16">
+                    <div 
+                      className="rounded-12 d-flex align-items-center justify-content-center"
+                      style={{ 
+                        width: '56px',
+                        height: '56px',
+                        background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)'
+                      }}
+                    >
+                      <i className="fas fa-exchange-alt text-white" style={{ fontSize: '24px' }}></i>
+                    </div>
+                    <div>
+                      <div className="text-neutral-500 text-13 mb-4">Đổi lớp</div>
+                      <div className="text-neutral-900 fw-bold text-32">{stats.changeClass}</div>
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+
+            {/* Học bù */}
+            <Col md={6} lg={3}>
+              <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+                <Card.Body className="p-20">
+                  <div className="d-flex align-items-center gap-16">
+                    <div 
+                      className="rounded-12 d-flex align-items-center justify-content-center"
+                      style={{ 
+                        width: '56px',
+                        height: '56px',
+                        background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                      }}
+                    >
+                      <i className="fas fa-calendar-plus text-white" style={{ fontSize: '24px' }}></i>
+                    </div>
+                    <div>
+                      <div className="text-neutral-500 text-13 mb-4">Học bù</div>
+                      <div className="text-neutral-900 fw-bold text-32">{stats.makeupClass}</div>
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+
+            {/* Xếp dạy thay */}
+            <Col md={6} lg={3}>
+              <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+                <Card.Body className="p-20">
+                  <div className="d-flex align-items-center gap-16">
+                    <div 
+                      className="rounded-12 d-flex align-items-center justify-content-center"
+                      style={{ 
+                        width: '56px',
+                        height: '56px',
+                        background: 'linear-gradient(135deg, #6B7280 0%, #4B5563 100%)'
+                      }}
+                    >
+                      <i className="fas fa-user-friends text-white" style={{ fontSize: '24px' }}></i>
+                    </div>
+                    <div>
+                      <div className="text-neutral-500 text-13 mb-4">Xếp dạy thay</div>
+                      <div className="text-neutral-900 fw-bold text-32">{stats.replaceTeacher}</div>
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
 
           {/* Filters and Search */}
           <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24">

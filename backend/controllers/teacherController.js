@@ -2,6 +2,7 @@ const User = require("../models/userModel");
 const Role = require("../models/roleModel");
 const Class = require("../models/classModel");
 const ClassSchedule = require("../models/classScheduleModel");
+const StudentSchedule = require("../models/studentScheduleModel");
 const Program = require("../models/programModel");
 const Course = require("../models/courseModel");
 
@@ -210,6 +211,10 @@ exports.getTeacherById = async (req, res) => {
   try {
     const { id } = req.params;
     
+    console.log(`\n🔍 [DEBUG] ============================================`);
+    console.log(`🔍 [DEBUG] getTeacherById - Teacher ID: ${id}`);
+    console.log(`🔍 [DEBUG] ============================================\n`);
+    
     const teacher = await User.findById(id)
       .select('-password -token')
       .populate('roleId', 'name');
@@ -218,21 +223,184 @@ exports.getTeacherById = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy giảng viên" });
     }
     
-    // Get classes taught by this teacher
-    const classes = await Class.find({ teacherId: id })
-      .select('name subject students')
-      .populate('students', 'username email');
+    console.log(`✅ [DEBUG] Tìm thấy giảng viên: ${teacher.username} (${teacher.email})`);
     
-    const totalStudents = classes.reduce((sum, cls) => sum + cls.students.length, 0);
+    // Get classes taught by this teacher - check both teacher and teacherId fields
+    const classes = await Class.find({ 
+      $or: [
+        { teacher: id },
+        { teacherId: id }
+      ]
+    })
+      .select('name course students status startDate endDate teacher teacherId')
+      .populate('students', 'username email')
+      .populate({ 
+        path: 'course', 
+        select: 'name',
+        populate: { path: 'program', select: 'level band' } 
+      })
+      .lean();
+    
+    console.log(`\n📋 [DEBUG] Tìm thấy ${classes.length} lớp học:`);
+    classes.forEach((cls, idx) => {
+      const teacherId = cls.teacher?.toString() || cls.teacherId?.toString() || 'N/A';
+      console.log(`  [${idx + 1}] ${cls.name}`);
+      console.log(`      Class ID: ${cls._id}`);
+      console.log(`      Teacher field: ${teacherId}`);
+      console.log(`      TeacherId field: ${cls.teacherId?.toString() || 'N/A'}`);
+    });
+    
+    // Format classes with level information and teaching stats
+    const formattedClasses = await Promise.all(classes.map(async (cls) => {
+      console.log(`\n📚 [DEBUG] Xử lý lớp: ${cls.name} (ID: ${cls._id})`);
+      
+      // Lấy tất cả ClassSchedule của lớp này để log
+      const allSchedules = await ClassSchedule.find({
+        class: cls._id,
+        status: { $in: ['temporary', 'fixed'] }
+      })
+      .select('teacher substituteTeacher date startTime endTime status')
+      .populate('teacher', 'username')
+      .populate('substituteTeacher', 'username')
+      .lean();
+      
+      console.log(`  - Tổng số ClassSchedule: ${allSchedules.length}`);
+      allSchedules.forEach((schedule, idx) => {
+        const teacherId = schedule.teacher?._id?.toString() || schedule.teacher?.toString() || 'N/A';
+        const teacherName = schedule.teacher?.username || 'N/A';
+        const subTeacherId = schedule.substituteTeacher?._id?.toString() || schedule.substituteTeacher?.toString() || null;
+        const subTeacherName = schedule.substituteTeacher?.username || null;
+        const hasSubstitute = subTeacherId !== null;
+        const isThisTeacher = teacherId === id.toString();
+        
+        console.log(`    [${idx + 1}] ${schedule.date} ${schedule.startTime}-${schedule.endTime}`);
+        console.log(`        Teacher: ${teacherName} (ID: ${teacherId}) ${isThisTeacher ? '✅' : '❌'}`);
+        console.log(`        SubstituteTeacher: ${subTeacherName || 'Không có'} (ID: ${subTeacherId || 'N/A'})`);
+        console.log(`        → Giảng viên này dạy: ${isThisTeacher && !hasSubstitute ? '✅ CÓ' : '❌ KHÔNG'}`);
+      });
+      
+      // Lấy tất cả schedule IDs để kiểm tra điểm danh
+      const scheduleIds = allSchedules.map(s => s._id);
+      
+      // Kiểm tra các buổi đã có điểm danh (có ít nhất 1 học sinh điểm danh)
+      const schedulesWithAttendance = await StudentSchedule.find({
+        classSchedule: { $in: scheduleIds },
+        'attendance.status': { $exists: true, $ne: null }
+      })
+      .select('classSchedule')
+      .lean();
+      
+      // Tạo Set các schedule IDs đã có điểm danh
+      const scheduleIdsWithAttendance = new Set(
+        schedulesWithAttendance.map(s => s.classSchedule.toString())
+      );
+      
+      console.log(`  - Số buổi đã có điểm danh: ${scheduleIdsWithAttendance.size}`);
+      
+      // Chỉ tính các buổi đã có điểm danh
+      const totalSessions = scheduleIdsWithAttendance.size;
+      
+      // Số buổi dạy thực tế: buổi đã có điểm danh + teacher = id + không có substituteTeacher
+      const actualTeachingSessions = allSchedules.filter(s => {
+        const scheduleId = s._id.toString();
+        const hasAttendance = scheduleIdsWithAttendance.has(scheduleId);
+        const teacherId = s.teacher?._id?.toString() || s.teacher?.toString();
+        const hasSubstitute = s.substituteTeacher && (s.substituteTeacher._id || s.substituteTeacher);
+        const isThisTeacher = teacherId === id.toString();
+        
+        return hasAttendance && isThisTeacher && !hasSubstitute;
+      }).length;
+      
+      console.log(`  - Tổng số buổi (đã có điểm danh): ${totalSessions}`);
+      console.log(`  - Số buổi dạy thực tế: ${actualTeachingSessions}`);
+      console.log(`  - Số buổi nghỉ: ${totalSessions - actualTeachingSessions}`);
+      
+      // Log chi tiết từng buổi
+      console.log(`\n  📝 Chi tiết từng buổi học:`);
+      allSchedules.forEach((schedule, idx) => {
+        const scheduleId = schedule._id.toString();
+        const hasAttendance = scheduleIdsWithAttendance.has(scheduleId);
+        const teacherId = schedule.teacher?._id?.toString() || schedule.teacher?.toString();
+        const hasSubstitute = schedule.substituteTeacher && (schedule.substituteTeacher._id || schedule.substituteTeacher);
+        const isThisTeacher = teacherId === id.toString();
+        const isCounted = hasAttendance && isThisTeacher && !hasSubstitute;
+        
+        const dateStr = new Date(schedule.date).toLocaleDateString('vi-VN');
+        console.log(`    [${idx + 1}] ${dateStr} ${schedule.startTime}-${schedule.endTime}`);
+        console.log(`        Đã có điểm danh: ${hasAttendance ? '✅ CÓ' : '❌ CHƯA'}`);
+        console.log(`        Teacher: ${schedule.teacher?.username || 'N/A'} (ID: ${teacherId}) ${isThisTeacher ? '✅ ĐÚNG' : '❌ KHÔNG PHẢI'}`);
+        if (hasSubstitute) {
+          console.log(`        ⚠️  SubstituteTeacher: ${schedule.substituteTeacher?.username || 'N/A'} → Giáo viên chính NGHỈ`);
+        } else {
+          console.log(`        SubstituteTeacher: Không có → Giáo viên chính dạy`);
+        }
+        console.log(`        → Được tính vào "Số buổi dạy": ${isCounted ? '✅ CÓ' : '❌ KHÔNG'}`);
+        console.log(``);
+      });
+      
+      console.log(`  📊 TÓM TẮT:`);
+      console.log(`     - Tổng số buổi đã có điểm danh: ${totalSessions}`);
+      console.log(`     - Số buổi do ${teacher.username} dạy (không có người dạy thay): ${actualTeachingSessions}`);
+      console.log(`     - Số buổi nghỉ (có người dạy thay): ${totalSessions - actualTeachingSessions}`);
+      
+      return {
+        _id: cls._id,
+        name: cls.name,
+        course: cls.course ? {
+          _id: cls.course._id,
+          name: cls.course.name,
+          level: cls.course.program?.level || 'N/A'
+        } : null,
+        level: cls.course?.program?.level || 'N/A',
+        students: cls.students || [],
+        status: cls.status,
+        startDate: cls.startDate,
+        endDate: cls.endDate,
+        stats: {
+          totalSessions,
+          actualTeachingSessions,
+          absentSessions: totalSessions - actualTeachingSessions
+        }
+      };
+    }));
+    
+    const totalStudents = formattedClasses.reduce((sum, cls) => sum + (cls.students?.length || 0), 0);
+    
+    // Calculate teaching schedule statistics (chỉ tính các buổi đã có điểm danh)
+    // Tính từ formattedClasses đã được tính với logic chỉ tính buổi có điểm danh
+    const totalSessions = formattedClasses.reduce((sum, cls) => sum + (cls.stats?.totalSessions || 0), 0);
+    const actualTeachingSessions = formattedClasses.reduce((sum, cls) => sum + (cls.stats?.actualTeachingSessions || 0), 0);
+    
+    console.log(`\n📊 [DEBUG] ============================================`);
+    console.log(`📊 [DEBUG] TỔNG HỢP KẾT QUẢ:`);
+    console.log(`📊 [DEBUG] - Số lớp: ${formattedClasses.length}`);
+    console.log(`📊 [DEBUG] - Tổng số học viên: ${totalStudents}`);
+    console.log(`📊 [DEBUG] - Tổng số buổi: ${totalSessions}`);
+    console.log(`📊 [DEBUG] - Số buổi dạy thực tế: ${actualTeachingSessions}`);
+    console.log(`📊 [DEBUG] - Số buổi nghỉ: ${totalSessions - actualTeachingSessions}`);
+    console.log(`📊 [DEBUG] ============================================\n`);
+    
+    // Log chi tiết stats của từng lớp
+    formattedClasses.forEach((cls, idx) => {
+      console.log(`📊 [DEBUG] Lớp ${idx + 1}: ${cls.name}`);
+      console.log(`📊 [DEBUG]   - Tổng số buổi: ${cls.stats.totalSessions}`);
+      console.log(`📊 [DEBUG]   - Số buổi dạy: ${cls.stats.actualTeachingSessions}`);
+      console.log(`📊 [DEBUG]   - Số buổi nghỉ: ${cls.stats.absentSessions}`);
+    });
+    console.log(`\n`);
     
     res.status(200).json({
+      success: true,
       message: "Lấy thông tin giảng viên thành công",
       teacher: {
         ...teacher.toObject(),
-        classes,
+        classes: formattedClasses,
         stats: {
-          classCount: classes.length,
-          totalStudents
+          classCount: formattedClasses.length,
+          totalStudents,
+          totalSessions,
+          actualTeachingSessions,
+          absentSessions: totalSessions - actualTeachingSessions // Số buổi nghỉ (có người dạy thay)
         }
       }
     });

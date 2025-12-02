@@ -66,23 +66,34 @@ const getCamSessionById = async (req, res) => {
  */
 const createCamSession = async (req, res) => {
   try {
-    const { Title, Des, Order, videoURL, Quiz } = req.body;
+    const { title, sessionType, description, order, videoURL, quizzes, vocabulary } = req.body;
+
+    console.log('=== Create CamSession Request ===');
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
 
     // Validation
-    if (!Title || Order === undefined) {
+    if (!title || order === undefined) {
       return res.status(400).json({
         success: false,
         message: 'Tiêu đề và thứ tự buổi học là bắt buộc'
       });
     }
 
-    const camSession = await CamSession.create({
-      Title,
-      Des,
-      Order,
+    const camSessionData = {
+      title,
+      sessionType: sessionType || 'reading',
+      description,
+      order,
       videoURL,
-      Quiz: Quiz || []
-    });
+      quizzes: quizzes || { quiz: [] },
+      vocabulary: vocabulary || { items: [] }
+    };
+
+    console.log('Creating camSession with data:', JSON.stringify(camSessionData, null, 2));
+
+    const camSession = await CamSession.create(camSessionData);
+
+    console.log('CamSession created successfully:', camSession._id);
 
     res.status(201).json({
       success: true,
@@ -91,6 +102,7 @@ const createCamSession = async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating cam session:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Lỗi khi tạo buổi học CAM',
@@ -106,7 +118,7 @@ const createCamSession = async (req, res) => {
 const updateCamSession = async (req, res) => {
   try {
     const { id } = req.params;
-    const { Title, Des, Order, videoURL, Quiz } = req.body;
+    const { title, sessionType, description, order, videoURL, quizzes, vocabulary } = req.body;
 
     const camSession = await CamSession.findById(id);
     if (!camSession) {
@@ -117,11 +129,13 @@ const updateCamSession = async (req, res) => {
     }
 
     // Update fields
-    if (Title !== undefined) camSession.Title = Title;
-    if (Des !== undefined) camSession.Des = Des;
-    if (Order !== undefined) camSession.Order = Order;
+    if (title !== undefined) camSession.title = title;
+    if (sessionType !== undefined) camSession.sessionType = sessionType;
+    if (description !== undefined) camSession.description = description;
+    if (order !== undefined) camSession.order = order;
     if (videoURL !== undefined) camSession.videoURL = videoURL;
-    if (Quiz !== undefined) camSession.Quiz = Quiz;
+    if (quizzes !== undefined) camSession.quizzes = quizzes;
+    if (vocabulary !== undefined) camSession.vocabulary = vocabulary;
 
     await camSession.save();
 

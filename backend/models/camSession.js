@@ -9,6 +9,11 @@ const quizSchema = new mongoose.Schema({
   AnswerKey: [{ type: String }],
 });
 
+const vocabularyItemSchema = new mongoose.Schema({
+  word: { type: String },
+  img: { type: String }
+}, { _id: false });
+
 const camSessionSchema = new mongoose.Schema(
   {
     title: { type: String },
@@ -18,8 +23,8 @@ const camSessionSchema = new mongoose.Schema(
     // Thứ tự bài học trong khóa học
     order: { type: Number },
     // Video bài giảng
-    videoURL: { 
-      type: String, 
+    videoURL: {
+      type: String,
     },
     // Quiz kiến thức trong lesson
     quizzes: {
@@ -27,8 +32,7 @@ const camSessionSchema = new mongoose.Schema(
     },
     // Flashcard từ vựng trong lesson
     vocabulary: {
-      img: { type: String },
-      words: [{ type: String }],
+      items: [vocabularyItemSchema]
     },
   },
   { timestamps: true }

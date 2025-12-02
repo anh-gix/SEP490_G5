@@ -14,6 +14,7 @@ const CourseDetails = () => {
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     fetchCourseDetails();
@@ -35,6 +36,30 @@ const CourseDetails = () => {
       setError('Không thể tải chi tiết giáo trình. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteCourse = async () => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa môn học "${course.name}"?\n\nHành động này không thể hoàn tác.`)) {
+      return;
+    }
+
+    try {
+      setDeleteLoading(true);
+      const response = await courseService.deleteCourse(id);
+
+      if (response.success) {
+        alert('Xóa môn học thành công!');
+        // Navigate back to program detail or course list
+        navigate(-1);
+      } else {
+        alert(response.message || 'Xóa môn học thất bại!');
+      }
+    } catch (err) {
+      console.error('Error deleting course:', err);
+      alert(err.message || 'Không thể xóa môn học. Vui lòng thử lại sau.');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -394,6 +419,14 @@ const CourseDetails = () => {
             onClick={() => navigate(`/center-head/programs/${course.program?._id || course.program}/courses/${id}/edit-form`)}
           >
             Sửa
+          </Button>
+          <Button
+            variant="danger"
+            icon="ph ph-trash"
+            onClick={handleDeleteCourse}
+            disabled={deleteLoading}
+          >
+            {deleteLoading ? 'Đang xóa...' : 'Xóa'}
           </Button>
         </div>
       </div>

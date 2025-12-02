@@ -6,8 +6,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Đảm bảo thư mục uploads tồn tại
-const uploadsDir = path.join(__dirname, '../uploads');
+// Đảm bảo thư mục uploads/homeworks tồn tại
+const uploadsDir = path.join(__dirname, '../uploads/homeworks');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -20,7 +20,8 @@ const storage = multer.diskStorage({
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
-    cb(null, `homework-${uniqueSuffix}${ext}`);
+    const prefix = file.fieldname === 'answerFile' ? 'answer' : 'assignment';
+    cb(null, `${prefix}-${uniqueSuffix}${ext}`);
   }
 });
 
@@ -51,6 +52,12 @@ const uploadHomeworkFiles = upload.fields([
 ]);
 
 // Routes
+// Lấy danh sách assignments của teacher
+router.get('/teacher/assignments', verifyToken, homeworkController.getTeacherAssignments);
+
+// Lấy danh sách schedules của class (để giao bài tập)
+router.get('/class/:classId/schedules', verifyToken, homeworkController.getClassSchedules);
+
 // Thêm homework vào ClassSchedule
 router.post('/classSchedule/:scheduleId', verifyToken, uploadHomeworkFiles, homeworkController.addHomeworkToSchedule);
 

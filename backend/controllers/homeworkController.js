@@ -39,10 +39,10 @@ exports.addHomeworkToSchedule = async (req, res) => {
       _id: new mongoose.Types.ObjectId(),
       assignment: {
         title: title,
-        files: assignmentFiles.map(f => `/uploads/${f.filename}`)
+        files: assignmentFiles.map(f => `/uploads/homeworks/${f.filename}`)
       },
       deadline: new Date(deadline),
-      answerFiles: answerFiles.map(f => `/uploads/${f.filename}`)
+      answerFiles: answerFiles.map(f => `/uploads/homeworks/${f.filename}`)
     };
 
     // Add homework to schedule
@@ -61,7 +61,7 @@ exports.addHomeworkToSchedule = async (req, res) => {
       homeworkId: newHomework._id,
       student: student._id,
       assignmentTitle: title,
-      assignmentFiles: assignmentFiles.map(f => `/uploads/${f.filename}`),
+      assignmentFiles: assignmentFiles.map(f => `/uploads/homeworks/${f.filename}`),
       deadline: new Date(deadline),
       status: 'not_submitted'
     }));      await HomeworkSubmission.insertMany(submissions);
@@ -127,11 +127,11 @@ exports.updateHomework = async (req, res) => {
     // Add new files if uploaded
     if (req.files) {
       if (req.files.assignmentFile) {
-        const newFiles = req.files.assignmentFile.map(f => `/uploads/${f.filename}`);
+        const newFiles = req.files.assignmentFile.map(f => `/uploads/homeworks/${f.filename}`);
         homework.assignment.files = [...(homework.assignment.files || []), ...newFiles];
       }
       if (req.files.answerFile) {
-        const newFiles = req.files.answerFile.map(f => `/uploads/${f.filename}`);
+        const newFiles = req.files.answerFile.map(f => `/uploads/homeworks/${f.filename}`);
         homework.answerFiles = [...(homework.answerFiles || []), ...newFiles];
       }
     }
@@ -253,6 +253,158 @@ exports.getHomeworkSubmissions = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy danh sách bài nộp',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Lấy tất cả homework assignments của giáo viên
+ * GET /api/homework/teacher/assignments
+ */
+exports.getTeacherAssignments = async (req, res) => {
+  try {
+    const teacherId = req.user._id;
+
+    // Find all classes taught by this teacher
+    const classes = await Class.find({ teacher: teacherId })
+      .populate('course', 'name courseCode')
+      .lean();
+
+    if (!classes || classes.length === 0) {
+      return res.status(200).json({
+        success: true,
+        total: 0,
+        assignments: []
+      });
+    }
+
+    const classIds = classes.map(c => c._id);
+
+    // Find all schedules for these classes that have homework
+    const schedules = await ClassSchedule.find({
+      class: { $in: classIds },
+      'homework.0': { $exists: true }
+    })
+      .populate('class', 'name')
+      .populate({
+        path: 'class',
+        populate: {
+          path: 'course',
+          select: 'name courseCode'
+        }
+      })
+      .lean();
+
+    // Flatten homework from all schedules
+    const assignments = [];
+    
+    for (const schedule of schedules) {
+      if (schedule.homework && schedule.homework.length > 0) {
+        for (const hw of schedule.homework) {
+          // Count submissions
+          const submissionCounts = await HomeworkSubmission.aggregate([
+            {
+              $match: {
+                classSchedule: schedule._id,
+                homeworkId: hw._id
+              }
+            },
+            {
+              $group: {
+                _id: '$status',
+                count: { $sum: 1 }
+              }
+            }
+          ]);
+
+          const totalStudents = await HomeworkSubmission.countDocuments({
+            classSchedule: schedule._id,
+            homeworkId: hw._id
+          });
+
+          const submitted = submissionCounts.find(s => s._id === 'submitted')?.count || 0;
+
+          assignments.push({
+            _id: hw._id,
+            scheduleId: schedule._id,
+            title: hw.assignment.title,
+            assignmentFiles: hw.assignment.files || [],
+            answerFiles: hw.answerFiles || [],
+            deadline: hw.deadline,
+            className: schedule.class?.name,
+            courseName: schedule.class?.course?.name,
+            courseCode: schedule.class?.course?.courseCode,
+            totalStudents,
+            submitted,
+            pending: totalStudents - submitted,
+            createdAt: schedule.createdAt
+          });
+        }
+      }
+    }
+
+    // Sort by deadline (newest first)
+    assignments.sort((a, b) => new Date(b.deadline) - new Date(a.deadline));
+
+    res.status(200).json({
+      success: true,
+      total: assignments.length,
+      assignments
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi khi lấy danh sách assignments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy danh sách bài tập',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Lấy danh sách schedules của một class (để giao bài tập)
+ * GET /api/homework/class/:classId/schedules
+ */
+exports.getClassSchedules = async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const teacherId = req.user._id;
+
+    // Verify teacher owns this class
+    const classInfo = await Class.findOne({ 
+      _id: classId, 
+      teacher: teacherId 
+    });
+
+    if (!classInfo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy lớp học hoặc bạn không có quyền truy cập'
+      });
+    }
+
+    // Get all schedules for this class
+    const schedules = await ClassSchedule.find({ 
+      class: classId 
+    })
+      .populate('session', 'title order')
+      .select('_id date startTime endTime order session status')
+      .sort({ date: 1, startTime: 1 })
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      total: schedules.length,
+      schedules: schedules
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi khi lấy danh sách schedules:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy danh sách buổi học',
       error: error.message
     });
   }

@@ -779,6 +779,69 @@ exports.submitHomework = async (req, res) => {
 };
 
 // =========================
+// 📄 LẤY THÔNG TIN BÀI NỘP CỦA HỌC VIÊN
+// =========================
+exports.getMySubmission = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const { classId, scheduleId, homeworkId } = req.params;
+
+    // Verify student is enrolled in the class
+    const studentClass = await Class.findOne({
+      _id: classId,
+      students: studentId
+    }).lean();
+
+    if (!studentClass) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền truy cập lớp học này'
+      });
+    }
+
+    // Find submission
+    const submission = await HomeworkSubmission.findOne({
+      classSchedule: scheduleId,
+      homeworkId: homeworkId,
+      student: studentId
+    }).lean();
+
+    if (!submission) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bài nộp'
+      });
+    }
+
+    // Format response
+    const submissionData = {
+      _id: submission._id,
+      submittedAt: submission.submittedAt,
+      isLate: submission.status === 'late',
+      status: submission.status,
+      files: submission.submittedFiles?.map(f => f.fileUrl) || [],
+      score: submission.score,
+      feedback: submission.feedback,
+      attemptNumber: submission.attemptNumber || 1,
+      gradedAt: submission.gradedAt
+    };
+
+    res.status(200).json({
+      success: true,
+      message: 'Lấy thông tin bài nộp thành công',
+      submission: submissionData
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi lấy thông tin bài nộp:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Lỗi server khi lấy thông tin bài nộp',
+      error: error.message 
+    });
+  }
+};
+
+// =========================
 // 📊 LẤY DỮ LIỆU DASHBOARD CỦA HỌC VIÊN
 // =========================
 exports.getDashboardData = async (req, res) => {

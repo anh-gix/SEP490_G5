@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import Breadcrumb from "../../components/Breadcrumb";
-import FooterOne from "../../components/FooterOne";
 import HeaderOne from "../../components/HomePageforStudent/HeaderOne";
 import Animation from "../../helper/Animation";
 import Preloader from "../../helper/Preloader";
@@ -163,28 +161,6 @@ const WritingResultPage = () => {
                     <h3 className={`text-${getScoreColor()}-600 mb-0 fw-bold`}>
                       {result.sectionScore} / {result.maxScore || "Chưa chấm"}
                     </h3>
-                  </div>
-                </div>
-                {result.maxScore > 0 && (
-                  <div className="col-md-4">
-                    <div className="bg-white box-shadow-md rounded-16 p-32 border border-neutral-30 text-center h-100">
-                      <div className="w-60 h-60 flex-center bg-main-25 text-main-600 text-28 rounded-circle mx-auto mb-16">
-                        <i className="ph-bold ph-percent" />
-                      </div>
-                      <p className="text-neutral-600 text-sm mb-8 fw-medium">Tỷ lệ đạt</p>
-                      <h3 className={`text-${getScoreColor()}-600 mb-0 fw-bold`}>
-                        {getScorePercentage()}%
-                      </h3>
-                    </div>
-                  </div>
-                )}
-                <div className="col-md-4">
-                  <div className="bg-white box-shadow-md rounded-16 p-32 border border-neutral-30 text-center h-100">
-                    <div className="w-60 h-60 flex-center bg-main-25 text-main-600 text-28 rounded-circle mx-auto mb-16">
-                      <i className="ph-bold ph-star" />
-                    </div>
-                    <p className="text-neutral-600 text-sm mb-8 fw-medium">Tổng điểm</p>
-                    <h3 className="text-main-600 mb-0 fw-bold">{result.totalScore}</h3>
                   </div>
                 </div>
               </div>

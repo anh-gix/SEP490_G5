@@ -408,8 +408,12 @@ const SpeakingExamPage = () => {
   const generateQuestionNumbers = (part) => {
     if (!sectionData?.parts) return [];
     const partData = sectionData.parts.find((p) => p.part === part);
-    if (!partData?.section?.questionCount) return [];
-    return Array.from({ length: partData.section.questionCount }, (_, i) => i + 1);
+    if (!partData?.section?.questions) return [];
+    // Lấy tất cả questionNumber từ questions array và sắp xếp
+    return partData.section.questions
+      .map((q) => q.questionNumber)
+      .filter((num) => num != null)
+      .sort((a, b) => a - b);
   };
 
   // Fullscreen functionality
@@ -874,7 +878,7 @@ const SpeakingExamPage = () => {
                       <p className="text-neutral-600 text-sm mb-0 text-center">
                         Đã ghi âm: <strong className="text-main-600">
                           {Object.keys(partRecordings).filter((qNum) => partRecordings[qNum]).length}
-                        </strong> / {currentPartData?.section?.questionCount || 0} câu
+                        </strong> / {generateQuestionNumbers(currentPart).length} câu
                       </p>
                     </div>
                   </>

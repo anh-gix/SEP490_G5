@@ -227,8 +227,12 @@ const WritingExamPage = () => {
   const generateQuestionNumbers = (part) => {
     if (!sectionData?.parts) return [];
     const partData = sectionData.parts.find((p) => p.part === part);
-    if (!partData?.section?.questionCount) return [];
-    return Array.from({ length: partData.section.questionCount }, (_, i) => i + 1);
+    if (!partData?.section?.questions) return [];
+    // Lấy tất cả questionNumber từ questions array và sắp xếp
+    return partData.section.questions
+      .map((q) => q.questionNumber)
+      .filter((num) => num != null)
+      .sort((a, b) => a - b);
   };
 
   const getWordCount = (text) => {
@@ -268,11 +272,11 @@ const WritingExamPage = () => {
   // Scroll to question
   const scrollToQuestion = useCallback((questionNumber) => {
     setCurrentQuestion(questionNumber);
-    const questionElement = questionRefs.current[questionNumber];
+    const questionElement = questionRefs.current[`part_${currentPart}_q_${questionNumber}`];
     if (questionElement) {
       questionElement.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, []);
+  }, [currentPart]);
 
   // Resize handlers
   const handleMouseMove = useCallback((e) => {
@@ -649,7 +653,7 @@ const WritingExamPage = () => {
                       <p className="text-neutral-600 text-sm mb-0 text-center">
                         Đã viết: <strong className="text-main-600">
                           {Object.keys(partAnswers).filter((qNum) => partAnswers[qNum]?.trim()).length}
-                        </strong> / {currentPartData?.section?.questionCount || 0} câu
+                        </strong> / {generateQuestionNumbers(currentPart).length} câu
                       </p>
                     </div>
                   </>
@@ -661,8 +665,9 @@ const WritingExamPage = () => {
 
         {/* Question Navigation at Bottom */}
         <div className="question-navigation">
-          {generateQuestionNumbers().map((qNum) => {
-            const answerText = answers[qNum] || "";
+          {generateQuestionNumbers(currentPart).map((qNum) => {
+            const partAnswers = answers[`part_${currentPart}`] || {};
+            const answerText = partAnswers[qNum] || "";
             const hasAnswer = answerText && answerText.trim();
             const isActive = currentQuestion === qNum;
             

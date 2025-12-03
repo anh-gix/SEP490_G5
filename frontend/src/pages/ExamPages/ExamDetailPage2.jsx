@@ -193,7 +193,7 @@ const ExamDetailPage2 = () => {
         <Preloader />
         <Animation />
         <HeaderOne />
-        <Breadcrumb title={"Chi tiết đề thi"} />
+       
         <section className="py-120">
           <div className="container">
             <div className="text-center py-80">
@@ -216,7 +216,7 @@ const ExamDetailPage2 = () => {
         <Preloader />
         <Animation />
         <HeaderOne />
-        <Breadcrumb title={"Chi tiết đề thi"} />
+       
         <section className="py-120">
           <div className="container">
             <div className="text-center py-80">
@@ -256,7 +256,7 @@ const ExamDetailPage2 = () => {
       <Preloader />
       <Animation />
       <HeaderOne />
-      <Breadcrumb title={exam.title || "Chi tiết đề thi"} />
+     
 
       <section 
         className="py-120 position-relative"
@@ -341,8 +341,6 @@ const ExamDetailPage2 = () => {
                     <div key={index} className="col-lg-3 col-md-6 col-sm-6">
                       <div
                         className="bg-white rounded-12 p-24 border border-neutral-30 box-shadow-sm transition-2 h-100 d-flex flex-column text-center"
-                        style={{ cursor: "pointer" }}
-                        onClick={() => handleSectionClick(sectionType)}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.1)";
                         }}
@@ -387,10 +385,7 @@ const ExamDetailPage2 = () => {
                             : config.gradient,
                           border: "none",
                         }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSectionClick(sectionType);
-                        }}
+                        onClick={() => handleSectionClick(sectionType)}
                         disabled={startingExam}
                       >
                         {startingExam ? (
@@ -411,39 +406,41 @@ const ExamDetailPage2 = () => {
                         )}
                       </button>
 
-                      {/* Key and Document Icons */}
-                      <div className="flex-center gap-8 justify-content-center">
-                        <i 
-                          className="ph ph-key text-neutral-400 text-xl transition-2"
-                          style={{
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = "#3b82f6";
-                            e.currentTarget.style.transform = "scale(1.2)";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = "";
-                            e.currentTarget.style.transform = "scale(1)";
-                          }}
-                        />
-                        <i 
-                          className="ph ph-file-text text-neutral-400 text-xl transition-2"
-                          style={{
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = "#3b82f6";
-                            e.currentTarget.style.transform = "scale(1.2)";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = "";
-                            e.currentTarget.style.transform = "scale(1)";
-                          }}
-                        />
-                      </div>
+                      {/* Key and Document Icons - Only show when section is completed */}
+                      {isCompleted && (
+                        <div className="flex-center gap-8 justify-content-center">
+                          <i 
+                            className="ph ph-key text-neutral-400 text-xl transition-2"
+                            style={{
+                              cursor: "pointer",
+                              transition: "all 0.2s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = "#3b82f6";
+                              e.currentTarget.style.transform = "scale(1.2)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = "";
+                              e.currentTarget.style.transform = "scale(1)";
+                            }}
+                          />
+                          <i 
+                            className="ph ph-file-text text-neutral-400 text-xl transition-2"
+                            style={{
+                              cursor: "pointer",
+                              transition: "all 0.2s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = "#3b82f6";
+                              e.currentTarget.style.transform = "scale(1.2)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = "";
+                              e.currentTarget.style.transform = "scale(1)";
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -454,8 +451,6 @@ const ExamDetailPage2 = () => {
             {/* Full Test Section */}
             <div
               className="bg-main-25 rounded-12 p-24 border border-neutral-30 position-relative"
-              style={{ cursor: "pointer" }}
-              onClick={handleFullTestClick}
             >
               <div className="d-flex flex-wrap flex-between gap-16">
                 {/* Left: Icon and Label */}
@@ -507,10 +502,7 @@ const ExamDetailPage2 = () => {
                 {/* Right: Start Button */}
                 <button
                   className="btn btn-main px-24 py-12 rounded-pill fw-semibold transition-2"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleFullTestClick();
-                  }}
+                  onClick={handleFullTestClick}
                   disabled={startingExam}
                 >
                   {startingExam ? (

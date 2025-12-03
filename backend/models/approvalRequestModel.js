@@ -6,7 +6,7 @@ const approvalRequestSchema = new Schema({
   // Loại entity cần duyệt
   requestType: {
     type: String,
-    enum: ['program', 'exam'],
+    enum: ['program', 'exam', 'class'],
     required: true,
     index: true
   },
@@ -14,7 +14,7 @@ const approvalRequestSchema = new Schema({
   // Reference đến entity cần duyệt (polymorphic reference)
   entityType: {
     type: String,
-    enum: ['Program', 'Exam'],
+    enum: ['Program', 'Exam', 'Class'],
     required: true
   },
   entityId: {
@@ -22,6 +22,13 @@ const approvalRequestSchema = new Schema({
     required: true,
     refPath: 'entityType',
     index: true
+  },
+
+  // File Excel khách hàng đính kèm (chỉ dùng cho đơn tạo lớp - type: 'create_class')
+  excelFile: {
+    title: String,
+    type: String, 
+    trim: true
   },
 
   // ===== THÔNG TIN SUBMIT =====

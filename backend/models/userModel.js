@@ -35,11 +35,12 @@ const userSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-  roleId: {
+  // Sửa thành array, 1 nhân viên nhiều role 2 đầu lương
+  roleId: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Role',
     required: true
-  }
+  }]
 }, {
   timestamps: true
 });

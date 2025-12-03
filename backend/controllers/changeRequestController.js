@@ -255,6 +255,86 @@ exports.getAllChangeRequests = async (req, res) => {
 };
 
 // =========================
+// ➕ TẠO CHANGE REQUEST MỚI
+// =========================
+exports.createChangeRequest = async (req, res) => {
+  try {
+    const { type, studentScheduleId, classId, classScheduleId, content } = req.body;
+    const senderId = req.user._id; // Lấy từ token
+    
+    // Validate required fields
+    if (!type || !content) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu thông tin bắt buộc'
+      });
+    }
+    
+    // Validate type
+    const validTypes = ['create_class', 'change_class', 'makeup_class', 'replace_teacher'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Loại đơn không hợp lệ'
+      });
+    }
+    
+    // Validate studentScheduleId for makeup_class
+    if (type === 'makeup_class' && !studentScheduleId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu thông tin buổi học'
+      });
+    }
+    
+    // Verify studentScheduleId exists and belongs to sender
+    if (type === 'makeup_class' && studentScheduleId) {
+      const studentSchedule = await StudentSchedule.findById(studentScheduleId);
+      if (!studentSchedule) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Không tìm thấy buổi học' 
+        });
+      }
+      if (studentSchedule.student.toString() !== senderId.toString()) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Bạn không có quyền truy cập buổi học này' 
+        });
+      }
+    }
+    
+    // Create change request
+    const changeRequest = await ChangeRequest.create({
+      sender: senderId,
+      type,
+      studentScheduleId: type === 'makeup_class' ? studentScheduleId : undefined,
+      classId: type === 'change_class' ? classId : undefined,
+      classScheduleId: type === 'replace_teacher' ? classScheduleId : undefined,
+      content: content.trim()
+    });
+    
+    // Populate sender info
+    const populatedRequest = await ChangeRequest.findById(changeRequest._id)
+      .populate('sender', 'username email')
+      .lean();
+    
+    res.status(201).json({
+      success: true,
+      message: 'Gửi đơn thành công',
+      changeRequest: populatedRequest
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi tạo change request:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi tạo đơn',
+      error: error.message
+    });
+  }
+};
+
+// =========================
 // 📅 LẤY LỊCH HỌC/DẠY CỦA NGƯỜI GỬI ĐƠN
 // =========================
 exports.getSenderSchedule = async (req, res) => {
@@ -562,24 +642,33 @@ exports.approveChangeRequest = async (req, res) => {
         if (isNewMakeup && newMakeupDate && newMakeupStartTime && newMakeupEndTime && newMakeupRoomId && newMakeupTeacherId) {
           console.log(`🆕 Tạo buổi học bù mới cho buổi nghỉ: ${absentScheduleId}`);
           
-          // Parse date string (YYYY-MM-DD) và tạo Date object ở local timezone
+          // Parse date string (YYYY-MM-DD) và tạo Date object ở UTC để tránh timezone issues
           const dateParts = newMakeupDate.split('-');
           if (dateParts.length !== 3) {
             console.warn(`⚠️ Định dạng ngày không hợp lệ: ${newMakeupDate}`);
             continue;
           }
           
-          const scheduleDate = new Date(
+          // Tạo date ở UTC để đảm bảo consistency với MongoDB (MongoDB lưu dates dưới dạng UTC)
+          const scheduleDate = new Date(Date.UTC(
             parseInt(dateParts[0]), // year
             parseInt(dateParts[1]) - 1, // month (0-indexed)
-            parseInt(dateParts[2]) // day
-          );
-          scheduleDate.setHours(0, 0, 0, 0);
+            parseInt(dateParts[2]), // day
+            0, // hours
+            0, // minutes
+            0, // seconds
+            0  // milliseconds
+          ));
+          
+          // Tạo date range để query (start và end của ngày trong UTC)
+          const startOfDay = new Date(scheduleDate);
+          const endOfDay = new Date(scheduleDate);
+          endOfDay.setUTCHours(23, 59, 59, 999);
           
           // Kiểm tra conflict với room và teacher (trong transaction)
           const roomConflict = await ClassSchedule.findOne({
             room: new mongoose.Types.ObjectId(newMakeupRoomId),
-            date: scheduleDate,
+            date: { $gte: startOfDay, $lte: endOfDay },
             status: { $in: ['temporary', 'fixed'] },
             $or: [
               { $and: [{ startTime: { $lte: newMakeupStartTime } }, { endTime: { $gt: newMakeupStartTime } }] },
@@ -605,7 +694,7 @@ exports.approveChangeRequest = async (req, res) => {
             const teacherClassIds = teacherClasses.map(c => c._id);
             const teacherConflict = await ClassSchedule.findOne({
               class: { $in: teacherClassIds },
-              date: scheduleDate,
+              date: { $gte: startOfDay, $lte: endOfDay },
               status: { $in: ['temporary', 'fixed'] },
               $or: [
                 { $and: [{ startTime: { $lte: newMakeupStartTime } }, { endTime: { $gt: newMakeupStartTime } }] },
@@ -653,9 +742,9 @@ exports.approveChangeRequest = async (req, res) => {
             if (!dateInput) return null;
             const d = new Date(dateInput);
             if (isNaN(d.getTime())) return null;
-            const year = d.getUTCFullYear();
-            const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-            const day = String(d.getUTCDate()).padStart(2, '0');
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
           };
           
@@ -1162,7 +1251,7 @@ exports.approveChangeRequest = async (req, res) => {
     }
     
     // Cập nhật trạng thái đơn sử dụng findByIdAndUpdate để tránh lỗi validation
-    const updatedChangeRequest = await ChangeRequest.findByIdAndUpdate(
+    await ChangeRequest.findByIdAndUpdate(
       id,
       {
         status: 'approved',
@@ -1173,12 +1262,16 @@ exports.approveChangeRequest = async (req, res) => {
         new: true,
         session: session
       }
-    )
-    .populate('sender', 'username email phone')
-    .populate('approver', 'username email');
+    );
     
+    // Commit transaction before populating (populate doesn't need to be in transaction)
     await session.commitTransaction();
     session.endSession();
+    
+    // Fetch the updated document with populated fields after transaction commits
+    const updatedChangeRequest = await ChangeRequest.findById(id)
+      .populate('sender', 'username email phone')
+      .populate('approver', 'username email');
     
     res.status(200).json({
       success: true,

@@ -64,6 +64,41 @@ const StudentManagementAPI = () => {
     fetchFilterOptions();
   }, []);
 
+  // Filter levels based on selected program type
+  useEffect(() => {
+    const filterLevels = async () => {
+      if (!programType) {
+        // If no program selected, show all levels
+        try {
+          const response = await courseService.getAllLevels();
+          if (response?.success && response.levels) {
+            setAvailableLevels(response.levels);
+          }
+        } catch (error) {
+          console.error('Error fetching all levels:', error);
+        }
+        return;
+      }
+
+      // Fetch levels for this program type
+      try {
+        const response = await courseService.getLevelsByType(programType);
+        if (response?.success && response.levels) {
+          setAvailableLevels(response.levels);
+          
+          // If current level is not available for selected program, clear it
+          if (level && !response.levels.includes(level)) {
+            setLevel('');
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching levels by type:', error);
+      }
+    };
+    
+    filterLevels();
+  }, [programType]);
+
   // Reset page when filters change (but not when page itself changes)
   useEffect(() => {
     setPage(1);
@@ -268,12 +303,18 @@ const StudentManagementAPI = () => {
       // Get attendance status
       const attendanceStatus = schedule.attendance?.status || null;
       
+      // Get schedule status from StudentSchedule
+      const scheduleStatus = schedule.scheduleStatus || 'scheduled';
+      const isMakeupSchedule = scheduleStatus === 'rescheduled';
+      const isCancelled = scheduleStatus === 'cancelled';
+      const reason = schedule.reason || null;
+      
       return {
         id: schedule._id || index,
         date: dateStr,
         startTime: schedule.startTime || '',
         endTime: schedule.endTime || '',
-        className: schedule.class?.name || 'N/A',
+        className: schedule.className || 'N/A',
         roomName: schedule.room?.room_name || 'N/A',
         topic: schedule.topic || '',
         status: schedule.status === 'fixed' ? 'scheduled' : schedule.status === 'temporary' ? 'makeup' : 'scheduled',
@@ -281,7 +322,12 @@ const StudentManagementAPI = () => {
         hasAttendance: !!attendanceStatus,
         teacherName: schedule.teacher?.username || 'N/A',
         lessonNumber: schedule.session?.order || '',
-        lessonTopic: schedule.topic || ''
+        lessonTopic: schedule.topic || '',
+        scheduleStatus: scheduleStatus,
+        reason: reason,
+        isMakeupSchedule: isMakeupSchedule,
+        isCancelled: isCancelled,
+        cancellationReason: isCancelled ? reason : null
       };
     });
   }, [studentSchedule]);
@@ -518,11 +564,19 @@ const StudentManagementAPI = () => {
                   </div>
 
                   <div className="mb-16">
-                    <div className="d-flex align-items-center gap-8">
-                      <i className="fas fa-door-open text-neutral-400"></i>
-                      <span className="text-neutral-700 text-14">
-                        Lớp: {student.stats?.classCount || 0} lớp
-                      </span>
+                    <div className="d-flex align-items-start gap-8">
+                      <i className="fas fa-door-open text-neutral-400 mt-2"></i>
+                      <div className="flex-grow-1">
+                        {student.stats?.classNames && student.stats.classNames.length > 0 ? (
+                          <div className="d-flex flex-column gap-4">
+                            {student.stats.classNames.map((className, idx) => (
+                              <span key={idx} className="text-neutral-700 text-14">{className}</span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-neutral-500 text-14">Chưa có lớp</span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -575,7 +629,15 @@ const StudentManagementAPI = () => {
                     <td className="px-20 py-16 text-neutral-700 text-14">{student.email}</td>
                     <td className="px-20 py-16 text-neutral-700 text-14">{student.phone || 'N/A'}</td>
                     <td className="px-20 py-16 text-center text-neutral-700 fw-medium text-14">
-                      {student.stats?.classCount || 0}
+                      {student.stats?.classNames && student.stats.classNames.length > 0 ? (
+                        <div className="d-flex flex-column gap-4">
+                          {student.stats.classNames.map((className, idx) => (
+                            <span key={idx} className="text-13">{className}</span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-neutral-500">Chưa có lớp</span>
+                      )}
                     </td>
                     <td className="px-20 py-16">
                       <div className="d-flex gap-8">

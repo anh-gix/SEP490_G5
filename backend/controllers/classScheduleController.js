@@ -1474,11 +1474,21 @@ exports.getStudentSchedule = async (req, res) => {
             }
           }
 
+          // Get className - try classInfo first, if null try to get from classSchedule.class directly
+          let className = classInfo?.name;
+          if (!className && classSchedule.class) {
+            // If classInfo is null but classSchedule.class exists, it might be an ObjectId
+            // Try to populate it if it's not already populated
+            if (typeof classSchedule.class === 'object' && classSchedule.class.name) {
+              className = classSchedule.class.name;
+            }
+          }
+          
           return {
             _id: ss._id,
             startTime: classSchedule.startTime,
             endTime: classSchedule.endTime,
-            className: classInfo?.name || "N/A",
+            className: className || "N/A",
             subject: classInfo?.subject || "N/A",
             teacher: teacher
               ? {
@@ -1499,6 +1509,8 @@ exports.getStudentSchedule = async (req, res) => {
             sessionTitle: sessionTitle || classSchedule.topic || null,
             status: classSchedule.status || "fixed",
             attendance: ss.attendance,
+            scheduleStatus: ss.scheduleStatus || "scheduled",
+            reason: ss.reason || null,
           };
         })
     );

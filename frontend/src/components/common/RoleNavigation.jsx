@@ -179,24 +179,6 @@ const RoleNavigation = ({
             </Dropdown.Item>
             
             <Dropdown.Item 
-              href="/notifications" 
-              className="rounded-8 px-12 py-10 text-13 d-flex align-items-center gap-10 mb-2"
-            >
-              <i className="fas fa-bell text-warning-600" style={{ width: '20px' }}></i>
-              <span>Thông báo</span>
-            </Dropdown.Item>
-
-            <Dropdown.Divider className="my-8" />
-            
-            <Dropdown.Item 
-              href="/help" 
-              className="rounded-8 px-12 py-10 text-13 d-flex align-items-center gap-10 mb-2"
-            >
-              <i className="fas fa-question-circle text-info-600" style={{ width: '20px' }}></i>
-              <span>Trợ giúp</span>
-            </Dropdown.Item>
-            
-            <Dropdown.Item 
               href="/logout" 
               className="rounded-8 px-12 py-10 text-13 d-flex align-items-center gap-10 text-danger-600"
             >

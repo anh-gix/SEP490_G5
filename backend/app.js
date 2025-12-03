@@ -36,7 +36,6 @@ app.use('/api/student-schedules', require('./routes/studentScheduleRoutes'));
 // Center Head Routes
 app.use('/api/center-head', require('./routes/centerHeadRoutes'));
 app.use('/api/programs', require('./routes/programRoutes'));
-app.use('/api/courses', require('./routes/courseRoute'));
 app.use('/api/courseshome', require('./routes/courseHomeRoutes'));
 app.use('/api/sessions', require('./routes/sessionRoutes'));
 app.use('/api/cam-sessions', require('./routes/camSessionRoutes'));

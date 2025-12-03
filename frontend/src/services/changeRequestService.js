@@ -36,6 +36,27 @@ const changeRequestService = {
     }
   },
 
+  // Create change request (for students)
+  createChangeRequest: async (data) => {
+    try {
+      const response = await api.post('/students/me/change-requests', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating change request:', error);
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Create change request (for teachers - uses general endpoint)
+  createTeacherChangeRequest: async (data) => {
+    try {
+      const response = await api.post('/change-requests', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating teacher change request:', error);
+      throw error.response?.data || error.message;
+    }
+  },
 
   // Get sender schedule
   getSenderSchedule: async (requestId) => {

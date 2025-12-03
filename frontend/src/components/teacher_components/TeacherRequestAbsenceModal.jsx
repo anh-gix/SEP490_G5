@@ -1,32 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
-import { useAuth } from '../../contexts/AuthContext';
 import changeRequestService from '../../services/changeRequestService';
 
 /**
- * Request Absence Modal Component
- * Modal cho phép học viên xin nghỉ học
+ * Teacher Request Absence Modal Component
+ * Modal cho phép giảng viên xin nghỉ dạy
  */
-const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
-  const { user } = useAuth();
+const TeacherRequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
   const [formData, setFormData] = useState({
     description: ''
   });
   const [validated, setValidated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // Log student ID and studentScheduleId when modal opens
-  useEffect(() => {
-    if (show && schedule) {
-      const studentId = user?._id || user?.id;
-      const studentScheduleId = schedule.studentScheduleId;
-      
-      console.log('=== Modal xin nghỉ học được mở ===');
-      console.log('1. Student ID:', studentId);
-      console.log('2. StudentScheduleId:', studentScheduleId);
-    }
-  }, [show, schedule, user]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -51,8 +37,8 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
     setError('');
 
     try {
-      // Validate studentScheduleId exists
-      if (!schedule.studentScheduleId) {
+      // Validate classScheduleId exists
+      if (!schedule.classScheduleId) {
         setError('Thiếu thông tin buổi học. Vui lòng thử lại.');
         setLoading(false);
         return;
@@ -60,13 +46,13 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
 
       // Prepare request data
       const requestData = {
-        type: 'makeup_class',
-        studentScheduleId: schedule.studentScheduleId,
+        type: 'replace_teacher',
+        classScheduleId: schedule.classScheduleId,
         content: formData.description
       };
 
       // Call API to create change request
-      const response = await changeRequestService.createChangeRequest(requestData);
+      const response = await changeRequestService.createTeacherChangeRequest(requestData);
 
       if (response.success) {
         // Success - reset form and close modal
@@ -124,10 +110,10 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
         <div>
           <Modal.Title className="fw-bold text-18 mb-4">
             <i className="fas fa-hand-paper me-2"></i>
-            Đơn xin nghỉ học
+            Đơn xin nghỉ dạy
           </Modal.Title>
           <p className="mb-0 text-15" style={{ opacity: 0.95 }}>
-            Gửi đơn xin nghỉ buổi học
+            Gửi đơn xin nghỉ buổi dạy
           </p>
         </div>
       </Modal.Header>
@@ -146,12 +132,12 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
           <div className="bg-warning-50 border border-warning-200 rounded-12 p-20 mb-24">
             <h6 className="text-neutral-900 fw-semibold mb-12">
               <i className="fas fa-info-circle text-warning-600 me-2"></i>
-              Thông tin buổi học
+              Thông tin buổi dạy
             </h6>
             <div className="d-flex flex-column gap-8">
               <div className="d-flex">
                 <span className="text-neutral-500 text-13" style={{ minWidth: '120px' }}>
-                  Ngày học:
+                  Ngày dạy:
                 </span>
                 <span className="text-neutral-900 fw-medium text-13">
                   {formatDate(schedule.date)}
@@ -162,7 +148,7 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
                   Thời gian:
                 </span>
                 <span className="text-neutral-900 fw-medium text-13">
-                  {schedule.startTime} - {schedule.endTime}
+                  {schedule.time || `${schedule.startTime} - ${schedule.endTime}`}
                 </span>
               </div>
               <div className="d-flex">
@@ -170,15 +156,15 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
                   Chủ đề:
                 </span>
                 <span className="text-neutral-900 fw-medium text-13">
-                  Buổi {schedule.lessonNumber} - {schedule.topic}
+                  {schedule.topic}
                 </span>
               </div>
               <div className="d-flex">
                 <span className="text-neutral-500 text-13" style={{ minWidth: '120px' }}>
-                  Giảng viên:
+                  Lớp học:
                 </span>
                 <span className="text-neutral-900 fw-medium text-13">
-                  {schedule.teacher}
+                  {schedule.className}
                 </span>
               </div>
               <div className="d-flex">
@@ -206,11 +192,11 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
               value={formData.description}
               onChange={handleInputChange}
               required
-              placeholder="Mô tả chi tiết lý do xin nghỉ học..."
+              placeholder="Mô tả chi tiết lý do xin nghỉ dạy..."
               className="border-neutral-30 radius-8 px-16 py-10 text-13"
             />
             <Form.Control.Feedback type="invalid" className="text-13">
-              Vui lòng nhập chi tiết lý do nghỉ học
+              Vui lòng nhập chi tiết lý do nghỉ dạy
             </Form.Control.Feedback>
             <Form.Text className="text-neutral-500 text-12 mt-8">
               Cung cấp thông tin chi tiết giúp giáo vụ xử lý đơn nhanh hơn
@@ -227,16 +213,16 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
                 </h6>
                 <ul className="text-neutral-700 text-13 mb-0 ps-20">
                   <li className="mb-4">
-                    Đơn xin nghỉ cần được gửi trước buổi học ít nhất 2 giờ
+                    Đơn xin nghỉ cần được gửi trước buổi dạy ít nhất 2 giờ
                   </li>
                   <li className="mb-4">
                     Giáo vụ sẽ xem xét và phản hồi trong vòng 24 giờ
                   </li>
                   <li className="mb-4">
-                    Bạn có thể theo dõi trạng thái đơn trong mục "Lịch sử xin nghỉ"
+                    Bạn có thể theo dõi trạng thái đơn trong mục quản lý đơn
                   </li>
                   <li>
-                    Nghỉ quá 3 buổi không phép có thể ảnh hưởng đến kết quả học tập
+                    Giáo vụ sẽ sắp xếp giáo viên dạy thay cho buổi học này
                   </li>
                 </ul>
               </div>
@@ -278,4 +264,5 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
   );
 };
 
-export default RequestAbsenceModal;
+export default TeacherRequestAbsenceModal;
+

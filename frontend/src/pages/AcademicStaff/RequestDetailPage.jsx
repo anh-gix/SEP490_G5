@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Container, Card, Button, Spinner, Alert, Modal, Form } from 'react-bootstrap';
 import AcademicNavigation from '../../components/class_management/AcademicNavigation.jsx';
 import ScheduleCalendar from '../../components/class_management/ScheduleCalendar';
-import { formatDateToYYYYMMDD } from '../../helper/helper';
+import { formatDateToYYYYMMDD, parseDateString } from '../../helper/helper';
 import classService from '../../services/classService';
 import { studentScheduleService } from '../../services/studentScheduleService';
 
@@ -339,8 +339,7 @@ const RequestDetailPage = ({
     const oldClassId = pendingClassChange?.oldClassId?.toString();
     
     const schedules = senderSchedule.map((schedule, index) => {
-      const scheduleDate = new Date(schedule.date);
-      const dateStr = formatDateToYYYYMMDD(scheduleDate);
+      const dateStr = formatDateToYYYYMMDD(schedule.date);
       
       // Lấy attendance status nếu có
       const attendanceStatus = schedule.attendance?.status || null;
@@ -490,8 +489,7 @@ const RequestDetailPage = ({
           return null;
         }
         
-        const scheduleDate = new Date(makeup.makeupSchedule.date);
-        const dateStr = formatDateToYYYYMMDD(scheduleDate);
+        const dateStr = formatDateToYYYYMMDD(makeup.makeupSchedule.date);
         
         return {
           id: `makeup-pending-${index}-${makeupScheduleId}`,
@@ -522,8 +520,7 @@ const RequestDetailPage = ({
       newClassSchedulesList.forEach((newSchedule, index) => {
         if (!newSchedule.date) return;
         
-        const scheduleDate = new Date(newSchedule.date);
-        const dateStr = formatDateToYYYYMMDD(scheduleDate);
+        const dateStr = formatDateToYYYYMMDD(newSchedule.date);
         
         newClassSchedules.push({
           id: `new-class-${index}-${newSchedule.date}`,
@@ -638,7 +635,7 @@ const RequestDetailPage = ({
                       });
                       
                       // Format ngày thứ mấy
-                      const scheduleDate = new Date(classSchedule.date);
+                      const scheduleDate = parseDateString(classSchedule.date) || new Date(classSchedule.date);
                       const dayOfWeek = scheduleDate.getDay();
                       const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
                       const dayName = dayNames[dayOfWeek];
@@ -651,7 +648,7 @@ const RequestDetailPage = ({
                       const substituteTeacherInfo = correspondingMakeup?.substituteTeacherInfo;
                       
                       const makeupDateStr = makeupSchedule?.date 
-                        ? new Date(makeupSchedule.date).toLocaleDateString('vi-VN') 
+                        ? (parseDateString(makeupSchedule.date) || new Date(makeupSchedule.date)).toLocaleDateString('vi-VN') 
                         : '';
                       const makeupTimeStr = makeupSchedule?.startTime && makeupSchedule?.endTime
                         ? `${makeupSchedule.startTime} - ${makeupSchedule.endTime}`
@@ -827,7 +824,7 @@ const RequestDetailPage = ({
                       });
                       
                       // Format ngày thứ mấy
-                      const scheduleDate = new Date(classSchedule.date);
+                      const scheduleDate = parseDateString(classSchedule.date) || new Date(classSchedule.date);
                       const dayOfWeek = scheduleDate.getDay();
                       const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
                       const dayName = dayNames[dayOfWeek];
@@ -1282,7 +1279,7 @@ const RequestDetailPage = ({
                                           <div className="fw-semibold">{session.sessionTitle}</div>
                                           {session.date && (
                                             <div className="text-neutral-600">
-                                              {new Date(session.date).toLocaleDateString('vi-VN')} {session.startTime}-{session.endTime}
+                                              {(parseDateString(session.date) || new Date(session.date)).toLocaleDateString('vi-VN')} {session.startTime}-{session.endTime}
                                             </div>
                                           )}
                                         </div>
@@ -1304,7 +1301,7 @@ const RequestDetailPage = ({
                                                   </div>
                                                   <div className="text-neutral-600">
                                                     {correspondingMakeup.makeupSchedule.date 
-                                                      ? new Date(correspondingMakeup.makeupSchedule.date).toLocaleDateString('vi-VN')
+                                                      ? (parseDateString(correspondingMakeup.makeupSchedule.date) || new Date(correspondingMakeup.makeupSchedule.date)).toLocaleDateString('vi-VN')
                                                       : 'N/A'} {correspondingMakeup.makeupSchedule.startTime || ''}-{correspondingMakeup.makeupSchedule.endTime || ''}
                                                   </div>
                                                   {correspondingMakeup.makeupClassInfo?.className && (

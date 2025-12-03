@@ -80,6 +80,14 @@ router.get('/me/classes/:classId/schedules/:scheduleId/homework/:homeworkId/subm
   studentController.getMySubmission
 );
 
+// Create change request (for absence request)
+const changeRequestController = require('../controllers/changeRequestController');
+router.post('/me/change-requests', 
+  verifyToken, 
+  isStudent, 
+  changeRequestController.createChangeRequest
+);
+
 // ==========================================
 // ADMIN/ACADEMIC STAFF ROUTES (for student management)
 // ==========================================

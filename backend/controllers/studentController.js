@@ -341,6 +341,7 @@ exports.getLessonDetail = async (req, res) => {
       // Student specific info
       attendance: studentSchedule?.attendance || null,
       scheduleStatus: studentSchedule?.scheduleStatus || 'scheduled',
+      studentScheduleId: studentSchedule?._id || null,
       notes: classSchedule.note || '',
       
       // Status (upcoming, completed, cancelled)
@@ -1257,14 +1258,18 @@ exports.getAllStudents = async (req, res) => {
       .limit(limitNum)
       .lean();
     
-    // Get class count for each student
+    // Get class names for each student
     const studentsWithClasses = await Promise.all(
       students.map(async (student) => {
-        const classCount = await Class.countDocuments({ students: student._id });
+        const classes = await Class.find({ students: student._id })
+          .select('name')
+          .lean();
+        const classNames = classes.map(cls => cls.name);
         return {
           ...student,
           stats: {
-            classCount
+            classCount: classNames.length,
+            classNames: classNames
           }
         };
       })
@@ -1365,14 +1370,32 @@ exports.getStudentById = async (req, res) => {
       });
     }
     
-    // Get class count
-    const classCount = await Class.countDocuments({ students: id });
+    // Get classes that student is enrolled in
+    const classes = await Class.find({ students: id })
+      .populate({
+        path: 'course',
+        select: 'name',
+        populate: { path: 'program', select: 'level' }
+      })
+      .populate('students', 'username email')
+      .select('name course status students')
+      .lean();
+    
+    // Format classes with level from program
+    const formattedClasses = classes.map(cls => ({
+      name: cls.name,
+      course: cls.course ? { name: cls.course.name } : null,
+      level: cls.course?.program?.level || 'N/A',
+      status: cls.status,
+      students: cls.students || []
+    }));
     
     res.status(200).json({
       success: true,
       student: {
         ...student,
-        classCount
+        classes: formattedClasses,
+        classCount: formattedClasses.length
       }
     });
   } catch (error) {

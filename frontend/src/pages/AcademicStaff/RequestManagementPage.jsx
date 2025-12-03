@@ -10,7 +10,7 @@ import teacherService from '../../services/teacherService';
 import roomService from '../../services/roomService';
 import { studentScheduleService } from '../../services/studentScheduleService';
 import scheduleService from '../../services/scheduleService';
-import { formatDateToYYYYMMDD } from '../../helper/helper';
+import { formatDateToYYYYMMDD, parseDateString } from '../../helper/helper';
 import RequestDetailPage from './RequestDetailPage';
 
 /**
@@ -799,8 +799,7 @@ const RequestManagementPage = () => {
   // Transform schedule data for calendar view
   const calendarSchedules = useMemo(() => {
     const schedules = senderSchedule.map((schedule, index) => {
-      const scheduleDate = new Date(schedule.date);
-      const dateStr = formatDateToYYYYMMDD(scheduleDate);
+      const dateStr = formatDateToYYYYMMDD(schedule.date);
       
       // Lấy attendance status nếu có
       const attendanceStatus = schedule.attendance?.status || null;
@@ -926,8 +925,7 @@ const RequestManagementPage = () => {
           return null;
         }
         
-        const scheduleDate = new Date(makeup.makeupSchedule.date);
-        const dateStr = formatDateToYYYYMMDD(scheduleDate);
+        const dateStr = formatDateToYYYYMMDD(makeup.makeupSchedule.date);
         
         return {
           id: `makeup-pending-${index}-${makeupScheduleId}`,
@@ -2565,8 +2563,7 @@ const RequestManagementPage = () => {
         const teacherInfo = availableTeachers.find(t => (t._id || t.id)?.toString() === newMakeupTeacherId.toString());
 
         // Format makeup schedule để hiển thị (chưa tạo trong DB)
-        const scheduleDate = newMakeupDate ? new Date(newMakeupDate) : null;
-        const dateStr = scheduleDate ? formatDateToYYYYMMDD(scheduleDate) : null;
+        const dateStr = newMakeupDate ? formatDateToYYYYMMDD(newMakeupDate) : null;
 
         const formattedMakeupSchedule = {
           date: dateStr || newMakeupDate,
@@ -3609,7 +3606,7 @@ const RequestManagementPage = () => {
                         );
                         if (selectedSchedule) {
                           if (selectedSchedule.date) {
-                            const date = new Date(selectedSchedule.date);
+                            const date = parseDateString(selectedSchedule.date) || new Date(selectedSchedule.date);
                             setNewMakeupDate(formatDateToYYYYMMDD(date));
                           }
                           if (selectedSchedule.startTime) {
@@ -3702,7 +3699,7 @@ const RequestManagementPage = () => {
                             <strong>Buổi dạy thay bạn đang chọn:</strong>
                             <div className="mt-4">
                               • <strong>Giáo viên dạy thay:</strong> {selectedTeacher?.username || selectedTeacher?.fullName || selectedTeacher?.name || 'N/A'}<br/>
-                              • <strong>Ngày:</strong> {selectedSchedule.date ? new Date(selectedSchedule.date).toLocaleDateString('vi-VN') : 'N/A'}<br/>
+                              • <strong>Ngày:</strong> {selectedSchedule.date ? (parseDateString(selectedSchedule.date) || new Date(selectedSchedule.date)).toLocaleDateString('vi-VN') : 'N/A'}<br/>
                               • <strong>Thời gian:</strong> {selectedSchedule.startTime || 'N/A'} - {selectedSchedule.endTime || 'N/A'}<br/>
                               • <strong>Phòng:</strong> {selectedSchedule.roomName || 'N/A'}
                             </div>
@@ -3736,7 +3733,7 @@ const RequestManagementPage = () => {
                             const makeupSchedule = pendingMakeupData.makeupSchedule;
                             const makeupClassInfo = selectedMakeupClassInfo;
                             if (makeupSchedule) {
-                              const scheduleDate = makeupSchedule.date ? new Date(makeupSchedule.date) : null;
+                              const scheduleDate = makeupSchedule.date ? (parseDateString(makeupSchedule.date) || new Date(makeupSchedule.date)) : null;
                               const dateStr = scheduleDate ? scheduleDate.toLocaleDateString('vi-VN') : 'N/A';
                               return (
                                 <div>
@@ -3829,8 +3826,7 @@ const RequestManagementPage = () => {
                               const classSchedule = studentSchedule.classSchedule;
                               
                               if (classSchedule) {
-                              const scheduleDate = classSchedule.date ? new Date(classSchedule.date) : null;
-                              const dateStr = scheduleDate ? formatDateToYYYYMMDD(scheduleDate) : null;
+                              const dateStr = classSchedule.date ? formatDateToYYYYMMDD(classSchedule.date) : null;
                               
                               selectedSchedule = {
                                 id: studentSchedule._id || studentSchedule.id,
@@ -3874,8 +3870,7 @@ const RequestManagementPage = () => {
                           if (originalSchedule) {
                             // Lấy thông tin từ classSchedule nếu có, nếu không thì từ chính nó
                             const classSchedule = originalSchedule.classSchedule || originalSchedule;
-                            const scheduleDate = classSchedule.date ? new Date(classSchedule.date) : null;
-                            const dateStr = scheduleDate ? formatDateToYYYYMMDD(scheduleDate) : null;
+                            const dateStr = classSchedule.date ? formatDateToYYYYMMDD(classSchedule.date) : null;
                             
                             selectedSchedule = {
                               id: originalSchedule._id || originalSchedule.id,
@@ -3899,8 +3894,7 @@ const RequestManagementPage = () => {
                           const classScheduleId = (classSchedule._id || classSchedule.id)?.toString();
                           
                           if (classSchedule) {
-                            const scheduleDate = classSchedule.date ? new Date(classSchedule.date) : null;
-                            const dateStr = scheduleDate ? formatDateToYYYYMMDD(scheduleDate) : null;
+                            const dateStr = classSchedule.date ? formatDateToYYYYMMDD(classSchedule.date) : null;
                             
                             selectedSchedule = {
                               id: classScheduleId,
@@ -3944,7 +3938,7 @@ const RequestManagementPage = () => {
                                     <div className="d-flex align-items-center gap-2">
                                       <i className="fas fa-calendar-alt text-primary"></i>
                                       <span className="text-muted">Ngày:</span>
-                                      <span className="fw-semibold">{new Date(selectedSchedule.date).toLocaleDateString('vi-VN')}</span>
+                                      <span className="fw-semibold">{(parseDateString(selectedSchedule.date) || new Date(selectedSchedule.date)).toLocaleDateString('vi-VN')}</span>
                                     </div>
                                   </div>
                                 )}
@@ -4003,7 +3997,7 @@ const RequestManagementPage = () => {
                             <div className="row g-2" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                               {filteredAbsentSchedules.map((schedule) => {
                               const scheduleId = schedule.id || schedule._id;
-                              const dateStr = schedule.date ? new Date(schedule.date).toLocaleDateString('vi-VN') : '';
+                              const dateStr = schedule.date ? (parseDateString(schedule.date) || new Date(schedule.date)).toLocaleDateString('vi-VN') : '';
                               const timeStr = `${schedule.startTime} - ${schedule.endTime}`;
                               const isSelected = selectedCurrentScheduleId === scheduleId.toString();
                               const isCancelled = schedule.scheduleStatus === 'cancelled';
@@ -4236,7 +4230,7 @@ const RequestManagementPage = () => {
                                             <div className="d-flex align-items-center gap-2">
                                               <i className="fas fa-calendar-alt text-success"></i>
                                               <span className="text-muted">Ngày:</span>
-                                              <span className="fw-semibold">{new Date(selectedSchedule.date).toLocaleDateString('vi-VN')}</span>
+                                              <span className="fw-semibold">{(parseDateString(selectedSchedule.date) || new Date(selectedSchedule.date)).toLocaleDateString('vi-VN')}</span>
                                             </div>
                                           </div>
                                         )}
@@ -4399,7 +4393,7 @@ const RequestManagementPage = () => {
                                     <option value="">-- Chọn buổi học bù --</option>
                                     {filteredClassSchedules.map((schedule) => {
                                       const scheduleId = (schedule._id || schedule.id)?.toString();
-                                      const dateStr = schedule.date ? new Date(schedule.date).toLocaleDateString('vi-VN') : '';
+                                      const dateStr = schedule.date ? (parseDateString(schedule.date) || new Date(schedule.date)).toLocaleDateString('vi-VN') : '';
                                       const timeStr = `${schedule.startTime || ''} - ${schedule.endTime || ''}`;
                                       const className = schedule.class?.name || 'N/A';
                                       const displayText = `${schedule.session?.title || 'N/A'} - ${className}${dateStr ? ` (${dateStr})` : ''} - ${timeStr}`;
@@ -4479,7 +4473,7 @@ const RequestManagementPage = () => {
                                             <div className="d-flex align-items-center gap-2">
                                               <i className="fas fa-calendar-alt text-success"></i>
                                               <span className="text-muted">Ngày:</span>
-                                              <span className="fw-semibold">{new Date(selectedSchedule.date).toLocaleDateString('vi-VN')}</span>
+                                              <span className="fw-semibold">{(parseDateString(selectedSchedule.date) || new Date(selectedSchedule.date)).toLocaleDateString('vi-VN')}</span>
                                             </div>
                                           </div>
                                         )}

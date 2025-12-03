@@ -9,16 +9,16 @@ const ChangeRequest = require('../models/changeRequestModel');
 // =========================
 exports.getDashboardData = async (req, res) => {
   try {
-    // Tạo date range theo UTC để query đúng với date trong database
-    // Date trong DB được lưu dưới dạng UTC, nên cần query theo UTC
+    // Tạo date range cho ngày hôm nay sử dụng date string format (giống scheduleController)
+    // Sử dụng date string format để đảm bảo tạo dates ở midnight UTC, khớp với cách MongoDB lưu trữ
     const now = new Date();
-    const localYear = now.getFullYear();
-    const localMonth = now.getMonth();
-    const localDay = now.getDate();
+    const todayString = now.toISOString().split('T')[0]; // Format: YYYY-MM-DD
     
-    // Tạo start và end của ngày ở UTC để đảm bảo query chính xác
-    const todayStart = new Date(Date.UTC(localYear, localMonth, localDay, 0, 0, 0, 0));
-    const todayEnd = new Date(Date.UTC(localYear, localMonth, localDay, 23, 59, 59, 999));
+    // Tạo start và end của ngày ở UTC midnight để khớp với MongoDB
+    // new Date("2025-12-03") tạo date ở 00:00:00 UTC của ngày đó
+    const todayStart = new Date(todayString);
+    const todayEnd = new Date(todayString);
+    todayEnd.setUTCHours(23, 59, 59, 999);
 
     // 1. Get today's schedules with populated data
     const todaySchedules = await ClassSchedule.find({
@@ -84,19 +84,25 @@ exports.getDashboardData = async (req, res) => {
       });
 
       // Determine schedule status
-      // schedule.date là Date object từ MongoDB (UTC), cần convert sang local timezone
-      // để lấy đúng ngày local (vì startTime/endTime là local time)
+      // schedule.date is stored in MongoDB as UTC, but we need to work with local timezone
+      // startTime and endTime are stored as local time strings (e.g., "14:00:00")
+      // Convert schedule.date to local timezone for consistent comparison
       const scheduleDate = new Date(schedule.date);
-      // Format date thành YYYY-MM-DD theo local timezone (vì startTime/endTime là local time)
+      
+      // Extract local date components (not UTC) to match local time strings
       const year = scheduleDate.getFullYear();
       const month = String(scheduleDate.getMonth() + 1).padStart(2, '0');
       const day = String(scheduleDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
       
-      // startTime và endTime là local time (UTC+7), tạo Date object theo local timezone
+      // Create Date objects in local timezone for startTime and endTime
+      // ISO string without timezone specifier is parsed as local time
       const startTime = new Date(`${dateStr}T${schedule.startTime}:00`);
       const endTime = new Date(`${dateStr}T${schedule.endTime}:00`);
-      const now = new Date();
+      
+      // Ensure 'now' is also in local timezone for consistent comparison
+      // 'now' is already local time from line 14, so comparison should be consistent
+      // All three (now, startTime, endTime) are now in the same timezone (local)
       
       let status = 'upcoming';
       if (startTime <= now && now <= endTime) {
@@ -129,10 +135,12 @@ exports.getDashboardData = async (req, res) => {
     const roomScheduleData = rooms.map(room => {
       const schedules = timeSlots.map(timeSlot => {
         const [startTime, endTime] = timeSlot.split('-');
+        // Normalize time strings (remove seconds if present) for comparison
+        const normalizeTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : '';
         const matchingSchedule = todaySchedules.find(s => 
           s.room?._id?.toString() === room._id?.toString() &&
-          s.startTime === startTime &&
-          s.endTime === endTime
+          normalizeTime(s.startTime) === startTime &&
+          normalizeTime(s.endTime) === endTime
         );
         
         if (matchingSchedule) {
@@ -201,10 +209,12 @@ exports.getDashboardData = async (req, res) => {
       .limit(5)
       .lean();
 
-    // Reuse 'now' variable declared at the beginning of the function
+    // Capture fresh timestamp right before calculating time differences
+    // to ensure accurate "time ago" values after async operations
+    const currentTime = new Date();
     const recentActivities = recentRequests.map(request => {
       const createdAt = new Date(request.createdAt);
-      const diffMs = now - createdAt;
+      const diffMs = currentTime - createdAt;
       const diffMins = Math.floor(diffMs / 60000);
       const diffHours = Math.floor(diffMs / 3600000);
       const diffDays = Math.floor(diffMs / 86400000);

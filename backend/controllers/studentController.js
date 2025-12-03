@@ -341,6 +341,7 @@ exports.getLessonDetail = async (req, res) => {
       // Student specific info
       attendance: studentSchedule?.attendance || null,
       scheduleStatus: studentSchedule?.scheduleStatus || 'scheduled',
+      studentScheduleId: studentSchedule?._id || null,
       notes: classSchedule.note || '',
       
       // Status (upcoming, completed, cancelled)

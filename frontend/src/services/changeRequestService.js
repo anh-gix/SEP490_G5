@@ -36,6 +36,16 @@ const changeRequestService = {
     }
   },
 
+  // Create change request
+  createChangeRequest: async (data) => {
+    try {
+      const response = await api.post('/students/me/change-requests', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating change request:', error);
+      throw error.response?.data || error.message;
+    }
+  },
 
   // Get sender schedule
   getSenderSchedule: async (requestId) => {

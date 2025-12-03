@@ -255,6 +255,86 @@ exports.getAllChangeRequests = async (req, res) => {
 };
 
 // =========================
+// ➕ TẠO CHANGE REQUEST MỚI
+// =========================
+exports.createChangeRequest = async (req, res) => {
+  try {
+    const { type, studentScheduleId, classId, classScheduleId, content } = req.body;
+    const senderId = req.user._id; // Lấy từ token
+    
+    // Validate required fields
+    if (!type || !content) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu thông tin bắt buộc'
+      });
+    }
+    
+    // Validate type
+    const validTypes = ['create_class', 'change_class', 'makeup_class', 'replace_teacher'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Loại đơn không hợp lệ'
+      });
+    }
+    
+    // Validate studentScheduleId for makeup_class
+    if (type === 'makeup_class' && !studentScheduleId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu thông tin buổi học'
+      });
+    }
+    
+    // Verify studentScheduleId exists and belongs to sender
+    if (type === 'makeup_class' && studentScheduleId) {
+      const studentSchedule = await StudentSchedule.findById(studentScheduleId);
+      if (!studentSchedule) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Không tìm thấy buổi học' 
+        });
+      }
+      if (studentSchedule.student.toString() !== senderId.toString()) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Bạn không có quyền truy cập buổi học này' 
+        });
+      }
+    }
+    
+    // Create change request
+    const changeRequest = await ChangeRequest.create({
+      sender: senderId,
+      type,
+      studentScheduleId: type === 'makeup_class' ? studentScheduleId : undefined,
+      classId: type === 'change_class' ? classId : undefined,
+      classScheduleId: type === 'replace_teacher' ? classScheduleId : undefined,
+      content: content.trim()
+    });
+    
+    // Populate sender info
+    const populatedRequest = await ChangeRequest.findById(changeRequest._id)
+      .populate('sender', 'username email')
+      .lean();
+    
+    res.status(201).json({
+      success: true,
+      message: 'Gửi đơn thành công',
+      changeRequest: populatedRequest
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi tạo change request:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi tạo đơn',
+      error: error.message
+    });
+  }
+};
+
+// =========================
 // 📅 LẤY LỊCH HỌC/DẠY CỦA NGƯỜI GỬI ĐƠN
 // =========================
 exports.getSenderSchedule = async (req, res) => {

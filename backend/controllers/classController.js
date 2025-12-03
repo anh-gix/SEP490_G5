@@ -1455,13 +1455,19 @@ exports.updateClass = async (req, res) => {
     console.log('🔍 [DEBUG] Old schedule pattern:', JSON.stringify(oldSchedulePattern, null, 2));
     console.log('🔍 [DEBUG] New schedule pattern:', JSON.stringify(newSchedulePattern, null, 2));
     
-    // Check if only scheduleEntries changed (without changing room/teacher/startDate)
+    // Check if students changed
+    const oldStudents = (oldStudentsList || []).map(id => id.toString()).sort();
+    const newStudents = (students !== undefined ? students : oldStudentsList || []).map(id => id.toString()).sort();
+    const studentsChanged = students !== undefined && JSON.stringify(oldStudents) !== JSON.stringify(newStudents);
+    
+    // Check if only scheduleEntries changed (without changing room/teacher/startDate/students)
     const scheduleEntriesChanged = compareScheduleEntries(oldSchedulePattern, newSchedulePattern);
     const scheduleEntriesOnlyChanged = newSchedulePattern.length > 0 && 
       !courseChanged && 
       !roomChanged && 
       !teacherChanged && 
       !startDateChanged &&
+      !studentsChanged &&
       scheduleEntriesChanged;
     
     const scheduleEntriesProvided = scheduleEntries && scheduleEntries.length > 0;
@@ -1471,6 +1477,7 @@ exports.updateClass = async (req, res) => {
       roomChanged,
       teacherChanged,
       startDateChanged,
+      studentsChanged,
       scheduleEntriesChanged,
       scheduleEntriesProvided,
       scheduleEntriesOnlyChanged

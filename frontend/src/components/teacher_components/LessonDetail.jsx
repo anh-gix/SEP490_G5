@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Badge, Button } from 'react-bootstrap';
 import { Link, useParams } from 'react-router-dom';
 import teacherService from '../../services/teacherService';
+import TeacherRequestAbsenceModal from './TeacherRequestAbsenceModal';
 
 /**
  * Lesson Detail Component
@@ -12,6 +13,7 @@ const LessonDetail = () => {
   const [lessonData, setLessonData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showAbsenceModal, setShowAbsenceModal] = useState(false);
 
   const fetchLessonData = async () => {
     try {
@@ -26,6 +28,8 @@ const LessonDetail = () => {
         const transformedData = {
           topic: lesson.sessionTitle || 'Chưa có tiêu đề',
           date: lesson.date,
+          startTime: lesson.startTime,
+          endTime: lesson.endTime,
           time: `${lesson.startTime} - ${lesson.endTime}`,
           className: lesson.className,
           level: lesson.className?.split('-')[0] || 'N/A',
@@ -143,9 +147,12 @@ const LessonDetail = () => {
               <i className="fas fa-user-check me-2"></i>
               Điểm danh
             </Link>
-            <Button className="btn-main text-13 px-16 py-8 radius-8">
-              <i className="fas fa-chalkboard-teacher me-2"></i>
-              Vào lớp
+            <Button 
+              onClick={() => setShowAbsenceModal(true)}
+              className="btn-outline-warning text-13 px-16 py-8 radius-8"
+            >
+              <i className="fas fa-hand-paper me-2"></i>
+              Xin nghỉ
             </Button>
           </div>
         </div>
@@ -341,6 +348,28 @@ const LessonDetail = () => {
       </Card>
     </Col>
   </Row>
+
+      {/* Request Absence Modal */}
+      {lessonData && (
+        <TeacherRequestAbsenceModal
+          show={showAbsenceModal}
+          onHide={() => setShowAbsenceModal(false)}
+          schedule={{
+            classScheduleId: lessonId,
+            date: lessonData.date,
+            time: lessonData.time,
+            startTime: lessonData.startTime,
+            endTime: lessonData.endTime,
+            topic: lessonData.topic,
+            className: lessonData.className,
+            room: lessonData.room
+          }}
+          onSuccess={() => {
+            setShowAbsenceModal(false);
+            // Optionally refresh lesson data
+          }}
+        />
+      )}
     </Container>
   );
 };

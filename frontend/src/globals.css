@@ -14825,3 +14825,15 @@ table.dataTable.display > tbody > tr > * {
   max-height: calc(90vh - 120px) !important;
   overflow-y: auto !important;
 }
+
+/* Pulse animation for pending approval indicator */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}

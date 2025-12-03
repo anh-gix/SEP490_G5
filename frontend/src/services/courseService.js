@@ -74,13 +74,33 @@ export const courseService = {
     }
   },
 
-  // Phê duyệt course
-  approveCourse: async (id) => {
+  // Submit course for approval
+  submitCourse: async (id, data) => {
     try {
-      const response = await axios.patch(`${API_BASE_URL}/${id}/approve`);
+      const response = await axios.patch(`${API_BASE_URL}/${id}/submit`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Nộp giáo trình thất bại' };
+    }
+  },
+
+  // Phê duyệt course
+  approveCourse: async (id, data) => {
+    try {
+      const response = await axios.patch(`${API_BASE_URL}/${id}/approve`, data);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Phê duyệt giáo trình thất bại' };
+    }
+  },
+
+  // Reject course
+  rejectCourse: async (id, data) => {
+    try {
+      const response = await axios.patch(`${API_BASE_URL}/${id}/reject`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Từ chối giáo trình thất bại' };
     }
   },
 
@@ -189,6 +209,31 @@ export const courseService = {
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy danh sách courses theo program và level' };
+      }
+  },
+  // =========================
+  // PLO MAPPING FUNCTIONS
+  // =========================
+
+  // Get PLOs of a Course's Program
+  getProgramPLOs: async (courseId) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/${courseId}/program-plos`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy danh sách PLO của chương trình' };
+    }
+  },
+
+  // Update Course PLO Mapping
+  updateCoursePLOMapping: async (courseId, mappedPLOs) => {
+    try {
+      const response = await axios.put(`${API_BASE_URL}/${courseId}/map-plos`, {
+        mappedPLOs
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Cập nhật PLO mapping thất bại' };
     }
   },
 };

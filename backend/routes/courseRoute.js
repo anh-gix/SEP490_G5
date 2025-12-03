@@ -4,11 +4,11 @@ const courseController = require('../controllers/courseController');
 
 
 
-// Lấy tất cả courses đã được phê duyệt
+// Lấy tất cả courses
 router.get('/', courseController.getAllCourses);
 
-// COURSE APPROVAL WORKFLOW ROUTES (specific routes must come first)
-router.get('/pending', courseController.getPendingCourses);
+// Course không có workflow phê duyệt riêng
+// Workflow phê duyệt chỉ áp dụng ở Program level
 
 // Lấy danh sách tất cả types - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
 router.get('/all-types', courseController.getAllTypes);
@@ -31,14 +31,12 @@ router.get('/mappings', courseController.getCourseMappings);
 // Lấy types theo level - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
 router.get('/types-by-level', courseController.getTypesByLevel);
 
-//lấy chi tiết giáo trình
-router.get('/:id/details', courseController.getCourseDetails);
-router.patch('/:id/approve', courseController.approveCourse);
-router.patch('/:id/revise', courseController.requestRevision);
+// PLO MAPPING ROUTES - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
+router.get('/:id/program-plos', courseController.getProgramPLOs);
+router.put('/:id/map-plos', courseController.updateCoursePLOMapping);
 
-// PROGRAM HEAD: ACCEPT/REJECT COURSE TO PROGRAM
-router.patch('/:id/accept', courseController.acceptCourseToProgram);
-router.patch('/:id/reject', courseController.rejectCourseFromProgram);
+//lấy chi tiết giáo trình
+router.get('/:id/details', courseController.getCourseById);
 
 // COURSE CRUD ROUTES (dynamic routes come after)
 router.get('/', courseController.getAllCourses);

@@ -1,5 +1,6 @@
 const Exam = require("../models/examModel");
 const Submission = require("../models/submissionModel");
+const ApprovalRequest = require("../models/approvalRequestModel");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
@@ -174,11 +175,21 @@ exports.getExamByIdForManagement = async (req, res) => {
     // Get submission count
     const submissionCount = await Submission.countDocuments({ examId: id });
 
+    // Get approval request info if exists
+    const approvalRequest = await ApprovalRequest.findOne({
+      entityId: id,
+      entityType: 'Exam'
+    })
+      .populate('submittedBy', 'username email')
+      .populate('reviewedBy', 'username email')
+      .sort({ submittedAt: -1 });
+
     res.status(200).json({
       success: true,
       data: {
         ...exam.toObject(),
-        submissionCount
+        submissionCount,
+        approvalInfo: approvalRequest
       }
     });
   } catch (err) {
@@ -450,6 +461,363 @@ exports.deleteExamForManagement = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Lỗi khi xóa bài thi',
+      error: err.message
+    });
+  }
+};
+
+// ================== 9. HELPER - KIỂM TRA TRẠNG THÁI SUBMIT EXAM ==================
+exports.getExamSubmissionStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const exam = await Exam.findById(id);
+    if (!exam) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bài thi'
+      });
+    }
+
+    // Validate exam has required data
+    const hasSections = exam.sections && exam.sections.length > 0;
+    const canSubmit =
+      ['draft', 'needs_revision'].includes(exam.status) &&
+      hasSections;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        examStatus: exam.status,
+        canSubmit,
+        hasSections,
+        sectionCount: exam.sections ? exam.sections.length : 0,
+        validationMessages: !canSubmit ? [
+          !['draft', 'needs_revision'].includes(exam.status) ? `Exam status is ${exam.status}` : null,
+          !hasSections ? 'Exam must have at least 1 section' : null
+        ].filter(Boolean) : []
+      }
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi kiểm tra trạng thái nộp đề thi',
+      error: err.message
+    });
+  }
+};
+
+// ================== 10. NỘP EXAM CHỜ DUYỆT (TEACHER/SUBJECT LEADER) ==================
+exports.submitExamForApproval = async (req, res) => {
+  const mongoose = require('mongoose');
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { submissionNote, submittedBy } = req.body;
+
+    // Tìm exam
+    const exam = await Exam.findById(id).session(session);
+    if (!exam) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bài thi'
+      });
+    }
+
+    // Sử dụng submittedBy từ body hoặc từ exam.createdBy
+    const userSubmittedBy = submittedBy || exam.createdBy;
+
+    if (!userSubmittedBy) {
+      await session.abortTransaction();
+      return res.status(401).json({
+        success: false,
+        message: 'Không xác định được người nộp đề thi'
+      });
+    }
+
+    // Kiểm tra quyền (chỉ người tạo mới được submit)
+    if (exam.createdBy && exam.createdBy.toString() !== userSubmittedBy.toString()) {
+      await session.abortTransaction();
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền nộp đề thi này'
+      });
+    }
+
+    // Validate exam status
+    if (!['draft', 'needs_revision'].includes(exam.status)) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Không thể nộp đề thi với trạng thái ${exam.status}`
+      });
+    }
+
+    // Validate exam has sections
+    if (!exam.sections || exam.sections.length === 0) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Đề thi phải có ít nhất 1 section'
+      });
+    }
+
+    // Validate exam sections have answer keys
+    const sectionsWithoutAnswers = exam.sections.filter(
+      section => !section.answerKey || section.answerKey.length === 0
+    );
+    if (sectionsWithoutAnswers.length > 0) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Các section sau chưa có đáp án: ${sectionsWithoutAnswers.map(s => s.type).join(', ')}`
+      });
+    }
+
+    // Kiểm tra xem có pending request nào không
+    const existingPendingRequest = await ApprovalRequest.findOne({
+      entityType: 'Exam',
+      entityId: id,
+      status: 'pending'
+    }).session(session);
+
+    if (existingPendingRequest) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Đề thi đã được nộp và đang chờ duyệt'
+      });
+    }
+
+    // 1. Update exam status to pending_approval
+    await Exam.findByIdAndUpdate(
+      id,
+      { status: 'pending_approval' },
+      { session }
+    );
+
+    // 2. Check if there's a rejected request (resubmit case)
+    const rejectedRequest = await ApprovalRequest.findOne({
+      entityType: 'Exam',
+      entityId: id,
+      status: 'rejected'
+    }).session(session);
+
+    let approvalRequest;
+
+    if (rejectedRequest) {
+      // Resubmit - update existing rejected request
+      approvalRequest = await ApprovalRequest.findByIdAndUpdate(
+        rejectedRequest._id,
+        {
+          status: 'pending',
+          submittedAt: new Date(),
+          submissionNote: submissionNote || '',
+          reviewedBy: null,
+          reviewedAt: null,
+          reviewNote: null,
+          rejectionReason: null,
+          $push: {
+            history: {
+              action: 'resubmitted',
+              performedBy: userSubmittedBy,
+              performedAt: new Date(),
+              note: submissionNote || '',
+              previousStatus: 'rejected'
+            }
+          }
+        },
+        { session, new: true }
+      );
+    } else {
+      // First submit - create new request
+      const newRequest = await ApprovalRequest.create([{
+        requestType: 'exam',
+        entityType: 'Exam',
+        entityId: id,
+        submittedBy: userSubmittedBy,
+        submittedAt: new Date(),
+        submissionNote: submissionNote || '',
+        status: 'pending',
+        history: [{
+          action: 'submitted',
+          performedBy: userSubmittedBy,
+          performedAt: new Date(),
+          note: submissionNote || '',
+          previousStatus: exam.status
+        }]
+      }], { session });
+
+      approvalRequest = newRequest[0];
+    }
+
+    await session.commitTransaction();
+
+    // Populate để trả về thông tin đầy đủ
+    await approvalRequest.populate('submittedBy', 'username email');
+
+    res.status(201).json({
+      success: true,
+      message: 'Nộp đề thi chờ duyệt thành công',
+      data: {
+        exam: await Exam.findById(id),
+        approvalRequest: approvalRequest
+      }
+    });
+  } catch (err) {
+    await session.abortTransaction();
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi nộp đề thi chờ duyệt',
+      error: err.message
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+// ================== 11. LẤY DANH SÁCH EXAM ĐÃ NỘP CỦA TEACHER ==================
+exports.getMySubmittedExams = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.body.userId;
+    const { status, search } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Yêu cầu đăng nhập'
+      });
+    }
+
+    // Build query for exams created by user
+    const examQuery = { createdBy: userId };
+
+    if (search) {
+      examQuery.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Filter by status if provided
+    if (status) {
+      examQuery.status = status;
+    }
+
+    // Get exams
+    const exams = await Exam.find(examQuery)
+      .sort({ updatedAt: -1 });
+
+    // Get approval requests for these exams
+    const examIds = exams.map(e => e._id);
+    const approvalRequests = await ApprovalRequest.find({
+      entityType: 'Exam',
+      entityId: { $in: examIds }
+    })
+      .populate('reviewedBy', 'username email')
+      .sort({ submittedAt: -1 });
+
+    // Map approval requests to exams
+    const examWithApprovalInfo = exams.map(exam => {
+      const approvalInfo = approvalRequests.find(
+        req => req.entityId.toString() === exam._id.toString()
+      );
+
+      return {
+        ...exam.toObject(),
+        approvalInfo: approvalInfo || null
+      };
+    });
+
+    // Get statistics
+    const stats = {
+      total: await Exam.countDocuments({ createdBy: userId }),
+      draft: await Exam.countDocuments({ createdBy: userId, status: 'draft' }),
+      pending_approval: await Exam.countDocuments({ createdBy: userId, status: 'pending_approval' }),
+      approved: await Exam.countDocuments({ createdBy: userId, status: 'approved' }),
+      needs_revision: await Exam.countDocuments({ createdBy: userId, status: 'needs_revision' })
+    };
+
+    res.status(200).json({
+      success: true,
+      data: examWithApprovalInfo,
+      stats,
+      count: examWithApprovalInfo.length
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách đề thi',
+      error: err.message
+    });
+  }
+};
+
+// ================== 12. RÚT LẠI EXAM ĐANG CHỜ DUYỆT ==================
+exports.withdrawExamSubmission = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?._id || req.body.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Yêu cầu đăng nhập'
+      });
+    }
+
+    // Tìm exam
+    const exam = await Exam.findById(id);
+    if (!exam) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bài thi'
+      });
+    }
+
+    // Kiểm tra quyền
+    if (exam.createdBy && exam.createdBy.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền rút lại đề thi này'
+      });
+    }
+
+    // Kiểm tra status
+    if (exam.status !== 'pending_approval') {
+      return res.status(400).json({
+        success: false,
+        message: 'Chỉ có thể rút lại đề thi đang chờ duyệt'
+      });
+    }
+
+    // Tìm và xóa pending approval request
+    const approvalRequest = await ApprovalRequest.findOne({
+      entityType: 'Exam',
+      entityId: id,
+      status: 'pending'
+    });
+
+    if (approvalRequest) {
+      await ApprovalRequest.findByIdAndDelete(approvalRequest._id);
+    }
+
+    // Đổi status về draft
+    exam.status = 'draft';
+    await exam.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Rút lại đề thi thành công',
+      data: exam
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi rút lại đề thi',
       error: err.message
     });
   }

@@ -7,9 +7,8 @@ import Button from '../compo/Button';
 import SearchBox from '../compo/SearchBox';
 import FilterBar from '../compo/FilterBar';
 import StatusBadge from '../compo/StatusBadge';
-import ActionMenu from '../compo/ActionMenu';
-import { programService } from '../../../services/programService';
 import { formatDate } from '../../../helper/helper';
+import programService from '../../../services/programService';
 
 const ProgramList = () => {
   const navigate = useNavigate();
@@ -32,120 +31,59 @@ const ProgramList = () => {
     try {
       setLoading(true);
 
-      // TODO: Replace with actual API call when backend is ready
-      // const response = await programService.getAllPrograms();
+      const response = await programService.getAllPrograms();
+      const programsData = response.data || [];
 
-      // Mock data for development
-      const mockPrograms = [
-        {
-          _id: 'prog1',
-          code: 'IELTS-B2',
-          program_name: 'IELTS Intermediate Program',
-          description: 'Chương trình IELTS trình độ trung cấp',
-          type: 'cam',
-          level: 'B2',
-          band: '5.5-6.5',
-          tuitionFee: 5000000,
-          status: 'active',
-          plos: [
-            { _id: 'plo1', code: 'PLO1', name: 'Listening Skills' },
-            { _id: 'plo2', code: 'PLO2', name: 'Reading Comprehension' },
-            { _id: 'plo3', code: 'PLO3', name: 'Writing Skills' },
-            { _id: 'plo4', code: 'PLO4', name: 'Speaking Fluency' }
-          ],
-          courseCount: 2,
-          updatedAt: new Date('2025-01-15')
-        },
-        {
-          _id: 'prog2',
-          code: 'IELTS-C1',
-          program_name: 'IELTS Advanced Program',
-          description: 'Chương trình IELTS nâng cao',
-          type: 'ielts',
-          level: 'C1',
-          band: '7.0-8.0',
-          tuitionFee: 7000000,
-          status: 'active',
-          plos: [
-            { _id: 'plo5', code: 'PLO1', name: 'Advanced Listening' },
-            { _id: 'plo6', code: 'PLO2', name: 'Critical Reading' },
-            { _id: 'plo7', code: 'PLO3', name: 'Academic Writing' }
-          ],
-          courseCount: 3,
-          updatedAt: new Date('2025-01-20')
-        },
-        {
-          _id: 'prog3',
-          code: 'TOEIC-B1',
-          program_name: 'TOEIC Basic Program',
-          description: 'Chương trình TOEIC cơ bản',
-          type: 'toeic',
-          level: 'B1',
-          band: '550-700',
-          tuitionFee: 4000000,
-          status: 'draft',
-          plos: [
-            { _id: 'plo8', code: 'PLO1', name: 'Business Listening' },
-            { _id: 'plo9', code: 'PLO2', name: 'Business Reading' }
-          ],
-          courseCount: 1,
-          updatedAt: new Date('2025-01-10')
-        }
-      ];
+      setPrograms(programsData);
 
-      setPrograms(mockPrograms);
+      // Set stats from API response
+      if (response.stats) {
+        setStats(response.stats);
+      } else {
+        // Calculate stats if not provided by API
+        const calculatedStats = {
+          total: programsData.length,
+          active: programsData.filter(p => p.status === 'active').length,
+          draft: programsData.filter(p => p.status === 'draft').length,
+          archived: programsData.filter(p => p.status === 'archived').length
+        };
+        setStats(calculatedStats);
+      }
 
-      // Calculate stats from mock data
-      const calculatedStats = {
-        total: mockPrograms.length,
-        active: mockPrograms.filter(p => p.status === 'active').length,
-        draft: mockPrograms.filter(p => p.status === 'draft').length,
-        archived: mockPrograms.filter(p => p.status === 'archived').length
-      };
-      setStats(calculatedStats);
-
-      console.log('Mock programs loaded:', mockPrograms);
+      console.log('Programs loaded from API:', programsData);
     } catch (err) {
       console.error('Error fetching programs:', err);
+      alert('Không thể tải danh sách chương trình!');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (programId) => {
-    const program = programs.find(p => p._id === programId);
-    if (!program) return;
+  const handleDeleteProgram = async (programId, programName) => {
+    const confirmMessage = `⚠️ CẢNH BÁO: Bạn có chắc muốn xóa chương trình "${programName}"?\n\n` +
+      `Hành động này sẽ XÓA TOÀN BỘ:\n` +
+      `• Tất cả PLO trong chương trình\n` +
+      `• Tất cả Course (học phần)\n` +
+      `• Tất cả CLO trong các course\n` +
+      `• Tất cả Session trong các course\n` +
+      `• Tất cả Materials trong các course\n\n` +
+      `Hành động này KHÔNG THỂ HOÀN TÁC!\n\n` +
+      `Nhấn OK để xác nhận xóa.`;
 
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn xóa chương trình "${program.program_name}" (${program.code})?\n\nHành động này không thể hoàn tác.`
-    );
-
-    if (!confirmed) return;
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
 
     try {
-      // TODO: Replace with actual API call when backend is ready
-      // await programService.deleteProgram(programId);
+      await programService.deleteProgram(programId);
 
-      // Mock deletion
-      console.log(`Deleting program: ${programId}`);
+      // Reload programs after deletion
+      await fetchPrograms();
 
-      // Remove from local state
-      const updatedPrograms = programs.filter(p => p._id !== programId);
-      setPrograms(updatedPrograms);
-
-      // Recalculate stats
-      const calculatedStats = {
-        total: updatedPrograms.length,
-        active: updatedPrograms.filter(p => p.status === 'active').length,
-        draft: updatedPrograms.filter(p => p.status === 'draft').length,
-        archived: updatedPrograms.filter(p => p.status === 'archived').length
-      };
-      setStats(calculatedStats);
-
-      alert('Xóa chương trình thành công!');
+      alert('Đã xóa chương trình và toàn bộ dữ liệu liên quan thành công!');
     } catch (err) {
       console.error('Error deleting program:', err);
-      alert('Có lỗi xảy ra khi xóa chương trình.');
+      alert(err.message || 'Có lỗi xảy ra khi xóa chương trình.');
     }
   };
 
@@ -225,31 +163,38 @@ const ProgramList = () => {
       header: 'Hành động',
       field: 'actions',
       render: (row) => (
-        <ActionMenu
-          actions={[
-            {
-              label: "Xem chi tiết",
-              icon: "ph ph-eye",
-              onClick: () => navigate(`/center-head/programs/${row._id}`)
-            },
-            {
-              label: "Chỉnh sửa",
-              icon: "ph ph-pencil-simple",
-              onClick: () => navigate(`/center-head/programs/${row._id}/edit`)
-            },
-            {
-              label: "Xem PLOs",
-              icon: "ph ph-list-bullets",
-              onClick: () => navigate(`/center-head/programs/${row._id}/plos`)
-            },
-            {
-              label: "Xóa",
-              icon: "ph ph-trash",
-              onClick: () => handleDelete(row._id),
-              variant: "danger"
-            },
-          ]}
-        />
+        <div className="d-flex gap-2 justify-content-center">
+          <button
+            className="btn btn-sm btn-outline-primary"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/programs/${row._id}`);
+            }}
+            title="Xem chi tiết"
+          >
+            <i className="ph ph-eye"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-secondary"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/programs/${row._id}/edit`);
+            }}
+            title="Chỉnh sửa"
+          >
+            <i className="ph ph-pencil"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-danger"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteProgram(row._id, row.program_name);
+            }}
+            title="Xóa chương trình"
+          >
+            <i className="ph ph-trash"></i>
+          </button>
+        </div>
       ),
     },
   ];
@@ -271,8 +216,12 @@ const ProgramList = () => {
           <h4 className="mb-8 text-neutral-900 fw-bold">Chương trình đào tạo</h4>
           <p className="text-neutral-600 mb-0">Quản lý các chương trình và PLOs</p>
         </div>
-        <Button variant="primary" icon="ph ph-plus" onClick={() => navigate('/center-head/programs/create')}>
-          Thêm chương trình
+        <Button
+          variant="primary"
+          icon="ph ph-plus"
+          onClick={() => navigate('/center-head/programs/create')}
+        >
+          Tạo chương trình mới
         </Button>
       </div>
 

@@ -14,6 +14,19 @@ router.post("/management/:id/publish", examController.publishExamForManagement);
 router.post("/management/:id/unpublish", examController.unpublishExamForManagement);
 router.post("/management/upload-answer-key", upload.single("file"), examController.uploadAnswerKeyForManagement);
 
+// Helper route to check exam submission status
+router.get("/management/:id/submission-status", examController.getExamSubmissionStatus);
+
+// ================== TEACHER - EXAM SUBMISSION ROUTES ==================
+// Nộp exam chờ duyệt
+router.post("/management/:id/submit-for-approval", examController.submitExamForApproval);
+
+// Lấy danh sách exam đã nộp của teacher
+router.get("/my-exams", examController.getMySubmittedExams);
+
+// Rút lại exam đang chờ duyệt
+router.post("/management/:id/withdraw", examController.withdrawExamSubmission);
+
 // ================== STUDENT - PUBLIC EXAM ROUTES ==================
 // 🧠 Lấy danh sách bài thi (public)
 router.get("/", examController.getAllExams);

@@ -4,8 +4,6 @@ module.exports = {
     Program: require('./programModel'),
     Course: require('./courseModel'),
     ClassSchedule: require('./classScheduleModel'),
-    CLO: require('./cloModel'),
-    PLO: require('./ploModel'),
     Session: require('./sessionModel'),
     User: require('./userModel'),
     Role: require('./roleModel'),
@@ -16,5 +14,6 @@ module.exports = {
     Exam: require('./examModel'),
     Submission: require('./submissionModel'),
     HomeworkSubmission: require('./homeworkSubmissionModel'),
-    ChangeRequest: require('./changeRequestModel')
+    ChangeRequest: require('./changeRequestModel'),
+    ApprovalRequest: require('./approvalRequestModel')
 };

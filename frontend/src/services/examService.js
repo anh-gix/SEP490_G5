@@ -96,6 +96,41 @@ export const examService = {
     }
   },
 
+  // Submit exam for approval
+  submitExamForApproval: async (examId, submissionNote) => {
+    try {
+      // Lấy user info từ localStorage
+      const userStr = localStorage.getItem('user');
+      let submittedBy = null;
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          submittedBy = user._id || user.id;
+        } catch (e) {
+          console.error('Error parsing user from localStorage:', e);
+        }
+      }
+
+      const response = await api.post(`/management/${examId}/submit-for-approval`, {
+        submissionNote,
+        submittedBy
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể nộp đề thi để duyệt' };
+    }
+  },
+
+  // Withdraw exam submission
+  withdrawExamSubmission: async (examId) => {
+    try {
+      const response = await api.post(`/management/${examId}/withdraw`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể rút lại đề thi' };
+    }
+  },
+
   // Upload answer key CSV/Excel
   uploadAnswerKeyForManagement: async (formData) => {
     try {
@@ -138,13 +173,21 @@ export const examService = {
 
   // Format exam data trước khi gửi
   formatExamData: (examData) => {
+    // Format sections - loại bỏ id frontend (Date.now()) để MongoDB tự tạo _id
+    const formattedSections = (examData.sections || []).map(section => {
+      const { id, ...rest } = section; // Remove frontend id
+      return rest;
+    });
+
     return {
       title: examData.title?.trim(),
       description: examData.description?.trim() || '',
-      examType: examData.examType || 'practice',
+      examType: examData.examType || 'cambridge', // Default to cambridge
       level: examData.level,
       totalDuration: parseInt(examData.totalDuration) || 0,
-      sections: examData.sections || []
+      sections: formattedSections,
+      isPublished: examData.isPublished || false,
+      lastCompletedStep: examData.lastCompletedStep || 0
     };
   },
 

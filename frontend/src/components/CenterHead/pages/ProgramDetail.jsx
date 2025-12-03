@@ -5,8 +5,9 @@ import Card from '../compo/Card';
 import Button from '../compo/Button';
 import StatusBadge from '../compo/StatusBadge';
 import Table from '../compo/Table';
-import { programService } from '../../../services/programService';
+import programService from '../../../services/programService';
 import { courseService } from '../../../services/courseService';
+import approvalRequestService from '../../../services/approvalRequestService';
 import { formatDate } from '../../../helper/helper';
 
 const ProgramDetail = () => {
@@ -15,11 +16,16 @@ const ProgramDetail = () => {
   const [program, setProgram] = useState(null);
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState([]);
-  const [cloMapping, setCloMapping] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [selectedCourseId, setSelectedCourseId] = useState(null);
+  const [showRejectProgramModal, setShowRejectProgramModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [showFullDescription, setShowFullDescription] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [submissionNote, setSubmissionNote] = useState('');
+
+  // Get user role from localStorage
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const userRole = user.roleId?.name || user.role;
 
   useEffect(() => {
     fetchProgramDetail();
@@ -29,148 +35,8 @@ const ProgramDetail = () => {
     try {
       setLoading(true);
 
-      // TODO: Replace with actual API call when backend is ready
-      // const response = await programService.getProgramById(id);
-
-      // Mock data based on program ID
-      const mockPrograms = {
-        'prog1': {
-          _id: 'prog1',
-          code: 'IELTS-B2',
-          program_name: 'IELTS Intermediate Program',
-          description: 'Chương trình IELTS trình độ trung cấp',
-          type: 'ielts',
-          level: 'B2',
-          band: '5.5-6.5',
-          tuitionFee: 5000000,
-          status: 'active',
-          plos: [
-            { _id: 'plo1', code: 'PLO1', name: 'Listening Skills', description: 'Hiểu và phản ứng với các đoạn hội thoại tiếng Anh' },
-            { _id: 'plo2', code: 'PLO2', name: 'Reading Comprehension', description: 'Đọc hiểu các văn bản học thuật và thông tin' },
-            { _id: 'plo3', code: 'PLO3', name: 'Writing Skills', description: 'Viết các bài luận và báo cáo tiếng Anh' },
-            { _id: 'plo4', code: 'PLO4', name: 'Speaking Fluency', description: 'Giao tiếp lưu loát và tự tin bằng tiếng Anh' }
-          ],
-          courses: [
-            {
-              _id: 'course1',
-              subjectCode: 'IELTS-B2-RW',
-              name: 'IELTS Reading & Writing',
-              description: 'Khóa học tập trung vào kỹ năng Reading và Writing',
-              status: 'approved',
-              updatedAt: new Date('2025-01-15'),
-              clos: [
-                {
-                  _id: 'clo1',
-                  code: 'CLO1',
-                  name: 'Reading Strategies',
-                  description: 'Áp dụng các chiến lược đọc hiệu quả cho IELTS Reading',
-                  detail: 'Áp dụng các chiến lược đọc hiệu quả cho IELTS Reading',
-                  mappedPLOs: [
-                    { _id: 'plo2', code: 'PLO2', name: 'Reading Comprehension' }
-                  ]
-                },
-                {
-                  _id: 'clo2',
-                  code: 'CLO2',
-                  name: 'Writing Task 1',
-                  description: 'Viết Writing Task 1 đạt band 6.0+',
-                  detail: 'Viết Writing Task 1 đạt band 6.0+',
-                  mappedPLOs: [
-                    { _id: 'plo3', code: 'PLO3', name: 'Writing Skills' }
-                  ]
-                },
-                {
-                  _id: 'clo3',
-                  code: 'CLO3',
-                  name: 'Writing Task 2',
-                  description: 'Viết Writing Task 2 đạt band 6.0+',
-                  detail: 'Viết Writing Task 2 đạt band 6.0+',
-                  mappedPLOs: [
-                    { _id: 'plo3', code: 'PLO3', name: 'Writing Skills' }
-                  ]
-                }
-              ],
-              sessions: [
-                { _id: 's1', title: 'Week 1', order: 1 },
-                { _id: 's2', title: 'Week 2', order: 2 },
-                { _id: 's3', title: 'Week 3', order: 3 }
-              ]
-            },
-            {
-              _id: 'course2',
-              subjectCode: 'IELTS-B2-LS',
-              name: 'IELTS Listening & Speaking',
-              description: 'Khóa học tập trung vào kỹ năng Listening và Speaking',
-              status: 'approved',
-              updatedAt: new Date('2025-01-20'),
-              clos: [
-                {
-                  _id: 'clo4',
-                  code: 'CLO4',
-                  name: 'Listening Comprehension',
-                  description: 'Nghe hiểu các đoạn hội thoại và bài giảng',
-                  detail: 'Nghe hiểu các đoạn hội thoại và bài giảng',
-                  mappedPLOs: [
-                    { _id: 'plo1', code: 'PLO1', name: 'Listening Skills' }
-                  ]
-                },
-                {
-                  _id: 'clo5',
-                  code: 'CLO5',
-                  name: 'Speaking Fluency',
-                  description: 'Nói lưu loát trong các tình huống giao tiếp',
-                  detail: 'Nói lưu loát trong các tình huống giao tiếp',
-                  mappedPLOs: [
-                    { _id: 'plo4', code: 'PLO4', name: 'Speaking Fluency' }
-                  ]
-                }
-              ],
-              sessions: [
-                { _id: 's4', title: 'Week 1', order: 1 },
-                { _id: 's5', title: 'Week 2', order: 2 }
-              ]
-            }
-          ],
-          updatedAt: new Date('2025-01-15')
-        },
-        'prog2': {
-          _id: 'prog2',
-          code: 'IELTS-C1',
-          program_name: 'IELTS Advanced Program',
-          description: 'Chương trình IELTS nâng cao',
-          type: 'ielts',
-          level: 'C1',
-          band: '7.0-8.0',
-          tuitionFee: 7000000,
-          status: 'active',
-          plos: [
-            { _id: 'plo5', code: 'PLO1', name: 'Advanced Listening', description: 'Nghe hiểu nâng cao các bài giảng phức tạp' },
-            { _id: 'plo6', code: 'PLO2', name: 'Critical Reading', description: 'Đọc và phân tích văn bản học thuật' },
-            { _id: 'plo7', code: 'PLO3', name: 'Academic Writing', description: 'Viết luận văn học thuật chuyên nghiệp' }
-          ],
-          courses: [],
-          updatedAt: new Date('2025-01-20')
-        },
-        'prog3': {
-          _id: 'prog3',
-          code: 'TOEIC-B1',
-          program_name: 'TOEIC Basic Program',
-          description: 'Chương trình TOEIC cơ bản',
-          type: 'toeic',
-          level: 'B1',
-          band: '550-700',
-          tuitionFee: 4000000,
-          status: 'draft',
-          plos: [
-            { _id: 'plo8', code: 'PLO1', name: 'Business Listening', description: 'Nghe hiểu trong môi trường kinh doanh' },
-            { _id: 'plo9', code: 'PLO2', name: 'Business Reading', description: 'Đọc hiểu tài liệu kinh doanh' }
-          ],
-          courses: [],
-          updatedAt: new Date('2025-01-10')
-        }
-      };
-
-      const programData = mockPrograms[id];
+      const response = await programService.getProgramById(id);
+      const programData = response.data;
 
       if (programData) {
         setProgram(programData);
@@ -179,61 +45,94 @@ const ProgramDetail = () => {
         const programCourses = programData.courses || [];
         setCourses(programCourses);
 
-        // Build CLO → PLO mapping from courses
-        const cloMappingData = [];
-        programCourses.forEach(course => {
-          if (course.clos && Array.isArray(course.clos)) {
-            course.clos.forEach(clo => {
-              cloMappingData.push({
-                _id: clo._id,
-                code: clo.code,
-                name: clo.name || clo.description,
-                detail: clo.description || clo.detail,
-                courseName: course.name,
-                mappedPLOs: clo.mappedPLOs || []
-              });
-            });
-          }
-        });
-        setCloMapping(cloMappingData);
-
-        console.log('Mock program detail loaded:', programData);
+        console.log('Program detail loaded from API:', programData);
       }
 
     } catch (err) {
       console.error('Error fetching program detail:', err);
+      alert('Không thể tải thông tin chương trình!');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAcceptCourse = async (courseId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn chấp nhận giáo trình này vào chương trình?')) {
+
+  // ===== COURSE DELETE HANDLER =====
+  const handleDeleteCourse = async (courseId, courseName) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa môn học "${courseName}"?\n\nHành động này không thể hoàn tác.`)) {
       return;
     }
 
     try {
       setActionLoading(true);
-      await courseService.acceptCourseToProgram(courseId, {
-        approvalNote: 'Đã được chấp nhận bởi Program Head'
-      });
+      const response = await courseService.deleteCourse(courseId);
 
-      alert('Đã chấp nhận giáo trình thành công!');
-      fetchProgramDetail(); // Refresh data
-    } catch (err) {
-      console.error('Error accepting course:', err);
-      alert(err.message || 'Có lỗi xảy ra khi chấp nhận giáo trình');
+      if (response.success) {
+        alert('Xóa môn học thành công!');
+        // Refresh the courses list
+        setCourses(courses.filter(c => c._id !== courseId));
+      } else {
+        alert(response.message || 'Xóa môn học thất bại!');
+      }
+    } catch (error) {
+      console.error('Error deleting course:', error);
+      alert(error.message || 'Không thể xóa môn học. Vui lòng thử lại sau.');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleRejectCourse = (courseId) => {
-    setSelectedCourseId(courseId);
-    setShowRejectModal(true);
+  // ===== PROGRAM WORKFLOW HANDLERS =====
+  const handleSubmitProgram = () => {
+    setShowSubmitModal(true);
   };
 
-  const handleConfirmReject = async () => {
+  const handleConfirmSubmitProgram = async () => {
+    try {
+      setActionLoading(true);
+      const response = await approvalRequestService.submitProgram(id, {
+        note: submissionNote.trim() || undefined
+      });
+
+      if (response.success) {
+        alert('Đã nộp chương trình thành công! Chờ Center Head phê duyệt.');
+        setShowSubmitModal(false);
+        setSubmissionNote('');
+        fetchProgramDetail();
+      }
+    } catch (err) {
+      console.error('Error submitting program:', err);
+      alert(err.message || 'Có lỗi xảy ra khi nộp chương trình');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleApproveProgram = async () => {
+    if (!window.confirm('Bạn có chắc chắn muốn duyệt chương trình này?\n\nLưu ý: Tất cả các môn học trong chương trình sẽ được duyệt cùng lúc.')) {
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await programService.approveProgram(id, {
+        approvalNote: 'Đã được phê duyệt bởi Center Head'
+      });
+      alert('Đã duyệt chương trình và toàn bộ môn học thành công!');
+      fetchProgramDetail();
+    } catch (err) {
+      console.error('Error approving program:', err);
+      alert(err.message || 'Có lỗi xảy ra khi duyệt chương trình');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectProgram = () => {
+    setShowRejectProgramModal(true);
+  };
+
+  const handleConfirmRejectProgram = async () => {
     if (!rejectionReason.trim()) {
       alert('Vui lòng nhập lý do từ chối');
       return;
@@ -241,22 +140,24 @@ const ProgramDetail = () => {
 
     try {
       setActionLoading(true);
-      await courseService.rejectCourseFromProgram(selectedCourseId, {
+      await programService.rejectProgram(id, {
         rejectionReason
       });
-
-      alert('Đã từ chối giáo trình thành công!');
-      setShowRejectModal(false);
+      alert('Đã từ chối chương trình thành công!');
+      setShowRejectProgramModal(false);
       setRejectionReason('');
-      setSelectedCourseId(null);
-      fetchProgramDetail(); // Refresh data
+      fetchProgramDetail();
     } catch (err) {
-      console.error('Error rejecting course:', err);
-      alert(err.message || 'Có lỗi xảy ra khi từ chối giáo trình');
+      console.error('Error rejecting program:', err);
+      alert(err.message || 'Có lỗi xảy ra khi từ chối chương trình');
     } finally {
       setActionLoading(false);
     }
   };
+
+  // ===== COURSE WORKFLOW HANDLERS =====
+  // Course không có workflow phê duyệt riêng, chỉ có draft và completed
+  // Workflow phê duyệt chỉ áp dụng cho Program level
 
   if (loading) {
     return (
@@ -334,46 +235,65 @@ const ProgramDetail = () => {
       field: 'actions',
       render: (row) => (
         <div className="d-flex flex-wrap gap-2">
-          {row.status === 'pending_approval' ? (
-            <>
-              <Button
-                variant="success"
-                size="sm"
-                icon="ph ph-check"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAcceptCourse(row._id);
-                }}
-                disabled={actionLoading}
-              >
-                <span className="d-none d-md-inline">Chấp nhận</span>
-                <span className="d-inline d-md-none">OK</span>
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                icon="ph ph-x"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRejectCourse(row._id);
-                }}
-                disabled={actionLoading}
-              >
-                <span className="d-none d-md-inline">Từ chối</span>
-                <span className="d-inline d-md-none">X</span>
-              </Button>
-            </>
-          ) : (
+          {/* Draft: Show "Continue" button to continue wizard - only for non-Center Head */}
+          {row.status === 'draft' && userRole !== 'Center Head' && (
+            <Button
+              variant="primary"
+              size="sm"
+              icon="ph ph-play-circle"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/center-head/programs/${id}/courses/${row._id}/edit`);
+              }}
+            >
+              <span className="d-none d-md-inline">Tiếp tục</span>
+              <span className="d-inline d-md-none">▶</span>
+            </Button>
+          )}
+
+          {/* Completed: Show "Edit" button to edit via form - only for non-Center Head */}
+          {row.status === 'completed' && userRole !== 'Center Head' && (
             <Button
               variant="outline"
               size="sm"
-              icon="ph ph-eye"
+              icon="ph ph-pencil"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/center-head/courses/${row._id}/details`);
+                navigate(`/center-head/programs/${id}/courses/${row._id}/edit-form`);
               }}
             >
-              Xem
+              <span className="d-none d-md-inline">Sửa</span>
+              <span className="d-inline d-md-none">✏</span>
+            </Button>
+          )}
+
+          {/* View button for all statuses */}
+          <Button
+            variant="outline"
+            size="sm"
+            icon="ph ph-eye"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/courses/${row._id}/details`);
+            }}
+          >
+            <span className="d-none d-md-inline">Xem</span>
+            <span className="d-inline d-md-none">👁</span>
+          </Button>
+
+          {/* Delete button - only for non-Center Head */}
+          {userRole !== 'Center Head' && (
+            <Button
+              variant="danger"
+              size="sm"
+              icon="ph ph-trash"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteCourse(row._id, row.name);
+              }}
+            >
+              <span className="d-none d-md-inline">Xóa</span>
+              <span className="d-inline d-md-none">🗑</span>
             </Button>
           )}
         </div>
@@ -398,47 +318,172 @@ const ProgramDetail = () => {
             </Button>
           </div>
           <h4 className="mb-8 text-neutral-900 fw-bold">{program.program_name}</h4>
-          <p className="text-neutral-600 mb-12">{program.description}</p>
+          <div className="mb-12">
+            {program.description && program.description.length > 300 ? (
+              <>
+                <p className="text-neutral-600 mb-2" style={{ whiteSpace: 'pre-wrap' }}>
+                  {showFullDescription ? program.description : `${program.description.substring(0, 300)}...`}
+                </p>
+                <button
+                  className="btn btn-link p-0 text-main-600"
+                  style={{ textDecoration: 'none', fontSize: '14px' }}
+                  onClick={() => setShowFullDescription(!showFullDescription)}
+                >
+                  {showFullDescription ? 'Thu gọn' : 'Xem thêm'}
+                </button>
+              </>
+            ) : (
+              <p className="text-neutral-600" style={{ whiteSpace: 'pre-wrap' }}>{program.description}</p>
+            )}
+          </div>
           <div className="d-flex flex-wrap align-items-center gap-3">
             <StatusBadge status={program.status} />
             <span className="text-neutral-600">Mã: <strong>{program.code}</strong></span>
           </div>
         </div>
-        <div className="d-flex gap-2">
-          <Button
-            variant="outline"
-            icon="ph ph-pencil-simple"
-            onClick={() => navigate(`/center-head/programs/${id}/edit`)}
-          >
-            Chỉnh sửa
-          </Button>
+        <div className="d-flex flex-wrap gap-2">
+          {/* Draft or Needs Revision: Subject Leader can submit */}
+          {(program.status === 'draft' || program.status === 'needs_revision') && userRole !== 'Center Head' && (
+            <Button
+              variant="primary"
+              icon="ph ph-paper-plane-tilt"
+              onClick={handleSubmitProgram}
+              disabled={actionLoading}
+            >
+              {program.status === 'needs_revision' ? 'Nộp lại Program' : 'Nộp Program'}
+            </Button>
+          )}
+
+          {/* Pending Approval: Center Head can approve/reject */}
+          {program.status === 'pending_approval' && userRole === 'Center Head' && (
+            <>
+              <button
+                className="btn"
+                onClick={handleApproveProgram}
+                disabled={actionLoading}
+                style={{
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderColor: '#10b981',
+                  color: '#10b981',
+                  backgroundColor: 'transparent',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: actionLoading ? 'not-allowed' : 'pointer',
+                  opacity: actionLoading ? 0.6 : 1,
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  if (!actionLoading) {
+                    e.currentTarget.style.backgroundColor = '#10b981';
+                    e.currentTarget.style.color = 'white';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!actionLoading) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#10b981';
+                  }
+                }}
+              >
+                <i className="ph ph-check"></i>
+                Duyệt Program
+              </button>
+              <button
+                className="btn"
+                onClick={handleRejectProgram}
+                disabled={actionLoading}
+                style={{
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderColor: '#ef4444',
+                  color: '#ef4444',
+                  backgroundColor: 'transparent',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: actionLoading ? 'not-allowed' : 'pointer',
+                  opacity: actionLoading ? 0.6 : 1,
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  if (!actionLoading) {
+                    e.currentTarget.style.backgroundColor = '#ef4444';
+                    e.currentTarget.style.color = 'white';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!actionLoading) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#ef4444';
+                  }
+                }}
+              >
+                <i className="ph ph-x"></i>
+                Từ chối Program
+              </button>
+            </>
+          )}
+
+          {/* Edit button - only for non-Center Head */}
+          {userRole !== 'Center Head' && (
+            <Button
+              variant="outline"
+              icon="ph ph-pencil-simple"
+              onClick={() => navigate(`/center-head/programs/${id}/edit`)}
+            >
+              Chỉnh sửa
+            </Button>
+          )}
         </div>
       </div>
 
+      {/* Program Rejection Warning */}
+      {program.status === 'needs_revision' && program.rejectionReason && (
+        <div className="alert alert-warning mb-24" role="alert" style={{ borderLeft: '4px solid #f59e0b' }}>
+          <div className="d-flex align-items-start">
+            <i className="ph ph-warning-circle" style={{ fontSize: '24px', marginRight: '12px', color: '#f59e0b' }}></i>
+            <div>
+              <h6 className="mb-2 fw-bold">Program bị từ chối - Cần chỉnh sửa</h6>
+              <p className="mb-1"><strong>Lý do từ chối:</strong></p>
+              <p className="mb-0">{program.rejectionReason}</p>
+              {program.rejectedBy && (
+                <p className="mb-0 mt-2 text-sm text-muted">
+                  Từ chối bởi: {program.rejectedBy.username || program.rejectedBy.email} - {formatDate(program.rejectedAt)}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stats Cards */}
       <div className="row g-3 g-md-4 mb-24">
-        <div className="col-6 col-md-3">
+        <div className="col-6 col-md-4">
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng PLOs</h6>
             <h4 className="text-main-600 fw-bold mb-0">{program.plos?.length || 0}</h4>
           </Card>
         </div>
-        <div className="col-6 col-md-3">
+        <div className="col-6 col-md-4">
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng Courses</h6>
             <h4 className="text-success-600 fw-bold mb-0">{courses.length}</h4>
           </Card>
         </div>
-        <div className="col-6 col-md-3">
-          <Card>
-            <h6 className="text-neutral-600 mb-8">Tổng CLOs</h6>
-            <h4 className="text-warning-600 fw-bold mb-0">{cloMapping.length}</h4>
-          </Card>
-        </div>
-        <div className="col-6 col-md-3">
+        <div className="col-6 col-md-4">
           <Card>
             <h6 className="text-neutral-600 mb-8">Cập nhật lần cuối</h6>
-            <h6 className="text-neutral-700 fw-semibold mb-0">{formatDate(program.updatedAt)}</h6>
+            <h6 className="text-neutral-600 fw-bold mb-0">{formatDate(program.updatedAt)}</h6>
           </Card>
         </div>
       </div>
@@ -447,26 +492,31 @@ const ProgramDetail = () => {
       <Card className="mb-24">
         <div className="d-flex justify-content-between align-items-center mb-20">
           <h5 className="mb-0 text-neutral-900 fw-bold">Program Learning Outcomes (PLOs)</h5>
+          <span className="text-neutral-600 text-sm">{program.plos?.length || 0} PLO(s) found</span>
         </div>
 
         {program.plos && program.plos.length > 0 ? (
           <div className="table-responsive">
-            <table className="table table-hover align-middle">
-              <thead style={{ backgroundColor: '#F9FAFB' }}>
+            <table className="table table-hover border border-neutral-40">
+              <thead className="bg-neutral-20">
                 <tr>
-                  <th className="text-neutral-900 fw-semibold border-0" style={{ padding: '12px 16px' }}>Mã PLO</th>
-                  <th className="text-neutral-900 fw-semibold border-0" style={{ padding: '12px 16px' }}>Mô tả</th>
+                  <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '10%' }}>#</th>
+                  <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '15%' }}>PLO Name</th>
+                  <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '75%' }}>PLO Description</th>
                 </tr>
               </thead>
               <tbody>
-                {program.plos.map((plo) => (
+                {program.plos.map((plo, index) => (
                   <tr key={plo._id}>
-                    <td style={{ padding: '16px' }}>
-                      <span className="badge bg-main-50 text-main-600 fw-semibold" style={{ padding: '8px 16px', fontSize: '13px', borderRadius: '20px' }}>
-                        {plo.code}
-                      </span>
+                    <td className="px-24 py-16" style={{ verticalAlign: 'top' }}>
+                      <span className="fw-semibold text-neutral-900">{index + 1}</span>
                     </td>
-                    <td className="text-neutral-700" style={{ padding: '16px' }}>{plo.description || 'N/A'}</td>
+                    <td className="px-24 py-16" style={{ verticalAlign: 'top' }}>
+                      <span className="fw-semibold text-neutral-900">{plo.code}</span>
+                    </td>
+                    <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top', whiteSpace: 'pre-wrap' }}>
+                      {plo.detail || plo.description || plo.name}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -476,101 +526,6 @@ const ProgramDetail = () => {
           <div className="text-center py-5 text-neutral-600">
             <i className="ph ph-books text-neutral-400" style={{ fontSize: '48px' }}></i>
             <p className="mt-3 mb-0">Chưa có PLO nào được liên kết</p>
-          </div>
-        )}
-      </Card>
-
-      {/* CLO → PLO Mapping */}
-      <Card className="mb-24">
-        <div className="d-flex justify-content-between align-items-center mb-20">
-          <div>
-            <h5 className="mb-4 text-neutral-900 fw-bold">Ánh xạ CLO → PLO</h5>
-            <p className="text-neutral-600 mb-0 text-sm">
-              Liên kết giữa các kết quả học tập cấp khóa học với cấp chương trình
-            </p>
-          </div>
-        </div>
-
-        {cloMapping.length > 0 ? (
-          <div>
-            {cloMapping.map((clo) => (
-              <div
-                key={clo._id}
-                className="border rounded mb-3 p-3"
-                style={{
-                  border: '1px solid #E5E7EB',
-                  borderRadius: '8px',
-                  transition: 'box-shadow 0.2s',
-                  cursor: 'default'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'}
-                onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
-              >
-                <div className="d-flex align-items-start mb-3">
-                  <div className="me-3">
-                    <span
-                      className="badge fw-semibold"
-                      style={{
-                        backgroundColor: '#F3E8FF',
-                        color: '#9333EA',
-                        padding: '8px 16px',
-                        fontSize: '13px',
-                        borderRadius: '20px'
-                      }}
-                    >
-                      {clo.code}
-                    </span>
-                  </div>
-                  <div className="flex-grow-1">
-                    <h6 className="mb-2 text-neutral-900 fw-semibold">{clo.name}</h6>
-                    <p className="text-neutral-600 mb-2" style={{ fontSize: '14px' }}>{clo.detail}</p>
-                    <p className="text-neutral-500 mb-0" style={{ fontSize: '12px' }}>
-                      <i className="ph ph-book-open me-1"></i>
-                      Từ môn: <strong>{clo.courseName}</strong>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="ms-4 ps-3" style={{paddingBottom: 5}}>
-                  <p className="fw-semibold text-neutral-700 mb-2" style={{ fontSize: '13px' }}>LIÊN KẾT PLOs:</p>
-                  {clo.mappedPLOs && clo.mappedPLOs.length > 0 ? (
-                    <div className="d-flex flex-wrap gap-2">
-                      {clo.mappedPLOs.map((plo) => (
-                        <div
-                          key={plo._id}
-                          className="d-flex align-items-center gap-2"
-                          style={{
-                            backgroundColor: '#EFF6FF',
-                            padding: '6px 12px',
-                            borderRadius: '8px'
-                          }}
-                        >
-                          <span
-                            className="badge text-white"
-                            style={{
-                              backgroundColor: '#2563EB',
-                              padding: '4px 10px',
-                              fontSize: '11px',
-                              borderRadius: '12px'
-                            }}
-                          >
-                            {plo.code}
-                          </span>
-                          <span className="text-neutral-900" style={{ fontSize: '13px' }}>{plo.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-neutral-500 fst-italic" style={{ fontSize: '13px' }}>Chưa liên kết với PLO nào</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-5 text-neutral-600">
-            <i className="ph ph-link text-neutral-400" style={{ fontSize: '48px' }}></i>
-            <p className="mt-3 mb-0">Chưa có CLO nào trong chương trình này</p>
           </div>
         )}
       </Card>
@@ -600,20 +555,189 @@ const ProgramDetail = () => {
         )}
       </Card>
 
-      {/* Reject Modal */}
-      {showRejectModal && (
+      {/* Submit Program Modal */}
+      {showSubmitModal && (
         <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Từ chối giáo trình</h5>
+                <h5 className="modal-title">Nộp chương trình để phê duyệt</h5>
                 <button
                   type="button"
                   className="btn-close"
                   onClick={() => {
-                    setShowRejectModal(false);
+                    setShowSubmitModal(false);
+                    setSubmissionNote('');
+                  }}
+                  disabled={actionLoading}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <p className="text-neutral-600 mb-3">
+                  Bạn đang nộp chương trình <strong>{program?.program_name}</strong> để chờ phê duyệt.
+                </p>
+                <label className="form-label">Ghi chú (tùy chọn)</label>
+                <textarea
+                  className="form-control"
+                  rows="4"
+                  placeholder="Nhập ghi chú khi nộp chương trình (nếu có)..."
+                  value={submissionNote}
+                  onChange={(e) => setSubmissionNote(e.target.value)}
+                  disabled={actionLoading}
+                ></textarea>
+              </div>
+              <div className="modal-footer">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowSubmitModal(false);
+                    setSubmissionNote('');
+                  }}
+                  disabled={actionLoading}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleConfirmSubmitProgram}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Đang xử lý...' : 'Xác nhận nộp'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sticky Action Bar - Only for Center Head with Pending Approval */}
+      {program.status === 'pending_approval' && userRole === 'Center Head' && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: '280px', // Sidebar width
+            right: 0,
+            backgroundColor: 'white',
+            borderTop: '2px solid #e5e7eb',
+            padding: '16px 32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1)',
+            zIndex: 1000
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: '#f59e0b',
+                animation: 'pulse 2s infinite'
+              }}
+            ></div>
+            <div>
+              <div style={{ fontWeight: '600', fontSize: '14px', color: '#111827' }}>
+                Chương trình đang chờ phê duyệt
+              </div>
+              <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                {program.program_name} - Mã: {program.code}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              className="btn"
+              onClick={handleRejectProgram}
+              disabled={actionLoading}
+              style={{
+                borderWidth: '1px',
+                borderStyle: 'solid',
+                borderColor: '#ef4444',
+                color: '#ef4444',
+                backgroundColor: 'transparent',
+                padding: '10px 24px',
+                borderRadius: '6px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: actionLoading ? 'not-allowed' : 'pointer',
+                opacity: actionLoading ? 0.6 : 1,
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                if (!actionLoading) {
+                  e.currentTarget.style.backgroundColor = '#ef4444';
+                  e.currentTarget.style.color = 'white';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!actionLoading) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = '#ef4444';
+                }
+              }}
+            >
+              <i className="ph ph-x"></i>
+              Từ chối
+            </button>
+            <button
+              className="btn"
+              onClick={handleApproveProgram}
+              disabled={actionLoading}
+              style={{
+                borderWidth: '1px',
+                borderStyle: 'solid',
+                borderColor: '#10b981',
+                color: 'white',
+                backgroundColor: '#10b981',
+                padding: '10px 24px',
+                borderRadius: '6px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: actionLoading ? 'not-allowed' : 'pointer',
+                opacity: actionLoading ? 0.6 : 1,
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                if (!actionLoading) {
+                  e.currentTarget.style.backgroundColor = '#059669';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!actionLoading) {
+                  e.currentTarget.style.backgroundColor = '#10b981';
+                }
+              }}
+            >
+              <i className="ph ph-check"></i>
+              Duyệt chương trình
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Program Modal */}
+      {showRejectProgramModal && (
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Từ chối chương trình</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowRejectProgramModal(false);
                     setRejectionReason('');
-                    setSelectedCourseId(null);
                   }}
                   disabled={actionLoading}
                 ></button>
@@ -623,7 +747,7 @@ const ProgramDetail = () => {
                 <textarea
                   className="form-control"
                   rows="4"
-                  placeholder="Nhập lý do từ chối giáo trình..."
+                  placeholder="Nhập lý do từ chối chương trình..."
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   disabled={actionLoading}
@@ -633,9 +757,8 @@ const ProgramDetail = () => {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    setShowRejectModal(false);
+                    setShowRejectProgramModal(false);
                     setRejectionReason('');
-                    setSelectedCourseId(null);
                   }}
                   disabled={actionLoading}
                 >
@@ -643,7 +766,7 @@ const ProgramDetail = () => {
                 </Button>
                 <Button
                   variant="danger"
-                  onClick={handleConfirmReject}
+                  onClick={handleConfirmRejectProgram}
                   disabled={actionLoading}
                 >
                   {actionLoading ? 'Đang xử lý...' : 'Xác nhận từ chối'}

@@ -3,6 +3,22 @@ const Schema = mongoose.Schema;
 
 // Schema cho Program (Chương trình đào tạo)
 
+// Embedded PLO schema - mỗi program có PLOs riêng
+const ploSchema = new Schema({
+    code: {
+        type: String,
+        required: [true, 'Mã PLO là bắt buộc']
+    },
+    name: {
+        type: String,
+        required: [true, 'Tên PLO là bắt buộc']
+    },
+    detail: {
+        type: String,
+        required: [true, 'Chi tiết PLO là bắt buộc']
+    }
+}, { _id: true, timestamps: true });
+
 const programSchema = new Schema({
     code: {
         type: String, required: true,
@@ -39,14 +55,29 @@ const programSchema = new Schema({
         type: Number,
         default: 0
     },
-    plos: [{
+    plos: [ploSchema],
+
+    // Creator tracking
+    createdBy: {
         type: Schema.Types.ObjectId,
-        ref: 'PLO'
-    }],
+        ref: 'User',
+        required: true
+    },
+
+    // ===== STATUS ĐỂ XEM PROGRAM ĐÃ ĐƯỢC DUYỆT CHƯA =====
+    // Tất cả thông tin chi tiết về submission, approval, rejection được lưu trong ApprovalRequest model
     status: {
         type: String,
-        enum: ['draft', 'active', 'archived', 'disabled'], // draft: đang soạn, active: đang dùng, archived: đã lưu trữ, disabled: không dùng nữa
-        default: 'draft'
+        enum: [
+            'draft',              // Subject Leader đang soạn
+            'pending_approval',   // Đã submit, chờ Center Head duyệt
+            'approved',           // Center Head đã duyệt
+            'needs_revision',     // Center Head yêu cầu chỉnh sửa
+            'active',             // Đang sử dụng (sau khi approved)
+            'archived'            // Đã lưu trữ
+        ],
+        default: 'draft',
+        index: true
     }
 }, { timestamps: true });
 

@@ -26,6 +26,14 @@ const Table = ({ columns, data, onRowClick, className = '' }) => {
     return baseClass;
   };
 
+  // Handle cell click - stop propagation for actions column
+  const handleCellClick = (e, column) => {
+    // If this is an actions column (has field 'actions'), stop propagation
+    if (column.field === 'actions') {
+      e.stopPropagation();
+    }
+  };
+
   return (
     <div className={`table-responsive ${className}`}>
       <table className="table table-hover border border-neutral-40">
@@ -50,7 +58,11 @@ const Table = ({ columns, data, onRowClick, className = '' }) => {
                 className={onRowClick ? 'cursor-pointer' : ''}
               >
                 {columns.map((column, colIndex) => (
-                  <td key={colIndex} className={getColumnClass(column)}>
+                  <td
+                    key={colIndex}
+                    className={getColumnClass(column)}
+                    onClick={(e) => handleCellClick(e, column)}
+                  >
                     {column.render ? column.render(row) : row[column.field]}
                   </td>
                 ))}

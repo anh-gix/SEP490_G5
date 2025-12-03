@@ -9,6 +9,7 @@ import Badge from "../compo/Badge";
 import programService from "../../../services/programService";
 import courseService from "../../../services/courseService";
 import sessionService from "../../../services/sessionService";
+import camSessionService from "../../../services/camSessionService";
 
 const CourseFormNew = () => {
   const navigate = useNavigate();
@@ -39,10 +40,12 @@ const CourseFormNew = () => {
     timeAllocation: "", // ← MỚI
     preRequisite: "None", // ← MỚI
     studentTasks: "", // ← MỚI
+    learningType: "offline",
     program: programId,
     status: "draft",
     clos: [],
     sessions: [],
+    camSessions: [],
     materials: [], // ← CẬP NHẬT: Array of objects
     mocktestSessionOrders: [],
   });
@@ -143,6 +146,7 @@ const CourseFormNew = () => {
             timeAllocation: courseData.timeAllocation || "",
             preRequisite: courseData.preRequisite || "None",
             studentTasks: courseData.studentTasks || "",
+            learningType: courseData.learningType || "offline",
             program: programId,
             status: courseData.status,
             clos:
@@ -162,6 +166,7 @@ const CourseFormNew = () => {
                 learningType: session.learningType,
                 clos: session.clos?.map((clo) => clo.code || clo) || [],
               })) || [],
+            camSessions: courseData.camSessions || [],
             materials: courseData.materials || [],
             mocktestSessionOrders: courseData.mocktestSessionOrders || [],
           });
@@ -450,6 +455,101 @@ const CourseFormNew = () => {
     setActiveTab("sessions");
 
     alert(`Đã tạo ${numberOfSessions} buổi học thành công! Vui lòng chỉnh sửa thông tin cho từng buổi.`);
+  };
+
+  const isCamOnlineCourse =
+    program?.type === "cam" && formData.learningType === "online";
+
+  // ==================== CAM SESSION QUICK CREATE (FORM VIEW) ====================
+  const handleQuickCreateCamSession = async () => {
+    if (!courseId) {
+      alert("Không tìm thấy ID học phần. Vui lòng lưu học phần trước khi tạo CAM Session.");
+      return;
+    }
+
+    const totalPlannedSessions = Number(formData.numberOfSessions) || 0;
+    const currentCamSessions = formData.camSessions || [];
+
+    if (totalPlannedSessions > 0 && currentCamSessions.length >= totalPlannedSessions) {
+      alert(
+        `Bạn đã tạo đủ CAM Session cho ${totalPlannedSessions} buổi học. ` +
+        "Vui lòng tăng số lượng buổi học nếu muốn tạo thêm CAM Session."
+      );
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const currentCamSessions = formData.camSessions || [];
+      const nextOrder =
+        currentCamSessions.length > 0
+          ? Math.max(...currentCamSessions.map((cs) => cs.order || 0)) + 1
+          : 1;
+
+      const payload = {
+        course: courseId,
+        title: `CAM Session ${nextOrder}`,
+        order: nextOrder,
+        sessionType: "reading",
+      };
+
+      const created = await camSessionService.createCamSession(payload);
+      const createdSession = created?.data || created;
+
+      // Cập nhật course để liên kết CAM Session mới
+      await courseService.updateCourse(courseId, {
+        camSessions: [...currentCamSessions, createdSession].map((cs) => cs._id),
+      });
+
+      // Cập nhật state local
+      setFormData((prev) => ({
+        ...prev,
+        camSessions: [...(prev.camSessions || []), createdSession],
+      }));
+
+      alert("Đã tạo CAM Session mới thành công!");
+    } catch (error) {
+      console.error("Error creating CAM Session:", error);
+      alert(error.response?.data?.message || "Lỗi khi tạo CAM Session!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCamSessionRow = async (camSessionId) => {
+    if (!camSessionId) return;
+    if (!window.confirm("Bạn có chắc chắn muốn xóa CAM Session này?")) return;
+
+    try {
+      setLoading(true);
+
+      const remaining = (formData.camSessions || []).filter(
+        (cs) => cs._id !== camSessionId
+      );
+
+      // 1. Cập nhật course để bỏ liên kết CAM Session đã xóa
+      if (courseId) {
+        await courseService.updateCourse(courseId, {
+          camSessions: remaining.map((cs) => cs._id),
+        });
+      }
+
+      // 2. Xóa document CamSession sau khi đã gỡ khỏi course
+      await camSessionService.deleteCamSession(camSessionId);
+
+      setFormData((prev) => ({
+        ...prev,
+        camSessions: remaining,
+      }));
+
+      alert("Xóa CAM Session thành công!");
+    } catch (error) {
+      console.error("Error deleting CAM Session:", error);
+      alert(error.response?.data?.message || "Lỗi khi xóa CAM Session!");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ==================== FORM SUBMISSION ====================
@@ -1070,145 +1170,266 @@ const CourseFormNew = () => {
           </Card>
         )}
 
-        {/* Tab 4: Sessions */}
+        {/* Tab 4: Sessions / CAM Sessions */}
         {activeTab === "sessions" && (
           <Card>
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <div>
-                <h5 className="mb-2">Kế hoạch giảng dạy (Sessions)</h5>
-                <p className="text-neutral-600 text-sm mb-0">
-                  Các buổi học và gán CLO cho từng buổi
-                </p>
-              </div>
-              <Button
-                variant="primary"
-                icon="ph ph-plus"
-                onClick={handleAddSession}
-                disabled={formData.clos.length === 0}
-              >
-                Thêm Session
-              </Button>
-            </div>
+            {isCamOnlineCourse ? (
+              <>
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                  <div>
+                    <h5 className="mb-2">CAM Sessions</h5>
+                    <p className="text-neutral-600 text-sm mb-0">
+                      Khóa học này thuộc chương trình CAM và là khóa online. Kế hoạch giảng dạy
+                      được quản lý thông qua CAM Sessions.
+                    </p>
+                  </div>
+                  <Button
+                    variant="primary"
+                    icon="ph ph-plus"
+                    onClick={handleQuickCreateCamSession}
+                    disabled={
+                      loading ||
+                      !formData.numberOfSessions ||
+                      (formData.camSessions?.length || 0) >= (formData.numberOfSessions || 0)
+                    }
+                  >
+                    Thêm CAM Session
+                  </Button>
+                </div>
 
-            {formData.clos.length === 0 && (
-              <div className="alert alert-warning">
-                <i className="ph ph-warning-circle me-2"></i>
-                Vui lòng tạo ít nhất 1 CLO trước khi tạo Session!
-              </div>
-            )}
-
-            {formData.sessions.length === 0 ? (
-              <div className="text-center py-5">
-                <i className="ph ph-calendar ph-3x text-neutral-400 mb-3"></i>
-                <p className="text-neutral-600 mb-3">
-                  Chưa có session nào được thêm
-                </p>
-                {formData.numberOfSessions > 0 && (
-                  <div className="alert alert-info d-inline-block">
-                    <i className="ph ph-info me-2"></i>
-                    Bạn đã nhập <strong>{formData.numberOfSessions} buổi học</strong>.
-                    Vui lòng quay lại tab "Thông tin cơ bản" và click "Tạo kế hoạch giảng dạy"
-                    để tự động tạo các buổi học.
+                 {formData.camSessions && formData.camSessions.length > 0 ? (
+                   <div className="table-responsive">
+                     <table className="table table-hover">
+                       <thead>
+                         <tr>
+                           <th style={{ width: "80px" }}>Order</th>
+                           <th>Tiêu đề</th>
+                           <th style={{ width: "160px" }}>Loại</th>
+                           <th>Mô tả</th>
+                           <th style={{ width: "200px" }}>Video / Media</th>
+                         </tr>
+                       </thead>
+                       <tbody>
+                         {formData.camSessions
+                           .slice()
+                           .sort((a, b) => (a.order || 0) - (b.order || 0))
+                           .map((camSession, index) => (
+                             <tr key={camSession._id || index}>
+                               <td className="text-center">
+                                 <Badge variant="secondary">
+                                   {camSession.order ?? index + 1}
+                                 </Badge>
+                               </td>
+                               <td className="fw-semibold">{camSession.title || "-"}</td>
+                               <td>
+                                 {camSession.sessionType ? (
+                                   <Badge variant="info" size="sm">
+                                     {camSession.sessionType.charAt(0).toUpperCase() +
+                                       camSession.sessionType.slice(1)}
+                                   </Badge>
+                                 ) : (
+                                   <span className="text-muted text-sm">Chưa phân loại</span>
+                                 )}
+                               </td>
+                               <td className="text-neutral-600">
+                                 {camSession.description || "-"}
+                               </td>
+                               <td>
+                                 <div className="d-flex justify-content-between align-items-center gap-2">
+                                   <div>
+                                     {camSession.videoURL ? (
+                                       <a
+                                         href={camSession.videoURL}
+                                         target="_blank"
+                                         rel="noopener noreferrer"
+                                         className="text-primary text-sm d-inline-flex align-items-center"
+                                         style={{ wordBreak: "break-all" }}
+                                       >
+                                         <i className="ph ph-play-circle me-1"></i>
+                                         Xem video
+                                       </a>
+                                     ) : (
+                                       <span className="text-muted text-sm">Chưa có video</span>
+                                     )}
+                                   </div>
+                                   <div className="d-flex gap-1">
+                                     <Button
+                                       variant="ghost"
+                                       size="sm"
+                                       icon="ph ph-pencil"
+                                       onClick={() =>
+                                         camSession._id &&
+                                         navigate(`/center-head/cam-sessions/${camSession._id}/edit`)
+                                       }
+                                       disabled={loading}
+                                     />
+                                     <Button
+                                       variant="ghost"
+                                       size="sm"
+                                       icon="ph ph-trash"
+                                       onClick={() => handleDeleteCamSessionRow(camSession._id)}
+                                       disabled={loading}
+                                     />
+                                   </div>
+                                 </div>
+                               </td>
+                             </tr>
+                           ))}
+                       </tbody>
+                     </table>
+                   </div>
+                 ) : (
+                  <div className="text-center py-5">
+                    <i className="ph ph-calendar ph-3x text-neutral-400 mb-3"></i>
+                    <p className="text-neutral-600 mb-0">
+                      Chưa có CAM Session nào được tạo cho học phần này.
+                    </p>
+                    <p className="text-neutral-500 text-sm mb-0">
+                      Vui lòng sử dụng bước CAM Session trong wizard để tạo nội dung.
+                    </p>
                   </div>
                 )}
-                {formData.clos.length > 0 && (
-                  <div className="mt-3">
-                    <Button
-                      variant="primary"
-                      icon="ph ph-plus"
-                      onClick={handleAddSession}
-                    >
-                      Hoặc thêm session thủ công
-                    </Button>
-                  </div>
-                )}
-              </div>
+              </>
             ) : (
-              <div className="table-responsive">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: "80px" }}>Order</th>
-                      <th>Tiêu đề</th>
-                      <th>Nội dung</th>
-                      <th style={{ width: "150px" }}>Loại hình</th>
-                      <th style={{ width: "150px" }}>CLOs</th>
-                      <th style={{ width: "120px" }} className="text-center">
-                        Thao tác
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {formData.sessions
-                      .sort((a, b) => a.order - b.order)
-                      .map((session, index) => (
-                        <tr key={index}>
-                          <td className="text-center">
-                            <Badge variant="secondary">{session.order}</Badge>
-                          </td>
-                          <td className="fw-semibold">{session.title}</td>
-                          <td className="text-neutral-600">
-                            {session.content}
-                          </td>
-                          <td>
-                            <Badge
-                              variant={
-                                session.learningType === "mocktest"
-                                  ? "danger"
-                                  : session.learningType === "theory"
-                                  ? "info"
-                                  : session.learningType === "practice"
-                                  ? "success"
-                                  : "warning"
-                              }
-                            >
-                              {session.learningType === "mocktest"
-                                ? "Mock Test"
-                                : session.learningType === "theory"
-                                ? "Lý thuyết"
-                                : session.learningType === "practice"
-                                ? "Thực hành"
-                                : session.learningType}
-                            </Badge>
-                          </td>
-                          <td>
-                            <div className="d-flex flex-wrap gap-1">
-                              {session.clos.length === 0 ? (
-                                <span className="text-muted text-sm">Chưa gán CLO</span>
-                              ) : (
-                                session.clos.map((cloCode) => (
-                                  <Badge
-                                    key={cloCode}
-                                    variant="primary"
-                                    size="sm"
-                                  >
-                                    {cloCode}
-                                  </Badge>
-                                ))
-                              )}
-                            </div>
-                          </td>
-                          <td className="text-center">
-                            <div className="d-flex gap-1 justify-content-center">
-                              <Button
-                                variant="ghost"
-                                icon="ph ph-pencil"
-                                size="sm"
-                                onClick={() => handleEditSession(index)}
-                              />
-                              <Button
-                                variant="ghost"
-                                icon="ph ph-trash"
-                                size="sm"
-                                onClick={() => handleDeleteSession(index)}
-                              />
-                            </div>
-                          </td>
+              <>
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                  <div>
+                    <h5 className="mb-2">Kế hoạch giảng dạy (Sessions)</h5>
+                    <p className="text-neutral-600 text-sm mb-0">
+                      Các buổi học và gán CLO cho từng buổi
+                    </p>
+                  </div>
+                  <Button
+                    variant="primary"
+                    icon="ph ph-plus"
+                    onClick={handleAddSession}
+                    disabled={formData.clos.length === 0}
+                  >
+                    Thêm Session
+                  </Button>
+                </div>
+
+                {formData.clos.length === 0 && (
+                  <div className="alert alert-warning">
+                    <i className="ph ph-warning-circle me-2"></i>
+                    Vui lòng tạo ít nhất 1 CLO trước khi tạo Session!
+                  </div>
+                )}
+
+                {formData.sessions.length === 0 ? (
+                  <div className="text-center py-5">
+                    <i className="ph ph-calendar ph-3x text-neutral-400 mb-3"></i>
+                    <p className="text-neutral-600 mb-3">
+                      Chưa có session nào được thêm
+                    </p>
+                    {formData.numberOfSessions > 0 && (
+                      <div className="alert alert-info d-inline-block">
+                        <i className="ph ph-info me-2"></i>
+                        Bạn đã nhập <strong>{formData.numberOfSessions} buổi học</strong>.
+                        Vui lòng quay lại tab "Thông tin cơ bản" và click "Tạo kế hoạch giảng dạy"
+                        để tự động tạo các buổi học.
+                      </div>
+                    )}
+                    {formData.clos.length > 0 && (
+                      <div className="mt-3">
+                        <Button
+                          variant="primary"
+                          icon="ph ph-plus"
+                          onClick={handleAddSession}
+                        >
+                          Hoặc thêm session thủ công
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: "80px" }}>Order</th>
+                          <th>Tiêu đề</th>
+                          <th>Nội dung</th>
+                          <th style={{ width: "150px" }}>Loại hình</th>
+                          <th style={{ width: "150px" }}>CLOs</th>
+                          <th style={{ width: "120px" }} className="text-center">
+                            Thao tác
+                          </th>
                         </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
+                      </thead>
+                      <tbody>
+                        {formData.sessions
+                          .sort((a, b) => a.order - b.order)
+                          .map((session, index) => (
+                            <tr key={index}>
+                              <td className="text-center">
+                                <Badge variant="secondary">{session.order}</Badge>
+                              </td>
+                              <td className="fw-semibold">{session.title}</td>
+                              <td className="text-neutral-600">
+                                {session.content}
+                              </td>
+                              <td>
+                                <Badge
+                                  variant={
+                                    session.learningType === "mocktest"
+                                      ? "danger"
+                                      : session.learningType === "theory"
+                                      ? "info"
+                                      : session.learningType === "practice"
+                                      ? "success"
+                                      : "warning"
+                                  }
+                                >
+                                  {session.learningType === "mocktest"
+                                    ? "Mock Test"
+                                    : session.learningType === "theory"
+                                    ? "Lý thuyết"
+                                    : session.learningType === "practice"
+                                    ? "Thực hành"
+                                    : session.learningType}
+                                </Badge>
+                              </td>
+                              <td>
+                                <div className="d-flex flex-wrap gap-1">
+                                  {session.clos.length === 0 ? (
+                                    <span className="text-muted text-sm">Chưa gán CLO</span>
+                                  ) : (
+                                    session.clos.map((cloCode) => (
+                                      <Badge
+                                        key={cloCode}
+                                        variant="primary"
+                                        size="sm"
+                                      >
+                                        {cloCode}
+                                      </Badge>
+                                    ))
+                                  )}
+                                </div>
+                              </td>
+                              <td className="text-center">
+                                <div className="d-flex gap-1 justify-content-center">
+                                  <Button
+                                    variant="ghost"
+                                    icon="ph ph-pencil"
+                                    size="sm"
+                                    onClick={() => handleEditSession(index)}
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    icon="ph ph-trash"
+                                    size="sm"
+                                    onClick={() => handleDeleteSession(index)}
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             )}
           </Card>
         )}

@@ -38,11 +38,26 @@ exports.getAllCourses = async (req, res) => {
 exports.getCourseById = async (req, res) => {
     try {
         const course = await Course.findById(req.params.id)
-            .populate('program', 'program_name code')
+            // Cần type để FE biết đây có phải course CAM không
+            .populate('program', 'program_name code type level')
             .populate('createdBy', 'fullname email')
+            // Sessions thường
             .populate({
                 path: 'sessions',
                 options: { sort: { order: 1 } }
+            })
+            // CAM Sessions cho course online CAM
+            .populate({
+                path: 'camSessions',
+                options: { sort: { Order: 1 } }
+            })
+            // CLOs cùng mapped PLOs (nếu cần hiển thị chi tiết)
+            .populate({
+                path: 'clos',
+                populate: {
+                    path: 'mappedPLOs',
+                    select: 'code name'
+                }
             });
 
         if (!course) {

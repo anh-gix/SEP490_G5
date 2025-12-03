@@ -11,6 +11,7 @@ import PendingCoursesPage from "../pages/CenterHead/PendingCoursesPage.jsx";
 import CourseDetailPage from "../pages/CenterHead/CourseDetailPage.jsx";
 import CourseFormPage from "../pages/CenterHead/CourseFormPage.jsx";
 import CamSessionPage from "../pages/CenterHead/CamSessionPage.jsx";
+import CamSessionEditPage from "../pages/CenterHead/CamSessionEditPage.jsx";
 import ClassListPage from "../pages/CenterHead/ClassListPage.jsx";
 import PendingSchedulesPage from "../pages/CenterHead/PendingSchedulesPage.jsx";
 import RoomListPage from "../pages/CenterHead/RoomListPage.jsx";
@@ -50,7 +51,7 @@ export const centerHeadRoutes = [
 
   // CAM Session Management
   { path: '/center-head/cam-sessions/create', element: <CamSessionPage /> },
-  { path: '/center-head/cam-sessions/:sessionId/edit', element: <CamSessionPage /> },
+  { path: '/center-head/cam-sessions/:sessionId/edit', element: <CamSessionEditPage /> },
 
   // Program Detail & Course Management
   { path: '/center-head/programs/:id', element: <ProgramDetailPage /> },

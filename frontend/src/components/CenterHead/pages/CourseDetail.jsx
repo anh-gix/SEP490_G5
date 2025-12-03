@@ -5,6 +5,7 @@ import Card from '../compo/Card';
 import Button from '../compo/Button';
 import Badge from '../compo/Badge';
 import Tabs from '../compo/Tabs';
+import Modal from '../compo/Modal';
 import { courseService } from '../../../services/courseService';
 import { formatDate } from '../../../helper/helper';
 
@@ -15,15 +16,20 @@ const CourseDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [selectedCamSession, setSelectedCamSession] = useState(null);
+  const [showCamSessionModal, setShowCamSessionModal] = useState(false);
+
 
   useEffect(() => {
     fetchCourseDetails();
+    
   }, [id]);
 
   const fetchCourseDetails = async () => {
     try {
       setLoading(true);
       const response = await courseService.getCourseDetails(id);
+console.log(response.data);
 
       if (response.success) {
         setCourse(response.data);
@@ -240,18 +246,118 @@ const CourseDetails = () => {
   );
 
   // Tab 2: Syllabus
+  const isCamOnlineCourse =
+    course.program?.type === 'cam' && course.learningType === 'online';
+
   const syllabusTab = (
     <div className="syllabus">
-      {course.sessions && course.sessions.length > 0 ? (
+      {isCamOnlineCourse ? (
+        // CAM online course → hiển thị Cam Sessions
+        course.camSessions && course.camSessions.length > 0 ? (
+          <div className="table-responsive">
+            <table className="table table-hover border border-neutral-40">
+              <thead className="bg-neutral-20">
+                <tr>
+                  <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '8%' }}>
+                    Order
+                  </th>
+                  <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '22%' }}>
+                    Title
+                  </th>
+                  <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '18%' }}>
+                    Session Type
+                  </th>
+                  <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '32%' }}>
+                    Description
+                  </th>
+                  <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '20%' }}>
+                    Video / Media
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {course.camSessions.map((camSession, index) => (
+                  <tr
+                    key={camSession._id || index}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => {
+                      setSelectedCamSession(camSession);
+                      setShowCamSessionModal(true);
+                    }}
+                  >
+                    <td className="px-24 py-16" style={{ verticalAlign: 'top' }}>
+                      <span className="fw-semibold text-neutral-900">
+                        {camSession.order ?? index + 1}
+                      </span>
+                    </td>
+                    <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top' }}>
+                      {camSession.title || '-'}
+                    </td>
+                    <td className="px-24 py-16" style={{ verticalAlign: 'top' }}>
+                      {camSession.sessionType ? (
+                        <Badge variant="info" size="sm">
+                          {camSession.sessionType.charAt(0).toUpperCase() +
+                            camSession.sessionType.slice(1)}
+                        </Badge>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
+                    <td
+                      className="px-24 py-16 text-neutral-700"
+                      style={{ verticalAlign: 'top', whiteSpace: 'pre-wrap' }}
+                    >
+                      {camSession.description || '-'}
+                    </td>
+                    <td className="px-24 py-16" style={{ verticalAlign: 'top' }}>
+                      {camSession.videoURL ? (
+                        <a
+                          href={camSession.videoURL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-main-600 d-inline-flex align-items-center"
+                          style={{ wordBreak: 'break-all' }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <i className="ph ph-play-circle me-1"></i>
+                          Xem video
+                        </a>
+                      ) : (
+                        <span className="text-neutral-400 text-sm">Chưa có video</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-5 text-neutral-500">
+            <i className="ph ph-book-open text-6xl mb-3 d-block"></i>
+            <p>Chưa có CAM Session nào cho khóa học này</p>
+          </div>
+        )
+      ) : course.sessions && course.sessions.length > 0 ? (
+        // Course thường → hiển thị Sessions
         <div className="table-responsive">
           <table className="table table-hover border border-neutral-40">
             <thead className="bg-neutral-20">
               <tr>
-                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '10%' }}>Order</th>
-                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '25%' }}>Title</th>
-                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '40%' }}>Content</th>
-                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '15%' }}>Learning Type</th>
-                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '10%' }}>CLOs</th>
+                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '10%' }}>
+                  Order
+                </th>
+                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '25%' }}>
+                  Title
+                </th>
+                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '40%' }}>
+                  Content
+                </th>
+                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '15%' }}>
+                  Learning Type
+                </th>
+                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '10%' }}>
+                  CLOs
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -263,7 +369,10 @@ const CourseDetails = () => {
                   <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top' }}>
                     {session.title || '-'}
                   </td>
-                  <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top', whiteSpace: 'pre-wrap' }}>
+                  <td
+                    className="px-24 py-16 text-neutral-700"
+                    style={{ verticalAlign: 'top', whiteSpace: 'pre-wrap' }}
+                  >
                     {session.content || '-'}
                   </td>
                   <td className="px-24 py-16" style={{ verticalAlign: 'top' }}>
@@ -288,7 +397,9 @@ const CourseDetails = () => {
                           </Badge>
                         ))}
                       </div>
-                    ) : '-'}
+                    ) : (
+                      '-'
+                    )}
                   </td>
                 </tr>
               ))}
@@ -435,6 +546,135 @@ const CourseDetails = () => {
       <Card>
         <Tabs tabs={tabs} />
       </Card>
+
+      {/* CAM Session Detail Modal */}
+      <Modal
+        show={showCamSessionModal && !!selectedCamSession}
+        onClose={() => {
+          setShowCamSessionModal(false);
+          setSelectedCamSession(null);
+        }}
+        title={
+          selectedCamSession
+            ? `Chi tiết CAM Session: ${selectedCamSession.title || ''}`
+            : 'Chi tiết CAM Session'
+        }
+        size="lg"
+      >
+        {!selectedCamSession ? (
+          <p>Đang tải dữ liệu...</p>
+        ) : (
+          <div className="d-flex flex-column gap-4">
+            <div className="row g-3">
+              <div className="col-md-3">
+                <label className="form-label text-sm text-neutral-600">Order</label>
+                <p className="mb-0 fw-semibold">
+                  {selectedCamSession.order ?? '-'}
+                </p>
+              </div>
+              <div className="col-md-5">
+                <label className="form-label text-sm text-neutral-600">Tiêu đề</label>
+                <p className="mb-0 fw-semibold">
+                  {selectedCamSession.title || '-'}
+                </p>
+              </div>
+              <div className="col-md-4">
+                <label className="form-label text-sm text-neutral-600">Loại</label>
+                <div>
+                  {selectedCamSession.sessionType ? (
+                    <Badge variant="info" size="sm">
+                      {selectedCamSession.sessionType.charAt(0).toUpperCase() +
+                        selectedCamSession.sessionType.slice(1)}
+                    </Badge>
+                  ) : (
+                    <span className="text-neutral-500 text-sm">Chưa phân loại</span>
+                  )}
+                </div>
+              </div>
+              <div className="col-12">
+                <label className="form-label text-sm text-neutral-600">Mô tả</label>
+                <div className="bg-neutral-20 p-3 radius-8">
+                  <p className="mb-0 text-neutral-800" style={{ whiteSpace: 'pre-wrap' }}>
+                    {selectedCamSession.description || 'Chưa có mô tả'}
+                  </p>
+                </div>
+              </div>
+              <div className="col-12">
+                <label className="form-label text-sm text-neutral-600">Video / Media</label>
+                {selectedCamSession.videoURL ? (
+                  <a
+                    href={selectedCamSession.videoURL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-main-600 d-inline-flex align-items-center"
+                    style={{ wordBreak: 'break-all' }}
+                  >
+                    <i className="ph ph-play-circle me-1"></i>
+                    Mở video trong tab mới
+                  </a>
+                ) : (
+                  <p className="mb-0 text-neutral-500 text-sm">Chưa có video</p>
+                )}
+              </div>
+            </div>
+
+            <div className="border rounded-3 p-3">
+              <div className="d-flex justify-content-between align-items-center mb-2">
+                <h6 className="mb-0 fw-semibold">Quizzes</h6>
+                <span className="text-sm text-neutral-500">
+                  {(selectedCamSession.quizzes?.quiz || []).length} quiz
+                </span>
+              </div>
+              {(selectedCamSession.quizzes?.quiz || []).length === 0 ? (
+                <p className="mb-0 text-neutral-500 text-sm">Chưa có quiz nào.</p>
+              ) : (
+                <div className="row row-cols-1 row-cols-md-2 g-3">
+                  {selectedCamSession.quizzes.quiz.map((quiz, idx) => (
+                    <div key={`quiz-${idx}`} className="col">
+                      <div className="border rounded-3 p-3 h-100">
+                        <div className="d-flex justify-content-between align-items-start mb-1">
+                          <span className="badge bg-neutral-100 text-neutral-800">
+                            Quiz #{idx + 1}
+                          </span>
+                          <span className="badge bg-neutral-50 text-neutral-700">
+                            {quiz.Type || 'N/A'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-neutral-800 mb-1">
+                          {quiz.Question || 'Chưa có câu hỏi'}
+                        </p>
+                        <p className="text-xs text-neutral-500 mb-0">
+                          Đáp án: {quiz.Answer?.length || 0} | Đáp án đúng: {quiz.AnswerKey?.length || 0}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="border rounded-3 p-3">
+              <div className="d-flex justify-content-between align-items-center mb-2">
+                <h6 className="mb-0 fw-semibold">Vocabulary</h6>
+                <span className="text-sm text-neutral-500">
+                  {(selectedCamSession.vocabulary?.items || []).length} từ
+                </span>
+              </div>
+              {(selectedCamSession.vocabulary?.items || []).length === 0 ? (
+                <p className="mb-0 text-neutral-500 text-sm">Chưa có từ vựng nào.</p>
+              ) : (
+                <div className="d-flex flex-wrap gap-2">
+                  {selectedCamSession.vocabulary.items.map((item, idx) => (
+                    <Badge key={`vocab-${idx}`} variant="primary" size="sm">
+                      {item.word || `Từ #${idx + 1}`}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

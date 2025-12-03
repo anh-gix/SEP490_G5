@@ -15,6 +15,7 @@ const ClassHomework = () => {
   const [error, setError] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedHomework, setSelectedHomework] = useState(null);
+  const [filterType, setFilterType] = useState('by-lesson'); // 'by-lesson', 'upcoming'
 
   useEffect(() => {
     if (classId) {
@@ -67,6 +68,49 @@ const ClassHomework = () => {
     await fetchHomework();
   };
 
+  // Filter and sort homework
+  const getFilteredHomework = () => {
+    let filtered = [...homework];
+    
+    if (filterType === 'upcoming') {
+      // Lọc bài tập sắp đến hạn (trong vòng 3 ngày) và chưa nộp
+      const threeDaysFromNow = new Date();
+      threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+      
+      filtered = filtered.filter(hw => {
+        const deadline = new Date(hw.deadline);
+        return hw.status === 'not_submitted' && deadline <= threeDaysFromNow && deadline > new Date();
+      });
+    }
+    
+    if (filterType === 'by-lesson') {
+      // Sắp xếp theo buổi học (lessonNumber)
+      filtered.sort((a, b) => (b.lessonNumber || 0) - (a.lessonNumber || 0));
+    } else {
+      // Mặc định sắp xếp theo deadline gần nhất
+      filtered.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+    }
+    
+    return filtered;
+  };
+
+  // Group homework by lesson
+  const groupHomeworkByLesson = (homeworkList) => {
+    const grouped = {};
+    homeworkList.forEach(hw => {
+      const key = `${hw.lessonNumber}-${hw.lessonTitle}`;
+      if (!grouped[key]) {
+        grouped[key] = {
+          lessonNumber: hw.lessonNumber,
+          lessonTitle: hw.lessonTitle,
+          homework: []
+        };
+      }
+      grouped[key].homework.push(hw);
+    });
+    return Object.values(grouped);
+  };
+
   if (loading) {
     return (
       <div className="p-24 text-center">
@@ -87,93 +131,69 @@ const ClassHomework = () => {
   return (
     <>
       <div className="p-24">
-        {homework.length > 0 ? (
-          <div className="d-flex flex-column gap-3">
-            {homework.map(hw => {
-              const isDeadlinePassed = new Date() > new Date(hw.deadline);
-              
-              return (
-                <Card 
-                  key={hw._id} 
-                  className="bg-white border-0 rounded-12 hover-shadow-lg transition-all cursor-pointer"
-                  style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}
-                >
-                  <Card.Body className="p-20">
-                    <div className="d-flex justify-content-between align-items-start mb-12">
-                      <div className="flex-grow-1">
-                        <h6 className="text-neutral-900 fw-bold mb-8">
-                          {hw.title}
-                        </h6>
-                        <div className="text-neutral-500 text-13 mb-8">
-                          <i className="fas fa-book-reader me-2"></i>
-                          Buổi {hw.lessonNumber}: {hw.lessonTitle}
-                        </div>
-                        <div className="d-flex align-items-center gap-3 text-13">
-                          <span className={`${isDeadlinePassed && hw.status === 'not_submitted' ? 'text-danger-600 fw-semibold' : 'text-neutral-600'}`}>
-                            <i className="fas fa-calendar-alt me-2"></i>
-                            Hạn: {new Date(hw.deadline).toLocaleDateString('vi-VN')} {new Date(hw.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          {hw.assignmentFiles && hw.assignmentFiles.length > 0 && (
-                            <span className="text-neutral-500">
-                              <i className="fas fa-paperclip me-1"></i>
-                              {hw.assignmentFiles.length} file
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="d-flex flex-column align-items-end gap-2">
-                        {getHomeworkStatusBadge(hw.status)}
-                        {hw.status === 'graded' && hw.score != null && (
-                          <Badge bg="warning" className="px-12 py-6">
-                            <i className="fas fa-star me-1"></i>
-                            {hw.score}/10
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+        {/* Filter Buttons */}
+        <div className="d-flex gap-2 mb-20">
+          <Button
+            variant={filterType === 'by-lesson' ? 'primary' : 'outline-primary'}
+            size="sm"
+            onClick={() => setFilterType('by-lesson')}
+            className="px-16 py-8 text-13"
+          >
+            <i className="fas fa-book-reader me-2"></i>
+            Theo buổi học
+          </Button>
+          <Button
+            variant={filterType === 'upcoming' ? 'primary' : 'outline-primary'}
+            size="sm"
+            onClick={() => setFilterType('upcoming')}
+            className="px-16 py-8 text-13"
+          >
+            <i className="fas fa-clock me-2"></i>
+            Sắp đến hạn
+          </Button>
+        </div>
 
-                    <div className="d-flex gap-2">
-                      {hw.status === 'not_submitted' && (
-                        <Button 
-                          className="btn-main text-13 fw-semibold px-20 py-8 radius-8 flex-grow-1"
-                          onClick={() => handleViewDetail(hw)}
-                        >
-                          <i className="fas fa-upload me-2"></i>
-                          Nộp bài
-                        </Button>
-                      )}
-                      {(hw.status === 'submitted' || hw.status === 'late' || hw.status === 'graded') && (
-                        <Button 
-                          variant="outline-primary"
-                          className="text-13 fw-medium px-20 py-8 radius-8 flex-grow-1"
-                          onClick={() => handleViewDetail(hw)}
-                        >
-                          <i className="fas fa-eye me-2"></i>
-                          Xem chi tiết
-                        </Button>
-                      )}
-                    </div>
+        {/* Content Container - 70% width, centered */}
+        <div className="d-flex justify-content-center">
+          <div style={{ width: '70%', minWidth: '700px' }}>
 
-                    {isDeadlinePassed && hw.status === 'not_submitted' && (
-                      <Alert variant="danger" className="mb-0 mt-12 py-8 px-12 text-12">
-                        <i className="fas fa-exclamation-triangle me-2"></i>
-                        Đã quá hạn nộp
-                      </Alert>
-                    )}
-                  </Card.Body>
-                </Card>
-              );
-            })}
-          </div>
+        {getFilteredHomework().length > 0 ? (
+          filterType === 'by-lesson' ? (
+            // Grouped by lesson view
+            <div className="d-flex flex-column gap-4">
+              {groupHomeworkByLesson(getFilteredHomework()).map(group => (
+                <div key={`lesson-${group.lessonNumber}`}>
+                  <h6 className="text-neutral-700 fw-bold mb-12 text-15">
+                    <i className="fas fa-book-reader me-2 text-primary-600"></i>
+                    Buổi {group.lessonNumber}: {group.lessonTitle}
+                  </h6>
+                  <div className="d-flex flex-column gap-2">
+                    {group.homework.map(hw => renderHomeworkCard(hw, false))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            // Regular list view
+            <div className="d-flex flex-column gap-3">
+              {getFilteredHomework().map(hw => renderHomeworkCard(hw, true))}
+            </div>
+          )
         ) : (
           <Card className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
             <Card.Body className="text-center py-60">
               <i className="fas fa-tasks fa-3x text-neutral-400 mb-16"></i>
-              <p className="text-neutral-500 mb-0">Chưa có bài tập nào</p>
-              <p className="text-neutral-400 text-13 mt-2">Giảng viên sẽ giao bài tập sau các buổi học</p>
+              <p className="text-neutral-500 mb-0">
+                {filterType === 'upcoming' ? 'Không có bài tập sắp đến hạn' : 'Chưa có bài tập nào'}
+              </p>
+              <p className="text-neutral-400 text-13 mt-2">
+                {filterType === 'upcoming' ? 'Các bài tập trong vòng 3 ngày tới sẽ hiển thị ở đây' : 'Giảng viên sẽ giao bài tập sau các buổi học'}
+              </p>
             </Card.Body>
           </Card>
         )}
+          </div>
+        </div>
       </div>
     
       {/* Homework Detail Modal */}
@@ -186,6 +206,74 @@ const ClassHomework = () => {
       />
     </>
   );
+
+  // Render individual homework card
+  function renderHomeworkCard(hw, showLessonInfo) {
+    const isDeadlinePassed = new Date() > new Date(hw.deadline);
+    
+    return (
+      <div key={hw._id}>
+        {showLessonInfo && (
+          <div className="text-neutral-600 fw-semibold mb-8 text-13">
+            <i className="fas fa-book-reader me-2"></i>
+            Buổi {hw.lessonNumber}: {hw.lessonTitle}
+          </div>
+        )}
+        <Card 
+          className="bg-white border-0 rounded-12 hover-shadow-lg transition-all"
+          style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}
+        >
+          <Card.Body className="p-16">
+            <div className="d-flex justify-content-between align-items-center">
+              {/* Left: Title */}
+              <h6 className="text-neutral-900 fw-bold mb-0 flex-shrink-0 me-4 text-15">
+                {hw.title}
+              </h6>
+              
+              {/* Right: Deadline, Button, Status */}
+              <div className="d-flex align-items-center gap-4 flex-shrink-0">
+                {/* Deadline */}
+                <div className={`text-15 fw-medium ${isDeadlinePassed && hw.status === 'not_submitted' ? 'text-danger-600' : 'text-neutral-700'}`}>
+                  <i className="fas fa-clock me-2"></i>
+                  {new Date(hw.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(hw.deadline).toLocaleDateString('vi-VN')}
+                </div>
+
+                {/* View Detail Button */}
+                <Button 
+                  variant="outline-primary"
+                  size="sm"
+                  className="text-12 px-12 py-6"
+                  onClick={() => handleViewDetail(hw)}
+                >
+                  <i className="fas fa-eye me-1"></i>
+                  Xem
+                </Button>
+
+                {/* Status Badge */}
+                <div className="d-flex flex-column align-items-end gap-1">
+                  {getHomeworkStatusBadge(hw.status)}
+                  {hw.status === 'graded' && hw.score != null && (
+                    <Badge bg="warning" className="px-8 py-4 text-10">
+                      <i className="fas fa-star me-1"></i>
+                      {hw.score}/10
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Warning for overdue */}
+            {isDeadlinePassed && hw.status === 'not_submitted' && (
+              <Alert variant="danger" className="mb-0 mt-12 py-6 px-12 text-11">
+                <i className="fas fa-exclamation-triangle me-2"></i>
+                Đã quá hạn nộp
+              </Alert>
+            )}
+          </Card.Body>
+        </Card>
+      </div>
+    );
+  }
 };
 
 export default ClassHomework;

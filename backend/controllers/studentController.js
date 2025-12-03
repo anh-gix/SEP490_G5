@@ -477,7 +477,7 @@ exports.getClassHomework = async (req, res) => {
           homeworkList.push({
             _id: hw._id,
             scheduleId: schedule._id,
-            title: hw.title,
+            title: hw.assignment?.title || 'Bài tập',
             description: hw.description || '',
             deadline: hw.deadline,
             lessonNumber: schedule.session?.order || 0,

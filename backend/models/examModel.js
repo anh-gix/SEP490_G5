@@ -27,12 +27,6 @@ const sectionSchema = new mongoose.Schema({
     enum: ["listening", "reading", "writing", "speaking"],
     required: true,
   },
-  // Thứ tự part/task trong bài thi tương ứng với kĩ năng 
-  // -> Chia luyện đề theo kĩ năng nhưng cần đúng format của đề
-  // Ví dụ: Listening gồm Part 1,2,3,4; Part 5,6,7 là reading (TOEIC)
-  // Đề Cambridge pre A1 starters, movers mỗi phần kĩ năng có các part lẻ, gồm các câu hỏi lẻ
-  // Đề IELTS tương tự mỗi phần có các part/task lẻ 
-  partOrder: Number,
   fileUrl: String, 
   audioUrls: [String],
   instructions: String,
@@ -52,6 +46,9 @@ const examSchema = new mongoose.Schema(
     level: { type: String, enum: ["Academic", "General"], required: true },
     totalDuration: Number,
     sections: [sectionSchema],
+
+    // ===== WIZARD PROGRESS =====
+    lastCompletedStep: { type: Number, default: 0 }, // 0: chưa hoàn thành step nào, 1-4: step đã hoàn thành
 
     // ===== STATUS ĐỂ XEM EXAM ĐÃ ĐƯỢC DUYỆT CHƯA =====
     // Tất cả thông tin chi tiết về submission, approval, rejection được lưu trong ApprovalRequest model

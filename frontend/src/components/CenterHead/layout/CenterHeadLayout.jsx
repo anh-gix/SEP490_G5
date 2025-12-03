@@ -29,21 +29,9 @@ const CenterHeadLayout = ({ children }) => {
       color: 'warning'
     },
     {
-      title: 'Lớp học',
-      icon: 'fa-chalkboard-teacher',
-      path: '/center-head/classes',
-      color: 'info'
-    },
-    {
       title: 'Yêu cầu phê duyệt',
       icon: 'fa-clipboard-check',
       path: '/center-head/approval-requests',
-      color: 'warning'
-    },
-    {
-      title: 'Lịch chờ duyệt',
-      icon: 'fa-calendar-alt',
-      path: '/schedules/pending',
       color: 'warning'
     },
     {

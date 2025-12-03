@@ -207,16 +207,21 @@ const AddQuestionModal = ({ isOpen, onClose, onAddQuestion, questionNumber, init
   if (!isOpen) return null;
 
   return (
-    <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)' }} onClick={onClose}>
+    <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
       <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-content shadow-lg border-0" style={{ borderRadius: '0.5rem' }}>
+        <div className="modal-content shadow-lg border-0" style={{ borderRadius: '1rem', overflow: 'hidden' }}>
           {/* Modal Header */}
-          <div className="modal-header border-bottom-0 pb-2" style={{ backgroundColor: '#f8f9fa' }}>
-            <h5 className="modal-title fw-bold d-flex align-items-center">
-              <i className={`ph ph-${isEditing ? 'pencil-simple' : 'plus-circle'} me-2 ${isEditing ? 'text-warning' : 'text-primary'}`} style={{ fontSize: '1.5rem' }}></i>
-              <span>{isEditing ? 'Edit Question' : 'Add New Question'}</span>
+          <div className="modal-header border-bottom-0 pb-3 pt-4" style={{
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            boxShadow: '0 4px 12px rgba(102, 126, 234, 0.15)'
+          }}>
+            <h5 className="modal-title fw-bold d-flex align-items-center text-white">
+              <div className="d-flex align-items-center justify-content-center rounded-circle bg-white bg-opacity-25 me-3" style={{ width: '40px', height: '40px' }}>
+                <i className={`ph ph-${isEditing ? 'pencil-simple' : 'plus-circle'} text-white`} style={{ fontSize: '1.25rem' }}></i>
+              </div>
+              <span style={{ fontSize: '1.25rem' }}>{isEditing ? 'Edit Question' : 'Add New Question'}</span>
             </h5>
-            <button type="button" className="btn-close" onClick={onClose}></button>
+            <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
           </div>
 
           {/* Modal Body */}

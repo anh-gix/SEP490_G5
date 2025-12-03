@@ -55,25 +55,18 @@ export const centerHeadRoutes = [
 
   // Program Detail & Course Management
   { path: '/center-head/programs/:id', element: <ProgramDetailPage /> },
-  { path: '/center-head/courses/pending', element: <PendingCoursesPage /> },
   { path: '/center-head/courses/:id/details', element: <CourseDetailPage /> },
 
   // III. Approval Requests Management
   { path: '/center-head/approval-requests', element: <ApprovalRequestsPage /> },
 
-  // IV. Class & Schedule Management
-  { path: '/center-head/classes', element: <ClassListPage /> },
-  { path: '/schedules/pending', element: <PendingSchedulesPage /> },
 
-  // V. Room Management
-  { path: '/center-head/rooms', element: <RoomListPage /> },
-
-  // VI. Exam Management
+  // IV. Exam Management
   { path: '/center-head/exams', element: <ExamListPage /> },
   { path: '/center-head/exams/create', element: <ExamCreatePage /> },
   { path: '/center-head/exams/:id', element: <ExamViewPage /> },
   { path: '/center-head/exams/:id/edit', element: <ExamEditPage /> },
 
-  // VII. Reports & Analytics
+  // V. Reports & Analytics
   { path: '/center-head/reports', element: <ReportsOverviewPage /> },
 ];

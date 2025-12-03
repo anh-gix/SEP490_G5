@@ -161,6 +161,7 @@ const ExamList = () => {
       field: 'actions',
       render: (row) => (
         <div className="d-flex gap-2 justify-content-center">
+          {/* Nút Xem */}
           <button
             className="btn btn-sm btn-outline-primary"
             onClick={(e) => {
@@ -171,6 +172,8 @@ const ExamList = () => {
           >
             <i className="ph ph-eye"></i>
           </button>
+
+          {/* Nút Sửa */}
           <button
             className="btn btn-sm btn-outline-secondary"
             onClick={(e) => {
@@ -181,26 +184,8 @@ const ExamList = () => {
           >
             <i className="ph ph-pencil"></i>
           </button>
-          <button
-            className="btn btn-sm btn-outline-info"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/center-head/exams/${row._id}/submissions`);
-            }}
-            title="Xem bài làm"
-          >
-            <i className="ph ph-notebook"></i>
-          </button>
-          <button
-            className={`btn btn-sm ${row.isPublished ? 'btn-outline-warning' : 'btn-outline-success'}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              console.log('Toggle publish', row._id);
-            }}
-            title={row.isPublished ? 'Hủy xuất bản' : 'Xuất bản'}
-          >
-            <i className={row.isPublished ? 'ph ph-eye-slash' : 'ph ph-book-open'}></i>
-          </button>
+
+          {/* Nút Xóa */}
           <button
             className="btn btn-sm btn-outline-danger"
             onClick={(e) => {

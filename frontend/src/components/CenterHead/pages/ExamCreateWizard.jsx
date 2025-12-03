@@ -16,10 +16,12 @@ const ExamCreateWizard = () => {
   const [examData, setExamData] = useState({
     title: '',
     description: '',
-    examType: 'practice',
+    examType: 'cambridge',
     level: 'Academic',
     totalDuration: 0,
-    sections: []
+    sections: [],
+    isPublished: false,
+    lastCompletedStep: 0
   });
   const [examId, setExamId] = useState(null); // Store exam ID after creation
   const [loading, setLoading] = useState(false);
@@ -81,14 +83,73 @@ const ExamCreateWizard = () => {
     }
   };
 
+  // Save draft - lưu nháp với lastCompletedStep
+  const handleSaveDraft = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Update lastCompletedStep based on current step
+      const updatedData = {
+        ...examData,
+        lastCompletedStep: currentStep
+      };
+      setExamData(updatedData);
+
+      // Format exam data
+      const formattedData = examService.formatExamData(updatedData);
+
+      // Create or update exam
+      let response;
+      if (examId) {
+        response = await examService.updateExamForManagement(examId, formattedData);
+      } else {
+        response = await examService.createExamForManagement(formattedData);
+        if (response.success && response.data._id) {
+          setExamId(response.data._id);
+        }
+      }
+
+      if (response.success) {
+        alert('Lưu nháp thành công!');
+        return true;
+      }
+
+      return false;
+    } catch (err) {
+      console.error('Error saving draft:', err);
+      setError(err.message || 'Lưu nháp thất bại');
+      alert(err.message || 'Lưu nháp thất bại');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleNext = async () => {
     if (currentStep < 4) {
-      // Save exam data only when moving from step 2 (after sections are added)
-      // Step 1 -> Step 2: Just move forward without saving (no sections yet)
-      // Step 2 -> Step 3: Save exam with sections
-      if (currentStep === 2) {
-        const saved = await handleSaveExam();
-        if (!saved) return;
+      // Auto-save and update lastCompletedStep when moving to next step
+      const updatedData = {
+        ...examData,
+        lastCompletedStep: currentStep
+      };
+      setExamData(updatedData);
+
+      // Save exam data when moving from step 2 or 3
+      if (currentStep >= 2) {
+        const formattedData = examService.formatExamData(updatedData);
+
+        let response;
+        if (examId) {
+          response = await examService.updateExamForManagement(examId, formattedData);
+        } else {
+          response = await examService.createExamForManagement(formattedData);
+          if (response.success && response.data._id) {
+            setExamId(response.data._id);
+          }
+        }
+
+        if (!response.success) return;
       }
 
       setCurrentStep(currentStep + 1);
@@ -107,25 +168,33 @@ const ExamCreateWizard = () => {
     }
   };
 
-  // Publish exam
-  const handlePublish = async () => {
-    if (!examId) {
-      alert('Vui lòng lưu đề thi trước khi xuất bản');
-      return;
-    }
-
+  // Complete exam creation - Step 4
+  const handleCompleteExam = async () => {
     try {
       setLoading(true);
 
-      const response = await examService.publishExamForManagement(examId);
+      // Update lastCompletedStep to 4 (all steps completed)
+      const updatedData = {
+        ...examData,
+        lastCompletedStep: 4
+      };
+
+      const formattedData = examService.formatExamData(updatedData);
+
+      let response;
+      if (examId) {
+        response = await examService.updateExamForManagement(examId, formattedData);
+      } else {
+        response = await examService.createExamForManagement(formattedData);
+      }
 
       if (response.success) {
-        alert('Xuất bản đề thi thành công!');
+        alert('Hoàn tất tạo đề thi! Bạn có thể publish hoặc submit để duyệt từ danh sách đề thi.');
         navigate('/center-head/exams');
       }
     } catch (err) {
-      console.error('Error publishing exam:', err);
-      alert(err.message || 'Xuất bản thất bại');
+      console.error('Error completing exam:', err);
+      alert(err.message || 'Hoàn tất thất bại');
     } finally {
       setLoading(false);
     }
@@ -252,8 +321,7 @@ const ExamCreateWizard = () => {
                 totalDuration={totalDuration}
                 totalQuestions={totalQuestions}
                 totalScore={totalScore}
-                onSave={handleSaveExam}
-                onPublish={handlePublish}
+                onSave={handleCompleteExam}
                 examId={examId}
               />
             )}
@@ -277,6 +345,18 @@ const ExamCreateWizard = () => {
                   Hủy
                 </Button>
 
+                {/* Nút Lưu nháp - hiển thị ở Step 1, 2, 3 */}
+                {currentStep < 4 && (
+                  <Button
+                    variant="outline-primary"
+                    icon="ph ph-floppy-disk"
+                    onClick={handleSaveDraft}
+                    disabled={loading}
+                  >
+                    {loading ? 'Đang lưu...' : 'Lưu nháp'}
+                  </Button>
+                )}
+
                 {currentStep < 4 && (
                   <Button
                     variant="primary"
@@ -293,6 +373,25 @@ const ExamCreateWizard = () => {
                         Tiếp theo
                         <i className="ph ph-caret-right ms-2"></i>
                       </>
+                    )}
+                  </Button>
+                )}
+
+                {/* Nút hoàn tất ở Step 4 */}
+                {currentStep === 4 && (
+                  <Button
+                    variant="success"
+                    icon="ph ph-check-circle"
+                    onClick={handleCompleteExam}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2"></span>
+                        Đang lưu...
+                      </>
+                    ) : (
+                      'Hoàn tất'
                     )}
                   </Button>
                 )}
@@ -317,7 +416,9 @@ const ExamCreateWizard = () => {
               <div className="mb-20">
                 <div className="text-neutral-500 mb-8 text-sm">Loại đề thi</div>
                 <div className="text-neutral-900 fw-semibold">
-                  {examData.examType === 'practice' ? 'Luyện tập' : 'Chính thức'}
+                  {examData.examType === 'cambridge' && 'Cambridge'}
+                  {examData.examType === 'ielts' && 'IELTS'}
+                  {examData.examType === 'toeic' && 'TOEIC'}
                 </div>
               </div>
 
@@ -325,6 +426,24 @@ const ExamCreateWizard = () => {
               <div className="mb-20">
                 <div className="text-neutral-500 mb-8 text-sm">Cấp độ</div>
                 <div className="text-neutral-900 fw-semibold">{examData.level}</div>
+              </div>
+
+              {/* Publish Status */}
+              <div className="mb-20">
+                <div className="text-neutral-500 mb-8 text-sm">Trạng thái hiển thị</div>
+                <span className={`badge ${examData.isPublished ? 'bg-success' : 'bg-primary'}`}>
+                  {examData.isPublished ? (
+                    <>
+                      <i className="ph ph-globe me-1"></i>
+                      Public
+                    </>
+                  ) : (
+                    <>
+                      <i className="ph ph-users me-1"></i>
+                      Private
+                    </>
+                  )}
+                </span>
               </div>
 
               {/* Statistics */}

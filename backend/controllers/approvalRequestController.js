@@ -325,25 +325,76 @@ exports.submitExam = async (req, res) => {
 /**
  * Get all pending approval requests (Center Head)
  * GET /api/approval-requests/pending
+ * Query params: type, status, fromDate, toDate, page, limit
  */
 exports.getPendingRequests = async (req, res) => {
   try {
-    const { type } = req.query; // 'program' hoặc 'exam'
+    const {
+      type,
+      status,
+      fromDate,
+      toDate,
+      page = 1,
+      limit = 10
+    } = req.query;
 
-    const query = { status: 'pending' };
+    // Build query
+    const query = {};
+
+    // Filter by status (default to all statuses if not specified)
+    if (status) {
+      query.status = status;
+    }
+
+    // Filter by type
     if (type) {
       query.requestType = type;
     }
 
-    const requests = await ApprovalRequest.find(query)
-      .populate('submittedBy', 'name email')
-      .populate('entityId')
-      .sort({ submittedAt: -1 });
+    // Filter by date range
+    if (fromDate || toDate) {
+      query.submittedAt = {};
+      if (fromDate) {
+        query.submittedAt.$gte = new Date(fromDate);
+      }
+      if (toDate) {
+        // Add 1 day to include the entire toDate
+        const endDate = new Date(toDate);
+        endDate.setDate(endDate.getDate() + 1);
+        query.submittedAt.$lt = endDate;
+      }
+    }
+
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const limitNum = parseInt(limit);
+
+    // Execute query with pagination
+    const [requests, total] = await Promise.all([
+      ApprovalRequest.find(query)
+        .populate('submittedBy', 'name email')
+        .populate('reviewedBy', 'name email')
+        .populate('entityId')
+        .sort({ submittedAt: -1 })
+        .skip(skip)
+        .limit(limitNum),
+      ApprovalRequest.countDocuments(query)
+    ]);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / limitNum);
 
     res.status(200).json({
       success: true,
       data: requests,
-      count: requests.length
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: limitNum,
+        totalPages,
+        hasNextPage: parseInt(page) < totalPages,
+        hasPrevPage: parseInt(page) > 1
+      }
     });
 
   } catch (error) {
@@ -751,29 +802,55 @@ exports.getStats = async (req, res) => {
     const stats = await ApprovalRequest.aggregate([
       {
         $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Transform data to simple format
+    const result = {
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+      total: 0
+    };
+
+    stats.forEach(item => {
+      const status = item._id;
+      if (result[status] !== undefined) {
+        result[status] = item.count;
+        result.total += item.count;
+      }
+    });
+
+    // Also get breakdown by type for detailed view
+    const detailedStats = await ApprovalRequest.aggregate([
+      {
+        $group: {
           _id: { type: '$requestType', status: '$status' },
           count: { $sum: 1 }
         }
       }
     ]);
 
-    // Transform data
-    const result = {
+    const breakdown = {
       program: { pending: 0, approved: 0, rejected: 0 },
       exam: { pending: 0, approved: 0, rejected: 0 }
     };
 
-    stats.forEach(item => {
+    detailedStats.forEach(item => {
       const type = item._id.type;
       const status = item._id.status;
-      if (result[type] && result[type][status] !== undefined) {
-        result[type][status] = item.count;
+      if (breakdown[type] && breakdown[type][status] !== undefined) {
+        breakdown[type][status] = item.count;
       }
     });
 
     res.status(200).json({
       success: true,
-      data: result
+      data: result,
+      breakdown: breakdown
     });
 
   } catch (error) {

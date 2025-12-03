@@ -8,11 +8,23 @@ import { formatDate } from '../../../helper/helper';
 const ApprovalRequests = () => {
   const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
-  const [filteredRequests, setFilteredRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('pending');
+
+  // Filter states
+  const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
+  // Modal states
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
@@ -22,20 +34,52 @@ const ApprovalRequests = () => {
   const [reviewNote, setReviewNote] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    fetchRequests();
-  }, []);
+  // Statistics
+  const [stats, setStats] = useState({
+    pending: 0,
+    approved: 0,
+    rejected: 0
+  });
 
   useEffect(() => {
-    filterRequests();
-  }, [requests, statusFilter, typeFilter, searchQuery]);
+    fetchRequests();
+  }, [statusFilter, typeFilter, fromDate, toDate, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
 
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      const response = await approvalRequestService.getPendingRequests();
+
+      const params = {
+        page: currentPage,
+        limit: itemsPerPage
+      };
+
+      // Add filters only if they have values
+      if (statusFilter && statusFilter !== 'all') {
+        params.status = statusFilter;
+      }
+      if (typeFilter && typeFilter !== 'all') {
+        params.type = typeFilter;
+      }
+      if (fromDate) {
+        params.fromDate = fromDate;
+      }
+      if (toDate) {
+        params.toDate = toDate;
+      }
+
+      const response = await approvalRequestService.getPendingRequests(params);
+
       if (response.success) {
         setRequests(response.data);
+        if (response.pagination) {
+          setTotalItems(response.pagination.total);
+          setTotalPages(response.pagination.totalPages);
+        }
       }
     } catch (error) {
       console.error('Error fetching requests:', error);
@@ -44,35 +88,19 @@ const ApprovalRequests = () => {
     }
   };
 
-  const filterRequests = () => {
-    let filtered = [...requests];
-
-    // Filter by status
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(req => req.status === statusFilter);
+  const fetchStats = async () => {
+    try {
+      const response = await approvalRequestService.getStats();
+      if (response.success) {
+        setStats({
+          pending: response.data.pending || 0,
+          approved: response.data.approved || 0,
+          rejected: response.data.rejected || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error);
     }
-
-    // Filter by type
-    if (typeFilter !== 'all') {
-      filtered = filtered.filter(req => req.requestType === typeFilter);
-    }
-
-    // Search
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(req => {
-        const entityName = req.entityId?.program_name || req.entityId?.name || '';
-        const submitterName = req.submittedBy?.name || '';
-        const submitterEmail = req.submittedBy?.email || '';
-        return (
-          entityName.toLowerCase().includes(query) ||
-          submitterName.toLowerCase().includes(query) ||
-          submitterEmail.toLowerCase().includes(query)
-        );
-      });
-    }
-
-    setFilteredRequests(filtered);
   };
 
   const handleViewDetail = (request) => {
@@ -96,6 +124,7 @@ const ApprovalRequests = () => {
         setApproveNote('');
         setSelectedRequest(null);
         fetchRequests();
+        fetchStats();
       }
     } catch (error) {
       console.error('Error approving request:', error);
@@ -126,6 +155,7 @@ const ApprovalRequests = () => {
         setReviewNote('');
         setSelectedRequest(null);
         fetchRequests();
+        fetchStats();
       }
     } catch (error) {
       console.error('Error rejecting request:', error);
@@ -141,9 +171,26 @@ const ApprovalRequests = () => {
     }
   };
 
-  const pendingCount = requests.filter(r => r.status === 'pending').length;
-  const approvedCount = requests.filter(r => r.status === 'approved').length;
-  const rejectedCount = requests.filter(r => r.status === 'rejected').length;
+  const handleResetFilters = () => {
+    setStatusFilter('all');
+    setTypeFilter('all');
+    setFromDate('');
+    setToDate('');
+    setSearchQuery('');
+    setCurrentPage(1);
+  };
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleItemsPerPageChange = (newLimit) => {
+    setItemsPerPage(parseInt(newLimit));
+    setCurrentPage(1);
+  };
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -158,6 +205,22 @@ const ApprovalRequests = () => {
       </span>
     );
   };
+
+  // Filter requests by search query (client-side)
+  const filteredRequests = requests.filter(req => {
+    if (!searchQuery.trim()) return true;
+
+    const query = searchQuery.toLowerCase();
+    const entityName = req.entityId?.program_name || req.entityId?.name || '';
+    const submitterName = req.submittedBy?.name || '';
+    const submitterEmail = req.submittedBy?.email || '';
+
+    return (
+      entityName.toLowerCase().includes(query) ||
+      submitterName.toLowerCase().includes(query) ||
+      submitterEmail.toLowerCase().includes(query)
+    );
+  });
 
   if (loading) {
     return (
@@ -174,46 +237,68 @@ const ApprovalRequests = () => {
 
   return (
     <div className="approval-requests-container">
-      {/* Header */}
-      <div className="mb-4">
+      {/* Header Section */}
+      <div className="mb-4 pb-3 border-bottom">
         <h2 className="fw-bold mb-2">Yêu cầu phê duyệt</h2>
-        <p className="text-muted">Quản lý yêu cầu phê duyệt chương trình và đề thi</p>
+        <p className="text-muted mb-0">Quản lý yêu cầu phê duyệt chương trình và đề thi</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="row g-3 mb-4">
+      {/* Stats Cards Section */}
+      <div className="row g-4 mb-5">
         <div className="col-md-4">
           <Card>
-            <div className="p-3">
-              <div className="text-muted small mb-1">Chờ duyệt</div>
-              <div className="h3 fw-bold text-warning mb-0">{pendingCount}</div>
+            <div className="p-4">
+              <div className="d-flex align-items-center justify-content-between">
+                <div>
+                  <div className="text-muted small mb-1">Chờ duyệt</div>
+                  <div className="h3 fw-bold text-warning mb-0">{stats.pending}</div>
+                </div>
+                <div className="text-warning" style={{ fontSize: '2.5rem', opacity: 0.2 }}>
+                  <i className="ph ph-clock"></i>
+                </div>
+              </div>
             </div>
           </Card>
         </div>
         <div className="col-md-4">
           <Card>
-            <div className="p-3">
-              <div className="text-muted small mb-1">Đã duyệt</div>
-              <div className="h3 fw-bold text-success mb-0">{approvedCount}</div>
+            <div className="p-4">
+              <div className="d-flex align-items-center justify-content-between">
+                <div>
+                  <div className="text-muted small mb-1">Đã duyệt</div>
+                  <div className="h3 fw-bold text-success mb-0">{stats.approved}</div>
+                </div>
+                <div className="text-success" style={{ fontSize: '2.5rem', opacity: 0.2 }}>
+                  <i className="ph ph-check-circle"></i>
+                </div>
+              </div>
             </div>
           </Card>
         </div>
         <div className="col-md-4">
           <Card>
-            <div className="p-3">
-              <div className="text-muted small mb-1">Từ chối</div>
-              <div className="h3 fw-bold text-danger mb-0">{rejectedCount}</div>
+            <div className="p-4">
+              <div className="d-flex align-items-center justify-content-between">
+                <div>
+                  <div className="text-muted small mb-1">Từ chối</div>
+                  <div className="h3 fw-bold text-danger mb-0">{stats.rejected}</div>
+                </div>
+                <div className="text-danger" style={{ fontSize: '2.5rem', opacity: 0.2 }}>
+                  <i className="ph ph-x-circle"></i>
+                </div>
+              </div>
             </div>
           </Card>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters Section */}
       <Card className="mb-4">
         <div className="p-3">
+          {/* Basic Filters - Always visible */}
           <div className="row g-3">
             {/* Search */}
-            <div className="col-md-4">
+            <div className="col-md-6">
               <label className="form-label fw-medium">Tìm kiếm</label>
               <input
                 type="text"
@@ -225,12 +310,15 @@ const ApprovalRequests = () => {
             </div>
 
             {/* Status Filter */}
-            <div className="col-md-4">
+            <div className="col-md-6">
               <label className="form-label fw-medium">Trạng thái</label>
               <select
                 className="form-select"
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
               >
                 <option value="all">Tất cả</option>
                 <option value="pending">Chờ duyệt</option>
@@ -238,26 +326,110 @@ const ApprovalRequests = () => {
                 <option value="rejected">Từ chối</option>
               </select>
             </div>
-
-            {/* Type Filter */}
-            <div className="col-md-4">
-              <label className="form-label fw-medium">Loại</label>
-              <select
-                className="form-select"
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-              >
-                <option value="all">Tất cả</option>
-                <option value="program">Chương trình</option>
-                <option value="exam">Đề thi</option>
-              </select>
-            </div>
           </div>
+
+          {/* Advanced Filter Toggle Button */}
+          <div className="mt-3">
+            <button
+              className="btn btn-sm btn-outline-primary"
+              onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
+            >
+              <i className={`ph ${showAdvancedFilter ? 'ph-caret-up' : 'ph-caret-down'} me-2`}></i>
+              {showAdvancedFilter ? 'Ẩn bộ lọc nâng cao' : 'Bộ lọc nâng cao'}
+            </button>
+          </div>
+
+          {/* Advanced Filters - Collapsible */}
+          {showAdvancedFilter && (
+            <div className="mt-3 pt-3 border-top">
+              <div className="row g-3">
+                {/* Type Filter */}
+                <div className="col-md-4">
+                  <label className="form-label fw-medium">Loại</label>
+                  <select
+                    className="form-select"
+                    value={typeFilter}
+                    onChange={(e) => {
+                      setTypeFilter(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <option value="all">Tất cả</option>
+                    <option value="program">Chương trình</option>
+                    <option value="exam">Đề thi</option>
+                  </select>
+                </div>
+
+                {/* Date Range */}
+                <div className="col-md-4">
+                  <label className="form-label fw-medium">Từ ngày</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={fromDate}
+                    onChange={(e) => {
+                      setFromDate(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                  />
+                </div>
+
+                <div className="col-md-4">
+                  <label className="form-label fw-medium">Đến ngày</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={toDate}
+                    onChange={(e) => {
+                      setToDate(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    min={fromDate}
+                  />
+                </div>
+
+                {/* Reset Button */}
+                <div className="col-12">
+                  <button
+                    className="btn btn-outline-secondary"
+                    onClick={handleResetFilters}
+                  >
+                    <i className="ph ph-arrow-clockwise me-2"></i>
+                    Đặt lại bộ lọc
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </Card>
 
-      {/* Requests Table */}
-      <Card>
+      {/* Requests Table Section */}
+      <Card className="mb-4">
+        <div className="p-3 border-bottom bg-light">
+          <div className="d-flex justify-content-between align-items-center">
+            <div>
+              <strong>{totalItems}</strong> yêu cầu
+              {(statusFilter && statusFilter !== 'all') && ` - ${getStatusBadge(statusFilter).props.children}`}
+            </div>
+            <div className="d-flex align-items-center gap-2">
+              <label className="mb-0 small text-muted">Hiển thị:</label>
+              <select
+                className="form-select form-select-sm"
+                style={{ width: 'auto' }}
+                value={itemsPerPage}
+                onChange={(e) => handleItemsPerPageChange(e.target.value)}
+              >
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+              </select>
+              <span className="small text-muted">/ trang</span>
+            </div>
+          </div>
+        </div>
+
         {filteredRequests.length === 0 ? (
           <div className="text-center py-5">
             <i className="ph ph-clipboard text-muted" style={{ fontSize: '48px' }}></i>
@@ -309,15 +481,97 @@ const ApprovalRequests = () => {
         )}
       </Card>
 
+      {/* Pagination Section */}
+      {totalPages > 1 && (
+        <Card>
+          <div className="p-3">
+            <div className="d-flex justify-content-between align-items-center">
+              <div className="text-muted small">
+                Trang {currentPage} / {totalPages}
+                <span className="ms-2">
+                  (Hiển thị {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, totalItems)} / {totalItems})
+                </span>
+              </div>
+              <nav>
+                <ul className="pagination mb-0">
+                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={() => handlePageChange(1)}
+                      disabled={currentPage === 1}
+                    >
+                      <i className="ph ph-caret-double-left"></i>
+                    </button>
+                  </li>
+                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      <i className="ph ph-caret-left"></i>
+                    </button>
+                  </li>
+
+                  {/* Page numbers */}
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+
+                    return (
+                      <li key={pageNum} className={`page-item ${currentPage === pageNum ? 'active' : ''}`}>
+                        <button
+                          className="page-link"
+                          onClick={() => handlePageChange(pageNum)}
+                        >
+                          {pageNum}
+                        </button>
+                      </li>
+                    );
+                  })}
+
+                  <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      <i className="ph ph-caret-right"></i>
+                    </button>
+                  </li>
+                  <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                    <button
+                      className="page-link"
+                      onClick={() => handlePageChange(totalPages)}
+                      disabled={currentPage === totalPages}
+                    >
+                      <i className="ph ph-caret-double-right"></i>
+                    </button>
+                  </li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Detail Modal */}
       {showDetailModal && selectedRequest && (
         <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div className="modal-content">
               {/* Modal Header */}
-              <div className="modal-header">
+              <div className="modal-header border-bottom">
                 <div>
-                  <h5 className="modal-title fw-bold">Chi tiết yêu cầu</h5>
+                  <h5 className="modal-title fw-bold mb-1">Chi tiết yêu cầu</h5>
                   <p className="text-muted small mb-0">
                     {selectedRequest.entityId?.program_name || selectedRequest.entityId?.name}
                   </p>
@@ -335,13 +589,13 @@ const ApprovalRequests = () => {
               {/* Modal Body */}
               <div className="modal-body">
                 {/* Status and Type */}
-                <div className="row g-3 mb-4">
+                <div className="row g-3 mb-4 pb-4 border-bottom">
                   <div className="col-6">
-                    <label className="form-label text-muted small text-uppercase">Trạng thái</label>
+                    <label className="form-label text-muted small text-uppercase fw-semibold">Trạng thái</label>
                     <div>{getStatusBadge(selectedRequest.status)}</div>
                   </div>
                   <div className="col-6">
-                    <label className="form-label text-muted small text-uppercase">Loại</label>
+                    <label className="form-label text-muted small text-uppercase fw-semibold">Loại</label>
                     <p className="mb-0 fw-medium">
                       {selectedRequest.requestType === 'program' ? 'Chương trình' : 'Đề thi'}
                     </p>
@@ -349,8 +603,9 @@ const ApprovalRequests = () => {
                 </div>
 
                 {/* Entity Info */}
-                <div className="border-top pt-4 mb-4">
+                <div className="mb-4 pb-4 border-bottom">
                   <h6 className="fw-semibold mb-3">
+                    <i className="ph ph-info me-2"></i>
                     Thông tin {selectedRequest.requestType === 'program' ? 'chương trình' : 'đề thi'}
                   </h6>
                   <div className="row g-3">
@@ -377,8 +632,11 @@ const ApprovalRequests = () => {
                 </div>
 
                 {/* Submission Info */}
-                <div className="border-top pt-4 mb-4">
-                  <h6 className="fw-semibold mb-3">Thông tin nộp</h6>
+                <div className="mb-4 pb-4 border-bottom">
+                  <h6 className="fw-semibold mb-3">
+                    <i className="ph ph-upload me-2"></i>
+                    Thông tin nộp
+                  </h6>
                   <div className="row g-3">
                     <div className="col-6">
                       <label className="form-label text-muted small text-uppercase">Người nộp</label>
@@ -402,8 +660,11 @@ const ApprovalRequests = () => {
 
                 {/* Review Info (if reviewed) */}
                 {selectedRequest.reviewedBy && (
-                  <div className="border-top pt-4 mb-4">
-                    <h6 className="fw-semibold mb-3">Thông tin phê duyệt</h6>
+                  <div className="mb-4 pb-4 border-bottom">
+                    <h6 className="fw-semibold mb-3">
+                      <i className="ph ph-check-square me-2"></i>
+                      Thông tin phê duyệt
+                    </h6>
                     <div className="row g-3">
                       <div className="col-6">
                         <label className="form-label text-muted small text-uppercase">Người duyệt</label>
@@ -425,7 +686,7 @@ const ApprovalRequests = () => {
                     )}
                     {selectedRequest.rejectionReason && (
                       <div className="mt-3">
-                        <label className="form-label text-danger small text-uppercase">Lý do từ chối</label>
+                        <label className="form-label text-danger small text-uppercase fw-semibold">Lý do từ chối</label>
                         <div className="p-3 bg-danger-subtle rounded border border-danger">
                           {selectedRequest.rejectionReason}
                         </div>
@@ -436,8 +697,11 @@ const ApprovalRequests = () => {
 
                 {/* History */}
                 {selectedRequest.history && selectedRequest.history.length > 0 && (
-                  <div className="border-top pt-4">
-                    <h6 className="fw-semibold mb-3">Lịch sử</h6>
+                  <div>
+                    <h6 className="fw-semibold mb-3">
+                      <i className="ph ph-clock-counter-clockwise me-2"></i>
+                      Lịch sử
+                    </h6>
                     <div className="vstack gap-3">
                       {selectedRequest.history.map((entry, idx) => (
                         <div key={idx} className="p-3 bg-light rounded border">
@@ -468,7 +732,7 @@ const ApprovalRequests = () => {
 
               {/* Modal Footer - Actions for Pending */}
               {selectedRequest.status === 'pending' && (
-                <div className="modal-footer">
+                <div className="modal-footer border-top">
                   <Button
                     variant="success"
                     onClick={() => {

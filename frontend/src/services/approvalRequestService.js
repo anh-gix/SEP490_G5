@@ -54,7 +54,7 @@ export const approvalRequestService = {
 
   /**
    * Get all pending approval requests (Center Head)
-   * @param {object} params - { type: 'program' | 'exam' }
+   * @param {object} params - { type: 'program' | 'exam', status: 'pending' | 'approved' | 'rejected', fromDate: string, toDate: string, page: number, limit: number }
    */
   getPendingRequests: async (params = {}) => {
     try {

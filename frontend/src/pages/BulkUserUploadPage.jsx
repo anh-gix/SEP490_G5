@@ -25,7 +25,7 @@ const BulkUserUploadPage = () => {
     const fetchRoles = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get('http://localhost:9999/api/roles', {
+        const response = await axios.get('http://localhost:8080/api/roles', {
           headers: {
             Authorization: `Bearer ${token}`,
           },

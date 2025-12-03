@@ -1258,14 +1258,18 @@ exports.getAllStudents = async (req, res) => {
       .limit(limitNum)
       .lean();
     
-    // Get class count for each student
+    // Get class names for each student
     const studentsWithClasses = await Promise.all(
       students.map(async (student) => {
-        const classCount = await Class.countDocuments({ students: student._id });
+        const classes = await Class.find({ students: student._id })
+          .select('name')
+          .lean();
+        const classNames = classes.map(cls => cls.name);
         return {
           ...student,
           stats: {
-            classCount
+            classCount: classNames.length,
+            classNames: classNames
           }
         };
       })

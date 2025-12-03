@@ -553,11 +553,19 @@ const StudentManagementAPI = () => {
                   </div>
 
                   <div className="mb-16">
-                    <div className="d-flex align-items-center gap-8">
-                      <i className="fas fa-door-open text-neutral-400"></i>
-                      <span className="text-neutral-700 text-14">
-                        Lớp: {student.stats?.classCount || 0} lớp
-                      </span>
+                    <div className="d-flex align-items-start gap-8">
+                      <i className="fas fa-door-open text-neutral-400 mt-2"></i>
+                      <div className="flex-grow-1">
+                        {student.stats?.classNames && student.stats.classNames.length > 0 ? (
+                          <div className="d-flex flex-column gap-4">
+                            {student.stats.classNames.map((className, idx) => (
+                              <span key={idx} className="text-neutral-700 text-14">{className}</span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-neutral-500 text-14">Chưa có lớp</span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -610,7 +618,15 @@ const StudentManagementAPI = () => {
                     <td className="px-20 py-16 text-neutral-700 text-14">{student.email}</td>
                     <td className="px-20 py-16 text-neutral-700 text-14">{student.phone || 'N/A'}</td>
                     <td className="px-20 py-16 text-center text-neutral-700 fw-medium text-14">
-                      {student.stats?.classCount || 0}
+                      {student.stats?.classNames && student.stats.classNames.length > 0 ? (
+                        <div className="d-flex flex-column gap-4">
+                          {student.stats.classNames.map((className, idx) => (
+                            <span key={idx} className="text-13">{className}</span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-neutral-500">Chưa có lớp</span>
+                      )}
                     </td>
                     <td className="px-20 py-16">
                       <div className="d-flex gap-8">

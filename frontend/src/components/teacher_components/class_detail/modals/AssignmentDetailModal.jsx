@@ -8,7 +8,6 @@ const AssignmentDetailModal = ({
   handleUpdateAssignmentFile,
   handleDeleteAssignmentFile,
   handleDeleteHomework,
-  handleGradeSubmission,
   handleDownloadSubmission,
   handleDownloadAllSubmissions,
   uploadingFiles
@@ -74,7 +73,7 @@ const AssignmentDetailModal = ({
           <div className="d-flex justify-content-between align-items-center mb-8">
             <div className="text-neutral-600 text-12">File đề bài</div>
             <Button 
-              className="btn-outline-main text-11 px-12 py-6 radius-6"
+              className="btn-primary text-11 px-12 py-6 radius-6"
               onClick={() => handleUpdateAssignmentFile('assignment')}
               disabled={uploadingFiles.assignment}
             >
@@ -103,12 +102,12 @@ const AssignmentDetailModal = ({
                       href={file} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="btn btn-outline-main text-11 px-8 py-4 radius-6"
+                      className="btn btn-primary text-11 px-8 py-4 radius-6"
                     >
                       <i className="fas fa-download"></i>
                     </a>
                     <Button 
-                      className="btn-outline-danger text-11 px-8 py-4 radius-6"
+                      className="btn-danger text-11 px-8 py-4 radius-6"
                       onClick={() => handleDeleteAssignmentFile('assignment', file)}
                       disabled={uploadingFiles.assignment}
                     >
@@ -131,7 +130,7 @@ const AssignmentDetailModal = ({
           <div className="d-flex justify-content-between align-items-center mb-8">
             <div className="text-neutral-600 text-12">File đáp án (Tùy chọn)</div>
             <Button 
-              className="btn-outline-success text-11 px-12 py-6 radius-6"
+              className="btn-primary text-11 px-12 py-6 radius-6"
               onClick={() => handleUpdateAssignmentFile('answer')}
               disabled={uploadingFiles.answer}
             >
@@ -148,10 +147,10 @@ const AssignmentDetailModal = ({
           {assignment.answerFiles && assignment.answerFiles.length > 0 ? (
             <div className="d-flex flex-column gap-2">
               {assignment.answerFiles.map((file, index) => (
-                <div key={index} className="d-flex align-items-center justify-content-between p-2 bg-success-25 rounded">
+                <div key={index} className="d-flex align-items-center justify-content-between p-2 bg-info-25 rounded">
                   <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ minWidth: 0 }}>
-                    <i className="fas fa-file text-success-600"></i>
-                    <span className="text-success-700 text-12" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <i className="fas fa-file text-primary"></i>
+                    <span className="text-primary text-12" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {file.split('/').pop()}
                     </span>
                   </div>
@@ -160,12 +159,12 @@ const AssignmentDetailModal = ({
                       href={file} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="btn btn-outline-success text-11 px-8 py-4 radius-6"
+                      className="btn btn-primary text-11 px-8 py-4 radius-6"
                     >
                       <i className="fas fa-download"></i>
                     </a>
                     <Button 
-                      className="btn-outline-danger text-11 px-8 py-4 radius-6"
+                      className="btn-danger text-11 px-8 py-4 radius-6"
                       onClick={() => handleDeleteAssignmentFile('answer', file)}
                       disabled={uploadingFiles.answer}
                     >
@@ -205,7 +204,6 @@ const AssignmentDetailModal = ({
                 <th className="px-16 py-12 text-neutral-900 fw-semibold text-12 border-0">STT</th>
                 <th className="px-16 py-12 text-neutral-900 fw-semibold text-12 border-0">Học viên</th>
                 <th className="px-16 py-12 text-neutral-900 fw-semibold text-12 border-0">Thời gian nộp</th>
-                <th className="px-16 py-12 text-neutral-900 fw-semibold text-12 border-0 text-center">Điểm</th>
                 <th className="px-16 py-12 text-neutral-900 fw-semibold text-12 border-0 text-center">Trạng thái</th>
                 <th className="px-16 py-12 text-neutral-900 fw-semibold text-12 border-0 text-center">Thao tác</th>
               </tr>
@@ -220,45 +218,30 @@ const AssignmentDetailModal = ({
                       {new Date(submission.submittedAt).toLocaleString('vi-VN')}
                     </td>
                     <td className="px-16 py-12 text-center">
-                      {submission.score !== null ? (
-                        <span className="text-neutral-900 fw-bold text-13">{submission.score}</span>
-                      ) : (
-                        <span className="text-neutral-400 text-12">Chưa chấm</span>
-                      )}
-                    </td>
-                    <td className="px-16 py-12 text-center">
                       <Badge className={
-                        submission.status === 'graded' ? 'bg-success-100 text-success-600' :
-                        submission.status === 'submitted' ? 'bg-warning-100 text-warning-600' :
+                        submission.status === 'submitted' ? 'bg-success-100 text-success-600' :
+                        submission.status === 'late' ? 'bg-warning-100 text-warning-600' :
                         'bg-neutral-100 text-neutral-600'
                       }>
-                        {submission.status === 'graded' ? 'Đã chấm' :
-                         submission.status === 'submitted' ? 'Chờ chấm' : 'Chưa nộp'}
+                        {submission.status === 'submitted' ? 'Đã nộp' :
+                         submission.status === 'late' ? 'Nộp muộn' : 'Chưa nộp'}
                       </Badge>
                     </td>
                     <td className="px-16 py-12 text-center">
-                      <div className="d-flex gap-4 justify-content-center">
-                        <Button 
-                          className="btn-outline-success text-11 px-8 py-4 radius-6"
-                          onClick={() => handleDownloadSubmission(submission)}
-                          title="Tải bài"
-                        >
-                          <i className="fas fa-download"></i>
-                        </Button>
-                        <Button 
-                          className={submission.status === 'graded' ? 'btn-outline-main text-11 px-10 py-4 radius-6' : 'btn-main text-11 px-10 py-4 radius-6'}
-                          onClick={() => handleGradeSubmission(submission)}
-                        >
-                          <i className={`fas ${submission.status === 'graded' ? 'fa-edit' : 'fa-pen'} me-1`}></i>
-                          {submission.status === 'graded' ? 'Sửa điểm' : 'Chấm điểm'}
-                        </Button>
-                      </div>
+                      <Button 
+                        className="btn-success text-11 px-12 py-6 radius-6"
+                        onClick={() => handleDownloadSubmission(submission)}
+                        title="Tải bài"
+                      >
+                        <i className="fas fa-download me-1"></i>
+                        Tải bài
+                      </Button>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="text-center py-24">
+                  <td colSpan="5" className="text-center py-24">
                     <i className="fas fa-inbox text-neutral-300 mb-2" style={{ fontSize: '32px' }}></i>
                     <div className="text-neutral-500 text-13">Chưa có bài nộp nào</div>
                   </td>
@@ -281,17 +264,17 @@ const AssignmentDetailModal = ({
       <Modal.Footer>
         <div className="d-flex justify-content-between w-100">
           <Button 
-            className="btn-outline-danger"
+            className="btn-danger"
             onClick={() => handleDeleteHomework(assignment)}
           >
             <i className="fas fa-trash me-2"></i>
             Xóa bài tập
           </Button>
           <div className="d-flex gap-2">
-            <Button className="btn-outline-neutral" onClick={onHide}>
+            <Button className="btn-secondary" onClick={onHide}>
               Đóng
             </Button>
-            <Button className="btn-main">
+            <Button className="btn-primary">
               <i className="fas fa-file-export me-2"></i>
               Xuất báo cáo
             </Button>

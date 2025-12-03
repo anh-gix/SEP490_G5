@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Button, Badge, Modal, Spinner } from 'react-bootstrap';
 import homeworkService from '../../../services/homeworkService';
 import CreateHomeworkModal from '../CreateHomeworkModal';
+import AssignmentDetailModal from './modals/AssignmentDetailModal';
 
 const ClassAssignments = ({ classId, onAssignmentUpdate }) => {
   const [assignments, setAssignments] = useState([]);
@@ -9,15 +10,8 @@ const ClassAssignments = ({ classId, onAssignmentUpdate }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
-  const [showSubmissionsModal, setShowSubmissionsModal] = useState(false);
-  const [submissions, setSubmissions] = useState([]);
-  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
-
-  useEffect(() => {
-    if (classId) {
-      fetchAssignments();
-    }
-  }, [classId]);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState({ assignment: false, answer: false });
 
   const fetchAssignments = async () => {
     try {
@@ -39,35 +33,169 @@ const ClassAssignments = ({ classId, onAssignmentUpdate }) => {
     }
   };
 
+  useEffect(() => {
+    if (classId) {
+      fetchAssignments();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classId]);
+
   const handleCreateSuccess = () => {
     fetchAssignments();
     if (onAssignmentUpdate) onAssignmentUpdate();
   };
 
   const handleViewSubmissions = async (assignment) => {
-    setSelectedAssignment(assignment);
-    setShowSubmissionsModal(true);
-    
     try {
-      setLoadingSubmissions(true);
+      setLoading(true);
       const response = await homeworkService.getHomeworkSubmissions(
         assignment._id, 
         assignment.scheduleId
       );
       
       if (response.success) {
-        setSubmissions(response.submissions || []);
+        // Transform data to match AssignmentDetailModal structure
+        const transformedAssignment = {
+          ...assignment,
+          sessionTitle: assignment.lessonTitle,
+          sessionOrder: assignment.lessonNumber,
+          dueDate: assignment.deadline,
+          total: assignment.totalStudents,
+          submissionRate: assignment.totalStudents > 0 
+            ? Math.round((assignment.submitted / assignment.totalStudents) * 100) 
+            : 0,
+          late: 0, // Calculate from submissions if needed
+          notSubmitted: assignment.pending,
+          files: assignment.assignmentFiles || [],
+          answerFiles: assignment.answerFiles || [],
+          submissions: (response.submissions || []).map(sub => ({
+            studentId: sub.student?._id,
+            studentName: sub.student?.username || sub.student?.email,
+            submittedAt: sub.submittedAt,
+            score: sub.score,
+            status: sub.status,
+            files: sub.submittedFiles || sub.files || []
+          }))
+        };
+        
+        setSelectedAssignment(transformedAssignment);
+        setShowDetailModal(true);
       }
     } catch (err) {
       console.error('Error fetching submissions:', err);
+      alert('Không thể tải thông tin bài tập. Vui lòng thử lại.');
     } finally {
-      setLoadingSubmissions(false);
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateAssignmentFile = async (fileType) => {
+    // Create file input element
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = '.pdf,.doc,.docx,.ppt,.pptx,.txt,.zip,.rar';
+    
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
+
+      // Max 5 files
+      if (files.length > 5) {
+        alert('Tối đa 5 files mỗi lần upload');
+        return;
+      }
+
+      try {
+        setUploadingFiles(prev => ({ ...prev, [fileType]: true }));
+        
+        const newAssignmentFiles = fileType === 'assignment' ? files : [];
+        const newAnswerFiles = fileType === 'answer' ? files : [];
+        
+        const response = await homeworkService.updateHomework(
+          selectedAssignment.scheduleId,
+          selectedAssignment._id,
+          {}, // No title/deadline changes
+          newAssignmentFiles,
+          newAnswerFiles,
+          [], // No files to delete
+          []
+        );
+
+        if (response.success) {
+          // Refresh the assignment detail
+          await handleViewSubmissions(selectedAssignment);
+          alert('Thêm file thành công!');
+        }
+      } catch (err) {
+        console.error('Error uploading files:', err);
+        alert('Không thể upload file. Vui lòng thử lại.');
+      } finally {
+        setUploadingFiles(prev => ({ ...prev, [fileType]: false }));
+      }
+    };
+
+    input.click();
+  };
+
+  const handleDeleteAssignmentFile = async (fileType, file) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa file này?')) {
+      return;
+    }
+
+    try {
+      setUploadingFiles(prev => ({ ...prev, [fileType]: true }));
+      
+      const deleteAssignmentFiles = fileType === 'assignment' ? [file] : [];
+      const deleteAnswerFiles = fileType === 'answer' ? [file] : [];
+      
+      const response = await homeworkService.updateHomework(
+        selectedAssignment.scheduleId,
+        selectedAssignment._id,
+        {}, // No title/deadline changes
+        [], // No new files
+        [],
+        deleteAssignmentFiles,
+        deleteAnswerFiles
+      );
+
+      if (response.success) {
+        // Refresh the assignment detail
+        await handleViewSubmissions(selectedAssignment);
+        alert('Xóa file thành công!');
+      }
+    } catch (err) {
+      console.error('Error deleting file:', err);
+      alert('Không thể xóa file. Vui lòng thử lại.');
+    } finally {
+      setUploadingFiles(prev => ({ ...prev, [fileType]: false }));
     }
   };
 
   const handleDeleteClick = (assignment) => {
     setSelectedAssignment(assignment);
     setShowDeleteModal(true);
+  };
+
+  const handleDeleteHomework = async (assignment) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa bài tập "${assignment.title}"?`)) {
+      return;
+    }
+
+    try {
+      await homeworkService.deleteHomework(
+        assignment.scheduleId, 
+        assignment._id
+      );
+      
+      setShowDetailModal(false);
+      setSelectedAssignment(null);
+      fetchAssignments();
+      if (onAssignmentUpdate) onAssignmentUpdate();
+    } catch (err) {
+      console.error('Error deleting homework:', err);
+      alert('Không thể xóa bài tập. Vui lòng thử lại.');
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -87,6 +215,60 @@ const ClassAssignments = ({ classId, onAssignmentUpdate }) => {
       console.error('Error deleting homework:', err);
       alert('Không thể xóa bài tập. Vui lòng thử lại.');
     }
+  };
+
+  const handleDownloadSubmission = (submission) => {
+    if (!submission.files || submission.files.length === 0) {
+      alert('Học viên chưa nộp file nào');
+      return;
+    }
+
+    // Download all files from this submission
+    submission.files.forEach((fileUrl, index) => {
+      setTimeout(() => {
+        const link = document.createElement('a');
+        link.href = fileUrl;
+        link.download = fileUrl.split('/').pop();
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }, index * 200); // Delay to avoid browser blocking multiple downloads
+    });
+  };
+
+  const handleDownloadAllSubmissions = () => {
+    if (!selectedAssignment || !selectedAssignment.submissions) {
+      alert('Không có bài nộp nào');
+      return;
+    }
+
+    const submittedFiles = selectedAssignment.submissions.filter(
+      sub => sub.files && sub.files.length > 0
+    );
+
+    if (submittedFiles.length === 0) {
+      alert('Không có file nào để tải');
+      return;
+    }
+
+    let fileIndex = 0;
+    submittedFiles.forEach((submission) => {
+      submission.files.forEach((fileUrl) => {
+        setTimeout(() => {
+          const link = document.createElement('a');
+          link.href = fileUrl;
+          link.download = `${submission.studentName}_${fileUrl.split('/').pop()}`;
+          link.target = '_blank';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }, fileIndex * 200);
+        fileIndex++;
+      });
+    });
+
+    alert(`Đang tải ${fileIndex} file từ ${submittedFiles.length} học viên...`);
   };
 
   const getStatusBadge = (assignment) => {
@@ -251,6 +433,19 @@ const ClassAssignments = ({ classId, onAssignmentUpdate }) => {
         classId={classId}
       />
 
+      {/* Assignment Detail Modal */}
+      <AssignmentDetailModal
+        show={showDetailModal}
+        onHide={() => setShowDetailModal(false)}
+        assignment={selectedAssignment}
+        handleUpdateAssignmentFile={handleUpdateAssignmentFile}
+        handleDeleteAssignmentFile={handleDeleteAssignmentFile}
+        handleDeleteHomework={handleDeleteHomework}
+        handleDownloadSubmission={handleDownloadSubmission}
+        handleDownloadAllSubmissions={handleDownloadAllSubmissions}
+        uploadingFiles={uploadingFiles}
+      />
+
       {/* Delete Confirmation Modal */}
       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
         <Modal.Header closeButton>
@@ -275,95 +470,6 @@ const ClassAssignments = ({ classId, onAssignmentUpdate }) => {
           <Button variant="danger" onClick={handleConfirmDelete}>
             <i className="fas fa-trash me-2"></i>
             Xóa bài tập
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Submissions Modal */}
-      <Modal 
-        show={showSubmissionsModal} 
-        onHide={() => setShowSubmissionsModal(false)} 
-        size="lg"
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>
-            <i className="fas fa-clipboard-check text-main-600 me-2"></i>
-            Bài nộp - {selectedAssignment?.title}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {loadingSubmissions ? (
-            <div className="text-center py-4">
-              <Spinner animation="border" variant="primary" />
-              <p className="mt-3 text-neutral-600">Đang tải danh sách bài nộp...</p>
-            </div>
-          ) : submissions.length === 0 ? (
-            <div className="text-center py-4">
-              <i className="fas fa-inbox text-neutral-300 mb-3" style={{ fontSize: '48px' }}></i>
-              <p className="text-neutral-500">Chưa có học viên nào nộp bài</p>
-            </div>
-          ) : (
-            <Table hover>
-              <thead>
-                <tr>
-                  <th>Học viên</th>
-                  <th>Trạng thái</th>
-                  <th>Thời gian nộp</th>
-                  <th className="text-center">File</th>
-                </tr>
-              </thead>
-              <tbody>
-                {submissions.map(submission => (
-                  <tr key={submission._id}>
-                    <td>
-                      <div className="fw-semibold">{submission.student?.username}</div>
-                      <div className="text-sm text-neutral-500">{submission.student?.email}</div>
-                    </td>
-                    <td>
-                      {submission.status === 'submitted' ? (
-                        <Badge bg="success">
-                          <i className="fas fa-check-circle me-1"></i>
-                          Đã nộp
-                        </Badge>
-                      ) : (
-                        <Badge bg="secondary">
-                          <i className="fas fa-clock me-1"></i>
-                          Chưa nộp
-                        </Badge>
-                      )}
-                    </td>
-                    <td>
-                      {submission.submittedAt ? (
-                        <div>
-                          <div className="text-sm">{formatDate(submission.submittedAt)}</div>
-                          <div className="text-xs text-neutral-500">
-                            {new Date(submission.submittedAt).toLocaleTimeString('vi-VN')}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-neutral-400">-</span>
-                      )}
-                    </td>
-                    <td className="text-center">
-                      {submission.submissionFiles && submission.submissionFiles.length > 0 ? (
-                        <Badge bg="info">
-                          <i className="fas fa-file me-1"></i>
-                          {submission.submissionFiles.length}
-                        </Badge>
-                      ) : (
-                        <span className="text-neutral-400">-</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="light" onClick={() => setShowSubmissionsModal(false)}>
-            Đóng
           </Button>
         </Modal.Footer>
       </Modal>

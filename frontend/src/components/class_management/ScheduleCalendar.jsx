@@ -173,7 +173,7 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
     
     // Kiểm tra buổi bị hủy (cancelled)
     if (schedule.isCancelled || schedule.scheduleStatus === 'cancelled') {
-      return '#9e9e9e'; // Màu xám đậm cho buổi bị hủy
+      return '#f44336'; // Màu đỏ cho buổi bị hủy
     }
     
     // Kiểm tra buổi nghỉ (absent)
@@ -288,7 +288,7 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                         } else if (schedule.isNewClassSchedule) {
                           backgroundColor = 'rgba(33, 150, 243, 0.15)'; // Xanh dương nhạt cho buổi lớp mới
                         } else if (schedule.isCancelled || schedule.scheduleStatus === 'cancelled') {
-                          backgroundColor = 'rgba(158, 158, 158, 0.2)'; // Xám đậm cho buổi bị hủy
+                          backgroundColor = 'rgba(244, 67, 54, 0.2)'; // Đỏ nhạt cho buổi bị hủy
                         } else if (schedule.isAbsentSchedule || schedule.status === 'absent') {
                           backgroundColor = 'rgba(244, 67, 54, 0.15)'; // Đỏ nhạt cho buổi nghỉ
                         } else if (schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled') {
@@ -324,13 +324,17 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                         } else if (schedule.isNewClassSchedule) {
                           tooltipText = `Buổi lớp mới: ${schedule.className}`;
                         } else if (schedule.isCancelled || schedule.scheduleStatus === 'cancelled') {
-                          tooltipText = schedule.cancellationReason 
-                            ? `Buổi đã hủy: ${schedule.cancellationReason}` 
+                          const cancellationReason = schedule.cancellationReason || schedule.reason;
+                          tooltipText = cancellationReason 
+                            ? `Buổi đã hủy: ${cancellationReason}` 
                             : 'Buổi đã hủy';
                         } else if (schedule.isAbsentSchedule || schedule.status === 'absent') {
                           tooltipText = 'Buổi nghỉ';
                         } else if (schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled') {
-                          tooltipText = 'Buổi học bù';
+                          const makeupReason = schedule.reason;
+                          tooltipText = makeupReason 
+                            ? `Buổi học bù: ${makeupReason}` 
+                            : 'Buổi học bù';
                         } else if (timeStatus === 'completed') {
                           tooltipText = 'Buổi đã kết thúc';
                         } else if (timeStatus === 'upcoming') {

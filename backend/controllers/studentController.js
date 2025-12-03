@@ -1370,14 +1370,32 @@ exports.getStudentById = async (req, res) => {
       });
     }
     
-    // Get class count
-    const classCount = await Class.countDocuments({ students: id });
+    // Get classes that student is enrolled in
+    const classes = await Class.find({ students: id })
+      .populate({
+        path: 'course',
+        select: 'name',
+        populate: { path: 'program', select: 'level' }
+      })
+      .populate('students', 'username email')
+      .select('name course status students')
+      .lean();
+    
+    // Format classes with level from program
+    const formattedClasses = classes.map(cls => ({
+      name: cls.name,
+      course: cls.course ? { name: cls.course.name } : null,
+      level: cls.course?.program?.level || 'N/A',
+      status: cls.status,
+      students: cls.students || []
+    }));
     
     res.status(200).json({
       success: true,
       student: {
         ...student,
-        classCount
+        classes: formattedClasses,
+        classCount: formattedClasses.length
       }
     });
   } catch (error) {

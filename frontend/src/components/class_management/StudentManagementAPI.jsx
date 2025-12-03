@@ -303,12 +303,18 @@ const StudentManagementAPI = () => {
       // Get attendance status
       const attendanceStatus = schedule.attendance?.status || null;
       
+      // Get schedule status from StudentSchedule
+      const scheduleStatus = schedule.scheduleStatus || 'scheduled';
+      const isMakeupSchedule = scheduleStatus === 'rescheduled';
+      const isCancelled = scheduleStatus === 'cancelled';
+      const reason = schedule.reason || null;
+      
       return {
         id: schedule._id || index,
         date: dateStr,
         startTime: schedule.startTime || '',
         endTime: schedule.endTime || '',
-        className: schedule.class?.name || 'N/A',
+        className: schedule.className || 'N/A',
         roomName: schedule.room?.room_name || 'N/A',
         topic: schedule.topic || '',
         status: schedule.status === 'fixed' ? 'scheduled' : schedule.status === 'temporary' ? 'makeup' : 'scheduled',
@@ -316,7 +322,12 @@ const StudentManagementAPI = () => {
         hasAttendance: !!attendanceStatus,
         teacherName: schedule.teacher?.username || 'N/A',
         lessonNumber: schedule.session?.order || '',
-        lessonTopic: schedule.topic || ''
+        lessonTopic: schedule.topic || '',
+        scheduleStatus: scheduleStatus,
+        reason: reason,
+        isMakeupSchedule: isMakeupSchedule,
+        isCancelled: isCancelled,
+        cancellationReason: isCancelled ? reason : null
       };
     });
   }, [studentSchedule]);

@@ -34,7 +34,7 @@ const sectionSchema = new mongoose.Schema({
   questionCount: Number,
   answerKey: [answerKeySchema],
   maxScore: Number,
-  part: Number
+  part: Number,
 });
 
 const examSchema = new mongoose.Schema(

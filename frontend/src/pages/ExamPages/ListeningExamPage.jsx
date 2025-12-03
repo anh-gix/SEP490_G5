@@ -10,7 +10,7 @@ const ListeningExamPage = () => {
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [sectionData, setSectionData] = useState(null);
-  const [answers, setAnswers] = useState({});
+  const [answers, setAnswers] = useState({}); // { part_1: { questionNumber: answer }, part_2: { ... } }
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -20,6 +20,7 @@ const ListeningExamPage = () => {
   const [leftWidth, setLeftWidth] = useState(50); // Percentage width for left panel
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(1);
+  const [currentPart, setCurrentPart] = useState(1);
   const audioRef = useRef(null);
   const timerRef = useRef(null);
   const containerRef = useRef(null);
@@ -27,9 +28,11 @@ const ListeningExamPage = () => {
   const questionRefs = useRef({});
 
   const getQuestionData = useCallback(
-    (questionNumber) => {
-      if (!sectionData?.section?.questions) return { questionType: "multiple_choice", questionTitle: "", questionAnswer: [] };
-      const question = sectionData.section.questions.find(
+    (part, questionNumber) => {
+      if (!sectionData?.parts) return { questionType: "multiple_choice", questionTitle: "", questionAnswer: [] };
+      const partData = sectionData.parts.find((p) => p.part === part);
+      if (!partData?.section?.questions) return { questionType: "multiple_choice", questionTitle: "", questionAnswer: [] };
+      const question = partData.section.questions.find(
         (q) => q.questionNumber === questionNumber
       );
       return {
@@ -70,33 +73,50 @@ const ListeningExamPage = () => {
 
       try {
         setSubmitting(true);
-        const answersArray = Object.keys(answers).map((qNum) => {
-          const questionData = getQuestionData(parseInt(qNum));
-          const questionType = questionData.questionType;
-          const answerValue = answers[qNum];
+        
+        // Xử lý answers cho tất cả các part
+        const partsData = [];
+        
+        if (sectionData?.parts) {
+          for (const partData of sectionData.parts) {
+            const part = partData.part;
+            const partAnswers = answers[`part_${part}`] || {};
+            
+            const answersArray = Object.keys(partAnswers).map((qNum) => {
+              const questionData = getQuestionData(part, parseInt(qNum));
+              const questionType = questionData.questionType;
+              const answerValue = partAnswers[qNum];
 
-          // Nếu là multiple choice type
-          if (isMultipleChoiceType(questionType)) {
-            // Gửi array cho các loại câu hỏi cho phép chọn nhiều
-            const answerArray = Array.isArray(answerValue) ? answerValue : [answerValue].filter(Boolean);
-            return {
-              questionNumber: parseInt(qNum),
-              selectedOption: answerArray,
-            };
-          } else if (questionType === "true_false") {
-            return {
-              questionNumber: parseInt(qNum),
-              selectedOption: answerValue,
-            };
-          } else {
-            return {
-              questionNumber: parseInt(qNum),
-              answerText: answerValue,
-            };
+              // Nếu là multiple choice type
+              if (isMultipleChoiceType(questionType)) {
+                const answerArray = Array.isArray(answerValue) ? answerValue : [answerValue].filter(Boolean);
+                return {
+                  questionNumber: parseInt(qNum),
+                  selectedOption: answerArray,
+                };
+              } else if (questionType === "true_false") {
+                return {
+                  questionNumber: parseInt(qNum),
+                  selectedOption: answerValue,
+                };
+              } else {
+                return {
+                  questionNumber: parseInt(qNum),
+                  answerText: answerValue,
+                };
+              }
+            });
+
+            if (answersArray.length > 0) {
+              partsData.push({
+                part: part,
+                answers: answersArray,
+              });
+            }
           }
-        });
+        }
 
-        await examService.submitListeningAnswers(examId, submissionId, answersArray);
+        await examService.submitListeningAnswers(examId, submissionId, { parts: partsData });
 
         // Navigate to result page
         navigate(`/exams/${examId}/submissions/${submissionId}/listening/result`);
@@ -105,7 +125,7 @@ const ListeningExamPage = () => {
         setSubmitting(false);
       }
     },
-    [submitting, answers, examId, submissionId, navigate, getQuestionData, isMultipleChoiceType]
+    [submitting, answers, examId, submissionId, navigate, getQuestionData, isMultipleChoiceType, sectionData]
   );
 
   // Fetch section + initialize state
@@ -130,14 +150,25 @@ const ListeningExamPage = () => {
 
         setSectionData(data);
 
-        // Initialize answers as empty
-        setAnswers({});
+        // Initialize answers as empty for all parts
+        const initialAnswers = {};
+        if (data.parts) {
+          data.parts.forEach((partData) => {
+            initialAnswers[`part_${partData.part}`] = {};
+          });
+        }
+        setAnswers(initialAnswers);
 
-        // Initialize timer if duration exists
-        if (data.section?.duration) {
-          setTimeRemaining(data.section.duration * 60); // minutes -> seconds
+        // Initialize timer if totalDuration exists
+        if (data.totalDuration) {
+          setTimeRemaining(data.totalDuration * 60); // minutes -> seconds
         } else {
           setTimeRemaining(null);
+        }
+
+        // Set current part to first part
+        if (data.parts && data.parts.length > 0) {
+          setCurrentPart(data.parts[0].part);
         }
 
         setError(null);
@@ -209,8 +240,8 @@ const ListeningExamPage = () => {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const getOptionsForQuestion = (questionNumber) => {
-    const questionData = getQuestionData(questionNumber);
+  const getOptionsForQuestion = (part, questionNumber) => {
+    const questionData = getQuestionData(part, questionNumber);
     const questionType = questionData.questionType;
     
     if (questionType === "multiple_choice") {
@@ -223,13 +254,15 @@ const ListeningExamPage = () => {
   };
 
   
-  const handleAnswerChange = (questionNumber, value, questionType) => {
+  const handleAnswerChange = (part, questionNumber, value, questionType) => {
     const isMultiple = isMultipleChoiceType(questionType);
+    const partKey = `part_${part}`;
     
     if (isMultiple) {
       // Xử lý multiple choice: toggle giá trị trong array
       setAnswers((prev) => {
-        const currentAnswer = prev[questionNumber] || [];
+        const partAnswers = prev[partKey] || {};
+        const currentAnswer = partAnswers[questionNumber] || [];
         const answerArray = Array.isArray(currentAnswer) ? currentAnswer : [];
         const newAnswer = answerArray.includes(value)
           ? answerArray.filter((item) => item !== value)
@@ -237,35 +270,45 @@ const ListeningExamPage = () => {
         
         return {
           ...prev,
-          [questionNumber]: newAnswer,
+          [partKey]: {
+            ...partAnswers,
+            [questionNumber]: newAnswer,
+          },
         };
       });
     } else {
       // Xử lý single choice: lưu giá trị đơn
       setAnswers((prev) => ({
         ...prev,
-        [questionNumber]: value,
+        [partKey]: {
+          ...(prev[partKey] || {}),
+          [questionNumber]: value,
+        },
       }));
     }
   };
 
-  const getPDFUrl = () => {
-    if (!sectionData?.section?.fileUrl) return null;
+  const getPDFUrl = (part) => {
+    if (!sectionData?.parts) return null;
+    const partData = sectionData.parts.find((p) => p.part === part);
+    if (!partData?.section?.fileUrl) return null;
+    
+    const fileUrl = partData.section.fileUrl;
     // If fileUrl is a full URL, use it directly
-    if (sectionData.section.fileUrl.startsWith("http")) {
-      return sectionData.section.fileUrl;
+    if (fileUrl.startsWith("http")) {
+      return fileUrl;
     }
     // If it starts with /, it's already a path from root
-    if (sectionData.section.fileUrl.startsWith("/")) {
+    if (fileUrl.startsWith("/")) {
       const API_PORT = import.meta.env.VITE_API_PORT;
-      return `http://localhost:${API_PORT}${sectionData.section.fileUrl}`;
+      return `http://localhost:${API_PORT}${fileUrl}`;
     }
     // Otherwise, assume it's in uploads folder
     const API_PORT = import.meta.env.VITE_API_PORT;
-    return `http://localhost:${API_PORT}/uploads/${sectionData.section.fileUrl}`;
+    return `http://localhost:${API_PORT}/uploads/${fileUrl}`;
   };
 
-  const getAudioUrl = (audioUrl) => {
+  const getAudioUrl = (part, audioUrl) => {
     if (!audioUrl) return null;
     // If audioUrl is a full URL, use it directly
     if (audioUrl.startsWith("http")) {
@@ -293,19 +336,32 @@ const ListeningExamPage = () => {
     }
   };
 
-  const audioUrls = sectionData?.section?.audioUrls || [];
+  // Get audio URLs for current part
+  const getCurrentPartAudioUrls = () => {
+    if (!sectionData?.parts) return [];
+    const partData = sectionData.parts.find((p) => p.part === currentPart);
+    return partData?.section?.audioUrls || [];
+  };
+
+  const audioUrls = getCurrentPartAudioUrls();
   const currentAudioUrl = audioUrls[currentAudioIndex];
-  // Update audio source when currentAudioIndex changes
+  // Update audio source when currentAudioIndex or currentPart changes
   useEffect(() => {
     if (audioRef.current && currentAudioUrl) {
       audioRef.current.load();
       setIsPlaying(false);
     }
-  }, [currentAudioIndex, currentAudioUrl]);
+  }, [currentAudioIndex, currentAudioUrl, currentPart]);
 
-  const generateQuestionNumbers = () => {
-    if (!sectionData?.section?.questionCount) return [];
-    return Array.from({ length: sectionData.section.questionCount }, (_, i) => i + 1);
+  const generateQuestionNumbers = (part) => {
+    if (!sectionData?.parts) return [];
+    const partData = sectionData.parts.find((p) => p.part === part);
+    if (!partData?.section?.questions) return [];
+    // Lấy tất cả questionNumber từ questions array và sắp xếp
+    return partData.section.questions
+      .map((q) => q.questionNumber)
+      .filter((num) => num != null)
+      .sort((a, b) => a - b);
   };
 
   // Fullscreen functionality
@@ -340,11 +396,11 @@ const ListeningExamPage = () => {
   // Scroll to question
   const scrollToQuestion = useCallback((questionNumber) => {
     setCurrentQuestion(questionNumber);
-    const questionElement = questionRefs.current[questionNumber];
+    const questionElement = questionRefs.current[`part_${currentPart}_q_${questionNumber}`];
     if (questionElement) {
       questionElement.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, []);
+  }, [currentPart]);
 
   // Resize handlers
   const handleMouseMove = useCallback((e) => {
@@ -543,7 +599,13 @@ const ListeningExamPage = () => {
             </button>
             <button
               onClick={() => handleSubmit()}
-              disabled={submitting || Object.keys(answers).length === 0}
+              disabled={submitting || (() => {
+                // Check if at least one part has answers
+                return !sectionData?.parts?.some((partData) => {
+                  const partAnswers = answers[`part_${partData.part}`] || {};
+                  return Object.keys(partAnswers).length > 0;
+                });
+              })()}
               className="btn btn-main rounded-pill px-32 py-12 flex-align gap-8"
             >
               {submitting ? (
@@ -560,6 +622,32 @@ const ListeningExamPage = () => {
             </button>
           </div>
         </div>
+
+        {/* Part Selector and Audio Player Section */}
+        {sectionData?.parts && sectionData.parts.length > 1 && (
+          <div className="bg-white border-bottom border-neutral-30 px-24 py-16 flex-shrink-0">
+            <div className="mb-12">
+              <div className="d-flex flex-wrap gap-8 align-items-center">
+                <span className="fw-semibold text-neutral-700 text-sm mb-0">Chọn phần:</span>
+                {sectionData.parts.map((partData) => (
+                  <button
+                    key={partData.part}
+                    onClick={() => {
+                      setCurrentPart(partData.part);
+                      setCurrentAudioIndex(0);
+                      setCurrentQuestion(1);
+                    }}
+                    className={`btn ${
+                      currentPart === partData.part ? "btn-main" : "btn-outline-main"
+                    } px-12 py-4 rounded-pill text-sm`}
+                  >
+                    Part {partData.part}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Audio Player Section */}
         {audioUrls.length > 0 && (
@@ -590,7 +678,7 @@ const ListeningExamPage = () => {
               </div>
               <audio
                 ref={audioRef}
-                src={getAudioUrl(currentAudioUrl)}
+                src={getAudioUrl(currentPart, currentAudioUrl)}
                 onEnded={handleAudioEnded}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
@@ -616,9 +704,9 @@ const ListeningExamPage = () => {
                 overflow: "auto",
               }}
             >
-              {getPDFUrl() ? (
+              {getPDFUrl(currentPart) ? (
                 <iframe
-                  src={getPDFUrl()}
+                  src={getPDFUrl(currentPart)}
                   className="w-100 h-100 border-0 rounded-8"
                   title="Listening PDF"
                   style={{ minHeight: "600px" }}
@@ -652,135 +740,145 @@ const ListeningExamPage = () => {
                 </div>
               )}
 
-              {sectionData?.section?.instructions && (
-                <div className="bg-white rounded-12 p-16 mb-24 border border-neutral-30">
-                  <p className="text-neutral-700 mb-0 fw-semibold">Hướng dẫn:</p>
-                  <p className="text-neutral-600 text-sm mb-0 mt-8">{sectionData.section.instructions}</p>
-                </div>
-              )}
-
-              <div className="mb-24">
-                {generateQuestionNumbers().map((qNum) => {
-                  const questionData = getQuestionData(qNum);
-                  const questionType = questionData.questionType;
-                  const options = getOptionsForQuestion(qNum);
-                  const answerValue = answers[qNum];
-                  const hasAnswer = Array.isArray(answerValue) 
-                    ? answerValue.length > 0 
-                    : answerValue && answerValue !== "";
-                  
-                  return (
-                    <div 
-                      key={qNum} 
-                      ref={(el) => (questionRefs.current[qNum] = el)}
-                      className="bg-white rounded-12 p-16 mb-16 border border-neutral-30"
-                    >
-                      <div className="flex-between gap-16 mb-12">
-                        <label className="fw-semibold text-neutral-700">Câu {qNum}</label>
-                        {hasAnswer && (
-                          <span className="badge bg-main-600 text-white px-12 py-4 rounded-pill">
-                            Đã trả lời
-                          </span>
-                        )}
+              {(() => {
+                const currentPartData = sectionData?.parts?.find((p) => p.part === currentPart);
+                const partAnswers = answers[`part_${currentPart}`] || {};
+                
+                return (
+                  <>
+                    {currentPartData?.section?.instructions && (
+                      <div className="bg-white rounded-12 p-16 mb-24 border border-neutral-30">
+                        <p className="text-neutral-700 mb-0 fw-semibold">Hướng dẫn:</p>
+                        <p className="text-neutral-600 text-sm mb-0 mt-8">{currentPartData.section.instructions}</p>
                       </div>
+                    )}
 
-                      {/* Question Title */}
-                      {questionData.questionTitle && (
-                        <div className="mb-12">
-                          <p className="text-neutral-700 mb-0">{questionData.questionTitle}</p>
-                        </div>
-                      )}
+                    <div className="mb-24">
+                      {generateQuestionNumbers(currentPart).map((qNum) => {
+                        const questionData = getQuestionData(currentPart, qNum);
+                        const questionType = questionData.questionType;
+                        const options = getOptionsForQuestion(currentPart, qNum);
+                        const answerValue = partAnswers[qNum];
+                        const hasAnswer = Array.isArray(answerValue) 
+                          ? answerValue.length > 0 
+                          : answerValue && answerValue !== "";
+                        
+                        return (
+                          <div 
+                            key={qNum} 
+                            ref={(el) => (questionRefs.current[`part_${currentPart}_q_${qNum}`] = el)}
+                            className="bg-white rounded-12 p-16 mb-16 border border-neutral-30"
+                          >
+                            <div className="flex-between gap-16 mb-12">
+                              <label className="fw-semibold text-neutral-700">Câu {qNum}</label>
+                              {hasAnswer && (
+                                <span className="badge bg-main-600 text-white px-12 py-4 rounded-pill">
+                                  Đã trả lời
+                                </span>
+                              )}
+                            </div>
 
-                      {/* Multiple Choice */}
-                      {questionType === "multiple_choice" && (
-                        <div className="d-flex flex-column gap-8">
-                          {options.map((option) => {
-                            const optionKey = typeof option === 'object' ? option.key : option;
-                            const optionText = typeof option === 'object' ? option.text : '';
-                            const answerArray = Array.isArray(answers[qNum]) ? answers[qNum] : [];
-                            const isChecked = answerArray.includes(optionKey);
-                            return (
-                              <label
-                                key={optionKey}
-                                className={`d-flex align-items-center gap-12 p-12 rounded-8 border cursor-pointer transition-2 ${
-                                  isChecked
-                                    ? "border-main-600 bg-main-25"
-                                    : "border-neutral-30 hover-border-main-300"
-                                }`}
-                              >
+                            {/* Question Title */}
+                            {questionData.questionTitle && (
+                              <div className="mb-12">
+                                <p className="text-neutral-700 mb-0">{questionData.questionTitle}</p>
+                              </div>
+                            )}
+
+                            {/* Multiple Choice */}
+                            {questionType === "multiple_choice" && (
+                              <div className="d-flex flex-column gap-8">
+                                {options.map((option) => {
+                                  const optionKey = typeof option === 'object' ? option.key : option;
+                                  const optionText = typeof option === 'object' ? option.text : '';
+                                  const answerArray = Array.isArray(partAnswers[qNum]) ? partAnswers[qNum] : [];
+                                  const isChecked = answerArray.includes(optionKey);
+                                  return (
+                                    <label
+                                      key={optionKey}
+                                      className={`d-flex align-items-center gap-12 p-12 rounded-8 border cursor-pointer transition-2 ${
+                                        isChecked
+                                          ? "border-main-600 bg-main-25"
+                                          : "border-neutral-30 hover-border-main-300"
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        value={optionKey}
+                                        checked={isChecked}
+                                        onChange={() => handleAnswerChange(currentPart, qNum, optionKey, questionType)}
+                                        className="form-check-input"
+                                      />
+                                      <div className="d-flex align-items-center gap-8">
+                                        <span className="fw-semibold text-neutral-700">{optionKey}.</span>
+                                        {optionText && <span className="text-neutral-700">{optionText}</span>}
+                                      </div>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Input Text */}
+                            {questionType === "input" && (
+                              <div>
                                 <input
-                                  type="checkbox"
-                                  value={optionKey}
-                                  checked={isChecked}
-                                  onChange={() => handleAnswerChange(qNum, optionKey, questionType)}
-                                  className="form-check-input"
+                                  type="text"
+                                  className="form-control"
+                                  placeholder="Nhập đáp án của bạn..."
+                                  value={partAnswers[qNum] || ""}
+                                  onChange={(e) => handleAnswerChange(currentPart, qNum, e.target.value, questionType)}
                                 />
-                                <div className="d-flex align-items-center gap-8">
-                                  <span className="fw-semibold text-neutral-700">{optionKey}.</span>
-                                  {optionText && <span className="text-neutral-700">{optionText}</span>}
-                                </div>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      )}
+                              </div>
+                            )}
 
-                      {/* Input Text */}
-                      {questionType === "input" && (
-                        <div>
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="Nhập đáp án của bạn..."
-                            value={answers[qNum] || ""}
-                            onChange={(e) => handleAnswerChange(qNum, e.target.value, questionType)}
-                          />
-                        </div>
-                      )}
-
-                      {/* True/False */}
-                      {questionType === "true_false" && (
-                        <div className="d-flex flex-column gap-8">
-                          {["True", "False"].map((option) => (
-                            <label
-                              key={option}
-                              className={`d-flex align-items-center gap-12 p-12 rounded-8 border cursor-pointer transition-2 ${
-                                answers[qNum] === option
-                                  ? "border-main-600 bg-main-25"
-                                  : "border-neutral-30 hover-border-main-300"
-                              }`}
-                            >
-                              <input
-                                type="radio"
-                                name={`question-${qNum}`}
-                                value={option}
-                                checked={answers[qNum] === option}
-                                onChange={() => handleAnswerChange(qNum, option, questionType)}
-                                className="form-check-input"
-                              />
-                              <span className="text-neutral-700">{option}</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
+                            {/* True/False */}
+                            {questionType === "true_false" && (
+                              <div className="d-flex flex-column gap-8">
+                                {["True", "False"].map((option) => (
+                                  <label
+                                    key={option}
+                                    className={`d-flex align-items-center gap-12 p-12 rounded-8 border cursor-pointer transition-2 ${
+                                      partAnswers[qNum] === option
+                                        ? "border-main-600 bg-main-25"
+                                        : "border-neutral-30 hover-border-main-300"
+                                    }`}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name={`part_${currentPart}_question-${qNum}`}
+                                      value={option}
+                                      checked={partAnswers[qNum] === option}
+                                      onChange={() => handleAnswerChange(currentPart, qNum, option, questionType)}
+                                      className="form-check-input"
+                                    />
+                                    <span className="text-neutral-700">{option}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
 
-              <div className="bg-white rounded-12 p-16 border border-neutral-30">
-                <p className="text-neutral-600 text-sm mb-0 text-center">
-                  Đã trả lời: <strong className="text-main-600">{Object.keys(answers).length}</strong> / {sectionData?.section?.questionCount || 0} câu
-                </p>
-              </div>
+                    <div className="bg-white rounded-12 p-16 border border-neutral-30">
+                      <p className="text-neutral-600 text-sm mb-0 text-center">
+                        Đã trả lời: <strong className="text-main-600">{Object.keys(partAnswers).length}</strong> / {generateQuestionNumbers(currentPart).length} câu
+                      </p>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
 
         {/* Question Navigation at Bottom */}
         <div className="question-navigation">
-          {generateQuestionNumbers().map((qNum) => {
-            const answerValue = answers[qNum];
+          {generateQuestionNumbers(currentPart).map((qNum) => {
+            const partAnswers = answers[`part_${currentPart}`] || {};
+            const answerValue = partAnswers[qNum];
             const hasAnswer = Array.isArray(answerValue) 
               ? answerValue.length > 0 
               : answerValue && answerValue !== "";

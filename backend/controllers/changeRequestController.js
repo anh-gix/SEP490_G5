@@ -1242,7 +1242,7 @@ exports.approveChangeRequest = async (req, res) => {
     }
     
     // Cập nhật trạng thái đơn sử dụng findByIdAndUpdate để tránh lỗi validation
-    const updatedChangeRequest = await ChangeRequest.findByIdAndUpdate(
+    await ChangeRequest.findByIdAndUpdate(
       id,
       {
         status: 'approved',
@@ -1253,12 +1253,16 @@ exports.approveChangeRequest = async (req, res) => {
         new: true,
         session: session
       }
-    )
-    .populate('sender', 'username email phone')
-    .populate('approver', 'username email');
+    );
     
+    // Commit transaction before populating (populate doesn't need to be in transaction)
     await session.commitTransaction();
     session.endSession();
+    
+    // Fetch the updated document with populated fields after transaction commits
+    const updatedChangeRequest = await ChangeRequest.findById(id)
+      .populate('sender', 'username email phone')
+      .populate('approver', 'username email');
     
     res.status(200).json({
       success: true,

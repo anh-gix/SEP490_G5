@@ -190,63 +190,8 @@ exports.getClassById = async (req, res) => {
     // Get class schedule IDs for this class
     const classScheduleIds = schedules.map(s => s._id);
     
-    // Log lịch học của từng sinh viên
-    console.log('\n👥 ========== LỊCH HỌC CỦA TỪNG SINH VIÊN (getClassById) ==========');
+    // Get students array for attendance calculation
     const students = classData.students || [];
-    console.log(`  - Tổng số học sinh: ${students.length}`);
-    
-    for (let idx = 0; idx < students.length; idx++) {
-      const student = students[idx];
-      const studentId = student._id?.toString() || student.toString();
-      const studentName = student.username || student.email || `Học sinh ${idx + 1}`;
-      
-      console.log(`\n  👤 [${idx + 1}] ${studentName} (ID: ${studentId}):`);
-      
-      // Tìm tất cả lớp mà học sinh này tham gia
-      const studentAllClasses = await Class.find({
-        students: new mongoose.Types.ObjectId(studentId)
-      })
-        .select('_id name')
-        .lean();
-      
-      console.log(`      - Tham gia ${studentAllClasses.length} lớp:`);
-      studentAllClasses.forEach((cls, cIdx) => {
-        const isCurrentClass = cls._id.toString() === id.toString();
-        console.log(`        [${cIdx + 1}] ${cls.name} (ID: ${cls._id})${isCurrentClass ? ' ← Lớp hiện tại' : ''}`);
-      });
-      
-      // Lấy tất cả schedules của học sinh này từ tất cả các lớp
-      const studentAllClassIds = studentAllClasses.map(c => c._id);
-      const studentAllSchedules = await ClassSchedule.find({
-        class: { $in: studentAllClassIds },
-        status: { $in: ['temporary', 'fixed'] }
-      })
-        .populate('class', 'name')
-        .select('date startTime endTime class status')
-        .sort({ date: 1, startTime: 1 })
-        .lean();
-      
-      console.log(`      - Tổng số buổi học: ${studentAllSchedules.length}`);
-      if (studentAllSchedules.length > 0) {
-        console.log(`      - Chi tiết các buổi học:`);
-        const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-        studentAllSchedules.forEach((schedule, sIdx) => {
-          const scheduleDate = new Date(schedule.date);
-          const year = scheduleDate.getFullYear();
-          const month = String(scheduleDate.getMonth() + 1).padStart(2, '0');
-          const day = String(scheduleDate.getDate()).padStart(2, '0');
-          const scheduleDateStr = `${year}-${month}-${day}`;
-          const dayOfWeek = scheduleDate.getDay();
-          const scheduleClassName = schedule.class?.name || 'N/A';
-          const isCurrentClassSchedule = schedule.class?._id?.toString() === id.toString();
-          console.log(`        [${sIdx + 1}] ${scheduleDateStr} (${dayNames[dayOfWeek]}) - ${schedule.startTime} - ${schedule.endTime} [${schedule.status || 'fixed'}]`);
-          console.log(`            Lớp: ${scheduleClassName}${isCurrentClassSchedule ? ' ← Lớp hiện tại' : ''}`);
-        });
-      } else {
-        console.log(`      - Học sinh này chưa có buổi học nào`);
-      }
-    }
-    console.log('  ============================================\n');
     
     // Calculate attendance for each student
     const studentsWithAttendance = await Promise.all(
@@ -1428,6 +1373,9 @@ exports.updateClass = async (req, res) => {
       });
     }
     
+    // Capture old students list before it gets modified
+    const oldStudentsList = classData.students ? [...classData.students] : [];
+    
     // Check name conflict
     if (name && name !== classData.name) {
       const existingClass = await Class.findOne({ 
@@ -1922,8 +1870,8 @@ exports.updateClass = async (req, res) => {
     if (students !== undefined && !shouldRegenerateSchedules && !scheduleEntriesOnlyChanged) {
       console.log('🔍 [DEBUG] Handling StudentSchedule changes for students only');
       
-      // Get old and new student lists
-      const oldStudents = (classData.students || []).map(id => id.toString());
+      // Get old and new student lists (use captured oldStudentsList before modification)
+      const oldStudents = (oldStudentsList || []).map(id => id.toString());
       const newStudents = (students || []).map(id => id.toString());
       
       // Find students added and removed

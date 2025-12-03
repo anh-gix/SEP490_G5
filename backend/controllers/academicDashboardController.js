@@ -201,10 +201,12 @@ exports.getDashboardData = async (req, res) => {
       .limit(5)
       .lean();
 
-    // Reuse 'now' variable declared at the beginning of the function
+    // Capture fresh timestamp right before calculating time differences
+    // to ensure accurate "time ago" values after async operations
+    const currentTime = new Date();
     const recentActivities = recentRequests.map(request => {
       const createdAt = new Date(request.createdAt);
-      const diffMs = now - createdAt;
+      const diffMs = currentTime - createdAt;
       const diffMins = Math.floor(diffMs / 60000);
       const diffHours = Math.floor(diffMs / 3600000);
       const diffDays = Math.floor(diffMs / 86400000);

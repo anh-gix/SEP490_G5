@@ -64,6 +64,41 @@ const StudentManagementAPI = () => {
     fetchFilterOptions();
   }, []);
 
+  // Filter levels based on selected program type
+  useEffect(() => {
+    const filterLevels = async () => {
+      if (!programType) {
+        // If no program selected, show all levels
+        try {
+          const response = await courseService.getAllLevels();
+          if (response?.success && response.levels) {
+            setAvailableLevels(response.levels);
+          }
+        } catch (error) {
+          console.error('Error fetching all levels:', error);
+        }
+        return;
+      }
+
+      // Fetch levels for this program type
+      try {
+        const response = await courseService.getLevelsByType(programType);
+        if (response?.success && response.levels) {
+          setAvailableLevels(response.levels);
+          
+          // If current level is not available for selected program, clear it
+          if (level && !response.levels.includes(level)) {
+            setLevel('');
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching levels by type:', error);
+      }
+    };
+    
+    filterLevels();
+  }, [programType]);
+
   // Reset page when filters change (but not when page itself changes)
   useEffect(() => {
     setPage(1);

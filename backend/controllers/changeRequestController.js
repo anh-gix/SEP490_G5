@@ -642,24 +642,33 @@ exports.approveChangeRequest = async (req, res) => {
         if (isNewMakeup && newMakeupDate && newMakeupStartTime && newMakeupEndTime && newMakeupRoomId && newMakeupTeacherId) {
           console.log(`🆕 Tạo buổi học bù mới cho buổi nghỉ: ${absentScheduleId}`);
           
-          // Parse date string (YYYY-MM-DD) và tạo Date object ở local timezone
+          // Parse date string (YYYY-MM-DD) và tạo Date object ở UTC để tránh timezone issues
           const dateParts = newMakeupDate.split('-');
           if (dateParts.length !== 3) {
             console.warn(`⚠️ Định dạng ngày không hợp lệ: ${newMakeupDate}`);
             continue;
           }
           
-          const scheduleDate = new Date(
+          // Tạo date ở UTC để đảm bảo consistency với MongoDB (MongoDB lưu dates dưới dạng UTC)
+          const scheduleDate = new Date(Date.UTC(
             parseInt(dateParts[0]), // year
             parseInt(dateParts[1]) - 1, // month (0-indexed)
-            parseInt(dateParts[2]) // day
-          );
-          scheduleDate.setHours(0, 0, 0, 0);
+            parseInt(dateParts[2]), // day
+            0, // hours
+            0, // minutes
+            0, // seconds
+            0  // milliseconds
+          ));
+          
+          // Tạo date range để query (start và end của ngày trong UTC)
+          const startOfDay = new Date(scheduleDate);
+          const endOfDay = new Date(scheduleDate);
+          endOfDay.setUTCHours(23, 59, 59, 999);
           
           // Kiểm tra conflict với room và teacher (trong transaction)
           const roomConflict = await ClassSchedule.findOne({
             room: new mongoose.Types.ObjectId(newMakeupRoomId),
-            date: scheduleDate,
+            date: { $gte: startOfDay, $lte: endOfDay },
             status: { $in: ['temporary', 'fixed'] },
             $or: [
               { $and: [{ startTime: { $lte: newMakeupStartTime } }, { endTime: { $gt: newMakeupStartTime } }] },
@@ -685,7 +694,7 @@ exports.approveChangeRequest = async (req, res) => {
             const teacherClassIds = teacherClasses.map(c => c._id);
             const teacherConflict = await ClassSchedule.findOne({
               class: { $in: teacherClassIds },
-              date: scheduleDate,
+              date: { $gte: startOfDay, $lte: endOfDay },
               status: { $in: ['temporary', 'fixed'] },
               $or: [
                 { $and: [{ startTime: { $lte: newMakeupStartTime } }, { endTime: { $gt: newMakeupStartTime } }] },
@@ -733,9 +742,9 @@ exports.approveChangeRequest = async (req, res) => {
             if (!dateInput) return null;
             const d = new Date(dateInput);
             if (isNaN(d.getTime())) return null;
-            const year = d.getUTCFullYear();
-            const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-            const day = String(d.getUTCDate()).padStart(2, '0');
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
           };
           

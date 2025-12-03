@@ -1553,10 +1553,12 @@ exports.updateClass = async (req, res) => {
         // Chỉ tạo lại số lượng future schedules đã bị xóa
         // Hoặc nếu tổng số schedules hiện tại < numberOfSessions, tạo thêm cho đủ
         // Nhưng không tạo thêm nếu đã có đủ số schedules
+        // Note: After deletion, only pastSessionsCount schedules remain, so use that for calculation
         let remainingSessions = 0;
         if (totalExistingSchedules < numberOfSessions) {
           // Chưa đủ số schedules, cần tạo thêm
-          remainingSessions = numberOfSessions - totalExistingSchedules;
+          // Use pastSessionsCount (remaining after deletion) instead of totalExistingSchedules
+          remainingSessions = numberOfSessions - pastSessionsCount;
         } else if (futureSchedulesCount > 0) {
           // Đã đủ số schedules nhưng có future schedules bị xóa, chỉ tạo lại số đó
           remainingSessions = futureSchedulesCount;
@@ -1703,7 +1705,9 @@ exports.updateClass = async (req, res) => {
       }
     }
     // If schedules need to be regenerated (full regeneration), delete old ClassSchedules and related data
-    else if (shouldRegenerateSchedules) {
+    // Only delete if scheduleEntries are provided to ensure new schedules will be created
+    // This prevents leaving the class without schedules when only course changes without scheduleEntries
+    else if (shouldRegenerateSchedules && scheduleEntries && scheduleEntries.length > 0 && finalCourse && finalStartDate) {
       console.log('🔍 [DEBUG] Entering FULL REGENERATION block');
       // Find all ClassSchedules for this class
       const classSchedules = await ClassSchedule.find({ class: req.params.id }).session(session).select('_id');
@@ -1726,6 +1730,10 @@ exports.updateClass = async (req, res) => {
           { class: req.params.id }
         ).session(session);
       }
+    } else if (shouldRegenerateSchedules && (!scheduleEntries || scheduleEntries.length === 0)) {
+      // If course changed but scheduleEntries not provided, warn but don't delete schedules
+      // This prevents data loss - old schedules remain until new scheduleEntries are provided
+      console.log('⚠️ [WARNING] Course changed but scheduleEntries not provided. Old schedules will be kept.');
     }
     
     // Update fields

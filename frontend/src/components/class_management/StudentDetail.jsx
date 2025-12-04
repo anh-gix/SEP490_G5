@@ -3,7 +3,10 @@ import { Container, Button, Badge, Alert, Tabs, Tab, Table, Row, Col, Card, Pagi
 import { useParams, useNavigate } from 'react-router-dom';
 import studentService from '../../services/studentService';
 import { courseService } from '../../services/courseService';
+import { classScheduleService } from '../../services/classScheduleService';
+import studentScheduleService from '../../services/studentScheduleService';
 import ScheduleCalendar from './ScheduleCalendar';
+import MakeupClassModalForStudent from './MakeupClassModalForStudent';
 
 /**
  * Student Detail Component
@@ -35,6 +38,11 @@ const StudentDetail = () => {
   const [selectedCourseIds, setSelectedCourseIds] = useState([]);
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [savingCourses, setSavingCourses] = useState(false);
+
+  // Makeup class modal state
+  const [showMakeupModal, setShowMakeupModal] = useState(false);
+  const [selectedScheduleForMakeup, setSelectedScheduleForMakeup] = useState(null);
+  const [creatingMakeup, setCreatingMakeup] = useState(false);
 
   // Fetch only student info (for Info tab)
   const fetchStudentInfo = useCallback(async () => {
@@ -212,6 +220,97 @@ const StudentDetail = () => {
     }
   };
 
+  // Handler to open makeup class modal
+  const handleCreateMakeup = (schedule) => {
+    setSelectedScheduleForMakeup(schedule);
+    setShowMakeupModal(true);
+  };
+
+  // Handler to close makeup class modal
+  const handleCloseMakeupModal = () => {
+    setShowMakeupModal(false);
+    setSelectedScheduleForMakeup(null);
+  };
+
+  // Handler to submit makeup class creation
+  const handleSubmitMakeup = async (makeupData) => {
+    if (!selectedScheduleForMakeup || !studentId) {
+      alert('Thiếu thông tin cần thiết');
+      return;
+    }
+
+    try {
+      setCreatingMakeup(true);
+
+      if (makeupData.existingScheduleId) {
+        // Trường hợp chọn buổi có sẵn
+        // 1. Tạo StudentSchedule entry để gán học viên vào buổi học bù
+        await studentScheduleService.createStudentSchedule(
+          studentId,
+          makeupData.existingScheduleId,
+          'rescheduled',
+          `Học bù cho buổi học ngày ${new Date(selectedScheduleForMakeup.date).toLocaleDateString('vi-VN')}`
+        );
+
+        // 2. Cập nhật StudentSchedule gốc thành cancelled
+        if (selectedScheduleForMakeup.studentScheduleId) {
+          await studentScheduleService.updateStudentSchedule(
+            selectedScheduleForMakeup.studentScheduleId,
+            'cancelled',
+            'Đã học bù'
+          );
+        }
+      } else {
+        // Trường hợp tạo buổi học bù mới
+        // 1. Tạo ClassSchedule mới cho buổi học bù
+        const makeupScheduleResponse = await classScheduleService.createMakeupClassSchedule({
+          date: makeupData.date,
+          startTime: makeupData.startTime,
+          endTime: makeupData.endTime,
+          room: makeupData.room,
+          teacher: makeupData.teacher,
+          reason: makeupData.reason || 'Buổi học bù',
+          session: null // Không có session cho buổi học bù riêng
+        });
+
+        if (!makeupScheduleResponse.success || !makeupScheduleResponse.schedule) {
+          throw new Error(makeupScheduleResponse.message || 'Không thể tạo buổi học bù');
+        }
+
+        const makeupClassScheduleId = makeupScheduleResponse.schedule._id;
+
+        // 2. Tạo StudentSchedule entry để gán học viên vào buổi học bù
+        await studentScheduleService.createStudentSchedule(
+          studentId,
+          makeupClassScheduleId,
+          'rescheduled',
+          `Học bù cho buổi học ngày ${new Date(selectedScheduleForMakeup.date).toLocaleDateString('vi-VN')}`
+        );
+
+        // 3. Cập nhật StudentSchedule gốc thành cancelled
+        if (selectedScheduleForMakeup.studentScheduleId) {
+          await studentScheduleService.updateStudentSchedule(
+            selectedScheduleForMakeup.studentScheduleId,
+            'cancelled',
+            'Đã học bù'
+          );
+        }
+      }
+
+      // 4. Refresh lịch học
+      await fetchStudentSchedule();
+
+      // 5. Đóng modal và hiển thị thông báo
+      handleCloseMakeupModal();
+      alert('Đã tạo buổi học bù thành công!');
+    } catch (err) {
+      console.error('Error creating makeup class:', err);
+      alert('Không thể tạo buổi học bù: ' + (err.response?.data?.message || err.message || 'Lỗi không xác định'));
+    } finally {
+      setCreatingMakeup(false);
+    }
+  };
+
   // Helper function to get Vietnamese class status text
   const getClassStatusText = (status) => {
     const statusMap = {
@@ -266,17 +365,21 @@ const StudentDetail = () => {
           
           return {
             id: schedule._id || `schedule-${index}`,
+            studentScheduleId: schedule._id, // Store original StudentSchedule ID
             date: dateStr,
             startTime: schedule.startTime || '',
             endTime: schedule.endTime || '',
             className: schedule.className || 'N/A',
             roomName: schedule.room?.room_name || schedule.roomName || 'N/A',
+            roomId: schedule.room?._id || null,
             topic: schedule.topic || schedule.sessionTitle || '',
             status: schedule.status === 'fixed' ? 'scheduled' : schedule.status === 'temporary' ? 'makeup' : 'scheduled',
             attendanceStatus: attendanceStatus, // 'present', 'absent', 'late', 'excused', or null
             hasAttendance: !!attendanceStatus,
             teacherName: schedule.teacher?.username || schedule.teacherName || 'N/A',
-            lessonNumber: schedule.session?.order || schedule.sessionOrder || '',
+            teacherId: schedule.teacher?._id || null,
+            lessonNumber: schedule.sessionOrder || schedule.session?.order || schedule.lessonNumber || '',
+            sessionOrder: schedule.sessionOrder || schedule.session?.order || schedule.lessonNumber || null,
             lessonTopic: schedule.topic || schedule.sessionTitle || '',
             scheduleStatus: scheduleStatus,
             reason: reason,
@@ -615,10 +718,7 @@ const StudentDetail = () => {
                           // Optional: Handle delete if needed
                           console.log('Delete schedule:', scheduleId);
                         }}
-                        onCreateMakeup={(schedule) => {
-                          // Optional: Handle create makeup if needed
-                          console.log('Create makeup:', schedule);
-                        }}
+                        onCreateMakeup={handleCreateMakeup}
                       />
                     )}
                   </>
@@ -729,6 +829,17 @@ const StudentDetail = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Makeup Class Modal */}
+      <MakeupClassModalForStudent
+        show={showMakeupModal}
+        originalSchedule={selectedScheduleForMakeup}
+        studentId={studentId}
+        onClose={handleCloseMakeupModal}
+        onSubmit={handleSubmitMakeup}
+        loading={creatingMakeup}
+        studentSchedule={studentSchedule}
+      />
     </Container>
   );
 };

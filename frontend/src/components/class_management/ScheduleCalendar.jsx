@@ -449,20 +449,20 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                                 <Badge bg="warning" text="dark" style={{ fontSize: '8px', padding: '2px 4px' }}>Học bù</Badge>
                               )}
                             </div>
-                            {onAssignSubstitute && (() => {
-                              // Kiểm tra xem buổi học có phải là quá khứ không
-                              const scheduleDate = new Date(schedule.date);
-                              const today = new Date();
-                              today.setHours(0, 0, 0, 0);
-                              scheduleDate.setHours(0, 0, 0, 0);
-                              const isPastSchedule = scheduleDate < today;
-                              
-                              if (isPastSchedule) {
-                                return null; // Không hiển thị nút cho buổi học quá khứ
-                              }
-                              
-                              return (
-                                <div className="mt-1 d-flex justify-content-end">
+                            <div className="mt-1 d-flex justify-content-end gap-1">
+                              {onAssignSubstitute && (() => {
+                                // Kiểm tra xem buổi học có phải là quá khứ không
+                                const scheduleDate = new Date(schedule.date);
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                scheduleDate.setHours(0, 0, 0, 0);
+                                const isPastSchedule = scheduleDate < today;
+                                
+                                if (isPastSchedule) {
+                                  return null; // Không hiển thị nút cho buổi học quá khứ
+                                }
+                                
+                                return (
                                   <Button
                                     variant="link"
                                     size="sm"
@@ -477,9 +477,45 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                                     <i className="fas fa-user-plus me-1"></i>
                                     Dạy thay
                                   </Button>
-                                </div>
-                              );
-                            })()}
+                                );
+                              })()}
+                              {onCreateMakeup && (() => {
+                                // Kiểm tra xem buổi học có phải là quá khứ không
+                                const scheduleDate = new Date(schedule.date);
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                scheduleDate.setHours(0, 0, 0, 0);
+                                const isPastSchedule = scheduleDate < today;
+                                
+                                // Không hiển thị nút nếu:
+                                // - Buổi học đã qua
+                                // - Buổi học đã bị hủy
+                                // - Buổi học đã là học bù
+                                const isCancelled = schedule.isCancelled || schedule.scheduleStatus === 'cancelled';
+                                const isMakeup = schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled';
+                                
+                                if (isPastSchedule || isCancelled || isMakeup) {
+                                  return null;
+                                }
+                                
+                                return (
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="p-0"
+                                    style={{ fontSize: '8px', color: '#FF9800', textDecoration: 'none' }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onCreateMakeup(schedule);
+                                    }}
+                                    title="Xếp buổi học bù"
+                                  >
+                                    <i className="fas fa-calendar-plus me-1"></i>
+                                    Học bù
+                                  </Button>
+                                );
+                              })()}
+                            </div>
                           </div>
                         );
                       })}

@@ -1417,6 +1417,8 @@ exports.getStudentSchedule = async (req, res) => {
 
           // Nếu không có session, thử lấy từ course
           let sessionTitle = classSchedule.session?.title;
+          let sessionOrder = classSchedule.session?.order || null;
+          
           if (!sessionTitle && classInfo?.course) {
             const classId = classInfo._id?.toString();
             
@@ -1453,6 +1455,7 @@ exports.getStudentSchedule = async (req, res) => {
                   if (scheduleIndex >= 0 && courseSessions.length > 0) {
                     const sessionIndex = scheduleIndex % courseSessions.length;
                     sessionTitle = courseSessions[sessionIndex]?.title;
+                    sessionOrder = courseSessions[sessionIndex]?.order || null;
                   }
                   
                   classSessionsMap[classId] = { courseSessions, allClassSchedules };
@@ -1470,6 +1473,7 @@ exports.getStudentSchedule = async (req, res) => {
               if (scheduleIndex >= 0 && courseSessions.length > 0) {
                 const sessionIndex = scheduleIndex % courseSessions.length;
                 sessionTitle = courseSessions[sessionIndex]?.title;
+                sessionOrder = courseSessions[sessionIndex]?.order || null;
               }
             }
           }
@@ -1507,6 +1511,7 @@ exports.getStudentSchedule = async (req, res) => {
             date: classSchedule.date,
             topic: classSchedule.topic,
             sessionTitle: sessionTitle || classSchedule.topic || null,
+            sessionOrder: sessionOrder || classSchedule.session?.order || null, // Add sessionOrder to response (from calculated or direct)
             status: classSchedule.status || "fixed",
             attendance: ss.attendance,
             scheduleStatus: ss.scheduleStatus || "scheduled",
@@ -2274,6 +2279,215 @@ exports.assignSubstituteTeacher = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi xếp người dạy thay',
+      error: error.message
+    });
+  }
+};
+
+// =========================
+// ✅ TẠO STUDENTSCHEDULE ENTRY MỚI
+// =========================
+exports.createStudentSchedule = async (req, res) => {
+  try {
+    const { studentId, classScheduleId, scheduleStatus, reason } = req.body;
+
+    if (!studentId || !classScheduleId) {
+      return res.status(400).json({
+        success: false,
+        message: "Thiếu thông tin bắt buộc: studentId và classScheduleId"
+      });
+    }
+
+    // Kiểm tra xem StudentSchedule đã tồn tại chưa
+    const existing = await StudentSchedule.findOne({
+      student: studentId,
+      classSchedule: classScheduleId
+    });
+
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        message: "StudentSchedule đã tồn tại cho học viên và buổi học này"
+      });
+    }
+
+    // Tạo StudentSchedule mới
+    const newStudentSchedule = await StudentSchedule.create({
+      student: studentId,
+      classSchedule: classScheduleId,
+      scheduleStatus: scheduleStatus || 'scheduled',
+      reason: reason || null
+    });
+
+    // Populate để trả về đầy đủ thông tin
+    const populated = await StudentSchedule.findById(newStudentSchedule._id)
+      .populate('student', 'username email')
+      .populate({
+        path: 'classSchedule',
+        populate: [
+          { path: 'class', select: 'name' },
+          { path: 'room', select: 'room_name' },
+          { path: 'teacher', select: 'username' }
+        ]
+      })
+      .lean();
+
+    return res.status(201).json({
+      success: true,
+      message: "Đã tạo StudentSchedule thành công",
+      studentSchedule: populated
+    });
+  } catch (error) {
+    console.error("❌ Lỗi khi tạo StudentSchedule:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi tạo StudentSchedule",
+      error: error.message
+    });
+  }
+};
+
+// =========================
+// ✅ LẤY CLASS SCHEDULE TỪ STUDENT SCHEDULE ID
+// =========================
+exports.getClassScheduleByStudentScheduleId = async (req, res) => {
+  try {
+    const { studentScheduleId } = req.params;
+
+    if (!studentScheduleId) {
+      return res.status(400).json({
+        success: false,
+        message: "Thiếu studentScheduleId"
+      });
+    }
+
+    // Tìm StudentSchedule và populate ClassSchedule với đầy đủ thông tin
+    const studentSchedule = await StudentSchedule.findById(studentScheduleId)
+      .populate({
+        path: 'classSchedule',
+        populate: [
+          {
+            path: 'class',
+            select: 'name subject teacherId course students',
+            populate: [
+              {
+                path: 'teacherId',
+                select: 'username email fullName'
+              },
+              {
+                path: 'course',
+                select: 'name type level band'
+              }
+            ]
+          },
+          {
+            path: 'room',
+            select: 'room_name location capacity'
+          },
+          {
+            path: 'session',
+            select: 'title order description content'
+          },
+          {
+            path: 'teacher',
+            select: 'username email fullName'
+          },
+          {
+            path: 'createdBy',
+            select: 'username email'
+          }
+        ]
+      })
+      .populate('student', 'username email')
+      .lean();
+
+    if (!studentSchedule) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy StudentSchedule"
+      });
+    }
+
+    if (!studentSchedule.classSchedule) {
+      return res.status(404).json({
+        success: false,
+        message: "StudentSchedule không có ClassSchedule liên kết"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Lấy ClassSchedule thành công",
+      studentSchedule: studentSchedule,
+      classSchedule: studentSchedule.classSchedule
+    });
+  } catch (error) {
+    console.error("❌ Lỗi khi lấy ClassSchedule từ StudentScheduleId:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi lấy ClassSchedule",
+      error: error.message
+    });
+  }
+};
+
+// =========================
+// ✅ CẬP NHẬT STUDENTSCHEDULE ENTRY
+// =========================
+exports.updateStudentSchedule = async (req, res) => {
+  try {
+    const { studentScheduleId } = req.params;
+    const { scheduleStatus, reason } = req.body;
+
+    if (!studentScheduleId) {
+      return res.status(400).json({
+        success: false,
+        message: "Thiếu studentScheduleId"
+      });
+    }
+
+    const studentSchedule = await StudentSchedule.findById(studentScheduleId);
+
+    if (!studentSchedule) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy StudentSchedule"
+      });
+    }
+
+    // Cập nhật các trường được phép
+    if (scheduleStatus !== undefined) {
+      studentSchedule.scheduleStatus = scheduleStatus;
+    }
+    if (reason !== undefined) {
+      studentSchedule.reason = reason;
+    }
+
+    await studentSchedule.save();
+
+    // Populate để trả về đầy đủ thông tin
+    const populated = await StudentSchedule.findById(studentSchedule._id)
+      .populate('student', 'username email')
+      .populate({
+        path: 'classSchedule',
+        populate: [
+          { path: 'class', select: 'name' },
+          { path: 'room', select: 'room_name' },
+          { path: 'teacher', select: 'username' }
+        ]
+      })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      message: "Đã cập nhật StudentSchedule thành công",
+      studentSchedule: populated
+    });
+  } catch (error) {
+    console.error("❌ Lỗi khi cập nhật StudentSchedule:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi cập nhật StudentSchedule",
       error: error.message
     });
   }

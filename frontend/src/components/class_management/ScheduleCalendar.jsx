@@ -160,6 +160,19 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
     }
   };
 
+  // Get color based on program type
+  const getProgramTypeColor = (programType) => {
+    if (!programType) return null;
+    
+    const colorMap = {
+      'ielts': '#2196F3', // Xanh dương
+      'toeic': '#4CAF50', // Xanh lá
+      'cam': '#FF9800'    // Cam
+    };
+    
+    return colorMap[programType.toLowerCase()] || null;
+  };
+
   const getStatusColor = (schedule) => {
     // Kiểm tra buổi của lớp cũ (khi đổi lớp)
     if (schedule.isOldClassSchedule) {
@@ -192,7 +205,9 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
     if (timeStatus === 'completed') {
       return '#4CAF50'; // Màu xanh lá cho buổi đã kết thúc
     } else if (timeStatus === 'upcoming') {
-      return '#757575'; // Màu xám cho buổi chưa bắt đầu
+      // Nếu có program type, sử dụng màu program type thay vì xám
+      const programColor = getProgramTypeColor(schedule.programType);
+      return programColor || '#757575'; // Màu xám cho buổi chưa bắt đầu
     }
     
     // Nếu không có timeStatus, kiểm tra attendance status (cho Student/Teacher management)
@@ -209,8 +224,9 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
       }
     }
     
-    // Chưa điểm danh (chưa học) - màu xám
-    return '#757575';
+    // Chưa điểm danh (chưa học) - sử dụng màu program type nếu có
+    const programColor = getProgramTypeColor(schedule.programType);
+    return programColor || '#757575'; // Màu xám mặc định
   };
 
   return (
@@ -278,6 +294,7 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                         const timeStatus = schedule.timeStatus;
                         const statusColor = getStatusColor(schedule);
                         const hasAttendance = !!attendanceStatus;
+                        const programColor = getProgramTypeColor(schedule.programType);
                         
                         // Màu nền khác nhau theo trạng thái
                         let backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt mặc định
@@ -296,7 +313,16 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                         } else if (timeStatus === 'completed') {
                           backgroundColor = 'rgba(76, 175, 80, 0.1)'; // Xanh lá nhạt cho buổi đã kết thúc
                         } else if (timeStatus === 'upcoming') {
-                          backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt cho buổi chưa bắt đầu
+                          // Sử dụng màu program type nếu có, nếu không thì xám nhạt
+                          if (programColor) {
+                            // Convert hex to rgba với opacity 0.1
+                            const r = parseInt(programColor.slice(1, 3), 16);
+                            const g = parseInt(programColor.slice(3, 5), 16);
+                            const b = parseInt(programColor.slice(5, 7), 16);
+                            backgroundColor = `rgba(${r}, ${g}, ${b}, 0.1)`;
+                          } else {
+                            backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt cho buổi chưa bắt đầu
+                          }
                         } else if (timeStatus === 'ongoing') {
                           // Buổi đang diễn ra, kiểm tra attendance
                           if (attendanceStatus === 'present' || attendanceStatus === 'late') {
@@ -305,6 +331,12 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                             backgroundColor = 'rgba(244, 67, 54, 0.1)'; // Đỏ nhạt cho vắng mặt
                           } else if (attendanceStatus === 'excused') {
                             backgroundColor = 'rgba(255, 152, 0, 0.1)'; // Cam nhạt cho có phép
+                          } else if (programColor) {
+                            // Nếu không có attendance status, sử dụng màu program type
+                            const r = parseInt(programColor.slice(1, 3), 16);
+                            const g = parseInt(programColor.slice(3, 5), 16);
+                            const b = parseInt(programColor.slice(5, 7), 16);
+                            backgroundColor = `rgba(${r}, ${g}, ${b}, 0.1)`;
                           }
                         } else {
                           // Không có timeStatus, kiểm tra attendance (cho Student/Teacher management)
@@ -314,6 +346,12 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                             backgroundColor = 'rgba(244, 67, 54, 0.1)'; // Đỏ nhạt cho vắng mặt
                           } else if (attendanceStatus === 'excused') {
                             backgroundColor = 'rgba(255, 152, 0, 0.1)'; // Cam nhạt cho có phép
+                          } else if (programColor) {
+                            // Nếu không có attendance status, sử dụng màu program type
+                            const r = parseInt(programColor.slice(1, 3), 16);
+                            const g = parseInt(programColor.slice(3, 5), 16);
+                            const b = parseInt(programColor.slice(5, 7), 16);
+                            backgroundColor = `rgba(${r}, ${g}, ${b}, 0.1)`;
                           }
                         }
                         

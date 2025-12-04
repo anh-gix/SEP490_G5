@@ -175,14 +175,26 @@ const RoomManagementFull = () => {
         }
       }
       
+      // Determine className: if it's a make-up class (temporary) without a class, show "học bù"
+      let className = schedule.class?.name;
+      if (!className && schedule.status === 'temporary') {
+        className = 'Học bù';
+      } else if (!className) {
+        className = 'N/A';
+      }
+      
+      // Extract program type from schedule.class.course.program.type
+      const programType = schedule.class?.course?.program?.type || null;
+      
       return {
         id: schedule._id || schedule.id,
         date: dateStr,
         startTime: schedule.startTime || '',
         endTime: schedule.endTime || '',
-        className: schedule.class?.name || 'N/A',
+        className: className,
         topic: schedule.session?.title || schedule.topic || 'N/A',
-        status: schedule.status || 'fixed'
+        status: schedule.status || 'fixed',
+        programType: programType
       };
     });
   }, [roomSchedule]);
@@ -569,7 +581,9 @@ const RoomManagementFull = () => {
                           </div>
                         </td>
                         <td className="px-16 py-12">
-                          {schedule.class?.name || 'N/A'}
+                          {schedule.status === 'temporary' && !schedule.class?.name 
+                            ? 'học bù' 
+                            : (schedule.class?.name || 'N/A')}
                         </td>
                         <td className="px-16 py-12">
                           {schedule.session?.title || schedule.topic || 'N/A'}
@@ -595,12 +609,29 @@ const RoomManagementFull = () => {
           {scheduleViewMode === 'calendar' && (
             <>
               {roomSchedule.length > 0 ? (
-                <ScheduleCalendar
-                  schedules={formatRoomSchedulesForCalendar}
-                  onEditSchedule={() => {}}
-                  onDeleteSchedule={() => {}}
-                  onCreateMakeup={() => {}}
-                />
+                <>
+                  <ScheduleCalendar
+                    schedules={formatRoomSchedulesForCalendar}
+                    onEditSchedule={() => {}}
+                    onDeleteSchedule={() => {}}
+                    onCreateMakeup={() => {}}
+                  />
+                  {/* Program Type Color Legend */}
+                  <div className="d-flex justify-content-center gap-4 mt-3">
+                    <div className="d-flex align-items-center gap-2">
+                      <div style={{ width: '16px', height: '16px', backgroundColor: '#2196F3', borderRadius: '2px' }}></div>
+                      <span className="text-13">IELTS</span>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <div style={{ width: '16px', height: '16px', backgroundColor: '#4CAF50', borderRadius: '2px' }}></div>
+                      <span className="text-13">TOEIC</span>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <div style={{ width: '16px', height: '16px', backgroundColor: '#FF9800', borderRadius: '2px' }}></div>
+                      <span className="text-13">Cambridge</span>
+                    </div>
+                  </div>
+                </>
               ) : (
                 <div className="text-center py-4 text-muted">
                   Chưa có lịch sử dụng

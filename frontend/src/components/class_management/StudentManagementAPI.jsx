@@ -18,6 +18,8 @@ const StudentManagementAPI = () => {
   const [viewMode, setViewMode] = useState('list');
   const [showModal, setShowModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentSchedule, setStudentSchedule] = useState([]);
@@ -261,21 +263,53 @@ const StudentManagementAPI = () => {
 
   const handleViewDetail = async (student) => {
     try {
-      setLoading(true);
+      setDetailLoading(true);
+      setDetailError(null);
+      
+      console.log('🔍 Fetching student details for:', student._id, student.username);
+      
+      // Fetch Student details
       const data = await studentService.getStudentById(student._id);
-      setSelectedStudent(data.student);
+      console.log('📦 Student data response:', data);
+      
+      if (!data || !data.student) {
+        throw new Error('Không nhận được dữ liệu học viên từ server');
+      }
+      
+      // Ensure classes array exists
+      const studentData = {
+        ...data.student,
+        classes: data.student.classes || []
+      };
+      console.log('✅ Student classes:', studentData.classes?.length || 0, studentData.classes);
+      setSelectedStudent(studentData);
       
       // Fetch Student's schedule
+      console.log('📅 Fetching student schedule...');
       const scheduleData = await studentService.getStudentSchedule(student._id);
-      setStudentSchedule(scheduleData.schedules || []);
+      console.log('📦 Schedule data response:', scheduleData);
+      
+      // Check response structure
+      const schedules = scheduleData?.schedules || scheduleData?.data?.schedules || [];
+      console.log('✅ Student schedules:', schedules.length, schedules);
+      setStudentSchedule(Array.isArray(schedules) ? schedules : []);
       setSchedulePage(1); // Reset to first page when opening modal
       
       setShowDetailModal(true);
     } catch (err) {
-      console.error('Error fetching Student details:', err);
-      alert('Không thể tải thông tin chi tiết');
+      console.error('❌ Error fetching Student details:', err);
+      const errorMessage = err?.response?.data?.message || err?.message || 'Không thể tải thông tin chi tiết';
+      setDetailError(errorMessage);
+      
+      // Still show modal but with error message
+      setSelectedStudent({
+        ...student,
+        classes: []
+      });
+      setStudentSchedule([]);
+      setShowDetailModal(true);
     } finally {
-      setLoading(false);
+      setDetailLoading(false);
     }
   };
 
@@ -292,44 +326,94 @@ const StudentManagementAPI = () => {
     setFormErrors({});
   };
 
+  const handleCloseDetailModal = () => {
+    setShowDetailModal(false);
+    setSelectedStudent(null);
+    setStudentSchedule([]);
+    setDetailError(null);
+    setSchedulePage(1);
+  };
+
   const filteredStudents = students;
+
+  // Helper function to get Vietnamese class status text
+  const getClassStatusText = (status) => {
+    const statusMap = {
+      'active': 'Đang học',
+      'pending': 'Chờ khai giảng',
+      'inactive': 'Đã kết thúc',
+      'completed': 'Đã hoàn thành',
+      'cancelled': 'Đã hủy',
+      'suspended': 'Tạm nghỉ'
+    };
+    return statusMap[status] || status || 'N/A';
+  };
+
+  // Helper function to get class status badge color
+  const getClassStatusBadgeColor = (status) => {
+    const colorMap = {
+      'active': 'success',
+      'pending': 'warning',
+      'inactive': 'secondary',
+      'completed': 'info',
+      'cancelled': 'danger',
+      'suspended': 'warning'
+    };
+    return colorMap[status] || 'secondary';
+  };
 
   // Transform schedule data for calendar view
   const calendarSchedules = useMemo(() => {
-    return studentSchedule.map((schedule, index) => {
-      const scheduleDate = new Date(schedule.date);
-      const dateStr = scheduleDate.toISOString().split('T')[0];
-      
-      // Get attendance status
-      const attendanceStatus = schedule.attendance?.status || null;
-      
-      // Get schedule status from StudentSchedule
-      const scheduleStatus = schedule.scheduleStatus || 'scheduled';
-      const isMakeupSchedule = scheduleStatus === 'rescheduled';
-      const isCancelled = scheduleStatus === 'cancelled';
-      const reason = schedule.reason || null;
-      
-      return {
-        id: schedule._id || index,
-        date: dateStr,
-        startTime: schedule.startTime || '',
-        endTime: schedule.endTime || '',
-        className: schedule.className || 'N/A',
-        roomName: schedule.room?.room_name || 'N/A',
-        topic: schedule.topic || '',
-        status: schedule.status === 'fixed' ? 'scheduled' : schedule.status === 'temporary' ? 'makeup' : 'scheduled',
-        attendanceStatus: attendanceStatus, // 'present', 'absent', 'late', 'excused', or null
-        hasAttendance: !!attendanceStatus,
-        teacherName: schedule.teacher?.username || 'N/A',
-        lessonNumber: schedule.session?.order || '',
-        lessonTopic: schedule.topic || '',
-        scheduleStatus: scheduleStatus,
-        reason: reason,
-        isMakeupSchedule: isMakeupSchedule,
-        isCancelled: isCancelled,
-        cancellationReason: isCancelled ? reason : null
-      };
-    });
+    if (!Array.isArray(studentSchedule) || studentSchedule.length === 0) {
+      return [];
+    }
+    
+    return studentSchedule
+      .filter(schedule => schedule && schedule.date) // Filter out invalid schedules
+      .map((schedule, index) => {
+        try {
+          const scheduleDate = new Date(schedule.date);
+          if (isNaN(scheduleDate.getTime())) {
+            console.warn('Invalid date in schedule:', schedule.date);
+            return null;
+          }
+          const dateStr = scheduleDate.toISOString().split('T')[0];
+          
+          // Get attendance status
+          const attendanceStatus = schedule.attendance?.status || null;
+          
+          // Get schedule status from StudentSchedule
+          const scheduleStatus = schedule.scheduleStatus || 'scheduled';
+          const isMakeupSchedule = scheduleStatus === 'rescheduled';
+          const isCancelled = scheduleStatus === 'cancelled';
+          const reason = schedule.reason || null;
+          
+          return {
+            id: schedule._id || `schedule-${index}`,
+            date: dateStr,
+            startTime: schedule.startTime || '',
+            endTime: schedule.endTime || '',
+            className: schedule.className || 'N/A',
+            roomName: schedule.room?.room_name || schedule.roomName || 'N/A',
+            topic: schedule.topic || schedule.sessionTitle || '',
+            status: schedule.status === 'fixed' ? 'scheduled' : schedule.status === 'temporary' ? 'makeup' : 'scheduled',
+            attendanceStatus: attendanceStatus, // 'present', 'absent', 'late', 'excused', or null
+            hasAttendance: !!attendanceStatus,
+            teacherName: schedule.teacher?.username || schedule.teacherName || 'N/A',
+            lessonNumber: schedule.session?.order || schedule.sessionOrder || '',
+            lessonTopic: schedule.topic || schedule.sessionTitle || '',
+            scheduleStatus: scheduleStatus,
+            reason: reason,
+            isMakeupSchedule: isMakeupSchedule,
+            isCancelled: isCancelled,
+            cancellationReason: isCancelled ? reason : null
+          };
+        } catch (error) {
+          console.error('Error transforming schedule:', error, schedule);
+          return null;
+        }
+      })
+      .filter(item => item !== null); // Remove null entries
   }, [studentSchedule]);
 
   return (
@@ -833,14 +917,33 @@ const StudentManagementAPI = () => {
       </Modal>
 
       {/* Student Detail Modal */}
-      <Modal show={showDetailModal} onHide={() => { setShowDetailModal(false); setSchedulePage(1); }} size="xl">
+      <Modal show={showDetailModal} onHide={handleCloseDetailModal} size="xl">
         <Modal.Header closeButton className="py-12">
           <Modal.Title className="text-16">
-            Chi tiết Học viên - {selectedStudent?.username}
+            Chi tiết Học viên - {selectedStudent?.username || 'Đang tải...'}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body style={{ padding: '16px' }}>
-          {selectedStudent && (
+          {/* Error Message */}
+          {detailError && (
+            <Alert variant="danger" className="mb-3">
+              <i className="fas fa-exclamation-triangle me-2"></i>
+              <strong>Lỗi:</strong> {detailError}
+            </Alert>
+          )}
+
+          {/* Loading State */}
+          {detailLoading && (
+            <div className="text-center py-5">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Đang tải...</span>
+              </div>
+              <p className="text-muted mt-2">Đang tải thông tin chi tiết...</p>
+            </div>
+          )}
+
+          {/* Content */}
+          {selectedStudent && !detailLoading && (
             <Tabs defaultActiveKey="info" className="mb-3">
               {/* Info Tab */}
               <Tab eventKey="info" title={<><i className="fas fa-user me-2"></i>Thông tin</>}>
@@ -874,7 +977,12 @@ const StudentManagementAPI = () => {
 
               {/* Classes Tab */}
               <Tab eventKey="classes" title={<><i className="fas fa-door-open me-2"></i>Lớp học ({selectedStudent.classes?.length || 0})</>}>
-                {selectedStudent.classes && selectedStudent.classes.length > 0 ? (
+                {detailError ? (
+                  <Alert variant="warning" className="mb-0">
+                    <i className="fas fa-exclamation-triangle me-2"></i>
+                    Không thể tải danh sách lớp học. Vui lòng thử lại sau.
+                  </Alert>
+                ) : selectedStudent.classes && Array.isArray(selectedStudent.classes) && selectedStudent.classes.length > 0 ? (
                   <Table hover>
                     <thead className="bg-neutral-25">
                       <tr>
@@ -887,16 +995,16 @@ const StudentManagementAPI = () => {
                     </thead>
                     <tbody>
                       {selectedStudent.classes.map((cls, index) => (
-                        <tr key={index}>
-                          <td className="px-16 py-12 fw-semibold">{cls.name}</td>
+                        <tr key={cls._id || index}>
+                          <td className="px-16 py-12 fw-semibold">{cls.name || 'N/A'}</td>
                           <td className="px-16 py-12">{cls.course?.name || 'N/A'}</td>
                           <td className="px-16 py-12">
-                            <Badge bg="info">{cls.level}</Badge>
+                            <Badge bg="info">{cls.level || 'N/A'}</Badge>
                           </td>
-                          <td className="px-16 py-12">{cls.students?.length || 0}</td>
+                          <td className="px-16 py-12">{Array.isArray(cls.students) ? cls.students.length : (cls.students?.length || 0)}</td>
                           <td className="px-16 py-12">
-                            <Badge bg={cls.status === 'active' ? 'success' : 'secondary'}>
-                              {cls.status}
+                            <Badge bg={getClassStatusBadgeColor(cls.status)}>
+                              {getClassStatusText(cls.status)}
                             </Badge>
                           </td>
                         </tr>
@@ -904,15 +1012,21 @@ const StudentManagementAPI = () => {
                     </tbody>
                   </Table>
                 ) : (
-                  <div className="text-center py-4 text-muted">
-                    Chưa có lớp học nào
+                  <div className="text-center py-5">
+                    <i className="fas fa-door-open text-muted mb-3" style={{ fontSize: '48px' }}></i>
+                    <p className="text-muted mb-0">Học viên chưa được đăng ký lớp học nào</p>
                   </div>
                 )}
               </Tab>
 
               {/* Schedule Tab */}
-              <Tab eventKey="schedule" title={<><i className="fas fa-calendar me-2"></i>lịch học</>}>
-                {studentSchedule.length > 0 ? (
+              <Tab eventKey="schedule" title={<><i className="fas fa-calendar me-2"></i>Lịch học ({studentSchedule.length})</>}>
+                {detailError ? (
+                  <Alert variant="warning" className="mb-0">
+                    <i className="fas fa-exclamation-triangle me-2"></i>
+                    Không thể tải lịch học. Vui lòng thử lại sau.
+                  </Alert>
+                ) : studentSchedule && Array.isArray(studentSchedule) && studentSchedule.length > 0 ? (
                   <>
                     {/* View Toggle */}
                     <div className="d-flex justify-content-end mb-2">
@@ -1059,8 +1173,9 @@ const StudentManagementAPI = () => {
                     )}
                   </>
                 ) : (
-                  <div className="text-center py-4 text-muted">
-                    Chưa có lịch học
+                  <div className="text-center py-5">
+                    <i className="fas fa-calendar-times text-muted mb-3" style={{ fontSize: '48px' }}></i>
+                    <p className="text-muted mb-0">Học viên chưa có lịch học nào</p>
                   </div>
                 )}
               </Tab>
@@ -1068,7 +1183,7 @@ const StudentManagementAPI = () => {
           )}
         </Modal.Body>
         <Modal.Footer className="py-10 border-top">
-          <Button variant="secondary" size="sm" onClick={() => { setShowDetailModal(false); setSchedulePage(1); }}>
+          <Button variant="secondary" size="sm" onClick={handleCloseDetailModal} disabled={detailLoading}>
             Đóng
           </Button>
         </Modal.Footer>

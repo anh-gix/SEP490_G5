@@ -562,6 +562,32 @@ const TeacherManagementAPI = () => {
     );
   };
 
+  // Helper function to get Vietnamese class status text
+  const getClassStatusText = (status) => {
+    const statusMap = {
+      'active': 'Đang học',
+      'pending': 'Chờ khai giảng',
+      'inactive': 'Đã kết thúc',
+      'completed': 'Đã hoàn thành',
+      'cancelled': 'Đã hủy',
+      'suspended': 'Tạm nghỉ'
+    };
+    return statusMap[status] || status || 'N/A';
+  };
+
+  // Helper function to get class status badge color
+  const getClassStatusBadgeColor = (status) => {
+    const colorMap = {
+      'active': 'success',
+      'pending': 'warning',
+      'inactive': 'secondary',
+      'completed': 'info',
+      'cancelled': 'danger',
+      'suspended': 'warning'
+    };
+    return colorMap[status] || 'secondary';
+  };
+
   const filteredTeachers = teachers;
 
   // Transform schedule data for calendar view
@@ -1419,8 +1445,8 @@ const TeacherManagementAPI = () => {
                             )}
                           </td>
                           <td className="px-16 py-12">
-                            <Badge bg={cls.status === 'active' ? 'success' : 'secondary'}>
-                              {cls.status}
+                            <Badge bg={getClassStatusBadgeColor(cls.status)}>
+                              {getClassStatusText(cls.status)}
                             </Badge>
                           </td>
                         </tr>

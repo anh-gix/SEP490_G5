@@ -228,10 +228,20 @@ exports.getRoomSchedule = async (req, res) => {
       .populate({
         path: 'class',
         select: 'name subject teacherId',
-        populate: {
-          path: 'teacherId',
-          select: 'username email'
-        }
+        populate: [
+          {
+            path: 'teacherId',
+            select: 'username email'
+          },
+          {
+            path: 'course',
+            select: 'name',
+            populate: {
+              path: 'program',
+              select: 'type program_name'
+            }
+          }
+        ]
       })
       .populate('session', 'title order') // Populate session để lấy title
       .sort({ date: 1, startTime: 1 })

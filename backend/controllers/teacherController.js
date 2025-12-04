@@ -168,10 +168,10 @@ exports.getCurrentTeacher = async (req, res) => {
     }
     
     // Kiểm tra role
-    if (teacher.roleId.name !== 'Teacher') {
+    if ((teacher.roleId.name !== 'Teacher') && (teacher.roleId.name !== "Subject Leader")) {
       return res.status(403).json({
         success: false,
-        message: 'User không phải là giảng viên'
+        message: 'User không phải là giảng viên hoặc trưởng môn'
       });
     }
     

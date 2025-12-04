@@ -1,4 +1,4 @@
-const ApprovalRequest = require('../models/approvalRequestModel');
+const WorkRequest = require('../models/workRequestModel');
 const Program = require('../models/programModel');
 const Exam = require('../models/examModel');
 const Course = require('../models/courseModel');
@@ -71,12 +71,12 @@ const validateExamBeforeSubmit = async (examId) => {
 };
 
 // =========================
-// SUBMIT PROGRAM/EXAM (Subject Leader/Teacher)
+// SUBMIT PROGRAM/EXAM (Subject Leader/Teacher) - BOTTOM-UP
 // =========================
 
 /**
  * Submit program for approval
- * POST /api/approval-requests/submit/program/:programId
+ * POST /api/work-requests/submit/program/:programId
  * Body: { userId, note }
  */
 exports.submitProgram = async (req, res) => {
@@ -101,10 +101,11 @@ exports.submitProgram = async (req, res) => {
     await validateProgramBeforeSubmit(programId);
 
     // Check đã có pending request chưa
-    const existingRequest = await ApprovalRequest.findOne({
+    const existingRequest = await WorkRequest.findOne({
       entityId: programId,
       entityType: 'Program',
-      status: 'pending'
+      status: 'pending',
+      direction: 'bottom_up'
     });
 
     if (existingRequest) {
@@ -122,30 +123,31 @@ exports.submitProgram = async (req, res) => {
       { session }
     );
 
-    // 2. Tạo hoặc update ApprovalRequest
-    const rejectedRequest = await ApprovalRequest.findOne({
+    // 2. Tạo hoặc update WorkRequest
+    const rejectedRequest = await WorkRequest.findOne({
       entityId: programId,
       entityType: 'Program',
-      status: 'rejected'
+      status: 'rejected',
+      direction: 'bottom_up'
     }).session(session);
 
-    let approvalRequest;
+    let workRequest;
 
     if (rejectedRequest) {
       // Resubmit - update request cũ
-      approvalRequest = await ApprovalRequest.findByIdAndUpdate(
+      workRequest = await WorkRequest.findByIdAndUpdate(
         rejectedRequest._id,
         {
           status: 'pending',
-          submittedAt: new Date(),
-          submissionNote: note,
-          reviewedBy: null,
-          reviewedAt: null,
-          reviewNote: null,
+          requestedAt: new Date(),
+          requestNote: note,
+          processedBy: null,
+          processedAt: null,
+          responseNote: null,
           rejectionReason: null,
           $push: {
             history: {
-              action: 'resubmitted',
+              action: 'submitted',
               performedBy: submitterId,
               performedAt: new Date(),
               note: note,
@@ -157,13 +159,14 @@ exports.submitProgram = async (req, res) => {
       );
     } else {
       // Submit lần đầu - tạo mới
-      const newRequest = await ApprovalRequest.create([{
+      const newRequest = await WorkRequest.create([{
+        direction: 'bottom_up',
         requestType: 'program',
         entityType: 'Program',
         entityId: programId,
-        submittedBy: submitterId,
-        submittedAt: new Date(),
-        submissionNote: note,
+        requestedBy: submitterId,
+        requestedAt: new Date(),
+        requestNote: note,
         status: 'pending',
         history: [{
           action: 'submitted',
@@ -173,7 +176,7 @@ exports.submitProgram = async (req, res) => {
         }]
       }], { session });
 
-      approvalRequest = newRequest[0];
+      workRequest = newRequest[0];
     }
 
     await session.commitTransaction();
@@ -181,7 +184,7 @@ exports.submitProgram = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Program submitted for approval successfully',
-      data: approvalRequest
+      data: workRequest
     });
 
   } catch (error) {
@@ -198,7 +201,7 @@ exports.submitProgram = async (req, res) => {
 
 /**
  * Submit exam for approval
- * POST /api/approval-requests/submit/exam/:examId
+ * POST /api/work-requests/submit/exam/:examId
  * Body: { userId, note }
  */
 exports.submitExam = async (req, res) => {
@@ -223,10 +226,11 @@ exports.submitExam = async (req, res) => {
     await validateExamBeforeSubmit(examId);
 
     // Check đã có pending request chưa
-    const existingRequest = await ApprovalRequest.findOne({
+    const existingRequest = await WorkRequest.findOne({
       entityId: examId,
       entityType: 'Exam',
-      status: 'pending'
+      status: 'pending',
+      direction: 'bottom_up'
     });
 
     if (existingRequest) {
@@ -244,30 +248,31 @@ exports.submitExam = async (req, res) => {
       { session }
     );
 
-    // 2. Tạo hoặc update ApprovalRequest
-    const rejectedRequest = await ApprovalRequest.findOne({
+    // 2. Tạo hoặc update WorkRequest
+    const rejectedRequest = await WorkRequest.findOne({
       entityId: examId,
       entityType: 'Exam',
-      status: 'rejected'
+      status: 'rejected',
+      direction: 'bottom_up'
     }).session(session);
 
-    let approvalRequest;
+    let workRequest;
 
     if (rejectedRequest) {
       // Resubmit
-      approvalRequest = await ApprovalRequest.findByIdAndUpdate(
+      workRequest = await WorkRequest.findByIdAndUpdate(
         rejectedRequest._id,
         {
           status: 'pending',
-          submittedAt: new Date(),
-          submissionNote: note,
-          reviewedBy: null,
-          reviewedAt: null,
-          reviewNote: null,
+          requestedAt: new Date(),
+          requestNote: note,
+          processedBy: null,
+          processedAt: null,
+          responseNote: null,
           rejectionReason: null,
           $push: {
             history: {
-              action: 'resubmitted',
+              action: 'submitted',
               performedBy: submitterId,
               performedAt: new Date(),
               note: note,
@@ -279,13 +284,14 @@ exports.submitExam = async (req, res) => {
       );
     } else {
       // Submit mới
-      const newRequest = await ApprovalRequest.create([{
+      const newRequest = await WorkRequest.create([{
+        direction: 'bottom_up',
         requestType: 'exam',
         entityType: 'Exam',
         entityId: examId,
-        submittedBy: submitterId,
-        submittedAt: new Date(),
-        submissionNote: note,
+        requestedBy: submitterId,
+        requestedAt: new Date(),
+        requestNote: note,
         status: 'pending',
         history: [{
           action: 'submitted',
@@ -295,7 +301,7 @@ exports.submitExam = async (req, res) => {
         }]
       }], { session });
 
-      approvalRequest = newRequest[0];
+      workRequest = newRequest[0];
     }
 
     await session.commitTransaction();
@@ -303,7 +309,7 @@ exports.submitExam = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Exam submitted for approval successfully',
-      data: approvalRequest
+      data: workRequest
     });
 
   } catch (error) {
@@ -319,18 +325,19 @@ exports.submitExam = async (req, res) => {
 };
 
 // =========================
-// GET APPROVAL REQUESTS
+// GET WORK REQUESTS
 // =========================
 
 /**
- * Get all pending approval requests (Center Head)
- * GET /api/approval-requests/pending
- * Query params: type, status, fromDate, toDate, page, limit
+ * Get all work requests with filters (Center Head/Staff)
+ * GET /api/work-requests
+ * Query params: direction, requestType, status, fromDate, toDate, page, limit
  */
-exports.getPendingRequests = async (req, res) => {
+exports.getAllRequests = async (req, res) => {
   try {
     const {
-      type,
+      direction,
+      requestType,
       status,
       fromDate,
       toDate,
@@ -341,27 +348,20 @@ exports.getPendingRequests = async (req, res) => {
     // Build query
     const query = {};
 
-    // Filter by status (default to all statuses if not specified)
-    if (status) {
-      query.status = status;
-    }
-
-    // Filter by type
-    if (type) {
-      query.requestType = type;
-    }
+    if (direction) query.direction = direction;
+    if (requestType) query.requestType = requestType;
+    if (status) query.status = status;
 
     // Filter by date range
     if (fromDate || toDate) {
-      query.submittedAt = {};
+      query.requestedAt = {};
       if (fromDate) {
-        query.submittedAt.$gte = new Date(fromDate);
+        query.requestedAt.$gte = new Date(fromDate);
       }
       if (toDate) {
-        // Add 1 day to include the entire toDate
         const endDate = new Date(toDate);
         endDate.setDate(endDate.getDate() + 1);
-        query.submittedAt.$lt = endDate;
+        query.requestedAt.$lt = endDate;
       }
     }
 
@@ -369,19 +369,19 @@ exports.getPendingRequests = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const limitNum = parseInt(limit);
 
-    // Execute query with pagination
+    // Execute query
     const [requests, total] = await Promise.all([
-      ApprovalRequest.find(query)
-        .populate('submittedBy', 'name email')
-        .populate('reviewedBy', 'name email')
+      WorkRequest.find(query)
+        .populate('requestedBy', 'name email username')
+        .populate('assignedTo', 'name email username')
+        .populate('processedBy', 'name email username')
         .populate('entityId')
-        .sort({ submittedAt: -1 })
+        .sort({ requestedAt: -1 })
         .skip(skip)
         .limit(limitNum),
-      ApprovalRequest.countDocuments(query)
+      WorkRequest.countDocuments(query)
     ]);
 
-    // Calculate pagination info
     const totalPages = Math.ceil(total / limitNum);
 
     res.status(200).json({
@@ -398,21 +398,21 @@ exports.getPendingRequests = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error getting pending requests:', error);
+    console.error('Error getting work requests:', error);
     res.status(500).json({
       success: false,
-      message: 'Error getting pending approval requests'
+      message: 'Error getting work requests'
     });
   }
 };
 
 /**
  * Get my submitted requests (Subject Leader)
- * GET /api/approval-requests/my-requests?userId=xxx&status=xxx&type=xxx
+ * GET /api/work-requests/my-requests?userId=xxx&status=xxx&requestType=xxx
  */
 exports.getMyRequests = async (req, res) => {
   try {
-    const { userId, status, type } = req.query;
+    const { userId, status, requestType } = req.query;
 
     if (!userId) {
       return res.status(400).json({
@@ -421,18 +421,15 @@ exports.getMyRequests = async (req, res) => {
       });
     }
 
-    const query = { submittedBy: userId };
-    if (status) {
-      query.status = status;
-    }
-    if (type) {
-      query.requestType = type;
-    }
+    const query = { requestedBy: userId };
+    if (status) query.status = status;
+    if (requestType) query.requestType = requestType;
 
-    const requests = await ApprovalRequest.find(query)
-      .populate('reviewedBy', 'name email')
+    const requests = await WorkRequest.find(query)
+      .populate('processedBy', 'name email username')
+      .populate('assignedTo', 'name email username')
       .populate('entityId')
-      .sort({ submittedAt: -1 });
+      .sort({ requestedAt: -1 });
 
     res.status(200).json({
       success: true,
@@ -450,22 +447,64 @@ exports.getMyRequests = async (req, res) => {
 };
 
 /**
- * Get approval request by ID
- * GET /api/approval-requests/:id
+ * Get requests assigned to me (Staff)
+ * GET /api/work-requests/assigned-to-me?userId=xxx&status=xxx
+ */
+exports.getAssignedToMe = async (req, res) => {
+  try {
+    const { userId, status } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in query parameters'
+      });
+    }
+
+    const query = {
+      assignedTo: userId,
+      direction: 'top_down'
+    };
+    if (status) query.status = status;
+
+    const requests = await WorkRequest.find(query)
+      .populate('requestedBy', 'name email username')
+      .populate('entityId')
+      .sort({ requestedAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: requests,
+      count: requests.length
+    });
+
+  } catch (error) {
+    console.error('Error getting assigned requests:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting assigned requests'
+    });
+  }
+};
+
+/**
+ * Get work request by ID
+ * GET /api/work-requests/:id
  */
 exports.getRequestById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const request = await ApprovalRequest.findById(id)
-      .populate('submittedBy', 'name email')
-      .populate('reviewedBy', 'name email')
+    const request = await WorkRequest.findById(id)
+      .populate('requestedBy', 'name email username')
+      .populate('assignedTo', 'name email username')
+      .populate('processedBy', 'name email username')
       .populate('entityId');
 
     if (!request) {
       return res.status(404).json({
         success: false,
-        message: 'Approval request not found'
+        message: 'Work request not found'
       });
     }
 
@@ -478,59 +517,18 @@ exports.getRequestById = async (req, res) => {
     console.error('Error getting request:', error);
     res.status(500).json({
       success: false,
-      message: 'Error getting approval request'
-    });
-  }
-};
-
-/**
- * Get approval history (Center Head)
- * GET /api/approval-requests/history?userId=xxx&limit=xxx
- */
-exports.getApprovalHistory = async (req, res) => {
-  try {
-    const { userId, limit = 20 } = req.query;
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: 'userId is required in query parameters'
-      });
-    }
-
-    const centerHeadId = userId;
-
-    const requests = await ApprovalRequest.find({
-      reviewedBy: centerHeadId,
-      status: { $in: ['approved', 'rejected'] }
-    })
-      .populate('submittedBy', 'name email')
-      .populate('entityId')
-      .sort({ reviewedAt: -1 })
-      .limit(parseInt(limit));
-
-    res.status(200).json({
-      success: true,
-      data: requests,
-      count: requests.length
-    });
-
-  } catch (error) {
-    console.error('Error getting approval history:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error getting approval history'
+      message: 'Error getting work request'
     });
   }
 };
 
 // =========================
-// APPROVE/REJECT (Center Head)
+// APPROVE/REJECT (Center Head) - FOR BOTTOM-UP
 // =========================
 
 /**
  * Approve request
- * POST /api/approval-requests/:id/approve
+ * POST /api/work-requests/:id/approve
  * Body: { userId, note }
  */
 exports.approveRequest = async (req, res) => {
@@ -551,13 +549,13 @@ exports.approveRequest = async (req, res) => {
 
     const centerHeadId = userId;
 
-    const request = await ApprovalRequest.findById(id).session(session);
+    const request = await WorkRequest.findById(id).session(session);
 
     if (!request) {
       await session.abortTransaction();
       return res.status(404).json({
         success: false,
-        message: 'Approval request not found'
+        message: 'Work request not found'
       });
     }
 
@@ -569,12 +567,20 @@ exports.approveRequest = async (req, res) => {
       });
     }
 
-    // 1. Update ApprovalRequest
-    await ApprovalRequest.findByIdAndUpdate(id, {
+    if (request.direction !== 'bottom_up') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Only bottom-up requests can be approved'
+      });
+    }
+
+    // 1. Update WorkRequest
+    await WorkRequest.findByIdAndUpdate(id, {
       status: 'approved',
-      reviewedBy: centerHeadId,
-      reviewedAt: new Date(),
-      reviewNote: note,
+      processedBy: centerHeadId,
+      processedAt: new Date(),
+      responseNote: note,
       $push: {
         history: {
           action: 'approved',
@@ -615,7 +621,7 @@ exports.approveRequest = async (req, res) => {
 
 /**
  * Reject request
- * POST /api/approval-requests/:id/reject
+ * POST /api/work-requests/:id/reject
  * Body: { userId, reason }
  */
 exports.rejectRequest = async (req, res) => {
@@ -644,13 +650,13 @@ exports.rejectRequest = async (req, res) => {
       });
     }
 
-    const request = await ApprovalRequest.findById(id).session(session);
+    const request = await WorkRequest.findById(id).session(session);
 
     if (!request) {
       await session.abortTransaction();
       return res.status(404).json({
         success: false,
-        message: 'Approval request not found'
+        message: 'Work request not found'
       });
     }
 
@@ -662,11 +668,19 @@ exports.rejectRequest = async (req, res) => {
       });
     }
 
-    // 1. Update ApprovalRequest
-    await ApprovalRequest.findByIdAndUpdate(id, {
+    if (request.direction !== 'bottom_up') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Only bottom-up requests can be rejected'
+      });
+    }
+
+    // 1. Update WorkRequest
+    await WorkRequest.findByIdAndUpdate(id, {
       status: 'rejected',
-      reviewedBy: centerHeadId,
-      reviewedAt: new Date(),
+      processedBy: centerHeadId,
+      processedAt: new Date(),
       rejectionReason: reason,
       $push: {
         history: {
@@ -712,7 +726,7 @@ exports.rejectRequest = async (req, res) => {
 
 /**
  * Cancel pending request
- * DELETE /api/approval-requests/:id/cancel
+ * DELETE /api/work-requests/:id/cancel
  * Body: { userId }
  */
 exports.cancelRequest = async (req, res) => {
@@ -731,18 +745,18 @@ exports.cancelRequest = async (req, res) => {
       });
     }
 
-    const request = await ApprovalRequest.findById(id).session(session);
+    const request = await WorkRequest.findById(id).session(session);
 
     if (!request) {
       await session.abortTransaction();
       return res.status(404).json({
         success: false,
-        message: 'Approval request not found'
+        message: 'Work request not found'
       });
     }
 
-    // Chỉ người submit mới được cancel
-    if (request.submittedBy.toString() !== userId.toString()) {
+    // Chỉ người request mới được cancel
+    if (request.requestedBy.toString() !== userId.toString()) {
       await session.abortTransaction();
       return res.status(403).json({
         success: false,
@@ -760,15 +774,17 @@ exports.cancelRequest = async (req, res) => {
     }
 
     // 1. Xóa request
-    await ApprovalRequest.findByIdAndDelete(id, { session });
+    await WorkRequest.findByIdAndDelete(id, { session });
 
-    // 2. Update entity status về draft
-    const Model = request.entityType === 'Program' ? Program : Exam;
-    await Model.findByIdAndUpdate(
-      request.entityId,
-      { status: 'draft' },
-      { session }
-    );
+    // 2. Update entity status về draft (chỉ cho bottom-up)
+    if (request.direction === 'bottom_up' && request.entityId) {
+      const Model = request.entityType === 'Program' ? Program : Exam;
+      await Model.findByIdAndUpdate(
+        request.entityId,
+        { status: 'draft' },
+        { session }
+      );
+    }
 
     await session.commitTransaction();
 
@@ -794,12 +810,17 @@ exports.cancelRequest = async (req, res) => {
 // =========================
 
 /**
- * Get approval statistics (Center Head)
- * GET /api/approval-requests/stats
+ * Get work request statistics
+ * GET /api/work-requests/stats?direction=xxx
  */
 exports.getStats = async (req, res) => {
   try {
-    const stats = await ApprovalRequest.aggregate([
+    const { direction } = req.query;
+
+    const matchStage = direction ? { direction } : {};
+
+    const stats = await WorkRequest.aggregate([
+      { $match: matchStage },
       {
         $group: {
           _id: '$status',
@@ -808,11 +829,15 @@ exports.getStats = async (req, res) => {
       }
     ]);
 
-    // Transform data to simple format
+    // Transform data
     const result = {
       pending: 0,
+      in_progress: 0,
+      pending_approval: 0,
       approved: 0,
       rejected: 0,
+      completed: 0,
+      need_revision: 0,
       total: 0
     };
 
@@ -824,33 +849,25 @@ exports.getStats = async (req, res) => {
       }
     });
 
-    // Also get breakdown by type for detailed view
-    const detailedStats = await ApprovalRequest.aggregate([
+    // Breakdown by type and direction
+    const detailedStats = await WorkRequest.aggregate([
+      { $match: matchStage },
       {
         $group: {
-          _id: { type: '$requestType', status: '$status' },
+          _id: {
+            direction: '$direction',
+            requestType: '$requestType',
+            status: '$status'
+          },
           count: { $sum: 1 }
         }
       }
     ]);
 
-    const breakdown = {
-      program: { pending: 0, approved: 0, rejected: 0 },
-      exam: { pending: 0, approved: 0, rejected: 0 }
-    };
-
-    detailedStats.forEach(item => {
-      const type = item._id.type;
-      const status = item._id.status;
-      if (breakdown[type] && breakdown[type][status] !== undefined) {
-        breakdown[type][status] = item.count;
-      }
-    });
-
     res.status(200).json({
       success: true,
       data: result,
-      breakdown: breakdown
+      detailed: detailedStats
     });
 
   } catch (error) {

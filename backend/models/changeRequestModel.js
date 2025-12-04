@@ -1,18 +1,27 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
+/**
+ * ChangeRequest Model - Quản lý các đơn yêu cầu từ HỌC VIÊN gửi cho GIÁO VỤ
+ *
+ * Các loại đơn:
+ * - change_class: Đơn xin đổi lớp học
+ * - makeup_class: Đơn xin học bù
+ * - request_replace_teacher: Đơn yêu cầu đổi giáo viên (khiếu nại giáo viên)
+ */
+
 const changeRequestSchema = new Schema({
-  // Người gửi đơn
+  // Người gửi đơn (Student)
   sender: {
     type: Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  
+
   // Loại đơn
   type: {
     type: String,
-    enum: ['create_class', 'change_class', 'makeup_class', 'replace_teacher'],
+    enum: ['change_class', 'makeup_class', 'request_replace_teacher'],
     required: true
   },
   
@@ -28,16 +37,10 @@ const changeRequestSchema = new Schema({
     ref: 'StudentSchedule'
   },
   
-  // ID lịch dạy của lớp (dùng cho thay giáo viên cho buổi dạy)
+  // ID lịch dạy của lớp (dùng cho request_replace_teacher)
   classScheduleId: {
     type: Schema.Types.ObjectId,
     ref: 'ClassSchedule'
-  },
-  
-  // File Excel đính kèm (chỉ dùng cho đơn tạo lớp - type: 'create_class')
-  excelFile: {
-    type: String,
-    trim: true
   },
   
   // Nội dung yêu cầu (có thể là đổi lớp hoặc đổi buổi học)

@@ -16,12 +16,13 @@ const sessionSchema = new Schema({
     },
     learningType: {
         type: String,
+        enum: ['theory', 'mocktest'],
         default: 'theory'
     },
 
+    // Lưu _id của CLO trong course (CLO là embedded trong Course)
     clos: [{
-        type: Schema.Types.ObjectId,
-        ref: 'CLO'
+        type: Schema.Types.ObjectId
     }],
 }, { timestamps: true });
 

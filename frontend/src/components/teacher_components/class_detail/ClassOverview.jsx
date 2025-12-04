@@ -2,7 +2,7 @@ import React from 'react';
 import { Row, Col, Card, ProgressBar, Button } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 
-const ClassOverview = ({ classInfo, assignments, materials, setShowMaterialModal }) => {
+const ClassOverview = ({ classInfo, materials, setShowMaterialModal }) => {
   return (
     <div className="p-24">
       <Row className="g-3 mb-24">
@@ -37,7 +37,7 @@ const ClassOverview = ({ classInfo, assignments, materials, setShowMaterialModal
             <Card.Body className="p-20">
               <div className="text-warning-600 text-13 mb-8">Bài tập</div>
               <div className="text-neutral-900 fw-bold text-28 mb-8">
-                {assignments.length}
+                {classInfo.totalAssignments || 0}
               </div>
               <div className="text-neutral-600 text-12">Đã giao</div>
             </Card.Body>

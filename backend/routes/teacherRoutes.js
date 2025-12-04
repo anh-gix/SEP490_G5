@@ -22,5 +22,6 @@ router.get('/:id/schedule', teacherController.getTeacherSchedule);
 router.post('/', teacherController.createTeacher);
 router.put('/:id', teacherController.updateTeacher);
 router.delete('/:id', teacherController.deleteTeacher);
+router.post('/import', teacherController.importTeachers);
 
 module.exports = router;

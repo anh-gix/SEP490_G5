@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, ProgressBar, Table, Spinner, Alert } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import classService from '../../services/classService';
-import scheduleService from '../../services/scheduleService';
-import roomService from '../../services/roomService';
-import axios from 'axios';
+import academicStaffService from '../../services/academicStaffService';
 
 /**
  * Academic Dashboard Component
@@ -38,153 +35,30 @@ const AcademicDashboard = () => {
       setLoading(true);
       setError(null);
 
-      const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
-      const startOfDay = new Date(today);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(today);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      // Fetch today's schedules
-      const schedulesResponse = await scheduleService.getAllSchedules({ 
-        date: todayStr,
-        status: 'approved'
-      });
-      const todaySchedules = schedulesResponse.schedules || schedulesResponse || [];
-
-      // Fetch all classes for progress
-      const classesResponse = await classService.getAllClasses();
-      const classes = classesResponse.classes || [];
-
-      // Fetch rooms
-      const roomsResponse = await roomService.getAllRooms();
-      const rooms = roomsResponse.rooms || roomsResponse || [];
-
-      // Fetch absent/late students from today's schedules
-      const absentStudents = [];
-      const lateStudents = [];
+      // Single API call to get all dashboard data
+      const response = await academicStaffService.getDashboardData();
       
-      for (const schedule of todaySchedules) {
-        try {
-          const attendanceResponse = await axios.get(
-            `http://localhost:8080/api/class-schedules/${schedule._id || schedule.id}/attendance`
-          );
-          const attendances = attendanceResponse.data.attendances || attendanceResponse.data || [];
-          
-          for (const att of attendances) {
-            if (att.attendance?.status === 'absent') {
-              absentStudents.push({
-                id: att.student?._id || att.student,
-                name: att.student?.username || 'N/A',
-                studentId: att.student?._id || att.student,
-                class: schedule.class?.name || schedule.className || 'N/A',
-                time: schedule.startTime || 'N/A',
-                status: 'absent'
-              });
-            } else if (att.attendance?.status === 'late') {
-              lateStudents.push({
-                id: att.student?._id || att.student,
-                name: att.student?.username || 'N/A',
-                studentId: att.student?._id || att.student,
-                class: schedule.class?.name || schedule.className || 'N/A',
-                time: schedule.startTime || 'N/A',
-                status: 'late'
-              });
-            }
-          }
-        } catch (err) {
-          // Skip if attendance endpoint doesn't exist or fails
-          console.warn(`Could not fetch attendance for schedule ${schedule._id}:`, err);
-        }
-      }
-
-      // Transform today's schedules
-      const transformedTodaySchedule = todaySchedules.slice(0, 10).map((schedule, index) => {
-        const startTime = new Date(`${schedule.date}T${schedule.startTime}`);
-        const endTime = new Date(`${schedule.date}T${schedule.endTime}`);
-        const now = new Date();
+      if (response.success && response.data) {
+        const data = response.data;
         
-        let status = 'upcoming';
-        if (startTime <= now && now <= endTime) {
-          status = 'ongoing';
-        } else if (endTime < now) {
-          status = 'completed';
-        }
-
-        return {
-          id: schedule._id || schedule.id || index,
-          time: `${schedule.startTime || 'N/A'} - ${schedule.endTime || 'N/A'}`,
-          className: schedule.class?.name || schedule.className || 'N/A',
-          teacher: schedule.teacher?.username || schedule.teacherName || 'N/A',
-          room: schedule.room?.room_name || schedule.roomName || 'N/A',
-          status
-        };
-      });
-
-      // Build room schedule
-      const timeSlots = ['08:00-10:00', '10:30-12:30', '14:00-16:00', '18:00-20:00'];
-      const roomScheduleData = rooms.slice(0, 4).map(room => {
-        const schedules = timeSlots.map(timeSlot => {
-          const [startTime, endTime] = timeSlot.split('-');
-          const matchingSchedule = todaySchedules.find(s => 
-            s.room?._id?.toString() === room._id?.toString() &&
-            s.startTime === startTime &&
-            s.endTime === endTime
-          );
-          
-          if (matchingSchedule) {
-            return {
-              time: timeSlot,
-              class: matchingSchedule.class?.name || matchingSchedule.className || 'N/A',
-              status: 'occupied'
-            };
-          }
-          return {
-            time: timeSlot,
-            class: 'Free',
-            status: 'available'
-          };
+        // Set all state from the aggregated response
+        setTodayOverview(data.todayOverview || {
+          todaySchedules: 0,
+          absentStudents: 0,
+          lateStudents: 0,
+          pendingLeaveRequests: 0,
+          pendingMakeupClasses: 0,
+          newClassRequests: 0
         });
-
-        return {
-          room: room.room_name || room.name || 'N/A',
-          location: room.location || 'N/A',
-          schedules
-        };
-      });
-
-      // Calculate class progress
-      const classProgressData = classes.slice(0, 3).map(cls => {
-        const totalSchedules = cls.totalSchedules || 0;
-        const completedSchedules = cls.completedSchedules || 0;
-        const progress = totalSchedules > 0 ? Math.round((completedSchedules / totalSchedules) * 100) : 0;
-
-        return {
-          id: cls._id || cls.id,
-          name: cls.name || 'N/A',
-          level: cls.level || cls.course?.level || 'N/A',
-          progress,
-          students: cls.totalStudents || cls.students?.length || 0,
-          completedLessons: completedSchedules,
-          totalLessons: totalSchedules
-        };
-      });
-
-      // Set overview stats
-      setTodayOverview({
-        todaySchedules: todaySchedules.length,
-        absentStudents: absentStudents.length,
-        lateStudents: lateStudents.length,
-        pendingLeaveRequests: 0, // TODO: Implement when leave request feature is added
-        pendingMakeupClasses: 0, // TODO: Implement when makeup class feature is added
-        newClassRequests: 0 // TODO: Implement when class request feature is added
-      });
-
-      setAbsentStudentsList([...absentStudents, ...lateStudents].slice(0, 10));
-      setRoomSchedule(roomScheduleData);
-      setRecentActivities([]); // TODO: Implement activity log endpoint
-      setTodaySchedule(transformedTodaySchedule);
-      setClassProgress(classProgressData);
+        
+        setTodaySchedule(data.todaySchedule || []);
+        setAbsentStudentsList(data.absentStudentsList || []);
+        setRoomSchedule(data.roomSchedule || []);
+        setClassProgress(data.classProgress || []);
+        setRecentActivities(data.recentActivities || []);
+      } else {
+        throw new Error(response.message || 'Không thể tải dữ liệu dashboard');
+      }
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -650,44 +524,6 @@ const AcademicDashboard = () => {
                     </Card>
                   </Col>
                 ))}
-              </Row>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Quick Actions */}
-      <Row className="mt-20">
-        <Col>
-          <Card className="bg-gradient border-0 rounded-12" 
-                style={{ 
-                  background: 'linear-gradient(135deg, var(--main-600) 0%, var(--main-700) 100%)',
-                  boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)'
-                }}>
-            <Card.Body className="p-20">
-              <Row className="align-items-center">
-                <Col lg={8}>
-                  <h5 className="text-white fw-bold mb-8">Thao tác nhanh</h5>
-                  <p className="text-white mb-0 text-14" style={{ opacity: 0.9 }}>
-                    Truy cập nhanh các chức năng thường dùng
-                  </p>
-                </Col>
-                <Col lg={4}>
-                  <div className="d-flex gap-8 flex-wrap justify-content-lg-end">
-                    <Link to="/academic/class-management">
-                      <Button className="bg-white text-main-600 fw-medium px-16 py-8 radius-8 border-0 text-13">
-                        <i className="fas fa-plus me-2"></i>
-                        Tạo lớp
-                      </Button>
-                    </Link>
-                    <Link to="/academic/schedule-management">
-                      <Button className="bg-white text-main-600 fw-medium px-16 py-8 radius-8 border-0 text-13">
-                        <i className="fas fa-calendar-plus me-2"></i>
-                        Tạo lịch học
-                      </Button>
-                    </Link>
-                  </div>
-                </Col>
               </Row>
             </Card.Body>
           </Card>

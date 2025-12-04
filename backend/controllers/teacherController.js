@@ -2,13 +2,16 @@ const User = require("../models/userModel");
 const Role = require("../models/roleModel");
 const Class = require("../models/classModel");
 const ClassSchedule = require("../models/classScheduleModel");
+const StudentSchedule = require("../models/studentScheduleModel");
+const Program = require("../models/programModel");
+const Course = require("../models/courseModel");
 
 // =========================
 // 📋 LẤY DANH SÁCH GIẢNG VIÊN
 // =========================
 exports.getAllTeachers = async (req, res) => {
   try {
-    const { status, search } = req.query;
+    const { status, search, programType, level, page = 1, limit = 50 } = req.query;
     
     // First, find the teacher role
     const teacherRole = await Role.findOne({ name: 'Teacher' });
@@ -37,10 +40,72 @@ exports.getAllTeachers = async (req, res) => {
       ];
     }
     
+    // Filter by program type and/or level
+    let teacherIdsToFilter = null;
+    if (programType || level) {
+      // Build program query
+      const programQuery = {};
+      if (programType) programQuery.type = programType;
+      if (level) programQuery.level = level;
+      
+      // Find programs matching the criteria
+      const programs = await Program.find(programQuery).select('_id');
+      const programIds = programs.map(p => p._id);
+      
+      if (programIds.length > 0) {
+        // Find courses belonging to these programs
+        const courses = await Course.find({ program: { $in: programIds } }).select('_id');
+        const courseIds = courses.map(c => c._id);
+        
+        if (courseIds.length > 0) {
+          // Find classes with these courses and get their teachers
+          const classes = await Class.find({ course: { $in: courseIds } }).select('teacher');
+          // Get all unique teacher IDs from these classes
+          const teacherIdSet = new Set();
+          classes.forEach(cls => {
+            if (cls.teacher) {
+              teacherIdSet.add(cls.teacher);
+            }
+          });
+          teacherIdsToFilter = Array.from(teacherIdSet);
+        }
+      }
+      
+      // If no teachers found matching the filter, return empty result
+      if (teacherIdsToFilter && teacherIdsToFilter.length === 0) {
+        return res.status(200).json({
+          success: true,
+          message: "Lấy danh sách giảng viên thành công",
+          teachers: [],
+          total: 0,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: 0
+        });
+      }
+    }
+    
+    // Apply filter to teacher query if needed
+    if (teacherIdsToFilter && teacherIdsToFilter.length > 0) {
+      query._id = { $in: teacherIdsToFilter };
+    }
+    
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+    
+    // Get total count
+    const total = await User.countDocuments(query);
+    
+    // Get teachers
     const teachers = await User.find(query)
       .select('-password -token')
       .populate('roleId', 'name description')
-      .sort({ username: 1 });
+      .sort({ username: 1 })
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
     
     console.log(`📋 Found ${teachers.length} users with roleId: ${teacherRole._id} (${teacherRole.name})`);
     
@@ -53,7 +118,7 @@ exports.getAllTeachers = async (req, res) => {
         const totalStudents = classes.reduce((sum, cls) => sum + (cls.students?.length || 0), 0);
         
         return {
-          ...teacher.toObject(),
+          ...teacher,
           stats: {
             classCount,
             totalStudents
@@ -67,12 +132,16 @@ exports.getAllTeachers = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Lấy danh sách giảng viên thành công",
-      total: teachersWithStats.length,
-      teachers: teachersWithStats
+      teachers: teachersWithStats,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum)
     });
   } catch (error) {
     console.error("❌ Lỗi khi lấy danh sách giảng viên:", error);
     res.status(500).json({ 
+      success: false,
       message: "Lỗi server khi lấy danh sách giảng viên",
       error: error.message 
     });
@@ -142,6 +211,10 @@ exports.getTeacherById = async (req, res) => {
   try {
     const { id } = req.params;
     
+    console.log(`\n🔍 [DEBUG] ============================================`);
+    console.log(`🔍 [DEBUG] getTeacherById - Teacher ID: ${id}`);
+    console.log(`🔍 [DEBUG] ============================================\n`);
+    
     const teacher = await User.findById(id)
       .select('-password -token')
       .populate('roleId', 'name');
@@ -150,21 +223,184 @@ exports.getTeacherById = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy giảng viên" });
     }
     
-    // Get classes taught by this teacher
-    const classes = await Class.find({ teacherId: id })
-      .select('name subject students')
-      .populate('students', 'username email');
+    console.log(`✅ [DEBUG] Tìm thấy giảng viên: ${teacher.username} (${teacher.email})`);
     
-    const totalStudents = classes.reduce((sum, cls) => sum + cls.students.length, 0);
+    // Get classes taught by this teacher - check both teacher and teacherId fields
+    const classes = await Class.find({ 
+      $or: [
+        { teacher: id },
+        { teacherId: id }
+      ]
+    })
+      .select('name course students status startDate endDate teacher teacherId')
+      .populate('students', 'username email')
+      .populate({ 
+        path: 'course', 
+        select: 'name',
+        populate: { path: 'program', select: 'level band' } 
+      })
+      .lean();
+    
+    console.log(`\n📋 [DEBUG] Tìm thấy ${classes.length} lớp học:`);
+    classes.forEach((cls, idx) => {
+      const teacherId = cls.teacher?.toString() || cls.teacherId?.toString() || 'N/A';
+      console.log(`  [${idx + 1}] ${cls.name}`);
+      console.log(`      Class ID: ${cls._id}`);
+      console.log(`      Teacher field: ${teacherId}`);
+      console.log(`      TeacherId field: ${cls.teacherId?.toString() || 'N/A'}`);
+    });
+    
+    // Format classes with level information and teaching stats
+    const formattedClasses = await Promise.all(classes.map(async (cls) => {
+      console.log(`\n📚 [DEBUG] Xử lý lớp: ${cls.name} (ID: ${cls._id})`);
+      
+      // Lấy tất cả ClassSchedule của lớp này để log
+      const allSchedules = await ClassSchedule.find({
+        class: cls._id,
+        status: { $in: ['temporary', 'fixed'] }
+      })
+      .select('teacher substituteTeacher date startTime endTime status')
+      .populate('teacher', 'username')
+      .populate('substituteTeacher', 'username')
+      .lean();
+      
+      console.log(`  - Tổng số ClassSchedule: ${allSchedules.length}`);
+      allSchedules.forEach((schedule, idx) => {
+        const teacherId = schedule.teacher?._id?.toString() || schedule.teacher?.toString() || 'N/A';
+        const teacherName = schedule.teacher?.username || 'N/A';
+        const subTeacherId = schedule.substituteTeacher?._id?.toString() || schedule.substituteTeacher?.toString() || null;
+        const subTeacherName = schedule.substituteTeacher?.username || null;
+        const hasSubstitute = subTeacherId !== null;
+        const isThisTeacher = teacherId === id.toString();
+        
+        console.log(`    [${idx + 1}] ${schedule.date} ${schedule.startTime}-${schedule.endTime}`);
+        console.log(`        Teacher: ${teacherName} (ID: ${teacherId}) ${isThisTeacher ? '✅' : '❌'}`);
+        console.log(`        SubstituteTeacher: ${subTeacherName || 'Không có'} (ID: ${subTeacherId || 'N/A'})`);
+        console.log(`        → Giảng viên này dạy: ${isThisTeacher && !hasSubstitute ? '✅ CÓ' : '❌ KHÔNG'}`);
+      });
+      
+      // Lấy tất cả schedule IDs để kiểm tra điểm danh
+      const scheduleIds = allSchedules.map(s => s._id);
+      
+      // Kiểm tra các buổi đã có điểm danh (có ít nhất 1 học sinh điểm danh)
+      const schedulesWithAttendance = await StudentSchedule.find({
+        classSchedule: { $in: scheduleIds },
+        'attendance.status': { $exists: true, $ne: null }
+      })
+      .select('classSchedule')
+      .lean();
+      
+      // Tạo Set các schedule IDs đã có điểm danh
+      const scheduleIdsWithAttendance = new Set(
+        schedulesWithAttendance.map(s => s.classSchedule.toString())
+      );
+      
+      console.log(`  - Số buổi đã có điểm danh: ${scheduleIdsWithAttendance.size}`);
+      
+      // Chỉ tính các buổi đã có điểm danh
+      const totalSessions = scheduleIdsWithAttendance.size;
+      
+      // Số buổi dạy thực tế: buổi đã có điểm danh + teacher = id + không có substituteTeacher
+      const actualTeachingSessions = allSchedules.filter(s => {
+        const scheduleId = s._id.toString();
+        const hasAttendance = scheduleIdsWithAttendance.has(scheduleId);
+        const teacherId = s.teacher?._id?.toString() || s.teacher?.toString();
+        const hasSubstitute = s.substituteTeacher && (s.substituteTeacher._id || s.substituteTeacher);
+        const isThisTeacher = teacherId === id.toString();
+        
+        return hasAttendance && isThisTeacher && !hasSubstitute;
+      }).length;
+      
+      console.log(`  - Tổng số buổi (đã có điểm danh): ${totalSessions}`);
+      console.log(`  - Số buổi dạy thực tế: ${actualTeachingSessions}`);
+      console.log(`  - Số buổi nghỉ: ${totalSessions - actualTeachingSessions}`);
+      
+      // Log chi tiết từng buổi
+      console.log(`\n  📝 Chi tiết từng buổi học:`);
+      allSchedules.forEach((schedule, idx) => {
+        const scheduleId = schedule._id.toString();
+        const hasAttendance = scheduleIdsWithAttendance.has(scheduleId);
+        const teacherId = schedule.teacher?._id?.toString() || schedule.teacher?.toString();
+        const hasSubstitute = schedule.substituteTeacher && (schedule.substituteTeacher._id || schedule.substituteTeacher);
+        const isThisTeacher = teacherId === id.toString();
+        const isCounted = hasAttendance && isThisTeacher && !hasSubstitute;
+        
+        const dateStr = new Date(schedule.date).toLocaleDateString('vi-VN');
+        console.log(`    [${idx + 1}] ${dateStr} ${schedule.startTime}-${schedule.endTime}`);
+        console.log(`        Đã có điểm danh: ${hasAttendance ? '✅ CÓ' : '❌ CHƯA'}`);
+        console.log(`        Teacher: ${schedule.teacher?.username || 'N/A'} (ID: ${teacherId}) ${isThisTeacher ? '✅ ĐÚNG' : '❌ KHÔNG PHẢI'}`);
+        if (hasSubstitute) {
+          console.log(`        ⚠️  SubstituteTeacher: ${schedule.substituteTeacher?.username || 'N/A'} → Giáo viên chính NGHỈ`);
+        } else {
+          console.log(`        SubstituteTeacher: Không có → Giáo viên chính dạy`);
+        }
+        console.log(`        → Được tính vào "Số buổi dạy": ${isCounted ? '✅ CÓ' : '❌ KHÔNG'}`);
+        console.log(``);
+      });
+      
+      console.log(`  📊 TÓM TẮT:`);
+      console.log(`     - Tổng số buổi đã có điểm danh: ${totalSessions}`);
+      console.log(`     - Số buổi do ${teacher.username} dạy (không có người dạy thay): ${actualTeachingSessions}`);
+      console.log(`     - Số buổi nghỉ (có người dạy thay): ${totalSessions - actualTeachingSessions}`);
+      
+      return {
+        _id: cls._id,
+        name: cls.name,
+        course: cls.course ? {
+          _id: cls.course._id,
+          name: cls.course.name,
+          level: cls.course.program?.level || 'N/A'
+        } : null,
+        level: cls.course?.program?.level || 'N/A',
+        students: cls.students || [],
+        status: cls.status,
+        startDate: cls.startDate,
+        endDate: cls.endDate,
+        stats: {
+          totalSessions,
+          actualTeachingSessions,
+          absentSessions: totalSessions - actualTeachingSessions
+        }
+      };
+    }));
+    
+    const totalStudents = formattedClasses.reduce((sum, cls) => sum + (cls.students?.length || 0), 0);
+    
+    // Calculate teaching schedule statistics (chỉ tính các buổi đã có điểm danh)
+    // Tính từ formattedClasses đã được tính với logic chỉ tính buổi có điểm danh
+    const totalSessions = formattedClasses.reduce((sum, cls) => sum + (cls.stats?.totalSessions || 0), 0);
+    const actualTeachingSessions = formattedClasses.reduce((sum, cls) => sum + (cls.stats?.actualTeachingSessions || 0), 0);
+    
+    console.log(`\n📊 [DEBUG] ============================================`);
+    console.log(`📊 [DEBUG] TỔNG HỢP KẾT QUẢ:`);
+    console.log(`📊 [DEBUG] - Số lớp: ${formattedClasses.length}`);
+    console.log(`📊 [DEBUG] - Tổng số học viên: ${totalStudents}`);
+    console.log(`📊 [DEBUG] - Tổng số buổi: ${totalSessions}`);
+    console.log(`📊 [DEBUG] - Số buổi dạy thực tế: ${actualTeachingSessions}`);
+    console.log(`📊 [DEBUG] - Số buổi nghỉ: ${totalSessions - actualTeachingSessions}`);
+    console.log(`📊 [DEBUG] ============================================\n`);
+    
+    // Log chi tiết stats của từng lớp
+    formattedClasses.forEach((cls, idx) => {
+      console.log(`📊 [DEBUG] Lớp ${idx + 1}: ${cls.name}`);
+      console.log(`📊 [DEBUG]   - Tổng số buổi: ${cls.stats.totalSessions}`);
+      console.log(`📊 [DEBUG]   - Số buổi dạy: ${cls.stats.actualTeachingSessions}`);
+      console.log(`📊 [DEBUG]   - Số buổi nghỉ: ${cls.stats.absentSessions}`);
+    });
+    console.log(`\n`);
     
     res.status(200).json({
+      success: true,
       message: "Lấy thông tin giảng viên thành công",
       teacher: {
         ...teacher.toObject(),
-        classes,
+        classes: formattedClasses,
         stats: {
-          classCount: classes.length,
-          totalStudents
+          classCount: formattedClasses.length,
+          totalStudents,
+          totalSessions,
+          actualTeachingSessions,
+          absentSessions: totalSessions - actualTeachingSessions // Số buổi nghỉ (có người dạy thay)
         }
       }
     });
@@ -204,6 +440,14 @@ exports.createTeacher = async (req, res) => {
     if (existingUsername) {
       return res.status(400).json({ 
         message: "Username đã tồn tại" 
+      });
+    }
+    
+    // Check if phone number already exists
+    const phoneExists = await User.findOne({ phone });
+    if (phoneExists) {
+      return res.status(400).json({ 
+        message: "Số điện thoại đã tồn tại trong hệ thống" 
       });
     }
     
@@ -1331,6 +1575,118 @@ exports.saveAttendance = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lưu điểm danh',
+      error: error.message
+    });
+  }
+};
+
+// =========================
+// 📥 IMPORT GIẢNG VIÊN HÀNG LOẠT
+// =========================
+exports.importTeachers = async (req, res) => {
+  try {
+    const { teachers } = req.body;
+    
+    if (!teachers || !Array.isArray(teachers) || teachers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Danh sách giảng viên không hợp lệ'
+      });
+    }
+    
+    // Find Teacher role
+    const teacherRole = await Role.findOne({ name: 'Teacher' });
+    if (!teacherRole) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy role giảng viên'
+      });
+    }
+    
+    const results = {
+      success: [],
+      failed: []
+    };
+    
+    // Process each teacher
+    for (const teacherData of teachers) {
+      try {
+        // Check if email exists
+        const emailExists = await User.findOne({ email: teacherData.email });
+        if (emailExists) {
+          results.failed.push({
+            email: teacherData.email,
+            username: teacherData.username,
+            phone: teacherData.phone || '',
+            reason: 'Email đã tồn tại trong hệ thống'
+          });
+          continue;
+        }
+        
+        // Check if username exists
+        const usernameExists = await User.findOne({ username: teacherData.username });
+        if (usernameExists) {
+          results.failed.push({
+            email: teacherData.email,
+            username: teacherData.username,
+            phone: teacherData.phone || '',
+            reason: 'Username đã tồn tại trong hệ thống'
+          });
+          continue;
+        }
+        
+        // Check if phone number exists
+        if (teacherData.phone) {
+          const phoneExists = await User.findOne({ phone: teacherData.phone });
+          if (phoneExists) {
+            results.failed.push({
+              email: teacherData.email,
+              username: teacherData.username,
+              phone: teacherData.phone,
+              reason: 'Số điện thoại đã tồn tại trong hệ thống'
+            });
+            continue;
+          }
+        }
+        
+        // Create teacher
+        const newTeacher = await User.create({
+          email: teacherData.email,
+          username: teacherData.username,
+          phone: teacherData.phone || '',
+          address: teacherData.address || '',
+          password: teacherData.password || '123456', // Default password
+          roleId: teacherRole._id
+        });
+        
+        results.success.push({
+          _id: newTeacher._id,
+          email: newTeacher.email,
+          username: newTeacher.username
+        });
+      } catch (error) {
+        results.failed.push({
+          email: teacherData.email,
+          username: teacherData.username,
+          phone: teacherData.phone || '',
+          reason: error.message || 'Lỗi không xác định'
+        });
+      }
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: `Import thành công ${results.success.length} giảng viên, thất bại ${results.failed.length} giảng viên`,
+      total: teachers.length,
+      successCount: results.success.length,
+      failedCount: results.failed.length,
+      results
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi import giảng viên:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi import giảng viên',
       error: error.message
     });
   }

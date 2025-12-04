@@ -35,6 +35,18 @@ export const studentScheduleService = {
       throw error.response?.data || { message: 'Không thể lấy lịch học của học sinh' };
     }
   },
+  
+  // Lấy StudentSchedule theo classScheduleIds
+  getStudentSchedulesByClassSchedules: async (classScheduleIds) => {
+    try {
+      const response = await api.post('/by-class-schedules', {
+        classScheduleIds: Array.isArray(classScheduleIds) ? classScheduleIds : [classScheduleIds]
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy StudentSchedule' };
+    }
+  },
 };
 
 export default studentScheduleService;

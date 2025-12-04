@@ -1,60 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
+import { useAuth } from '../../contexts/AuthContext';
+import changeRequestService from '../../services/changeRequestService';
 
 /**
  * Request Absence Modal Component
  * Modal cho phép học viên xin nghỉ học
  */
 const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
-    reason: '',
-    description: '',
-    attachments: [],
-    makeupDates: []
+    description: ''
   });
   const [validated, setValidated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
-  // Generate available makeup dates (next 7 days, excluding weekends)
-  const getAvailableMakeupDates = () => {
-    const dates = [];
-    const currentDate = new Date();
-    let count = 0;
-    let daysAdded = 0;
-    
-    while (daysAdded < 7) {
-      count++;
-      const date = new Date(currentDate);
-      date.setDate(date.getDate() + count);
-      
-      // Skip weekends (0 = Sunday, 6 = Saturday)
-      if (date.getDay() !== 0 && date.getDay() !== 6) {
-        dates.push({
-          value: date.toISOString().split('T')[0],
-          label: date.toLocaleDateString('vi-VN', { 
-            weekday: 'long', 
-            day: '2-digit', 
-            month: '2-digit',
-            year: 'numeric'
-          })
-        });
-        daysAdded++;
-      }
-    }
-    
-    return dates;
-  };
-  
-  const availableMakeupDates = getAvailableMakeupDates();
 
-  const reasonOptions = [
-    { value: 'sick', label: 'Ốm đau, sức khỏe' },
-    { value: 'family', label: 'Việc gia đình' },
-    { value: 'work', label: 'Công việc đột xuất' },
-    { value: 'emergency', label: 'Khẩn cấp' },
-    { value: 'other', label: 'Lý do khác' }
-  ];
+  // Log student ID and studentScheduleId when modal opens
+  useEffect(() => {
+    if (show && schedule) {
+      const studentId = user?._id || user?.id;
+      const studentScheduleId = schedule.studentScheduleId;
+      
+      console.log('=== Modal xin nghỉ học được mở ===');
+      console.log('1. Student ID:', studentId);
+      console.log('2. StudentScheduleId:', studentScheduleId);
+    }
+  }, [show, schedule, user]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -63,22 +35,6 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
       [name]: value
     }));
     setError('');
-  };
-
-  const handleFileChange = (e) => {
-    const files = Array.from(e.target.files);
-    setFormData(prev => ({
-      ...prev,
-      attachments: files
-    }));
-  };
-
-  const handleMakeupDateChange = (e) => {
-    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-    setFormData(prev => ({
-      ...prev,
-      makeupDates: selectedOptions
-    }));
   };
 
   const handleSubmit = async (e) => {
@@ -95,33 +51,42 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
     setError('');
 
     try {
-      // TODO: Replace with actual API call
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Mock submission
-      console.log('Submitting absence request:', {
-        scheduleId: schedule.id,
-        ...formData
-      });
-
-      // Reset form
-      setFormData({
-        reason: '',
-        description: '',
-        attachments: [],
-        makeupDates: []
-      });
-      setValidated(false);
-
-      // Call success callback
-      if (onSuccess) {
-        onSuccess();
+      // Validate studentScheduleId exists
+      if (!schedule.studentScheduleId) {
+        setError('Thiếu thông tin buổi học. Vui lòng thử lại.');
+        setLoading(false);
+        return;
       }
 
-      onHide();
+      // Prepare request data
+      const requestData = {
+        type: 'makeup_class',
+        studentScheduleId: schedule.studentScheduleId,
+        content: formData.description
+      };
+
+      // Call API to create change request
+      const response = await changeRequestService.createChangeRequest(requestData);
+
+      if (response.success) {
+        // Success - reset form and close modal
+        setFormData({
+          description: ''
+        });
+        setValidated(false);
+
+        // Call success callback
+        if (onSuccess) {
+          onSuccess();
+        }
+
+        onHide();
+      } else {
+        setError(response.message || 'Có lỗi xảy ra khi gửi đơn xin nghỉ. Vui lòng thử lại.');
+      }
     } catch (err) {
-      setError('Có lỗi xảy ra khi gửi đơn xin nghỉ. Vui lòng thử lại.');
+      const errorMessage = err.message || err.response?.data?.message || 'Có lỗi xảy ra khi gửi đơn xin nghỉ. Vui lòng thử lại.';
+      setError(errorMessage);
       console.error('Error submitting absence request:', err);
     } finally {
       setLoading(false);
@@ -131,10 +96,7 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
   const handleClose = () => {
     if (!loading) {
       setFormData({
-        reason: '',
-        description: '',
-        attachments: [],
-        makeupDates: []
+        description: ''
       });
       setValidated(false);
       setError('');
@@ -235,29 +197,6 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
         <Form noValidate validated={validated} onSubmit={handleSubmit}>
           <Form.Group className="mb-20">
             <Form.Label className="text-neutral-900 fw-semibold text-13 mb-8">
-              Lý do nghỉ học <span className="text-danger-600">*</span>
-            </Form.Label>
-            <Form.Select
-              name="reason"
-              value={formData.reason}
-              onChange={handleInputChange}
-              required
-              className="border-neutral-30 radius-8 px-16 py-10 text-13"
-            >
-              <option value="">Chọn lý do nghỉ học</option>
-              {reasonOptions.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Form.Select>
-            <Form.Control.Feedback type="invalid" className="text-13">
-              Vui lòng chọn lý do nghỉ học
-            </Form.Control.Feedback>
-          </Form.Group>
-
-          <Form.Group className="mb-20">
-            <Form.Label className="text-neutral-900 fw-semibold text-13 mb-8">
               Chi tiết lý do <span className="text-danger-600">*</span>
             </Form.Label>
             <Form.Control
@@ -276,64 +215,6 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
             <Form.Text className="text-neutral-500 text-12 mt-8">
               Cung cấp thông tin chi tiết giúp giáo vụ xử lý đơn nhanh hơn
             </Form.Text>
-          </Form.Group>
-
-          <Form.Group className="mb-20">
-            <Form.Label className="text-neutral-900 fw-semibold text-13 mb-8">
-              Ngày có thể học bù (không bắt buộc)
-            </Form.Label>
-            <Form.Select
-              multiple
-              value={formData.makeupDates}
-              onChange={handleMakeupDateChange}
-              className="border-neutral-30 radius-8 px-16 py-10 text-13"
-              style={{ minHeight: '120px' }}
-            >
-              {availableMakeupDates.map(date => (
-                <option key={date.value} value={date.value}>
-                  {date.label}
-                </option>
-              ))}
-            </Form.Select>
-            <Form.Text className="text-neutral-500 text-12 mt-8">
-              <i className="fas fa-info-circle me-1"></i>
-              Giữ Ctrl (hoặc Cmd) để chọn nhiều ngày. Danh sách các ngày trong tuần tới mà bạn có thể tham gia học bù.
-            </Form.Text>
-          </Form.Group>
-
-          <Form.Group className="mb-20">
-            <Form.Label className="text-neutral-900 fw-semibold text-13 mb-8">
-              Đính kèm tài liệu (nếu có)
-            </Form.Label>
-            <Form.Control
-              type="file"
-              multiple
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-              onChange={handleFileChange}
-              className="border-neutral-30 radius-8 px-16 py-10 text-13"
-            />
-            <Form.Text className="text-neutral-500 text-12 mt-8">
-              <i className="fas fa-info-circle me-1"></i>
-              Chấp nhận: PDF, Word, hình ảnh (tối đa 5MB mỗi file)
-            </Form.Text>
-            {formData.attachments.length > 0 && (
-              <div className="mt-12">
-                <div className="text-neutral-700 text-13 fw-medium mb-8">
-                  Tệp đã chọn:
-                </div>
-                {formData.attachments.map((file, index) => (
-                  <div key={index} className="bg-neutral-25 rounded-8 px-12 py-8 mb-8 d-flex align-items-center justify-content-between">
-                    <div className="text-neutral-700 text-13">
-                      <i className="fas fa-file me-2 text-neutral-500"></i>
-                      {file.name}
-                    </div>
-                    <span className="text-neutral-500 text-12">
-                      {(file.size / 1024).toFixed(1)} KB
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
           </Form.Group>
 
           {/* Important Notice */}

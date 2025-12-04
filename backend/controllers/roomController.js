@@ -199,17 +199,23 @@ exports.deleteRoom = async (req, res) => {
 exports.getRoomSchedule = async (req, res) => {
   try {
     const { id } = req.params;
-    const { date } = req.query; // Optional: filter by specific date
+    const { date, startDate, endDate } = req.query; // Optional: filter by specific date or date range
     
     const room = await Room.findById(id);
     if (!room) {
       return res.status(404).json({ message: "Không tìm thấy phòng học" });
     }
     
-    let query = { room: id };
+    let query = { room: id, status: { $in: ['temporary', 'fixed'] } };
     
-    // Filter by date if provided
-    if (date) {
+    // Filter by date range if provided (priority over single date)
+    if (startDate && endDate) {
+      query.date = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    } else if (date) {
+      // Filter by single date if provided
       const startDate = new Date(date);
       startDate.setHours(0, 0, 0, 0);
       const endDate = new Date(date);
@@ -228,10 +234,12 @@ exports.getRoomSchedule = async (req, res) => {
         }
       })
       .populate('session', 'title order') // Populate session để lấy title
-      .sort({ date: 1, startTime: 1 });
+      .sort({ date: 1, startTime: 1 })
+      .lean();
     
     res.status(200).json({
       message: "Lấy lịch sử dụng phòng thành công",
+      success: true,
       room: {
         _id: room._id,
         room_name: room.room_name,

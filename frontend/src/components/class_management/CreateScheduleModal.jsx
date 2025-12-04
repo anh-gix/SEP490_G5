@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, ButtonGroup, Badge, Alert } from 'react-bootstrap';
 import ConflictChecker from './ConflictChecker';
 import classService from '../../services/classService';
-import axios from 'axios';
+import courseService from '../../services/courseService';
 
 const CreateScheduleModal = ({ classes, teachers, rooms, onClose, onSubmit, existingSchedules }) => {
   const [mode, setMode] = useState('auto'); // auto or manual
@@ -55,10 +55,8 @@ const CreateScheduleModal = ({ classes, teachers, rooms, onClose, onSubmit, exis
       }
       
       // Get course details with sessions
-      const courseResponse = await axios.get(
-        `http://localhost:8080/api/courses/${courseId}/details`
-      );
-      const course = courseResponse.data.data || courseResponse.data;
+      const courseResponse = await courseService.getCourseDetails(courseId);
+      const course = courseResponse.data || courseResponse;
       const sessions = course.sessions || [];
       
       // Transform sessions to syllabus format

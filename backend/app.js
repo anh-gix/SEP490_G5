@@ -24,6 +24,7 @@ mongoose.connect(process.env.MONGODB_URI, {
 .catch(err => console.error('MongoDB connection error:', err));
 
 // Routes
+app.use('/api/courses', require('./routes/courseRoute'));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/roles', require('./routes/roleRoutes'));
@@ -35,8 +36,9 @@ app.use('/api/student-schedules', require('./routes/studentScheduleRoutes'));
 // Center Head Routes
 app.use('/api/center-head', require('./routes/centerHeadRoutes'));
 app.use('/api/programs', require('./routes/programRoutes'));
-app.use('/api/courses', require('./routes/courseRoute'));
+app.use('/api/courseshome', require('./routes/courseHomeRoutes'));
 app.use('/api/sessions', require('./routes/sessionRoutes'));
+app.use('/api/cam-sessions', require('./routes/camSessionRoutes'));
 
 // Academic Staff Routes
 app.use('/api/rooms', require('./routes/roomRoutes'));
@@ -53,6 +55,20 @@ app.use('/api/schedules', require('./routes/scheduleRoute'));
 // Homework Routes
 app.use('/api/homework', require('./routes/homeworkRoutes'));
 
+// Change Request Routes
+app.use('/api/change-requests', require('./routes/changeRequestRoutes'));
+
+// Approval Request Routes
+app.use('/api/approval-requests', require('./routes/approvalRequestRoutes'));
+
+// Academic Staff Routes
+app.use('/api/academic-staff', require('./routes/academicStaffRoutes'));
+
+// Tip Routes
+app.use('/api/tips', require('./routes/tipRoutes'));
+
+// Online Learning Routes
+app.use('/api/online-learning', require('./routes/onlineLearningRoutes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

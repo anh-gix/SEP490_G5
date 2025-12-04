@@ -30,8 +30,8 @@ const AboutTwo = () => {
                     <i className='ph ph-watch' />
                   </span>
                   <div>
-                    <h6 className='mb-4'>20% OFF</h6>
-                    <span className=''>For All Courses</span>
+                    <h6 className='mb-4'>GIẢM 20%</h6>
+                    <span className=''>Cho Tất Cả Khóa Học</span>
                   </div>
                 </div>
                 <div className='offer-message style-two  me-lg-0 me-24 px-24 py-12 rounded-12 bg-white fw-medium flex-align d-inline-flex gap-16 box-shadow-lg animation-upDown'>
@@ -43,7 +43,7 @@ const AboutTwo = () => {
                       4.6
                       <span className='text-neutral-100'>(2.4k)</span>
                     </span>
-                    <span className='text-neutral-500'>AVG Reviews</span>
+                    <span className='text-neutral-500'>Đánh Giá Trung Bình</span>
                   </div>
                 </div>
                 <div className='position-absolute inset-block-end-0 inset-inline-end-0 me-lg-0 me-24 px-24 py-12 rounded-12 bg-white fw-medium flex-align d-inline-flex gap-16 box-shadow-lg animation-upDown'>
@@ -53,9 +53,9 @@ const AboutTwo = () => {
                       className='d-sm-flex d-none mb-24'
                       alt=''
                     />
-                    <h6 className='mb-4 text-neutral-700 text-2xl'>Excelent</h6>
+                    <h6 className='mb-4 text-neutral-700 text-2xl'>Xuất Sắc</h6>
                     <span className='text-sm text-neutral-500'>
-                      90% Satisfied Clients
+                      90% Khách Hàng Hài Lòng
                     </span>
                   </div>
                 </div>
@@ -68,16 +68,16 @@ const AboutTwo = () => {
                     <span className='text-main-600 text-2xl d-flex'>
                       <i className='ph-bold ph-book' />
                     </span>
-                    <h5 className='text-main-600 mb-0'>Why Choose Us</h5>
+                    <h5 className='text-main-600 mb-0'>Tại Sao Chọn Chúng Tôi</h5>
                   </div>
                   <h2 className='mb-24 wow bounceIn'>
-                    Over 16 Years in Distant learning for Skill Development
+                    Hơn 16 Năm Trong Đào Tạo Từ Xa Phát Triển Kỹ Năng
                   </h2>
                   <p className='text-neutral-500 text-line-2 wow bounceInUp'>
-                    We are passionate about transforming lives through
-                    education. Founded with a vision to make learning accessible
-                    to all, we believe in the power of knowledge to unlock
-                    opportunities and shape the future.
+                    Chúng tôi đam mê việc thay đổi cuộc sống thông qua
+                    giáo dục. Được thành lập với tầm nhìn làm cho việc học trở nên dễ tiếp cận
+                    cho tất cả mọi người, chúng tôi tin vào sức mạnh của tri thức để mở ra
+                    cơ hội và định hình tương lai.
                   </p>
                 </div>
                 <div className='grid-cols-2'>
@@ -95,10 +95,10 @@ const AboutTwo = () => {
                     </span>
                     <div className='flex-grow-1'>
                       <h6 className='text-neutral-800 text-xl fw-medium mb-8'>
-                        Academic Excellence
+                        Xuất Sắc Học Thuật
                       </h6>
                       <p className='text-neutral-500 text-line-2'>
-                        Through our curated courses, interactive content
+                        Thông qua các khóa học được tuyển chọn, nội dung tương tác
                       </p>
                     </div>
                   </div>
@@ -116,11 +116,11 @@ const AboutTwo = () => {
                     </span>
                     <div className='flex-grow-1'>
                       <h6 className='text-neutral-800 text-xl fw-medium mb-8'>
-                        Course Offerings
+                        Các Khóa Học
                       </h6>
                       <p className='text-neutral-500 text-line-2'>
-                        Personalized learning paths, we empower learners to
-                        acquire{" "}
+                        Lộ trình học tập cá nhân hóa, chúng tôi trao quyền cho người học
+                        tiếp thu{" "}
                       </p>
                     </div>
                   </div>
@@ -138,10 +138,10 @@ const AboutTwo = () => {
                     </span>
                     <div className='flex-grow-1'>
                       <h6 className='text-neutral-800 text-xl fw-medium mb-8'>
-                        Innovative Learning{" "}
+                        Học Tập Đổi Mới{" "}
                       </h6>
                       <p className='text-neutral-500 text-line-2'>
-                        Immerse yourself in an innovative learning
+                        Đắm mình trong một môi trường học tập đổi mới
                       </p>
                     </div>
                   </div>
@@ -159,10 +159,10 @@ const AboutTwo = () => {
                     </span>
                     <div className='flex-grow-1'>
                       <h6 className='text-neutral-800 text-xl fw-medium mb-8'>
-                        Sustainability Initiative
+                        Sáng Kiến Bền Vững
                       </h6>
                       <p className='text-neutral-500 text-line-2'>
-                        Be part of a university that cares about the planet.{" "}
+                        Trở thành một phần của trường đại học quan tâm đến hành tinh.{" "}
                       </p>
                     </div>
                   </div>
@@ -172,7 +172,7 @@ const AboutTwo = () => {
                     to='/course'
                     className='btn btn-main rounded-pill flex-align d-inline-flex gap-8'
                   >
-                    Read More
+                    Đọc Thêm
                     <i className='ph-bold ph-arrow-up-right d-flex text-lg' />
                   </Link>
                 </div>

@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Button, Badge, Alert, Spinner } from 'react-bootstrap';
+import { Card, Button, Badge, Alert, Spinner } from 'react-bootstrap';
 import { useParams } from 'react-router-dom';
 import studentService from '../../../services/studentService';
-import SubmitHomeworkModal from './SubmitHomeworkModal';
+import HomeworkDetailModal from './HomeworkDetailModal';
 
 /**
  * Class Homework Component for Student
- * Danh sách bài tập về nhà của lớp
+ * Danh sách bài tập về nhà của lớp - Simplified version
  */
 const ClassHomework = () => {
   const { classId } = useParams();
   const [homework, setHomework] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedHomework, setSelectedHomework] = useState(null);
+  const [filterType, setFilterType] = useState('by-lesson'); // 'by-lesson', 'upcoming'
 
   useEffect(() => {
     if (classId) {
@@ -39,24 +40,24 @@ const ClassHomework = () => {
 
   const getHomeworkStatusBadge = (status) => {
     const statusConfig = {
-      not_submitted: { bg: 'bg-warning-600', text: 'Chưa nộp', icon: 'fa-clock' },
-      submitted: { bg: 'bg-info-500', text: 'Đã nộp', icon: 'fa-check' },
-      late: { bg: 'bg-danger-600', text: 'Nộp trễ', icon: 'fa-exclamation' },
-      graded: { bg: 'bg-success-600', text: 'Đã chấm', icon: 'fa-star' }
+      not_submitted: { bg: 'warning', text: 'Chưa nộp', icon: 'fa-clock' },
+      submitted: { bg: 'info', text: 'Đã nộp', icon: 'fa-check' },
+      late: { bg: 'danger', text: 'Nộp trễ', icon: 'fa-exclamation-triangle' },
+      graded: { bg: 'success', text: 'Đã chấm', icon: 'fa-star' }
     };
 
     const config = statusConfig[status] || statusConfig.not_submitted;
     return (
-      <Badge className={`${config.bg} text-white px-12 py-6 text-12`}>
-        <i className={`fas ${config.icon} me-1`}></i>
+      <Badge bg={config.bg} className="px-12 py-6">
+        <i className={`fas ${config.icon} me-2`}></i>
         {config.text}
       </Badge>
     );
   };
 
-  const handleSubmitClick = (hw) => {
+  const handleViewDetail = (hw) => {
     setSelectedHomework(hw);
-    setShowSubmitModal(true);
+    setShowDetailModal(true);
   };
 
   const handleSubmitSuccess = async (response) => {
@@ -65,6 +66,49 @@ const ClassHomework = () => {
     
     // Refresh homework list
     await fetchHomework();
+  };
+
+  // Filter and sort homework
+  const getFilteredHomework = () => {
+    let filtered = [...homework];
+    
+    if (filterType === 'upcoming') {
+      // Lọc bài tập sắp đến hạn (trong vòng 3 ngày) và chưa nộp
+      const threeDaysFromNow = new Date();
+      threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+      
+      filtered = filtered.filter(hw => {
+        const deadline = new Date(hw.deadline);
+        return hw.status === 'not_submitted' && deadline <= threeDaysFromNow && deadline > new Date();
+      });
+    }
+    
+    if (filterType === 'by-lesson') {
+      // Sắp xếp theo buổi học (lessonNumber)
+      filtered.sort((a, b) => (b.lessonNumber || 0) - (a.lessonNumber || 0));
+    } else {
+      // Mặc định sắp xếp theo deadline gần nhất
+      filtered.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+    }
+    
+    return filtered;
+  };
+
+  // Group homework by lesson
+  const groupHomeworkByLesson = (homeworkList) => {
+    const grouped = {};
+    homeworkList.forEach(hw => {
+      const key = `${hw.lessonNumber}-${hw.lessonTitle}`;
+      if (!grouped[key]) {
+        grouped[key] = {
+          lessonNumber: hw.lessonNumber,
+          lessonTitle: hw.lessonTitle,
+          homework: []
+        };
+      }
+      grouped[key].homework.push(hw);
+    });
+    return Object.values(grouped);
   };
 
   if (loading) {
@@ -86,146 +130,150 @@ const ClassHomework = () => {
 
   return (
     <>
-    <div className="p-24 d-flex flex-column gap-3">{homework.length > 0 ? (
-        homework.map(hw => (
-          <Card key={hw._id} className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-            <Card.Body className="p-20">
-              <Row className="align-items-start">
-                <Col md={8}>
-                  <div className="d-flex justify-content-between align-items-start mb-12">
-                    <div>
-                      <h6 className="text-neutral-900 fw-bold mb-4">{hw.title}</h6>
-                      <div className="text-neutral-500 text-13">
-                        <i className="fas fa-book-reader me-1"></i>
-                        Buổi {hw.lessonNumber}: {hw.lessonTitle}
-                      </div>
-                    </div>
-                    {getHomeworkStatusBadge(hw.status)}
-                  </div>
-                  {hw.description && (
-                    <p className="text-neutral-700 text-14 mb-12">{hw.description}</p>
-                  )}
-                  
-                  <div className="d-flex gap-16 text-neutral-500 text-13 mb-12">
-                    <span>
-                      <i className="fas fa-calendar-alt me-1"></i>
-                      Hạn nộp: {new Date(hw.deadline).toLocaleDateString('vi-VN')} {new Date(hw.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    {hw.submittedAt && (
-                      <span>
-                        <i className="fas fa-check-circle me-1"></i>
-                        Đã nộp: {new Date(hw.submittedAt).toLocaleDateString('vi-VN')}
-                      </span>
-                    )}
-                  </div>
+      <div className="p-24">
+        {/* Filter Buttons */}
+        <div className="d-flex gap-2 mb-20">
+          <Button
+            variant={filterType === 'by-lesson' ? 'primary' : 'outline-primary'}
+            size="sm"
+            onClick={() => setFilterType('by-lesson')}
+            className="px-16 py-8 text-13"
+          >
+            <i className="fas fa-book-reader me-2"></i>
+            Theo buổi học
+          </Button>
+          <Button
+            variant={filterType === 'upcoming' ? 'primary' : 'outline-primary'}
+            size="sm"
+            onClick={() => setFilterType('upcoming')}
+            className="px-16 py-8 text-13"
+          >
+            <i className="fas fa-clock me-2"></i>
+            Sắp đến hạn
+          </Button>
+        </div>
 
-                  {hw.assignmentFiles && hw.assignmentFiles.length > 0 && (
-                    <div className="mb-12">
-                      <div className="text-neutral-700 text-13 fw-semibold mb-2">
-                        <i className="fas fa-paperclip me-1"></i>
-                        File đề bài:
-                      </div>
-                      {hw.assignmentFiles.map((file, idx) => (
-                        <Button
-                          key={idx}
-                          variant="link"
-                          size="sm"
-                          className="text-primary text-12 p-0 me-3"
-                          onClick={() => window.open(file, '_blank')}
-                        >
-                          <i className="fas fa-file-download me-1"></i>
-                          File {idx + 1}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
+        {/* Content Container - 70% width, centered */}
+        <div className="d-flex justify-content-center">
+          <div style={{ width: '70%', minWidth: '700px' }}>
 
-                  {hw.status === 'graded' && hw.score != null && (
-                    <Alert variant="success" className="bg-success-50 border-success-200 rounded-8 mb-0 py-12">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-neutral-700 text-13">
-                          <i className="fas fa-star text-warning-600 me-2"></i>
-                          Điểm: <strong>{hw.score}/10</strong>
-                        </span>
-                        {hw.gradedAt && (
-                          <span className="text-neutral-500 text-12">
-                            {new Date(hw.gradedAt).toLocaleDateString('vi-VN')}
-                          </span>
-                        )}
-                      </div>
-                      {hw.feedback && (
-                        <div className="mt-8 text-neutral-700 text-13">
-                          <strong>Nhận xét:</strong> {hw.feedback}
-                        </div>
-                      )}
-                    </Alert>
-                  )}
-                </Col>
-                <Col md={4} className="text-md-end">
-                  {hw.status === 'not_submitted' && (
-                    <Button 
-                      className="btn-main text-13 fw-semibold px-20 py-10 radius-8 w-100 mb-2"
-                      onClick={() => handleSubmitClick(hw)}
-                    >
-                      <i className="fas fa-upload me-2"></i>
-                      Nộp bài
-                    </Button>
-                  )}
-                  {(hw.status === 'submitted' || hw.status === 'late') && (
-                    <Button className="btn-outline-main text-13 fw-medium px-20 py-10 radius-8 w-100 mb-2">
-                      <i className="fas fa-eye me-2"></i>
-                      Xem bài nộp
-                    </Button>
-                  )}
-                  {hw.status === 'graded' && (
-                    <Button className="btn-outline-success text-13 fw-medium px-20 py-10 radius-8 w-100 mb-2">
-                      <i className="fas fa-file-download me-2"></i>
-                      Tải bài chấm
-                    </Button>
-                  )}
-                  {hw.answerFiles && hw.answerFiles.length > 0 && (
-                    <div className="mt-2">
-                      <div className="text-neutral-600 text-11 mb-1">Đáp án:</div>
-                      {hw.answerFiles.map((file, idx) => (
-                        <Button
-                          key={idx}
-                          variant="link"
-                          size="sm"
-                          className="text-success text-11 p-0 d-block"
-                          onClick={() => window.open(file, '_blank')}
-                        >
-                          <i className="fas fa-file-pdf me-1"></i>
-                          Xem đáp án {hw.answerFiles.length > 1 ? idx + 1 : ''}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </Col>
-              </Row>
+        {getFilteredHomework().length > 0 ? (
+          filterType === 'by-lesson' ? (
+            // Grouped by lesson view
+            <div className="d-flex flex-column gap-4">
+              {groupHomeworkByLesson(getFilteredHomework()).map(group => (
+                <div key={`lesson-${group.lessonNumber}`}>
+                  <h6 className="text-neutral-700 fw-bold mb-12 text-15">
+                    <i className="fas fa-book-reader me-2 text-primary-600"></i>
+                    Buổi {group.lessonNumber}: {group.lessonTitle}
+                  </h6>
+                  <div className="d-flex flex-column gap-2">
+                    {group.homework.map(hw => renderHomeworkCard(hw, false))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            // Regular list view
+            <div className="d-flex flex-column gap-3">
+              {getFilteredHomework().map(hw => renderHomeworkCard(hw, true))}
+            </div>
+          )
+        ) : (
+          <Card className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+            <Card.Body className="text-center py-60">
+              <i className="fas fa-tasks fa-3x text-neutral-400 mb-16"></i>
+              <p className="text-neutral-500 mb-0">
+                {filterType === 'upcoming' ? 'Không có bài tập sắp đến hạn' : 'Chưa có bài tập nào'}
+              </p>
+              <p className="text-neutral-400 text-13 mt-2">
+                {filterType === 'upcoming' ? 'Các bài tập trong vòng 3 ngày tới sẽ hiển thị ở đây' : 'Giảng viên sẽ giao bài tập sau các buổi học'}
+              </p>
             </Card.Body>
           </Card>
-        ))
-      ) : (
-        <Card className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-          <Card.Body className="text-center py-60">
-            <i className="fas fa-tasks fa-3x text-neutral-400 mb-16"></i>
-            <p className="text-neutral-500 mb-0">Chưa có bài tập nào</p>
-            <p className="text-neutral-400 text-13 mt-2">Giảng viên sẽ giao bài tập sau các buổi học</p>
-          </Card.Body>
-        </Card>
-      )}
-    </div>
+        )}
+          </div>
+        </div>
+      </div>
     
-    {/* Submit Homework Modal */}
-    <SubmitHomeworkModal
-      show={showSubmitModal}
-      onHide={() => setShowSubmitModal(false)}
-      homework={selectedHomework}
-      classId={classId}
-      onSubmitSuccess={handleSubmitSuccess}
-    />
+      {/* Homework Detail Modal */}
+      <HomeworkDetailModal
+        show={showDetailModal}
+        onHide={() => setShowDetailModal(false)}
+        homework={selectedHomework}
+        classId={classId}
+        onSubmitSuccess={handleSubmitSuccess}
+      />
     </>
   );
+
+  // Render individual homework card
+  function renderHomeworkCard(hw, showLessonInfo) {
+    const isDeadlinePassed = new Date() > new Date(hw.deadline);
+    
+    return (
+      <div key={hw._id}>
+        {showLessonInfo && (
+          <div className="text-neutral-600 fw-semibold mb-8 text-13">
+            <i className="fas fa-book-reader me-2"></i>
+            Buổi {hw.lessonNumber}: {hw.lessonTitle}
+          </div>
+        )}
+        <Card 
+          className="bg-white border-0 rounded-12 hover-shadow-lg transition-all"
+          style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}
+        >
+          <Card.Body className="p-16">
+            <div className="d-flex justify-content-between align-items-center">
+              {/* Left: Title */}
+              <h6 className="text-neutral-900 fw-bold mb-0 flex-shrink-0 me-4 text-15">
+                {hw.title}
+              </h6>
+              
+              {/* Right: Deadline, Button, Status */}
+              <div className="d-flex align-items-center gap-4 flex-shrink-0">
+                {/* Deadline */}
+                <div className={`text-15 fw-medium ${isDeadlinePassed && hw.status === 'not_submitted' ? 'text-danger-600' : 'text-neutral-700'}`}>
+                  <i className="fas fa-clock me-2"></i>
+                  {new Date(hw.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(hw.deadline).toLocaleDateString('vi-VN')}
+                </div>
+
+                {/* View Detail Button */}
+                <Button 
+                  variant="outline-primary"
+                  size="sm"
+                  className="text-12 px-12 py-6"
+                  onClick={() => handleViewDetail(hw)}
+                >
+                  <i className="fas fa-eye me-1"></i>
+                  Xem
+                </Button>
+
+                {/* Status Badge */}
+                <div className="d-flex flex-column align-items-end gap-1">
+                  {getHomeworkStatusBadge(hw.status)}
+                  {hw.status === 'graded' && hw.score != null && (
+                    <Badge bg="warning" className="px-8 py-4 text-10">
+                      <i className="fas fa-star me-1"></i>
+                      {hw.score}/10
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Warning for overdue */}
+            {isDeadlinePassed && hw.status === 'not_submitted' && (
+              <Alert variant="danger" className="mb-0 mt-12 py-6 px-12 text-11">
+                <i className="fas fa-exclamation-triangle me-2"></i>
+                Đã quá hạn nộp
+              </Alert>
+            )}
+          </Card.Body>
+        </Card>
+      </div>
+    );
+  }
 };
 
 export default ClassHomework;

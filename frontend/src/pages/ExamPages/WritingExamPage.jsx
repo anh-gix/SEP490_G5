@@ -1,8 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import Breadcrumb from "../../components/Breadcrumb";
-import FooterOne from "../../components/FooterOne";
-import HeaderOne from "../../components/HomePageforStudent/HeaderOne";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import Animation from "../../helper/Animation";
 import Preloader from "../../helper/Preloader";
 import { examService } from "../../services/examService";
@@ -13,12 +10,19 @@ const WritingExamPage = () => {
   const navigate = useNavigate();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [sectionData, setSectionData] = useState(null);
-  const [answers, setAnswers] = useState({});
+  const [answers, setAnswers] = useState({}); // { part_1: { questionNumber: answerText }, part_2: { ... } }
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState(1);
+  const [currentPart, setCurrentPart] = useState(1);
+  const [leftWidth, setLeftWidth] = useState(50);
   const timerRef = useRef(null);
+  const containerRef = useRef(null);
+  const isResizingRef = useRef(false);
+  const questionRefs = useRef({});
 
   const handleSubmit = useCallback(
     async (force = false) => {
@@ -33,12 +37,30 @@ const WritingExamPage = () => {
 
       try {
         setSubmitting(true);
-        const answersArray = Object.keys(answers).map((qNum) => ({
-          questionNumber: parseInt(qNum),
-          answerText: answers[qNum] || "",
-        }));
+        
+        // Xử lý answers cho tất cả các part
+        const partsData = [];
+        
+        if (sectionData?.parts) {
+          for (const partData of sectionData.parts) {
+            const part = partData.part;
+            const partAnswers = answers[`part_${part}`] || {};
+            
+            const answersArray = Object.keys(partAnswers).map((qNum) => ({
+              questionNumber: parseInt(qNum),
+              answerText: partAnswers[qNum] || "",
+            }));
 
-        await examService.submitWritingAnswers(examId, submissionId, answersArray);
+            if (answersArray.length > 0) {
+              partsData.push({
+                part: part,
+                answers: answersArray,
+              });
+            }
+          }
+        }
+
+        await examService.submitWritingAnswers(examId, submissionId, { parts: partsData });
 
         // Navigate to result page
         navigate(`/exams/${examId}/submissions/${submissionId}/writing/result`);
@@ -47,7 +69,7 @@ const WritingExamPage = () => {
         setSubmitting(false);
       }
     },
-    [submitting, answers, examId, submissionId, navigate]
+    [submitting, answers, examId, submissionId, navigate, sectionData]
   );
 
   // Fetch section + initialize state
@@ -72,22 +94,25 @@ const WritingExamPage = () => {
 
         setSectionData(data);
 
-        // Initialize answers from existing submission
-        if (data.submission?.answers?.length > 0) {
-          const existingAnswers = {};
-          data.submission.answers.forEach((ans) => {
-            existingAnswers[ans.questionNumber] = ans.answerText || "";
+        // Initialize answers as empty for all parts
+        const initialAnswers = {};
+        if (data.parts) {
+          data.parts.forEach((partData) => {
+            initialAnswers[`part_${partData.part}`] = {};
           });
-          setAnswers(existingAnswers);
-        } else {
-          setAnswers({});
         }
+        setAnswers(initialAnswers);
 
-        // Initialize timer if duration exists
-        if (data.section?.duration) {
-          setTimeRemaining(data.section.duration * 60); // minutes -> seconds
+        // Initialize timer if totalDuration exists
+        if (data.totalDuration) {
+          setTimeRemaining(data.totalDuration * 60); // minutes -> seconds
         } else {
           setTimeRemaining(null);
+        }
+
+        // Set current part to first part
+        if (data.parts && data.parts.length > 0) {
+          setCurrentPart(data.parts[0].part);
         }
 
         setError(null);
@@ -155,30 +180,40 @@ const WritingExamPage = () => {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const handleAnswerChange = (questionNumber, value) => {
+  const handleAnswerChange = (part, questionNumber, value) => {
+    const partKey = `part_${part}`;
     setAnswers((prev) => ({
       ...prev,
-      [questionNumber]: value,
+      [partKey]: {
+        ...(prev[partKey] || {}),
+        [questionNumber]: value,
+      },
     }));
   };
 
-  const getPDFUrl = () => {
-    if (!sectionData?.section?.fileUrl) return null;
-    if (sectionData.section.fileUrl.startsWith("http")) {
-      return sectionData.section.fileUrl;
+  const getPDFUrl = (part) => {
+    if (!sectionData?.parts) return null;
+    const partData = sectionData.parts.find((p) => p.part === part);
+    if (!partData?.section?.fileUrl) return null;
+    
+    const fileUrl = partData.section.fileUrl;
+    if (fileUrl.startsWith("http")) {
+      return fileUrl;
     }
-    if (sectionData.section.fileUrl.startsWith("/")) {
+    if (fileUrl.startsWith("/")) {
       const API_PORT = import.meta.env.VITE_API_PORT;
-      return `http://localhost:${API_PORT}${sectionData.section.fileUrl}`;
+      return `http://localhost:${API_PORT}${fileUrl}`;
     }
     const API_PORT = import.meta.env.VITE_API_PORT;
-    return `http://localhost:${API_PORT}/uploads/${sectionData.section.fileUrl}`;
+    return `http://localhost:${API_PORT}/uploads/${fileUrl}`;
   };
 
   const getQuestionData = useCallback(
-    (questionNumber) => {
-      if (!sectionData?.section?.questions) return { questionTitle: "", questionAnswer: [] };
-      const question = sectionData.section.questions.find(
+    (part, questionNumber) => {
+      if (!sectionData?.parts) return { questionTitle: "", questionAnswer: [] };
+      const partData = sectionData.parts.find((p) => p.part === part);
+      if (!partData?.section?.questions) return { questionTitle: "", questionAnswer: [] };
+      const question = partData.section.questions.find(
         (q) => q.questionNumber === questionNumber
       );
       return {
@@ -189,9 +224,15 @@ const WritingExamPage = () => {
     [sectionData]
   );
 
-  const generateQuestionNumbers = () => {
-    if (!sectionData?.section?.questionCount) return [];
-    return Array.from({ length: sectionData.section.questionCount }, (_, i) => i + 1);
+  const generateQuestionNumbers = (part) => {
+    if (!sectionData?.parts) return [];
+    const partData = sectionData.parts.find((p) => p.part === part);
+    if (!partData?.section?.questions) return [];
+    // Lấy tất cả questionNumber từ questions array và sắp xếp
+    return partData.section.questions
+      .map((q) => q.questionNumber)
+      .filter((num) => num != null)
+      .sort((a, b) => a - b);
   };
 
   const getWordCount = (text) => {
@@ -199,12 +240,87 @@ const WritingExamPage = () => {
     return text.trim().split(/\s+/).filter(word => word.length > 0).length;
   };
 
+  // Fullscreen functionality
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+      }).catch((err) => {
+        console.error("Error attempting to enable fullscreen:", err);
+      });
+    } else {
+      document.exitFullscreen().then(() => {
+        setIsFullscreen(false);
+      }).catch((err) => {
+        console.error("Error attempting to exit fullscreen:", err);
+      });
+    }
+  }, []);
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  // Scroll to question
+  const scrollToQuestion = useCallback((questionNumber) => {
+    setCurrentQuestion(questionNumber);
+    const questionElement = questionRefs.current[`part_${currentPart}_q_${questionNumber}`];
+    if (questionElement) {
+      questionElement.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [currentPart]);
+
+  // Resize handlers
+  const handleMouseMove = useCallback((e) => {
+    if (!isResizingRef.current || !containerRef.current) return;
+    
+    const container = containerRef.current;
+    const containerRect = container.getBoundingClientRect();
+    const newLeftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+    
+    // Limit between 20% and 80%
+    const clampedWidth = Math.max(20, Math.min(80, newLeftWidth));
+    setLeftWidth(clampedWidth);
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    isResizingRef.current = false;
+    document.removeEventListener("mousemove", handleMouseMove);
+    document.removeEventListener("mouseup", handleMouseUp);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  }, [handleMouseMove]);
+
+  const handleMouseDown = useCallback((e) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [handleMouseMove, handleMouseUp]);
+
+  // Cleanup resize listeners on unmount
+  useEffect(() => {
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [handleMouseMove, handleMouseUp]);
+
   if (authLoading || loading) {
     return (
       <>
         <Preloader />
         <Animation />
-        <HeaderOne />
         <div className="text-center py-80">
           <div className="spinner-border text-main-600" role="status">
             <span className="visually-hidden">Loading...</span>
@@ -218,176 +334,356 @@ const WritingExamPage = () => {
     <>
       <Preloader />
       <Animation />
-      <section className="py-40">
-        <div className="container-fluid px-0">
-          <div className="row g-0">
-            {/* Left side - PDF Viewer (if available) */}
-            {getPDFUrl() && (
-              <div className="col-lg-6 col-md-6">
-                <div
-                  className="bg-white border-end border-neutral-30 h-100"
-                  style={{ minHeight: "calc(100vh - 200px)" }}
-                >
-                  <div className="p-24 border-bottom border-neutral-30 flex-between gap-16">
-                    <h4 className="mb-0">Đề thi Writing</h4>
-                    {timeRemaining !== null && (
-                      <div className="flex-align gap-8">
-                        <span className="text-2xl text-main-600">
-                          <i className="ph ph-clock" />
-                        </span>
-                        <span
-                          className={`text-lg fw-bold ${
-                            timeRemaining < 300 ? "text-danger" : "text-neutral-700"
-                          }`}
-                        >
-                          {formatTime(timeRemaining)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-24" style={{ height: "calc(100vh - 280px)", overflow: "auto" }}>
-                    <iframe
-                      src={getPDFUrl()}
-                      className="w-100 h-100 border-0 rounded-8"
-                      title="Writing PDF"
-                      style={{ minHeight: "600px" }}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
+      
+      <div className="writing-exam-container" style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+        <style>{`
+          .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+          }
+          .hide-scrollbar {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+          }
+          .writing-exam-container {
+            background: hsl(var(--main-25));
+          }
+          .writing-exam-header {
+            background: white;
+            border-bottom: 1px solid hsl(var(--border-color));
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            z-index: 10;
+          }
+          .writing-exam-header .logo img {
+            height: 40px;
+            width: auto;
+          }
+          .writing-exam-timer {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 18px;
+            font-weight: 600;
+          }
+          .writing-exam-timer.danger {
+            color: var(--danger-600);
+          }
+          .writing-exam-main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+          }
+          .resizable-panel {
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+          }
+          .resizer {
+            width: 4px;
+            background-color: #e0e0e0;
+            cursor: col-resize;
+            position: relative;
+            flex-shrink: 0;
+            transition: background-color 0.2s;
+          }
+          .resizer:hover {
+            background-color: hsl(var(--main-600));
+          }
+          .resizer::before {
+            content: '';
+            position: absolute;
+            left: -2px;
+            right: -2px;
+            top: 0;
+            bottom: 0;
+            cursor: col-resize;
+          }
+          .question-navigation {
+            background: white;
+            border-top: 1px solid hsl(var(--border-color));
+            padding: 16px 24px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+            overflow-x: auto;
+            flex-shrink: 0;
+          }
+          .question-nav-item {
+            min-width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            border: 1px solid hsl(var(--border-color));
+            background: white;
+            color: var(--neutral-700);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+          }
+          .question-nav-item:hover {
+            border-color: hsl(var(--main-600));
+            color: hsl(var(--main-600));
+          }
+          .question-nav-item.active {
+            background: hsl(var(--main-600));
+            color: white;
+            border-color: hsl(var(--main-600));
+          }
+          .question-nav-item.answered {
+            background: hsl(var(--main-25));
+            border-color: hsl(var(--main-300));
+          }
+          .question-nav-item.answered.active {
+            background: hsl(var(--main-600));
+            border-color: hsl(var(--main-600));
+          }
+        `}</style>
 
-            {/* Right side - Writing Area */}
-            <div className={getPDFUrl() ? "col-lg-6 col-md-6" : "col-12"}>
-              <div className="bg-main-25 h-100" style={{ minHeight: "calc(100vh - 200px)" }}>
-                <div className="p-24 border-bottom border-neutral-30 bg-white">
-                  <div className="flex-between gap-16 flex-wrap">
-                    <div>
-                      <h4 className="mb-8">Viết bài</h4>
-                      {sectionData?.section?.instructions && (
-                        <p className="text-neutral-600 text-sm mb-0">
-                          {sectionData.section.instructions}
-                        </p>
-                      )}
-                    </div>
-                    {timeRemaining !== null && !getPDFUrl() && (
-                      <div className="flex-align gap-8">
-                        <span className="text-2xl text-main-600">
-                          <i className="ph ph-clock" />
-                        </span>
-                        <span
-                          className={`text-lg fw-bold ${
-                            timeRemaining < 300 ? "text-danger" : "text-neutral-700"
-                          }`}
-                        >
-                          {formatTime(timeRemaining)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div
-                  className="p-24"
-                  style={{
-                    height: getPDFUrl() ? "calc(100vh - 280px)" : "calc(100vh - 200px)",
+        {/* Header: Logo, Timer, Submit Button */}
+        <div className="writing-exam-header">
+          <div className="logo">
+            <Link to="/" className="link">
+              <img src="assets/images/logo/logo.png" alt="Logo" />
+            </Link>
+          </div>
+          
+          {timeRemaining !== null && (
+            <div className={`writing-exam-timer ${timeRemaining < 300 ? "danger" : ""}`}>
+              <i className="ph ph-clock" style={{ fontSize: "20px" }}></i>
+              <span>{formatTime(timeRemaining)}</span>
+            </div>
+          )}
+          
+          <div className="flex-align gap-16">
+            <button
+              onClick={toggleFullscreen}
+              className="btn btn-outline-main rounded-pill flex-align gap-8"
+              title={isFullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
+            >
+              <i className={`ph ${isFullscreen ? "ph-arrows-in" : "ph-arrows-out"}`}></i>
+              {isFullscreen ? "Thoát" : "Toàn màn hình"}
+            </button>
+            <button
+              onClick={() => handleSubmit()}
+              disabled={submitting || (() => {
+                // Check if at least one part has answers
+                return !sectionData?.parts?.some((partData) => {
+                  const partAnswers = answers[`part_${partData.part}`] || {};
+                  return Object.keys(partAnswers).some((qNum) => partAnswers[qNum]?.trim());
+                });
+              })()}
+              className="btn btn-main rounded-pill px-32 py-12 flex-align gap-8"
+            >
+              {submitting ? (
+                <>
+                  <span className="spinner-border spinner-border-sm" role="status"></span>
+                  Đang nộp...
+                </>
+              ) : (
+                <>
+                  <i className="ph ph-check"></i>
+                  Nộp bài
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Main Content: PDF and Writing Area */}
+        <div className="writing-exam-main" ref={containerRef}>
+          {/* Left side - PDF Viewer (if available) */}
+          {getPDFUrl(currentPart) && (
+            <>
+              <div
+                className="resizable-panel bg-white"
+                style={{ width: `${leftWidth}%` }}
+              >
+                <div 
+                  className="p-24 hide-scrollbar" 
+                  style={{ 
+                    height: "100%", 
                     overflow: "auto",
                   }}
                 >
-                  {error && (
-                    <div className="alert alert-danger mb-24" role="alert">
-                      {error}
-                    </div>
-                  )}
-
-                  <div className="mb-24">
-                    {generateQuestionNumbers().map((qNum) => {
-                      const answerText = answers[qNum] || "";
-                      const wordCount = getWordCount(answerText);
-                      const questionData = getQuestionData(qNum);
-                      return (
-                        <div
-                          key={qNum}
-                          className="bg-white rounded-12 p-24 mb-24 border border-neutral-30"
-                        >
-                          <div className="flex-between gap-16 mb-16">
-                            <label className="fw-semibold text-neutral-700 text-lg">
-                              Câu {qNum}
-                            </label>
-                            <div className="flex-align gap-16">
-                              {answerText && (
-                                <span className="badge bg-main-600 text-white px-12 py-4 rounded-pill">
-                                  Đã viết ({wordCount} từ)
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Question Title */}
-                          {questionData.questionTitle && (
-                            <div className="mb-16">
-                              <p className="text-neutral-700 fw-semibold mb-0">{questionData.questionTitle}</p>
-                            </div>
-                          )}
-
-                          {/* Question Answers (if any) */}
-                          {questionData.questionAnswer && questionData.questionAnswer.length > 0 && (
-                            <div className="mb-16">
-                              <p className="text-neutral-600 text-sm mb-8">Các đáp án:</p>
-                              <div className="d-flex flex-column gap-4">
-                                {questionData.questionAnswer.map((option, idx) => (
-                                  <div key={idx} className="text-neutral-600 text-sm">
-                                    <span className="fw-semibold">{option.key}.</span> {option.text}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          <textarea
-                            className="form-control"
-                            rows={12}
-                            placeholder="Viết câu trả lời của bạn ở đây..."
-                            value={answerText}
-                            onChange={(e) => handleAnswerChange(qNum, e.target.value)}
-                            style={{
-                              fontSize: "16px",
-                              lineHeight: "1.6",
-                              resize: "vertical",
-                            }}
-                          />
-                          <div className="mt-8 text-end">
-                            <span className="text-neutral-500 text-sm">
-                              Số từ: {wordCount}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="sticky-bottom bg-white border-top border-neutral-30 p-24 mt-24">
-                    <div className="flex-between gap-16 flex-wrap">
-                      <div>
-                        <p className="text-neutral-600 text-sm mb-0">
-                          Đã viết: {Object.keys(answers).filter((qNum) => answers[qNum]?.trim()).length} /{" "}
-                          {sectionData?.section?.questionCount || 0} câu
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleSubmit()}
-                        disabled={submitting || Object.keys(answers).filter((qNum) => answers[qNum]?.trim()).length === 0}
-                        className="btn btn-primary px-32 py-12 rounded-pill"
-                      >
-                        {submitting ? "Đang nộp..." : "Nộp bài"}
-                      </button>
-                    </div>
-                  </div>
+                  <iframe
+                    src={getPDFUrl(currentPart)}
+                    className="w-100 h-100 border-0 rounded-8"
+                    title="Writing PDF"
+                    style={{ minHeight: "600px" }}
+                  />
                 </div>
               </div>
+
+              {/* Resizer Bar */}
+              <div 
+                className="resizer"
+                onMouseDown={handleMouseDown}
+                role="separator"
+                aria-label="Resize panels"
+                aria-orientation="vertical"
+              />
+            </>
+          )}
+
+          {/* Right side - Writing Area */}
+          <div
+            className="resizable-panel bg-main-25"
+            style={{ width: getPDFUrl(currentPart) ? `${100 - leftWidth}%` : "100%" }}
+          >
+            <div className="p-24" style={{ height: "100%", overflow: "auto" }}>
+              {error && (
+                <div className="alert alert-danger mb-24" role="alert">
+                  {error}
+                </div>
+              )}
+
+              {/* Part Selector */}
+              {sectionData?.parts && sectionData.parts.length > 1 && (
+                <div className="bg-white rounded-12 p-16 mb-24 border border-neutral-30">
+                  <div className="d-flex flex-wrap gap-8 align-items-center">
+                    <span className="fw-semibold text-neutral-700 text-sm mb-0">Chọn phần:</span>
+                    {sectionData.parts.map((partData) => (
+                      <button
+                        key={partData.part}
+                        onClick={() => {
+                          setCurrentPart(partData.part);
+                          setCurrentQuestion(1);
+                        }}
+                        className={`btn ${
+                          currentPart === partData.part ? "btn-main" : "btn-outline-main"
+                        } px-12 py-4 rounded-pill text-sm`}
+                      >
+                        Part {partData.part}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(() => {
+                const currentPartData = sectionData?.parts?.find((p) => p.part === currentPart);
+                const partAnswers = answers[`part_${currentPart}`] || {};
+                
+                return (
+                  <>
+                    {currentPartData?.section?.instructions && (
+                      <div className="bg-white rounded-12 p-16 mb-24 border border-neutral-30">
+                        <p className="text-neutral-700 mb-0 fw-semibold">Hướng dẫn:</p>
+                        <p className="text-neutral-600 text-sm mb-0 mt-8">{currentPartData.section.instructions}</p>
+                      </div>
+                    )}
+
+                    <div className="mb-24">
+                      {generateQuestionNumbers(currentPart).map((qNum) => {
+                        const answerText = partAnswers[qNum] || "";
+                        const wordCount = getWordCount(answerText);
+                        const questionData = getQuestionData(currentPart, qNum);
+                        const hasAnswer = answerText && answerText.trim();
+                        
+                        return (
+                          <div
+                            key={qNum}
+                            ref={(el) => (questionRefs.current[`part_${currentPart}_q_${qNum}`] = el)}
+                            className="bg-white rounded-12 p-24 mb-24 border border-neutral-30"
+                          >
+                            <div className="flex-between gap-16 mb-16">
+                              <label className="fw-semibold text-neutral-700 text-lg">
+                                Câu {qNum}
+                              </label>
+                              <div className="flex-align gap-16">
+                                {hasAnswer && (
+                                  <span className="badge bg-main-600 text-white px-12 py-4 rounded-pill">
+                                    Đã viết ({wordCount} từ)
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Question Title */}
+                            {questionData.questionTitle && (
+                              <div className="mb-16">
+                                <p className="text-neutral-700 fw-semibold mb-0">{questionData.questionTitle}</p>
+                              </div>
+                            )}
+
+                            {/* Question Answers (if any) */}
+                            {questionData.questionAnswer && questionData.questionAnswer.length > 0 && (
+                              <div className="mb-16">
+                                <p className="text-neutral-600 text-sm mb-8">Các đáp án:</p>
+                                <div className="d-flex flex-column gap-4">
+                                  {questionData.questionAnswer.map((option, idx) => (
+                                    <div key={idx} className="text-neutral-600 text-sm">
+                                      <span className="fw-semibold">{option.key}.</span> {option.text}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            <textarea
+                              className="form-control"
+                              rows={12}
+                              placeholder="Viết câu trả lời của bạn ở đây..."
+                              value={answerText}
+                              onChange={(e) => handleAnswerChange(currentPart, qNum, e.target.value)}
+                              style={{
+                                fontSize: "16px",
+                                lineHeight: "1.6",
+                                resize: "vertical",
+                              }}
+                            />
+                            <div className="mt-8 text-end">
+                              <span className="text-neutral-500 text-sm">
+                                Số từ: {wordCount}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="bg-white rounded-12 p-16 border border-neutral-30">
+                      <p className="text-neutral-600 text-sm mb-0 text-center">
+                        Đã viết: <strong className="text-main-600">
+                          {Object.keys(partAnswers).filter((qNum) => partAnswers[qNum]?.trim()).length}
+                        </strong> / {generateQuestionNumbers(currentPart).length} câu
+                      </p>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
-      </section>
+
+        {/* Question Navigation at Bottom */}
+        <div className="question-navigation">
+          {generateQuestionNumbers(currentPart).map((qNum) => {
+            const partAnswers = answers[`part_${currentPart}`] || {};
+            const answerText = partAnswers[qNum] || "";
+            const hasAnswer = answerText && answerText.trim();
+            const isActive = currentQuestion === qNum;
+            
+            return (
+              <button
+                key={qNum}
+                onClick={() => scrollToQuestion(qNum)}
+                className={`question-nav-item ${isActive ? "active" : ""} ${hasAnswer ? "answered" : ""}`}
+                title={`Câu ${qNum}${hasAnswer ? " - Đã viết" : ""}`}
+              >
+                {qNum}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </>
   );
 };

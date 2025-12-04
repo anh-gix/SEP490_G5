@@ -20,19 +20,21 @@ const answerKeySchema = new mongoose.Schema({
   }]
 });
 
+// Phân loại kĩ năng cho các part trong đề thi
 const sectionSchema = new mongoose.Schema({
   type: {
     type: String,
     enum: ["listening", "reading", "writing", "speaking"],
     required: true,
   },
-  fileUrl: String,
+  fileUrl: String, 
   audioUrls: [String],
   instructions: String,
   duration: Number,
   questionCount: Number,
   answerKey: [answerKeySchema],
   maxScore: Number,
+  part: Number,
 });
 
 const examSchema = new mongoose.Schema(
@@ -44,6 +46,25 @@ const examSchema = new mongoose.Schema(
     level: { type: String, enum: ["Academic", "General"], required: true },
     totalDuration: Number,
     sections: [sectionSchema],
+
+    // ===== WIZARD PROGRESS =====
+    lastCompletedStep: { type: Number, default: 0 }, // 0: chưa hoàn thành step nào, 1-4: step đã hoàn thành
+
+    // ===== STATUS ĐỂ XEM EXAM ĐÃ ĐƯỢC DUYỆT CHƯA =====
+    // Tất cả thông tin chi tiết về submission, approval, rejection được lưu trong ApprovalRequest model
+    status: {
+      type: String,
+      enum: [
+        'draft',              // Đang soạn
+        'pending_approval',   // Đã submit, chờ Center Head duyệt
+        'approved',           // Center Head đã duyệt
+        'needs_revision',     // Center Head yêu cầu chỉnh sửa
+        'archived'            // Đã lưu trữ
+      ],
+      default: 'draft'
+    },
+
+    // Giữ lại isPublished để quản lý việc publish exam cho học viên
     isPublished: { type: Boolean, default: false },
     publishedAt: { type: Date },
     unpublishedAt: { type: Date },

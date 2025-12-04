@@ -442,10 +442,6 @@ export const mockSessions = [
     title: "Introduction to TOEIC",
     order: 1,
     content: "Giới thiệu về kỳ thi TOEIC, cấu trúc đề thi, chiến lược làm bài",
-    materials: [
-      { name: "TOEIC Overview.pdf", url: "/materials/toeic-overview.pdf" },
-      { name: "Sample Test.pdf", url: "/materials/sample-test.pdf" },
-    ],
     learningType: "Online",
     clos: ["clo001", "clo002"],
     cloDetails: [
@@ -459,10 +455,6 @@ export const mockSessions = [
     title: "Grammar Basics - Present Tenses",
     order: 2,
     content: "Học về thì hiện tại đơn, hiện tại tiếp diễn, hiện tại hoàn thành",
-    materials: [
-      { name: "Present Tenses.pdf", url: "/materials/present-tenses.pdf" },
-      { name: "Exercises.pdf", url: "/materials/exercises.pdf" },
-    ],
     learningType: "Offline",
     clos: ["clo003"],
     cloDetails: [
@@ -475,10 +467,6 @@ export const mockSessions = [
     title: "Practice Test 1",
     order: 3,
     content: "Làm bài thi thử TOEIC Part 1-4 (Listening)",
-    materials: [
-      { name: "Practice Test 1.pdf", url: "/materials/practice-test-1.pdf" },
-      { name: "Audio Files.zip", url: "/materials/audio-files.zip" },
-    ],
     learningType: "Mixed",
     clos: ["clo001"],
     cloDetails: [

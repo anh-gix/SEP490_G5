@@ -9,11 +9,11 @@ const JoinCommunityOne = () => {
                 <div className='join-community__content'>
                   <div className='mb-40'>
                     <h2 className='mb-24 wow bounceIn'>
-                      Join the EduAll Community: Start Now
+                      Tham Gia Cộng Đồng EduAll: Bắt Đầu Ngay
                     </h2>
                     <p className='text-neutral-500 text-line-2 wow bounceInUp'>
-                      Ready to explore our courses firsthand? Sign up for a free
-                      trial lesson today and get a taste of the engaging.
+                      Sẵn sàng khám phá các khóa học của chúng tôi trực tiếp? Đăng ký
+                      bài học thử miễn phí ngay hôm nay và trải nghiệm sự thú vị.
                     </p>
                   </div>
                   <form action='#'>
@@ -25,7 +25,7 @@ const JoinCommunityOne = () => {
                       <input
                         type='text'
                         className='bg-white text-black border border-transparent focus-border-main-600 h-48 rounded-pill px-16 ps-60 outline-0 w-100'
-                        placeholder='Enter Name...'
+                        placeholder='Nhập tên...'
                       />
                       <span className='bg-white text-neutral-200 text-2xl flex-center w-48 h-48 rounded-circle border border-main-25 border-4 position-absolute inset-inline-start-0 top-50 translate-middle-y'>
                         <i className='ph-bold ph-user-circle' />
@@ -39,7 +39,7 @@ const JoinCommunityOne = () => {
                       <input
                         type='email'
                         className='bg-white text-black border border-transparent focus-border-main-600 h-48 rounded-pill px-16 ps-60 outline-0 w-100'
-                        placeholder='Enter Email'
+                        placeholder='Nhập Email'
                       />
                       <span className='bg-white text-neutral-200 text-2xl flex-center w-48 h-48 rounded-circle border border-main-25 border-4 position-absolute inset-inline-start-0 top-50 translate-middle-y'>
                         <i className='ph-bold ph-envelope-open' />
@@ -51,9 +51,9 @@ const JoinCommunityOne = () => {
                       data-aos-duration={800}
                     >
                       <select className='bg-white text-black border border-transparent focus-border-main-600 h-48 rounded-pill px-16 ps-60 outline-0 w-100 text-neutral-300'>
-                        <option value={1}>Front End Developer</option>
-                        <option value={1}>Back End Developer</option>
-                        <option value={1}>UX/UI Designer</option>
+                        <option value={1}>Nhà Phát Triển Front End</option>
+                        <option value={1}>Nhà Phát Triển Back End</option>
+                        <option value={1}>Nhà Thiết Kế UX/UI</option>
                       </select>
                       <span className='bg-white text-neutral-200 text-2xl flex-center w-48 h-48 rounded-circle border border-main-25 border-4 position-absolute inset-inline-start-0 top-50 translate-middle-y'>
                         <i className='ph-bold ph-book' />
@@ -68,7 +68,7 @@ const JoinCommunityOne = () => {
                         type='submit'
                         className='btn btn-main rounded-pill flex-align d-inline-flex gap-8'
                       >
-                        Join Now
+                        Tham Gia Ngay
                         <i className='ph-bold ph-arrow-up-right d-flex text-lg' />
                       </button>
                     </div>
@@ -93,7 +93,7 @@ const JoinCommunityOne = () => {
                     </span>
                     <div className='text-start'>
                       <h6 className='mb-4'>56K</h6>
-                      <span className=''>All Students</span>
+                      <span className=''>Tất Cả Học Viên</span>
                     </div>
                   </div>
                 </div>

@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
-import axios from 'axios';
+import * as XLSX from 'xlsx';
 import scheduleService from '../../services/scheduleService';
 import roomService from '../../services/roomService';
 import teacherService from '../../services/teacherService';
+import studentService from '../../services/studentService';
+import classService from '../../services/classService';
+import courseService from '../../services/courseService';
+import SelectStudentModal from './SelectStudentModal';
 
 const createEmptyScheduleEntry = () => ({
   id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -22,19 +26,47 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     level: '',
     program: '',
     band: '',
+    course: '',
     teacherId: '',
     roomId: '',
     maxStudents: 25,
     startDate: '',
     endDate: '',
     scheduleEntries: [createEmptyScheduleEntry()],
-    tuitionFee: 0
+    selectedStudents: []
   });
+
+  const [courses, setCourses] = useState([]);
+  const [coursesLoading, setCoursesLoading] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState(null); // Store course details including numberOfSessions
 
   const [teachers, setTeachers] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [studentsLoading, setStudentsLoading] = useState(true);
+  const [studentsError, setStudentsError] = useState(null);
+  const [scheduleEntriesError, setScheduleEntriesError] = useState(null);
+  const [duplicateEntryIndices, setDuplicateEntryIndices] = useState([]);
+  const [showSelectStudentModal, setShowSelectStudentModal] = useState(false);
+  const [importingExcel, setImportingExcel] = useState(false);
+  const [showImportResultModal, setShowImportResultModal] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [capacityWarning, setCapacityWarning] = useState(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const fileInputRef = useRef(null);
+  
+  // Conflict checking states
+  const [conflicts, setConflicts] = useState({
+    hasConflict: false,
+    teacher: [],
+    room: [],
+    students: []
+  });
+  const [checkingConflicts, setCheckingConflicts] = useState(false);
 
   const [teacherSchedules, setTeacherSchedules] = useState({}); // Map teacherId -> schedules
+  const [studentSchedules, setStudentSchedules] = useState({}); // Map studentId -> schedules
   const [existingSchedules, setExistingSchedules] = useState(() => {
     // Mock data để test conflict checking - CHỈ DÙNG KHI USE_MOCK_DATA = true
     // Trong production, dữ liệu sẽ được fetch từ API
@@ -136,14 +168,14 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   const programTypeMap = {
     'IELTS': 'ielts',
     'TOEIC': 'toeic',
-    'Tiếng Anh Giao tiếp': 'cam'
+    'Cambridge': 'cam'
   };
 
   // Type to program name mapping
   const typeProgramMap = {
     'ielts': 'IELTS',
     'toeic': 'TOEIC',
-    'cam': 'Tiếng Anh Giao tiếp'
+    'cam': 'Cambridge'
   };
 
   const daysOfWeek = [
@@ -170,31 +202,239 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     return programTypeMap[programName] || null;
   };
 
+  // Map type to program name (case-insensitive)
+  const getProgramFromType = (type) => {
+    if (!type) return null;
+    const normalizedType = type.toLowerCase();
+    return typeProgramMap[normalizedType] || null;
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
-    // Validate dates when they change (use setTimeout to validate after state update)
-    if (name === 'startDate' || name === 'endDate') {
+    // Validate start date when it changes
+    if (name === 'startDate') {
       const today = getTodayDate();
       
-      // Get the updated values
-      const newStartDate = name === 'startDate' ? value : formData.startDate;
-      const newEndDate = name === 'endDate' ? value : formData.endDate;
-      
       // Validate start date is not in the past
-      if (name === 'startDate' && value && value < today) {
+      if (value && value < today) {
         setDateError('Ngày khai giảng không được là quá khứ!');
-      }
-      // Validate if both dates are filled
-      else if (newStartDate && newEndDate && newEndDate <= newStartDate) {
-        setDateError('Ngày kết thúc phải sau ngày khai giảng!');
-      }
-      else {
+      } else {
         setDateError('');
       }
     }
     
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleStudentToggle = (studentId) => {
+    setFormData(prev => {
+      const currentSelected = prev.selectedStudents || [];
+      const isSelected = currentSelected.includes(studentId);
+      
+      if (isSelected) {
+        // Remove student
+        return {
+          ...prev,
+          selectedStudents: currentSelected.filter(id => id !== studentId)
+        };
+      } else {
+        // Add student
+        return {
+          ...prev,
+          selectedStudents: [...currentSelected, studentId]
+        };
+      }
+    });
+  };
+
+  const handleRemoveStudent = (studentId) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedStudents: prev.selectedStudents.filter(id => id !== studentId)
+    }));
+  };
+
+  const handleStudentsConfirmed = (selectedStudentIds) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedStudents: selectedStudentIds
+    }));
+  };
+
+  // Normalize phone number for matching (remove spaces, +, -, etc.)
+  const normalizePhone = (phone) => {
+    if (!phone) return '';
+    return phone.toString().replace(/[\s\+\-\(\)]/g, '');
+  };
+
+  // Handle Excel import button click
+  const handleExcelImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Handle Excel file selection and processing
+  const handleExcelFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
+    const isValidType = validTypes.includes(file.type) || 
+                       file.name.endsWith('.xlsx') || 
+                       file.name.endsWith('.xls');
+
+    if (!isValidType) {
+      setImportResult({
+        success: 0,
+        notFound: [],
+        total: 0,
+        error: 'Vui lòng chọn file Excel (.xlsx hoặc .xls)'
+      });
+      setShowImportResultModal(true);
+      e.target.value = '';
+      return;
+    }
+
+    setImportingExcel(true);
+
+    try {
+      // Read file as array buffer
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+
+      // Get first sheet
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        setImportResult({
+          success: 0,
+          notFound: [],
+          total: 0,
+          error: 'File Excel không có sheet nào'
+        });
+        setShowImportResultModal(true);
+        e.target.value = '';
+        return;
+      }
+
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+
+      if (!worksheet) {
+        setImportResult({
+          success: 0,
+          notFound: [],
+          total: 0,
+          error: 'Sheet đầu tiên không có dữ liệu'
+        });
+        setShowImportResultModal(true);
+        e.target.value = '';
+        return;
+      }
+
+      // Convert to JSON (array of objects)
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+        header: 1, 
+        defval: '' 
+      });
+
+      if (!jsonData || jsonData.length === 0) {
+        setImportResult({
+          success: 0,
+          notFound: [],
+          total: 0,
+          error: 'File Excel không có dữ liệu'
+        });
+        setShowImportResultModal(true);
+        e.target.value = '';
+        return;
+      }
+
+      // Extract emails/phones from first column (skip header row)
+      const emailsOrPhones = [];
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        if (row && row[0]) {
+          const value = String(row[0]).trim();
+          if (value) {
+            emailsOrPhones.push(value);
+          }
+        }
+      }
+
+      if (emailsOrPhones.length === 0) {
+        setImportResult({
+          success: 0,
+          notFound: [],
+          total: 0,
+          error: 'Không tìm thấy email hoặc số điện thoại nào trong file Excel'
+        });
+        setShowImportResultModal(true);
+        e.target.value = '';
+        return;
+      }
+
+      // Match students by email or phone
+      const matchedStudentIds = [];
+      const notFound = [];
+
+      emailsOrPhones.forEach((value) => {
+        const normalizedValue = value.toLowerCase().trim();
+        const normalizedPhone = normalizePhone(value);
+
+        const foundStudent = students.find((student) => {
+          const studentEmail = (student.email || '').toLowerCase().trim();
+          const studentPhone = normalizePhone(student.phone || '');
+
+          return studentEmail === normalizedValue || 
+                 studentPhone === normalizedPhone;
+        });
+
+        if (foundStudent) {
+          const studentId = foundStudent._id || foundStudent.id;
+          if (studentId && !matchedStudentIds.includes(String(studentId))) {
+            matchedStudentIds.push(String(studentId));
+          }
+        } else {
+          notFound.push(value);
+        }
+      });
+
+      // Add matched students to selectedStudents (avoid duplicates)
+      if (matchedStudentIds.length > 0) {
+        setFormData(prev => {
+          const currentSelected = prev.selectedStudents || [];
+          const newSelected = [...new Set([...currentSelected, ...matchedStudentIds])];
+          return {
+            ...prev,
+            selectedStudents: newSelected
+          };
+        });
+      }
+
+      // Show results in modal
+      setImportResult({
+        success: matchedStudentIds.length,
+        notFound: notFound,
+        total: emailsOrPhones.length
+      });
+      setShowImportResultModal(true);
+
+    } catch (error) {
+      console.error('Error reading Excel file:', error);
+      setImportResult({
+        success: 0,
+        notFound: [],
+        total: 0,
+        error: 'Lỗi khi đọc file Excel: ' + (error.message || 'Vui lòng thử lại')
+      });
+      setShowImportResultModal(true);
+    } finally {
+      setImportingExcel(false);
+      e.target.value = ''; // Reset file input
+    }
   };
 
   // Auto-fetch band when program and level are selected
@@ -219,35 +459,158 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
       try {
         console.log('🌐 Fetching band from API with params:', { type, level: formData.level });
-        const response = await axios.get('http://localhost:8080/api/v1/courses/band', {
-          params: {
-            type: type,
-            level: formData.level
+        const response = await courseService.getBandByTypeAndLevel(type, formData.level);
+
+        console.log('✅ API Response:', response);
+
+        if (response && response.success) {
+          if (response.band && response.band.trim() !== '') {
+            console.log('✅ Setting band to:', response.band);
+            setFormData(prev => ({ ...prev, band: response.band }));
+          } else {
+            console.warn('⚠️ No band found in response (band is null or empty), clearing band');
+            setFormData(prev => ({ ...prev, band: '' }));
           }
-        });
-
-        console.log('✅ API Response:', response.data);
-
-        if (response.data && response.data.success && response.data.band) {
-          console.log('✅ Setting band to:', response.data.band);
-          setFormData(prev => ({ ...prev, band: response.data.band }));
         } else {
-          console.warn('⚠️ No band found in response, clearing band');
-          // Clear band if no mapping found
+          console.warn('⚠️ API response not successful, clearing band');
           setFormData(prev => ({ ...prev, band: '' }));
         }
       } catch (error) {
         console.error('❌ Error fetching band:', error);
-        if (error.response) {
-          console.error('❌ Response data:', error.response.data);
-          console.error('❌ Response status:', error.response.status);
-        }
-        // Don't clear band on error, keep existing value
+        console.error('❌ Error details:', error.response?.data || error.message);
+        // Clear band on error to avoid showing stale data
+        setFormData(prev => ({ ...prev, band: '' }));
       }
     };
 
     fetchBand();
   }, [formData.program, formData.level]);
+
+  // Fetch courses when program is selected
+  useEffect(() => {
+    const fetchCourses = async () => {
+      if (!formData.program) {
+        setCourses([]);
+        setSelectedCourse(null);
+        setFormData(prev => ({ ...prev, course: '' }));
+        return;
+      }
+
+      try {
+        setCoursesLoading(true);
+        const response = await courseService.getCoursesByProgram(formData.program, formData.level);
+
+        if (response && response.success && response.courses) {
+          setCourses(response.courses);
+          // Clear course selection if current course is not in the new list
+          if (formData.course) {
+            const courseExists = response.courses.some(c => 
+              (c._id || c.id) === formData.course
+            );
+            if (!courseExists) {
+              setFormData(prev => ({ ...prev, course: '' }));
+              setSelectedCourse(null);
+            }
+          }
+        } else {
+          setCourses([]);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching courses:', error);
+        setCourses([]);
+      } finally {
+        setCoursesLoading(false);
+      }
+    };
+
+    fetchCourses();
+  }, [formData.program, formData.level]);
+
+  // Fetch course details when course is selected
+  useEffect(() => {
+    const fetchCourseDetails = async () => {
+      if (!formData.course) {
+        setSelectedCourse(null);
+        return;
+      }
+
+      // First, try to get course from the courses list (already fetched)
+      const courseFromList = courses.find(c => (c._id || c.id) === formData.course);
+      if (courseFromList && courseFromList.numberOfSessions) {
+        // Use course from list if it has numberOfSessions
+        setSelectedCourse(courseFromList);
+        return;
+      }
+
+      // If not found in list or missing numberOfSessions, fetch details
+      try {
+        const response = await courseService.getCourseDetails(formData.course);
+        if (response && response.success && response.data) {
+          setSelectedCourse(response.data);
+        } else {
+          // Fallback to course from list if available
+          if (courseFromList) {
+            setSelectedCourse(courseFromList);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error fetching course details:', error);
+        // Fallback to course from list if available
+        if (courseFromList) {
+          setSelectedCourse(courseFromList);
+        } else {
+          setSelectedCourse(null);
+        }
+      }
+    };
+
+    fetchCourseDetails();
+  }, [formData.course, courses]);
+
+  // Real-time capacity validation
+  useEffect(() => {
+    if (formData.roomId && formData.selectedStudents && formData.selectedStudents.length > 0) {
+      const selectedRoom = rooms.find(r => (r._id || r.id) === formData.roomId);
+      if (selectedRoom) {
+        const roomCapacity = selectedRoom.capacity || selectedRoom.maxCapacity || selectedRoom.maxStudents;
+        const studentCount = formData.selectedStudents.length;
+        
+        if (roomCapacity && studentCount > roomCapacity) {
+          setCapacityWarning({
+            type: 'danger',
+            message: `⚠️ Cảnh báo: Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`
+          });
+        } else {
+          setCapacityWarning(null);
+        }
+      } else {
+        setCapacityWarning(null);
+      }
+    } else {
+      setCapacityWarning(null);
+    }
+  }, [formData.roomId, formData.selectedStudents, rooms]);
+
+  const checkDuplicateEntries = (entries) => {
+    const seen = new Set();
+    const duplicates = [];
+    
+    entries.forEach((entry, index) => {
+      // Chỉ kiểm tra entries đã điền đầy đủ
+      if (!entry.day || !entry.startTime || !entry.endTime) {
+        return;
+      }
+      
+      const key = `${entry.day}-${entry.startTime}-${entry.endTime}`;
+      if (seen.has(key)) {
+        duplicates.push(index);
+      } else {
+        seen.add(key);
+      }
+    });
+    
+    return duplicates;
+  };
 
   const handleScheduleEntryChange = (id, field, value) => {
     setFormData(prev => ({
@@ -257,6 +620,82 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       )
     }));
   };
+
+  // Real-time validation: Check for duplicates whenever scheduleEntries change
+  useEffect(() => {
+    const duplicates = checkDuplicateEntries(formData.scheduleEntries);
+    if (duplicates.length > 0) {
+      setScheduleEntriesError('Có các buổi học trùng lặp. Vui lòng kiểm tra lại ngày và giờ học.');
+      setDuplicateEntryIndices(duplicates);
+    } else {
+      setScheduleEntriesError(null);
+      setDuplicateEntryIndices([]);
+    }
+  }, [formData.scheduleEntries]);
+
+  // Real-time conflict checking: Check conflicts when relevant fields change
+  useEffect(() => {
+    const checkConflicts = async () => {
+      // Only check if we have minimum required fields
+      if (!formData.teacherId || !formData.startDate || !formData.course || 
+          !formData.scheduleEntries || formData.scheduleEntries.length === 0 ||
+          formData.scheduleEntries.some(entry => !entry.day || !entry.startTime || !entry.endTime)) {
+        setConflicts({
+          hasConflict: false,
+          teacher: [],
+          room: [],
+          students: []
+        });
+        return;
+      }
+
+      setCheckingConflicts(true);
+      try {
+        const conflictData = {
+          course: formData.course,
+          teacher: formData.teacherId,
+          students: formData.selectedStudents || [],
+          room: formData.roomId || null,
+          startDate: formData.startDate,
+          scheduleEntries: formData.scheduleEntries.map(entry => ({
+            day: entry.day,
+            startTime: entry.startTime,
+            endTime: entry.endTime
+          }))
+        };
+
+        const response = await classService.validateConflicts(conflictData);
+        
+        if (response.success) {
+          setConflicts({
+            hasConflict: response.hasConflict,
+            teacher: response.conflicts?.teacher || [],
+            room: response.conflicts?.room || [],
+            students: response.conflicts?.students || []
+          });
+        }
+      } catch (error) {
+        console.error('Error checking conflicts:', error);
+        // Don't show error to user, just silently fail
+        setConflicts({
+          hasConflict: false,
+          teacher: [],
+          room: [],
+          students: []
+        });
+      } finally {
+        setCheckingConflicts(false);
+      }
+    };
+
+    // Debounce the conflict check to avoid too many API calls
+    const timeoutId = setTimeout(() => {
+      checkConflicts();
+    }, 500); // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.teacherId, formData.startDate, formData.course, formData.roomId, 
+      formData.selectedStudents, formData.scheduleEntries]);
 
   const addScheduleEntry = () => {
     setFormData(prev => ({
@@ -280,7 +719,15 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     
     // Validation
     if (!formData.name || !formData.level || !formData.program) {
-      alert('Vui lòng điền đầy đủ thông tin bắt buộc!');
+      setErrorMessage('Vui lòng điền đầy đủ thông tin bắt buộc (tên lớp, chương trình, cấp độ)!');
+      setShowErrorModal(true);
+      return;
+    }
+
+    // Validate teacher is selected
+    if (!formData.teacherId) {
+      setErrorMessage('Vui lòng chọn giáo viên!');
+      setShowErrorModal(true);
       return;
     }
 
@@ -288,7 +735,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       formData.scheduleEntries.length === 0 ||
       formData.scheduleEntries.some(entry => !entry.day)
     ) {
-      alert('Vui lòng chọn ít nhất 1 ngày học và điền đủ thời gian!');
+      setErrorMessage('Vui lòng chọn ít nhất 1 ngày học và điền đủ thời gian!');
+      setShowErrorModal(true);
       return;
     }
 
@@ -297,97 +745,192 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         entry => entry.startTime >= entry.endTime
       )
     ) {
-      alert('Giờ bắt đầu phải nhỏ hơn giờ kết thúc!');
+      setErrorMessage('Giờ bắt đầu phải nhỏ hơn giờ kết thúc!');
+      setShowErrorModal(true);
       return;
     }
+
+    // Check for duplicate schedule entries
+    const duplicateIndices = checkDuplicateEntries(formData.scheduleEntries);
+    if (duplicateIndices.length > 0) {
+      setScheduleEntriesError('Có các buổi học trùng lặp. Vui lòng kiểm tra lại ngày và giờ học.');
+      setErrorMessage('Có các buổi học trùng lặp. Vui lòng kiểm tra lại ngày và giờ học.');
+      setShowErrorModal(true);
+      return;
+    }
+    setScheduleEntriesError(null);
 
     // Validate start date is not in the past
     const today = getTodayDate();
     if (formData.startDate && formData.startDate < today) {
-      alert('Ngày khai giảng không được là quá khứ!');
       setDateError('Ngày khai giảng không được là quá khứ!');
+      setErrorMessage('Ngày khai giảng không được là quá khứ!');
+      setShowErrorModal(true);
       return;
     }
 
-    // Validate date range
-    if (formData.startDate && formData.endDate && formData.endDate <= formData.startDate) {
-      alert('Ngày kết thúc phải sau ngày khai giảng!');
-      setDateError('Ngày kết thúc phải sau ngày khai giảng!');
+    // Validate course is selected
+    if (!formData.course) {
+      setErrorMessage('Vui lòng chọn course!');
+      setShowErrorModal(true);
       return;
     }
 
-    onSubmit(formData);
+    // Validate room capacity if room is selected
+    if (formData.roomId) {
+      const selectedRoom = rooms.find(r => (r._id || r.id) === formData.roomId);
+      if (selectedRoom) {
+        const roomCapacity = selectedRoom.capacity || selectedRoom.maxCapacity || selectedRoom.maxStudents;
+        const studentCount = (formData.selectedStudents || []).length;
+        
+        if (roomCapacity && studentCount > roomCapacity) {
+          setErrorMessage(`Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`);
+          setShowErrorModal(true);
+          return;
+        }
+      }
+    }
+
+    // Transform formData to match backend API expectations
+    const submitData = {
+      ...formData,
+      students: formData.selectedStudents || [], // Map selectedStudents to students for backend
+      teacher: formData.teacherId, // Map teacherId to teacher for backend
+      room: formData.roomId // Map roomId to room for backend
+    };
+
+    // Remove selectedStudents, teacherId, roomId from submitData as they're now mapped
+    delete submitData.selectedStudents;
+    delete submitData.teacherId;
+    delete submitData.roomId;
+
+    onSubmit(submitData);
   };
 
-  // Fetch mappings from database on mount
+  // Fetch types and levels from program table on mount
   useEffect(() => {
-    const fetchMappings = async () => {
+    const fetchCourseData = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/api/v1/courses/mappings');
-        if (response.data && response.data.success && response.data.mappings) {
-          setMappings(response.data.mappings);
-          console.log('✅ Loaded mappings from database:', response.data.mappings.length);
+        // Fetch all types and levels from program table
+        const [typesResponse, levelsResponse] = await Promise.all([
+          courseService.getAllTypes(),
+          courseService.getAllLevels()
+        ]);
+        
+        if (typesResponse?.success && typesResponse.types) {
+          const allTypes = typesResponse.types;
+          console.log('📋 Types from API:', allTypes);
+          const allPrograms = allTypes.map(type => getProgramFromType(type)).filter(Boolean);
+          setAvailablePrograms(allPrograms);
+          console.log('✅ Loaded types from program table:', allTypes.length);
+          console.log('✅ Available programs:', allPrograms);
+        } else {
+          console.warn('⚠️ Types response:', typesResponse);
+        }
+        
+        if (levelsResponse?.success && levelsResponse.levels) {
+          const allLevels = levelsResponse.levels;
+          setAvailableLevels(allLevels);
+          console.log('✅ Loaded levels from program table:', allLevels.length);
+        }
+        
+        // Also fetch mappings for band lookup (still needed for band display)
+        try {
+          const mappingsResponse = await courseService.getCourseMappings();
+          if (mappingsResponse && mappingsResponse.success && mappingsResponse.mappings) {
+            setMappings(mappingsResponse.mappings);
+            console.log('✅ Loaded mappings from program table:', mappingsResponse.mappings.length);
+          }
+        } catch (mappingsError) {
+          console.error('❌ Error fetching mappings:', mappingsError);
         }
       } catch (error) {
-        console.error('❌ Error fetching mappings:', error);
+        console.error('❌ Error fetching course data:', error);
       }
     };
-    fetchMappings();
+    fetchCourseData();
   }, []);
 
   // Filter levels based on selected program
   useEffect(() => {
-    if (!formData.program) {
-      // If no program selected, show all unique levels from mappings
-      const allLevels = [...new Set(mappings.map(m => m.level))].sort();
-      setAvailableLevels(allLevels);
-      return;
-    }
+    const filterLevels = async () => {
+      if (!formData.program) {
+        // If no program selected, show all levels from program table
+        try {
+          const response = await courseService.getAllLevels();
+          if (response?.success && response.levels) {
+            setAvailableLevels(response.levels);
+          }
+        } catch (error) {
+          console.error('❌ Error fetching all levels:', error);
+        }
+        return;
+      }
 
-    const type = getTypeFromProgram(formData.program);
-    if (!type) {
-      setAvailableLevels([]);
-      return;
-    }
+      const type = getTypeFromProgram(formData.program);
+      if (!type) {
+        setAvailableLevels([]);
+        return;
+      }
 
-    const levelsForType = mappings
-      .filter(m => m.type === type)
-      .map(m => m.level)
-      .filter((level, index, self) => self.indexOf(level) === index) // Remove duplicates
-      .sort();
+      // Fetch levels for this type from program table
+      try {
+        const response = await courseService.getLevelsByType(type);
+        if (response?.success && response.levels) {
+          setAvailableLevels(response.levels);
+          
+          // If current level is not available for selected program, clear it
+          if (formData.level && !response.levels.includes(formData.level)) {
+            setFormData(prev => ({ ...prev, level: '', band: '' }));
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error fetching levels by type:', error);
+      }
+    };
     
-    setAvailableLevels(levelsForType);
-
-    // If current level is not available for selected program, clear it
-    if (formData.level && !levelsForType.includes(formData.level)) {
-      setFormData(prev => ({ ...prev, level: '', band: '' }));
-    }
-  }, [formData.program, mappings]);
+    filterLevels();
+  }, [formData.program]);
 
   // Filter programs based on selected level
   useEffect(() => {
-    if (!formData.level) {
-      // If no level selected, show all unique programs from mappings
-      const allTypes = [...new Set(mappings.map(m => m.type))];
-      const allPrograms = allTypes.map(type => typeProgramMap[type]).filter(Boolean);
-      setAvailablePrograms(allPrograms);
-      return;
-    }
+    const filterPrograms = async () => {
+      if (!formData.level) {
+        // If no level selected, show all types from program table
+        try {
+          const response = await courseService.getAllTypes();
+          if (response?.success && response.types) {
+            const allTypes = response.types;
+            const allPrograms = allTypes.map(type => getProgramFromType(type)).filter(Boolean);
+            setAvailablePrograms(allPrograms);
+          }
+        } catch (error) {
+          console.error('❌ Error fetching all types:', error);
+        }
+        return;
+      }
 
-    const programsForLevel = mappings
-      .filter(m => m.level === formData.level)
-      .map(m => m.type)
-      .filter((type, index, self) => self.indexOf(type) === index) // Remove duplicates
-      .map(type => typeProgramMap[type])
-      .filter(Boolean);
+      // Fetch types for this level from program table
+      try {
+        const response = await courseService.getTypesByLevel(formData.level);
+        if (response?.success && response.types) {
+          const programsForLevel = response.types
+            .map(type => getProgramFromType(type))
+            .filter(Boolean);
+          setAvailablePrograms(programsForLevel);
+
+          // If current program is not available for selected level, clear it
+          if (formData.program && !programsForLevel.includes(formData.program)) {
+            setFormData(prev => ({ ...prev, program: '', band: '' }));
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error fetching types by level:', error);
+      }
+    };
     
-    setAvailablePrograms(programsForLevel);
-
-    // If current program is not available for selected level, clear it
-    if (formData.program && !programsForLevel.includes(formData.program)) {
-      setFormData(prev => ({ ...prev, program: '', band: '' }));
-    }
-  }, [formData.level, mappings]);
+    filterPrograms();
+  }, [formData.level]);
 
   useEffect(() => {
     const fetchExistingSchedules = async () => {
@@ -471,6 +1014,39 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     fetchTeachers();
   }, []);
 
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        setStudentsLoading(true);
+        setStudentsError(null);
+        console.log('🔍 Fetching students...');
+        // Không filter theo status vì User model không có field status
+        const response = await studentService.getAllStudents();
+        console.log('📋 Students API Response:', response);
+        
+        if (response && (response.students || response.data)) {
+          const fetchedStudents = response.students || response.data || [];
+          console.log('📋 Fetched students count:', fetchedStudents.length);
+          setStudents(fetchedStudents);
+        } else {
+          console.warn('⚠️ API response không có students hoặc data field:', response);
+          setStudents([]);
+          setStudentsError('Không tìm thấy dữ liệu học viên');
+        }
+      } catch (error) {
+        console.error('❌ Lỗi khi fetch students:', error);
+        setStudents([]);
+        const errorMessage = error.message || 'Không thể tải danh sách học viên';
+        setStudentsError(errorMessage);
+        console.error('❌ Error details:', error);
+      } finally {
+        setStudentsLoading(false);
+      }
+    };
+
+    fetchStudents();
+  }, []);
+
   // Cập nhật mock data với _id từ DB sau khi fetch teachers
   useEffect(() => {
     if (USE_MOCK_DATA && teachers.length > 0) {
@@ -549,7 +1125,26 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
   const hasTimeOverlap = (startA, endA, startB, endB) => {
     if (!startA || !endA || !startB || !endB) return false;
-    return startA < endB && startB < endA;
+    
+    // Chuyển đổi thời gian từ string "HH:MM" sang phút để so sánh chính xác
+    const timeToMinutes = (timeStr) => {
+      if (!timeStr) return 0;
+      const parts = timeStr.split(':');
+      if (parts.length !== 2) return 0;
+      const hours = parseInt(parts[0], 10);
+      const minutes = parseInt(parts[1], 10);
+      return hours * 60 + minutes;
+    };
+    
+    const startAMin = timeToMinutes(startA);
+    const endAMin = timeToMinutes(endA);
+    const startBMin = timeToMinutes(startB);
+    const endBMin = timeToMinutes(endB);
+    
+    // Hai khoảng thời gian overlap nếu: startA < endB VÀ endA > startB
+    // Lưu ý: Nếu một lớp kết thúc đúng lúc lớp kia bắt đầu (ví dụ: 08:00-10:00 và 10:00-12:00)
+    // thì KHÔNG có overlap vì sử dụng > và < (không có =)
+    return startAMin < endBMin && endAMin > startBMin;
   };
 
   const hasDateRangeOverlap = (startDateA, endDateA, startDateB, endDateB) => {
@@ -564,6 +1159,89 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     return startA <= endB && startB <= endA;
   };
 
+  // Convert day string to day of week number (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+  const getDayOfWeekNumber = (dayStr) => {
+    const dayMap = {
+      'CN': 0,
+      '2': 1,
+      '3': 2,
+      '4': 3,
+      '5': 4,
+      '6': 5,
+      '7': 6
+    };
+    return dayMap[dayStr] !== undefined ? dayMap[dayStr] : null;
+  };
+
+  // Find the next occurrence of a day of week from a start date
+  const findNextDayOfWeek = (startDate, targetDayOfWeek) => {
+    const start = new Date(startDate);
+    const currentDay = start.getDay();
+    let daysToAdd = (targetDayOfWeek - currentDay + 7) % 7;
+    if (daysToAdd === 0 && start.getTime() < new Date().getTime()) {
+      daysToAdd = 7; // If today is the target day but in the past, go to next week
+    }
+    const result = new Date(start);
+    result.setDate(start.getDate() + daysToAdd);
+    return result;
+  };
+
+  // Generate all sessions that will be created
+  const generateSessions = (startDate, scheduleEntries, numberOfSessions) => {
+    if (!startDate || !scheduleEntries.length || !numberOfSessions) {
+      return [];
+    }
+
+    const sessions = [];
+    const start = new Date(startDate);
+    
+    // Find first occurrence of each day of week from start date
+    const firstOccurrences = {};
+    scheduleEntries.forEach(entry => {
+      const dayOfWeek = getDayOfWeekNumber(entry.day);
+      if (dayOfWeek !== null && !firstOccurrences[dayOfWeek]) {
+        firstOccurrences[dayOfWeek] = findNextDayOfWeek(start, dayOfWeek);
+      }
+    });
+
+    // Generate sessions in round-robin fashion
+    let entryIndex = 0;
+    let weekOffset = 0;
+
+    for (let i = 0; i < numberOfSessions; i++) {
+      const entry = scheduleEntries[entryIndex % scheduleEntries.length];
+      const dayOfWeek = getDayOfWeekNumber(entry.day);
+      
+      if (dayOfWeek === null) {
+        entryIndex++;
+        continue;
+      }
+
+      // Get the first occurrence of this day
+      const firstOccurrence = firstOccurrences[dayOfWeek];
+      
+      // Calculate the date for this session
+      const sessionDate = new Date(firstOccurrence);
+      sessionDate.setDate(firstOccurrence.getDate() + (weekOffset * 7));
+
+      sessions.push({
+        date: sessionDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        dayOfWeek: dayOfWeek,
+        startTime: entry.startTime,
+        endTime: entry.endTime
+      });
+
+      // Move to next entry (round-robin)
+      entryIndex++;
+      // If we've gone through all entries, move to next week
+      if (entryIndex % scheduleEntries.length === 0) {
+        weekOffset++;
+      }
+    }
+
+    return sessions;
+  };
+
   const filledScheduleEntries = useMemo(
     () =>
       formData.scheduleEntries.filter(
@@ -572,17 +1250,26 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     [formData.scheduleEntries]
   );
 
+  // Generate sessions that will be created
+  const generatedSessions = useMemo(() => {
+    if (!formData.startDate || !filledScheduleEntries.length || !selectedCourse?.numberOfSessions) {
+      return [];
+    }
+    return generateSessions(formData.startDate, filledScheduleEntries, selectedCourse.numberOfSessions);
+  }, [formData.startDate, filledScheduleEntries, selectedCourse?.numberOfSessions]);
+
   const conflictingRoomIds = useMemo(() => {
-    if (!filledScheduleEntries.length || !existingSchedules.length || !formData.startDate || !formData.endDate) {
+    if (!generatedSessions.length || !existingSchedules.length) {
       return new Set();
     }
 
     const conflicts = new Set();
 
-    filledScheduleEntries.forEach((entry) => {
-      const entryDay = normalizeDayValue(entry.day);
-      const entryStart = parseTime(entry.startTime);
-      const entryEnd = parseTime(entry.endTime);
+    // Check each generated session against existing schedules
+    generatedSessions.forEach((session) => {
+      const sessionDate = session.date;
+      const sessionStart = parseTime(session.startTime);
+      const sessionEnd = parseTime(session.endTime);
 
       existingSchedules.forEach((schedule) => {
         // API populate room với _id và room_name
@@ -601,24 +1288,17 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           return;
         }
 
-        // Try to get day from various possible fields
-        let scheduleDayRaw = 
-          schedule.day ||
-          schedule.dayOfWeek ||
-          schedule.day_of_week ||
-          schedule.weekDay ||
-          schedule.date ||
-          schedule.scheduleDate ||
-          schedule.classDate;
-        
-        // If we have a date, try to parse it to day of week
-        if (!scheduleDayRaw && (schedule.date || schedule.scheduleDate || schedule.classDate)) {
-          scheduleDayRaw = schedule.date || schedule.scheduleDate || schedule.classDate;
+        // Get schedule date
+        const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+        if (!scheduleDate) {
+          return;
         }
-        
-        const scheduleDay = normalizeDayValue(scheduleDayRaw);
 
-        if (!scheduleDay || scheduleDay !== entryDay) {
+        // Format schedule date to YYYY-MM-DD for comparison
+        const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
+
+        // Check if dates match
+        if (scheduleDateStr !== sessionDate) {
           return;
         }
 
@@ -636,80 +1316,17 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             schedule.endHour
         );
 
-        const hasTimeConflict = hasTimeOverlap(entryStart, entryEnd, scheduleStart, scheduleEnd);
+        // Check if times overlap
+        const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
 
-        // Kiểm tra date range overlap với class (API populate class với startDate và endDate)
-        const scheduleStartDate = 
-          schedule.class?.startDate ||
-          schedule.classStartDate ||
-          schedule.startDate ||
-          schedule.start_date;
-        const scheduleEndDate = 
-          schedule.class?.endDate ||
-          schedule.classEndDate ||
-          schedule.endDate ||
-          schedule.end_date;
-
-        const hasDateConflict = hasDateRangeOverlap(
-          formData.startDate,
-          formData.endDate,
-          scheduleStartDate,
-          scheduleEndDate
-        );
-
-        // Chỉ coi là conflict nếu có cả time overlap VÀ date range overlap
-        if (hasTimeConflict && hasDateConflict) {
-          // Lấy ngày cụ thể của schedule (nếu có)
-          const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
-          const scheduleDateStr = scheduleDate 
-            ? new Date(scheduleDate).toLocaleDateString('vi-VN', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: '2-digit', 
-                day: '2-digit' 
-              })
-            : 'N/A';
-          
-          // Format ngày tháng cho dễ đọc
-          const formatDate = (dateStr) => {
-            if (!dateStr) return 'N/A';
-            try {
-              const date = new Date(dateStr);
-              return date.toLocaleDateString('vi-VN', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: '2-digit', 
-                day: '2-digit' 
-              });
-            } catch {
-              return dateStr;
-            }
-          };
-
+        // Conflict if same date and overlapping time
+        if (hasTimeConflict) {
           console.log('🔴 CONFLICT Room:', {
             room: scheduleRoomName || `Room ID: ${scheduleRoomId}`,
-            conflictDetails: {
-              'Bạn chọn': {
-                'Ngày trong tuần': entryDay === '2' ? 'Thứ 2' : entryDay === '3' ? 'Thứ 3' : entryDay === '4' ? 'Thứ 4' : entryDay === '5' ? 'Thứ 5' : entryDay === '6' ? 'Thứ 6' : entryDay === '7' ? 'Thứ 7' : entryDay === 'CN' ? 'Chủ nhật' : entryDay,
-                'Giờ học': `${entryStart} - ${entryEnd}`,
-                'Khoảng thời gian lớp học': `${formatDate(formData.startDate)} đến ${formatDate(formData.endDate)}`
-              },
-              'Phòng đã bị đặt': {
-                'Ngày cụ thể': scheduleDateStr,
-                'Ngày trong tuần': scheduleDay === '2' ? 'Thứ 2' : scheduleDay === '3' ? 'Thứ 3' : scheduleDay === '4' ? 'Thứ 4' : scheduleDay === '5' ? 'Thứ 5' : scheduleDay === '6' ? 'Thứ 6' : scheduleDay === '7' ? 'Thứ 7' : scheduleDay === 'CN' ? 'Chủ nhật' : scheduleDay,
-                'Giờ học': `${scheduleStart} - ${scheduleEnd}`,
-                'Khoảng thời gian lớp học': `${formatDate(scheduleStartDate)} đến ${formatDate(scheduleEndDate)}`,
-                'Lớp học': schedule.class?.name || 'N/A'
-              },
-              'Lý do conflict': 'Trùng ngày trong tuần, trùng giờ học, và khoảng thời gian lớp học có overlap'
-            },
-            technical: {
-              scheduleId: schedule._id || schedule.id,
-              scheduleRoomId,
-              scheduleRoomName,
-              hasTimeConflict,
-              hasDateConflict
-            }
+            sessionDate: sessionDate,
+            sessionTime: `${sessionStart} - ${sessionEnd}`,
+            scheduleDate: scheduleDateStr,
+            scheduleTime: `${scheduleStart} - ${scheduleEnd}`
           });
           if (scheduleRoomId) {
             conflicts.add(String(scheduleRoomId));
@@ -722,16 +1339,23 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     });
 
     return conflicts;
-  }, [filledScheduleEntries, existingSchedules, formData.startDate, formData.endDate]);
+  }, [generatedSessions, existingSchedules]);
 
-  // Fetch teacher schedules when date range is available
+  // Fetch teacher schedules - need to get all schedules for conflict checking
   useEffect(() => {
     const fetchTeacherSchedules = async () => {
-      if (!formData.startDate || !formData.endDate || teachers.length === 0) {
+      if (!teachers.length || !generatedSessions.length) {
         return;
       }
 
       const schedulesMap = {};
+      
+      // Get date range from generated sessions
+      if (generatedSessions.length === 0) return;
+      
+      const sessionDates = generatedSessions.map(s => s.date).sort();
+      const minDate = sessionDates[0];
+      const maxDate = sessionDates[sessionDates.length - 1];
       
       // Fetch schedules for each teacher
       await Promise.all(
@@ -741,8 +1365,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
           try {
             const response = await teacherService.getTeacherSchedule(teacherId, {
-              startDate: formData.startDate,
-              endDate: formData.endDate
+              startDate: minDate,
+              endDate: maxDate
             });
             
             if (response && response.schedules) {
@@ -759,10 +1383,56 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     };
 
     fetchTeacherSchedules();
-  }, [teachers, formData.startDate, formData.endDate]);
+  }, [teachers, generatedSessions]);
+
+  // Fetch student schedules - need to get all schedules for conflict checking
+  useEffect(() => {
+    const fetchStudentSchedules = async () => {
+      if (!formData.selectedStudents.length || !generatedSessions.length) {
+        setStudentSchedules({});
+        return;
+      }
+
+      const schedulesMap = {};
+      
+      // Get date range from generated sessions
+      const sessionDates = generatedSessions.map(s => s.date).sort();
+      const minDate = sessionDates[0];
+      const maxDate = sessionDates[sessionDates.length - 1];
+      
+      // Fetch schedules for each selected student
+      await Promise.all(
+        formData.selectedStudents.map(async (studentId) => {
+          if (!studentId) return;
+
+          try {
+            const response = await studentService.getStudentSchedule(studentId, {
+              startDate: minDate,
+              endDate: maxDate
+            });
+            
+            if (response && response.schedules) {
+              schedulesMap[String(studentId)] = response.schedules;
+            } else if (response && response.data) {
+              schedulesMap[String(studentId)] = response.data;
+            } else {
+              schedulesMap[String(studentId)] = [];
+            }
+          } catch (error) {
+            console.error(`Error fetching schedule for student ${studentId}:`, error);
+            schedulesMap[String(studentId)] = [];
+          }
+        })
+      );
+
+      setStudentSchedules(schedulesMap);
+    };
+
+    fetchStudentSchedules();
+  }, [formData.selectedStudents, generatedSessions]);
 
   const conflictingTeacherIds = useMemo(() => {
-    if (!filledScheduleEntries.length || !formData.startDate || !formData.endDate) {
+    if (!generatedSessions.length || Object.keys(teacherSchedules).length === 0) {
       return new Set();
     }
 
@@ -772,59 +1442,38 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     Object.entries(teacherSchedules).forEach(([teacherId, schedules]) => {
       if (!schedules || schedules.length === 0) return;
 
-    filledScheduleEntries.forEach((entry) => {
-      const entryDay = normalizeDayValue(entry.day);
-      const entryStart = parseTime(entry.startTime);
-      const entryEnd = parseTime(entry.endTime);
+      // Check each generated session against teacher's schedules
+      generatedSessions.forEach((session) => {
+        const sessionDate = session.date;
+        const sessionStart = parseTime(session.startTime);
+        const sessionEnd = parseTime(session.endTime);
 
         schedules.forEach((schedule) => {
-          // Get day of week from schedule date
+          // Get schedule date
           const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
-          const scheduleDay = scheduleDate ? parseDateToDayOfWeek(scheduleDate) : null;
+          if (!scheduleDate) return;
 
-          // Check if same day of week
-          if (!scheduleDay || scheduleDay !== entryDay) {
-          return;
-        }
+          // Format schedule date to YYYY-MM-DD for comparison
+          const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
+
+          // Check if dates match
+          if (scheduleDateStr !== sessionDate) {
+            return;
+          }
 
           // Check time overlap
           const scheduleStart = parseTime(schedule.startTime);
           const scheduleEnd = parseTime(schedule.endTime);
-          const hasTimeConflict = hasTimeOverlap(entryStart, entryEnd, scheduleStart, scheduleEnd);
+          const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
 
-          if (!hasTimeConflict) {
-          return;
-        }
-
-          // Check date range overlap with class (not just schedule date)
-          const scheduleClassStartDate = 
-          schedule.classStartDate ||
-            schedule.class?.startDate ||
-            schedule.startDate;
-          const scheduleClassEndDate = 
-          schedule.classEndDate ||
-            schedule.class?.endDate ||
-            schedule.endDate;
-
-          // Kiểm tra overlap giữa khoảng thời gian lớp học mới và lớp học cũ của giáo viên
-        const hasDateConflict = hasDateRangeOverlap(
-          formData.startDate,
-          formData.endDate,
-            scheduleClassStartDate,
-            scheduleClassEndDate
-        );
-
-          if (hasDateConflict) {
-          console.log('🔴 CONFLICT Teacher:', {
+          if (hasTimeConflict) {
+            console.log('🔴 CONFLICT Teacher:', {
               teacherId,
               scheduleId: schedule._id || schedule.id,
-            entryDay,
-            scheduleDay,
-            entryTime: `${entryStart}-${entryEnd}`,
-            scheduleTime: `${scheduleStart}-${scheduleEnd}`,
-              newClassDateRange: `${formData.startDate} - ${formData.endDate}`,
-              existingClassDateRange: `${scheduleClassStartDate} - ${scheduleClassEndDate}`,
-              scheduleDate: scheduleDate
+              sessionDate: sessionDate,
+              sessionTime: `${sessionStart} - ${sessionEnd}`,
+              scheduleDate: scheduleDateStr,
+              scheduleTime: `${scheduleStart} - ${scheduleEnd}`
             });
             conflicts.add(teacherId);
           }
@@ -834,10 +1483,110 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
     console.log('📋 Conflicting Teacher IDs:', Array.from(conflicts));
     return conflicts;
-  }, [filledScheduleEntries, teacherSchedules, formData.startDate, formData.endDate]);
+  }, [generatedSessions, teacherSchedules]);
+
+  const conflictingStudentIds = useMemo(() => {
+    if (!generatedSessions.length || Object.keys(studentSchedules).length === 0) {
+      return new Map();
+    }
+
+    const conflicts = new Map(); // Map<studentId, Array<conflictDetails>>
+
+    // Check each student's schedules
+    Object.entries(studentSchedules).forEach(([studentId, schedules]) => {
+      if (!schedules || schedules.length === 0) return;
+
+      const studentConflicts = [];
+
+      // Check each generated session against student's schedules
+      generatedSessions.forEach((session) => {
+        const sessionDate = session.date;
+        const sessionStart = parseTime(session.startTime);
+        const sessionEnd = parseTime(session.endTime);
+
+        schedules.forEach((schedule) => {
+          // Get schedule date - handle different response formats
+          const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate || schedule.classSchedule?.date;
+          if (!scheduleDate) return;
+
+          // Format schedule date to YYYY-MM-DD for comparison
+          const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
+
+          // Check if dates match
+          if (scheduleDateStr !== sessionDate) {
+            return;
+          }
+
+          // Check time overlap - handle different response formats
+          const scheduleStart = parseTime(
+            schedule.startTime ||
+            schedule.start_time ||
+            schedule.time?.start ||
+            schedule.classSchedule?.startTime ||
+            schedule.startHour
+          );
+          const scheduleEnd = parseTime(
+            schedule.endTime ||
+            schedule.end_time ||
+            schedule.time?.end ||
+            schedule.classSchedule?.endTime ||
+            schedule.endHour
+          );
+
+          if (!scheduleStart || !scheduleEnd) return;
+
+          const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
+
+          if (hasTimeConflict) {
+            // Get class name - handle different response formats
+            const className = 
+              schedule.className || 
+              schedule.class?.name || 
+              schedule.classSchedule?.class?.name ||
+              'N/A';
+            
+            // Format date for display
+            const displayDate = new Date(scheduleDateStr).toLocaleDateString('vi-VN', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            });
+
+            const conflictDetail = {
+              className,
+              date: displayDate,
+              dateRaw: scheduleDateStr,
+              time: `${scheduleStart} - ${scheduleEnd}`,
+              newClassTime: `${sessionStart} - ${sessionEnd}`
+            };
+
+            studentConflicts.push(conflictDetail);
+
+            console.log('🔴 CONFLICT Student:', {
+              studentId,
+              scheduleId: schedule._id || schedule.id || schedule.classSchedule?._id,
+              className,
+              sessionDate: sessionDate,
+              sessionTime: `${sessionStart} - ${sessionEnd}`,
+              scheduleDate: scheduleDateStr,
+              scheduleTime: `${scheduleStart} - ${scheduleEnd}`
+            });
+          }
+        });
+      });
+
+      if (studentConflicts.length > 0) {
+        conflicts.set(studentId, studentConflicts);
+      }
+    });
+
+    console.log('📋 Conflicting Student IDs:', Array.from(conflicts.keys()));
+    return conflicts;
+  }, [generatedSessions, studentSchedules]);
 
   const filteredRooms = useMemo(() => {
-    if (!filledScheduleEntries.length || !existingSchedules.length || !formData.startDate || !formData.endDate) {
+    if (!generatedSessions.length || !existingSchedules.length) {
       return rooms;
     }
 
@@ -880,11 +1629,11 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     });
     
     return filtered;
-  }, [filledScheduleEntries, existingSchedules, rooms, conflictingRoomIds, formData.startDate, formData.endDate]);
+  }, [generatedSessions, existingSchedules, rooms, conflictingRoomIds]);
 
   const filteredTeachers = useMemo(() => {
-    // Nếu chưa có đủ thông tin để filter (chưa chọn schedule hoặc date), hiển thị tất cả teachers
-    if (!filledScheduleEntries.length || !existingSchedules.length || !formData.startDate || !formData.endDate) {
+    // Nếu chưa có đủ thông tin để filter, hiển thị tất cả teachers
+    if (!generatedSessions.length || Object.keys(teacherSchedules).length === 0) {
       console.log('📋 Showing all teachers (no filter conditions):', teachers.length);
       return teachers;
     }
@@ -910,7 +1659,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     });
     
     return filtered;
-  }, [filledScheduleEntries, existingSchedules, teachers, conflictingTeacherIds, formData.startDate, formData.endDate]);
+  }, [generatedSessions, teacherSchedules, teachers, conflictingTeacherIds]);
+
 
   useEffect(() => {
     if (
@@ -947,6 +1697,128 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
       <Form onSubmit={handleSubmit}>
         <Modal.Body className="p-24" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+          {/* Basic Information - Moved to top */}
+          <div className="mb-24">
+            <h5 className="text-neutral-900 fw-semibold mb-16 pb-12 border-bottom border-neutral-100">
+              Thông tin cơ bản
+            </h5>
+            
+            <div className="row g-3 mb-16">
+              <div className="col-md-6">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">
+                    Tên lớp <span className="text-danger-600">*</span>
+                  </Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="VD: A1-Morning-01"
+                    required
+                    className="border-neutral-30 radius-8 px-16 py-10"
+                  />
+                </Form.Group>
+              </div>
+
+              <div className="col-md-6">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">
+                    Loại Chương trình <span className="text-danger-600">*</span>
+                  </Form.Label>
+                  <Form.Select
+                    name="program"
+                    value={formData.program}
+                    onChange={handleInputChange}
+                    required
+                    className="border-neutral-30 radius-8 px-16 py-10"
+                  >
+                    <option value="">-- Chọn loại chương trình --</option>
+                    {availablePrograms.map(program => (
+                      <option key={program} value={program}>{program}</option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              </div>
+            </div>
+
+            <div className="row g-3 mb-16">
+              <div className="col-md-6">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">
+                    Cấp độ <span className="text-danger-600">*</span>
+                  </Form.Label>
+                  <Form.Select
+                    name="level"
+                    value={formData.level}
+                    onChange={handleInputChange}
+                    required
+                    className="border-neutral-30 radius-8 px-16 py-10"
+                  >
+                    <option value="">-- Chọn cấp độ --</option>
+                    {availableLevels.map(level => (
+                      <option key={level} value={level}>{level}</option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              </div>
+
+              <div className="col-md-6">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">Band</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="band"
+                    value={formData.band}
+                    onChange={handleInputChange}
+                    placeholder="VD: Band 1"
+                    className="border-neutral-30 radius-8 px-16 py-10"
+                    readOnly
+                  />
+                </Form.Group>
+              </div>
+            </div>
+
+            <div className="row g-3 mb-16">
+              <div className="col-md-12">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">
+                    Course <span className="text-danger-600">*</span>
+                  </Form.Label>
+                  <Form.Select
+                    name="course"
+                    value={formData.course}
+                    onChange={handleInputChange}
+                    required
+                    disabled={!formData.program || coursesLoading}
+                    className="border-neutral-30 radius-8 px-16 py-10"
+                  >
+                    <option value="">
+                      {!formData.program 
+                        ? '-- Chọn loại chương trình trước --'
+                        : coursesLoading 
+                        ? 'Đang tải danh sách course...'
+                        : '-- Chọn course --'}
+                    </option>
+                    {courses.map(course => {
+                      const courseId = course._id || course.id;
+                      return (
+                        <option key={courseId} value={courseId}>
+                          {course.name} {course.numberOfSessions ? `(${course.numberOfSessions} buổi)` : ''}
+                        </option>
+                      );
+                    })}
+                  </Form.Select>
+                  {selectedCourse && selectedCourse.numberOfSessions && (
+                    <Form.Text className="text-neutral-500 text-12 d-block mt-4">
+                      Course này có {selectedCourse.numberOfSessions} buổi học
+                    </Form.Text>
+                  )}
+                </Form.Group>
+              </div>
+            </div>
+          </div>
+
           {/* Schedule */}
           <div className="mb-24">
             <h5 className="text-neutral-900 fw-semibold mb-16 pb-12 border-bottom border-neutral-100">
@@ -976,26 +1848,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                   )}
                 </Form.Group>
               </div>
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">
-                    Ngày kết thúc
-                  </Form.Label>
-                  <Form.Control
-                    type="date"
-                    name="endDate"
-                    value={formData.endDate}
-                    onChange={handleInputChange}
-                    min={formData.startDate || getTodayDate()}
-                    className={`border-neutral-30 radius-8 px-16 py-10 ${dateError ? 'border-danger' : ''}`}
-                  />
-                  {dateError && dateError.includes('kết thúc') && (
-                    <Form.Text className="text-danger-600 text-12 d-block mt-4">
-                      {dateError}
-                    </Form.Text>
-                  )}
-                </Form.Group>
-              </div>
             </div>
 
             <Form.Group className="mb-12">
@@ -1008,10 +1860,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             </Form.Group>
 
             <div className="d-flex flex-column gap-12">
-              {formData.scheduleEntries.map((entry, index) => (
+              {formData.scheduleEntries.map((entry, index) => {
+                const isDuplicate = duplicateEntryIndices.includes(index);
+                return (
                 <div
                   key={entry.id}
-                  className="border border-neutral-100 rounded-12 p-16"
+                  className={`border rounded-12 p-16 ${isDuplicate ? 'border-danger border-2' : 'border-neutral-100'}`}
                 >
                   <div className="d-flex justify-content-between align-items-center mb-12">
                     <div className="fw-semibold text-neutral-900">
@@ -1086,7 +1940,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             <Button
@@ -1097,6 +1952,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               <i className="fas fa-plus me-2"></i>
               Thêm buổi học
             </Button>
+
+            {scheduleEntriesError && (
+              <Alert variant="danger" className="mt-12 mb-0">
+                {scheduleEntriesError}
+              </Alert>
+            )}
           </div>
 
                     {/* Resources */}
@@ -1108,20 +1969,23 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             <div className="row g-3">
               <div className="col-md-6">
                 <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">Giáo viên</Form.Label>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">
+                    Giáo viên <span className="text-danger-600">*</span>
+                  </Form.Label>
                   <Form.Select
                     name="teacherId"
                     value={formData.teacherId}
                     onChange={handleInputChange}
                     className="border-neutral-30 radius-8 px-16 py-10"
                     disabled={teachers.length === 0}
+                    required
                   >
                     <option value="">-- Chọn giáo viên --</option>
                     {teachers.length === 0 ? (
                       <option value="" disabled>
                         Đang tải danh sách giáo viên...
                       </option>
-                    ) : filteredTeachers.length === 0 && (filledScheduleEntries.length > 0 && formData.startDate && formData.endDate) ? (
+                    ) : filteredTeachers.length === 0 && generatedSessions.length > 0 ? (
                       <option value="" disabled>
                         Không còn giáo viên phù hợp (tất cả đều bị trùng lịch)
                       </option>
@@ -1148,12 +2012,38 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                   <Form.Text className="text-neutral-500 text-12">
                     {teachers.length === 0
                       ? 'Đang tải danh sách giáo viên...'
-                      : filteredTeachers.length === 0 && (filledScheduleEntries.length > 0 && formData.startDate && formData.endDate)
+                      : filteredTeachers.length === 0 && generatedSessions.length > 0
                       ? 'Không còn giáo viên phù hợp (tất cả đều bị trùng lịch)'
-                      : filledScheduleEntries.length > 0 && formData.startDate && formData.endDate
+                      : generatedSessions.length > 0
                       ? `Có ${filteredTeachers.length} giáo viên phù hợp (chưa bị trùng lịch)`
-                      : `Có ${teachers.length} giáo viên. Chọn lịch học để lọc giáo viên phù hợp.`}
+                      : `Có ${teachers.length} giáo viên. Chọn course và lịch học để lọc giáo viên phù hợp.`}
                   </Form.Text>
+                  {checkingConflicts && formData.teacherId && (
+                    <div className="mt-8">
+                      <Form.Text className="text-info text-12">
+                        <i className="fas fa-spinner fa-spin me-1"></i>
+                        Đang kiểm tra xung đột...
+                      </Form.Text>
+                    </div>
+                  )}
+                  {!checkingConflicts && conflicts.teacher && conflicts.teacher.length > 0 && (
+                    <Alert variant="warning" className="mt-12 mb-0">
+                      <div className="d-flex align-items-start">
+                        <i className="fas fa-exclamation-triangle me-2 mt-1 text-warning"></i>
+                        <div className="flex-grow-1">
+                          <strong className="text-danger">⚠️ Xung đột lịch giáo viên:</strong>
+                          <ul className="mb-0 mt-2" style={{ fontSize: '13px' }}>
+                            {conflicts.teacher.map((c, idx) => (
+                              <li key={idx}>
+                              Ngày <strong>{c.date}</strong>: Giáo viên đã có lớp "<strong>{c.className}</strong>" 
+                              học từ <strong>{c.time}</strong>, trùng với lịch mới <strong>{c.conflictingTime}</strong>
+                            </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </Alert>
+                  )}
                 </Form.Group>
               </div>
 
@@ -1189,6 +2079,32 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                   <Form.Text className="text-neutral-500 text-12">
                     Chỉ hiển thị phòng chưa bị trùng với lịch đã chọn.
                   </Form.Text>
+                  {checkingConflicts && formData.roomId && (
+                    <div className="mt-8">
+                      <Form.Text className="text-info text-12">
+                        <i className="fas fa-spinner fa-spin me-1"></i>
+                        Đang kiểm tra xung đột...
+                      </Form.Text>
+                    </div>
+                  )}
+                  {!checkingConflicts && conflicts.room && conflicts.room.length > 0 && (
+                    <Alert variant="warning" className="mt-12 mb-0">
+                      <div className="d-flex align-items-start">
+                        <i className="fas fa-exclamation-triangle me-2 mt-1 text-warning"></i>
+                        <div className="flex-grow-1">
+                          <strong className="text-danger">⚠️ Xung đột phòng học:</strong>
+                          <ul className="mb-0 mt-2" style={{ fontSize: '13px' }}>
+                            {conflicts.room.map((c, idx) => (
+                              <li key={idx}>
+                              Ngày <strong>{c.date}</strong>: Phòng học đã được lớp "<strong>{c.className}</strong>" 
+                              sử dụng từ <strong>{c.time}</strong>, trùng với lịch mới <strong>{c.conflictingTime}</strong>
+                            </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </Alert>
+                  )}
                   {roomError && (
                     <Alert variant="warning" className="mt-12 mb-0">
                       {roomError}
@@ -1199,103 +2115,234 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             </div>
           </div>
 
-          {/* Basic Information */}
+          {/* Students Selection */}
           <div className="mb-24">
-            <h5 className="text-neutral-900 fw-semibold mb-16 pb-12 border-bottom border-neutral-100">
-              Thông tin cơ bản
-            </h5>
+            <div className="d-flex justify-content-between align-items-center mb-16 pb-12 border-bottom border-neutral-100">
+              <h5 className="text-neutral-900 fw-semibold mb-0">
+                Học viên
+              </h5>
+              {formData.selectedStudents && formData.selectedStudents.length > 0 && (
+                <div className="d-flex align-items-center gap-12">
+                  <span className={`badge ${capacityWarning ? 'bg-danger' : 'bg-main-600'} text-white px-16 py-8 radius-8 text-14 fw-semibold`}>
+                    Tổng cộng: {formData.selectedStudents.length} học viên
+                  </span>
+                  {formData.roomId && (() => {
+                    const selectedRoom = rooms.find(r => (r._id || r.id) === formData.roomId);
+                    if (selectedRoom) {
+                      const roomCapacity = selectedRoom.capacity || selectedRoom.maxCapacity || selectedRoom.maxStudents;
+                      return (
+                        <span className="badge bg-info text-white px-12 py-6 radius-6 text-12">
+                          Sức chứa phòng: {roomCapacity}
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              )}
+            </div>
             
-            <div className="row g-3 mb-16">
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">
-                    Tên lớp <span className="text-danger-600">*</span>
-                  </Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="VD: A1-Morning-01"
-                    required
-                    className="border-neutral-30 radius-8 px-16 py-10"
-                  />
-                </Form.Group>
-              </div>
-
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">
-                    Chương trình <span className="text-danger-600">*</span>
-                  </Form.Label>
-                  <Form.Select
-                    name="program"
-                    value={formData.program}
-                    onChange={handleInputChange}
-                    required
-                    className="border-neutral-30 radius-8 px-16 py-10"
+            {capacityWarning && (
+              <Alert variant={capacityWarning.type} className="mb-16">
+                <i className="fas fa-exclamation-triangle me-2"></i>
+                {capacityWarning.message}
+              </Alert>
+            )}
+            
+            <div className="mb-16">
+              <div className="d-flex justify-content-between align-items-center mb-12">
+                <Form.Label className="text-neutral-700 fw-medium mb-0">
+                  Danh sách học viên đã chọn
+                </Form.Label>
+                <div className="d-flex gap-8">
+                  <Button
+                    type="button"
+                    variant="outline-success"
+                    size="sm"
+                    onClick={handleExcelImport}
+                    disabled={importingExcel}
+                    className="text-13 fw-medium px-16 py-8 radius-8"
                   >
-                    <option value="">-- Chọn chương trình --</option>
-                    {availablePrograms.map(program => (
-                      <option key={program} value={program}>{program}</option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </div>
-            </div>
-
-            <div className="row g-3 mb-16">
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">
-                    Cấp độ <span className="text-danger-600">*</span>
-                  </Form.Label>
-                  <Form.Select
-                    name="level"
-                    value={formData.level}
-                    onChange={handleInputChange}
-                    required
-                    className="border-neutral-30 radius-8 px-16 py-10"
+                    <i className={`fas ${importingExcel ? 'fa-spinner fa-spin' : 'fa-file-excel'} me-2`}></i>
+                    {importingExcel ? 'Đang xử lý...' : 'Import từ Excel'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={() => setShowSelectStudentModal(true)}
+                    className="text-13 fw-medium px-16 py-8 radius-8"
                   >
-                    <option value="">-- Chọn cấp độ --</option>
-                    {availableLevels.map(level => (
-                      <option key={level} value={level}>{level}</option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
+                    <i className="fas fa-plus me-2"></i>
+                    Thêm học viên
+                  </Button>
+                </div>
               </div>
 
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">Band</Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="band"
-                    value={formData.band}
-                    onChange={handleInputChange}
-                    placeholder="VD: Band 1"
-                    className="border-neutral-30 radius-8 px-16 py-10"
-                  />
-                </Form.Group>
-              </div>
-            </div>
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                onChange={handleExcelFileChange}
+                style={{ display: 'none' }}
+              />
 
-            <div className="row g-3">
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">Học phí (VNĐ)</Form.Label>
-                  <Form.Control
-                    type="number"
-                    name="tuitionFee"
-                    value={formData.tuitionFee}
-                    onChange={handleInputChange}
-                    placeholder="0"
-                    className="border-neutral-30 radius-8 px-16 py-10"
-                  />
-                </Form.Group>
+              <div 
+                className="border border-neutral-100 rounded-12 p-16"
+                style={{ maxHeight: '300px', overflowY: 'auto' }}
+              >
+                {formData.selectedStudents.length === 0 ? (
+                  <div className="text-center text-neutral-500 py-40">
+                    <i className="fas fa-user-slash fa-2x mb-12 text-neutral-300"></i>
+                    <div className="text-14">Chưa có học viên nào được chọn</div>
+                    <div className="text-12 mt-4">Nhấn "Thêm học viên" để chọn học viên cho lớp học</div>
+                  </div>
+                ) : (
+                  <div className="d-flex flex-column gap-8">
+                    {formData.selectedStudents.map(selectedStudentId => {
+                      // Find student details from the students list
+                      const student = students.find(s => {
+                        const studentId = s._id || s.id;
+                        return String(studentId) === String(selectedStudentId);
+                      });
+                      
+                      if (!student) {
+                        // If student not found in list, show placeholder
+                        return (
+                          <div
+                            key={selectedStudentId}
+                            className="d-flex align-items-center justify-content-between p-12 rounded-8 border border-neutral-100 bg-neutral-25"
+                          >
+                            <div className="flex-grow-1">
+                              <div className="fw-medium text-neutral-600 text-14">
+                                Đang tải thông tin...
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline-danger"
+                              size="sm"
+                              onClick={() => handleRemoveStudent(selectedStudentId)}
+                              className="text-12 fw-medium px-12 py-6 radius-8"
+                            >
+                              <i className="fas fa-times"></i>
+                            </Button>
+                          </div>
+                        );
+                      }
+                      
+                      const displayName = student.fullName || student.name || student.username || student.email || 'N/A';
+                      const email = student.email || 'N/A';
+                      const username = student.username || 'N/A';
+                      const studentConflicts = conflictingStudentIds.get(String(selectedStudentId));
+                      const hasConflict = !!studentConflicts;
+                      
+                      return (
+                        <div
+                          key={selectedStudentId}
+                          className={`d-flex align-items-center justify-content-between p-12 rounded-8 border ${
+                            hasConflict 
+                              ? 'border-danger-600 bg-danger-50' 
+                              : 'border-main-200 bg-main-50'
+                          }`}
+                        >
+                          <div className="flex-grow-1">
+                            <div className="d-flex align-items-center gap-8">
+                              <div className="fw-medium text-neutral-900 text-14">
+                                {displayName}
+                              </div>
+                              {hasConflict && (
+                                <span 
+                                  className="badge bg-danger-600 text-white px-8 py-4 radius-4 text-11 fw-semibold"
+                                  title="Học viên này có lịch học trùng giờ với lớp đang tạo"
+                                >
+                                  <i className="fas fa-exclamation-triangle me-1"></i>
+                                  Trùng giờ
+                                </span>
+                              )}
+                            </div>
+                            <div className={`text-12 ${hasConflict ? 'text-danger-700' : 'text-neutral-500'}`}>
+                              {email} • {username}
+                              {hasConflict && studentConflicts && (
+                                <div className="text-danger-600 text-11 mt-4">
+                                  <i className="fas fa-info-circle me-1"></i>
+                                  <strong>Trùng giờ với:</strong>
+                                  <div className="mt-2 ms-12">
+                                    {studentConflicts.map((conflict, idx) => (
+                                      <div key={idx} className="mb-2">
+                                        • <strong>{conflict.className}</strong> - {conflict.date} ({conflict.time})
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline-danger"
+                            size="sm"
+                            onClick={() => handleRemoveStudent(selectedStudentId)}
+                            className="text-12 fw-medium px-12 py-6 radius-8"
+                            title="Xóa học viên khỏi danh sách"
+                          >
+                            <i className="fas fa-times"></i>
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
+
+              <Form.Text className="text-neutral-500 text-12 mt-8">
+                <i className="fas fa-info-circle me-1"></i>
+                Có thể thêm học viên sau khi tạo lớp. File Excel cần có cột đầu tiên chứa Email hoặc Số điện thoại của học viên.
+              </Form.Text>
+              {checkingConflicts && formData.selectedStudents && formData.selectedStudents.length > 0 && (
+                <div className="mt-12">
+                  <Form.Text className="text-info text-12">
+                    <i className="fas fa-spinner fa-spin me-1"></i>
+                    Đang kiểm tra xung đột lịch học viên...
+                  </Form.Text>
+                </div>
+              )}
+              {!checkingConflicts && conflicts.students && conflicts.students.length > 0 && (
+                <Alert variant="warning" className="mt-12 mb-0">
+                  <div className="d-flex align-items-start">
+                    <i className="fas fa-exclamation-triangle me-2 mt-1 text-warning"></i>
+                    <div className="flex-grow-1">
+                      <strong className="text-danger">⚠️ Xung đột lịch học viên:</strong>
+                      <div className="mt-2" style={{ fontSize: '13px' }}>
+                        {conflicts.students.map((studentConflict, idx) => (
+                          <div key={idx} className="mb-2">
+                            <strong>Học viên "{studentConflict.studentName}":</strong>
+                            <ul className="mb-0 mt-1 ms-3">
+                              {studentConflict.conflicts.map((c, cIdx) => (
+                                <li key={cIdx}>
+                                  Ngày <strong>{c.date}</strong>: Lớp "<strong>{c.className}</strong>" 
+                                  từ <strong>{c.time}</strong>, trùng với lịch mới <strong>{c.conflictingTime}</strong>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </Alert>
+              )}
+              {conflictingStudentIds.size > 0 && (!conflicts.students || conflicts.students.length === 0) && (
+                <Alert variant="warning" className="mt-12 mb-0">
+                  <i className="fas fa-exclamation-triangle me-2"></i>
+                  <strong>Cảnh báo:</strong> Có {conflictingStudentIds.size} học viên bị trùng giờ học với lớp đang tạo. 
+                  Vui lòng kiểm tra lại lịch học của các học viên này (xem chi tiết bên trên).
+                </Alert>
+              )}
             </div>
           </div>
+
 
 
         </Modal.Body>
@@ -1310,11 +2357,135 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           <Button 
             type="submit" 
             className="btn-main text-15 fw-semibold px-24 py-10 radius-8"
+            disabled={conflicts.hasConflict || checkingConflicts}
+            title={conflicts.hasConflict ? 'Vui lòng giải quyết các xung đột lịch học trước khi tạo lớp' : ''}
           >
             <i className="fas fa-check me-2"></i> Tạo lớp học
+            {conflicts.hasConflict && (
+              <span className="ms-2">
+                <i className="fas fa-exclamation-triangle"></i>
+              </span>
+            )}
           </Button>
         </Modal.Footer>
       </Form>
+
+      {/* Select Student Modal */}
+      <SelectStudentModal
+        show={showSelectStudentModal}
+        onClose={() => setShowSelectStudentModal(false)}
+        onConfirm={handleStudentsConfirmed}
+        initialSelectedStudents={formData.selectedStudents}
+        generatedSessions={generatedSessions}
+      />
+
+      {/* Import Result Modal */}
+      <Modal 
+        show={showImportResultModal} 
+        onHide={() => setShowImportResultModal(false)} 
+        centered
+        size="md"
+      >
+        <Modal.Header closeButton className="bg-main-600 text-white border-0 p-24">
+          <Modal.Title className="fw-bold">
+            <i className="fas fa-file-excel me-2"></i>
+            Kết quả Import Excel
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-24">
+          {importResult?.error ? (
+            <Alert variant="danger" className="mb-0">
+              <i className="fas fa-exclamation-circle me-2"></i>
+              {importResult.error}
+            </Alert>
+          ) : (
+            <>
+              {importResult?.success > 0 && (
+                <Alert variant="success" className="mb-16">
+                  <i className="fas fa-check-circle me-2"></i>
+                  <strong>Đã import thành công {importResult.success} học viên</strong>
+                </Alert>
+              )}
+              
+              {importResult?.success === 0 && importResult?.total > 0 && (
+                <Alert variant="warning" className="mb-16">
+                  <i className="fas fa-exclamation-triangle me-2"></i>
+                  <strong>Không tìm thấy học viên nào phù hợp trong hệ thống</strong>
+                </Alert>
+              )}
+
+              {importResult?.notFound && importResult.notFound.length > 0 && (
+                <div className="mb-0">
+                  <div className="text-neutral-700 fw-medium mb-8">
+                    <i className="fas fa-info-circle me-2"></i>
+                    Không tìm thấy {importResult.notFound.length} học viên:
+                  </div>
+                  <div 
+                    className="border border-neutral-100 rounded-8 p-12 bg-neutral-25"
+                    style={{ maxHeight: '200px', overflowY: 'auto' }}
+                  >
+                    <div className="d-flex flex-column gap-4">
+                      {importResult.notFound.slice(0, 20).map((item, index) => (
+                        <div key={index} className="text-neutral-600 text-13">
+                          • {item}
+                        </div>
+                      ))}
+                      {importResult.notFound.length > 20 && (
+                        <div className="text-neutral-500 text-12 mt-4">
+                          ... và {importResult.notFound.length - 20} học viên khác
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="bg-neutral-25 border-0 p-20">
+          <Button 
+            className="btn-main text-15 fw-semibold px-24 py-10 radius-8"
+            onClick={() => setShowImportResultModal(false)}
+          >
+            <i className="fas fa-check me-2"></i> OK
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Error Modal - Modal lỗi chung cho tạo class */}
+      <Modal 
+        show={showErrorModal} 
+        onHide={() => setShowErrorModal(false)} 
+        centered
+        size="md"
+      >
+        <Modal.Header closeButton className="bg-danger-600 text-white border-0 p-24">
+          <Modal.Title className="fw-bold">
+            <i className="fas fa-exclamation-triangle me-2"></i>
+            Lỗi tạo lớp học
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-24">
+          <Alert variant="danger" className="mb-0">
+            <div className="d-flex align-items-start">
+              <i className="fas fa-exclamation-circle me-3 mt-1" style={{ fontSize: '20px' }}></i>
+              <div className="flex-grow-1">
+                <p className="mb-0 fw-medium" style={{ fontSize: '15px' }}>
+                  {errorMessage}
+                </p>
+              </div>
+            </div>
+          </Alert>
+        </Modal.Body>
+        <Modal.Footer className="bg-neutral-25 border-0 p-20">
+          <Button 
+            className="btn-danger text-15 fw-semibold px-24 py-10 radius-8"
+            onClick={() => setShowErrorModal(false)}
+          >
+            <i className="fas fa-check me-2"></i> Đã hiểu
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Modal>
   );
 };

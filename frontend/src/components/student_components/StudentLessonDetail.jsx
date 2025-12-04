@@ -373,6 +373,7 @@ const StudentLessonDetail = () => {
         onHide={() => setShowAbsenceModal(false)}
         schedule={{
           id: lessonData._id,
+          studentScheduleId: lessonData.studentScheduleId,
           date: lessonData.date,
           startTime: lessonData.startTime,
           endTime: lessonData.endTime,

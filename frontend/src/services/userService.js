@@ -2,12 +2,20 @@ import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8080/api/users';
 
+// Helper to get auth token
+const getAuthHeader = () => {
+  const token = localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 // User service functions
 export const userService = {
   // Lấy tất cả users
   getAllUsers: async () => {
     try {
-      const response = await axios.get(API_BASE_URL);
+      const response = await axios.get(API_BASE_URL, {
+        headers: getAuthHeader()
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy danh sách người dùng' };
@@ -17,7 +25,9 @@ export const userService = {
   // Lấy user theo ID
   getUserById: async (id) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/${id}`);
+      const response = await axios.get(`${API_BASE_URL}/${id}`, {
+        headers: getAuthHeader()
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy thông tin người dùng' };
@@ -27,7 +37,9 @@ export const userService = {
   // Tạo user mới
   createUser: async (userData) => {
     try {
-      const response = await axios.post(API_BASE_URL, userData);
+      const response = await axios.post(API_BASE_URL, userData, {
+        headers: getAuthHeader()
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Tạo người dùng thất bại' };
@@ -37,7 +49,9 @@ export const userService = {
   // Cập nhật user
   updateUser: async (id, userData) => {
     try {
-      const response = await axios.put(`${API_BASE_URL}/${id}`, userData);
+      const response = await axios.put(`${API_BASE_URL}/${id}`, userData, {
+        headers: getAuthHeader()
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Cập nhật người dùng thất bại' };
@@ -47,7 +61,9 @@ export const userService = {
   // Xóa user
   deleteUser: async (id) => {
     try {
-      const response = await axios.delete(`${API_BASE_URL}/${id}`);
+      const response = await axios.delete(`${API_BASE_URL}/${id}`, {
+        headers: getAuthHeader()
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Xóa người dùng thất bại' };

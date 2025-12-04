@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup } from 'react-bootstrap';
 import roomService from '../../services/roomService';
+import ScheduleCalendar from './ScheduleCalendar';
+import { formatDateToYYYYMMDD } from '../../helper/helper';
 
 /**
  * Room Management Full Component with API Integration
@@ -11,12 +13,12 @@ const RoomManagementFull = () => {
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState('grid');
   const [showModal, setShowModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [editingRoom, setEditingRoom] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [roomSchedule, setRoomSchedule] = useState([]);
+  const [scheduleViewMode, setScheduleViewMode] = useState('calendar'); // table or calendar
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [formData, setFormData] = useState({
@@ -120,6 +122,7 @@ const RoomManagementFull = () => {
 
   const handleViewSchedule = async (room) => {
     setSelectedRoom(room);
+    setScheduleViewMode('calendar'); // Reset to calendar view when opening modal
     try {
       setLoading(true);
       const data = await roomService.getRoomSchedule(room._id);
@@ -159,6 +162,30 @@ const RoomManagementFull = () => {
       </Badge>
     );
   };
+
+  // Format room schedule data for ScheduleCalendar component
+  const formatRoomSchedulesForCalendar = useMemo(() => {
+    return roomSchedule.map(schedule => {
+      let dateStr = 'N/A';
+      if (schedule.date) {
+        if (schedule.date instanceof Date) {
+          dateStr = formatDateToYYYYMMDD(schedule.date);
+        } else if (typeof schedule.date === 'string') {
+          dateStr = schedule.date.split('T')[0];
+        }
+      }
+      
+      return {
+        id: schedule._id || schedule.id,
+        date: dateStr,
+        startTime: schedule.startTime || '',
+        endTime: schedule.endTime || '',
+        className: schedule.class?.name || 'N/A',
+        topic: schedule.session?.title || schedule.topic || 'N/A',
+        status: schedule.status || 'fixed'
+      };
+    });
+  }, [roomSchedule]);
 
   const filteredRooms = rooms;
 
@@ -306,26 +333,6 @@ const RoomManagementFull = () => {
               </Form.Select>
             </Col>
 
-            <Col md={5} className="text-end">
-              <div className="btn-group">
-                <Button
-                  variant={viewMode === 'grid' ? 'primary' : 'outline-secondary'}
-                  onClick={() => setViewMode('grid')}
-                  className="px-16"
-                >
-                  <i className="fas fa-th me-2"></i>
-                  Grid
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'primary' : 'outline-secondary'}
-                  onClick={() => setViewMode('list')}
-                  className="px-16"
-                >
-                  <i className="fas fa-list me-2"></i>
-                  List
-                </Button>
-              </div>
-            </Col>
           </Row>
         </Card.Body>
       </Card>
@@ -347,66 +354,8 @@ const RoomManagementFull = () => {
         </div>
       )}
 
-      {/* Grid View */}
-      {!loading && !error && viewMode === 'grid' && (
-        <Row className="g-3">
-          {filteredRooms.map(room => (
-            <Col key={room._id} lg={4} md={6}>
-              <Card className="bg-white border-0 rounded-12 box-shadow-sm h-100">
-                <Card.Body className="p-20">
-                  <div className="d-flex justify-content-between align-items-start mb-16">
-                    <div>
-                      <h6 className="text-neutral-900 fw-semibold mb-4">{room.room_name}</h6>
-                      <p className="text-neutral-600 text-13 mb-0">{room.location}</p>
-                    </div>
-                    {getStatusBadge(room.status)}
-                  </div>
-
-                  <div className="mb-16">
-                    <div className="d-flex align-items-center gap-8 mb-8">
-                      <i className="fas fa-users text-neutral-400"></i>
-                      <span className="text-neutral-700 text-14">Sức chứa: {room.capacity} người</span>
-                    </div>
-                  </div>
-
-                  {room.description && (
-                    <p className="text-neutral-600 text-13 mb-16">{room.description}</p>
-                  )}
-
-                  <div className="d-flex gap-8">
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={() => handleViewSchedule(room)}
-                      className="flex-grow-1"
-                    >
-                      <i className="fas fa-calendar me-1"></i>
-                      Lịch sử dụng
-                    </Button>
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={() => handleEdit(room)}
-                    >
-                      <i className="fas fa-edit"></i>
-                    </Button>
-                    <Button
-                      variant="outline-danger"
-                      size="sm"
-                      onClick={() => handleDelete(room._id)}
-                    >
-                      <i className="fas fa-trash"></i>
-                    </Button>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          ))}
-        </Row>
-      )}
-
-      {/* List View */}
-      {!loading && !error && viewMode === 'list' && (
+      {/* Rooms List View */}
+      {!loading && !error && (
         <Card className="bg-white border-0 rounded-12 box-shadow-sm">
           <Card.Body className="p-0">
             <Table hover className="mb-0">
@@ -559,7 +508,7 @@ const RoomManagementFull = () => {
       </Modal>
 
       {/* Room Schedule Modal */}
-      <Modal show={showScheduleModal} onHide={() => setShowScheduleModal(false)} size="lg">
+      <Modal show={showScheduleModal} onHide={() => setShowScheduleModal(false)} size="xl">
         <Modal.Header closeButton>
           <Modal.Title>
             Lịch sử dụng - {selectedRoom?.room_name}
@@ -572,47 +521,92 @@ const RoomManagementFull = () => {
               <div className="text-muted">Sức chứa: {selectedRoom.capacity} người</div>
             </div>
           )}
-          
-          {roomSchedule.length > 0 ? (
-            <Table hover>
-              <thead className="bg-neutral-25">
-                <tr>
-                  <th className="px-16 py-12 text-13">Thời gian</th>
-                  <th className="px-16 py-12 text-13">Lớp học</th>
-                  <th className="px-16 py-12 text-13">Chủ đề</th>
-                  <th className="px-16 py-12 text-13">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody>
-                {roomSchedule.map((schedule, index) => (
-                  <tr key={index}>
-                    <td className="px-16 py-12">
-                      <div className="text-14">
-                        {new Date(schedule.date).toLocaleDateString('vi-VN')}
-                      </div>
-                      <div className="text-13 text-muted">
-                        {schedule.startTime} - {schedule.endTime}
-                      </div>
-                    </td>
-                    <td className="px-16 py-12">
-                      {schedule.class?.name || 'N/A'}
-                    </td>
-                    <td className="px-16 py-12">
-                      {schedule.session?.title || schedule.topic || 'N/A'}
-                    </td>
-                    <td className="px-16 py-12">
-                      <Badge bg={schedule.status === 'approved' ? 'success' : 'warning'}>
-                        {schedule.status}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          ) : (
-            <div className="text-center py-4 text-muted">
-              Chưa có lịch sử dụng
+
+          {/* View Toggle Buttons */}
+          <div className="d-flex justify-content-end mb-3">
+            <div className="btn-group">
+              <Button
+                variant={scheduleViewMode === 'calendar' ? 'primary' : 'outline-secondary'}
+                size="sm"
+                onClick={() => setScheduleViewMode('calendar')}
+              >
+                <i className="fas fa-calendar me-2"></i>
+                Calendar
+              </Button>
+              <Button
+                variant={scheduleViewMode === 'table' ? 'primary' : 'outline-secondary'}
+                size="sm"
+                onClick={() => setScheduleViewMode('table')}
+              >
+                <i className="fas fa-list me-2"></i>
+                Bảng
+              </Button>
             </div>
+          </div>
+          
+          {/* Table View */}
+          {scheduleViewMode === 'table' && (
+            <>
+              {roomSchedule.length > 0 ? (
+                <Table hover>
+                  <thead className="bg-neutral-25">
+                    <tr>
+                      <th className="px-16 py-12 text-13">Thời gian</th>
+                      <th className="px-16 py-12 text-13">Lớp học</th>
+                      <th className="px-16 py-12 text-13">Chủ đề</th>
+                      <th className="px-16 py-12 text-13">Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {roomSchedule.map((schedule, index) => (
+                      <tr key={index}>
+                        <td className="px-16 py-12">
+                          <div className="text-14">
+                            {new Date(schedule.date).toLocaleDateString('vi-VN')}
+                          </div>
+                          <div className="text-13 text-muted">
+                            {schedule.startTime} - {schedule.endTime}
+                          </div>
+                        </td>
+                        <td className="px-16 py-12">
+                          {schedule.class?.name || 'N/A'}
+                        </td>
+                        <td className="px-16 py-12">
+                          {schedule.session?.title || schedule.topic || 'N/A'}
+                        </td>
+                        <td className="px-16 py-12">
+                          <Badge bg={schedule.status === 'fixed' ? 'success' : schedule.status === 'temporary' ? 'warning' : 'secondary'}>
+                            {schedule.status === 'fixed' ? 'Buổi cố định' : schedule.status === 'temporary' ? 'Buổi tạm' : schedule.status}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              ) : (
+                <div className="text-center py-4 text-muted">
+                  Chưa có lịch sử dụng
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Calendar View */}
+          {scheduleViewMode === 'calendar' && (
+            <>
+              {roomSchedule.length > 0 ? (
+                <ScheduleCalendar
+                  schedules={formatRoomSchedulesForCalendar}
+                  onEditSchedule={() => {}}
+                  onDeleteSchedule={() => {}}
+                  onCreateMakeup={() => {}}
+                />
+              ) : (
+                <div className="text-center py-4 text-muted">
+                  Chưa có lịch sử dụng
+                </div>
+              )}
+            </>
           )}
         </Modal.Body>
         <Modal.Footer>

@@ -3,16 +3,33 @@ import QuestionListView from './QuestionListView';
 import AddQuestionModal from './AddQuestionModal';
 
 const Step3AnswerKeys = ({ examData, updateExamData }) => {
-  const [selectedSectionIndex, setSelectedSectionIndex] = useState(0);
+  const [selectedSectionId, setSelectedSectionId] = useState(null);
   const [isAddQuestionModalOpen, setIsAddQuestionModalOpen] = useState(false);
   const [editingQuestionIndex, setEditingQuestionIndex] = useState(null);
 
-  // Filter sections that need answer keys (reading/listening)
+  // Filter sections that need answer keys (reading/listening) và nhóm theo skill type
   const sectionsNeedingAnswers = examData.sections.filter(
     section => section.type === 'reading' || section.type === 'listening'
   );
 
-  const currentSection = sectionsNeedingAnswers[selectedSectionIndex];
+  // Nhóm sections theo skill type
+  const groupedSections = {};
+  sectionsNeedingAnswers.forEach(section => {
+    if (!groupedSections[section.type]) {
+      groupedSections[section.type] = [];
+    }
+    groupedSections[section.type].push(section);
+  });
+
+  // Sắp xếp sections trong mỗi group theo part
+  Object.keys(groupedSections).forEach(type => {
+    groupedSections[type].sort((a, b) => (a.part || 1) - (b.part || 1));
+  });
+
+  // Chọn section đầu tiên nếu chưa chọn
+  const currentSection = selectedSectionId
+    ? examData.sections.find(s => s.id === selectedSectionId)
+    : sectionsNeedingAnswers[0];
 
   const updateSectionAnswers = (answers) => {
     const updatedSections = examData.sections.map(section =>
@@ -171,37 +188,92 @@ const Step3AnswerKeys = ({ examData, updateExamData }) => {
     );
   }
 
+  const getSectionIcon = (type) => {
+    const icons = {
+      reading: 'ph-book-open',
+      listening: 'ph-headphones'
+    };
+    return icons[type] || 'ph-file';
+  };
+
   return (
     <div className="container-fluid px-0" style={{ backgroundColor: '#f5f5f5', padding: '2rem', minHeight: '100vh' }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        {/* Section Selector Card */}
-        <div className="card shadow border mb-5" style={{
+        {/* Section Selector Card - Nhóm theo Skill */}
+        <div className="card shadow border mb-4" style={{
           borderColor: '#dee2e6',
           borderWidth: '1px',
           borderRadius: '0.5rem'
         }}>
           <div className="card-body" style={{ padding: '1.5rem' }}>
-            <div className="row align-items-center">
+            <h6 className="mb-3 fw-bold">
+              <i className="ph ph-folder-open me-2 text-primary"></i>
+              Chọn Part để thêm đáp án
+            </h6>
+
+            {/* Hiển thị theo Skill Groups */}
+            <div className="d-flex flex-column gap-3">
+              {Object.keys(groupedSections).map(skillType => (
+                <div key={skillType} className="border rounded p-3 bg-light">
+                  <div className="d-flex align-items-center gap-2 mb-2">
+                    <i className={`ph ${getSectionIcon(skillType)} text-primary`} style={{ fontSize: '20px' }}></i>
+                    <h6 className="mb-0 fw-semibold text-capitalize">{skillType}</h6>
+                    <span className="badge bg-primary ms-auto">{groupedSections[skillType].length} part(s)</span>
+                  </div>
+
+                  {/* Parts trong skill */}
+                  <div className="d-flex flex-wrap gap-2 mt-2">
+                    {groupedSections[skillType].map((section) => {
+                      const isSelected = currentSection?.id === section.id;
+                      const hasAnswers = section.answerKey && section.answerKey.length > 0;
+
+                      return (
+                        <button
+                          key={section.id}
+                          className={`btn ${isSelected ? 'btn-primary' : 'btn-outline-primary'} btn-sm d-flex align-items-center gap-2`}
+                          onClick={() => setSelectedSectionId(section.id)}
+                          style={{ minWidth: '120px' }}
+                        >
+                          <div className="d-flex align-items-center justify-content-center rounded-circle bg-white text-primary fw-bold"
+                            style={{ width: '24px', height: '24px', fontSize: '12px' }}>
+                            {section.part || 1}
+                          </div>
+                          <span>
+                            Part {section.part || 1}
+                          </span>
+                          {hasAnswers && (
+                            <span className="badge bg-success ms-auto">{section.answerKey.length}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Legacy dropdown - giữ lại để fallback */}
+            <div className="row align-items-center mt-3 d-none">
               <div className="col-md-6">
                 <label className="form-label fw-semibold text-dark mb-2">
                   <i className="ph ph-folder-open me-2 text-primary"></i>
-                  Select Section
+                  Select Section (Legacy)
                 </label>
                 <select
                   className="form-select form-select-lg"
-                  value={selectedSectionIndex}
-                  onChange={(e) => setSelectedSectionIndex(parseInt(e.target.value))}
+                  value={currentSection?.id || ''}
+                  onChange={(e) => setSelectedSectionId(e.target.value)}
                   style={{
                     cursor: 'pointer',
                     border: '2px solid #dee2e6',
                     borderRadius: '0.5rem'
                   }}
                 >
-                  {sectionsNeedingAnswers.map((section, index) => {
+                  {sectionsNeedingAnswers.map((section) => {
                     const sectionNumber = examData.sections.indexOf(section) + 1;
                     return (
-                      <option key={section.id} value={index}>
-                        Section {sectionNumber} - {section.type.charAt(0).toUpperCase() + section.type.slice(1)} ({section.answerKey?.length || 0} questions)
+                      <option key={section.id} value={section.id}>
+                        Section {sectionNumber} - Part {section.part || 1} - {section.type.charAt(0).toUpperCase() + section.type.slice(1)} ({section.answerKey?.length || 0} questions)
                       </option>
                     );
                   })}

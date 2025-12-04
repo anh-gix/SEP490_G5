@@ -1,17 +1,14 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Container, Card, Button, Form, Row, Col, Spinner, Alert } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 import ClassList from './ClassList';
 import CreateClassModal from './CreateClassModal';
-import EditClassModal from './EditClassModal';
-import ClassDetails from './ClassDetails';
 import classService from '../../services/classService';
 
 const ClassManagement = () => {
+  const navigate = useNavigate();
   const [classes, setClasses] = useState([]);
-  const [selectedClass, setSelectedClass] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
@@ -38,7 +35,8 @@ const ClassManagement = () => {
         level: cls.level || cls.course?.level || 'N/A', // Level từ course
         program: cls.courseName || cls.course?.name || 'N/A',
         band: cls.band || cls.course?.band || 'N/A', // Band từ course
-        courseType: cls.courseType || cls.course?.type || 'N/A',
+        courseType: cls.courseType || cls.course?.program?.type || 'N/A',
+        course: cls.course?._id || cls.course || null, // Keep course ID for EditClassForm
         status: cls.status,
         startDate: cls.startDate ? new Date(cls.startDate).toISOString().split('T')[0] : 'N/A',
         endDate: cls.endDate ? new Date(cls.endDate).toISOString().split('T')[0] : 'N/A',
@@ -51,8 +49,8 @@ const ClassManagement = () => {
         roomLocation: cls.roomLocation || cls.room?.location || 'N/A',
         totalStudents: cls.totalStudents || cls.students?.length || 0,
         maxStudents: cls.maxStudents || 25,
-        currentLesson: cls.totalSchedules || 0,
-        totalLessons: cls.totalSchedules || 0,
+        currentLesson: cls.completedSchedules || 0, // Số buổi đã hoàn thành
+        totalLessons: cls.totalSchedules || 0, // Tổng số buổi
         completionRate: typeof cls.completionRate !== 'undefined' ? cls.completionRate : (cls.stats?.completionRate || 0)
       }));
       
@@ -84,20 +82,8 @@ const ClassManagement = () => {
     }
   };
 
-  const handleEditClass = async (classData) => {
-    try {
-      setLoading(true);
-      await classService.updateClass(classData.id, classData);
-      setShowEditModal(false);
-      setSelectedClass(null);
-      alert('Cập nhật lớp học thành công!');
-      await fetchClasses();
-    } catch (err) {
-      console.error('Error updating class:', err);
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật lớp học!');
-    } finally {
-      setLoading(false);
-    }
+  const handleEditClass = (classItem) => {
+    navigate(`/academic/class-management/${classItem.id}/edit`);
   };
 
   const handleDeleteClass = async (classId) => {
@@ -117,8 +103,7 @@ const ClassManagement = () => {
   };
 
   const handleViewDetails = (classItem) => {
-    setSelectedClass(classItem);
-    setShowDetails(true);
+    navigate(`/academic/class-management/${classItem.id}`);
   };
 
   const handleFilterChange = (e) => {
@@ -308,10 +293,7 @@ const ClassManagement = () => {
 
       <ClassList
         classes={classes}
-        onEdit={(classItem) => {
-          setSelectedClass(classItem);
-          setShowEditModal(true);
-        }}
+        onEdit={handleEditClass}
         onDelete={handleDeleteClass}
         onViewDetails={handleViewDetails}
       />
@@ -320,27 +302,6 @@ const ClassManagement = () => {
         <CreateClassModal
           onClose={() => setShowCreateModal(false)}
           onSubmit={handleCreateClass}
-        />
-      )}
-
-      {showEditModal && selectedClass && (
-        <EditClassModal
-          classData={selectedClass}
-          onClose={() => {
-            setShowEditModal(false);
-            setSelectedClass(null);
-          }}
-          onSubmit={handleEditClass}
-        />
-      )}
-
-      {showDetails && selectedClass && (
-        <ClassDetails
-          classData={selectedClass}
-          onClose={() => {
-            setShowDetails(false);
-            setSelectedClass(null);
-          }}
         />
       )}
     </Container>

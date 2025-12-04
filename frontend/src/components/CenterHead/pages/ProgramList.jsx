@@ -7,9 +7,8 @@ import Button from '../compo/Button';
 import SearchBox from '../compo/SearchBox';
 import FilterBar from '../compo/FilterBar';
 import StatusBadge from '../compo/StatusBadge';
-import ActionMenu from '../compo/ActionMenu';
-import { programService } from '../../../services/programService';
 import { formatDate } from '../../../helper/helper';
+import programService from '../../../services/programService';
 
 const ProgramList = () => {
   const navigate = useNavigate();
@@ -31,18 +30,60 @@ const ProgramList = () => {
   const fetchPrograms = async () => {
     try {
       setLoading(true);
-      const response = await programService.getAllPrograms();
 
-      if (response.success) {
-        setPrograms(response.data || []);
-        if (response.stats) {
-          setStats(response.stats);
-        }
+      const response = await programService.getAllPrograms();
+      const programsData = response.data || [];
+
+      setPrograms(programsData);
+
+      // Set stats from API response
+      if (response.stats) {
+        setStats(response.stats);
+      } else {
+        // Calculate stats if not provided by API
+        const calculatedStats = {
+          total: programsData.length,
+          active: programsData.filter(p => p.status === 'active').length,
+          draft: programsData.filter(p => p.status === 'draft').length,
+          archived: programsData.filter(p => p.status === 'archived').length
+        };
+        setStats(calculatedStats);
       }
+
+      console.log('Programs loaded from API:', programsData);
     } catch (err) {
       console.error('Error fetching programs:', err);
+      alert('Không thể tải danh sách chương trình!');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteProgram = async (programId, programName) => {
+    const confirmMessage = `⚠️ CẢNH BÁO: Bạn có chắc muốn xóa chương trình "${programName}"?\n\n` +
+      `Hành động này sẽ XÓA TOÀN BỘ:\n` +
+      `• Tất cả PLO trong chương trình\n` +
+      `• Tất cả Course (học phần)\n` +
+      `• Tất cả CLO trong các course\n` +
+      `• Tất cả Session trong các course\n` +
+      `• Tất cả Materials trong các course\n\n` +
+      `Hành động này KHÔNG THỂ HOÀN TÁC!\n\n` +
+      `Nhấn OK để xác nhận xóa.`;
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      await programService.deleteProgram(programId);
+
+      // Reload programs after deletion
+      await fetchPrograms();
+
+      alert('Đã xóa chương trình và toàn bộ dữ liệu liên quan thành công!');
+    } catch (err) {
+      console.error('Error deleting program:', err);
+      alert(err.message || 'Có lỗi xảy ra khi xóa chương trình.');
     }
   };
 
@@ -122,25 +163,38 @@ const ProgramList = () => {
       header: 'Hành động',
       field: 'actions',
       render: (row) => (
-        <ActionMenu
-          actions={[
-            {
-              label: "Xem chi tiết",
-              icon: "ph ph-eye",
-              onClick: () => navigate(`/center-head/programs/${row._id}`)
-            },
-            {
-              label: "Chỉnh sửa",
-              icon: "ph ph-pencil-simple",
-              onClick: () => navigate(`/center-head/programs/${row._id}/edit`)
-            },
-            {
-              label: "Xem PLOs",
-              icon: "ph ph-list-bullets",
-              onClick: () => navigate(`/center-head/programs/${row._id}/plos`)
-            },
-          ]}
-        />
+        <div className="d-flex gap-2 justify-content-center">
+          <button
+            className="btn btn-sm btn-outline-primary"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/programs/${row._id}`);
+            }}
+            title="Xem chi tiết"
+          >
+            <i className="ph ph-eye"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-secondary"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/programs/${row._id}/edit`);
+            }}
+            title="Chỉnh sửa"
+          >
+            <i className="ph ph-pencil"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-danger"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteProgram(row._id, row.program_name);
+            }}
+            title="Xóa chương trình"
+          >
+            <i className="ph ph-trash"></i>
+          </button>
+        </div>
       ),
     },
   ];
@@ -162,8 +216,12 @@ const ProgramList = () => {
           <h4 className="mb-8 text-neutral-900 fw-bold">Chương trình đào tạo</h4>
           <p className="text-neutral-600 mb-0">Quản lý các chương trình và PLOs</p>
         </div>
-        <Button variant="primary" icon="ph ph-plus" onClick={() => navigate('/center-head/programs/create')}>
-          Thêm chương trình
+        <Button
+          variant="primary"
+          icon="ph ph-plus"
+          onClick={() => navigate('/center-head/programs/create')}
+        >
+          Tạo chương trình mới
         </Button>
       </div>
 

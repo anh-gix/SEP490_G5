@@ -14,6 +14,19 @@ router.post("/management/:id/publish", examController.publishExamForManagement);
 router.post("/management/:id/unpublish", examController.unpublishExamForManagement);
 router.post("/management/upload-answer-key", upload.single("file"), examController.uploadAnswerKeyForManagement);
 
+// Helper route to check exam submission status
+router.get("/management/:id/submission-status", examController.getExamSubmissionStatus);
+
+// ================== TEACHER - EXAM SUBMISSION ROUTES ==================
+// Nộp exam chờ duyệt
+router.post("/management/:id/submit-for-approval", examController.submitExamForApproval);
+
+// Lấy danh sách exam đã nộp của teacher
+router.get("/my-exams", examController.getMySubmittedExams);
+
+// Rút lại exam đang chờ duyệt
+router.post("/management/:id/withdraw", examController.withdrawExamSubmission);
+
 // ================== STUDENT - PUBLIC EXAM ROUTES ==================
 // 🧠 Lấy danh sách bài thi (public)
 router.get("/", examController.getAllExams);
@@ -21,17 +34,7 @@ router.get("/", examController.getAllExams);
 // 🧩 Bắt đầu làm bài (protected - cần đăng nhập)
 router.post("/start", verifyToken, examController.startExam);
 
-// ================== GENERIC ROUTES - Hỗ trợ tất cả các phần thi (reading, listening, writing, speaking) ==================
-// 📖 Lấy thông tin section (protected) - Generic route
-router.get("/:examId/submissions/:submissionId/sections/:sectionType", verifyToken, examController.getSection);
-
-// 📝 Nộp đáp án section (protected) - Generic route
-router.post("/:examId/submissions/:submissionId/sections/:sectionType/submit", verifyToken, examController.submitSectionAnswers);
-
-// 📊 Xem kết quả section (protected) - Generic route
-router.get("/:examId/submissions/:submissionId/sections/:sectionType/result", verifyToken, examController.getSectionResult);
-
-// ================== BACKWARD COMPATIBILITY - Giữ lại các routes cũ ==================
+// ================== SECTION ROUTES - Mỗi section type có route riêng ==================
 // 📖 Lấy thông tin section Reading (protected) - phải đặt trước route /:id
 router.get("/:examId/submissions/:submissionId/reading", verifyToken, examController.getReadingSection);
 

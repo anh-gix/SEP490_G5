@@ -26,6 +26,8 @@ const StatusBadge = ({ status, label, size = "md" }) => {
     scheduled: { variant: "success", icon: "ph-calendar-check", text: "Đã xếp lịch" },
     pending_schedule: { variant: "warning", icon: "ph-calendar", text: "Chờ xếp lịch" },
     rejected: { variant: "danger", icon: "ph-x-circle", text: "Bị từ chối" },
+    temporary: { variant: "warning", icon: "ph-clock-clockwise", text: "Buổi tạm" },
+    fixed: { variant: "success", icon: "ph-calendar-check", text: "Buổi cố định" },
 
     // Room
     available: { variant: "success", icon: "ph-check", text: "Có sẵn" },

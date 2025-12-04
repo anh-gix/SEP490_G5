@@ -13,6 +13,7 @@ import { formatDateToYYYYMMDD } from '../../helper/helper';
 const RoomManagementFull = () => {
   const [rooms, setRooms] = useState([]);
   const [stats, setStats] = useState({});
+  const [todayRoomUsage, setTodayRoomUsage] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -34,6 +35,7 @@ const RoomManagementFull = () => {
   useEffect(() => {
     fetchRooms();
     fetchStats();
+    fetchTodayRoomUsage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, filterStatus]);
 
@@ -61,6 +63,15 @@ const RoomManagementFull = () => {
       setStats(data.stats || {});
     } catch (err) {
       console.error('Error fetching stats:', err);
+    }
+  };
+
+  const fetchTodayRoomUsage = async () => {
+    try {
+      const data = await roomService.getTodayRoomUsage();
+      setTodayRoomUsage(data.roomSchedule || []);
+    } catch (err) {
+      console.error('Error fetching today room usage:', err);
     }
   };
 
@@ -123,6 +134,7 @@ const RoomManagementFull = () => {
       setLoading(true);
       await roomService.deleteRoom(roomId);
       toast.success('Xóa phòng học thành công!');
+      handleCloseModal();
       fetchRooms();
       fetchStats();
     } catch (err) {
@@ -327,118 +339,169 @@ const RoomManagementFull = () => {
         </Col>
       </Row>
 
-      {/* Filters and View Toggle */}
-      <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24">
-        <Card.Body className="p-20">
-          <Row className="g-3 align-items-center">
-            <Col md={4}>
-              <InputGroup>
-                <InputGroup.Text className="bg-neutral-50 border-neutral-200">
-                  <i className="fas fa-search text-neutral-600"></i>
-                </InputGroup.Text>
-                <Form.Control
-                  placeholder="Tìm theo tên phòng hoặc vị trí..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="border-neutral-200"
-                />
-              </InputGroup>
-            </Col>
-
-            <Col md={3}>
-              <Form.Select 
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="border-neutral-200"
-              >
-                <option value="all">Tất cả trạng thái</option>
-                <option value="available">Sẵn sàng</option>
-                <option value="in_use">Đang sử dụng</option>
-                <option value="maintenance">Bảo trì</option>
-              </Form.Select>
-            </Col>
-
-          </Row>
-        </Card.Body>
-      </Card>
-
-      {/* Loading State */}
-      {loading && (
-        <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Đang tải...</span>
-          </div>
-        </div>
-      )}
-
-      {/* Error State */}
-      {error && (
-        <div className="alert alert-danger" role="alert">
-          <i className="fas fa-exclamation-triangle me-2"></i>
-          {error}
-        </div>
-      )}
-
-      {/* Rooms List View */}
-      {!loading && !error && (
-        <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-          <Card.Body className="p-0">
-            <Table hover className="mb-0">
-              <thead>
-                <tr className="bg-neutral-25">
-                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Phòng</th>
-                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Vị trí</th>
-                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Sức chứa</th>
-                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Trạng thái</th>
-                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRooms.map(room => (
-                  <tr key={room._id}>
-                    <td className="px-20 py-16">
-                      <div className="text-neutral-900 fw-semibold text-14">{room.room_name}</div>
-                    </td>
-                    <td className="px-20 py-16 text-neutral-700 text-14">{room.location}</td>
-                    <td className="px-20 py-16 text-center text-neutral-700 fw-medium text-14">
-                      {room.capacity}
-                    </td>
-                    <td className="px-20 py-16">
-                      {getStatusBadge(room.status)}
-                    </td>
-                    <td className="px-20 py-16">
-                      <div className="d-flex gap-8">
-                        <Button
-                          variant="outline-info"
-                          size="sm"
-                          onClick={() => handleViewSchedule(room)}
-                        >
-                          <i className="fas fa-calendar me-1"></i>
-                          Lịch
-                        </Button>
-                        <Button
-                          variant="outline-secondary"
-                          size="sm"
-                          onClick={() => handleEdit(room)}
-                        >
-                          <i className="fas fa-edit"></i>
-                        </Button>
-                        <Button
-                          variant="outline-danger"
-                          size="sm"
-                          onClick={() => handleDelete(room._id)}
-                        >
-                          <i className="fas fa-trash"></i>
-                        </Button>
-                      </div>
-                    </td>
+      {/* Two Column Layout: Room Schedule (Left) and Room Management (Right) */}
+      <Row className="g-3">
+        {/* Left Column - Room Schedule */}
+        <Col lg={7}>
+          <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24" 
+                style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+            <Card.Header className="bg-main-25 border-0 p-20">
+              <div className="d-flex justify-content-between align-items-center">
+                <h6 className="text-neutral-900 fw-bold mb-0">
+                  <i className="fas fa-door-open text-warning-600 me-2"></i>
+                  Lịch sử dụng phòng học
+                </h6>
+              </div>
+            </Card.Header>
+            <Card.Body className="p-0">
+              <Table className="mb-0" hover size="sm">
+                <thead style={{ backgroundColor: 'var(--neutral-50)' }}>
+                  <tr>
+                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Phòng</th>
+                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">08:00-10:00</th>
+                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">10:30-12:30</th>
+                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">14:00-16:00</th>
+                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">18:00-20:00</th>
                   </tr>
-                ))}
-              </tbody>
-            </Table>
-          </Card.Body>
-        </Card>
-      )}
+                </thead>
+                <tbody>
+                  {todayRoomUsage.map((room, idx) => (
+                    <tr key={idx}>
+                      <td className="px-16 py-12">
+                        <div className="text-neutral-900 fw-semibold text-13">{room.room}</div>
+                        <div className="text-neutral-500 text-11">{room.location}</div>
+                      </td>
+                      {room.schedules.map((schedule, sIdx) => (
+                        <td key={sIdx} className="px-16 py-12">
+                          {schedule.status === 'occupied' ? (
+                            <Badge className="bg-success-100 text-success-700 px-8 py-4 text-11 fw-medium">
+                              <i className="fas fa-users me-1"></i>
+                              {schedule.class}
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-neutral-100 text-neutral-500 px-8 py-4 text-11">
+                              <i className="fas fa-check-circle me-1"></i>
+                              Trống
+                            </Badge>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </Card.Body>
+          </Card>
+        </Col>
+
+        {/* Right Column - Room Management */}
+        <Col lg={5}>
+          {/* Filters and View Toggle */}
+          <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24">
+            <Card.Body className="p-20">
+              <Row className="g-3 align-items-center">
+                <Col md={6}>
+                  <InputGroup>
+                    <InputGroup.Text className="bg-neutral-50 border-neutral-200">
+                      <i className="fas fa-search text-neutral-600"></i>
+                    </InputGroup.Text>
+                    <Form.Control
+                      placeholder="Tìm theo tên phòng hoặc vị trí..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="border-neutral-200"
+                    />
+                  </InputGroup>
+                </Col>
+
+                <Col md={6}>
+                  <Form.Select 
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="border-neutral-200"
+                  >
+                    <option value="all">Tất cả trạng thái</option>
+                    <option value="available">Sẵn sàng</option>
+                    <option value="in_use">Đang sử dụng</option>
+                    <option value="maintenance">Bảo trì</option>
+                  </Form.Select>
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
+
+          {/* Loading State */}
+          {loading && (
+            <div className="text-center py-5">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Đang tải...</span>
+              </div>
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && (
+            <div className="alert alert-danger" role="alert">
+              <i className="fas fa-exclamation-triangle me-2"></i>
+              {error}
+            </div>
+          )}
+
+          {/* Rooms List View */}
+          {!loading && !error && (
+            <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+              <Card.Body className="p-0">
+                <Table hover className="mb-0">
+                  <thead>
+                    <tr className="bg-neutral-25">
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Phòng</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Vị trí</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Sức chứa</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Trạng thái</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRooms.map(room => (
+                      <tr key={room._id}>
+                        <td className="px-20 py-16">
+                          <div className="text-neutral-900 fw-semibold text-14">{room.room_name}</div>
+                        </td>
+                        <td className="px-20 py-16 text-neutral-700 text-14">{room.location}</td>
+                        <td className="px-20 py-16 text-center text-neutral-700 fw-medium text-14">
+                          {room.capacity}
+                        </td>
+                        <td className="px-20 py-16">
+                          {getStatusBadge(room.status)}
+                        </td>
+                        <td className="px-20 py-16">
+                          <div className="d-flex gap-8">
+                            <Button
+                              variant="outline-info"
+                              size="sm"
+                              onClick={() => handleViewSchedule(room)}
+                            >
+                              <i className="fas fa-calendar me-1"></i>
+                              Lịch
+                            </Button>
+                            <Button
+                              variant="outline-secondary"
+                              size="sm"
+                              onClick={() => handleEdit(room)}
+                            >
+                              <i className="fas fa-edit"></i>
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </Card.Body>
+            </Card>
+          )}
+        </Col>
+      </Row>
 
       {/* Add/Edit Modal */}
       <Modal show={showModal} onHide={handleCloseModal} size="lg">
@@ -525,6 +588,16 @@ const RoomManagementFull = () => {
             <Button variant="secondary" onClick={handleCloseModal} disabled={loading}>
               Hủy
             </Button>
+            {editingRoom && (
+              <Button
+                variant="danger"
+                onClick={() => handleDelete(editingRoom._id)}
+                disabled={loading}
+              >
+                <i className="fas fa-trash me-1"></i>
+                Xóa
+              </Button>
+            )}
             <Button variant="primary" type="submit" disabled={loading}>
               {loading ? 'Đang lưu...' : (editingRoom ? 'Cập nhật' : 'Thêm mới')}
             </Button>

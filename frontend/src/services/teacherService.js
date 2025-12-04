@@ -15,6 +15,7 @@ const teacherService = {
       const response = await axios.get(`${API_URL}/teachers/me`, {
         headers: getAuthHeader()
       });
+      console.log(response);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;

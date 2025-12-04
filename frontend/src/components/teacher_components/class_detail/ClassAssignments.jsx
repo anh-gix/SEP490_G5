@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, Badge, Modal, Spinner } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import Swal from 'sweetalert2';
 import homeworkService from '../../../services/homeworkService';
 import CreateHomeworkModal from '../CreateHomeworkModal';
-import AssignmentDetailModal from './modals/AssignmentDetailModal';
 
 const ClassAssignments = ({ classId, onAssignmentUpdate }) => {
+  const navigate = useNavigate();
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [uploadingFiles, setUploadingFiles] = useState({ assignment: false, answer: false });
 
   const fetchAssignments = async () => {
     try {
@@ -45,131 +46,9 @@ const ClassAssignments = ({ classId, onAssignmentUpdate }) => {
     if (onAssignmentUpdate) onAssignmentUpdate();
   };
 
-  const handleViewSubmissions = async (assignment) => {
-    try {
-      setLoading(true);
-      const response = await homeworkService.getHomeworkSubmissions(
-        assignment._id, 
-        assignment.scheduleId
-      );
-      
-      if (response.success) {
-        // Transform data to match AssignmentDetailModal structure
-        const transformedAssignment = {
-          ...assignment,
-          sessionTitle: assignment.lessonTitle,
-          sessionOrder: assignment.lessonNumber,
-          dueDate: assignment.deadline,
-          total: assignment.totalStudents,
-          submissionRate: assignment.totalStudents > 0 
-            ? Math.round((assignment.submitted / assignment.totalStudents) * 100) 
-            : 0,
-          late: 0, // Calculate from submissions if needed
-          notSubmitted: assignment.pending,
-          files: assignment.assignmentFiles || [],
-          answerFiles: assignment.answerFiles || [],
-          submissions: (response.submissions || []).map(sub => ({
-            studentId: sub.student?._id,
-            studentName: sub.student?.username || sub.student?.email,
-            submittedAt: sub.submittedAt,
-            score: sub.score,
-            status: sub.status,
-            files: sub.submittedFiles || sub.files || []
-          }))
-        };
-        
-        setSelectedAssignment(transformedAssignment);
-        setShowDetailModal(true);
-      }
-    } catch (err) {
-      console.error('Error fetching submissions:', err);
-      alert('Không thể tải thông tin bài tập. Vui lòng thử lại.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdateAssignmentFile = async (fileType) => {
-    // Create file input element
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.multiple = true;
-    input.accept = '.pdf,.doc,.docx,.ppt,.pptx,.txt,.zip,.rar';
-    
-    input.onchange = async (e) => {
-      const files = Array.from(e.target.files);
-      if (files.length === 0) return;
-
-      // Max 5 files
-      if (files.length > 5) {
-        alert('Tối đa 5 files mỗi lần upload');
-        return;
-      }
-
-      try {
-        setUploadingFiles(prev => ({ ...prev, [fileType]: true }));
-        
-        const newAssignmentFiles = fileType === 'assignment' ? files : [];
-        const newAnswerFiles = fileType === 'answer' ? files : [];
-        
-        const response = await homeworkService.updateHomework(
-          selectedAssignment.scheduleId,
-          selectedAssignment._id,
-          {}, // No title/deadline changes
-          newAssignmentFiles,
-          newAnswerFiles,
-          [], // No files to delete
-          []
-        );
-
-        if (response.success) {
-          // Refresh the assignment detail
-          await handleViewSubmissions(selectedAssignment);
-          alert('Thêm file thành công!');
-        }
-      } catch (err) {
-        console.error('Error uploading files:', err);
-        alert('Không thể upload file. Vui lòng thử lại.');
-      } finally {
-        setUploadingFiles(prev => ({ ...prev, [fileType]: false }));
-      }
-    };
-
-    input.click();
-  };
-
-  const handleDeleteAssignmentFile = async (fileType, file) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa file này?')) {
-      return;
-    }
-
-    try {
-      setUploadingFiles(prev => ({ ...prev, [fileType]: true }));
-      
-      const deleteAssignmentFiles = fileType === 'assignment' ? [file] : [];
-      const deleteAnswerFiles = fileType === 'answer' ? [file] : [];
-      
-      const response = await homeworkService.updateHomework(
-        selectedAssignment.scheduleId,
-        selectedAssignment._id,
-        {}, // No title/deadline changes
-        [], // No new files
-        [],
-        deleteAssignmentFiles,
-        deleteAnswerFiles
-      );
-
-      if (response.success) {
-        // Refresh the assignment detail
-        await handleViewSubmissions(selectedAssignment);
-        alert('Xóa file thành công!');
-      }
-    } catch (err) {
-      console.error('Error deleting file:', err);
-      alert('Không thể xóa file. Vui lòng thử lại.');
-    } finally {
-      setUploadingFiles(prev => ({ ...prev, [fileType]: false }));
-    }
+  const handleViewSubmissions = (assignment) => {
+    // Navigate to assignment detail page
+    navigate(`/teacher/assignments/${assignment._id}`);
   };
 
   const handleDeleteClick = (assignment) => {
@@ -177,29 +56,24 @@ const ClassAssignments = ({ classId, onAssignmentUpdate }) => {
     setShowDeleteModal(true);
   };
 
-  const handleDeleteHomework = async (assignment) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa bài tập "${assignment.title}"?`)) {
-      return;
-    }
-
-    try {
-      await homeworkService.deleteHomework(
-        assignment.scheduleId, 
-        assignment._id
-      );
-      
-      setShowDetailModal(false);
-      setSelectedAssignment(null);
-      fetchAssignments();
-      if (onAssignmentUpdate) onAssignmentUpdate();
-    } catch (err) {
-      console.error('Error deleting homework:', err);
-      alert('Không thể xóa bài tập. Vui lòng thử lại.');
-    }
-  };
-
-  const handleConfirmDelete = async () => {
+  const handleDeleteHomework = async () => {
     if (!selectedAssignment) return;
+
+    const result = await Swal.fire({
+      title: 'Xóa bài tập',
+      html: `
+        <p>Bạn có chắc chắn muốn xóa bài tập <strong>"${selectedAssignment.title}"</strong>?</p>
+        <p class="text-danger"><i class="fas fa-exclamation-triangle me-2"></i>Hành động này không thể hoàn tác và sẽ xóa tất cả bài nộp của học viên.</p>
+      `,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: 'Xóa bài tập',
+      cancelButtonText: 'Hủy'
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
       await homeworkService.deleteHomework(
@@ -211,64 +85,11 @@ const ClassAssignments = ({ classId, onAssignmentUpdate }) => {
       setSelectedAssignment(null);
       fetchAssignments();
       if (onAssignmentUpdate) onAssignmentUpdate();
+      toast.success('Xóa bài tập thành công!');
     } catch (err) {
       console.error('Error deleting homework:', err);
-      alert('Không thể xóa bài tập. Vui lòng thử lại.');
+      toast.error('Không thể xóa bài tập. Vui lòng thử lại.');
     }
-  };
-
-  const handleDownloadSubmission = (submission) => {
-    if (!submission.files || submission.files.length === 0) {
-      alert('Học viên chưa nộp file nào');
-      return;
-    }
-
-    // Download all files from this submission
-    submission.files.forEach((fileUrl, index) => {
-      setTimeout(() => {
-        const link = document.createElement('a');
-        link.href = fileUrl;
-        link.download = fileUrl.split('/').pop();
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }, index * 200); // Delay to avoid browser blocking multiple downloads
-    });
-  };
-
-  const handleDownloadAllSubmissions = () => {
-    if (!selectedAssignment || !selectedAssignment.submissions) {
-      alert('Không có bài nộp nào');
-      return;
-    }
-
-    const submittedFiles = selectedAssignment.submissions.filter(
-      sub => sub.files && sub.files.length > 0
-    );
-
-    if (submittedFiles.length === 0) {
-      alert('Không có file nào để tải');
-      return;
-    }
-
-    let fileIndex = 0;
-    submittedFiles.forEach((submission) => {
-      submission.files.forEach((fileUrl) => {
-        setTimeout(() => {
-          const link = document.createElement('a');
-          link.href = fileUrl;
-          link.download = `${submission.studentName}_${fileUrl.split('/').pop()}`;
-          link.target = '_blank';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }, fileIndex * 200);
-        fileIndex++;
-      });
-    });
-
-    alert(`Đang tải ${fileIndex} file từ ${submittedFiles.length} học viên...`);
   };
 
   const getStatusBadge = (assignment) => {
@@ -433,19 +254,6 @@ const ClassAssignments = ({ classId, onAssignmentUpdate }) => {
         classId={classId}
       />
 
-      {/* Assignment Detail Modal */}
-      <AssignmentDetailModal
-        show={showDetailModal}
-        onHide={() => setShowDetailModal(false)}
-        assignment={selectedAssignment}
-        handleUpdateAssignmentFile={handleUpdateAssignmentFile}
-        handleDeleteAssignmentFile={handleDeleteAssignmentFile}
-        handleDeleteHomework={handleDeleteHomework}
-        handleDownloadSubmission={handleDownloadSubmission}
-        handleDownloadAllSubmissions={handleDownloadAllSubmissions}
-        uploadingFiles={uploadingFiles}
-      />
-
       {/* Delete Confirmation Modal */}
       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
         <Modal.Header closeButton>
@@ -467,7 +275,7 @@ const ClassAssignments = ({ classId, onAssignmentUpdate }) => {
           <Button variant="light" onClick={() => setShowDeleteModal(false)}>
             Hủy
           </Button>
-          <Button variant="danger" onClick={handleConfirmDelete}>
+          <Button variant="danger" onClick={handleDeleteHomework}>
             <i className="fas fa-trash me-2"></i>
             Xóa bài tập
           </Button>

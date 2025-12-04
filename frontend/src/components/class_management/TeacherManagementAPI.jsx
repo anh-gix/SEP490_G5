@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Pagination, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import Swal from 'sweetalert2';
 import teacherService from '../../services/teacherService';
 import studentService from '../../services/studentService';
 import { courseService } from '../../services/courseService';
@@ -166,6 +168,7 @@ const TeacherManagementAPI = () => {
       await teacherService.createTeacher(formData);
       
       // Success - close modal and refresh
+      toast.success('Thêm giảng viên thành công!');
       handleCloseModal();
       fetchTeachers();
       fetchStats();
@@ -174,6 +177,7 @@ const TeacherManagementAPI = () => {
       const errorMessage = err?.message || err?.response?.data?.message || 'Không thể lưu thông tin Giảng viên';
       const parsedErrors = parseErrorToField(errorMessage);
       setFormErrors(parsedErrors);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -222,7 +226,7 @@ const TeacherManagementAPI = () => {
                        file.name.endsWith('.xls');
 
     if (!isValidType) {
-      alert('Vui lòng chọn file Excel (.xlsx hoặc .xls)');
+      toast.error('Vui lòng chọn file Excel (.xlsx hoặc .xls)');
       e.target.value = '';
       return;
     }
@@ -233,7 +237,7 @@ const TeacherManagementAPI = () => {
 
   const handlePreviewExcel = async () => {
     if (!importFile) {
-      alert('Vui lòng chọn file Excel');
+      toast.error('Vui lòng chọn file Excel');
       return;
     }
 
@@ -245,7 +249,7 @@ const TeacherManagementAPI = () => {
 
       // Get first sheet
       if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-        alert('File Excel không có sheet nào');
+        toast.error('File Excel không có sheet nào');
         setImporting(false);
         return;
       }
@@ -254,7 +258,7 @@ const TeacherManagementAPI = () => {
       const worksheet = workbook.Sheets[sheetName];
 
       if (!worksheet) {
-        alert('Sheet đầu tiên không có dữ liệu');
+        toast.error('Sheet đầu tiên không có dữ liệu');
         setImporting(false);
         return;
       }
@@ -283,7 +287,7 @@ const TeacherManagementAPI = () => {
       });
 
       if (!jsonData || jsonData.length === 0) {
-        alert('File Excel không có dữ liệu');
+        toast.error('File Excel không có dữ liệu');
         setImporting(false);
         return;
       }
@@ -460,7 +464,7 @@ const TeacherManagementAPI = () => {
       setPreviewTeachers(previewData);
     } catch (error) {
       console.error('Error reading Excel file:', error);
-      alert('Lỗi khi đọc file Excel: ' + (error.message || 'Vui lòng thử lại'));
+      toast.error('Lỗi khi đọc file Excel: ' + (error.message || 'Vui lòng thử lại'));
     } finally {
       setImporting(false);
     }
@@ -470,7 +474,7 @@ const TeacherManagementAPI = () => {
     const validTeachers = previewTeachers.filter(t => !t.hasError);
     
     if (validTeachers.length === 0) {
-      alert('Không có giảng viên hợp lệ để import');
+      toast.error('Không có giảng viên hợp lệ để import');
       return;
     }
 
@@ -478,7 +482,7 @@ const TeacherManagementAPI = () => {
       setLoading(true);
       const result = await teacherService.importTeachers(validTeachers);
       
-      alert(`Import thành công: ${result.successCount} giảng viên\nThất bại: ${result.failedCount} giảng viên`);
+      toast.success(`Import thành công: ${result.successCount} giảng viên. Thất bại: ${result.failedCount} giảng viên`);
       
       handleCloseImportModal();
       fetchTeachers();
@@ -486,7 +490,7 @@ const TeacherManagementAPI = () => {
     } catch (err) {
       console.error('Error importing teachers:', err);
       const errorMessage = err.message || (typeof err === 'string' ? err : 'Không thể import giảng viên');
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

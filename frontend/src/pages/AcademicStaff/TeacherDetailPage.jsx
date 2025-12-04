@@ -16,3 +16,5 @@ const TeacherDetailPage = () => {
 
 export default TeacherDetailPage;
 
+
+

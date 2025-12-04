@@ -3,7 +3,7 @@ import { Card, Button, Badge, Dropdown } from 'react-bootstrap';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
 import { classScheduleService } from '../../services/classScheduleService';
 
-const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateMakeup, onAssignSubstitute, classService, studentSchedule = [] }) => {
+const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateMakeup, onAssignSubstitute, classService, studentSchedule = [], readOnly = false }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
 
@@ -450,7 +450,7 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                               )}
                             </div>
                             <div className="mt-1 d-flex justify-content-end gap-1">
-                              {onAssignSubstitute && (() => {
+                              {onAssignSubstitute && !readOnly && (() => {
                                 // Kiểm tra xem buổi học có phải là quá khứ không
                                 const scheduleDate = new Date(schedule.date);
                                 const today = new Date();
@@ -479,7 +479,7 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                                   </Button>
                                 );
                               })()}
-                              {onCreateMakeup && (() => {
+                              {onCreateMakeup && !readOnly && (() => {
                                 // Kiểm tra xem buổi học có phải là quá khứ không
                                 const scheduleDate = new Date(schedule.date);
                                 const today = new Date();

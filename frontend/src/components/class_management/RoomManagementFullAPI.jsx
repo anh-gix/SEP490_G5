@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup } from 'react-bootstrap';
+import { toast } from 'react-toastify';
+import Swal from 'sweetalert2';
 import roomService from '../../services/roomService';
 import ScheduleCalendar from './ScheduleCalendar';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
@@ -74,10 +76,10 @@ const RoomManagementFull = () => {
       setLoading(true);
       if (editingRoom) {
         await roomService.updateRoom(editingRoom._id, formData);
-        alert('Cập nhật phòng học thành công!');
+        toast.success('Cập nhật phòng học thành công!');
       } else {
         await roomService.createRoom(formData);
-        alert('Thêm phòng học thành công!');
+        toast.success('Thêm phòng học thành công!');
       }
       
       handleCloseModal();
@@ -85,7 +87,7 @@ const RoomManagementFull = () => {
       fetchStats();
     } catch (err) {
       console.error('Error saving room:', err);
-      alert(err.message || 'Không thể lưu phòng học');
+      toast.error(err.message || 'Không thể lưu phòng học');
     } finally {
       setLoading(false);
     }
@@ -104,17 +106,28 @@ const RoomManagementFull = () => {
   };
 
   const handleDelete = async (roomId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa phòng học này?')) return;
+    const result = await Swal.fire({
+      title: 'Xác nhận xóa',
+      text: 'Bạn có chắc chắn muốn xóa phòng học này?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+      confirmButtonColor: '#dc3545',
+      cancelButtonColor: '#6c757d'
+    });
+    
+    if (!result.isConfirmed) return;
     
     try {
       setLoading(true);
       await roomService.deleteRoom(roomId);
-      alert('Xóa phòng học thành công!');
+      toast.success('Xóa phòng học thành công!');
       fetchRooms();
       fetchStats();
     } catch (err) {
       console.error('Error deleting room:', err);
-      alert(err.message || 'Không thể xóa phòng học');
+      toast.error(err.message || 'Không thể xóa phòng học');
     } finally {
       setLoading(false);
     }
@@ -130,7 +143,7 @@ const RoomManagementFull = () => {
       setShowScheduleModal(true);
     } catch (err) {
       console.error('Error fetching room schedule:', err);
-      alert('Không thể tải lịch sử dụng phòng');
+      toast.error('Không thể tải lịch sử dụng phòng');
     } finally {
       setLoading(false);
     }
@@ -615,6 +628,7 @@ const RoomManagementFull = () => {
                     onEditSchedule={() => {}}
                     onDeleteSchedule={() => {}}
                     onCreateMakeup={() => {}}
+                    readOnly={true}
                   />
                   {/* Program Type Color Legend */}
                   <div className="d-flex justify-content-center gap-4 mt-3">

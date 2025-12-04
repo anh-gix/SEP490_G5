@@ -736,10 +736,6 @@ const TeacherDetail = () => {
                         // Optional: Handle delete if needed
                         console.log('Delete schedule:', scheduleId);
                       }}
-                      onCreateMakeup={(schedule) => {
-                        // Optional: Handle create makeup if needed
-                        console.log('Create makeup:', schedule);
-                      }}
                       onAssignSubstitute={handleAssignSubstitute}
                     />
                   )}

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Pagination, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import Swal from 'sweetalert2';
 import studentService from '../../services/studentService';
 import { courseService } from '../../services/courseService';
 
@@ -209,6 +211,7 @@ const StudentManagementAPI = () => {
       await studentService.createStudent(formData);
       
       // Success - close modal and refresh
+      toast.success('Thêm học viên thành công!');
       handleCloseModal();
       fetchStudents();
       fetchStats();
@@ -217,6 +220,7 @@ const StudentManagementAPI = () => {
       const errorMessage = err?.message || err?.response?.data?.message || 'Không thể lưu thông tin Học viên';
       const parsedErrors = parseErrorToField(errorMessage);
       setFormErrors(parsedErrors);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

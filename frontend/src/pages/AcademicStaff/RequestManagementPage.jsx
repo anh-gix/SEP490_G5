@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Container, Card, Table, Badge, Spinner, Alert, Pagination, Button, Modal, Form, Row, Col, InputGroup, Accordion } from 'react-bootstrap';
+import { toast } from 'react-toastify';
+import Swal from 'sweetalert2';
 import AcademicNavigation from '../../components/class_management/AcademicNavigation.jsx';
 import ScheduleCalendar from '../../components/class_management/ScheduleCalendar';
 import changeRequestService from '../../services/changeRequestService';
@@ -2409,19 +2411,19 @@ const RequestManagementPage = () => {
     // Xử lý trường hợp tạo buổi học bù mới
     if (makeupClassOption === 'new') {
       if (!selectedCurrentScheduleId || !newMakeupDate || !newMakeupStartTime || !newMakeupEndTime || !newMakeupRoomId || !newMakeupTeacherId) {
-        alert('Vui lòng điền đầy đủ thông tin buổi học bù');
+        toast.error('Vui lòng điền đầy đủ thông tin buổi học bù');
         return;
       }
 
       // Kiểm tra conflict - không cho tiếp tục nếu có conflict
       if (conflictInfo && (conflictInfo.teacher?.length > 0 || conflictInfo.room?.length > 0 || conflictInfo.students?.length > 0)) {
-        alert('Không thể tiếp tục khi có xung đột lịch học. Vui lòng chọn thời gian/phòng/giáo viên khác.');
+        toast.error('Không thể tiếp tục khi có xung đột lịch học. Vui lòng chọn thời gian/phòng/giáo viên khác.');
         return;
       }
       
       // Kiểm tra conflict với lịch học của học sinh
       if (makeupConflictInfo && makeupConflictInfo.hasConflict) {
-        alert(`Không thể tạo buổi học bù vì học sinh đã có lịch học trùng thời gian:\n${makeupConflictInfo.conflicts.map(c => `- ${c.className} (${c.time})`).join('\n')}`);
+        toast.error(`Không thể tạo buổi học bù vì học sinh đã có lịch học trùng thời gian:\n${makeupConflictInfo.conflicts.map(c => `- ${c.className} (${c.time})`).join('\n')}`);
         return;
       }
 
@@ -2485,7 +2487,7 @@ const RequestManagementPage = () => {
         }
 
         if (!absentScheduleFromCalendar) {
-          alert('Không tìm thấy thông tin buổi nghỉ');
+          toast.error('Không tìm thấy thông tin buổi nghỉ');
           setProcessing(false);
           return;
         }
@@ -2600,12 +2602,13 @@ const RequestManagementPage = () => {
 
         setPendingMakeupClasses(prev => [...prev, newMakeupEntry]);
         
+        toast.success('Thêm buổi học bù thành công!');
         // Reset và đóng modal
         resetMakeupModalState();
         
       } catch (err) {
         console.error('Error creating new makeup class:', err);
-        alert(err.message || 'Có lỗi xảy ra khi tạo buổi học bù');
+        toast.error(err.message || 'Có lỗi xảy ra khi tạo buổi học bù');
       } finally {
         setProcessing(false);
       }
@@ -2617,13 +2620,13 @@ const RequestManagementPage = () => {
       // Xử lý trường hợp giáo viên dạy thay
       if (senderRole === 'Teacher') {
         if (!selectedCurrentScheduleId || !selectedSubstituteTeacherId) {
-          alert('Vui lòng chọn đầy đủ buổi nghỉ và giáo viên dạy thay');
+          toast.error('Vui lòng chọn đầy đủ buổi nghỉ và giáo viên dạy thay');
           return;
         }
 
         // Kiểm tra conflict - không cho tiếp tục nếu có conflict với giáo viên (không check conflict phòng vì phòng đã trống)
         if (conflictInfo && conflictInfo.teacher?.length > 0) {
-          alert('Không thể tiếp tục khi có xung đột lịch học. Vui lòng chọn giáo viên dạy thay khác.');
+          toast.error('Không thể tiếp tục khi có xung đột lịch học. Vui lòng chọn giáo viên dạy thay khác.');
           return;
         }
 
@@ -2732,7 +2735,7 @@ const RequestManagementPage = () => {
           }
 
           if (!absentScheduleFromCalendar) {
-            alert('Không tìm thấy thông tin buổi nghỉ');
+            toast.error('Không tìm thấy thông tin buổi nghỉ');
             setProcessing(false);
             return;
           }
@@ -2743,7 +2746,7 @@ const RequestManagementPage = () => {
           );
 
           if (!substituteTeacher) {
-            alert('Không tìm thấy thông tin giáo viên dạy thay');
+            toast.error('Không tìm thấy thông tin giáo viên dạy thay');
             setProcessing(false);
             return;
           }
@@ -2795,12 +2798,13 @@ const RequestManagementPage = () => {
 
           setPendingMakeupClasses(prev => [...prev, newMakeupEntry]);
           
+          toast.success('Thêm buổi dạy thay thành công!');
           // Reset và đóng modal
           resetMakeupModalState();
           
         } catch (err) {
           console.error('Error saving substitute class:', err);
-          alert(err.message || 'Có lỗi xảy ra khi lưu buổi dạy thay');
+          toast.error(err.message || 'Có lỗi xảy ra khi lưu buổi dạy thay');
         } finally {
           setProcessing(false);
         }
@@ -2808,8 +2812,8 @@ const RequestManagementPage = () => {
       }
 
       // Xử lý trường hợp chọn buổi có sẵn (cho học sinh)
-      if (!selectedCurrentScheduleId || !selectedMakeupClassInfo?.selectedScheduleId) {
-        alert('Vui lòng chọn đầy đủ buổi học ở cả 2 cột');
+        if (!selectedCurrentScheduleId || !selectedMakeupClassInfo?.selectedScheduleId) {
+        toast.error('Vui lòng chọn đầy đủ buổi học ở cả 2 cột');
         return;
       }
 
@@ -2824,7 +2828,7 @@ const RequestManagementPage = () => {
         );
 
         if (!makeupSchedule) {
-          alert('Không tìm thấy thông tin buổi học bù');
+          toast.error('Không tìm thấy thông tin buổi học bù');
           setProcessing(false);
           return;
         }
@@ -2931,7 +2935,7 @@ const RequestManagementPage = () => {
         }
 
         if (!absentScheduleFromCalendar) {
-          alert('Không tìm thấy thông tin buổi nghỉ');
+          toast.error('Không tìm thấy thông tin buổi nghỉ');
           setProcessing(false);
           return;
         }
@@ -2962,7 +2966,7 @@ const RequestManagementPage = () => {
 
         // Kiểm tra conflict - không cho tiếp tục nếu có conflict với students
         if (conflictInfo && conflictInfo.students && conflictInfo.students.length > 0) {
-          alert('Không thể tiếp tục khi có xung đột lịch học. Vui lòng chọn buổi học bù khác.');
+          toast.error('Không thể tiếp tục khi có xung đột lịch học. Vui lòng chọn buổi học bù khác.');
           setProcessing(false);
           return;
         }
@@ -2981,12 +2985,13 @@ const RequestManagementPage = () => {
 
         setPendingMakeupClasses(prev => [...prev, newMakeupEntry]);
         
+        toast.success('Thêm buổi học bù thành công!');
         // Reset và đóng modal
         resetMakeupModalState();
         
       } catch (err) {
         console.error('Error saving makeup class:', err);
-        alert(err.message || 'Có lỗi xảy ra khi lưu buổi học bù');
+        toast.error(err.message || 'Có lỗi xảy ra khi lưu buổi học bù');
       } finally {
         setProcessing(false);
       }
@@ -3080,6 +3085,7 @@ const RequestManagementPage = () => {
       };
       
       await academicStaffService.approveChangeRequest(selectedRequest._id, approvalData);
+      toast.success('Chấp nhận đơn thành công!');
       setShowDetailModal(false);
       setSelectedRequest(null);
       setRejectReason('');
@@ -3090,7 +3096,7 @@ const RequestManagementPage = () => {
       fetchChangeRequests(); // Refresh list
     } catch (err) {
       console.error('Error approving request:', err);
-      alert(err.message || 'Có lỗi xảy ra khi chấp nhận đơn');
+      toast.error(err.message || 'Có lỗi xảy ra khi chấp nhận đơn');
     } finally {
       setProcessing(false);
     }
@@ -3102,6 +3108,7 @@ const RequestManagementPage = () => {
     try {
       setProcessing(true);
       await academicStaffService.rejectChangeRequest(selectedRequest._id, rejectReasonParam || rejectReason || null);
+      toast.success('Từ chối đơn thành công!');
       setShowRejectModal(false);
       setRequestToReject(null);
       setRejectReason('');
@@ -3115,7 +3122,7 @@ const RequestManagementPage = () => {
       fetchChangeRequests(); // Refresh list
     } catch (err) {
       console.error('Error rejecting request:', err);
-      alert(err.message || 'Có lỗi xảy ra khi từ chối đơn');
+      toast.error(err.message || 'Có lỗi xảy ra khi từ chối đơn');
     } finally {
       setProcessing(false);
     }
@@ -3464,7 +3471,7 @@ const RequestManagementPage = () => {
               disabled={!selectedNewClassId || processing}
               onClick={() => {
                 if (!selectedClassToChange || !selectedNewClassId || !selectedNewClassInfo) {
-                  alert('Vui lòng chọn lớp muốn đổi');
+                  toast.error('Vui lòng chọn lớp muốn đổi');
                   return;
                 }
                 
@@ -4541,7 +4548,7 @@ const RequestManagementPage = () => {
                               const selectedDate = e.target.value;
                               // Validate: ngày được chọn phải sau ngày nghỉ
                               if (minMakeupDate && selectedDate < minMakeupDate) {
-                                alert(`Ngày học bù phải sau ngày nghỉ (tối thiểu: ${minMakeupDate})`);
+                                toast.error(`Ngày học bù phải sau ngày nghỉ (tối thiểu: ${minMakeupDate})`);
                                 return;
                               }
                               setNewMakeupDate(selectedDate);
@@ -5563,7 +5570,7 @@ const RequestManagementPage = () => {
                 disabled={!selectedNewClassId || processing}
                 onClick={() => {
                   if (!selectedClassToChange || !selectedNewClassId || !selectedNewClassInfo) {
-                    alert('Vui lòng chọn lớp muốn đổi');
+                    toast.error('Vui lòng chọn lớp muốn đổi');
                     return;
                   }
                   

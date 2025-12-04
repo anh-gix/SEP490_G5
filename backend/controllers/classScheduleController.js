@@ -1692,7 +1692,7 @@ exports.getTeacherSchedule = async (req, res) => {
 // =========================
 exports.validateScheduleConflictSimple = async (req, res) => {
   try {
-    const { date, startTime, endTime, room, teacher, studentId } = req.body;
+    const { date, startTime, endTime, room, teacher, studentId, excludeScheduleId } = req.body;
 
     if (!date || !startTime || !endTime || !room) {
       return res.status(400).json({ 
@@ -1771,6 +1771,11 @@ exports.validateScheduleConflictSimple = async (req, res) => {
       status: { $in: ['temporary', 'fixed'] }
     };
 
+    // Exclude current schedule if provided
+    if (excludeScheduleId) {
+      roomScheduleQuery._id = { $ne: new mongoose.Types.ObjectId(excludeScheduleId) };
+    }
+
     const roomSchedules = await ClassSchedule.find(roomScheduleQuery)
       .populate('class', 'name')
       .select('date startTime endTime class')
@@ -1810,10 +1815,28 @@ exports.validateScheduleConflictSimple = async (req, res) => {
           status: { $in: ['temporary', 'fixed'] }
         };
 
+        // Exclude current schedule if provided
+        if (excludeScheduleId) {
+          teacherScheduleQuery._id = { $ne: new mongoose.Types.ObjectId(excludeScheduleId) };
+        }
+
         const teacherSchedules = await ClassSchedule.find(teacherScheduleQuery)
           .populate('class', 'name')
           .select('date startTime endTime class')
           .lean();
+
+        console.log('🔍 Kiểm tra conflict giáo viên:', {
+          teacherId: teacher,
+          date: date,
+          excludeScheduleId: excludeScheduleId,
+          foundSchedules: teacherSchedules.length,
+          schedules: teacherSchedules.map(s => ({
+            id: s._id,
+            className: s.class?.name,
+            date: formatDateLocal(s.date),
+            time: `${s.startTime} - ${s.endTime}`
+          }))
+        });
 
         teacherSchedules.forEach((schedule) => {
           if (hasTimeOverlap(startTime, endTime, schedule.startTime, schedule.endTime)) {
@@ -2117,6 +2140,141 @@ exports.validateMakeupClassSchedule = async (req, res) => {
       success: false,
       message: "Lỗi server khi validate học bù", 
       error: err.message 
+    });
+  }
+};
+
+// =========================
+// 👨‍🏫 XẾP NGƯỜI DẠY THAY CHO BUỔI HỌC
+// =========================
+exports.assignSubstituteTeacher = async (req, res) => {
+  try {
+    const { id: scheduleId } = req.params;
+    const { substituteTeacherId } = req.body;
+
+    if (!substituteTeacherId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu thông tin giáo viên dạy thay'
+      });
+    }
+
+    // Lấy ClassSchedule
+    const classSchedule = await ClassSchedule.findById(scheduleId)
+      .populate('class', 'name teacher')
+      .populate('room', 'room_name')
+      .populate('teacher', 'username');
+
+    if (!classSchedule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy buổi học'
+      });
+    }
+
+    // Kiểm tra xem buổi học có phải là quá khứ không
+    const scheduleDate = new Date(classSchedule.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    scheduleDate.setHours(0, 0, 0, 0);
+    
+    if (scheduleDate < today) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không thể xếp người dạy thay cho buổi học đã qua'
+      });
+    }
+
+    // Lưu giáo viên gốc (giữ nguyên teacher)
+    const originalTeacher = classSchedule.teacher;
+
+    // Lấy tất cả lớp của giáo viên dạy thay
+    const substituteTeacherClasses = await Class.find({
+      $or: [
+        { teacher: substituteTeacherId },
+        { teacherId: substituteTeacherId }
+      ]
+    }).select('_id name').lean();
+
+    if (substituteTeacherClasses.length > 0) {
+      const substituteTeacherClassIds = substituteTeacherClasses.map(c => c._id);
+
+      // Kiểm tra xung đột thời gian
+      const hasTimeOverlap = (start1, end1, start2, end2) => {
+        const timeToMinutes = (timeStr) => {
+          if (!timeStr) return 0;
+          const parts = timeStr.split(':');
+          if (parts.length !== 2) return 0;
+          const hours = parseInt(parts[0], 10);
+          const minutes = parseInt(parts[1], 10);
+          return hours * 60 + minutes;
+        };
+        
+        const start1Min = timeToMinutes(start1);
+        const end1Min = timeToMinutes(end1);
+        const start2Min = timeToMinutes(start2);
+        const end2Min = timeToMinutes(end2);
+        
+        return start1Min < end2Min && end1Min > start2Min;
+      };
+
+      const conflictSchedule = await ClassSchedule.findOne({
+        class: { $in: substituteTeacherClassIds },
+        date: scheduleDate,
+        status: { $in: ['temporary', 'fixed'] },
+        _id: { $ne: new mongoose.Types.ObjectId(scheduleId) },
+        $or: [
+          { $and: [{ startTime: { $lte: classSchedule.startTime } }, { endTime: { $gt: classSchedule.startTime } }] },
+          { $and: [{ startTime: { $lt: classSchedule.endTime } }, { endTime: { $gte: classSchedule.endTime } }] },
+          { $and: [{ startTime: { $gte: classSchedule.startTime } }, { endTime: { $lte: classSchedule.endTime } }] }
+        ]
+      })
+        .populate('class', 'name')
+        .lean();
+
+      if (conflictSchedule) {
+        return res.status(400).json({
+          success: false,
+          message: `Giáo viên dạy thay đã có lớp khác (${conflictSchedule.class?.name || 'N/A'}) vào thời gian này`,
+          hasConflict: true
+        });
+      }
+    }
+
+    // Gán giáo viên dạy thay vào substituteTeacher
+    // teacher giữ nguyên là giáo viên gốc
+    classSchedule.substituteTeacher = new mongoose.Types.ObjectId(substituteTeacherId);
+
+    // Thêm note để ghi nhận việc có giáo viên dạy thay
+    const substituteNote = `Giáo viên dạy thay: ${substituteTeacherId} (Giáo viên gốc: ${originalTeacher._id || originalTeacher})`;
+    if (classSchedule.note) {
+      classSchedule.note += `\n${substituteNote}`;
+    } else {
+      classSchedule.note = substituteNote;
+    }
+
+    await classSchedule.save();
+
+    // Populate để trả về đầy đủ thông tin
+    const updatedSchedule = await ClassSchedule.findById(classSchedule._id)
+      .populate('class', 'name')
+      .populate('room', 'room_name location')
+      .populate('teacher', 'username email')
+      .populate('substituteTeacher', 'username email')
+      .populate('session', 'title order')
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      message: 'Đã xếp người dạy thay thành công',
+      schedule: updatedSchedule
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi xếp người dạy thay:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi xếp người dạy thay',
+      error: error.message
     });
   }
 };

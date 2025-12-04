@@ -1389,13 +1389,22 @@ exports.getStudentById = async (req, res) => {
       status: cls.status,
       students: cls.students || []
     }));
+
+    // Get courses that student is enrolled in (from studentEnrollments)
+    const enrolledCourses = await Course.find({
+      studentEnrollments: id
+    })
+      .populate('program', 'program_name name type level')
+      .select('name description program')
+      .lean();
     
     res.status(200).json({
       success: true,
       student: {
         ...student,
         classes: formattedClasses,
-        classCount: formattedClasses.length
+        classCount: formattedClasses.length,
+        courses: enrolledCourses || [] // Courses from studentEnrollments
       }
     });
   } catch (error) {
@@ -1611,6 +1620,114 @@ exports.importStudents = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi import học viên',
+      error: error.message
+    });
+  }
+};
+
+// =========================
+// 📝 CẬP NHẬT KHÓA HỌC CỦA HỌC VIÊN
+// =========================
+exports.updateStudentCourseEnrollments = async (req, res) => {
+  const session = await require('mongoose').startSession();
+  session.startTransaction();
+  
+  try {
+    const { id: studentId } = req.params;
+    const { courseIds } = req.body;
+
+    if (!Array.isArray(courseIds)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'courseIds phải là một mảng'
+      });
+    }
+
+    // Validate student exists
+    const studentRole = await Role.findOne({ name: 'Student' });
+    if (!studentRole) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy role học viên'
+      });
+    }
+
+    const student = await User.findOne({
+      _id: studentId,
+      roleId: studentRole._id
+    }).session(session);
+
+    if (!student) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy học viên'
+      });
+    }
+
+    // Get courses that student is currently enrolled in
+    const currentlyEnrolledCourses = await Course.find({
+      studentEnrollments: studentId
+    }).session(session).select('_id').lean();
+    
+    const currentCourseIds = currentlyEnrolledCourses.map(c => c._id.toString());
+    const newCourseIds = courseIds.map(id => id.toString());
+    
+    // Find courses to add (in new list but not in current)
+    const coursesToAdd = newCourseIds.filter(id => !currentCourseIds.includes(id));
+    
+    // Find courses to remove (in current but not in new)
+    const coursesToRemove = currentCourseIds.filter(id => !newCourseIds.includes(id));
+    
+    const updatedCourses = [];
+
+    // Add student to new courses using $addToSet to avoid duplicates
+    if (coursesToAdd.length > 0) {
+      const mongoose = require('mongoose');
+      const result = await Course.updateMany(
+        { _id: { $in: coursesToAdd.map(id => new mongoose.Types.ObjectId(id)) } },
+        { $addToSet: { studentEnrollments: new mongoose.Types.ObjectId(studentId) } },
+        { session }
+      );
+      updatedCourses.push(...coursesToAdd);
+      console.log(`✅ Đã thêm học viên ${studentId} vào ${result.modifiedCount} course(s)`);
+    }
+
+    // Remove student from courses using $pull
+    if (coursesToRemove.length > 0) {
+      const mongoose = require('mongoose');
+      const result = await Course.updateMany(
+        { _id: { $in: coursesToRemove.map(id => new mongoose.Types.ObjectId(id)) } },
+        { $pull: { studentEnrollments: new mongoose.Types.ObjectId(studentId) } },
+        { session }
+      );
+      updatedCourses.push(...coursesToRemove);
+      console.log(`✅ Đã xóa học viên ${studentId} khỏi ${result.modifiedCount} course(s)`);
+    }
+
+    // Commit transaction
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(200).json({
+      success: true,
+      message: 'Cập nhật khóa học của học viên thành công',
+      updatedCourses: updatedCourses.length,
+      courseIds: updatedCourses
+    });
+  } catch (error) {
+    // Rollback transaction on error
+    await session.abortTransaction();
+    session.endSession();
+    console.error('❌ Lỗi khi cập nhật khóa học của học viên:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi cập nhật khóa học của học viên',
       error: error.message
     });
   }

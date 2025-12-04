@@ -3,7 +3,7 @@ import { Card, Button, Badge, Dropdown } from 'react-bootstrap';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
 import { classScheduleService } from '../../services/classScheduleService';
 
-const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateMakeup, classService, studentSchedule = [] }) => {
+const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateMakeup, onAssignSubstitute, classService, studentSchedule = [] }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
 
@@ -449,6 +449,37 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                                 <Badge bg="warning" text="dark" style={{ fontSize: '8px', padding: '2px 4px' }}>Học bù</Badge>
                               )}
                             </div>
+                            {onAssignSubstitute && (() => {
+                              // Kiểm tra xem buổi học có phải là quá khứ không
+                              const scheduleDate = new Date(schedule.date);
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+                              scheduleDate.setHours(0, 0, 0, 0);
+                              const isPastSchedule = scheduleDate < today;
+                              
+                              if (isPastSchedule) {
+                                return null; // Không hiển thị nút cho buổi học quá khứ
+                              }
+                              
+                              return (
+                                <div className="mt-1 d-flex justify-content-end">
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="p-0"
+                                    style={{ fontSize: '8px', color: '#2196F3', textDecoration: 'none' }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onAssignSubstitute(schedule);
+                                    }}
+                                    title="Xếp người dạy thay"
+                                  >
+                                    <i className="fas fa-user-plus me-1"></i>
+                                    Dạy thay
+                                  </Button>
+                                </div>
+                              );
+                            })()}
                           </div>
                         );
                       })}

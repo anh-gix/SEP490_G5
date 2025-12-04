@@ -101,6 +101,9 @@ router.get('/stats', studentController.getStudentStats);
 // Get student by ID
 router.get('/:id', studentController.getStudentById);
 
+// Update student course enrollments (must be before /:id routes to avoid conflict)
+router.patch('/:id/courses', studentController.updateStudentCourseEnrollments);
+
 // Create student
 router.post('/', studentController.createStudent);
 

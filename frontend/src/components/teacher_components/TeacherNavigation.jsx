@@ -15,6 +15,7 @@ const TeacherNavigation = () => {
     const fetchTeacherInfo = async () => {
       try {
         const response = await teacherService.getCurrentTeacher();
+        console.log(response);
         if (response.success) {
           setTeacherInfo(response.teacher);
         }
@@ -65,6 +66,18 @@ const TeacherNavigation = () => {
     //   path: '/teacher/materials',
     //   color: 'info'
     // }
+    {
+      title: 'Chương trình đào tạo',
+      icon: 'fa-user-check',
+      path: '/teacher/programs',
+      color: 'main'
+    },
+    {
+      title: 'Đề thi',
+      icon: 'fa-user-check',
+      path: '/teacher/exams',
+      color: 'main'
+    }
   ];
 
   const userInfo = {

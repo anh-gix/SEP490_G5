@@ -1,71 +1,71 @@
 const express = require('express');
 const router = express.Router();
-const approvalRequestController = require('../controllers/approvalRequestController');
+const workRequestController = require('../controllers/workRequestController');
 
 // =========================
-// SUBMIT FOR APPROVAL
+// SUBMIT FOR APPROVAL (BOTTOM-UP)
 // =========================
 
 // Submit program for approval
 router.post(
   '/submit/program/:programId',
-  approvalRequestController.submitProgram
+  workRequestController.submitProgram
 );
 
 // Submit exam for approval
 router.post(
   '/submit/exam/:examId',
-  approvalRequestController.submitExam
+  workRequestController.submitExam
 );
 
 // =========================
 // GET REQUESTS
 // =========================
 
-// Get all pending requests
+// Get all work requests with filters
 router.get(
-  '/pending',
-  approvalRequestController.getPendingRequests
+  '/',
+  workRequestController.getAllRequests
 );
 
 // Get my submitted requests
 router.get(
   '/my-requests',
-  approvalRequestController.getMyRequests
+  workRequestController.getMyRequests
 );
 
-// Get approval history
+// Get requests assigned to me
 router.get(
-  '/history',
-  approvalRequestController.getApprovalHistory
+  '/assigned-to-me',
+  workRequestController.getAssignedToMe
 );
 
-// Get approval statistics
+// Get work request statistics
 router.get(
   '/stats',
-  approvalRequestController.getStats
+  workRequestController.getStats
 );
 
 // Get request by ID
 router.get(
   '/:id',
-  approvalRequestController.getRequestById
+  workRequestController.getRequestById
 );
 
 // =========================
-// APPROVE/REJECT
+// APPROVE/REJECT (CENTER HEAD)
 // =========================
 
 // Approve request
 router.post(
   '/:id/approve',
-  approvalRequestController.approveRequest
+  workRequestController.approveRequest
 );
 
 // Reject request
 router.post(
   '/:id/reject',
-  approvalRequestController.rejectRequest
+  workRequestController.rejectRequest
 );
 
 // =========================
@@ -75,7 +75,7 @@ router.post(
 // Cancel pending request
 router.delete(
   '/:id/cancel',
-  approvalRequestController.cancelRequest
+  workRequestController.cancelRequest
 );
 
 module.exports = router;

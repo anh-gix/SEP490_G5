@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
-import homeworkService from '../../services/homeworkService';
+import { toast } from 'react-toastify';
+import Swal from 'sweetalert2';
+import homeworkService from '../../../../services/homeworkService';
 
 /**
  * CreateHomeworkModal Component
@@ -92,6 +94,23 @@ const CreateHomeworkModal = ({ show, onHide, onSuccess, classId }) => {
       return;
     }
 
+    // Confirmation dialog
+    const result = await Swal.fire({
+      title: 'Xác nhận giao bài tập',
+      html: `
+        <p>Bạn có chắc chắn muốn giao bài tập <strong>"${formData.title}"</strong>?</p>
+        <p class="text-muted mb-0">Hạn nộp: ${new Date(formData.deadline).toLocaleString('vi-VN')}</p>
+      `,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#0D74FF',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: 'Giao bài tập',
+      cancelButtonText: 'Hủy'
+    });
+
+    if (!result.isConfirmed) return;
+
     try {
       setLoading(true);
       setError(null);
@@ -102,6 +121,12 @@ const CreateHomeworkModal = ({ show, onHide, onSuccess, classId }) => {
         assignmentFiles,
         answerFiles
       );
+
+      // Success notification
+      toast.success('Giao bài tập thành công!', {
+        position: 'top-right',
+        autoClose: 3000
+      });
 
       // Reset form
       setSelectedSchedule('');
@@ -115,7 +140,12 @@ const CreateHomeworkModal = ({ show, onHide, onSuccess, classId }) => {
       onHide();
     } catch (err) {
       console.error('Error creating homework:', err);
-      setError(err.message || 'Không thể tạo bài tập. Vui lòng thử lại.');
+      const errorMsg = err.message || 'Không thể tạo bài tập. Vui lòng thử lại.';
+      setError(errorMsg);
+      toast.error(errorMsg, {
+        position: 'top-right',
+        autoClose: 5000
+      });
     } finally {
       setLoading(false);
     }

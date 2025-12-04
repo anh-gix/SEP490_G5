@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Modal, Button, Badge, Alert, Tabs, Tab, Table, Row, Col, Card, Pagination, ButtonGroup, Form } from 'react-bootstrap';
+import { toast } from 'react-toastify';
 import studentService from '../../services/studentService';
 import { courseService } from '../../services/courseService';
 import ScheduleCalendar from './ScheduleCalendar';
@@ -123,7 +124,7 @@ const StudentDetailModal = ({
       setShowEditCoursesModal(true);
     } catch (err) {
       console.error('Error loading courses:', err);
-      alert('Không thể tải danh sách khóa học: ' + (err.message || 'Lỗi không xác định'));
+      toast.error('Không thể tải danh sách khóa học: ' + (err.message || 'Lỗi không xác định'));
     } finally {
       setLoadingCourses(false);
     }
@@ -132,7 +133,7 @@ const StudentDetailModal = ({
   // Handler to save course enrollments
   const handleSaveCourseEnrollments = async () => {
     if (!selectedStudent?._id) {
-      alert('Không tìm thấy thông tin học viên');
+      toast.error('Không tìm thấy thông tin học viên');
       return;
     }
 
@@ -155,10 +156,10 @@ const StudentDetailModal = ({
       
       // Close modal
       setShowEditCoursesModal(false);
-      alert('Cập nhật khóa học thành công!');
+      toast.success('Cập nhật khóa học thành công!');
     } catch (err) {
       console.error('Error saving course enrollments:', err);
-      alert('Không thể cập nhật khóa học: ' + (err.response?.data?.message || err.message || 'Lỗi không xác định'));
+      toast.error('Không thể cập nhật khóa học: ' + (err.response?.data?.message || err.message || 'Lỗi không xác định'));
     } finally {
       setSavingCourses(false);
     }

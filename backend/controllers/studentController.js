@@ -1733,4 +1733,377 @@ exports.updateStudentCourseEnrollments = async (req, res) => {
   }
 };
 
+// =========================
+// 🔄 ĐỔI LỚP HỌC CỦA HỌC VIÊN
+// =========================
+exports.changeStudentClass = async (req, res) => {
+  const mongoose = require('mongoose');
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
+  try {
+    const { id: studentId } = req.params;
+    const { oldClassId, newClassId } = req.body;
+    
+    // 1. Validate dữ liệu
+    if (!oldClassId || !newClassId) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu thông tin lớp cũ hoặc lớp mới'
+      });
+    }
+    
+    // Validate student exists
+    const studentRole = await Role.findOne({ name: 'Student' });
+    if (!studentRole) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy role học viên'
+      });
+    }
+    
+    const student = await User.findOne({
+      _id: studentId,
+      roleId: studentRole._id
+    }).session(session);
+    
+    if (!student) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy học viên'
+      });
+    }
+    
+    // Kiểm tra lớp cũ và lớp mới có tồn tại
+    const oldClass = await Class.findById(oldClassId).session(session);
+    const newClass = await Class.findById(newClassId).session(session);
+    
+    if (!oldClass) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy lớp cũ'
+      });
+    }
+    
+    if (!newClass) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy lớp mới'
+      });
+    }
+    
+    // Kiểm tra học viên có trong lớp cũ không
+    const studentInOldClass = oldClass.students.some(
+      id => id.toString() === studentId.toString()
+    );
+    
+    if (!studentInOldClass) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'Học viên không có trong lớp cũ'
+      });
+    }
+    
+    // Kiểm tra lớp mới còn chỗ không (nếu có maxStudents)
+    if (newClass.maxStudents) {
+      const currentStudentCount = newClass.students ? newClass.students.length : 0;
+      const studentInNewClass = newClass.students.some(
+        id => id.toString() === studentId.toString()
+      );
+      // Nếu học viên chưa có trong lớp mới và lớp đã đầy
+      if (!studentInNewClass && currentStudentCount >= newClass.maxStudents) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          success: false,
+          message: 'Lớp mới đã đầy'
+        });
+      }
+    }
+    
+    // 2. Lấy session order hiện tại của lớp cũ và lớp mới
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Tìm ClassSchedule gần nhất (date >= today) của lớp cũ
+    const oldClassSchedules = await ClassSchedule.find({
+      class: oldClassId,
+      date: { $gte: today }
+    })
+      .populate('session', 'order')
+      .sort({ date: 1, startTime: 1 })
+      .limit(1)
+      .session(session)
+      .lean();
+    
+    // Tìm ClassSchedule gần nhất (date >= today) của lớp mới
+    const newClassSchedules = await ClassSchedule.find({
+      class: newClassId,
+      date: { $gte: today }
+    })
+      .populate('session', 'order')
+      .sort({ date: 1, startTime: 1 })
+      .limit(1)
+      .session(session)
+      .lean();
+    
+    const oldClassSessionOrder = oldClassSchedules.length > 0 && oldClassSchedules[0].session
+      ? oldClassSchedules[0].session.order
+      : null;
+    const newClassSessionOrder = newClassSchedules.length > 0 && newClassSchedules[0].session
+      ? newClassSchedules[0].session.order
+      : null;
+    
+    console.log(`📊 Session order - Lớp cũ: ${oldClassSessionOrder}, Lớp mới: ${newClassSessionOrder}`);
+    
+    // Xác định trường hợp
+    let caseType = 1; // Mặc định là trường hợp 1
+    if (oldClassSessionOrder !== null && newClassSessionOrder !== null) {
+      if (oldClassSessionOrder < newClassSessionOrder) {
+        caseType = 2; // Lớp cũ < lớp mới
+      } else if (oldClassSessionOrder > newClassSessionOrder) {
+        caseType = 3; // Lớp cũ > lớp mới
+      }
+    }
+    
+    console.log(`🔍 Trường hợp xử lý: ${caseType}`);
+    
+    // 3. Xử lý Class model
+    // Xóa học viên khỏi lớp cũ
+    oldClass.students = oldClass.students.filter(
+      id => id.toString() !== studentId.toString()
+    );
+    await oldClass.save({ session });
+    console.log(`✅ Đã xóa học viên khỏi lớp cũ: ${oldClassId}`);
+    
+    // Thêm học viên vào lớp mới (nếu chưa có)
+    const studentInNewClass = newClass.students.some(
+      id => id.toString() === studentId.toString()
+    );
+    if (!studentInNewClass) {
+      newClass.students.push(studentId);
+      await newClass.save({ session });
+      console.log(`✅ Đã thêm học viên vào lớp mới: ${newClassId}`);
+    }
+    
+    // 4. Xử lý StudentSchedule
+    // a) Lấy tất cả ClassSchedule của lớp cũ
+    const allOldClassSchedules = await ClassSchedule.find({
+      class: oldClassId
+    })
+      .populate('session', 'order')
+      .session(session)
+      .lean();
+    
+    const oldClassScheduleIds = allOldClassSchedules.map(s => s._id);
+    
+    // b) Lấy tất cả StudentSchedule của học viên ở lớp cũ
+    const studentSchedules = await StudentSchedule.find({
+      student: studentId,
+      classSchedule: { $in: oldClassScheduleIds }
+    })
+      .populate({
+        path: 'classSchedule',
+        populate: {
+          path: 'session',
+          select: 'order'
+        }
+      })
+      .session(session)
+      .lean();
+    
+    console.log(`📋 Tìm thấy ${studentSchedules.length} StudentSchedule của học viên ở lớp cũ`);
+    
+    // c) Lấy tất cả ClassSchedule của lớp mới để match
+    const allNewClassSchedules = await ClassSchedule.find({
+      class: newClassId
+    })
+      .populate('session', 'order')
+      .session(session)
+      .lean();
+    
+    // Tạo map để tìm ClassSchedule theo session order
+    const newClassScheduleMap = new Map();
+    allNewClassSchedules.forEach(schedule => {
+      if (schedule.session && schedule.session.order !== null && schedule.session.order !== undefined) {
+        const order = schedule.session.order;
+        if (!newClassScheduleMap.has(order)) {
+          newClassScheduleMap.set(order, []);
+        }
+        newClassScheduleMap.get(order).push(schedule);
+      }
+    });
+    
+    // d) Xử lý từng StudentSchedule
+    let updatedCount = 0;
+    let cancelledCount = 0;
+    let unchangedCount = 0;
+    
+    for (const studentSchedule of studentSchedules) {
+      const classSchedule = studentSchedule.classSchedule;
+      if (!classSchedule) continue;
+      
+      const sessionOrder = classSchedule.session?.order;
+      const hasAttendance = studentSchedule.attendance && studentSchedule.attendance.status !== null;
+      const scheduleDate = new Date(classSchedule.date);
+      scheduleDate.setHours(0, 0, 0, 0);
+      const isPastSchedule = scheduleDate < today;
+      
+      // Nếu đã có điểm danh hoặc đã diễn ra, giữ nguyên
+      if (hasAttendance || isPastSchedule) {
+        unchangedCount++;
+        console.log(`⏭️ Giữ nguyên StudentSchedule ${studentSchedule._id} (${hasAttendance ? 'đã có điểm danh' : 'đã diễn ra'})`);
+        continue;
+      }
+      
+      // Xử lý theo từng trường hợp
+      if (caseType === 1) {
+        // Trường hợp 1: session order bằng nhau
+        if (sessionOrder !== null && sessionOrder !== undefined) {
+          const matchingSchedules = newClassScheduleMap.get(sessionOrder);
+          if (matchingSchedules && matchingSchedules.length > 0) {
+            // Lấy ClassSchedule đầu tiên có cùng session order
+            const newClassScheduleId = matchingSchedules[0]._id;
+            await StudentSchedule.findByIdAndUpdate(
+              studentSchedule._id,
+              { classSchedule: newClassScheduleId },
+              { session }
+            );
+            updatedCount++;
+            console.log(`✅ Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
+          }
+        }
+      } else if (caseType === 2) {
+        // Trường hợp 2: lớp cũ < lớp mới
+        if (sessionOrder !== null && sessionOrder !== undefined) {
+          if (sessionOrder < newClassSessionOrder) {
+            // Cancel các buổi có sessionOrder < newClassSessionOrder
+            await StudentSchedule.findByIdAndUpdate(
+              studentSchedule._id,
+              {
+                scheduleStatus: 'cancelled',
+                reason: 'Đã đổi lớp'
+              },
+              { session }
+            );
+            cancelledCount++;
+            console.log(`🚫 Cancelled StudentSchedule ${studentSchedule._id} (session ${sessionOrder} < ${newClassSessionOrder})`);
+          } else if (sessionOrder >= newClassSessionOrder) {
+            // Session order >= lớp mới: update classSchedule
+            const matchingSchedules = newClassScheduleMap.get(sessionOrder);
+            if (matchingSchedules && matchingSchedules.length > 0) {
+              const newClassScheduleId = matchingSchedules[0]._id;
+              await StudentSchedule.findByIdAndUpdate(
+                studentSchedule._id,
+                { classSchedule: newClassScheduleId },
+                { session }
+              );
+              updatedCount++;
+              console.log(`✅ Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
+            }
+          }
+        }
+      } else if (caseType === 3) {
+        // Trường hợp 3: lớp cũ > lớp mới
+        if (sessionOrder !== null && sessionOrder !== undefined) {
+          if (sessionOrder < oldClassSessionOrder) {
+            // Session order < lớp cũ: không thay đổi gì
+            unchangedCount++;
+            console.log(`⏭️ Giữ nguyên StudentSchedule ${studentSchedule._id} (session ${sessionOrder} < ${oldClassSessionOrder})`);
+          } else if (sessionOrder >= oldClassSessionOrder) {
+            // Session order >= lớp cũ: update classSchedule
+            const matchingSchedules = newClassScheduleMap.get(sessionOrder);
+            if (matchingSchedules && matchingSchedules.length > 0) {
+              const newClassScheduleId = matchingSchedules[0]._id;
+              await StudentSchedule.findByIdAndUpdate(
+                studentSchedule._id,
+                { classSchedule: newClassScheduleId },
+                { session }
+              );
+              updatedCount++;
+              console.log(`✅ Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
+            }
+          }
+        }
+      }
+    }
+    
+    // Tạo StudentSchedule mới cho các buổi học tương lai của lớp mới mà học viên chưa có
+    const existingStudentScheduleIds = studentSchedules
+      .map(ss => ss.classSchedule?._id?.toString())
+      .filter(id => id);
+    
+    const futureNewClassSchedules = allNewClassSchedules.filter(schedule => {
+      const scheduleDate = new Date(schedule.date);
+      scheduleDate.setHours(0, 0, 0, 0);
+      return scheduleDate >= today && !existingStudentScheduleIds.includes(schedule._id.toString());
+    });
+    
+    for (const classSchedule of futureNewClassSchedules) {
+      // Chỉ tạo StudentSchedule cho các buổi có session order >= session order hiện tại của lớp mới
+      if (newClassSessionOrder !== null && classSchedule.session?.order !== null) {
+        if (classSchedule.session.order >= newClassSessionOrder) {
+          await StudentSchedule.create([{
+            student: studentId,
+            classSchedule: classSchedule._id,
+            scheduleStatus: 'scheduled'
+          }], { session });
+          console.log(`✅ Tạo StudentSchedule mới cho ClassSchedule ${classSchedule._id}`);
+        }
+      } else {
+        // Nếu không có session order, tạo cho tất cả buổi tương lai
+        await StudentSchedule.create([{
+          student: studentId,
+          classSchedule: classSchedule._id,
+          scheduleStatus: 'scheduled'
+        }], { session });
+        console.log(`✅ Tạo StudentSchedule mới cho ClassSchedule ${classSchedule._id}`);
+      }
+    }
+    
+    console.log(`📊 Kết quả xử lý StudentSchedule:`);
+    console.log(`   - Updated: ${updatedCount}`);
+    console.log(`   - Cancelled: ${cancelledCount}`);
+    console.log(`   - Unchanged: ${unchangedCount}`);
+    console.log(`✅ Hoàn thành xử lý đổi lớp`);
+    
+    // Commit transaction
+    await session.commitTransaction();
+    session.endSession();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Đổi lớp học thành công',
+      data: {
+        oldClassId,
+        newClassId,
+        updatedSchedules: updatedCount,
+        cancelledSchedules: cancelledCount,
+        unchangedSchedules: unchangedCount
+      }
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('❌ Lỗi khi đổi lớp học:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi đổi lớp học',
+      error: error.message
+    });
+  }
+};
+
 module.exports = exports;

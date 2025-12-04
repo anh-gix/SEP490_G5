@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Container, Button, Badge, Alert, Tabs, Tab, Table, Row, Col, Card, Pagination, ButtonGroup, Form, Modal } from 'react-bootstrap';
 import { useParams, useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import studentService from '../../services/studentService';
 import { courseService } from '../../services/courseService';
 import { classScheduleService } from '../../services/classScheduleService';
 import studentScheduleService from '../../services/studentScheduleService';
+import classService from '../../services/classService';
 import ScheduleCalendar from './ScheduleCalendar';
 import MakeupClassModalForStudent from './MakeupClassModalForStudent';
 
@@ -43,6 +45,16 @@ const StudentDetail = () => {
   const [showMakeupModal, setShowMakeupModal] = useState(false);
   const [selectedScheduleForMakeup, setSelectedScheduleForMakeup] = useState(null);
   const [creatingMakeup, setCreatingMakeup] = useState(false);
+
+  // Change class modal state
+  const [showChangeClassModal, setShowChangeClassModal] = useState(false);
+  const [selectedClassToChange, setSelectedClassToChange] = useState(null);
+  const [availableClasses, setAvailableClasses] = useState([]);
+  const [selectedNewClassId, setSelectedNewClassId] = useState(null);
+  const [selectedNewClassInfo, setSelectedNewClassInfo] = useState(null);
+  const [loadingAvailableClasses, setLoadingAvailableClasses] = useState(false);
+  const [loadingNewClassInfo, setLoadingNewClassInfo] = useState(false);
+  const [changingClass, setChangingClass] = useState(false);
 
   // Fetch only student info (for Info tab)
   const fetchStudentInfo = useCallback(async () => {
@@ -179,7 +191,7 @@ const StudentDetail = () => {
       setShowEditCoursesModal(true);
     } catch (err) {
       console.error('Error loading courses:', err);
-      alert('Không thể tải danh sách khóa học: ' + (err.message || 'Lỗi không xác định'));
+      toast.error('Không thể tải danh sách khóa học: ' + (err.message || 'Lỗi không xác định'));
     } finally {
       setLoadingCourses(false);
     }
@@ -188,7 +200,7 @@ const StudentDetail = () => {
   // Handler to save course enrollments
   const handleSaveCourseEnrollments = async () => {
     if (!selectedStudent?._id) {
-      alert('Không tìm thấy thông tin học viên');
+      toast.error('Không tìm thấy thông tin học viên');
       return;
     }
 
@@ -211,10 +223,10 @@ const StudentDetail = () => {
       
       // Close modal
       setShowEditCoursesModal(false);
-      alert('Cập nhật khóa học thành công!');
+      toast.success('Cập nhật khóa học thành công!');
     } catch (err) {
       console.error('Error saving course enrollments:', err);
-      alert('Không thể cập nhật khóa học: ' + (err.response?.data?.message || err.message || 'Lỗi không xác định'));
+      toast.error('Không thể cập nhật khóa học: ' + (err.response?.data?.message || err.message || 'Lỗi không xác định'));
     } finally {
       setSavingCourses(false);
     }
@@ -230,6 +242,173 @@ const StudentDetail = () => {
   const handleCloseMakeupModal = () => {
     setShowMakeupModal(false);
     setSelectedScheduleForMakeup(null);
+  };
+
+  // Handler to open change class modal
+  const handleChangeClassClick = async (classItem) => {
+    setSelectedClassToChange(classItem);
+    setShowChangeClassModal(true);
+    setSelectedNewClassId(null);
+    setSelectedNewClassInfo(null);
+    setAvailableClasses([]);
+    setLoadingAvailableClasses(true);
+
+    try {
+      // Get course ID from class
+      const courseId = classItem.course?._id || classItem.course;
+      if (courseId) {
+        // Get all classes with the same course
+        const response = await classService.getAllClasses({ courseId });
+        if (response.success) {
+          const classes = response.classes || [];
+          // Filter out current class
+          const otherClasses = classes.filter(cls => {
+            const clsId = cls._id || cls;
+            return clsId.toString() !== classItem._id?.toString();
+          });
+          setAvailableClasses(otherClasses);
+        } else {
+          setAvailableClasses([]);
+        }
+      } else {
+        setAvailableClasses([]);
+      }
+    } catch (err) {
+      console.error('Error fetching available classes:', err);
+      setAvailableClasses([]);
+    } finally {
+      setLoadingAvailableClasses(false);
+    }
+  };
+
+  // Handler to fetch new class info when selected
+  useEffect(() => {
+    const fetchNewClassInfo = async () => {
+      if (!selectedNewClassId || !classService) {
+        setSelectedNewClassInfo(null);
+        return;
+      }
+
+      try {
+        setLoadingNewClassInfo(true);
+        const response = await classService.getClassById(selectedNewClassId);
+        
+        if (response.success && response.class) {
+          const classData = response.class;
+          
+          // Get fixed schedules
+          const schedules = classData.schedules || [];
+          const fixedSchedules = schedules.filter(sch => {
+            const status = sch.status || 'fixed';
+            return status === 'fixed';
+          });
+          
+          // Sort schedules
+          const sortedSchedules = [...fixedSchedules].sort((a, b) => {
+            const dateA = new Date(a.date);
+            const dateB = new Date(b.date);
+            if (dateA.getTime() !== dateB.getTime()) {
+              return dateA - dateB;
+            }
+            return (a.startTime || '').localeCompare(b.startTime || '');
+          });
+
+          const fixedSchedulesList = sortedSchedules.map(sch => ({
+            title: sch.session?.title || 'N/A',
+            order: sch.session?.order || null,
+            date: sch.date || null,
+            startTime: sch.startTime || 'N/A',
+            endTime: sch.endTime || 'N/A',
+            roomName: sch.room?.room_name || classData.roomName || 'N/A'
+          }));
+
+          // Calculate current session
+          const now = new Date();
+          let currentSessionTitle = 'Chưa có session';
+          let currentSessionOrder = null;
+          
+          if (fixedSchedulesList.length > 0) {
+            const upcomingSchedules = fixedSchedulesList.filter(sch => {
+              if (!sch.date) return false;
+              const scheduleDate = new Date(sch.date);
+              return scheduleDate >= now;
+            });
+            
+            if (upcomingSchedules.length > 0) {
+              const nextSchedule = upcomingSchedules[0];
+              currentSessionTitle = nextSchedule.title;
+              currentSessionOrder = nextSchedule.order;
+            } else {
+              // All schedules are past, get the last one
+              const lastSchedule = fixedSchedulesList[fixedSchedulesList.length - 1];
+              currentSessionTitle = lastSchedule.title;
+              currentSessionOrder = lastSchedule.order;
+            }
+          }
+
+          setSelectedNewClassInfo({
+            classId: classData._id,
+            className: classData.name,
+            courseName: classData.course?.name || 'N/A',
+            fixedSchedules: fixedSchedulesList,
+            currentSessionTitle,
+            currentSessionOrder
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching new class info:', err);
+        setSelectedNewClassInfo(null);
+      } finally {
+        setLoadingNewClassInfo(false);
+      }
+    };
+
+    fetchNewClassInfo();
+  }, [selectedNewClassId]);
+
+  // Handler to confirm class change
+  const handleConfirmChangeClass = async () => {
+    if (!selectedClassToChange || !selectedNewClassId || !selectedNewClassInfo || !studentId) {
+      alert('Vui lòng chọn lớp mới');
+      return;
+    }
+
+    const oldClassId = selectedClassToChange._id;
+    if (!oldClassId) {
+      alert('Không tìm thấy thông tin lớp cũ');
+      return;
+    }
+
+    // Confirm action
+    if (!window.confirm(`Bạn có chắc chắn muốn đổi học viên từ lớp "${selectedClassToChange.name}" sang lớp "${selectedNewClassInfo.className}"?`)) {
+      return;
+    }
+
+    try {
+      setChangingClass(true);
+      
+      // Call API to change class
+      await studentService.changeStudentClass(studentId, oldClassId, selectedNewClassId);
+      
+      // Refresh student data
+      await fetchStudentInfo();
+      if (classesLoaded) {
+        await fetchStudentClasses();
+      }
+      
+      // Close modal
+      setShowChangeClassModal(false);
+      setSelectedClassToChange(null);
+      setSelectedNewClassId(null);
+      setSelectedNewClassInfo(null);
+      
+      alert('Đổi lớp học thành công!');
+    } catch (err) {
+      console.error('Error changing class:', err);
+      alert('Không thể đổi lớp học: ' + (err.response?.data?.message || err.message || 'Lỗi không xác định'));
+    } finally {
+      setChangingClass(false);
+    }
   };
 
   // Handler to submit makeup class creation
@@ -537,6 +716,7 @@ const StudentDetail = () => {
                         <th className="px-16 py-12 text-13">Trình độ</th>
                         <th className="px-16 py-12 text-13">Học viên</th>
                         <th className="px-16 py-12 text-13">Trạng thái</th>
+                        <th className="px-16 py-12 text-13">Thao tác</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -552,6 +732,17 @@ const StudentDetail = () => {
                             <Badge bg={getClassStatusBadgeColor(cls.status)}>
                               {getClassStatusText(cls.status)}
                             </Badge>
+                          </td>
+                          <td className="px-16 py-12">
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              onClick={() => handleChangeClassClick(cls)}
+                              className="px-12 py-6"
+                            >
+                              <i className="fas fa-exchange-alt me-1"></i>
+                              Đổi lớp
+                            </Button>
                           </td>
                         </tr>
                       ))}
@@ -840,6 +1031,165 @@ const StudentDetail = () => {
         loading={creatingMakeup}
         studentSchedule={studentSchedule}
       />
+
+      {/* Change Class Modal */}
+      <Modal show={showChangeClassModal} onHide={() => setShowChangeClassModal(false)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="fas fa-exchange-alt me-2"></i>
+            Đổi lớp học
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedClassToChange ? (
+            <>
+              {/* Current Class Info */}
+              <div className="mb-4">
+                <h6 className="fw-semibold mb-3">Lớp hiện tại:</h6>
+                <Card className="border-0 bg-neutral-25">
+                  <Card.Body className="p-16">
+                    <div className="mb-2">
+                      <span className="text-13 text-neutral-500 me-2">Tên lớp:</span>
+                      <span className="text-14 text-neutral-900 fw-semibold">{selectedClassToChange.name || 'N/A'}</span>
+                    </div>
+                    <div className="mb-2">
+                      <span className="text-13 text-neutral-500 me-2">Khóa học:</span>
+                      <span className="text-14 text-neutral-900">{selectedClassToChange.course?.name || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-13 text-neutral-500 me-2">Trạng thái:</span>
+                      <Badge bg={getClassStatusBadgeColor(selectedClassToChange.status)}>
+                        {getClassStatusText(selectedClassToChange.status)}
+                      </Badge>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </div>
+
+              {/* Select New Class */}
+              <div className="mb-4">
+                <Form.Label className="fw-semibold">Chọn lớp mới:</Form.Label>
+                {loadingAvailableClasses ? (
+                  <div className="text-center py-3">
+                    <div className="spinner-border spinner-border-sm text-primary" role="status">
+                      <span className="visually-hidden">Đang tải...</span>
+                    </div>
+                    <p className="text-muted mt-2 text-13">Đang tải danh sách lớp học...</p>
+                  </div>
+                ) : availableClasses.length > 0 ? (
+                  <Form.Select
+                    value={selectedNewClassId || ''}
+                    onChange={(e) => setSelectedNewClassId(e.target.value)}
+                    disabled={changingClass}
+                  >
+                    <option value="">-- Chọn lớp mới --</option>
+                    {availableClasses.map((cls) => (
+                      <option key={cls._id} value={cls._id}>
+                        {cls.name} {cls.status ? `(${getClassStatusText(cls.status)})` : ''}
+                      </option>
+                    ))}
+                  </Form.Select>
+                ) : (
+                  <Alert variant="warning" className="mb-0">
+                    <i className="fas fa-exclamation-triangle me-2"></i>
+                    Không có lớp học nào cùng khóa học để chuyển đổi
+                  </Alert>
+                )}
+              </div>
+
+              {/* New Class Info */}
+              {selectedNewClassInfo && (
+                <div className="mb-3">
+                  <h6 className="fw-semibold mb-3">Lớp mới:</h6>
+                  <Card className="border-0 bg-neutral-25">
+                    <Card.Body className="p-16">
+                      <div className="mb-2">
+                        <span className="text-13 text-neutral-500 me-2">Tên lớp:</span>
+                        <span className="text-14 text-neutral-900 fw-semibold">{selectedNewClassInfo.className || 'N/A'}</span>
+                      </div>
+                      <div className="mb-2">
+                        <span className="text-13 text-neutral-500 me-2">Khóa học:</span>
+                        <span className="text-14 text-neutral-900">{selectedNewClassInfo.courseName || 'N/A'}</span>
+                      </div>
+                      {selectedNewClassInfo.currentSessionTitle && (
+                        <div className="mb-2">
+                          <span className="text-13 text-neutral-500 me-2">Session hiện tại:</span>
+                          <span className="text-14 text-neutral-900">{selectedNewClassInfo.currentSessionTitle}</span>
+                          {selectedNewClassInfo.currentSessionOrder !== null && (
+                            <span className="text-13 text-neutral-500 ms-2">(Số thứ tự: {selectedNewClassInfo.currentSessionOrder})</span>
+                          )}
+                        </div>
+                      )}
+                      {selectedNewClassInfo.fixedSchedules && selectedNewClassInfo.fixedSchedules.length > 0 && (
+                        <div>
+                          <span className="text-13 text-neutral-500 me-2">Lịch học:</span>
+                          <div className="mt-2">
+                            {selectedNewClassInfo.fixedSchedules.slice(0, 3).map((schedule, idx) => (
+                              <div key={idx} className="text-13 text-neutral-700 mb-1">
+                                {schedule.date ? new Date(schedule.date).toLocaleDateString('vi-VN') : 'N/A'} - {schedule.startTime} - {schedule.endTime}
+                                {schedule.roomName && <span className="text-neutral-500 ms-2">({schedule.roomName})</span>}
+                              </div>
+                            ))}
+                            {selectedNewClassInfo.fixedSchedules.length > 3 && (
+                              <div className="text-13 text-neutral-500">
+                                ... và {selectedNewClassInfo.fixedSchedules.length - 3} buổi học khác
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </Card.Body>
+                  </Card>
+                </div>
+              )}
+
+              {loadingNewClassInfo && (
+                <div className="text-center py-3">
+                  <div className="spinner-border spinner-border-sm text-primary" role="status">
+                    <span className="visually-hidden">Đang tải...</span>
+                  </div>
+                  <p className="text-muted mt-2 text-13">Đang tải thông tin lớp mới...</p>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-3">
+              <p className="text-muted">Đang tải thông tin...</p>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowChangeClassModal(false);
+              setSelectedClassToChange(null);
+              setSelectedNewClassId(null);
+              setSelectedNewClassInfo(null);
+            }}
+            disabled={changingClass}
+          >
+            Hủy
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleConfirmChangeClass}
+            disabled={!selectedNewClassId || changingClass || loadingNewClassInfo}
+          >
+            {changingClass ? (
+              <>
+                <i className="fas fa-spinner fa-spin me-2"></i>
+                Đang xử lý...
+              </>
+            ) : (
+              <>
+                <i className="fas fa-check me-2"></i>
+                Xác nhận đổi lớp
+              </>
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };

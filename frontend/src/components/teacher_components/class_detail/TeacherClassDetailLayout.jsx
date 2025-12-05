@@ -25,8 +25,9 @@ const TeacherClassDetailLayout = () => {
   
   const [classInfo, setClassInfo] = useState(null);
   const [students, setStudents] = useState([]);
-  const [materials, setMaterials] = useState([]);
   const [lessons, setLessons] = useState([]);
+  const [attendanceByLesson, setAttendanceByLesson] = useState([]);
+  const [homeworkStats, setHomeworkStats] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -61,8 +62,9 @@ const TeacherClassDetailLayout = () => {
       if (response.success) {
         setClassInfo(response.data.classInfo);
         setStudents(response.data.students || []);
-        setMaterials(response.data.materials || []);
         setLessons(response.data.lessons || []);
+        setAttendanceByLesson(response.data.attendanceByLesson || []);
+        setHomeworkStats(response.data.homeworkStats || []);
       }
     } catch (error) {
       console.error('Error fetching class details:', error);
@@ -81,18 +83,6 @@ const TeacherClassDetailLayout = () => {
       }
     } catch (error) {
       console.error('Error fetching students:', error);
-    }
-  };
-
-  // Fetch only materials - for refreshing after CRUD operations
-  const fetchMaterials = async () => {
-    try {
-      const response = await teacherService.getMyClassDetail(classId);
-      if (response.success) {
-        setMaterials(response.data.materials || []);
-      }
-    } catch (error) {
-      console.error('Error fetching materials:', error);
     }
   };
 
@@ -228,20 +218,16 @@ const TeacherClassDetailLayout = () => {
         <Card.Body className="p-24">
           <Row className="align-items-center">
             <Col lg={8}>
-            {/* Breadcrumb */}
-      <div className="mb-16">
-        <Link to="/teacher/classes" className="text-white text-13 text-decoration-none">
-          <i className="fas fa-arrow-left me-2"></i>
-          Quay lại danh sách lớp
-        </Link>
-      </div>
+            {/* Breadcrumb back to class list*/}
+            <div className="mb-16">
+              <Link to="/teacher/classes" className="text-white text-13 text-decoration-none">
+                <i className="fas fa-arrow-left me-2"></i>
+                Quay lại danh sách lớp
+              </Link>
+            </div>
               <div className="d-flex align-items-center gap-12 mb-12">
                 <h4 className="text-white fw-bold mb-0">{classInfo.name}</h4>
                 <Badge className="bg-white text-main-600 px-12 py-6">{classInfo.level}</Badge>
-              </div>
-              <div className="text-white mb-12" style={{ opacity: 0.95 }}>
-                <i className="fas fa-book me-2"></i>
-                {classInfo.subject}
               </div>
               <div className="text-white d-flex gap-20" style={{ opacity: 0.9 }}>
                 <span><i className="fas fa-calendar me-2"></i>{classInfo.schedule}</span>
@@ -290,8 +276,8 @@ const TeacherClassDetailLayout = () => {
             >
               <ClassOverview 
                 classInfo={classInfo}
-                materials={materials}
-                setShowMaterialModal={setShowMaterialModal}
+                attendanceByLesson={attendanceByLesson}
+                homeworkStats={homeworkStats}
               />
             </Tab>
 
@@ -364,7 +350,7 @@ const TeacherClassDetailLayout = () => {
       <MaterialModal 
         show={showMaterialModal}
         onHide={() => setShowMaterialModal(false)}
-        onSuccess={fetchMaterials}
+        onSuccess={fetchClassDetails}
         classId={classId}
       />
       <StudentDetailModal 

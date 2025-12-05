@@ -1163,6 +1163,58 @@ exports.getMyClassDetail = async (req, res) => {
       formattedStudents.reduce((sum, s) => sum + s.attendanceRate, 0) / formattedStudents.length
     );
 
+    // === THÊM DỮ LIỆU CHO CLASS OVERVIEW ===
+
+    // 1. Mocktest Milestones
+    const mocktestMilestones = [];
+    for (const sessionOrder of mocktestSessionOrders) {
+      const lessonIndex = lessons.findIndex(l => l.session?.order === sessionOrder);
+      if (lessonIndex !== -1) {
+        const mocktestLesson = lessons[lessonIndex];
+        mocktestMilestones.push({
+          sessionOrder: sessionOrder,
+          lessonNumber: lessonIndex + 1,
+          lessonId: mocktestLesson._id,
+          date: mocktestLesson.date,
+          status: formattedLessons[lessonIndex]?.status || 'scheduled',
+          title: `Mocktest ${sessionOrder}`
+        });
+      }
+    }
+
+    // 2. Attendance by Lesson (chỉ completed lessons)
+    const attendanceByLesson = formattedLessons
+      .filter(l => l.status === 'completed' && l.hasAttendance)
+      .map(l => ({
+        lessonNumber: l.lessonNumber,
+        date: l.date,
+        attendanceCount: l.attendanceCount,
+        totalStudents: l.totalStudents,
+        attendanceRate: Math.round((l.attendanceCount / l.totalStudents) * 100)
+      }));
+
+    // 3. Homework Stats
+    const homeworkStats = assignments.map(hw => {
+      const onTime = hw.submitted - hw.late;
+      const lessonIndex = formattedLessons.findIndex(
+        l => l._id.toString() === hw.classScheduleId.toString()
+      );
+      return {
+        assignmentId: hw._id,
+        lessonNumber: lessonIndex !== -1 ? lessonIndex + 1 : 0,
+        sessionOrder: hw.sessionOrder,
+        title: hw.title,
+        dueDate: hw.dueDate,
+        onTime: onTime,
+        late: hw.late,
+        notSubmitted: hw.notSubmitted,
+        total: hw.total,
+        onTimeRate: hw.total > 0 ? Math.round((onTime / hw.total) * 100) : 0,
+        lateRate: hw.total > 0 ? Math.round((hw.late / hw.total) * 100) : 0,
+        notSubmittedRate: hw.total > 0 ? Math.round((hw.notSubmitted / hw.total) * 100) : 0
+      };
+    });
+
     // Determine class status
     let classStatus = classInfo.status;
     if (classInfo.status === 'active') {
@@ -1208,12 +1260,15 @@ exports.getMyClassDetail = async (req, res) => {
           topic: nextLesson.topic,
           date: nextLesson.date,
           time: nextLesson.time
-        } : null
+        } : null,
+        mocktestMilestones: mocktestMilestones
       },
       students: formattedStudents,
       lessons: formattedLessons,
       materials,
-      assignments
+      assignments,
+      attendanceByLesson: attendanceByLesson,
+      homeworkStats: homeworkStats
     };
 
     res.status(200).json({

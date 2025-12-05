@@ -10,6 +10,7 @@ import TeacherGradingPage from "../pages/TeacherPages/TeacherGradingPage.jsx";
 import TeacherClassDetailPage from "../pages/TeacherPages/TeacherClassDetailPage.jsx";
 import LessonDetailPage from "../pages/TeacherPages/LessonDetailPage.jsx";
 import TeacherProfilePage from "../pages/TeacherPages/TeacherProfilePage.jsx";
+import TeacherApplicationsPage from "../pages/TeacherPages/TeacherApplicationsPage.jsx";
 
 /**
  * TeacherRoutes
@@ -39,6 +40,7 @@ export const teacherRoutes = [
   // I. Schedule
   { path: '/teacher/schedule', element: <TeacherSchedulePage /> },
   { path: '/teacher/lessons/:lessonId', element: <LessonDetailPage /> },
+  { path: '/teacher/applications', element: <TeacherApplicationsPage /> },
 
   // II. Classes
   { path: '/teacher/classes', element: <TeacherClassesPage /> },

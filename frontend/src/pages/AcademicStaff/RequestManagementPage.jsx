@@ -37,7 +37,7 @@ const RequestManagementPage = () => {
     replaceTeacher: 0
   });
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('pending');
   const [filterType, setFilterType] = useState('all');
   const [sortBy, setSortBy] = useState('oldest'); // 'oldest', 'newest', 'sender', 'sender-desc'
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -99,6 +99,11 @@ const RequestManagementPage = () => {
   useEffect(() => {
     fetchChangeRequests();
   }, [page, searchTerm, filterStatus, filterType]);
+
+  // Fetch stats separately (phụ thuộc vào filterStatus, không phụ thuộc vào filterType)
+  useEffect(() => {
+    fetchStats();
+  }, [filterStatus]); // Fetch lại khi filterStatus thay đổi
 
   // Hàm helper để kiểm tra conflict với lịch học của học sinh
   const checkMakeupTimeConflict = async (date, startTime, endTime) => {
@@ -729,6 +734,36 @@ const RequestManagementPage = () => {
     }
   }, [sortedRequests, page]);
 
+  // Fetch stats riêng biệt (phụ thuộc vào filterStatus, không phụ thuộc vào filterType)
+  const fetchStats = async () => {
+    try {
+      // Fetch đơn với filterStatus nhưng không có filterType để tính stats
+      const params = { limit: 10000 };
+      if (filterStatus && filterStatus !== 'all') {
+        params.status = filterStatus;
+      }
+      // KHÔNG thêm filterType vào params để stats hiển thị tất cả loại đơn
+      
+      const response = await changeRequestService.getAllChangeRequests(params);
+      if (response.success) {
+        const requests = response.changeRequests || [];
+        
+        // Calculate stats từ các đơn đã filter theo status
+        setStats({
+          pending: requests.filter(r => r.status === 'pending').length,
+          approved: requests.filter(r => r.status === 'approved').length,
+          rejected: requests.filter(r => r.status === 'rejected').length,
+          createClass: requests.filter(r => r.type === 'create_class').length,
+          changeClass: requests.filter(r => r.type === 'change_class').length,
+          makeupClass: requests.filter(r => r.type === 'makeup_class').length,
+          replaceTeacher: requests.filter(r => r.type === 'replace_teacher').length
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching stats:', err);
+    }
+  };
+
   const fetchChangeRequests = async () => {
     try {
       setLoading(true);
@@ -743,17 +778,6 @@ const RequestManagementPage = () => {
         const requests = response.changeRequests || [];
         setAllChangeRequests(requests);
         setTotal(requests.length);
-        
-        // Calculate stats
-        setStats({
-          pending: requests.filter(r => r.status === 'pending').length,
-          approved: requests.filter(r => r.status === 'approved').length,
-          rejected: requests.filter(r => r.status === 'rejected').length,
-          createClass: requests.filter(r => r.type === 'create_class').length,
-          changeClass: requests.filter(r => r.type === 'change_class').length,
-          makeupClass: requests.filter(r => r.type === 'makeup_class').length,
-          replaceTeacher: requests.filter(r => r.type === 'replace_teacher').length
-        });
       } else {
         setError(response.message || 'Không thể tải danh sách đơn');
       }
@@ -3094,6 +3118,7 @@ const RequestManagementPage = () => {
       setPendingMakeupClasses([]);
       setPendingMakeupSessions([]);
       fetchChangeRequests(); // Refresh list
+      fetchStats(); // Refresh stats
     } catch (err) {
       console.error('Error approving request:', err);
       toast.error(err.message || 'Có lỗi xảy ra khi chấp nhận đơn');
@@ -3120,6 +3145,7 @@ const RequestManagementPage = () => {
       setPendingMakeupClasses([]);
       setPendingMakeupSessions([]);
       fetchChangeRequests(); // Refresh list
+      fetchStats(); // Refresh stats
     } catch (err) {
       console.error('Error rejecting request:', err);
       toast.error(err.message || 'Có lỗi xảy ra khi từ chối đơn');
@@ -4810,10 +4836,22 @@ const RequestManagementPage = () => {
           </div>
 
           {/* Summary Cards */}
-          <Row className="g-3 mb-24">
+          <Row className="g-3 mb-24" style={{ display: 'flex', flexWrap: 'wrap' }}>
             {/* Tổng số đơn */}
-            <Col md={6} lg={3}>
-              <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+            <Col xs={12} sm={6} md={4} lg style={{ flex: '1', minWidth: '200px' }}>
+              <Card 
+                className="bg-white border-0 rounded-12 box-shadow-sm"
+                style={{ 
+                  cursor: 'pointer',
+                  border: filterType === 'all' ? '2px solid #0D74FF' : '0',
+                  boxShadow: filterType === 'all' ? '0 4px 12px rgba(13, 116, 255, 0.3)' : undefined,
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={() => {
+                  setFilterType(filterType === 'all' ? 'all' : 'all'); // Tổng số đơn luôn là 'all', không cần toggle
+                  setPage(1);
+                }}
+              >
                 <Card.Body className="p-20">
                   <div className="d-flex align-items-center gap-16">
                     <div 
@@ -4828,79 +4866,9 @@ const RequestManagementPage = () => {
                     </div>
                     <div>
                       <div className="text-neutral-500 text-13 mb-4">Tổng số đơn</div>
-                      <div className="text-neutral-900 fw-bold text-32">{total}</div>
-                    </div>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-
-            {/* Chờ duyệt */}
-            <Col md={6} lg={3}>
-              <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-                <Card.Body className="p-20">
-                  <div className="d-flex align-items-center gap-16">
-                    <div 
-                      className="rounded-12 d-flex align-items-center justify-content-center"
-                      style={{ 
-                        width: '56px',
-                        height: '56px',
-                        background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
-                      }}
-                    >
-                      <i className="fas fa-clock text-white" style={{ fontSize: '24px' }}></i>
-                    </div>
-                    <div>
-                      <div className="text-neutral-500 text-13 mb-4">Chờ duyệt</div>
-                      <div className="text-neutral-900 fw-bold text-32">{stats.pending}</div>
-                    </div>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-
-            {/* Đã duyệt */}
-            <Col md={6} lg={3}>
-              <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-                <Card.Body className="p-20">
-                  <div className="d-flex align-items-center gap-16">
-                    <div 
-                      className="rounded-12 d-flex align-items-center justify-content-center"
-                      style={{ 
-                        width: '56px',
-                        height: '56px',
-                        background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
-                      }}
-                    >
-                      <i className="fas fa-check-circle text-white" style={{ fontSize: '24px' }}></i>
-                    </div>
-                    <div>
-                      <div className="text-neutral-500 text-13 mb-4">Đã duyệt</div>
-                      <div className="text-neutral-900 fw-bold text-32">{stats.approved}</div>
-                    </div>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-
-            {/* Từ chối */}
-            <Col md={6} lg={3}>
-              <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-                <Card.Body className="p-20">
-                  <div className="d-flex align-items-center gap-16">
-                    <div 
-                      className="rounded-12 d-flex align-items-center justify-content-center"
-                      style={{ 
-                        width: '56px',
-                        height: '56px',
-                        background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)'
-                      }}
-                    >
-                      <i className="fas fa-times-circle text-white" style={{ fontSize: '24px' }}></i>
-                    </div>
-                    <div>
-                      <div className="text-neutral-500 text-13 mb-4">Từ chối</div>
-                      <div className="text-neutral-900 fw-bold text-32">{stats.rejected}</div>
+                      <div className="text-neutral-900 fw-bold text-32">
+                        {stats.createClass + stats.changeClass + stats.makeupClass + stats.replaceTeacher}
+                      </div>
                     </div>
                   </div>
                 </Card.Body>
@@ -4908,8 +4876,20 @@ const RequestManagementPage = () => {
             </Col>
 
             {/* Tạo lớp */}
-            <Col md={6} lg={3}>
-              <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+            <Col xs={12} sm={6} md={4} lg style={{ flex: '1', minWidth: '200px' }}>
+              <Card 
+                className="bg-white border-0 rounded-12 box-shadow-sm"
+                style={{ 
+                  cursor: 'pointer',
+                  border: filterType === 'create_class' ? '2px solid #3B82F6' : '0',
+                  boxShadow: filterType === 'create_class' ? '0 4px 12px rgba(59, 130, 246, 0.3)' : undefined,
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={() => {
+                  setFilterType(filterType === 'create_class' ? 'all' : 'create_class');
+                  setPage(1);
+                }}
+              >
                 <Card.Body className="p-20">
                   <div className="d-flex align-items-center gap-16">
                     <div 
@@ -4932,8 +4912,20 @@ const RequestManagementPage = () => {
             </Col>
 
             {/* Đổi lớp */}
-            <Col md={6} lg={3}>
-              <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+            <Col xs={12} sm={6} md={4} lg style={{ flex: '1', minWidth: '200px' }}>
+              <Card 
+                className="bg-white border-0 rounded-12 box-shadow-sm"
+                style={{ 
+                  cursor: 'pointer',
+                  border: filterType === 'change_class' ? '2px solid #6366F1' : '0',
+                  boxShadow: filterType === 'change_class' ? '0 4px 12px rgba(99, 102, 241, 0.3)' : undefined,
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={() => {
+                  setFilterType(filterType === 'change_class' ? 'all' : 'change_class');
+                  setPage(1);
+                }}
+              >
                 <Card.Body className="p-20">
                   <div className="d-flex align-items-center gap-16">
                     <div 
@@ -4956,8 +4948,20 @@ const RequestManagementPage = () => {
             </Col>
 
             {/* Học bù */}
-            <Col md={6} lg={3}>
-              <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+            <Col xs={12} sm={6} md={4} lg style={{ flex: '1', minWidth: '200px' }}>
+              <Card 
+                className="bg-white border-0 rounded-12 box-shadow-sm"
+                style={{ 
+                  cursor: 'pointer',
+                  border: filterType === 'makeup_class' ? '2px solid #F59E0B' : '0',
+                  boxShadow: filterType === 'makeup_class' ? '0 4px 12px rgba(245, 158, 11, 0.3)' : undefined,
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={() => {
+                  setFilterType(filterType === 'makeup_class' ? 'all' : 'makeup_class');
+                  setPage(1);
+                }}
+              >
                 <Card.Body className="p-20">
                   <div className="d-flex align-items-center gap-16">
                     <div 
@@ -4980,8 +4984,20 @@ const RequestManagementPage = () => {
             </Col>
 
             {/* Xếp dạy thay */}
-            <Col md={6} lg={3}>
-              <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+            <Col xs={12} sm={6} md={4} lg style={{ flex: '1', minWidth: '200px' }}>
+              <Card 
+                className="bg-white border-0 rounded-12 box-shadow-sm"
+                style={{ 
+                  cursor: 'pointer',
+                  border: filterType === 'replace_teacher' ? '2px solid #6B7280' : '0',
+                  boxShadow: filterType === 'replace_teacher' ? '0 4px 12px rgba(107, 114, 128, 0.3)' : undefined,
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={() => {
+                  setFilterType(filterType === 'replace_teacher' ? 'all' : 'replace_teacher');
+                  setPage(1);
+                }}
+              >
                 <Card.Body className="p-20">
                   <div className="d-flex align-items-center gap-16">
                     <div 
@@ -5025,7 +5041,7 @@ const RequestManagementPage = () => {
                   </InputGroup>
                 </Col>
 
-                <Col md={2}>
+                <Col md={3}>
                   <Form.Select 
                     value={filterStatus}
                     onChange={(e) => {
@@ -5038,23 +5054,6 @@ const RequestManagementPage = () => {
                     <option value="pending">Chờ duyệt</option>
                     <option value="approved">Đã duyệt</option>
                     <option value="rejected">Từ chối</option>
-                  </Form.Select>
-                </Col>
-
-                <Col md={3}>
-                  <Form.Select 
-                    value={filterType}
-                    onChange={(e) => {
-                      setFilterType(e.target.value);
-                      setPage(1); // Reset về trang 1 khi filter
-                    }}
-                    className="border-neutral-200"
-                  >
-                    <option value="all">Tất cả loại đơn</option>
-                    <option value="create_class">Tạo lớp</option>
-                    <option value="change_class">Đổi lớp</option>
-                    <option value="makeup_class">Học bù</option>
-                    <option value="replace_teacher">Thay giáo viên</option>
                   </Form.Select>
                 </Col>
 
@@ -5097,7 +5096,7 @@ const RequestManagementPage = () => {
                   <thead>
                     <tr className="bg-neutral-25">
                       <th 
-                        className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0"
+                        className="px-20 py-16 text-neutral-900 fw-semibold text-21 border-0"
                         style={{ cursor: 'pointer' }}
                         onClick={() => {
                           if (sortBy === 'sender') {
@@ -5111,13 +5110,13 @@ const RequestManagementPage = () => {
                         {sortBy === 'sender' && <span className="ms-2">↑</span>}
                         {sortBy === 'sender-desc' && <span className="ms-2">↓</span>}
                       </th>
-                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Loại đơn</th>
-                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Nội dung</th>
-                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Ngày gửi</th>
-                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Trạng thái</th>
-                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Người duyệt</th>
-                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Ngày duyệt</th>
-                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Hành động</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-21 border-0">Loại đơn</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-21 border-0">Nội dung</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-21 border-0">Ngày gửi</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-21 border-0">Trạng thái</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-21 border-0">Người duyệt</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-21 border-0">Ngày duyệt</th>
+                      <th className="px-20 py-16 text-neutral-900 fw-semibold text-21 border-0">Hành động</th>
                     </tr>
                   </thead>
                   <tbody>

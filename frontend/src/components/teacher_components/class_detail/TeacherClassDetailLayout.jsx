@@ -64,6 +64,7 @@ const TeacherClassDetailLayout = () => {
         setStudents(response.data.students || []);
         setLessons(response.data.lessons || []);
         setAttendanceByLesson(response.data.attendanceByLesson || []);
+        console.log('Attendance Data:', response.data.attendanceByLesson);
         setHomeworkStats(response.data.homeworkStats || []);
       }
     } catch (error) {

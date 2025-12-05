@@ -920,8 +920,8 @@ exports.getMyClassDetail = async (req, res) => {
 
     // Get all schedules/lessons for this class
     const lessons = await ClassSchedule.find({ 
-      class: classId,
-      status: 'fixed' 
+      class: classId
+      // Không filter theo status, lấy tất cả (scheduled, completed, cancelled, etc.)
     })
       .populate('session', 'title order content')
       .populate('room', 'room_name location')
@@ -932,19 +932,37 @@ exports.getMyClassDetail = async (req, res) => {
     const today = now.toISOString().split('T')[0];
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
-    // Format lessons with status
-    const formattedLessons = lessons.map((lesson, index) => {
+    // Get StudentSchedule for attendance counting
+    const StudentSchedule = require('../models/studentScheduleModel');
+    
+    console.log(`📚 [DEBUG] Total lessons found: ${lessons.length}`);
+    console.log(`📅 [DEBUG] Today: ${today}, Current time: ${currentTime}`);
+    
+    // Format lessons with status and real attendance data
+    const formattedLessons = await Promise.all(lessons.map(async (lesson, index) => {
+      // Convert lesson.date to YYYY-MM-DD string for comparison
+      const lessonDateStr = new Date(lesson.date).toISOString().split('T')[0];
+      
       let status = 'scheduled';
-      if (lesson.date < today || (lesson.date === today && lesson.endTime < currentTime)) {
+      if (lessonDateStr < today || (lessonDateStr === today && lesson.endTime < currentTime)) {
         status = 'completed';
-      } else if (lesson.date === today || (lesson.date > today && new Date(lesson.date) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))) {
+      } else if (lessonDateStr === today || (lessonDateStr > today && new Date(lesson.date) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))) {
         status = 'upcoming';
       }
+      
+      console.log(`📅 Lesson ${index + 1}: date=${lessonDateStr}, today=${today}, status=${status}`);
 
-      // Count attendance (placeholder - would need StudentSchedule)
+      // Get real attendance count from StudentSchedule
       const totalStudents = classInfo.students.length;
-      const hasAttendance = status === 'completed';
-      const attendanceCount = hasAttendance ? Math.round(totalStudents * (0.8 + Math.random() * 0.15)) : 0;
+      const studentSchedules = await StudentSchedule.find({
+        classSchedule: lesson._id
+      });
+      
+      const hasAttendance = studentSchedules.some(ss => ss.attendance?.status);
+      console.log(`📝 Lesson ${index + 1} (${lesson.date}): hasAttendance = ${hasAttendance}, totalStudents = ${totalStudents}, recorded = ${studentSchedules.length}`) ;
+      const attendanceCount = studentSchedules.filter(
+        ss => ss.attendance?.status === 'present' || ss.attendance?.status === 'late'
+      ).length;
 
       return {
         _id: lesson._id,
@@ -959,7 +977,7 @@ exports.getMyClassDetail = async (req, res) => {
         attendanceCount,
         totalStudents
       };
-    });
+    }));
 
     // Get materials from schedules
     const materials = [];
@@ -1029,9 +1047,6 @@ exports.getMyClassDetail = async (req, res) => {
     const Course = require('../models/courseModel');
     const course = await Course.findById(classInfo.course._id);
     const mocktestSessionOrders = course?.mocktestSessionOrders || [];
-
-    // Get StudentSchedule for attendance
-    const StudentSchedule = require('../models/studentScheduleModel');
 
     // Format students with real stats
     const formattedStudents = await Promise.all(classInfo.students.map(async (student) => {
@@ -1183,6 +1198,10 @@ exports.getMyClassDetail = async (req, res) => {
     }
 
     // 2. Attendance by Lesson (chỉ completed lessons)
+    console.log(`📊 [DEBUG] formattedLessons count: ${formattedLessons.length}`);
+    console.log(`📊 [DEBUG] Completed lessons: ${formattedLessons.filter(l => l.status === 'completed').length}`);
+    console.log(`📊 [DEBUG] Completed with attendance: ${formattedLessons.filter(l => l.status === 'completed' && l.hasAttendance).length}`);
+    
     const attendanceByLesson = formattedLessons
       .filter(l => l.status === 'completed' && l.hasAttendance)
       .map(l => ({
@@ -1192,6 +1211,8 @@ exports.getMyClassDetail = async (req, res) => {
         totalStudents: l.totalStudents,
         attendanceRate: Math.round((l.attendanceCount / l.totalStudents) * 100)
       }));
+    
+    console.log(`📊 [DEBUG] attendanceByLesson result:`, attendanceByLesson);
 
     // 3. Homework Stats
     const homeworkStats = assignments.map(hw => {
@@ -1310,7 +1331,7 @@ exports.getLessonDetail = async (req, res) => {
           },
           {
             path: 'students',
-            select: 'username email'
+            select: 'username email fullName'
           }
         ]
       })
@@ -1332,6 +1353,26 @@ exports.getLessonDetail = async (req, res) => {
         message: 'Bạn không có quyền xem buổi học này'
       });
     }
+
+    // Get attendance data for all students in this class
+    const studentSchedules = await StudentSchedule.find({
+      classSchedule: scheduleId
+    }).populate('student', 'username email fullName').lean();
+
+    // Map students with their attendance status
+    const studentsWithAttendance = (schedule.class?.students || []).map(student => {
+      const studentSchedule = studentSchedules.find(
+        ss => ss.student._id.toString() === student._id.toString()
+      );
+
+      return {
+        _id: student._id,
+        username: student.username,
+        email: student.email,
+        fullName: student.fullName || student.username,
+        attendance: studentSchedule?.attendance || null // null if not marked yet
+      };
+    });
 
     // Format response
     const lessonDetail = {
@@ -1363,9 +1404,9 @@ exports.getLessonDetail = async (req, res) => {
       teacherName: schedule.class?.teacher?.username,
       teacherEmail: schedule.class?.teacher?.email,
       
-      // Student info
-      totalStudents: schedule.class?.students?.length || 0,
-      students: schedule.class?.students || [],
+      // Student info with attendance
+      totalStudents: studentsWithAttendance.length,
+      students: studentsWithAttendance,
       
       // Homework
       homework: schedule.homework || [],
@@ -1558,8 +1599,16 @@ exports.saveAttendance = async (req, res) => {
     const { scheduleId } = req.params;
     const { attendanceData } = req.body; // Array of { studentId, status, checkInTime }
 
+    console.log('📝 Save Attendance Request:', {
+      scheduleId,
+      teacherId,
+      totalStudents: attendanceData?.length
+    });
+
     // Verify schedule exists and teacher owns it
-    const schedule = await ClassSchedule.findById(scheduleId).populate('class');
+    const schedule = await ClassSchedule.findById(scheduleId)
+      .populate('class', 'teacher name');
+    
     if (!schedule) {
       return res.status(404).json({
         success: false,
@@ -1568,62 +1617,92 @@ exports.saveAttendance = async (req, res) => {
     }
 
     // Verify teacher owns this class
-    if (schedule.teacher.toString() !== teacherId.toString()) {
+    if (schedule.class.teacher.toString() !== teacherId.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Bạn không có quyền điểm danh lớp này'
       });
     }
 
-    // TODO: Tạm thời bỏ kiểm tra ngày để test
-    // Verify class date
-    // const today = new Date();
-    // today.setHours(0, 0, 0, 0);
-    // const scheduleDate = new Date(schedule.date);
-    // scheduleDate.setHours(0, 0, 0, 0);
+    // Get schedule start time for late detection
+    const scheduleStart = new Date(schedule.date);
+    const [hours, minutes] = (schedule.startTime || '08:00').split(':');
+    scheduleStart.setHours(parseInt(hours), parseInt(minutes), 0);
 
-    // if (scheduleDate.getTime() !== today.getTime()) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: 'Chỉ được điểm danh vào ngày học'
-    //   });
-    // }
+    console.log('⏰ Schedule start time:', scheduleStart);
 
-    const StudentSchedule = require('../models/studentScheduleModel');
+    // Prepare bulk operations for efficiency
+    const bulkOps = [];
     
-    // Update attendance for each student
-    const updatePromises = attendanceData.map(async ({ studentId, status, checkInTime }) => {
+    for (const record of attendanceData) {
+      let finalStatus = record.status;
+      
+      // Auto-detect late if checked in after start time
+      if (record.status === 'present' && record.checkInTime) {
+        const checkIn = new Date(record.checkInTime);
+        if (checkIn > scheduleStart) {
+          finalStatus = 'late';
+          console.log(`⏰ Student ${record.studentId} marked as LATE (checked in at ${checkIn.toLocaleTimeString()})`);
+        }
+      }
+
       // Find or create StudentSchedule
-      let studentSchedule = await StudentSchedule.findOne({
-        student: studentId,
+      const existingSchedule = await StudentSchedule.findOne({
+        student: record.studentId,
         classSchedule: scheduleId
       });
 
-      if (!studentSchedule) {
-        // Create new StudentSchedule if doesn't exist
-        studentSchedule = new StudentSchedule({
-          student: studentId,
-          classSchedule: scheduleId,
-          scheduleStatus: 'scheduled'
+      if (existingSchedule) {
+        // Update existing
+        bulkOps.push({
+          updateOne: {
+            filter: {
+              student: record.studentId,
+              classSchedule: scheduleId
+            },
+            update: {
+              $set: {
+                'attendance.status': finalStatus,
+                'attendance.checkInTime': record.checkInTime || null,
+                'attendance.markedBy': teacherId,
+                scheduleStatus: 'completed'
+              }
+            }
+          }
         });
+      } else {
+        // Create new
+        const newSchedule = new StudentSchedule({
+          student: record.studentId,
+          classSchedule: scheduleId,
+          attendance: {
+            status: finalStatus,
+            checkInTime: record.checkInTime || null,
+            markedBy: teacherId
+          },
+          scheduleStatus: 'completed'
+        });
+        await newSchedule.save();
       }
+    }
 
-      // Update attendance
-      studentSchedule.attendance = {
-        status,
-        checkInTime: checkInTime ? new Date(checkInTime) : (status === 'present' || status === 'late' ? new Date() : null),
-        markedBy: teacherId
-      };
+    // Execute bulk operations if any
+    if (bulkOps.length > 0) {
+      await StudentSchedule.bulkWrite(bulkOps);
+    }
 
-      return studentSchedule.save();
+    // Update ClassSchedule status
+    await ClassSchedule.findByIdAndUpdate(scheduleId, {
+      status: 'completed',
+      hasAttendance: true
     });
 
-    await Promise.all(updatePromises);
+    console.log('✅ Attendance saved successfully');
 
     res.status(200).json({
       success: true,
-      message: 'Lưu điểm danh thành công',
-      totalUpdated: attendanceData.length
+      message: 'Đã lưu điểm danh thành công',
+      attendanceCount: attendanceData.length
     });
   } catch (error) {
     console.error('❌ Lỗi khi lưu điểm danh:', error);

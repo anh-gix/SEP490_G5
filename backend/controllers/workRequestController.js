@@ -721,6 +721,134 @@ exports.rejectRequest = async (req, res) => {
 };
 
 // =========================
+// REVOKE APPROVAL (Center Head) - THU HỒI PHÊ DUYỆT
+// =========================
+
+/**
+ * Revoke (thu hồi) approval decision
+ * POST /api/work-requests/:id/revoke
+ * Body: { userId, reason }
+ */
+exports.revokeApproval = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { userId, reason } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    const centerHeadId = userId;
+
+    if (!reason || reason.trim() === '') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Revocation reason is required'
+      });
+    }
+
+    const request = await WorkRequest.findById(id).session(session);
+
+    if (!request) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Work request not found'
+      });
+    }
+
+    // Chỉ có thể revoke request đã approved
+    if (request.status !== 'approved') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Can only revoke approved requests'
+      });
+    }
+
+    if (request.direction !== 'bottom_up') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Only bottom-up requests can be revoked'
+      });
+    }
+
+    // Kiểm tra entity status - chỉ revoke được nếu entity chưa active/published
+    const Model = request.entityType === 'Program' ? Program : Exam;
+    const entity = await Model.findById(request.entityId).session(session);
+
+    if (!entity) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: `${request.entityType} not found`
+      });
+    }
+
+    // Không cho phép revoke nếu entity đã active hoặc published
+    if (entity.status === 'active' || entity.status === 'published') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot revoke approval: ${request.entityType} is already ${entity.status}`
+      });
+    }
+
+    // 1. Update WorkRequest - chuyển về pending
+    await WorkRequest.findByIdAndUpdate(id, {
+      status: 'pending',
+      revocation: {
+        revokedBy: centerHeadId,
+        revokedAt: new Date(),
+        revocationReason: reason
+      },
+      $push: {
+        history: {
+          action: 'revoked',
+          performedBy: centerHeadId,
+          performedAt: new Date(),
+          note: reason,
+          previousStatus: 'approved'
+        }
+      }
+    }, { session });
+
+    // 2. Update entity status về pending_approval
+    await Model.findByIdAndUpdate(
+      request.entityId,
+      { status: 'pending_approval' },
+      { session }
+    );
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: `Approval revoked successfully. ${request.requestType} is now pending review again.`
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error revoking approval:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error revoking approval'
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+// =========================
 // CANCEL REQUEST (Subject Leader)
 // =========================
 
@@ -864,9 +992,52 @@ exports.getStats = async (req, res) => {
       }
     ]);
 
+    // Breakdown by direction
+    const byDirectionStats = await WorkRequest.aggregate([
+      {
+        $group: {
+          _id: {
+            direction: '$direction',
+            status: '$status'
+          },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Transform byDirection data
+    const byDirection = {
+      bottom_up: {
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+        need_revision: 0,
+        total: 0
+      },
+      top_down: {
+        pending: 0,
+        in_progress: 0,
+        pending_approval: 0,
+        approved: 0,
+        rejected: 0,
+        completed: 0,
+        need_revision: 0,
+        total: 0
+      }
+    };
+
+    byDirectionStats.forEach(item => {
+      const { direction, status } = item._id;
+      if (byDirection[direction] && byDirection[direction][status] !== undefined) {
+        byDirection[direction][status] = item.count;
+        byDirection[direction].total += item.count;
+      }
+    });
+
     res.status(200).json({
       success: true,
       data: result,
+      byDirection: byDirection,
       detailed: detailedStats
     });
 
@@ -876,5 +1047,155 @@ exports.getStats = async (req, res) => {
       success: false,
       message: 'Error getting statistics'
     });
+  }
+};
+
+// =========================
+// CREATE TOP-DOWN WORK REQUEST (Center Head)
+// =========================
+
+/**
+ * Create top-down work request (task assignment from Center Head)
+ * POST /api/work-requests/create
+ * Body: {
+ *   requestType: 'create_program' | 'edit_course' | 'create_exam' | 'assign_students',
+ *   assignedTo: userId,
+ *   requestNote: string,
+ *   entityType?: 'Course',
+ *   entityId?: courseId (for edit_course),
+ *   changeDetails?: object (for edit_course),
+ *   requestedBy: centerHeadUserId
+ * }
+ * Files: attachmentFile, inputFile (multipart/form-data)
+ */
+exports.createTopDownRequest = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const {
+      requestType,
+      assignedTo,
+      requestNote,
+      entityType,
+      entityId,
+      changeDetails,
+      requestedBy
+    } = req.body;
+
+    // Validation
+    if (!requestType || !assignedTo || !requestedBy) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'requestType, assignedTo, and requestedBy are required'
+      });
+    }
+
+    const validTopDownTypes = ['create_program', 'edit_course', 'create_exam', 'assign_students'];
+    if (!validTopDownTypes.includes(requestType)) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid requestType for top-down workflow'
+      });
+    }
+
+    // Prepare work request data
+    const workRequestData = {
+      direction: 'top_down',
+      requestType,
+      requestedBy,
+      assignedTo,
+      requestedAt: new Date(),
+      status: 'pending',
+      history: [{
+        action: 'assigned',
+        performedBy: requestedBy,
+        performedAt: new Date(),
+        note: requestNote || '',
+        previousStatus: null
+      }]
+    };
+
+    // Add optional fields
+    if (requestNote) {
+      workRequestData.requestNote = requestNote;
+    }
+
+    // For edit_course, add entity reference
+    if (requestType === 'edit_course') {
+      if (!entityType || !entityId) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'entityType and entityId are required for edit_course'
+        });
+      }
+      workRequestData.entityType = entityType;
+      workRequestData.entityId = entityId;
+
+      if (changeDetails) {
+        try {
+          workRequestData.changeDetails = typeof changeDetails === 'string'
+            ? JSON.parse(changeDetails)
+            : changeDetails;
+        } catch (e) {
+          workRequestData.changeDetails = { description: changeDetails };
+        }
+      }
+    }
+
+    // Handle file uploads (if using multer)
+    // For now, we'll store file references if provided
+    if (req.files) {
+      if (req.files.attachmentFile) {
+        const file = req.files.attachmentFile[0];
+        workRequestData.attachmentFile = {
+          fileName: file.originalname,
+          fileUrl: file.path, // or S3 URL if uploaded to cloud
+          fileSize: file.size,
+          uploadedAt: new Date(),
+          uploadedBy: requestedBy
+        };
+      }
+
+      if (req.files.inputFile && requestType === 'assign_students') {
+        const file = req.files.inputFile[0];
+        workRequestData.inputFile = {
+          fileName: file.originalname,
+          fileUrl: file.path,
+          uploadedAt: new Date(),
+          uploadedBy: requestedBy
+        };
+      }
+    }
+
+    // Create work request
+    const workRequest = await WorkRequest.create([workRequestData], { session });
+
+    await session.commitTransaction();
+
+    // Populate before returning
+    const populatedRequest = await WorkRequest.findById(workRequest[0]._id)
+      .populate('requestedBy', 'username email name')
+      .populate('assignedTo', 'username email name');
+
+    res.status(201).json({
+      success: true,
+      message: 'Work request created successfully',
+      data: populatedRequest
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error creating top-down request:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating work request',
+      error: error.message
+    });
+  } finally {
+    session.endSession();
   }
 };

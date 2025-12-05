@@ -3,6 +3,16 @@ const router = express.Router();
 const workRequestController = require('../controllers/workRequestController');
 
 // =========================
+// CREATE TOP-DOWN REQUEST (CENTER HEAD)
+// =========================
+
+// Create top-down work request (task assignment)
+router.post(
+  '/create',
+  workRequestController.createTopDownRequest
+);
+
+// =========================
 // SUBMIT FOR APPROVAL (BOTTOM-UP)
 // =========================
 
@@ -66,6 +76,12 @@ router.post(
 router.post(
   '/:id/reject',
   workRequestController.rejectRequest
+);
+
+// Revoke approval (thu hồi phê duyệt)
+router.post(
+  '/:id/revoke',
+  workRequestController.revokeApproval
 );
 
 // =========================

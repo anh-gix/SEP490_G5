@@ -11,11 +11,11 @@ const RequestStats = ({ stats, filterType, onFilterTypeChange }) => {
       {/* Tổng số đơn */}
       <Col xs={12} sm={6} md={4} lg style={{ flex: '1', minWidth: '200px' }}>
         <Card 
-          className="bg-white border-0 rounded-12 box-shadow-sm"
+          className="bg-white rounded-12 box-shadow-sm"
           style={{ 
             cursor: 'pointer',
-            border: filterType === 'all' ? '2px solid #0D74FF' : '0',
-            boxShadow: filterType === 'all' ? '0 4px 12px rgba(13, 116, 255, 0.3)' : undefined,
+            border: filterType === 'all' ? '3px solid #0D74FF' : '2px solid #E5E7EB',
+            boxShadow: filterType === 'all' ? '0 4px 16px rgba(13, 116, 255, 0.4)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
             transition: 'all 0.2s ease'
           }}
           onClick={() => {
@@ -48,11 +48,11 @@ const RequestStats = ({ stats, filterType, onFilterTypeChange }) => {
       {/* Tạo lớp */}
       <Col xs={12} sm={6} md={4} lg style={{ flex: '1', minWidth: '200px' }}>
         <Card 
-          className="bg-white border-0 rounded-12 box-shadow-sm"
+          className="bg-white rounded-12 box-shadow-sm"
           style={{ 
             cursor: 'pointer',
-            border: filterType === 'create_class' ? '2px solid #3B82F6' : '0',
-            boxShadow: filterType === 'create_class' ? '0 4px 12px rgba(59, 130, 246, 0.3)' : undefined,
+            border: filterType === 'create_class' ? '3px solid #3B82F6' : '2px solid #E5E7EB',
+            boxShadow: filterType === 'create_class' ? '0 4px 16px rgba(59, 130, 246, 0.4)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
             transition: 'all 0.2s ease'
           }}
           onClick={() => {
@@ -72,7 +72,7 @@ const RequestStats = ({ stats, filterType, onFilterTypeChange }) => {
                 <i className="fas fa-plus-circle text-white" style={{ fontSize: '24px' }}></i>
               </div>
               <div>
-                <div className="text-neutral-500 text-13 mb-4">Tạo lớp</div>
+                <div className="text-neutral-500 text-13 mb-4">Đơn tạo lớp</div>
                 <div className="text-neutral-900 fw-bold text-32">{stats.createClass}</div>
               </div>
             </div>
@@ -83,11 +83,11 @@ const RequestStats = ({ stats, filterType, onFilterTypeChange }) => {
       {/* Đổi lớp */}
       <Col xs={12} sm={6} md={4} lg style={{ flex: '1', minWidth: '200px' }}>
         <Card 
-          className="bg-white border-0 rounded-12 box-shadow-sm"
+          className="bg-white rounded-12 box-shadow-sm"
           style={{ 
             cursor: 'pointer',
-            border: filterType === 'change_class' ? '2px solid #6366F1' : '0',
-            boxShadow: filterType === 'change_class' ? '0 4px 12px rgba(99, 102, 241, 0.3)' : undefined,
+            border: filterType === 'change_class' ? '3px solid #6366F1' : '2px solid #E5E7EB',
+            boxShadow: filterType === 'change_class' ? '0 4px 16px rgba(99, 102, 241, 0.4)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
             transition: 'all 0.2s ease'
           }}
           onClick={() => {
@@ -107,7 +107,7 @@ const RequestStats = ({ stats, filterType, onFilterTypeChange }) => {
                 <i className="fas fa-exchange-alt text-white" style={{ fontSize: '24px' }}></i>
               </div>
               <div>
-                <div className="text-neutral-500 text-13 mb-4">Đổi lớp</div>
+                <div className="text-neutral-500 text-13 mb-4">Đơn đổi lớp</div>
                 <div className="text-neutral-900 fw-bold text-32">{stats.changeClass}</div>
               </div>
             </div>
@@ -118,11 +118,11 @@ const RequestStats = ({ stats, filterType, onFilterTypeChange }) => {
       {/* Học bù */}
       <Col xs={12} sm={6} md={4} lg style={{ flex: '1', minWidth: '200px' }}>
         <Card 
-          className="bg-white border-0 rounded-12 box-shadow-sm"
+          className="bg-white rounded-12 box-shadow-sm"
           style={{ 
             cursor: 'pointer',
-            border: filterType === 'makeup_class' ? '2px solid #F59E0B' : '0',
-            boxShadow: filterType === 'makeup_class' ? '0 4px 12px rgba(245, 158, 11, 0.3)' : undefined,
+            border: filterType === 'makeup_class' ? '3px solid #F59E0B' : '2px solid #E5E7EB',
+            boxShadow: filterType === 'makeup_class' ? '0 4px 16px rgba(245, 158, 11, 0.4)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
             transition: 'all 0.2s ease'
           }}
           onClick={() => {
@@ -142,7 +142,7 @@ const RequestStats = ({ stats, filterType, onFilterTypeChange }) => {
                 <i className="fas fa-calendar-plus text-white" style={{ fontSize: '24px' }}></i>
               </div>
               <div>
-                <div className="text-neutral-500 text-13 mb-4">Học bù</div>
+                <div className="text-neutral-500 text-13 mb-4">Đơn học bù</div>
                 <div className="text-neutral-900 fw-bold text-32">{stats.makeupClass}</div>
               </div>
             </div>
@@ -153,11 +153,11 @@ const RequestStats = ({ stats, filterType, onFilterTypeChange }) => {
       {/* Xếp dạy thay */}
       <Col xs={12} sm={6} md={4} lg style={{ flex: '1', minWidth: '200px' }}>
         <Card 
-          className="bg-white border-0 rounded-12 box-shadow-sm"
+          className="bg-white rounded-12 box-shadow-sm"
           style={{ 
             cursor: 'pointer',
-            border: filterType === 'replace_teacher' ? '2px solid #6B7280' : '0',
-            boxShadow: filterType === 'replace_teacher' ? '0 4px 12px rgba(107, 114, 128, 0.3)' : undefined,
+            border: filterType === 'replace_teacher' ? '3px solid #6B7280' : '2px solid #E5E7EB',
+            boxShadow: filterType === 'replace_teacher' ? '0 4px 16px rgba(107, 114, 128, 0.4)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
             transition: 'all 0.2s ease'
           }}
           onClick={() => {
@@ -177,7 +177,7 @@ const RequestStats = ({ stats, filterType, onFilterTypeChange }) => {
                 <i className="fas fa-user-friends text-white" style={{ fontSize: '24px' }}></i>
               </div>
               <div>
-                <div className="text-neutral-500 text-13 mb-4">Xếp dạy thay</div>
+                <div className="text-neutral-500 text-13 mb-4">Đơn xếp dạy thay</div>
                 <div className="text-neutral-900 fw-bold text-32">{stats.replaceTeacher}</div>
               </div>
             </div>

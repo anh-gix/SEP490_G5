@@ -84,24 +84,16 @@ const TeacherClassDetailLayout = () => {
     }
   };
 
-  const getFileIcon = (type) => {
-    const icons = {
-      document: 'fa-file-pdf',
-      audio: 'fa-file-audio',
-      video: 'fa-file-video',
-      presentation: 'fa-file-powerpoint'
-    };
-    return icons[type] || 'fa-file';
-  };
-
-  const getFileIconColor = (type) => {
-    const colors = {
-      document: 'text-danger-600',
-      audio: 'text-success-600',
-      video: 'text-warning-600',
-      presentation: 'text-main-600'
-    };
-    return colors[type] || 'text-neutral-600';
+  // Fetch only materials - for refreshing after CRUD operations
+  const fetchMaterials = async () => {
+    try {
+      const response = await teacherService.getMyClassDetail(classId);
+      if (response.success) {
+        setMaterials(response.data.materials || []);
+      }
+    } catch (error) {
+      console.error('Error fetching materials:', error);
+    }
   };
 
   const getLessonStatusBadge = (status) => {
@@ -229,13 +221,6 @@ const TeacherClassDetailLayout = () => {
 
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
-      {/* Breadcrumb */}
-      <div className="mb-16">
-        <Link to="/teacher/classes" className="text-neutral-600 text-13 text-decoration-none">
-          <i className="fas fa-arrow-left me-2"></i>
-          Quay lại danh sách lớp
-        </Link>
-      </div>
 
       {/* Class Header */}
       <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24"
@@ -243,6 +228,13 @@ const TeacherClassDetailLayout = () => {
         <Card.Body className="p-24">
           <Row className="align-items-center">
             <Col lg={8}>
+            {/* Breadcrumb */}
+      <div className="mb-16">
+        <Link to="/teacher/classes" className="text-white text-13 text-decoration-none">
+          <i className="fas fa-arrow-left me-2"></i>
+          Quay lại danh sách lớp
+        </Link>
+      </div>
               <div className="d-flex align-items-center gap-12 mb-12">
                 <h4 className="text-white fw-bold mb-0">{classInfo.name}</h4>
                 <Badge className="bg-white text-main-600 px-12 py-6">{classInfo.level}</Badge>
@@ -338,15 +330,14 @@ const TeacherClassDetailLayout = () => {
               title={
                 <span className="px-8">
                   <i className="fas fa-folder-open me-2"></i>
-                  Tài liệu ({materials.length})
+                  Tài liệu
                 </span>
               }
             >
               <ClassMaterials 
-                materials={materials}
+                classId={classId}
+                courseId={classInfo?.course?._id}
                 setShowMaterialModal={setShowMaterialModal}
-                getFileIcon={getFileIcon}
-                getFileIconColor={getFileIconColor}
               />
             </Tab>
 
@@ -369,11 +360,13 @@ const TeacherClassDetailLayout = () => {
       </Card>
 
       {/* Modals */}
+      {/* Modals */}
       <MaterialModal 
         show={showMaterialModal}
         onHide={() => setShowMaterialModal(false)}
+        onSuccess={fetchMaterials}
+        classId={classId}
       />
-
       <StudentDetailModal 
         show={showStudentDetail}
         onHide={() => setShowStudentDetail(false)}

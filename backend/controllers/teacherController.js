@@ -1734,3 +1734,222 @@ exports.getTeacherStats = async (req, res) => {
     });
   }
 };
+
+// =========================
+// 📁 QUẢN LÝ TÀI LIỆU LỚP HỌC
+// =========================
+
+/**
+ * GET /api/teachers/me/classes/:classId/materials
+ * Lấy tài liệu riêng của lớp học (từ ClassSchedule)
+ */
+exports.getClassMaterials = async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const teacherId = req.user._id;
+
+    // Verify teacher owns this class
+    const classInfo = await Class.findOne({ 
+      _id: classId, 
+      teacher: teacherId 
+    });
+
+    if (!classInfo) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền truy cập lớp học này'
+      });
+    }
+
+    // Get all schedules with materials
+    const schedules = await ClassSchedule.find({ 
+      class: classId,
+      material: { $exists: true, $ne: [] }
+    })
+      .populate('session', 'title order')
+      .select('date material session topic')
+      .sort({ date: 1 })
+      .lean();
+
+    // Format materials
+    const materials = [];
+    schedules.forEach(schedule => {
+      if (schedule.material && schedule.material.length > 0) {
+        schedule.material.forEach((materialObj, index) => {
+          materials.push({
+            id: materialObj._id || `${schedule._id}-${index}`,
+            title: materialObj.title || `Tài liệu buổi ${schedule.session?.order || 'N/A'}`,
+            lessonNumber: schedule.session?.order || 0,
+            lessonTitle: schedule.session?.title || schedule.topic || 'Chưa có tiêu đề',
+            url: materialObj.file,
+            uploadDate: schedule.date,
+            scheduleId: schedule._id
+          });
+        });
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Lấy danh sách tài liệu thành công',
+      total: materials.length,
+      materials
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi lấy tài liệu lớp học:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Lỗi server khi lấy tài liệu',
+      error: error.message 
+    });
+  }
+};
+
+/**
+ * POST /api/teachers/me/schedules/:scheduleId/materials
+ * Thêm tài liệu cho buổi học
+ */
+exports.addMaterialToSchedule = async (req, res) => {
+  try {
+    const { scheduleId } = req.params;
+    const teacherId = req.user._id;
+
+    // Get schedule and verify teacher ownership
+    const schedule = await ClassSchedule.findById(scheduleId).populate('class');
+    
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy buổi học'
+      });
+    }
+
+    // Verify teacher owns this class
+    if (schedule.class.teacher.toString() !== teacherId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền thêm tài liệu cho buổi học này'
+      });
+    }
+
+    // Check if files were uploaded
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng chọn ít nhất 1 file'
+      });
+    }
+
+    // Parse titles from request body (sent as JSON string)
+    let titles = [];
+    if (req.body.titles) {
+      try {
+        titles = JSON.parse(req.body.titles);
+      } catch (e) {
+        console.warn('⚠️ Failed to parse titles, using filenames as fallback');
+      }
+    }
+
+    // Get file paths and create material objects (multer saves files and provides paths)
+    const materialObjects = req.files.map((file, index) => ({
+      title: titles[index] || file.originalname, // Use custom title or fallback to filename
+      file: `/uploads/materials/${file.filename}`
+    }));
+
+    // Add materials to schedule
+    if (!schedule.material) {
+      schedule.material = [];
+    }
+    schedule.material.push(...materialObjects);
+
+    await schedule.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Thêm ${materialObjects.length} tài liệu thành công`,
+      materials: materialObjects.map(m => m.file),
+      total: schedule.material.length
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi thêm tài liệu:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Lỗi server khi thêm tài liệu',
+      error: error.message 
+    });
+  }
+};
+
+/**
+ * DELETE /api/teachers/me/schedules/:scheduleId/materials
+ * Xóa tài liệu khỏi buổi học
+ */
+exports.deleteMaterialFromSchedule = async (req, res) => {
+  try {
+    const { scheduleId } = req.params;
+    const { materialUrl } = req.body;
+    const teacherId = req.user._id;
+
+    if (!materialUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp URL tài liệu cần xóa'
+      });
+    }
+
+    // Get schedule and verify teacher ownership
+    const schedule = await ClassSchedule.findById(scheduleId).populate('class');
+    
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy buổi học'
+      });
+    }
+
+    // Verify teacher owns this class
+    if (schedule.class.teacher.toString() !== teacherId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền xóa tài liệu của buổi học này'
+      });
+    }
+
+    // Check if material exists
+    const materialExists = schedule.material && schedule.material.some(m => m.file === materialUrl);
+    if (!materialExists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy tài liệu này trong buổi học'
+      });
+    }
+
+    // Remove material from array
+    schedule.material = schedule.material.filter(m => m.file !== materialUrl);
+    await schedule.save();
+
+    // Optional: Delete physical file
+    const fs = require('fs');
+    const path = require('path');
+    const filePath = path.join(__dirname, '..', materialUrl);
+    
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log(`🗑️ Đã xóa file vật lý: ${filePath}`);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Xóa tài liệu thành công',
+      remainingMaterials: schedule.material.length
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi xóa tài liệu:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Lỗi server khi xóa tài liệu',
+      error: error.message 
+    });
+  }
+};
+

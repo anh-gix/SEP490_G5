@@ -8,6 +8,44 @@ const API_BASE_URL = 'http://localhost:8080/api/work-requests';
  */
 export const workRequestService = {
   // =========================
+  // CREATE TOP-DOWN REQUEST (CENTER HEAD)
+  // =========================
+
+  /**
+   * Create top-down work request (task assignment from Center Head)
+   * @param {FormData} formData - Form data with files
+   * Required fields in formData:
+   *   - requestType: 'create_program' | 'edit_course' | 'create_exam' | 'assign_students'
+   *   - assignedTo: userId
+   *   - requestedBy: centerHeadUserId (auto-added if not provided)
+   * Optional fields:
+   *   - requestNote: string
+   *   - entityType: 'Course' (for edit_course)
+   *   - entityId: courseId (for edit_course)
+   *   - changeDetails: JSON string or object
+   *   - attachmentFile: File (reference documents)
+   *   - inputFile: File (Excel for assign_students)
+   */
+  createRequest: async (formData) => {
+    try {
+      // Auto-add requestedBy if not provided
+      if (!formData.get('requestedBy')) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        formData.append('requestedBy', user._id);
+      }
+
+      const response = await axios.post(`${API_BASE_URL}/create`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể tạo yêu cầu' };
+    }
+  },
+
+  // =========================
   // SUBMIT FOR APPROVAL (BOTTOM-UP)
   // =========================
 
@@ -175,6 +213,25 @@ export const workRequestService = {
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể từ chối yêu cầu' };
+    }
+  },
+
+  /**
+   * Revoke approval (thu hồi phê duyệt)
+   * @param {string} id - Request ID
+   * @param {object} data - { userId: string, reason: string }
+   */
+  revokeApproval: async (id, data) => {
+    try {
+      if (!data.userId) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        data.userId = user._id;
+      }
+
+      const response = await axios.post(`${API_BASE_URL}/${id}/revoke`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể thu hồi phê duyệt' };
     }
   },
 

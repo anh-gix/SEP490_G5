@@ -25,7 +25,7 @@ const workRequestSchema = new Schema({
       'create_program',    // Yêu cầu tạo program mới
       'edit_course',       // Yêu cầu chỉnh sửa course
       'create_exam',       // Yêu cầu tạo exam mới
-      'create_class',      // Yêu cầu tạo tài khoản & xếp lớp từ file khách hàng
+      'assign_students',   // Yêu cầu sắp xếp học viên vào lớp từ file Excel
     ],
     required: true,
     index: true
@@ -117,6 +117,23 @@ const workRequestSchema = new Schema({
     trim: true
   },
 
+  // ===== REVOCATION (THU HỒI PHÊ DUYỆT) =====
+
+  // Thông tin thu hồi phê duyệt
+  revocation: {
+    revokedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    revokedAt: {
+      type: Date
+    },
+    revocationReason: {
+      type: String,
+      trim: true
+    }
+  },
+
   // ===== FILES XỬ LÝ (cho create_class) =====
 
   // File từ Center Head gửi cho Academic Staff (thông tin khách hàng)
@@ -169,6 +186,7 @@ const workRequestSchema = new Schema({
         'completed',         // Hoàn thành
         'approved',          // Duyệt
         'rejected',          // Từ chối
+        'revoked',           // Thu hồi phê duyệt
         'need_revision',     // Yêu cầu chỉnh sửa
       ],
       required: true

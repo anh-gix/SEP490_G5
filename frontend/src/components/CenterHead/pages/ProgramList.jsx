@@ -23,17 +23,36 @@ const ProgramList = () => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
 
-  useEffect(() => {
-    fetchPrograms();
-  }, []);
+  const applyFilters = useCallback(() => {
+    let filtered = [...programs];
 
-  useEffect(() => {
-    applyFilters();
-  }, [searchKeyword, filterValues, programs, applyFilters]);
+    if (searchKeyword) {
+      const keyword = searchKeyword.toLowerCase();
+      filtered = filtered.filter(program =>
+        program.program_name?.toLowerCase().includes(keyword) ||
+        program.code?.toLowerCase().includes(keyword)
+      );
+    }
 
-  useEffect(() => {
-    applyPagination();
-  }, [filteredPrograms, currentPage, itemsPerPage, applyPagination]);
+    if (filterValues.status && filterValues.status !== "all") {
+      filtered = filtered.filter(program => program.status === filterValues.status);
+    }
+
+    setFilteredPrograms(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [programs, searchKeyword, filterValues]);
+
+  const applyPagination = useCallback(() => {
+    const totalItems = filteredPrograms.length;
+    const totalPagesCount = Math.ceil(totalItems / itemsPerPage);
+    setTotalPages(totalPagesCount);
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = filteredPrograms.slice(startIndex, endIndex);
+
+    setPaginatedPrograms(paginatedData);
+  }, [filteredPrograms, currentPage, itemsPerPage]);
 
   const fetchPrograms = async () => {
     try {
@@ -105,36 +124,17 @@ const ProgramList = () => {
     }
   };
 
-  const applyFilters = useCallback(() => {
-    let filtered = [...programs];
+  useEffect(() => {
+    fetchPrograms();
+  }, []);
 
-    if (searchKeyword) {
-      const keyword = searchKeyword.toLowerCase();
-      filtered = filtered.filter(program =>
-        program.program_name?.toLowerCase().includes(keyword) ||
-        program.code?.toLowerCase().includes(keyword)
-      );
-    }
+  useEffect(() => {
+    applyFilters();
+  }, [searchKeyword, filterValues, programs, applyFilters]);
 
-    if (filterValues.status && filterValues.status !== "all") {
-      filtered = filtered.filter(program => program.status === filterValues.status);
-    }
-
-    setFilteredPrograms(filtered);
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [programs, searchKeyword, filterValues]);
-
-  const applyPagination = useCallback(() => {
-    const totalItems = filteredPrograms.length;
-    const totalPagesCount = Math.ceil(totalItems / itemsPerPage);
-    setTotalPages(totalPagesCount);
-
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const paginatedData = filteredPrograms.slice(startIndex, endIndex);
-
-    setPaginatedPrograms(paginatedData);
-  }, [filteredPrograms, currentPage, itemsPerPage]);
+  useEffect(() => {
+    applyPagination();
+  }, [filteredPrograms, currentPage, itemsPerPage, applyPagination]);
 
   const breadcrumbItems = [
     { label: 'Dashboard', path: '/center-head/dashboard' },

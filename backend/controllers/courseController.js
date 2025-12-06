@@ -1072,3 +1072,49 @@ exports.updateCoursePLOMapping = async (req, res) => {
     }
 };
 
+// =========================
+// COURSE MATERIALS
+// =========================
+
+/**
+ * Get course materials
+ * GET /api/courses/:courseId/materials
+ */
+exports.getCourseMaterials = async (req, res) => {
+    try {
+        const { courseId } = req.params;
+
+        const course = await Course.findById(courseId).select('materials name');
+
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy khóa học'
+            });
+        }
+
+        // Format materials array (if it's an array of URLs)
+        const formattedMaterials = (course.materials || []).map((materialUrl, index) => ({
+            id: `course-${courseId}-${index}`,
+            title: `Tài liệu ${index + 1}`,
+            url: materialUrl,
+            type: 'course',
+            uploadDate: null // Course materials may not have upload dates
+        }));
+
+        res.status(200).json({
+            success: true,
+            message: 'Lấy tài liệu khóa học thành công',
+            courseName: course.name,
+            total: formattedMaterials.length,
+            materials: formattedMaterials
+        });
+    } catch (err) {
+        console.error('❌ Lỗi khi lấy tài liệu khóa học:', err);
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server khi lấy tài liệu khóa học',
+            error: err.message
+        });
+    }
+};

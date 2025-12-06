@@ -14,6 +14,7 @@ import StudentTipsPage from "../pages/StudentPages/StudentTipsPage.jsx";
 import StudentOnlineCoursesPage from "../pages/StudentPages/StudentOnlineCoursesPage.jsx";
 import StudentOnlineCourseDetailPage from "../pages/StudentPages/StudentOnlineCourseDetailPage.jsx";
 import StudentSessionLearningPage from "../pages/StudentPages/StudentSessionLearningPage.jsx";
+import StudentApplicationsPage from "../pages/StudentPages/StudentApplicationsPage.jsx";
 
 /**
  * StudentRoutes
@@ -61,5 +62,6 @@ export const studentRoutes = [
   // IX. Leave Request (future)
   // { path: '/student/leave-request', element: <StudentLeaveRequestPage /> },
 
- 
+  // X. Applications
+  { path: '/student/applications', element: <StudentApplicationsPage /> },
 ];

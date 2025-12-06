@@ -35,7 +35,11 @@ const ClassMaterials = () => {
   };
 
   const getFileIcon = (url) => {
-    const fileName = url?.split('/').pop() || '';
+    if (!url || typeof url !== 'string') {
+      return { icon: 'fa-file', color: 'secondary' };
+    }
+    
+    const fileName = url.split('/').pop() || '';
     const extension = fileName.split('.').pop().toLowerCase();
     
     const iconMap = {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal } from 'react-bootstrap';
 import homeworkService from '../../services/homeworkService';
-import CreateHomeworkModal from './CreateHomeworkModal';
+import CreateHomeworkModal from './class_detail/modals/CreateHomeworkModal';
 
 /**
  * Teacher Assignments Component

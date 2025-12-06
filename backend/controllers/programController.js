@@ -2,7 +2,7 @@ const Program = require('../models/programModel');
 const Course = require('../models/courseModel');
 const Session = require('../models/sessionModel');
 const CamSession = require('../models/camSession');
-const ApprovalRequest = require('../models/approvalRequestModel');
+const WorkRequest = require('../models/workRequestModel');
 
 // =========================
 // PROGRAM CRUD OPERATIONS
@@ -69,21 +69,22 @@ const getProgramById = async (req, res) => {
       .populate('sessions', 'title order')
       .select('_id courseCode name description status createdAt updatedAt clos sessions mappedPLOs');
 
-    // Get approval request info if exists
-    const approvalRequest = await ApprovalRequest.findOne({
+    // Get work request info if exists (use WorkRequest model)
+    const workRequest = await WorkRequest.findOne({
       entityId: id,
-      entityType: 'Program'
+      entityType: 'Program',
+      direction: 'bottom_up'
     })
-      .populate('submittedBy', 'username email')
-      .populate('reviewedBy', 'username email')
-      .sort({ submittedAt: -1 });
+      .populate('requestedBy', 'username email')
+      .populate('processedBy', 'username email')
+      .sort({ requestedAt: -1 });
 
     res.status(200).json({
       success: true,
       data: {
         ...program.toObject(),
         courses,
-        approvalInfo: approvalRequest
+        workRequestInfo: workRequest // Changed from approvalInfo
       }
     });
   } catch (error) {
@@ -523,9 +524,7 @@ module.exports = {
   updateProgram,
   deleteProgram,
   getProgramPLOs,
-  // Helper functions
   getProgramSubmissionStatus,
-  // Program management
   activateProgram,
   archiveProgram
 };

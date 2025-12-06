@@ -69,7 +69,9 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
       };
 
       let response;
-      if (isEdit && courseData._id) {
+      // If courseData._id exists, it means we already created the course, so UPDATE it
+      // Otherwise, CREATE a new course
+      if (courseData._id) {
         response = await courseService.updateCourse(courseData._id, dataToSave);
       } else {
         response = await courseService.createCourse(dataToSave);
@@ -97,7 +99,9 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
         status: response.data.status || 'draft'
       }));
 
-      alert(isEdit ? 'Cập nhật thông tin học phần thành công!' : 'Tạo học phần thành công!');
+      // Show appropriate message based on whether we created or updated
+      const isUpdate = courseData._id !== null;
+      alert(isUpdate ? 'Cập nhật thông tin học phần thành công!' : 'Tạo học phần thành công!');
       onNext();
     } catch (error) {
       console.error('Error saving course:', error);
@@ -135,11 +139,11 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
               onChange={handleInputChange}
               className={`form-control radius-8 ${errors.courseCode ? 'is-invalid' : ''}`}
               placeholder="Ví dụ: IELTS-B1-01"
-              disabled={isEdit}
+              disabled={courseData._id !== null}
               style={{ height: '44px' }}
             />
             {errors.courseCode && <div className="invalid-feedback">{errors.courseCode}</div>}
-            {isEdit && <small className="text-muted">Mã học phần không thể thay đổi khi chỉnh sửa</small>}
+            {courseData._id && <small className="text-muted">Mã học phần không thể thay đổi sau khi đã tạo</small>}
           </div>
 
           {/* Tên học phần */}

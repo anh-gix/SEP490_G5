@@ -30,7 +30,7 @@ const classScheduleSchema = new Schema({
     
     status: {
         type: String,
-        enum: ['temporary', 'fixed'],//temporary: buổi tạm, fixed: buổi cố định
+        enum: ['temporary', 'fixed', 'completed'],//temporary: buổi tạm, fixed: buổi cố định
         default: 'fixed'
     },
     

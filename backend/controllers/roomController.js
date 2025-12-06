@@ -228,10 +228,20 @@ exports.getRoomSchedule = async (req, res) => {
       .populate({
         path: 'class',
         select: 'name subject teacherId',
-        populate: {
-          path: 'teacherId',
-          select: 'username email'
-        }
+        populate: [
+          {
+            path: 'teacherId',
+            select: 'username email'
+          },
+          {
+            path: 'course',
+            select: 'name',
+            populate: {
+              path: 'program',
+              select: 'type program_name'
+            }
+          }
+        ]
       })
       .populate('session', 'title order') // Populate session để lấy title
       .sort({ date: 1, startTime: 1 })
@@ -292,6 +302,84 @@ exports.getRoomStats = async (req, res) => {
     console.error("❌ Lỗi khi lấy thống kê phòng:", error);
     res.status(500).json({ 
       message: "Lỗi server khi lấy thống kê phòng",
+      error: error.message 
+    });
+  }
+};
+
+// =========================
+// 📅 LẤY LỊCH SỬ DỤNG PHÒNG HÔM NAY
+// =========================
+exports.getTodayRoomUsage = async (req, res) => {
+  try {
+    // Tạo date range cho ngày hôm nay sử dụng date string format
+    const now = new Date();
+    const todayString = now.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    
+    // Tạo start và end của ngày ở UTC midnight để khớp với MongoDB
+    const todayStart = new Date(todayString);
+    const todayEnd = new Date(todayString);
+    todayEnd.setUTCHours(23, 59, 59, 999);
+
+    // Get today's schedules with populated data
+    const todaySchedules = await ClassSchedule.find({
+      date: { $gte: todayStart, $lte: todayEnd },
+      status: { $in: ['temporary', 'fixed'] }
+    })
+      .populate('class', 'name level course')
+      .populate('room', 'room_name location')
+      .sort({ startTime: 1 })
+      .lean();
+
+    // Get all rooms
+    const rooms = await Room.find()
+      .select('room_name location')
+      .sort({ room_name: 1 })
+      .lean();
+
+    // Build room schedule data
+    const timeSlots = ['08:00-10:00', '10:30-12:30', '14:00-16:00', '18:00-20:00'];
+    const roomScheduleData = rooms.map(room => {
+      const schedules = timeSlots.map(timeSlot => {
+        const [startTime, endTime] = timeSlot.split('-');
+        // Normalize time strings (remove seconds if present) for comparison
+        const normalizeTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : '';
+        const matchingSchedule = todaySchedules.find(s => 
+          s.room?._id?.toString() === room._id?.toString() &&
+          normalizeTime(s.startTime) === startTime &&
+          normalizeTime(s.endTime) === endTime
+        );
+        
+        if (matchingSchedule) {
+          return {
+            time: timeSlot,
+            class: matchingSchedule.class?.name || 'N/A',
+            status: 'occupied'
+          };
+        }
+        return {
+          time: timeSlot,
+          class: 'Free',
+          status: 'available'
+        };
+      });
+
+      return {
+        room: room.room_name || 'N/A',
+        location: room.location || 'N/A',
+        schedules
+      };
+    });
+
+    res.status(200).json({
+      message: "Lấy lịch sử dụng phòng hôm nay thành công",
+      success: true,
+      roomSchedule: roomScheduleData
+    });
+  } catch (error) {
+    console.error("❌ Lỗi khi lấy lịch sử dụng phòng hôm nay:", error);
+    res.status(500).json({ 
+      message: "Lỗi server khi lấy lịch sử dụng phòng hôm nay",
       error: error.message 
     });
   }

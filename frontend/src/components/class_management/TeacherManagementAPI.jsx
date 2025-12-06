@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Nav, Tabs, Tab, Pagination, ButtonGroup, Alert } from 'react-bootstrap';
+import React, { useState, useEffect, useRef } from 'react';
+import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Pagination, Alert } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import Swal from 'sweetalert2';
 import teacherService from '../../services/teacherService';
 import studentService from '../../services/studentService';
 import { courseService } from '../../services/courseService';
-import ScheduleCalendar from './ScheduleCalendar';
 import * as XLSX from 'xlsx';
 
 /**
@@ -11,17 +13,13 @@ import * as XLSX from 'xlsx';
  * Quản lý Giảng viên đầy đủ chức năng
  */
 const TeacherManagementAPI = () => {
+  const navigate = useNavigate();
   const [teachers, setTeachers] = useState([]);
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('list');
   const [showModal, setShowModal] = useState(false);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [selectedTeacher, setSelectedTeacher] = useState(null);
-  const [teacherSchedule, setTeacherSchedule] = useState([]);
-  const [schedulePage, setSchedulePage] = useState(1);
-  const [scheduleViewMode, setScheduleViewMode] = useState('calendar'); // 'table' or 'calendar'
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [programType, setProgramType] = useState('');
@@ -170,6 +168,7 @@ const TeacherManagementAPI = () => {
       await teacherService.createTeacher(formData);
       
       // Success - close modal and refresh
+      toast.success('Thêm giảng viên thành công!');
       handleCloseModal();
       fetchTeachers();
       fetchStats();
@@ -178,6 +177,7 @@ const TeacherManagementAPI = () => {
       const errorMessage = err?.message || err?.response?.data?.message || 'Không thể lưu thông tin Giảng viên';
       const parsedErrors = parseErrorToField(errorMessage);
       setFormErrors(parsedErrors);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -226,7 +226,7 @@ const TeacherManagementAPI = () => {
                        file.name.endsWith('.xls');
 
     if (!isValidType) {
-      alert('Vui lòng chọn file Excel (.xlsx hoặc .xls)');
+      toast.error('Vui lòng chọn file Excel (.xlsx hoặc .xls)');
       e.target.value = '';
       return;
     }
@@ -237,7 +237,7 @@ const TeacherManagementAPI = () => {
 
   const handlePreviewExcel = async () => {
     if (!importFile) {
-      alert('Vui lòng chọn file Excel');
+      toast.error('Vui lòng chọn file Excel');
       return;
     }
 
@@ -249,7 +249,7 @@ const TeacherManagementAPI = () => {
 
       // Get first sheet
       if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-        alert('File Excel không có sheet nào');
+        toast.error('File Excel không có sheet nào');
         setImporting(false);
         return;
       }
@@ -258,7 +258,7 @@ const TeacherManagementAPI = () => {
       const worksheet = workbook.Sheets[sheetName];
 
       if (!worksheet) {
-        alert('Sheet đầu tiên không có dữ liệu');
+        toast.error('Sheet đầu tiên không có dữ liệu');
         setImporting(false);
         return;
       }
@@ -287,7 +287,7 @@ const TeacherManagementAPI = () => {
       });
 
       if (!jsonData || jsonData.length === 0) {
-        alert('File Excel không có dữ liệu');
+        toast.error('File Excel không có dữ liệu');
         setImporting(false);
         return;
       }
@@ -464,7 +464,7 @@ const TeacherManagementAPI = () => {
       setPreviewTeachers(previewData);
     } catch (error) {
       console.error('Error reading Excel file:', error);
-      alert('Lỗi khi đọc file Excel: ' + (error.message || 'Vui lòng thử lại'));
+      toast.error('Lỗi khi đọc file Excel: ' + (error.message || 'Vui lòng thử lại'));
     } finally {
       setImporting(false);
     }
@@ -474,7 +474,7 @@ const TeacherManagementAPI = () => {
     const validTeachers = previewTeachers.filter(t => !t.hasError);
     
     if (validTeachers.length === 0) {
-      alert('Không có giảng viên hợp lệ để import');
+      toast.error('Không có giảng viên hợp lệ để import');
       return;
     }
 
@@ -482,7 +482,7 @@ const TeacherManagementAPI = () => {
       setLoading(true);
       const result = await teacherService.importTeachers(validTeachers);
       
-      alert(`Import thành công: ${result.successCount} giảng viên\nThất bại: ${result.failedCount} giảng viên`);
+      toast.success(`Import thành công: ${result.successCount} giảng viên. Thất bại: ${result.failedCount} giảng viên`);
       
       handleCloseImportModal();
       fetchTeachers();
@@ -490,7 +490,7 @@ const TeacherManagementAPI = () => {
     } catch (err) {
       console.error('Error importing teachers:', err);
       const errorMessage = err.message || (typeof err === 'string' ? err : 'Không thể import giảng viên');
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -528,24 +528,8 @@ const TeacherManagementAPI = () => {
     XLSX.writeFile(wb, fileName);
   };
 
-  const handleViewDetail = async (teacher) => {
-    try {
-      setLoading(true);
-      const data = await teacherService.getTeacherById(teacher._id);
-      setSelectedTeacher(data.teacher);
-      
-      // Fetch teacher's schedule
-      const scheduleData = await teacherService.getTeacherSchedule(teacher._id);
-      setTeacherSchedule(scheduleData.schedules || []);
-      setSchedulePage(1); // Reset to first page when opening modal
-      
-      setShowDetailModal(true);
-    } catch (err) {
-      console.error('Error fetching teacher details:', err);
-      alert('Không thể tải thông tin chi tiết');
-    } finally {
-      setLoading(false);
-    }
+  const handleViewDetail = (teacher) => {
+    navigate(`/academic/teacher-management/${teacher._id}`);
   };
 
   const getStatusBadge = (status) => {
@@ -563,30 +547,6 @@ const TeacherManagementAPI = () => {
   };
 
   const filteredTeachers = teachers;
-
-  // Transform schedule data for calendar view
-  const calendarSchedules = useMemo(() => {
-    return teacherSchedule.map((schedule, index) => {
-      const scheduleDate = new Date(schedule.date);
-      const dateStr = scheduleDate.toISOString().split('T')[0];
-      
-      return {
-        id: schedule._id || index,
-        date: dateStr,
-        startTime: schedule.startTime || '',
-        endTime: schedule.endTime || '',
-        className: schedule.class?.name || 'N/A',
-        roomName: schedule.room?.room_name || 'N/A',
-        topic: schedule.topic || '',
-        status: schedule.status === 'fixed' ? 'scheduled' : schedule.status === 'temporary' ? 'makeup' : 'scheduled',
-        attendanceStatus: null, // Teachers don't have attendance status
-        hasAttendance: false,
-        teacherName: selectedTeacher?.username || 'N/A',
-        lessonNumber: schedule.session?.order || '',
-        lessonTopic: schedule.topic || ''
-      };
-    });
-  }, [teacherSchedule, selectedTeacher]);
 
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#f8f9fa' }}>
@@ -1279,306 +1239,6 @@ const TeacherManagementAPI = () => {
           >
             <i className="fas fa-check me-2"></i>
             Xác nhận và Import
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Teacher Detail Modal */}
-      <Modal show={showDetailModal} onHide={() => { setShowDetailModal(false); setSchedulePage(1); }} size="xl">
-        <Modal.Header closeButton>
-          <Modal.Title>
-            Chi tiết giảng viên - {selectedTeacher?.username}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {selectedTeacher && (
-            <Tabs defaultActiveKey="info" className="mb-3">
-              {/* Info Tab */}
-              <Tab eventKey="info" title={<><i className="fas fa-user me-2"></i>Thông tin</>}>
-                <Row className="g-3">
-                  <Col md={6}>
-                    <Card className="border-0 bg-neutral-25">
-                      <Card.Body className="p-16">
-                        <h6 className="text-13 text-neutral-500 mb-8">Email</h6>
-                        <p className="text-14 text-neutral-900 mb-0">{selectedTeacher.email}</p>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                  <Col md={6}>
-                    <Card className="border-0 bg-neutral-25">
-                      <Card.Body className="p-16">
-                        <h6 className="text-13 text-neutral-500 mb-8">Số điện thoại</h6>
-                        <p className="text-14 text-neutral-900 mb-0">{selectedTeacher.phone || 'N/A'}</p>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                  <Col md={12}>
-                    <Card className="border-0 bg-neutral-25">
-                      <Card.Body className="p-16">
-                        <h6 className="text-13 text-neutral-500 mb-8">Địa chỉ</h6>
-                        <p className="text-14 text-neutral-900 mb-0">{selectedTeacher.address || 'N/A'}</p>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                  <Col md={6}>
-                    <Card className="border-0 bg-neutral-25">
-                      <Card.Body className="p-16">
-                        <h6 className="text-13 text-neutral-500 mb-8">Trạng thái</h6>
-                        {getStatusBadge(selectedTeacher.status)}
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                  {selectedTeacher.stats && (
-                    <>
-                      <Col md={6}>
-                        <Card className="border-0 bg-neutral-25">
-                          <Card.Body className="p-16">
-                            <h6 className="text-13 text-neutral-500 mb-8">Số lớp đang dạy</h6>
-                            <p className="text-14 text-neutral-900 mb-0 fw-semibold">{selectedTeacher.stats.classCount || 0}</p>
-                          </Card.Body>
-                        </Card>
-                      </Col>
-                      <Col md={6}>
-                        <Card className="border-0 bg-neutral-25">
-                          <Card.Body className="p-16">
-                            <h6 className="text-13 text-neutral-500 mb-8">Tổng số học viên</h6>
-                            <p className="text-14 text-neutral-900 mb-0 fw-semibold">{selectedTeacher.stats.totalStudents || 0}</p>
-                          </Card.Body>
-                        </Card>
-                      </Col>
-                      <Col md={6}>
-                        <Card className="border-0 bg-neutral-25">
-                          <Card.Body className="p-16">
-                            <h6 className="text-13 text-neutral-500 mb-8">Số buổi dạy / Tổng số buổi</h6>
-                            <p className="text-14 text-neutral-900 mb-0 fw-semibold">
-                              {selectedTeacher.stats.actualTeachingSessions || 0} / {selectedTeacher.stats.totalSessions || 0}
-                            </p>
-                            {selectedTeacher.stats.totalSessions > 0 && (
-                              <p className="text-12 text-neutral-600 mb-0 mt-1">
-                                Tỷ lệ: {((selectedTeacher.stats.actualTeachingSessions / selectedTeacher.stats.totalSessions) * 100).toFixed(1)}%
-                              </p>
-                            )}
-                          </Card.Body>
-                        </Card>
-                      </Col>
-                      {selectedTeacher.stats.absentSessions > 0 && (
-                        <Col md={6}>
-                          <Card className="border-0 bg-warning-50">
-                            <Card.Body className="p-16">
-                              <h6 className="text-13 text-neutral-500 mb-8">Số buổi nghỉ (có người dạy thay)</h6>
-                              <p className="text-14 text-neutral-900 mb-0 fw-semibold text-warning-700">
-                                {selectedTeacher.stats.absentSessions}
-                              </p>
-                            </Card.Body>
-                          </Card>
-                        </Col>
-                      )}
-                    </>
-                  )}
-                </Row>
-              </Tab>
-
-              {/* Classes Tab */}
-              <Tab eventKey="classes" title={<><i className="fas fa-door-open me-2"></i>Lớp học ({selectedTeacher.classes?.length || 0})</>}>
-                {selectedTeacher.classes && selectedTeacher.classes.length > 0 ? (
-                  <Table hover>
-                    <thead className="bg-neutral-25">
-                      <tr>
-                        <th className="px-16 py-12 text-13">Lớp</th>
-                        <th className="px-16 py-12 text-13">Khóa học</th>
-                        <th className="px-16 py-12 text-13">Trình độ</th>
-                        <th className="px-16 py-12 text-13">Học viên</th>
-                        <th className="px-16 py-12 text-13">Số buổi dạy</th>
-                        <th className="px-16 py-12 text-13">Trạng thái</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedTeacher.classes.map((cls, index) => (
-                        <tr key={index}>
-                          <td className="px-16 py-12 fw-semibold">{cls.name}</td>
-                          <td className="px-16 py-12">{cls.course?.name || 'N/A'}</td>
-                          <td className="px-16 py-12">
-                            <Badge bg="info">{cls.level}</Badge>
-                          </td>
-                          <td className="px-16 py-12">{cls.students?.length || 0}</td>
-                          <td className="px-16 py-12">
-                            {cls.stats ? (
-                              <div>
-                                <span className="fw-semibold">
-                                  {cls.stats.actualTeachingSessions || 0} / {cls.stats.totalSessions || 0}
-                                </span>
-                                {cls.stats.absentSessions > 0 && (
-                                  <div className="text-11 text-warning-600 mt-1">
-                                    <i className="fas fa-exclamation-triangle me-1"></i>
-                                    Nghỉ: {cls.stats.absentSessions}
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-muted">-</span>
-                            )}
-                          </td>
-                          <td className="px-16 py-12">
-                            <Badge bg={cls.status === 'active' ? 'success' : 'secondary'}>
-                              {cls.status}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                ) : (
-                  <div className="text-center py-4 text-muted">
-                    Chưa có lớp học nào
-                  </div>
-                )}
-              </Tab>
-
-              {/* Schedule Tab */}
-              <Tab eventKey="schedule" title={<><i className="fas fa-calendar me-2"></i>Lịch giảng dạy</>}>
-                {teacherSchedule.length > 0 ? (
-                  <>
-                    {/* View Toggle */}
-                    <div className="d-flex justify-content-end mb-3">
-                      <ButtonGroup>
-                        <Button
-                          variant={scheduleViewMode === 'table' ? 'primary' : 'outline-secondary'}
-                          size="sm"
-                          onClick={() => setScheduleViewMode('table')}
-                        >
-                          <i className="fas fa-table me-2"></i>
-                          Bảng
-                        </Button>
-                        <Button
-                          variant={scheduleViewMode === 'calendar' ? 'primary' : 'outline-secondary'}
-                          size="sm"
-                          onClick={() => setScheduleViewMode('calendar')}
-                        >
-                          <i className="fas fa-calendar-alt me-2"></i>
-                          Lịch
-                        </Button>
-                      </ButtonGroup>
-                    </div>
-
-                    {/* Table View */}
-                    {scheduleViewMode === 'table' && (
-                      <>
-                        <Table hover>
-                          <thead className="bg-neutral-25">
-                            <tr>
-                              <th className="px-16 py-12 text-13">Thời gian</th>
-                              <th className="px-16 py-12 text-13">Lớp học</th>
-                              <th className="px-16 py-12 text-13">Phòng</th>
-                              <th className="px-16 py-12 text-13">Chủ đề</th>
-                              <th className="px-16 py-12 text-13">Trạng thái</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {teacherSchedule
-                              .slice((schedulePage - 1) * 10, schedulePage * 10)
-                              .map((schedule, index) => (
-                              <tr key={index}>
-                                <td className="px-16 py-12">
-                                  <div className="text-14">
-                                    {new Date(schedule.date).toLocaleDateString('vi-VN')}
-                                  </div>
-                                  <div className="text-13 text-muted">
-                                    {schedule.startTime} - {schedule.endTime}
-                                  </div>
-                                </td>
-                                <td className="px-16 py-12">{schedule.class?.name || 'N/A'}</td>
-                                <td className="px-16 py-12">{schedule.room?.room_name || 'N/A'}</td>
-                                <td className="px-16 py-12">{schedule.topic}</td>
-                                <td className="px-16 py-12">
-                                  <Badge bg={schedule.status === 'fixed' ? 'success' : schedule.status === 'temporary' ? 'warning' : 'secondary'}>
-                                    {schedule.status === 'fixed' ? 'Buổi cố định' : schedule.status === 'temporary' ? 'Buổi tạm' : schedule.status}
-                                  </Badge>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </Table>
-                        {teacherSchedule.length > 10 && (
-                          <div className="d-flex justify-content-center mt-3">
-                            <Pagination>
-                              <Pagination.First 
-                                onClick={() => setSchedulePage(1)} 
-                                disabled={schedulePage === 1}
-                              />
-                              <Pagination.Prev 
-                                onClick={() => setSchedulePage(prev => Math.max(1, prev - 1))} 
-                                disabled={schedulePage === 1}
-                              />
-                              {[...Array(Math.ceil(teacherSchedule.length / 10))].map((_, i) => {
-                                const page = i + 1;
-                                // Show first page, last page, current page, and pages around current
-                                if (
-                                  page === 1 ||
-                                  page === Math.ceil(teacherSchedule.length / 10) ||
-                                  (page >= schedulePage - 1 && page <= schedulePage + 1)
-                                ) {
-                                  return (
-                                    <Pagination.Item
-                                      key={page}
-                                      active={page === schedulePage}
-                                      onClick={() => setSchedulePage(page)}
-                                    >
-                                      {page}
-                                    </Pagination.Item>
-                                  );
-                                } else if (
-                                  page === schedulePage - 2 ||
-                                  page === schedulePage + 2
-                                ) {
-                                  return <Pagination.Ellipsis key={page} />;
-                                }
-                                return null;
-                              })}
-                              <Pagination.Next 
-                                onClick={() => setSchedulePage(prev => Math.min(Math.ceil(teacherSchedule.length / 10), prev + 1))} 
-                                disabled={schedulePage === Math.ceil(teacherSchedule.length / 10)}
-                              />
-                              <Pagination.Last 
-                                onClick={() => setSchedulePage(Math.ceil(teacherSchedule.length / 10))} 
-                                disabled={schedulePage === Math.ceil(teacherSchedule.length / 10)}
-                              />
-                            </Pagination>
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    {/* Calendar View */}
-                    {scheduleViewMode === 'calendar' && (
-                      <ScheduleCalendar
-                        schedules={calendarSchedules}
-                        onEditSchedule={(schedule) => {
-                          // Optional: Handle edit if needed
-                          console.log('Edit schedule:', schedule);
-                        }}
-                        onDeleteSchedule={(scheduleId) => {
-                          // Optional: Handle delete if needed
-                          console.log('Delete schedule:', scheduleId);
-                        }}
-                        onCreateMakeup={(schedule) => {
-                          // Optional: Handle create makeup if needed
-                          console.log('Create makeup:', schedule);
-                        }}
-                      />
-                    )}
-                  </>
-                ) : (
-                  <div className="text-center py-4 text-muted">
-                    Chưa có lịch giảng dạy
-                  </div>
-                )}
-              </Tab>
-            </Tabs>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => { setShowDetailModal(false); setSchedulePage(1); }}>
-            Đóng
           </Button>
         </Modal.Footer>
       </Modal>

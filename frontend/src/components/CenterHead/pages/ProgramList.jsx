@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
@@ -14,18 +14,45 @@ const ProgramList = () => {
   const navigate = useNavigate();
   const [programs, setPrograms] = useState([]);
   const [filteredPrograms, setFilteredPrograms] = useState([]);
+  const [paginatedPrograms, setPaginatedPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [filterValues, setFilterValues] = useState({});
   const [stats, setStats] = useState({ total: 0, active: 0, draft: 0, archived: 0 });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(0);
 
-  useEffect(() => {
-    fetchPrograms();
-  }, []);
+  const applyFilters = useCallback(() => {
+    let filtered = [...programs];
 
-  useEffect(() => {
-    applyFilters();
-  }, [searchKeyword, filterValues, programs]);
+    if (searchKeyword) {
+      const keyword = searchKeyword.toLowerCase();
+      filtered = filtered.filter(program =>
+        program.program_name?.toLowerCase().includes(keyword) ||
+        program.code?.toLowerCase().includes(keyword)
+      );
+    }
+
+    if (filterValues.status && filterValues.status !== "all") {
+      filtered = filtered.filter(program => program.status === filterValues.status);
+    }
+
+    setFilteredPrograms(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [programs, searchKeyword, filterValues]);
+
+  const applyPagination = useCallback(() => {
+    const totalItems = filteredPrograms.length;
+    const totalPagesCount = Math.ceil(totalItems / itemsPerPage);
+    setTotalPages(totalPagesCount);
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = filteredPrograms.slice(startIndex, endIndex);
+
+    setPaginatedPrograms(paginatedData);
+  }, [filteredPrograms, currentPage, itemsPerPage]);
 
   const fetchPrograms = async () => {
     try {
@@ -59,6 +86,16 @@ const ProgramList = () => {
     }
   };
 
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (e) => {
+    const newItemsPerPage = parseInt(e.target.value);
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when items per page changes
+  };
+
   const handleDeleteProgram = async (programId, programName) => {
     const confirmMessage = `⚠️ CẢNH BÁO: Bạn có chắc muốn xóa chương trình "${programName}"?\n\n` +
       `Hành động này sẽ XÓA TOÀN BỘ:\n` +
@@ -87,23 +124,17 @@ const ProgramList = () => {
     }
   };
 
-  const applyFilters = () => {
-    let filtered = [...programs];
+  useEffect(() => {
+    fetchPrograms();
+  }, []);
 
-    if (searchKeyword) {
-      const keyword = searchKeyword.toLowerCase();
-      filtered = filtered.filter(program =>
-        program.program_name?.toLowerCase().includes(keyword) ||
-        program.code?.toLowerCase().includes(keyword)
-      );
-    }
+  useEffect(() => {
+    applyFilters();
+  }, [searchKeyword, filterValues, programs, applyFilters]);
 
-    if (filterValues.status && filterValues.status !== "all") {
-      filtered = filtered.filter(program => program.status === filterValues.status);
-    }
-
-    setFilteredPrograms(filtered);
-  };
+  useEffect(() => {
+    applyPagination();
+  }, [filteredPrograms, currentPage, itemsPerPage, applyPagination]);
 
   const breadcrumbItems = [
     { label: 'Dashboard', path: '/center-head/dashboard' },
@@ -274,10 +305,87 @@ const ProgramList = () => {
       <Card>
         <Table
           columns={columns}
-          data={filteredPrograms}
+          data={paginatedPrograms}
           onRowClick={(row) => navigate(`/center-head/programs/${row._id}`)}
         />
       </Card>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="d-flex justify-content-between align-items-center mt-4">
+          <div className="d-flex align-items-center gap-3">
+            <span className="text-sm text-neutral-600">Hiển thị</span>
+            <select
+              className="form-select form-select-sm"
+              style={{ width: 'auto' }}
+              value={itemsPerPage}
+              onChange={handleItemsPerPageChange}
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+            <span className="text-sm text-neutral-600">
+              bản ghi trên trang
+            </span>
+          </div>
+
+          <div className="d-flex align-items-center gap-2">
+            <span className="text-sm text-neutral-600">
+              Trang {currentPage} / {totalPages} ({filteredPrograms.length} bản ghi)
+            </span>
+
+            <div className="d-flex gap-1">
+              <button
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                title="Trang trước"
+              >
+                <i className="ph ph-caret-left"></i>
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(page => {
+                  const distance = Math.abs(page - currentPage);
+                  return distance === 0 || distance === 1 || page === 1 || page === totalPages;
+                })
+                .map((page, index, array) => {
+                  const prevPage = array[index - 1];
+                  const showEllipsis = prevPage && page - prevPage > 1;
+
+                  return (
+                    <div key={page} className="d-flex">
+                      {showEllipsis && (
+                        <span className="px-2 py-1 text-neutral-600">...</span>
+                      )}
+                      <button
+                        className={`btn btn-sm ${
+                          page === currentPage
+                            ? 'btn-primary'
+                            : 'btn-outline-secondary'
+                        }`}
+                        onClick={() => handlePageChange(page)}
+                      >
+                        {page}
+                      </button>
+                    </div>
+                  );
+                })}
+
+              <button
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                title="Trang sau"
+              >
+                <i className="ph ph-caret-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -222,6 +222,32 @@ const studentService = {
     } catch (error) {
       throw error.response?.data || error.message;
     }
+  },
+
+  // Update student course enrollments
+  updateStudentCourseEnrollments: async (studentId, courseIds) => {
+    try {
+      const response = await axios.patch(`${API_URL}/students/${studentId}/courses`, 
+        { courseIds },
+        { headers: getAuthHeader() }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Change student class
+  changeStudentClass: async (studentId, oldClassId, newClassId) => {
+    try {
+      const response = await axios.patch(`${API_URL}/students/${studentId}/change-class`, 
+        { oldClassId, newClassId },
+        { headers: getAuthHeader() }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
   }
 };
 

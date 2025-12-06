@@ -287,6 +287,7 @@ exports.getTeacherAssignments = async (req, res) => {
       'homework.0': { $exists: true }
     })
       .populate('class', 'name')
+      .populate('session', 'title order')
       .populate({
         path: 'class',
         populate: {
@@ -335,6 +336,8 @@ exports.getTeacherAssignments = async (req, res) => {
             className: schedule.class?.name,
             courseName: schedule.class?.course?.name,
             courseCode: schedule.class?.course?.courseCode,
+            lessonNumber: schedule.session?.order,
+            lessonTitle: schedule.session?.title,
             totalStudents,
             submitted,
             pending: totalStudents - submitted,

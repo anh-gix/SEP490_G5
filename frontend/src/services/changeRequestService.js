@@ -68,6 +68,17 @@ const changeRequestService = {
       throw error.response?.data || error.message;
     }
   },
+
+  // Get my change requests (for students - filtered by current user)
+  getMyChangeRequests: async (params = {}) => {
+    try {
+      const response = await api.get('/change-requests', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching my change requests:', error);
+      throw error.response?.data || error.message;
+    }
+  },
 };
 
 export default changeRequestService;

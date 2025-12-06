@@ -36,6 +36,9 @@ router.get("/:id/attendance", classScheduleController.getAttendanceByClassSchedu
 // ✅ Điểm danh sinh viên (PATCH method nên không conflict với GET ở trên)
 router.patch("/:studentScheduleId/attendance", classScheduleController.markAttendance);
 
+// ✅ Xếp người dạy thay cho buổi học
+router.patch("/:id/assign-substitute", classScheduleController.assignSubstituteTeacher);
+
 // ✅ Xem tất cả các phòng học
 router.get("/rooms", ministryController.getAllRooms); // 🆕 thêm dòng này
 

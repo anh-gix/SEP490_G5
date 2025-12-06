@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table } from 'react-bootstrap';
 import teacherService from '../../services/teacherService';
+import { useAuth } from '../../contexts/AuthContext';
+import changeRequestService from '../../services/changeRequestService';
 
 /**
  * Teacher Schedule Component
  * Lịch dạy của giảng viên - tương tự student schedule
  */
 const TeacherSchedule = () => {
+  const { user } = useAuth();
+  
   const getCurrentWeek = () => {
     const today = new Date();
     const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 1));
@@ -21,6 +25,10 @@ const TeacherSchedule = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Recent applications preview
+  const [recentApplications, setRecentApplications] = useState([]);
+  const [loadingApplications, setLoadingApplications] = useState(false);
 
   const fetchSchedules = async () => {
     try {
@@ -104,6 +112,37 @@ const TeacherSchedule = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedWeek, selectedMonth, viewMode]);
 
+  // Fetch recent applications for preview
+  useEffect(() => {
+    if (user?._id) {
+      fetchRecentApplications();
+    }
+  }, [user]);
+
+  const fetchRecentApplications = async () => {
+    try {
+      setLoadingApplications(true);
+      const params = { limit: 5 }; // Get only 5 most recent
+      
+      const response = await changeRequestService.getAllChangeRequests(params);
+      if (response.success) {
+        const requests = response.changeRequests || [];
+        // Filter by current user (sender)
+        const userRequests = requests.filter(request => {
+          const senderId = request.sender?._id || request.sender;
+          return senderId?.toString() === user._id.toString();
+        });
+        // Sort by newest and take first 5
+        userRequests.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setRecentApplications(userRequests.slice(0, 5));
+      }
+    } catch (err) {
+      console.error('Error fetching recent applications:', err);
+    } finally {
+      setLoadingApplications(false);
+    }
+  };
+
   const getWeekDays = () => {
     const days = [];
     const current = new Date(selectedWeek);
@@ -146,6 +185,40 @@ const TeacherSchedule = () => {
     };
     const config = statusConfig[status] || statusConfig.upcoming;
     return <Badge className={`${config.bg} text-white px-12 py-6`}>{config.text}</Badge>;
+  };
+
+  // Helper functions for change requests
+  const getRequestStatusBadge = (status) => {
+    const statusConfig = {
+      pending: { variant: 'warning', text: 'Chờ duyệt' },
+      approved: { variant: 'success', text: 'Đã duyệt' },
+      rejected: { variant: 'danger', text: 'Từ chối' }
+    };
+    const config = statusConfig[status] || { variant: 'secondary', text: status };
+    return <Badge bg={config.variant}>{config.text}</Badge>;
+  };
+
+  const getTypeBadge = (type) => {
+    const typeConfig = {
+      create_class: { variant: 'info', text: 'Tạo lớp' },
+      change_class: { variant: 'primary', text: 'Đổi lớp' },
+      makeup_class: { variant: 'warning', text: 'Học bù' },
+      replace_teacher: { variant: 'secondary', text: 'Thay giáo viên' }
+    };
+    const config = typeConfig[type] || { variant: 'secondary', text: type || 'N/A' };
+    return <Badge bg={config.variant}>{config.text}</Badge>;
+  };
+
+  const formatRequestDate = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   const getMonthDays = () => {
@@ -661,6 +734,70 @@ const TeacherSchedule = () => {
           )}
         </>
       )}
+
+      {/* Recent Applications Preview */}
+      <div className="mt-24">
+        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+          <Card.Header className="bg-neutral-25 border-0 px-20 py-16 d-flex justify-content-between align-items-center">
+            <div>
+              <h5 className="text-neutral-900 fw-bold mb-0">Đơn đã gửi gần đây</h5>
+              <p className="text-neutral-600 text-13 mb-0 mt-4">Xem các đơn bạn đã gửi</p>
+            </div>
+            <Link to="/teacher/applications">
+              <Button className="btn-main">
+                <i className="fas fa-eye me-2"></i>
+                Xem tất cả
+              </Button>
+            </Link>
+          </Card.Header>
+          <Card.Body className="p-0">
+            {loadingApplications ? (
+              <div className="text-center py-40">
+                <div className="spinner-border text-main-600" role="status">
+                  <span className="visually-hidden">Đang tải...</span>
+                </div>
+                <p className="text-neutral-600 mt-12 mb-0">Đang tải đơn...</p>
+              </div>
+            ) : recentApplications.length === 0 ? (
+              <div className="text-center py-40">
+                <i className="fas fa-file-alt text-neutral-400 mb-12" style={{ fontSize: '48px' }}></i>
+                <p className="text-neutral-500 mb-0">Chưa có đơn nào</p>
+              </div>
+            ) : (
+              <Table hover className="mb-0">
+                <thead>
+                  <tr className="bg-neutral-25">
+                    <th className="px-20 py-12 text-neutral-900 fw-semibold text-13 border-0">Loại đơn</th>
+                    <th className="px-20 py-12 text-neutral-900 fw-semibold text-13 border-0">Nội dung</th>
+                    <th className="px-20 py-12 text-neutral-900 fw-semibold text-13 border-0">Ngày gửi</th>
+                    <th className="px-20 py-12 text-neutral-900 fw-semibold text-13 border-0">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentApplications.map((request) => (
+                    <tr key={request._id}>
+                      <td className="px-20 py-12">
+                        {getTypeBadge(request.type)}
+                      </td>
+                      <td className="px-20 py-12">
+                        <div className="text-neutral-700 text-13" style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {request.content}
+                        </div>
+                      </td>
+                      <td className="px-20 py-12 text-neutral-600 text-13">
+                        {formatRequestDate(request.createdAt)}
+                      </td>
+                      <td className="px-20 py-12">
+                        {getRequestStatusBadge(request.status)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
+          </Card.Body>
+        </Card>
+      </div>
     </Container>
   );
 };

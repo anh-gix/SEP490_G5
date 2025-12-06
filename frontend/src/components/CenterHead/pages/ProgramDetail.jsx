@@ -539,6 +539,16 @@ const ProgramDetail = () => {
               Các môn học thuộc chương trình này
             </p>
           </div>
+          {/* Show Create Course button only when program is draft or needs_revision */}
+          {(program?.status === 'draft' || program?.status === 'needs_revision') && (
+            <Button
+              variant="primary"
+              onClick={() => navigate(`/center-head/programs/${id}/courses/create`)}
+            >
+              <i className="ph ph-plus me-2"></i>
+              Tạo học phần mới
+            </Button>
+          )}
         </div>
 
         {courses.length > 0 ? (

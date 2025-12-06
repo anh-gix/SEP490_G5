@@ -43,6 +43,12 @@ const TeacherNavigation = () => {
       color: 'info'
     },
     {
+      title: 'Quản lý đơn đã gửi',
+      icon: 'fa-file-alt',
+      path: '/teacher/applications',
+      color: 'warning'
+    },
+    {
       title: 'Lớp học của tôi',
       icon: 'fa-chalkboard-teacher',
       path: '/teacher/classes',

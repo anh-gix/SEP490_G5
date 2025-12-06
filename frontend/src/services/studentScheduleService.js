@@ -47,6 +47,44 @@ export const studentScheduleService = {
       throw error.response?.data || { message: 'Không thể lấy StudentSchedule' };
     }
   },
+
+  // Tạo StudentSchedule entry mới
+  createStudentSchedule: async (studentId, classScheduleId, scheduleStatus, reason) => {
+    try {
+      const response = await api.post('/', {
+        studentId,
+        classScheduleId,
+        scheduleStatus,
+        reason
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể tạo StudentSchedule' };
+    }
+  },
+
+  // Lấy ClassSchedule từ StudentScheduleId
+  getClassScheduleByStudentScheduleId: async (studentScheduleId) => {
+    try {
+      const response = await api.get(`/${studentScheduleId}/class-schedule`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy ClassSchedule' };
+    }
+  },
+
+  // Cập nhật StudentSchedule entry
+  updateStudentSchedule: async (studentScheduleId, scheduleStatus, reason) => {
+    try {
+      const response = await api.patch(`/${studentScheduleId}`, {
+        scheduleStatus,
+        reason
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể cập nhật StudentSchedule' };
+    }
+  },
 };
 
 export default studentScheduleService;

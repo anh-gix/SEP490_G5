@@ -1429,6 +1429,7 @@ const RequestDetailPage = ({
                         onEditSchedule={() => {}} // Read-only
                         onDeleteSchedule={() => {}} // Read-only
                         onCreateMakeup={() => {}} // Read-only
+                        readOnly={true} // Read-only mode
                         classService={classService}
                         studentSchedule={senderSchedule.map(sch => {
                           const scheduleDate = new Date(sch.date);

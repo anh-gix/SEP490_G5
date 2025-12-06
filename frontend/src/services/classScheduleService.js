@@ -144,6 +144,18 @@ export const classScheduleService = {
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy danh sách phòng học' };
     }
+  },
+
+  // Xếp người dạy thay cho buổi học
+  assignSubstituteTeacher: async (scheduleId, substituteTeacherId) => {
+    try {
+      const response = await api.patch(`/${scheduleId}/assign-substitute`, {
+        substituteTeacherId
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể xếp người dạy thay' };
+    }
   }
 };
 

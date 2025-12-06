@@ -719,14 +719,43 @@ exports.getTeacherSchedule = async (req, res) => {
     
     const classIds = teacherClasses.map(cls => cls._id);
     
-    let query = { class: { $in: classIds }, status: 'fixed' };
+    // Lấy cả temporary và fixed để hiển thị đầy đủ lịch dạy
+    let query = { class: { $in: classIds }, status: { $in: ['temporary', 'fixed'] } };
     
     // Filter by date range if provided
     if (startDate && endDate) {
-      query.date = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      };
+      // Parse date string (YYYY-MM-DD) và tạo Date range để tránh vấn đề timezone
+      const startDateParts = startDate.split('-');
+      const endDateParts = endDate.split('-');
+      
+      if (startDateParts.length === 3 && endDateParts.length === 3) {
+        const start = new Date(
+          Date.UTC(
+            parseInt(startDateParts[0]),
+            parseInt(startDateParts[1]) - 1,
+            parseInt(startDateParts[2])
+          )
+        );
+        const end = new Date(
+          Date.UTC(
+            parseInt(endDateParts[0]),
+            parseInt(endDateParts[1]) - 1,
+            parseInt(endDateParts[2])
+          )
+        );
+        end.setUTCDate(end.getUTCDate() + 1); // Ngày tiếp theo để bao gồm cả ngày cuối
+        
+        query.date = {
+          $gte: start,
+          $lt: end
+        };
+      } else {
+        // Fallback to old method if date format is different
+        query.date = {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate)
+        };
+      }
     }
     
     const schedules = await ClassSchedule.find(query)

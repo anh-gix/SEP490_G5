@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Container, Card, Button, ButtonGroup, Form, Row, Col, Badge, Spinner, Alert } from 'react-bootstrap';
+import { toast } from 'react-toastify';
+import Swal from 'sweetalert2';
 import ScheduleCalendar from './ScheduleCalendar';
 import ScheduleWeekly from './ScheduleWeekly';
 import ScheduleList from './ScheduleList';
@@ -150,14 +152,14 @@ const ScheduleManagement = () => {
       setLoading(true);
       await scheduleService.createSchedule(scheduleData);
       setShowCreateModal(false);
-      alert('Tạo lịch học thành công!');
+      toast.success('Tạo lịch học thành công!');
       await fetchSchedules();
     } catch (err) {
       console.error('Error creating schedule:', err);
       if (err.message && err.message.includes('conflict')) {
-        alert(`Xung đột lịch học: ${err.message}`);
+        toast.error(`Xung đột lịch học: ${err.message}`);
       } else {
-        alert(err.message || 'Có lỗi xảy ra khi tạo lịch học!');
+        toast.error(err.message || 'Có lỗi xảy ra khi tạo lịch học!');
       }
     } finally {
       setLoading(false);
@@ -170,27 +172,38 @@ const ScheduleManagement = () => {
       await scheduleService.updateSchedule(scheduleData.id, scheduleData);
       setShowEditModal(false);
       setSelectedSchedule(null);
-      alert('Cập nhật lịch học thành công!');
+      toast.success('Cập nhật lịch học thành công!');
       await fetchSchedules();
     } catch (err) {
       console.error('Error updating schedule:', err);
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật lịch học!');
+      toast.error(err.message || 'Có lỗi xảy ra khi cập nhật lịch học!');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteSchedule = async (scheduleId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa lịch học này?')) return;
+    const result = await Swal.fire({
+      title: 'Xác nhận xóa',
+      text: 'Bạn có chắc chắn muốn xóa lịch học này?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+      confirmButtonColor: '#dc3545',
+      cancelButtonColor: '#6c757d'
+    });
+    
+    if (!result.isConfirmed) return;
     
     try {
       setLoading(true);
       await scheduleService.deleteSchedule(scheduleId);
-      alert('Xóa lịch học thành công!');
+      toast.success('Xóa lịch học thành công!');
       await fetchSchedules();
     } catch (err) {
       console.error('Error deleting schedule:', err);
-      alert(err.message || 'Có lỗi xảy ra khi xóa lịch học!');
+      toast.error(err.message || 'Có lỗi xảy ra khi xóa lịch học!');
     } finally {
       setLoading(false);
     }
@@ -201,11 +214,11 @@ const ScheduleManagement = () => {
       setLoading(true);
       await scheduleService.createSchedule({ ...makeupData, type: 'makeup' });
       setShowMakeupModal(false);
-      alert('Tạo lịch học bù thành công!');
+      toast.success('Tạo lịch học bù thành công!');
       await fetchSchedules();
     } catch (err) {
       console.error('Error creating makeup class:', err);
-      alert(err.message || 'Có lỗi xảy ra khi tạo lịch học bù!');
+      toast.error(err.message || 'Có lỗi xảy ra khi tạo lịch học bù!');
     } finally {
       setLoading(false);
     }
@@ -229,7 +242,7 @@ const ScheduleManagement = () => {
 
   const handleExportSchedule = () => {
     // TODO: Implement export functionality (Excel/PDF)
-    alert('Chức năng xuất lịch học sẽ được triển khai sau!');
+    toast.info('Chức năng xuất lịch học sẽ được triển khai sau!');
   };
 
   return (

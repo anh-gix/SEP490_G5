@@ -56,6 +56,16 @@ const roomService = {
     }
   },
 
+  // Get today's room usage schedule
+  getTodayRoomUsage: async () => {
+    try {
+      const response = await axios.get(`${API_URL}/rooms/today-usage`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
   // Create room
   createRoom: async (roomData) => {
     try {

@@ -1,6 +1,8 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Container, Card, Button, Form, Row, Col, Spinner, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import Swal from 'sweetalert2';
 import ClassList from './ClassList';
 import CreateClassModal from './CreateClassModal';
 import classService from '../../services/classService';
@@ -72,11 +74,11 @@ const ClassManagement = () => {
       setLoading(true);
       await classService.createClass(classData);
       setShowCreateModal(false);
-      alert('Tạo lớp học thành công!');
+      toast.success('Tạo lớp học thành công!');
       await fetchClasses();
     } catch (err) {
       console.error('Error creating class:', err);
-      alert(err.message || 'Có lỗi xảy ra khi tạo lớp học!');
+      toast.error(err.message || 'Có lỗi xảy ra khi tạo lớp học!');
     } finally {
       setLoading(false);
     }
@@ -87,16 +89,27 @@ const ClassManagement = () => {
   };
 
   const handleDeleteClass = async (classId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa lớp học này?')) return;
+    const result = await Swal.fire({
+      title: 'Xác nhận xóa',
+      text: 'Bạn có chắc chắn muốn xóa lớp học này?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+      confirmButtonColor: '#dc3545',
+      cancelButtonColor: '#6c757d'
+    });
+    
+    if (!result.isConfirmed) return;
     
     try {
       setLoading(true);
       await classService.deleteClass(classId);
-      alert('Xóa lớp học thành công!');
+      toast.success('Xóa lớp học thành công!');
       await fetchClasses();
     } catch (err) {
       console.error('Error deleting class:', err);
-      alert(err.message || 'Có lỗi xảy ra khi xóa lớp học!');
+      toast.error(err.message || 'Có lỗi xảy ra khi xóa lớp học!');
     } finally {
       setLoading(false);
     }

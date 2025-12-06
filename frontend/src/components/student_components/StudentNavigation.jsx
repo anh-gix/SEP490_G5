@@ -42,6 +42,12 @@ const StudentNavigation = () => {
       color: 'info'
     },
     {
+      title: 'Quản lý đơn đã gửi',
+      icon: 'fa-book-open',
+      path: '/student/applications',
+      color: 'success'
+    },
+    {
       title: 'Lớp học của tôi',
       icon: 'fa-book-open',
       path: '/student/courses',

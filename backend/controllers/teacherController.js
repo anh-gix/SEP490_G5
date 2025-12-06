@@ -932,8 +932,9 @@ exports.getMyClassDetail = async (req, res) => {
     const today = now.toISOString().split('T')[0];
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
-    // Get StudentSchedule for attendance counting
+    // Get StudentSchedule and HomeworkSubmission for counting
     const StudentSchedule = require('../models/studentScheduleModel');
+    const HomeworkSubmission = require('../models/homeworkSubmissionModel');
     
     console.log(`📚 [DEBUG] Total lessons found: ${lessons.length}`);
     console.log(`📅 [DEBUG] Today: ${today}, Current time: ${currentTime}`);
@@ -964,6 +965,38 @@ exports.getMyClassDetail = async (req, res) => {
         ss => ss.attendance?.status === 'present' || ss.attendance?.status === 'late'
       ).length;
 
+      // Get homework for this lesson
+      const homeworkWithStats = [];
+      
+      if (lesson.homework && lesson.homework.length > 0) {
+        for (const hw of lesson.homework) {
+          const submissions = await HomeworkSubmission.find({
+            classSchedule: lesson._id,
+            homeworkId: hw._id
+          });
+          
+          const submittedCount = submissions.filter(
+            s => s.status === 'submitted' || s.status === 'late'
+          ).length;
+          
+          const lateCount = submissions.filter(
+            s => s.status === 'late'
+          ).length;
+
+          homeworkWithStats.push({
+            _id: hw._id,
+            title: hw.assignment?.title || 'Bài tập',
+            files: hw.assignment?.files || [],
+            answerFiles: hw.answerFiles || [],
+            deadline: hw.deadline,
+            submitted: submittedCount,
+            late: lateCount,
+            pending: totalStudents - submittedCount,
+            total: totalStudents
+          });
+        }
+      }
+
       return {
         _id: lesson._id,
         lessonNumber: index + 1,
@@ -975,7 +1008,8 @@ exports.getMyClassDetail = async (req, res) => {
         status,
         hasAttendance,
         attendanceCount,
-        totalStudents
+        totalStudents,
+        homework: homeworkWithStats
       };
     }));
 
@@ -998,50 +1032,6 @@ exports.getMyClassDetail = async (req, res) => {
         });
       }
     });
-
-    // Get assignments/homework from schedules
-    const HomeworkSubmission = require('../models/homeworkSubmissionModel');
-    const assignments = [];
-    
-    for (const lesson of lessons) {
-      if (lesson.homework && lesson.homework.length > 0) {
-        for (const hw of lesson.homework) {
-          const totalStudents = classInfo.students.length;
-          
-          // Get real submission statistics
-          const submissions = await HomeworkSubmission.find({
-            classSchedule: lesson._id,
-            homeworkId: hw._id
-          });
-          
-          const submittedCount = submissions.filter(
-            s => s.status === 'submitted' || s.status === 'late'
-          ).length;
-          
-          const lateCount = submissions.filter(
-            s => s.status === 'late'
-          ).length;
-
-          assignments.push({
-            _id: hw._id,
-            classScheduleId: lesson._id,
-            lessonDate: lesson.date,
-            sessionOrder: lesson.session?.order,
-            sessionTitle: lesson.session?.title,
-            title: hw.assignment.title,
-            files: hw.assignment.files || [], // Support multiple files
-            answerFiles: hw.answerFiles || [], // Support multiple answer files
-            type: 'homework',
-            dueDate: hw.deadline,
-            total: totalStudents,
-            submitted: submittedCount,
-            late: lateCount,
-            notSubmitted: totalStudents - submittedCount,
-            submissionRate: totalStudents > 0 ? Math.round((submittedCount / totalStudents) * 100) : 0
-          });
-        }
-      }
-    }
 
     // Get course info to check mocktest sessions
     const Course = require('../models/courseModel');
@@ -1069,6 +1059,8 @@ exports.getMyClassDetail = async (req, res) => {
         .flatMap(l => l.homework || [])
         .map(hw => hw._id);
       
+      const totalAssignments = homeworkIds.length;
+      
       const submissions = await HomeworkSubmission.find({
         student: student._id,
         homeworkId: { $in: homeworkIds }
@@ -1077,8 +1069,8 @@ exports.getMyClassDetail = async (req, res) => {
       const submittedCount = submissions.filter(
         s => s.status === 'submitted' || s.status === 'late'
       ).length;
-      const homeworkCompletionRate = assignments.length > 0
-        ? Math.round((submittedCount / assignments.length) * 100)
+      const homeworkCompletionRate = totalAssignments > 0
+        ? Math.round((submittedCount / totalAssignments) * 100)
         : 0;
 
       // Get mocktest scores
@@ -1164,7 +1156,7 @@ exports.getMyClassDetail = async (req, res) => {
         totalLessons: totalLessons,
         attendanceRate: attendanceRate,
         submittedAssignments: submittedCount,
-        totalAssignments: assignments.length,
+        totalAssignments: totalAssignments,
         homeworkCompletionRate: homeworkCompletionRate,
         mocktestScores: mocktestScores,
         mocktestSessionOrders: mocktestSessionOrders
@@ -1214,27 +1206,31 @@ exports.getMyClassDetail = async (req, res) => {
     
     console.log(`📊 [DEBUG] attendanceByLesson result:`, attendanceByLesson);
 
-    // 3. Homework Stats
-    const homeworkStats = assignments.map(hw => {
-      const onTime = hw.submitted - hw.late;
-      const lessonIndex = formattedLessons.findIndex(
-        l => l._id.toString() === hw.classScheduleId.toString()
-      );
-      return {
-        assignmentId: hw._id,
-        lessonNumber: lessonIndex !== -1 ? lessonIndex + 1 : 0,
-        sessionOrder: hw.sessionOrder,
-        title: hw.title,
-        dueDate: hw.dueDate,
-        onTime: onTime,
-        late: hw.late,
-        notSubmitted: hw.notSubmitted,
-        total: hw.total,
-        onTimeRate: hw.total > 0 ? Math.round((onTime / hw.total) * 100) : 0,
-        lateRate: hw.total > 0 ? Math.round((hw.late / hw.total) * 100) : 0,
-        notSubmittedRate: hw.total > 0 ? Math.round((hw.notSubmitted / hw.total) * 100) : 0
-      };
+    // 3. Homework Stats - Extract from formattedLessons
+    const homeworkStats = [];
+    formattedLessons.forEach(lesson => {
+      if (lesson.homework && lesson.homework.length > 0) {
+        lesson.homework.forEach(hw => {
+          const onTime = hw.submitted - hw.late;
+          homeworkStats.push({
+            assignmentId: hw._id,
+            lessonNumber: lesson.lessonNumber,
+            sessionOrder: lesson.sessionOrder,
+            title: hw.title,
+            deadline: hw.deadline,
+            onTime: onTime,
+            late: hw.late,
+            pending: hw.pending,
+            total: hw.total,
+            onTimeRate: hw.total > 0 ? Math.round((onTime / hw.total) * 100) : 0,
+            lateRate: hw.total > 0 ? Math.round((hw.late / hw.total) * 100) : 0,
+            pendingRate: hw.total > 0 ? Math.round((hw.pending / hw.total) * 100) : 0
+          });
+        });
+      }
     });
+    
+    console.log(`📊 [DEBUG] homeworkStats result:`, homeworkStats);
 
     // Determine class status
     let classStatus = classInfo.status;
@@ -1287,7 +1283,6 @@ exports.getMyClassDetail = async (req, res) => {
       students: formattedStudents,
       lessons: formattedLessons,
       materials,
-      assignments,
       attendanceByLesson: attendanceByLesson,
       homeworkStats: homeworkStats
     };

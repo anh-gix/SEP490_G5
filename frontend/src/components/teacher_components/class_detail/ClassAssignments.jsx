@@ -1,47 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button, Badge, Spinner } from 'react-bootstrap';
-import homeworkService from '../../../services/homeworkService';
+// import homeworkService from '../../../services/homeworkService';
 import CreateHomeworkModal from './modals/CreateHomeworkModal';
 import AssignmentDetail from './AssignmentDetail';
 
-const ClassAssignments = ({ classId, onAssignmentUpdate }) => {
-  const [assignments, setAssignments] = useState([]);
+const ClassAssignments = ({ classId, lessons = [], onAssignmentUpdate }) => {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState(null);
   const [showAssignmentDetail, setShowAssignmentDetail] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [filterType, setFilterType] = useState('by-lesson'); // 'by-lesson', 'upcoming'
 
-  const fetchAssignments = async () => {
-    try {
-      setLoading(true);
-      const response = await homeworkService.getTeacherAssignments();
-      
-      if (response.success) {
-        // Filter assignments for this class only
-        const classAssignments = response.assignments.filter(a => 
-          a.classId?.toString() === classId?.toString() || 
-          a.scheduleId // If scheduleId exists, we can use it
-        );
-        setAssignments(classAssignments);
-      }
-    } catch (err) {
-      console.error('Error fetching assignments:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (classId) {
-      fetchAssignments();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [classId]);
+  // Extract assignments from lessons data (already filtered by class from parent)
+  const assignments = lessons
+    .filter(lesson => lesson.homework && lesson.homework.length > 0)
+    .flatMap(lesson => 
+      lesson.homework.map(hw => ({
+        _id: hw._id,
+        classScheduleId: lesson._id,
+        lessonNumber: lesson.lessonNumber,
+        lessonTitle: lesson.topic,
+        lessonDate: lesson.date,
+        sessionOrder: lesson.sessionOrder,
+        title: hw.assignment?.title || hw.title,
+        assignmentFiles: hw.assignment?.files || [],
+        answerFiles: hw.answerFiles || [],
+        deadline: hw.deadline,
+        totalStudents: lesson.totalStudents || 0,
+        submitted: hw.submitted || 0,
+        pending: (lesson.totalStudents || 0) - (hw.submitted || 0)
+      }))
+    );
 
   const handleCreateSuccess = () => {
-    fetchAssignments();
-    // Don't call onAssignmentUpdate() - no need to refresh entire parent layout
+    // Refresh parent to get updated lessons with new homework
+    if (onAssignmentUpdate) onAssignmentUpdate();
   };
 
   const handleViewSubmissions = (assignment) => {
@@ -67,15 +59,6 @@ const ClassAssignments = ({ classId, onAssignmentUpdate }) => {
     return date.toLocaleDateString('vi-VN');
   };
 
-  if (loading) {
-    return (
-      <div className="text-center py-5">
-        <Spinner animation="border" variant="primary" />
-        <p className="mt-3 text-neutral-600">Đang tải danh sách bài tập...</p>
-      </div>
-    );
-  }
-
   // Show AssignmentDetail if an assignment is selected
   if (showAssignmentDetail && selectedAssignmentId) {
     return (
@@ -84,14 +67,14 @@ const ClassAssignments = ({ classId, onAssignmentUpdate }) => {
         onBack={() => {
           setShowAssignmentDetail(false);
           setSelectedAssignmentId(null);
-          fetchAssignments(); // Refresh assignments list only
-          // Don't call onAssignmentUpdate() here - no need to refresh parent
+          // Refresh parent to get updated homework stats
+          if (onAssignmentUpdate) onAssignmentUpdate();
         }}
         onDelete={() => {
           setShowAssignmentDetail(false);
           setSelectedAssignmentId(null);
-          fetchAssignments();
-          if (onAssignmentUpdate) onAssignmentUpdate(); // Refresh parent when assignment deleted
+          // Refresh parent when assignment deleted
+          if (onAssignmentUpdate) onAssignmentUpdate();
         }}
       />
     );

@@ -339,6 +339,7 @@ const TeacherClassDetailLayout = () => {
             >
               <ClassAssignments 
                 classId={classId}
+                lessons={lessons}
                 onAssignmentUpdate={fetchClassDetails}
               />
             </Tab>

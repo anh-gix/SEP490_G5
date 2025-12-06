@@ -21,7 +21,7 @@ const createEmptyScheduleEntry = () => ({
   endTime: '10:00'
 });
 
-const EditClassForm = ({ classData, onSubmit }) => {
+const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     id: '',
@@ -3059,15 +3059,21 @@ const EditClassForm = ({ classData, onSubmit }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Tên lớp <span className="text-danger-600">*</span>
                   </Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="VD: A1-Morning-01"
-                    required
-                    className="border-neutral-30 radius-8 px-16 py-10"
-                  />
+                  {formData.status === 'active' ? (
+                    <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
+                      {formData.name}
+                    </div>
+                  ) : (
+                    <Form.Control
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      placeholder="VD: A1-Morning-01"
+                      required
+                      className="border-neutral-30 radius-8 px-16 py-10"
+                    />
+                  )}
                 </Form.Group>
               </div>
 
@@ -3310,7 +3316,7 @@ const EditClassForm = ({ classData, onSubmit }) => {
                       setShowScheduleDetailModal(true);
                     }}
                     onDeleteSchedule={() => {}} // Read-only in this context
-                    onCreateMakeup={() => {}} // Read-only in this context
+                    showLegend={false}
                   />
                 ) : (
                   <ScheduleWeekly
@@ -3810,23 +3816,37 @@ const EditClassForm = ({ classData, onSubmit }) => {
         </Card>
 
         {/* Action Buttons */}
-        <div className="d-flex justify-content-end gap-12 mt-24">
-          <Button 
-            variant="outline-secondary"
-            className="text-15 fw-medium px-24 py-12 radius-8"
-            onClick={handleBack}
-          >
-            <i className="fas fa-times me-2"></i>
-            Hủy
-          </Button>
-          <Button 
-            variant="warning"
-            className="text-white text-15 fw-semibold px-24 py-12 radius-8"
-            type="submit"
-          >
-            <i className="fas fa-save me-2"></i>
-            Lưu thay đổi
-          </Button>
+        <div className="d-flex justify-content-between align-items-center gap-12 mt-24">
+          <div>
+            {formData.status === 'pending' && onDelete && (
+              <Button 
+                variant="outline-danger"
+                className="text-15 fw-medium px-24 py-12 radius-8"
+                onClick={() => onDelete(classId || formData.id)}
+              >
+                <i className="fas fa-trash me-2"></i>
+                Xóa lớp học
+              </Button>
+            )}
+          </div>
+          <div className="d-flex gap-12">
+            <Button 
+              variant="outline-secondary"
+              className="text-15 fw-medium px-24 py-12 radius-8"
+              onClick={handleBack}
+            >
+              <i className="fas fa-times me-2"></i>
+              Hủy
+            </Button>
+            <Button 
+              variant="warning"
+              className="text-white text-15 fw-semibold px-24 py-12 radius-8"
+              type="submit"
+            >
+              <i className="fas fa-save me-2"></i>
+              Lưu thay đổi
+            </Button>
+          </div>
         </div>
       </Form>
 

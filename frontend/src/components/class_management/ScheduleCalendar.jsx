@@ -3,7 +3,7 @@ import { Card, Button, Badge, Dropdown } from 'react-bootstrap';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
 import { classScheduleService } from '../../services/classScheduleService';
 
-const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateMakeup, onAssignSubstitute, classService, studentSchedule = [], readOnly = false }) => {
+const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateMakeup, onAssignSubstitute, classService, studentSchedule = [], readOnly = false, showLegend = true }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
 
@@ -577,44 +577,46 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
       </Card>
 
       {/* Program Type Color Legend */}
-      <div className="d-flex justify-content-center gap-4 mt-3 mb-2">
-        <div className="d-flex align-items-center gap-2">
-          <div 
-            style={{ 
-              width: '20px', 
-              height: '20px', 
-              backgroundColor: '#2196F3', 
-              borderRadius: '4px',
-              border: '1px solid #e0e0e0'
-            }}
-          ></div>
-          <span className="text-13 text-neutral-700">IELTS</span>
+      {showLegend && (
+        <div className="d-flex justify-content-center gap-4 mt-3 mb-2">
+          <div className="d-flex align-items-center gap-2">
+            <div 
+              style={{ 
+                width: '20px', 
+                height: '20px', 
+                backgroundColor: '#2196F3', 
+                borderRadius: '4px',
+                border: '1px solid #e0e0e0'
+              }}
+            ></div>
+            <span className="text-13 text-neutral-700">IELTS</span>
+          </div>
+          <div className="d-flex align-items-center gap-2">
+            <div 
+              style={{ 
+                width: '20px', 
+                height: '20px', 
+                backgroundColor: '#FF9800', 
+                borderRadius: '4px',
+                border: '1px solid #e0e0e0'
+              }}
+            ></div>
+            <span className="text-13 text-neutral-700">TOEIC</span>
+          </div>
+          <div className="d-flex align-items-center gap-2">
+            <div 
+              style={{ 
+                width: '20px', 
+                height: '20px', 
+                backgroundColor: '#757575', 
+                borderRadius: '4px',
+                border: '1px solid #e0e0e0'
+              }}
+            ></div>
+            <span className="text-13 text-neutral-700">Cambridge</span>
+          </div>
         </div>
-        <div className="d-flex align-items-center gap-2">
-          <div 
-            style={{ 
-              width: '20px', 
-              height: '20px', 
-              backgroundColor: '#FF9800', 
-              borderRadius: '4px',
-              border: '1px solid #e0e0e0'
-            }}
-          ></div>
-          <span className="text-13 text-neutral-700">TOEIC</span>
-        </div>
-        <div className="d-flex align-items-center gap-2">
-          <div 
-            style={{ 
-              width: '20px', 
-              height: '20px', 
-              backgroundColor: '#757575', 
-              borderRadius: '4px',
-              border: '1px solid #e0e0e0'
-            }}
-          ></div>
-          <span className="text-13 text-neutral-700">Cambridge</span>
-        </div>
-      </div>
+      )}
 
     </div>
   );

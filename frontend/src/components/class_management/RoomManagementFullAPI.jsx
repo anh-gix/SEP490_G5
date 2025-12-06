@@ -210,8 +210,9 @@ const RoomManagementFull = () => {
         className = 'N/A';
       }
       
-      // Extract program type from schedule.class.course.program.type
-      const programType = schedule.class?.course?.program?.type || null;
+      // Extract program type: ưu tiên schedule.programType (từ backend cho buổi học bù),
+      // sau đó mới fallback về schedule.class?.course?.program?.type
+      const programType = schedule.programType || schedule.class?.course?.program?.type || schedule._course?.program?.type || null;
       
       return {
         id: schedule._id || schedule.id,

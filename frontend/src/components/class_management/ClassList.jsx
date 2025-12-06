@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, Button, Badge, ProgressBar, Dropdown } from 'react-bootstrap';
 
-const ClassList = ({ classes, onEdit, onDelete, onViewDetails }) => {
+const ClassList = ({ classes, onEdit, onViewDetails }) => {
   const getStatusText = (status) => {
     const statusMap = {
       pending: 'Chờ khai giảng',
@@ -103,14 +103,6 @@ const ClassList = ({ classes, onEdit, onDelete, onViewDetails }) => {
                 >
                   <i className="fas fa-edit"></i>
                 </Button>
-                {classItem.status === 'pending' && (
-                  <Button 
-                    className="btn-outline-danger text-13 fw-medium px-12 py-8 radius-8"
-                    onClick={() => onDelete(classItem.id)}
-                  >
-                    <i className="fas fa-trash"></i>
-                  </Button>
-                )}
               </Card.Footer>
             </Card>
           </div>

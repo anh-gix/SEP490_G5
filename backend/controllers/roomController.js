@@ -1,5 +1,7 @@
 const Room = require("../models/room");
 const ClassSchedule = require("../models/classScheduleModel");
+const Course = require("../models/courseModel");
+const mongoose = require("mongoose");
 
 exports.getAllRooms = async (req, res) => {
   try {
@@ -219,6 +221,74 @@ exports.getRoomSchedule = async (req, res) => {
       .populate('session', 'title order')
       .sort({ date: 1, startTime: 1 })
       .lean();
+    
+    // Xử lý các schedule không có class nhưng có session (buổi học bù)
+    // Tìm course chứa session để lấy program type
+    for (let schedule of schedules) {
+      if (!schedule.class && schedule.session) {
+        // Lấy sessionId: có thể là object (đã populate) hoặc ObjectId
+        let sessionId = schedule.session._id || schedule.session;
+        
+        // Convert sang ObjectId nếu cần
+        let sessionObjectId;
+        try {
+          if (sessionId instanceof mongoose.Types.ObjectId) {
+            sessionObjectId = sessionId;
+          } else if (typeof sessionId === 'string') {
+            sessionObjectId = new mongoose.Types.ObjectId(sessionId);
+          } else {
+            sessionObjectId = sessionId;
+          }
+        } catch (error) {
+          continue;
+        }
+        
+        // Tìm course chứa session này - thử với cả ObjectId và string
+        let course = await Course.findOne({ sessions: sessionObjectId })
+          .populate({
+            path: 'program',
+            select: 'type'
+          })
+          .select('name program sessions')
+          .lean();
+        
+        // Nếu không tìm thấy với ObjectId, thử với string
+        if (!course) {
+          course = await Course.findOne({ sessions: sessionObjectId.toString() })
+            .populate({
+              path: 'program',
+              select: 'type'
+            })
+            .select('name program sessions')
+            .lean();
+        }
+        
+        // Nếu vẫn không tìm thấy, thử với $in operator
+        if (!course) {
+          course = await Course.findOne({ 
+            sessions: { $in: [sessionObjectId, sessionObjectId.toString()] }
+          })
+            .populate({
+              path: 'program',
+              select: 'type'
+            })
+            .select('name program sessions')
+            .lean();
+        }
+        
+        // Gán program type vào schedule
+        if (course && course.program) {
+          schedule.programType = course.program.type;
+          // Có thể thêm thông tin course vào schedule để frontend dùng
+          schedule._course = {
+            name: course.name,
+            program: {
+              type: course.program.type
+            }
+          };
+        }
+      }
+    }
     
     res.status(200).json({
       message: "Lấy lịch sử dụng phòng thành công",

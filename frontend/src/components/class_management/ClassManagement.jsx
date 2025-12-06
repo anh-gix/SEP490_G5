@@ -309,7 +309,6 @@ const ClassManagement = () => {
       <ClassList
         classes={classes}
         onEdit={handleEditClass}
-        onDelete={handleDeleteClass}
         onViewDetails={handleViewDetails}
       />
 

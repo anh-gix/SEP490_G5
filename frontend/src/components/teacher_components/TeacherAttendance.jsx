@@ -454,7 +454,7 @@ const TeacherAttendance = () => {
           )}
 
           {/* Empty state if no schedule selected */}
-          {!scheduleInfo && !loading && todaySchedules.length > 0 && (
+          {!scheduleInfo && !loading && todaySchedules.length >= 0 && (
             <Card className="bg-white border-0 rounded-12 shadow-sm">
               <Card.Body className="text-center py-5">
                 <i className="fas fa-hand-pointer text-main-600" style={{ fontSize: '48px' }}></i>

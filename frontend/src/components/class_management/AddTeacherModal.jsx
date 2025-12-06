@@ -29,7 +29,7 @@ const AddTeacherModal = ({
           <Row className="g-3">
             <Col md={6}>
               <Form.Group>
-                <Form.Label>Tên đăng nhập <span className="text-danger">*</span></Form.Label>
+                <Form.Label>Tên người dùng <span className="text-danger">*</span></Form.Label>
                 <Form.Control
                   type="text"
                   name="username"

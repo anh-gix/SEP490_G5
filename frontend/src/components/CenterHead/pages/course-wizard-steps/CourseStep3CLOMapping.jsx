@@ -11,16 +11,31 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
   const [cloForm, setCLOForm] = useState({ code: '', name: '', detail: '', mappedPLOs: [] });
   const [clos, setCLOs] = useState([]);
 
+  // Load CLOs whenever component mounts or courseData._id changes
   useEffect(() => {
     if (courseData._id) {
       fetchCourseCLOs();
     }
-  }, [courseData._id]);
+  }, [courseData._id]); // This will trigger on mount and when courseData._id changes
+
+  // Also initialize from courseData.clos on mount
+  useEffect(() => {
+    if (courseData.clos && courseData.clos.length > 0) {
+      setCLOs(courseData.clos);
+    }
+  }, []);
 
   const fetchCourseCLOs = async () => {
     try {
       const response = await courseService.getCourseById(courseData._id);
-      setCLOs(response.data.clos || []);
+      const fetchedCLOs = response.data.clos || [];
+      setCLOs(fetchedCLOs);
+
+      // Also update parent courseData to keep it in sync
+      setCourseData(prev => ({
+        ...prev,
+        clos: fetchedCLOs
+      }));
     } catch (error) {
       console.error('Error loading CLOs:', error);
     }
@@ -66,16 +81,23 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
         return c;
       });
 
+      const savedCLOs = updatedCLOs.map(c => ({
+        code: c.code,
+        name: c.name,
+        detail: c.detail,
+        mappedPLOs: c.mappedPLOs || []
+      }));
+
       await courseService.updateCourse(courseData._id, {
-        clos: updatedCLOs.map(c => ({
-          code: c.code,
-          name: c.name,
-          detail: c.detail,
-          mappedPLOs: c.mappedPLOs || []
-        }))
+        clos: savedCLOs
       });
 
+      // Update both local and parent state
       setCLOs(updatedCLOs);
+      setCourseData(prev => ({
+        ...prev,
+        clos: updatedCLOs
+      }));
     } catch (error) {
       console.error('Error updating mapping:', error);
       alert('Lỗi khi cập nhật mapping!');
@@ -140,16 +162,20 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
         updatedCLOs = [...clos, newCLO];
       }
 
+      const savedCLOs = updatedCLOs.map(c => ({
+        code: c.code,
+        name: c.name,
+        detail: c.detail,
+        mappedPLOs: c.mappedPLOs || []
+      }));
+
       await courseService.updateCourse(courseData._id, {
-        clos: updatedCLOs.map(c => ({
-          code: c.code,
-          name: c.name,
-          detail: c.detail,
-          mappedPLOs: c.mappedPLOs || []
-        }))
+        clos: savedCLOs
       });
 
+      // Update both local and parent state
       await fetchCourseCLOs();
+
       setCLOForm({ code: '', name: '', detail: '', mappedPLOs: [] });
       setShowCLOForm(false);
       setEditingCLO(null);
@@ -228,6 +254,16 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
       return pId === searchId || pId === ploId || (typeof p === 'object' && p === ploId);
     });
   };
+
+  // Protection: Course must be created first
+  if (!courseData._id) {
+    return (
+      <div className="alert alert-warning">
+        <i className="ph ph-warning me-2"></i>
+        Vui lòng hoàn thành Bước 1 (Thông tin cơ bản) trước khi tạo CLO.
+      </div>
+    );
+  }
 
   return (
     <div>

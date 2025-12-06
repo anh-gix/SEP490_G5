@@ -259,6 +259,16 @@ const CourseStep4Sessions = ({ courseData, onPrevious, navigate }) => {
     }
   };
 
+  // Protection: Course must be created first
+  if (!courseData._id) {
+    return (
+      <div className="alert alert-warning">
+        <i className="ph ph-warning me-2"></i>
+        Vui lòng hoàn thành Bước 1 (Thông tin cơ bản) trước khi tạo Sessions.
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Auto Generate Sessions Modal */}

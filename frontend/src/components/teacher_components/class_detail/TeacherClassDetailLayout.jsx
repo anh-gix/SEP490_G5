@@ -25,8 +25,9 @@ const TeacherClassDetailLayout = () => {
   
   const [classInfo, setClassInfo] = useState(null);
   const [students, setStudents] = useState([]);
-  const [materials, setMaterials] = useState([]);
   const [lessons, setLessons] = useState([]);
+  const [attendanceByLesson, setAttendanceByLesson] = useState([]);
+  const [homeworkStats, setHomeworkStats] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -61,8 +62,10 @@ const TeacherClassDetailLayout = () => {
       if (response.success) {
         setClassInfo(response.data.classInfo);
         setStudents(response.data.students || []);
-        setMaterials(response.data.materials || []);
         setLessons(response.data.lessons || []);
+        setAttendanceByLesson(response.data.attendanceByLesson || []);
+        console.log('Attendance Data:', response.data.attendanceByLesson);
+        setHomeworkStats(response.data.homeworkStats || []);
       }
     } catch (error) {
       console.error('Error fetching class details:', error);
@@ -82,26 +85,6 @@ const TeacherClassDetailLayout = () => {
     } catch (error) {
       console.error('Error fetching students:', error);
     }
-  };
-
-  const getFileIcon = (type) => {
-    const icons = {
-      document: 'fa-file-pdf',
-      audio: 'fa-file-audio',
-      video: 'fa-file-video',
-      presentation: 'fa-file-powerpoint'
-    };
-    return icons[type] || 'fa-file';
-  };
-
-  const getFileIconColor = (type) => {
-    const colors = {
-      document: 'text-danger-600',
-      audio: 'text-success-600',
-      video: 'text-warning-600',
-      presentation: 'text-main-600'
-    };
-    return colors[type] || 'text-neutral-600';
   };
 
   const getLessonStatusBadge = (status) => {
@@ -229,13 +212,6 @@ const TeacherClassDetailLayout = () => {
 
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
-      {/* Breadcrumb */}
-      <div className="mb-16">
-        <Link to="/teacher/classes" className="text-neutral-600 text-13 text-decoration-none">
-          <i className="fas fa-arrow-left me-2"></i>
-          Quay lại danh sách lớp
-        </Link>
-      </div>
 
       {/* Class Header */}
       <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24"
@@ -243,13 +219,16 @@ const TeacherClassDetailLayout = () => {
         <Card.Body className="p-24">
           <Row className="align-items-center">
             <Col lg={8}>
+            {/* Breadcrumb back to class list*/}
+            <div className="mb-16">
+              <Link to="/teacher/classes" className="text-white text-13 text-decoration-none">
+                <i className="fas fa-arrow-left me-2"></i>
+                Quay lại danh sách lớp
+              </Link>
+            </div>
               <div className="d-flex align-items-center gap-12 mb-12">
                 <h4 className="text-white fw-bold mb-0">{classInfo.name}</h4>
                 <Badge className="bg-white text-main-600 px-12 py-6">{classInfo.level}</Badge>
-              </div>
-              <div className="text-white mb-12" style={{ opacity: 0.95 }}>
-                <i className="fas fa-book me-2"></i>
-                {classInfo.subject}
               </div>
               <div className="text-white d-flex gap-20" style={{ opacity: 0.9 }}>
                 <span><i className="fas fa-calendar me-2"></i>{classInfo.schedule}</span>
@@ -298,8 +277,8 @@ const TeacherClassDetailLayout = () => {
             >
               <ClassOverview 
                 classInfo={classInfo}
-                materials={materials}
-                setShowMaterialModal={setShowMaterialModal}
+                attendanceByLesson={attendanceByLesson}
+                homeworkStats={homeworkStats}
               />
             </Tab>
 
@@ -338,15 +317,14 @@ const TeacherClassDetailLayout = () => {
               title={
                 <span className="px-8">
                   <i className="fas fa-folder-open me-2"></i>
-                  Tài liệu ({materials.length})
+                  Tài liệu
                 </span>
               }
             >
               <ClassMaterials 
-                materials={materials}
+                classId={classId}
+                courseId={classInfo?.course?._id}
                 setShowMaterialModal={setShowMaterialModal}
-                getFileIcon={getFileIcon}
-                getFileIconColor={getFileIconColor}
               />
             </Tab>
 
@@ -361,6 +339,7 @@ const TeacherClassDetailLayout = () => {
             >
               <ClassAssignments 
                 classId={classId}
+                lessons={lessons}
                 onAssignmentUpdate={fetchClassDetails}
               />
             </Tab>
@@ -369,11 +348,13 @@ const TeacherClassDetailLayout = () => {
       </Card>
 
       {/* Modals */}
+      {/* Modals */}
       <MaterialModal 
         show={showMaterialModal}
         onHide={() => setShowMaterialModal(false)}
+        onSuccess={fetchClassDetails}
+        classId={classId}
       />
-
       <StudentDetailModal 
         show={showStudentDetail}
         onHide={() => setShowStudentDetail(false)}

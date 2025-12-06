@@ -344,7 +344,7 @@ const RoomManagementFull = () => {
       {/* Two Column Layout: Room Schedule (Left) and Room Management (Right) */}
       <Row className="g-3">
         {/* Left Column - Room Schedule */}
-        <Col lg={7}>
+        {/* <Col lg={7}>
           <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24" 
                 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
             <Card.Header className="bg-main-25 border-0 p-20">
@@ -405,10 +405,10 @@ const RoomManagementFull = () => {
               </Table>
             </Card.Body>
           </Card>
-        </Col>
+        </Col> */}
 
         {/* Right Column - Room Management */}
-        <Col lg={5}>
+        <Col>
           {/* Filters and View Toggle */}
           <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24">
             <Card.Body className="p-20">
@@ -475,39 +475,57 @@ const RoomManagementFull = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredRooms.map(room => (
-                      <tr key={room._id}>
-                        <td className="px-20 py-16">
-                          <div className="text-neutral-900 fw-semibold text-14">{room.room_name}</div>
-                        </td>
-                        <td className="px-20 py-16 text-neutral-700 text-14">{room.location}</td>
-                        <td className="px-20 py-16 text-center text-neutral-700 fw-medium text-14">
-                          {room.capacity}
-                        </td>
-                        <td className="px-20 py-16">
-                          {getStatusBadge(room.status)}
-                        </td>
-                        <td className="px-20 py-16">
-                          <div className="d-flex gap-8">
-                            <Button
-                              variant="outline-info"
-                              size="sm"
-                              onClick={() => handleViewSchedule(room)}
-                            >
-                              <i className="fas fa-calendar me-1"></i>
-                              Lịch
-                            </Button>
-                            <Button
-                              variant="outline-secondary"
-                              size="sm"
-                              onClick={() => handleEdit(room)}
-                            >
-                              <i className="fas fa-edit"></i>
-                            </Button>
+                    {filteredRooms.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-20 py-40 text-center">
+                          <div className="d-flex flex-column align-items-center justify-content-center">
+                            <i className="fas fa-search text-neutral-400 mb-3" style={{ fontSize: '48px' }}></i>
+                            <div className="text-neutral-600 fw-medium text-16 mb-2">
+                              Không tìm thấy phòng học
+                            </div>
+                            <div className="text-neutral-500 text-14">
+                              {searchTerm || filterStatus !== 'all' 
+                                ? 'Thử thay đổi điều kiện tìm kiếm hoặc bộ lọc'
+                                : 'Chưa có phòng học nào trong hệ thống'}
+                            </div>
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredRooms.map(room => (
+                        <tr key={room._id}>
+                          <td className="px-20 py-16">
+                            <div className="text-neutral-900 fw-semibold text-14">{room.room_name}</div>
+                          </td>
+                          <td className="px-20 py-16 text-neutral-700 text-14">{room.location}</td>
+                          <td className="px-20 py-16 text-center text-neutral-700 fw-medium text-14">
+                            {room.capacity}
+                          </td>
+                          <td className="px-20 py-16">
+                            {getStatusBadge(room.status)}
+                          </td>
+                          <td className="px-20 py-16">
+                            <div className="d-flex gap-8">
+                              <Button
+                                variant="outline-info"
+                                size="sm"
+                                onClick={() => handleViewSchedule(room)}
+                              >
+                                <i className="fas fa-calendar me-1"></i>
+                                Lịch
+                              </Button>
+                              <Button
+                                variant="outline-secondary"
+                                size="sm"
+                                onClick={() => handleEdit(room)}
+                              >
+                                <i className="fas fa-edit"></i>
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </Table>
               </Card.Body>
@@ -716,21 +734,6 @@ const RoomManagementFull = () => {
                     onCreateMakeup={() => {}}
                     readOnly={true}
                   />
-                  {/* Program Type Color Legend */}
-                  <div className="d-flex justify-content-center gap-4 mt-3">
-                    <div className="d-flex align-items-center gap-2">
-                      <div style={{ width: '16px', height: '16px', backgroundColor: '#2196F3', borderRadius: '2px' }}></div>
-                      <span className="text-13">IELTS</span>
-                    </div>
-                    <div className="d-flex align-items-center gap-2">
-                      <div style={{ width: '16px', height: '16px', backgroundColor: '#4CAF50', borderRadius: '2px' }}></div>
-                      <span className="text-13">TOEIC</span>
-                    </div>
-                    <div className="d-flex align-items-center gap-2">
-                      <div style={{ width: '16px', height: '16px', backgroundColor: '#FF9800', borderRadius: '2px' }}></div>
-                      <span className="text-13">Cambridge</span>
-                    </div>
-                  </div>
                 </>
               ) : (
                 <div className="text-center py-4 text-muted">

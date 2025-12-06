@@ -3,10 +3,6 @@ import { Container, Row, Col, Card, Button, Badge, ProgressBar, Table, Spinner, 
 import { Link } from 'react-router-dom';
 import academicStaffService from '../../services/academicStaffService';
 
-/**
- * Academic Dashboard Component
- * Trang tổng quan cho module Giáo vụ
- */
 const AcademicDashboard = () => {
 
   const [todayOverview, setTodayOverview] = useState({
@@ -140,7 +136,6 @@ const AcademicDashboard = () => {
         </Alert>
       )}
 
-      {/* Today Overview - Priority Section */}
       <Card className="bg-white border-0 rounded-12 mb-20" 
             style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
         <Card.Body className="p-20">
@@ -153,7 +148,7 @@ const AcademicDashboard = () => {
 
           <Row className="g-2">
             {/* Học viên vắng */}
-            <Col md={6} lg>
+            {/* <Col md={6} lg>
               <Card className="bg-danger-50 border border-danger-200 rounded-8 h-100 cursor-pointer transition-2 item-hover">
                 <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
                   <div className="d-flex justify-content-between align-items-start">
@@ -179,10 +174,10 @@ const AcademicDashboard = () => {
                   </div>
                 </Card.Body>
               </Card>
-            </Col>
+            </Col> */}
 
             {/* Yêu cầu xếp lớp mới */}
-            <Col md={6} lg>
+            <Col md={4} lg>
                 <Card className="bg-purple-50 border border-purple-200 rounded-8 h-100 transition-2 item-hover">
                   <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
                     <div className="d-flex justify-content-between align-items-start">
@@ -211,7 +206,7 @@ const AcademicDashboard = () => {
             </Col>
 
             {/* Yêu cầu xin nghỉ */}
-            <Col md={6} lg>
+            <Col md={4} lg>
               <Card className="bg-warning-50 border border-warning-200 rounded-8 h-100 cursor-pointer transition-2 item-hover">
                 <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
                   <div className="d-flex justify-content-between align-items-start">
@@ -240,7 +235,7 @@ const AcademicDashboard = () => {
             </Col>
 
             {/* Buổi học bù chờ xếp */}
-            <Col md={6} lg>
+            <Col md={4} lg>
               <Card className="bg-info-50 border border-info-200 rounded-8 h-100 cursor-pointer transition-2 item-hover">
                 <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
                   <div className="d-flex justify-content-between align-items-start">
@@ -273,9 +268,9 @@ const AcademicDashboard = () => {
 
 
       <Row className="g-3">
-        {/* Left Column - Schedule & Room Usage */}
+
         <Col lg={8}>
-          {/* Today's Schedule - Compact */}
+
           <Card className="bg-white border-0 rounded-12 mb-24" 
                 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
             <Card.Header className="bg-main-25 border-0 p-20">
@@ -329,7 +324,6 @@ const AcademicDashboard = () => {
             </Card.Body>
           </Card>
 
-          {/* Room Schedule */}
           <Card className="bg-white border-0 rounded-12 mb-24" 
                 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
             <Card.Header className="bg-main-25 border-0 p-20">
@@ -396,7 +390,6 @@ const AcademicDashboard = () => {
             </Card.Body>
           </Card>
 
-          {/* Absent Students List */}
           {absentStudentsList.length > 0 && (
             <Card className="bg-white border-0 rounded-12" 
                   style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
@@ -449,15 +442,15 @@ const AcademicDashboard = () => {
           )}
         </Col>
 
-        {/* Right Column - Activities */}
         <Col lg={4}>
           <Card className="bg-white border-0 rounded-12 mb-24" 
                 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
             <Card.Header className="bg-main-25 border-0 p-20">
               <h6 className="text-neutral-900 fw-bold mb-0">
                 <i className="fas fa-history text-main-600 me-2"></i>
-                Hoạt động gần đây
+                Yêu cầu gần đây
               </h6>
+              <p>Xem tất cả</p>
             </Card.Header>
             <Card.Body className="p-20" style={{ maxHeight: '600px', overflowY: 'auto' }}>
               <div className="d-flex flex-column gap-16">
@@ -479,8 +472,7 @@ const AcademicDashboard = () => {
         </Col>
       </Row>
 
-      {/* Class Progress - Compact */}
-      <Row>
+      {/* <Row>
         <Col>
           <Card className="bg-white border-0 rounded-12" 
                 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
@@ -541,7 +533,7 @@ const AcademicDashboard = () => {
             </Card.Body>
           </Card>
         </Col>
-      </Row>
+      </Row> */}
     </Container>
   );
 };

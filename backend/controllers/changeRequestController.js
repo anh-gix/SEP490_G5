@@ -6,28 +6,21 @@ const StudentSchedule = require('../models/studentScheduleModel');
 const Class = require('../models/classModel');
 const mongoose = require('mongoose');
 
-// =========================
-// 📋 LẤY DANH SÁCH TẤT CẢ ĐƠN
-// =========================
 exports.getAllChangeRequests = async (req, res) => {
   try {
     const { status, type, search, page = 1, limit = 10 } = req.query;
     
     let query = {};
-    
-    // Filter by status
+
     if (status && status !== 'all') {
       query.status = status;
     }
     
-    // Filter by type
     if (type && type !== 'all') {
       query.type = type;
     }
     
-    // Search by content or sender name/email
     if (search) {
-      // First, find users matching the search term
       const User = require('../models/userModel');
       const matchingUsers = await User.find({
         $or: [
@@ -38,7 +31,6 @@ exports.getAllChangeRequests = async (req, res) => {
       
       const userIds = matchingUsers.map(u => u._id);
       
-      // Search in content or sender
       query.$or = [
         { content: { $regex: search, $options: 'i' } }
       ];
@@ -48,22 +40,17 @@ exports.getAllChangeRequests = async (req, res) => {
       }
     }
     
-    // Pagination
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const skip = (pageNum - 1) * limitNum;
     
-    // Get total count
     const total = await ChangeRequest.countDocuments(query);
     
-    // Get paginated results
-    // Sắp xếp theo ngày gửi cũ nhất trước (để xử lý những đơn lâu nhất trước)
     const changeRequests = await ChangeRequest.find(query)
       .populate('sender', 'username email phone')
       .populate('approver', 'username email')
       .populate({
         path: 'studentScheduleId',
-        // Không dùng select để đảm bảo tất cả field (bao gồm student) được include
         populate: {
           path: 'classSchedule',
           select: 'date startTime endTime session class room',
@@ -132,21 +119,16 @@ exports.getAllChangeRequests = async (req, res) => {
       .limit(limitNum)
       .lean();
     
-    // Đảm bảo field student được include trong studentScheduleId
-    // Lấy đầy đủ thông tin StudentSchedule từ database cho tất cả request có studentScheduleId
     for (let i = 0; i < changeRequests.length; i++) {
       const request = changeRequests[i];
       if (request.studentScheduleId && request.studentScheduleId._id) {
-        // Lấy đầy đủ thông tin StudentSchedule từ database
         const studentScheduleId = request.studentScheduleId._id;
         const fullStudentSchedule = await StudentSchedule.findById(studentScheduleId)
           .select('student classSchedule attendance scheduleStatus reason')
           .lean();
         
         if (fullStudentSchedule) {
-          // Merge thông tin từ database vào studentScheduleId (đảm bảo có field student)
           request.studentScheduleId.student = fullStudentSchedule.student;
-          // Giữ nguyên classSchedule đã populate, nhưng đảm bảo các field khác cũng có
           if (!request.studentScheduleId.attendance) {
             request.studentScheduleId.attendance = fullStudentSchedule.attendance;
           }
@@ -160,7 +142,6 @@ exports.getAllChangeRequests = async (req, res) => {
       }
     }
     
-    // Thêm thông tin lịch học và session hiện tại cho các request có classId (change_class)
     const classIdsToEnrich = changeRequests
       .filter(req => req.type === 'change_class' && req.classId)
       .map(req => req.classId._id || req.classId);
@@ -169,7 +150,6 @@ exports.getAllChangeRequests = async (req, res) => {
       const now = new Date();
       now.setHours(0, 0, 0, 0);
       
-      // Lấy tất cả fixed schedules của các lớp này
       const classSchedules = await ClassSchedule.find({
         class: { $in: classIdsToEnrich },
         status: 'fixed'
@@ -179,7 +159,6 @@ exports.getAllChangeRequests = async (req, res) => {
         .sort({ date: 1, startTime: 1 })
         .lean();
       
-      // Nhóm schedules theo classId
       const schedulesByClass = {};
       classSchedules.forEach(schedule => {
         const classId = schedule.class?.toString() || schedule.class;
@@ -189,13 +168,11 @@ exports.getAllChangeRequests = async (req, res) => {
         schedulesByClass[classId].push(schedule);
       });
       
-      // Tìm session hiện tại và attach vào từng request
       changeRequests.forEach(request => {
         if (request.type === 'change_class' && request.classId) {
           const classId = request.classId._id?.toString() || request.classId.toString();
           const schedules = schedulesByClass[classId] || [];
           
-          // Tìm session hiện tại (session gần nhất đã học hoặc sắp học)
           let currentSession = null;
           const pastSessions = schedules.filter(s => {
             const scheduleDate = new Date(s.date);
@@ -204,14 +181,11 @@ exports.getAllChangeRequests = async (req, res) => {
           });
           
           if (pastSessions.length > 0) {
-            // Lấy session đã học gần nhất
             currentSession = pastSessions[pastSessions.length - 1];
           } else if (schedules.length > 0) {
-            // Nếu chưa có session nào đã học, lấy session đầu tiên (sắp học)
             currentSession = schedules[0];
           }
           
-          // Attach thông tin vào classId
           if (request.classId) {
             request.classId.fixedSchedules = schedules.map(s => ({
               id: s._id,
@@ -221,7 +195,7 @@ exports.getAllChangeRequests = async (req, res) => {
               session: s.session,
               room: s.room,
               roomName: s.room?.room_name || 'N/A',
-              status: s.status || 'fixed' // Đảm bảo có field status
+              status: s.status || 'fixed'
             }));
             
             if (currentSession && currentSession.session) {
@@ -254,15 +228,11 @@ exports.getAllChangeRequests = async (req, res) => {
   }
 };
 
-// =========================
-// ➕ TẠO CHANGE REQUEST MỚI
-// =========================
 exports.createChangeRequest = async (req, res) => {
   try {
     const { type, studentScheduleId, classId, classScheduleId, content } = req.body;
-    const senderId = req.user._id; // Lấy từ token
+    const senderId = req.user._id;
     
-    // Validate required fields
     if (!type || !content) {
       return res.status(400).json({
         success: false,
@@ -270,7 +240,6 @@ exports.createChangeRequest = async (req, res) => {
       });
     }
     
-    // Validate type
     const validTypes = ['create_class', 'change_class', 'makeup_class', 'replace_teacher'];
     if (!validTypes.includes(type)) {
       return res.status(400).json({
@@ -279,7 +248,6 @@ exports.createChangeRequest = async (req, res) => {
       });
     }
     
-    // Validate studentScheduleId for makeup_class
     if (type === 'makeup_class' && !studentScheduleId) {
       return res.status(400).json({
         success: false,
@@ -287,7 +255,6 @@ exports.createChangeRequest = async (req, res) => {
       });
     }
     
-    // Verify studentScheduleId exists and belongs to sender
     if (type === 'makeup_class' && studentScheduleId) {
       const studentSchedule = await StudentSchedule.findById(studentScheduleId);
       if (!studentSchedule) {
@@ -304,7 +271,6 @@ exports.createChangeRequest = async (req, res) => {
       }
     }
     
-    // Create change request
     const changeRequest = await ChangeRequest.create({
       sender: senderId,
       type,
@@ -314,7 +280,6 @@ exports.createChangeRequest = async (req, res) => {
       content: content.trim()
     });
     
-    // Populate sender info
     const populatedRequest = await ChangeRequest.findById(changeRequest._id)
       .populate('sender', 'username email')
       .lean();
@@ -334,14 +299,10 @@ exports.createChangeRequest = async (req, res) => {
   }
 };
 
-// =========================
-// 📅 LẤY LỊCH HỌC/DẠY CỦA NGƯỜI GỬI ĐƠN
-// =========================
 exports.getSenderSchedule = async (req, res) => {
   try {
     const { requestId } = req.params;
     
-    // Lấy thông tin đơn
     const changeRequest = await ChangeRequest.findById(requestId)
       .populate('sender', 'username email roleId');
     
@@ -360,7 +321,6 @@ exports.getSenderSchedule = async (req, res) => {
       });
     }
     
-    // Lấy role để xác định là học sinh hay giáo viên
     const role = await Role.findById(sender.roleId);
     const isStudent = role?.name === 'Student';
     const isTeacher = role?.name === 'Teacher';
@@ -368,7 +328,6 @@ exports.getSenderSchedule = async (req, res) => {
     let schedules = [];
     
     if (isStudent) {
-      // Lấy TẤT CẢ StudentSchedule của học sinh (bao gồm cả buổi học bù ở lớp khác)
       const allStudentSchedules = await StudentSchedule.find({
         student: sender._id
       })
@@ -381,7 +340,11 @@ exports.getSenderSchedule = async (req, res) => {
             select: 'name',
             populate: {
               path: 'course',
-              select: 'name'
+              select: 'name',
+              populate: {
+                path: 'program',
+                select: 'type'
+              }
             }
           },
           {
@@ -400,9 +363,8 @@ exports.getSenderSchedule = async (req, res) => {
       })
       .lean();
       
-      // Chuyển đổi StudentSchedule thành format giống ClassSchedule để tương thích với frontend
       schedules = allStudentSchedules
-        .filter(ss => ss.classSchedule) // Chỉ lấy những cái có classSchedule hợp lệ
+        .filter(ss => ss.classSchedule)
         .map(ss => {
           const classSchedule = ss.classSchedule;
           return {
@@ -418,14 +380,12 @@ exports.getSenderSchedule = async (req, res) => {
             teacher: classSchedule.teacher,
             createdBy: classSchedule.createdBy,
             reason: classSchedule.reason,
-            // Thông tin từ StudentSchedule
             attendance: ss.attendance || null,
             scheduleStatus: ss.scheduleStatus || 'scheduled',
             studentScheduleReason: ss.reason || null
           };
         })
         .sort((a, b) => {
-          // Sắp xếp theo date và startTime
           const dateA = new Date(a.date);
           const dateB = new Date(b.date);
           if (dateA.getTime() !== dateB.getTime()) {
@@ -434,7 +394,6 @@ exports.getSenderSchedule = async (req, res) => {
           return (a.startTime || '').localeCompare(b.startTime || '');
         });
     } else if (isTeacher) {
-      // Lấy lịch dạy của giáo viên - lấy tất cả lịch dạy (không giới hạn thời gian)
       const teacherClasses = await Class.find({ teacher: sender._id })
         .select('_id name')
         .lean();
@@ -451,7 +410,11 @@ exports.getSenderSchedule = async (req, res) => {
           select: 'name',
           populate: {
             path: 'course',
-            select: 'name'
+            select: 'name',
+            populate: {
+              path: 'program',
+              select: 'type'
+            }
           }
         })
         .populate('room', 'room_name location')
@@ -482,9 +445,6 @@ exports.getSenderSchedule = async (req, res) => {
   }
 };
 
-// =========================
-// ✅ CHẤP NHẬN ĐƠN
-// =========================
 exports.approveChangeRequest = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -492,9 +452,8 @@ exports.approveChangeRequest = async (req, res) => {
   try {
     const { id } = req.params;
     const { pendingMakeupClasses, pendingClassChange } = req.body;
-    const approverId = req.user?._id || req.body.approverId; // Lấy từ token hoặc body
+    const approverId = req.user?._id || req.body.approverId;
     
-    // Lấy thông tin đơn trước khi cập nhật
     const changeRequest = await ChangeRequest.findById(id)
       .populate('sender', 'username email phone')
       .session(session);
@@ -510,7 +469,6 @@ exports.approveChangeRequest = async (req, res) => {
     
     const studentId = changeRequest.sender._id || changeRequest.sender;
     
-    // Xử lý buổi học bù nếu có
     if (pendingMakeupClasses && Array.isArray(pendingMakeupClasses) && pendingMakeupClasses.length > 0) {
       console.log(`📚 Xử lý ${pendingMakeupClasses.length} buổi học bù cho học sinh ${studentId}`);
       
@@ -540,12 +498,9 @@ exports.approveChangeRequest = async (req, res) => {
         console.log(`   - Type: ${typeof absentScheduleId}`);
         console.log(`   - isNewMakeup: ${isNewMakeup}`);
         
-        // Kiểm tra ClassSchedule của buổi nghỉ
-        // absentScheduleId có thể là StudentSchedule ID hoặc ClassSchedule ID
         let absentClassSchedule = null;
         let actualAbsentClassScheduleId = null;
         
-        // Thử tìm ClassSchedule trực tiếp trước
         try {
           absentClassSchedule = await ClassSchedule.findById(absentScheduleId).session(session);
           if (absentClassSchedule) {
@@ -556,7 +511,6 @@ exports.approveChangeRequest = async (req, res) => {
           console.log(`ℹ️ Không tìm thấy ClassSchedule trực tiếp với ID: ${absentScheduleId}`);
         }
         
-        // Nếu không tìm thấy ClassSchedule, thử tìm StudentSchedule và lấy classSchedule từ đó
         if (!absentClassSchedule) {
           console.log(`🔍 Thử tìm StudentSchedule với ID: ${absentScheduleId}`);
           try {
@@ -571,7 +525,6 @@ exports.approveChangeRequest = async (req, res) => {
                 actualAbsentClassScheduleId = absentStudentSchedule.classSchedule._id || absentStudentSchedule.classSchedule;
                 console.log(`   - ClassSchedule ID từ StudentSchedule: ${actualAbsentClassScheduleId}`);
                 
-                // Tìm lại ClassSchedule với ID đúng
                 absentClassSchedule = await ClassSchedule.findById(actualAbsentClassScheduleId).session(session);
                 
                 if (absentClassSchedule) {
@@ -602,21 +555,17 @@ exports.approveChangeRequest = async (req, res) => {
         
         let finalMakeupScheduleId = makeupScheduleId;
         
-        // Xử lý trường hợp giáo viên dạy thay
         if (isSubstituteClass && substituteTeacherId) {
           console.log(`👨‍🏫 Xử lý giáo viên dạy thay cho buổi nghỉ: ${absentScheduleId}`);
           console.log(`   - Giáo viên dạy thay: ${substituteTeacherId}`);
           
-          // Lưu giáo viên gốc vào substituteTeacher (nếu chưa có)
           const originalTeacher = absentClassSchedule.teacher;
           if (!absentClassSchedule.substituteTeacher) {
             absentClassSchedule.substituteTeacher = originalTeacher;
           }
           
-          // Cập nhật teacher của ClassSchedule buổi nghỉ thành giáo viên dạy thay
           absentClassSchedule.teacher = new mongoose.Types.ObjectId(substituteTeacherId);
           
-          // Thêm note để ghi nhận việc có giáo viên dạy thay
           const substituteNote = `Giáo viên dạy thay: ${substituteTeacherId} (Giáo viên gốc: ${originalTeacher})`;
           if (absentClassSchedule.note) {
             absentClassSchedule.note += `\n${substituteNote}`;
@@ -630,42 +579,32 @@ exports.approveChangeRequest = async (req, res) => {
           console.log(`   - Giáo viên gốc (đã lưu vào substituteTeacher): ${originalTeacher}`);
           console.log(`   - Giáo viên dạy thay (đã cập nhật vào teacher): ${substituteTeacherId}`);
           
-          // Với đơn replace_teacher, buổi học vẫn diễn ra bình thường
-          // Học sinh vẫn đi học, không cần xử lý StudentSchedule
-          // StudentSchedule giữ nguyên trạng thái (scheduled) vì buổi học không bị hủy
-          
-          // Bỏ qua các bước xử lý buổi học bù thông thường
           continue;
         }
         
-        // Xử lý trường hợp tạo buổi học bù mới
         if (isNewMakeup && newMakeupDate && newMakeupStartTime && newMakeupEndTime && newMakeupRoomId && newMakeupTeacherId) {
           console.log(`🆕 Tạo buổi học bù mới cho buổi nghỉ: ${absentScheduleId}`);
-          
-          // Parse date string (YYYY-MM-DD) và tạo Date object ở UTC để tránh timezone issues
+
           const dateParts = newMakeupDate.split('-');
           if (dateParts.length !== 3) {
             console.warn(`⚠️ Định dạng ngày không hợp lệ: ${newMakeupDate}`);
             continue;
           }
           
-          // Tạo date ở UTC để đảm bảo consistency với MongoDB (MongoDB lưu dates dưới dạng UTC)
           const scheduleDate = new Date(Date.UTC(
-            parseInt(dateParts[0]), // year
-            parseInt(dateParts[1]) - 1, // month (0-indexed)
-            parseInt(dateParts[2]), // day
-            0, // hours
-            0, // minutes
-            0, // seconds
-            0  // milliseconds
+            parseInt(dateParts[0]),
+            parseInt(dateParts[1]) - 1,
+            parseInt(dateParts[2]),
+            0,
+            0,
+            0,
+            0
           ));
           
-          // Tạo date range để query (start và end của ngày trong UTC)
           const startOfDay = new Date(scheduleDate);
           const endOfDay = new Date(scheduleDate);
           endOfDay.setUTCHours(23, 59, 59, 999);
           
-          // Kiểm tra conflict với room và teacher (trong transaction)
           const roomConflict = await ClassSchedule.findOne({
             room: new mongoose.Types.ObjectId(newMakeupRoomId),
             date: { $gte: startOfDay, $lte: endOfDay },
@@ -682,7 +621,6 @@ exports.approveChangeRequest = async (req, res) => {
             throw new Error('Phòng học đã được sử dụng vào thời gian này');
           }
           
-          // Kiểm tra conflict với teacher
           const teacherClasses = await Class.find({
             $or: [
               { teacher: newMakeupTeacherId },
@@ -709,7 +647,6 @@ exports.approveChangeRequest = async (req, res) => {
             }
           }
           
-          // Kiểm tra conflict với lịch học của học sinh
           const hasTimeOverlap = (start1, end1, start2, end2) => {
             const timeToMinutes = (timeStr) => {
               if (!timeStr) return 0;
@@ -726,8 +663,6 @@ exports.approveChangeRequest = async (req, res) => {
             const start2Min = timeToMinutes(start2);
             const end2Min = timeToMinutes(end2);
             
-            // Hai khoảng thời gian overlap nếu: start1 < end2 VÀ end1 > start2
-            // Ví dụ: 09:00-11:00 và 10:00-12:00 overlap từ 10:00-11:00
             const hasOverlap = start1Min < end2Min && end1Min > start2Min;
             
             console.log(`🔍 Kiểm tra overlap: [${start1}-${end1}] vs [${start2}-${end2}]`);
@@ -752,10 +687,9 @@ exports.approveChangeRequest = async (req, res) => {
           console.log(`📅 Kiểm tra conflict cho buổi học bù: ${makeupDateStr} ${newMakeupStartTime}-${newMakeupEndTime}`);
           console.log(`   - Học sinh ID: ${studentId}`);
           
-          // Lấy tất cả buổi học của học sinh (bao gồm cả các buổi có status là scheduled, rescheduled, pending)
           const studentSchedules = await StudentSchedule.find({ 
             student: studentId,
-            scheduleStatus: { $in: ['scheduled', 'rescheduled', 'pending'] } // Chỉ kiểm tra các buổi học đang active
+            scheduleStatus: { $in: ['scheduled', 'rescheduled', 'pending'] }
           })
             .populate({
               path: 'classSchedule',
@@ -770,7 +704,6 @@ exports.approveChangeRequest = async (req, res) => {
           
           console.log(`   - Tìm thấy ${studentSchedules.length} buổi học của học sinh`);
           
-          // Kiểm tra conflict với lịch học của học sinh
           const studentConflicts = [];
           studentSchedules.forEach((studentSchedule, index) => {
             if (!studentSchedule.classSchedule) {
@@ -784,7 +717,6 @@ exports.approveChangeRequest = async (req, res) => {
             
             console.log(`   - Buổi học ${index + 1}: ${existingScheduleDateStr} ${studentSchedule.classSchedule.startTime}-${studentSchedule.classSchedule.endTime}`);
             
-            // Kiểm tra cùng ngày và trùng giờ
             if (existingScheduleDateStr === makeupDateStr) {
               console.log(`     ✓ Cùng ngày, kiểm tra overlap...`);
               const hasOverlap = hasTimeOverlap(
@@ -814,9 +746,8 @@ exports.approveChangeRequest = async (req, res) => {
           
           console.log(`✅ Không có conflict với lịch học của học sinh`);
           
-          // Tạo ClassSchedule mới trong transaction
           const newMakeupSchedule = new ClassSchedule({
-            class: null, // Không có classId cho buổi học bù
+            class: null,
             session: newMakeupSessionId ? new mongoose.Types.ObjectId(newMakeupSessionId) : null,
             date: scheduleDate,
             startTime: newMakeupStartTime,
@@ -825,7 +756,7 @@ exports.approveChangeRequest = async (req, res) => {
             teacher: new mongoose.Types.ObjectId(newMakeupTeacherId),
             createdBy: approverId || new mongoose.Types.ObjectId(newMakeupTeacherId),
             reason: 'Buổi học bù',
-            status: 'temporary' // Buổi học bù là temporary
+            status: 'temporary'
           });
           
           await newMakeupSchedule.save({ session });
@@ -833,8 +764,6 @@ exports.approveChangeRequest = async (req, res) => {
           
           console.log(`✅ Đã tạo ClassSchedule mới cho buổi học bù: ${finalMakeupScheduleId}`);
         } else if (makeupScheduleId) {
-          // Trường hợp chọn từ lớp có sẵn
-          // Kiểm tra ClassSchedule có tồn tại không
           const makeupClassSchedule = await ClassSchedule.findById(makeupScheduleId).session(session);
           
           if (!makeupClassSchedule) {
@@ -848,7 +777,6 @@ exports.approveChangeRequest = async (req, res) => {
           continue;
         }
         
-        // Đảm bảo finalMakeupScheduleId đã được set
         if (!finalMakeupScheduleId) {
           console.error(`❌ finalMakeupScheduleId chưa được set. Makeup data:`, JSON.stringify(makeup, null, 2));
           continue;
@@ -859,14 +787,12 @@ exports.approveChangeRequest = async (req, res) => {
         console.log(`   - actualAbsentClassScheduleId: ${actualAbsentClassScheduleId}`);
         console.log(`   - studentId: ${studentId}`);
         
-        // Kiểm tra xem đã có StudentSchedule cho buổi học bù chưa (tránh duplicate)
         const existingMakeupSchedule = await StudentSchedule.findOne({
           student: studentId,
           classSchedule: finalMakeupScheduleId
         }).session(session);
         
         if (!existingMakeupSchedule) {
-          // Tạo StudentSchedule mới cho buổi học bù
           console.log(`🆕 Tạo StudentSchedule mới cho buổi học bù...`);
           const newStudentSchedule = new StudentSchedule({
             student: studentId,
@@ -886,7 +812,6 @@ exports.approveChangeRequest = async (req, res) => {
           console.log(`   - StudentSchedule ID: ${existingMakeupSchedule._id}`);
         }
         
-        // Cập nhật StudentSchedule của buổi nghỉ thành cancelled
         console.log(`🚫 Bắt đầu cancel StudentSchedule của buổi nghỉ...`);
         console.log(`   - Tìm StudentSchedule với studentId: ${studentId}`);
         console.log(`   - Tìm StudentSchedule với classSchedule: ${actualAbsentClassScheduleId}`);
@@ -916,7 +841,6 @@ exports.approveChangeRequest = async (req, res) => {
           console.warn(`   - classSchedule: ${actualAbsentClassScheduleId}`);
           console.warn(`   - absentScheduleId (original): ${absentScheduleId}`);
           
-          // Thử tìm với absentScheduleId gốc (có thể là StudentSchedule ID)
           if (absentScheduleId !== actualAbsentClassScheduleId) {
             console.log(`🔍 Thử tìm StudentSchedule với absentScheduleId gốc: ${absentScheduleId}`);
             const absentStudentScheduleByOriginalId = await StudentSchedule.findById(absentScheduleId).session(session);
@@ -930,22 +854,20 @@ exports.approveChangeRequest = async (req, res) => {
             }
           }
         }
-        } // Đóng vòng lặp for
+        }
       } catch (makeupError) {
         console.error(`❌ Lỗi khi xử lý buổi học bù:`, makeupError);
         console.error(`   - Error message: ${makeupError.message}`);
         console.error(`   - Error stack: ${makeupError.stack}`);
-        throw makeupError; // Re-throw để transaction rollback
+        throw makeupError;
       }
     }
     
-    // Xử lý đổi lớp nếu có
     if (pendingClassChange) {
       console.log('🔄 Bắt đầu xử lý đổi lớp...');
       
       const { oldClassId, newClassId } = pendingClassChange;
       
-      // 1. Validate dữ liệu
       if (!oldClassId || !newClassId) {
         await session.abortTransaction();
         session.endSession();
@@ -955,7 +877,6 @@ exports.approveChangeRequest = async (req, res) => {
         });
       }
       
-      // Kiểm tra lớp cũ và lớp mới có tồn tại
       const oldClass = await Class.findById(oldClassId).session(session);
       const newClass = await Class.findById(newClassId).session(session);
       
@@ -977,7 +898,6 @@ exports.approveChangeRequest = async (req, res) => {
         });
       }
       
-      // Kiểm tra học viên có trong lớp cũ không
       const studentInOldClass = oldClass.students.some(
         id => id.toString() === studentId.toString()
       );
@@ -991,7 +911,6 @@ exports.approveChangeRequest = async (req, res) => {
         });
       }
       
-      // Kiểm tra lớp mới còn chỗ không (nếu có maxStudents)
       if (newClass.maxStudents) {
         const currentStudentCount = newClass.students ? newClass.students.length : 0;
         if (currentStudentCount >= newClass.maxStudents) {
@@ -1004,11 +923,9 @@ exports.approveChangeRequest = async (req, res) => {
         }
       }
       
-      // 2. Lấy session order hiện tại của lớp cũ và lớp mới
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      // Tìm ClassSchedule gần nhất (date >= today) của lớp cũ
       const oldClassSchedules = await ClassSchedule.find({
         class: oldClassId,
         date: { $gte: today }
@@ -1019,7 +936,6 @@ exports.approveChangeRequest = async (req, res) => {
         .session(session)
         .lean();
       
-      // Tìm ClassSchedule gần nhất (date >= today) của lớp mới
       const newClassSchedules = await ClassSchedule.find({
         class: newClassId,
         date: { $gte: today }
@@ -1039,27 +955,23 @@ exports.approveChangeRequest = async (req, res) => {
       
       console.log(`📊 Session order - Lớp cũ: ${oldClassSessionOrder}, Lớp mới: ${newClassSessionOrder}`);
       
-      // Xác định trường hợp
-      let caseType = 1; // Mặc định là trường hợp 1
+      let caseType = 1;
       if (oldClassSessionOrder !== null && newClassSessionOrder !== null) {
         if (oldClassSessionOrder < newClassSessionOrder) {
-          caseType = 2; // Lớp cũ < lớp mới
+          caseType = 2;
         } else if (oldClassSessionOrder > newClassSessionOrder) {
-          caseType = 3; // Lớp cũ > lớp mới
+          caseType = 3;
         }
       }
       
       console.log(`🔍 Trường hợp xử lý: ${caseType}`);
       
-      // 3. Xử lý Class model
-      // Xóa học viên khỏi lớp cũ
       oldClass.students = oldClass.students.filter(
         id => id.toString() !== studentId.toString()
       );
       await oldClass.save({ session });
       console.log(`✅ Đã xóa học viên khỏi lớp cũ: ${oldClassId}`);
       
-      // Thêm học viên vào lớp mới (nếu chưa có)
       const studentInNewClass = newClass.students.some(
         id => id.toString() === studentId.toString()
       );
@@ -1069,8 +981,6 @@ exports.approveChangeRequest = async (req, res) => {
         console.log(`✅ Đã thêm học viên vào lớp mới: ${newClassId}`);
       }
       
-      // 4. Xử lý StudentSchedule
-      // a) Lấy tất cả ClassSchedule của lớp cũ
       const allOldClassSchedules = await ClassSchedule.find({
         class: oldClassId
       })
@@ -1080,7 +990,6 @@ exports.approveChangeRequest = async (req, res) => {
       
       const oldClassScheduleIds = allOldClassSchedules.map(s => s._id);
       
-      // b) Lấy tất cả StudentSchedule của học viên ở lớp cũ
       const studentSchedules = await StudentSchedule.find({
         student: studentId,
         classSchedule: { $in: oldClassScheduleIds }
@@ -1097,7 +1006,6 @@ exports.approveChangeRequest = async (req, res) => {
       
       console.log(`📋 Tìm thấy ${studentSchedules.length} StudentSchedule của học viên ở lớp cũ`);
       
-      // c) Lấy tất cả ClassSchedule của lớp mới để match
       const allNewClassSchedules = await ClassSchedule.find({
         class: newClassId
       })
@@ -1105,7 +1013,6 @@ exports.approveChangeRequest = async (req, res) => {
         .session(session)
         .lean();
       
-      // Tạo map để tìm ClassSchedule theo session order
       const newClassScheduleMap = new Map();
       allNewClassSchedules.forEach(schedule => {
         if (schedule.session && schedule.session.order !== null && schedule.session.order !== undefined) {
@@ -1117,7 +1024,6 @@ exports.approveChangeRequest = async (req, res) => {
         }
       });
       
-      // Tạo set các absentScheduleId đã được xử lý trong pendingMakeupClasses (đã cancel riêng)
       const processedAbsentScheduleIds = new Set();
       if (pendingMakeupClasses && Array.isArray(pendingMakeupClasses)) {
         pendingMakeupClasses.forEach(makeup => {
@@ -1128,7 +1034,6 @@ exports.approveChangeRequest = async (req, res) => {
       }
       console.log(`📋 Đã xử lý ${processedAbsentScheduleIds.size} buổi học bù, các buổi này sẽ không bị cancel lại`);
       
-      // d) Xử lý từng StudentSchedule
       let updatedCount = 0;
       let cancelledCount = 0;
       let unchangedCount = 0;
@@ -1141,32 +1046,26 @@ exports.approveChangeRequest = async (req, res) => {
         const hasAttendance = studentSchedule.attendance && studentSchedule.attendance.status !== null;
         const classScheduleId = classSchedule._id?.toString() || classSchedule.toString();
         
-        // Kiểm tra buổi học đã diễn ra chưa (date < today)
         const scheduleDate = new Date(classSchedule.date);
         scheduleDate.setHours(0, 0, 0, 0);
         const isPastSchedule = scheduleDate < today;
         
-        // Nếu đã có điểm danh hoặc đã diễn ra, giữ nguyên
         if (hasAttendance || isPastSchedule) {
           unchangedCount++;
           console.log(`⏭️ Giữ nguyên StudentSchedule ${studentSchedule._id} (${hasAttendance ? 'đã có điểm danh' : 'đã diễn ra'})`);
           continue;
         }
         
-        // Nếu buổi học này đã được xử lý trong pendingMakeupClasses (đã cancel riêng), bỏ qua
         if (processedAbsentScheduleIds.has(classScheduleId)) {
           unchangedCount++;
           console.log(`⏭️ Giữ nguyên StudentSchedule ${studentSchedule._id} (đã được xử lý trong buổi học bù)`);
           continue;
         }
         
-        // Xử lý theo từng trường hợp
         if (caseType === 1) {
-          // Trường hợp 1: session order bằng nhau
           if (sessionOrder !== null && sessionOrder !== undefined) {
             const matchingSchedules = newClassScheduleMap.get(sessionOrder);
             if (matchingSchedules && matchingSchedules.length > 0) {
-              // Lấy ClassSchedule đầu tiên có cùng session order
               const newClassScheduleId = matchingSchedules[0]._id;
               await StudentSchedule.findByIdAndUpdate(
                 studentSchedule._id,
@@ -1178,20 +1077,12 @@ exports.approveChangeRequest = async (req, res) => {
             }
           }
         } else if (caseType === 2) {
-          // Trường hợp 2: lớp cũ < lớp mới
-          // Khi có học bù, chỉ cancel những buổi được chọn để học bù
-          // Các buổi khác có sessionOrder < newClassSessionOrder sẽ được giữ nguyên
-          // vì học viên đã học ở lớp cũ rồi, không cần cancel
           if (sessionOrder !== null && sessionOrder !== undefined) {
             if (sessionOrder < newClassSessionOrder) {
-              // Nếu có pendingMakeupClasses, chỉ cancel những buổi trong danh sách học bù
-              // Các buổi khác giữ nguyên (học viên đã học rồi)
               if (pendingMakeupClasses && pendingMakeupClasses.length > 0) {
-                // Đã được xử lý ở trên (processedAbsentScheduleIds), nên đến đây là các buổi không cần cancel
                 unchangedCount++;
                 console.log(`⏭️ Giữ nguyên StudentSchedule ${studentSchedule._id} (session ${sessionOrder} < ${newClassSessionOrder}, không nằm trong danh sách học bù)`);
               } else {
-                // Không có học bù, cancel tất cả buổi có sessionOrder < newClassSessionOrder
                 await StudentSchedule.findByIdAndUpdate(
                   studentSchedule._id,
                   {
@@ -1204,7 +1095,6 @@ exports.approveChangeRequest = async (req, res) => {
                 console.log(`🚫 Cancelled StudentSchedule ${studentSchedule._id} (session ${sessionOrder} < ${newClassSessionOrder}, date: ${scheduleDate.toISOString().split('T')[0]})`);
               }
             } else if (sessionOrder >= newClassSessionOrder) {
-              // Session order >= lớp mới: update classSchedule
               const matchingSchedules = newClassScheduleMap.get(sessionOrder);
               if (matchingSchedules && matchingSchedules.length > 0) {
                 const newClassScheduleId = matchingSchedules[0]._id;
@@ -1219,14 +1109,11 @@ exports.approveChangeRequest = async (req, res) => {
             }
           }
         } else if (caseType === 3) {
-          // Trường hợp 3: lớp cũ > lớp mới
           if (sessionOrder !== null && sessionOrder !== undefined) {
             if (sessionOrder < oldClassSessionOrder) {
-              // Session order < lớp cũ: không thay đổi gì
               unchangedCount++;
               console.log(`⏭️ Giữ nguyên StudentSchedule ${studentSchedule._id} (session ${sessionOrder} < ${oldClassSessionOrder})`);
             } else if (sessionOrder >= oldClassSessionOrder) {
-              // Session order >= lớp cũ: update classSchedule
               const matchingSchedules = newClassScheduleMap.get(sessionOrder);
               if (matchingSchedules && matchingSchedules.length > 0) {
                 const newClassScheduleId = matchingSchedules[0]._id;
@@ -1250,7 +1137,6 @@ exports.approveChangeRequest = async (req, res) => {
       console.log(`✅ Hoàn thành xử lý đổi lớp`);
     }
     
-    // Cập nhật trạng thái đơn sử dụng findByIdAndUpdate để tránh lỗi validation
     await ChangeRequest.findByIdAndUpdate(
       id,
       {
@@ -1264,11 +1150,9 @@ exports.approveChangeRequest = async (req, res) => {
       }
     );
     
-    // Commit transaction before populating (populate doesn't need to be in transaction)
     await session.commitTransaction();
     session.endSession();
     
-    // Fetch the updated document with populated fields after transaction commits
     const updatedChangeRequest = await ChangeRequest.findById(id)
       .populate('sender', 'username email phone')
       .populate('approver', 'username email');
@@ -1290,14 +1174,12 @@ exports.approveChangeRequest = async (req, res) => {
   }
 };
 
-// =========================
-// ❌ TỪ CHỐI ĐƠN
-// =========================
+
 exports.rejectChangeRequest = async (req, res) => {
   try {
     const { id } = req.params;
-    const { responseContent } = req.body; // Lý do từ chối (không bắt buộc)
-    const approverId = req.user?._id || req.body.approverId; // Lấy từ token hoặc body
+    const { responseContent } = req.body;
+    const approverId = req.user?._id || req.body.approverId;
     
     const changeRequest = await ChangeRequest.findByIdAndUpdate(
       id,

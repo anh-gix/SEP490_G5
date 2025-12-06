@@ -4,23 +4,15 @@ const Class = require('../models/classModel');
 const Room = require('../models/room');
 const ChangeRequest = require('../models/changeRequestModel');
 
-// =========================
-// 📊 LẤY DỮ LIỆU DASHBOARD GIÁO VỤ
-// =========================
 exports.getDashboardData = async (req, res) => {
   try {
-    // Tạo date range cho ngày hôm nay sử dụng date string format (giống scheduleController)
-    // Sử dụng date string format để đảm bảo tạo dates ở midnight UTC, khớp với cách MongoDB lưu trữ
     const now = new Date();
-    const todayString = now.toISOString().split('T')[0]; // Format: YYYY-MM-DD
-    
-    // Tạo start và end của ngày ở UTC midnight để khớp với MongoDB
-    // new Date("2025-12-03") tạo date ở 00:00:00 UTC của ngày đó
+    const todayString = now.toISOString().split('T')[0];
+
     const todayStart = new Date(todayString);
     const todayEnd = new Date(todayString);
     todayEnd.setUTCHours(23, 59, 59, 999);
 
-    // 1. Get today's schedules with populated data
     const todaySchedules = await ClassSchedule.find({
       date: { $gte: todayStart, $lte: todayEnd }
     })
@@ -31,10 +23,8 @@ exports.getDashboardData = async (req, res) => {
       .sort({ startTime: 1 })
       .lean();
 
-    // 2. Get all schedule IDs for today
     const scheduleIds = todaySchedules.map(s => s._id);
 
-    // 3. Get attendance data for all today's schedules in one query (BATCH)
     const attendances = await StudentSchedule.find({
       classSchedule: { $in: scheduleIds }
     })
@@ -42,7 +32,6 @@ exports.getDashboardData = async (req, res) => {
       .select('student classSchedule attendance')
       .lean();
 
-    // 4. Group attendances by schedule ID for quick lookup
     const attendanceBySchedule = {};
     attendances.forEach(att => {
       const scheduleId = att.classSchedule?.toString() || att.classSchedule;
@@ -52,7 +41,6 @@ exports.getDashboardData = async (req, res) => {
       attendanceBySchedule[scheduleId].push(att);
     });
 
-    // 5. Process today's schedules with attendance data
     const absentStudents = [];
     const lateStudents = [];
     const processedSchedules = todaySchedules.map(schedule => {
@@ -124,8 +112,6 @@ exports.getDashboardData = async (req, res) => {
       };
     });
 
-    // 6. Get unique time slots from database (from schedules in the current month)
-    // Lấy time slots từ database thay vì hardcode
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     
@@ -134,8 +120,7 @@ exports.getDashboardData = async (req, res) => {
     })
       .select('startTime endTime')
       .lean();
-    
-    // Extract unique time slots and normalize them
+
     const normalizeTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : '';
     const timeSlotSet = new Set();
     
@@ -148,30 +133,25 @@ exports.getDashboardData = async (req, res) => {
         }
       }
     });
-    
-    // Convert to array and sort by start time
+
     let timeSlots = Array.from(timeSlotSet).sort((a, b) => {
       const [startA] = a.split('-');
       const [startB] = b.split('-');
       return startA.localeCompare(startB);
     });
-    
-    // Fallback to default time slots if no schedules found
+
     if (timeSlots.length === 0) {
       timeSlots = ['08:00-10:00', '10:30-12:30', '14:00-16:00', '18:00-20:00'];
     }
 
-    // 7. Get rooms (limit to 4 for room schedule display)
     const rooms = await Room.find()
       .select('room_name location')
       .limit(4)
       .lean();
 
-    // 8. Build room schedule data using dynamic time slots
     const roomScheduleData = rooms.map(room => {
       const schedules = timeSlots.map(timeSlot => {
         const [startTime, endTime] = timeSlot.split('-');
-        // Normalize time strings (remove seconds if present) for comparison
         const normalizeTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : '';
         const matchingSchedule = todaySchedules.find(s => 
           s.room?._id?.toString() === room._id?.toString() &&
@@ -200,14 +180,12 @@ exports.getDashboardData = async (req, res) => {
       };
     });
 
-    // 9. Get classes for progress (limit to top 3)
     const classes = await Class.find({ status: 'active' })
       .populate('course', 'name level')
       .select('name course startDate endDate students')
       .limit(3)
       .lean();
 
-    // 10. Get total schedules count for each class to calculate progress
     const classIds = classes.map(c => c._id);
     const classSchedulesCount = await ClassSchedule.aggregate([
       { $match: { class: { $in: classIds } } },
@@ -237,7 +215,6 @@ exports.getDashboardData = async (req, res) => {
       };
     });
 
-    // 11. Get recent change requests (top 5 pending, newest first)
     const recentRequests = await ChangeRequest.find({ status: 'pending' })
       .populate('sender', 'username email')
       .select('_id type sender createdAt')
@@ -245,8 +222,6 @@ exports.getDashboardData = async (req, res) => {
       .limit(5)
       .lean();
 
-    // Capture fresh timestamp right before calculating time differences
-    // to ensure accurate "time ago" values after async operations
     const currentTime = new Date();
     const recentActivities = recentRequests.map(request => {
       const createdAt = new Date(request.createdAt);
@@ -309,8 +284,6 @@ exports.getDashboardData = async (req, res) => {
       };
     });
 
-    // 12. Count pending change requests by type
-    // Note: pendingLeaveRequests is set to 0 as it wasn't implemented in the original code
     const pendingLeaveRequests = 0;
     
     const pendingMakeupClasses = await ChangeRequest.countDocuments({ 
@@ -323,10 +296,8 @@ exports.getDashboardData = async (req, res) => {
       type: 'create_class'
     });
 
-    // 13. Combine absent and late students
     const absentStudentsList = [...absentStudents, ...lateStudents].slice(0, 10);
 
-    // 14. Build response
     const dashboardData = {
       todayOverview: {
         todaySchedules: todaySchedules.length,
@@ -339,7 +310,7 @@ exports.getDashboardData = async (req, res) => {
       todaySchedule: processedSchedules.slice(0, 10),
       absentStudentsList,
       roomSchedule: roomScheduleData,
-      timeSlots: timeSlots, // Include time slots in response
+      timeSlots: timeSlots,
       classProgress: classProgressData,
       recentActivities
     };

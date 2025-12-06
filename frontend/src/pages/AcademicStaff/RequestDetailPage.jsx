@@ -337,6 +337,25 @@ const RequestDetailPage = ({
     const isClassChangeRequest = selectedRequest?.type === 'change_class' && pendingClassChange;
     const oldClassId = pendingClassChange?.oldClassId?.toString();
     
+    // Debug: Kiểm tra dữ liệu programType từ backend
+    if (senderSchedule && senderSchedule.length > 0) {
+      const firstSchedule = senderSchedule[0];
+      if (firstSchedule.class?.course?.program) {
+        console.log('✅ Program type data received:', {
+          programType: firstSchedule.class?.course?.program?.type,
+          className: firstSchedule.class?.name,
+          courseName: firstSchedule.class?.course?.name
+        });
+      } else {
+        console.warn('⚠️ Program type not found in schedule:', {
+          hasClass: !!firstSchedule.class,
+          hasCourse: !!firstSchedule.class?.course,
+          hasProgram: !!firstSchedule.class?.course?.program,
+          schedule: firstSchedule
+        });
+      }
+    }
+    
     const schedules = senderSchedule.map((schedule, index) => {
       const dateStr = formatDateToYYYYMMDD(schedule.date);
       
@@ -460,7 +479,8 @@ const RequestDetailPage = ({
         cancellationReason: schedule.studentScheduleReason || null,
         makeupReason: isMakeupFromDB ? schedule.studentScheduleReason : null, // Lý do học bù
         isOldClassSchedule: isOldClassSchedule, // Đánh dấu buổi của lớp cũ (khi đổi lớp)
-        isNewClassSchedule: false // Đánh dấu buổi của lớp mới (sẽ được thêm ở dưới)
+        isNewClassSchedule: false, // Đánh dấu buổi của lớp mới (sẽ được thêm ở dưới)
+        programType: schedule.class?.course?.program?.type || null // Thêm program type để hiển thị màu
       };
     });
     
@@ -505,7 +525,8 @@ const RequestDetailPage = ({
           teacherName: 'N/A',
           lessonNumber: makeup.makeupSchedule.order || '',
           lessonTopic: makeup.makeupSchedule.title || '',
-          isMakeupSchedule: true
+          isMakeupSchedule: true,
+          programType: makeup.makeupClassInfo?.programType || makeup.makeupSchedule?.class?.course?.program?.type || null
         };
       })
       .filter(Boolean);
@@ -541,7 +562,8 @@ const RequestDetailPage = ({
           isMakeupSchedule: false,
           isSubstituteClass: false,
           isOldClassSchedule: false, // Đánh dấu buổi của lớp cũ
-          isNewClassSchedule: true // Đánh dấu buổi của lớp mới
+          isNewClassSchedule: true, // Đánh dấu buổi của lớp mới
+          programType: newClassInfo?.programType || newSchedule?.class?.course?.program?.type || null
         });
       });
     }

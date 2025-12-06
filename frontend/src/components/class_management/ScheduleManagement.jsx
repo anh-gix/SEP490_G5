@@ -78,7 +78,8 @@ const ScheduleManagement = () => {
           lessonNumber: sch.session?.order || sch.session?.sessionNumber || 0,
           lessonTopic: sch.session?.title || sch.topic || 'N/A',
           status: sch.status || 'fixed',
-          type: sch.type || 'regular'
+          type: sch.type || 'regular',
+          programType: sch.class?.course?.program?.type || null
         };
       });
       
@@ -269,14 +270,6 @@ const ScheduleManagement = () => {
           <h2 className="text-neutral-900 fw-bold mb-8">Quản lý lịch học</h2>
           <p className="text-neutral-500 mb-0">Sắp xếp và quản lý lịch học cho các lớp</p>
         </div>
-        <div className="d-flex gap-12">
-          <Button 
-            className="btn-outline-main text-15 fw-medium px-20 py-10 radius-8"
-            onClick={handleExportSchedule}
-          >
-            <i className="fas fa-download me-2"></i> Xuất lịch học
-          </Button>
-        </div>
       </div>
 
       {/* Filters */}
@@ -437,10 +430,6 @@ const ScheduleManagement = () => {
               setShowEditModal(true);
             }}
             onDeleteSchedule={handleDeleteSchedule}
-            onCreateMakeup={(schedule) => {
-              setSelectedSchedule(schedule);
-              setShowMakeupModal(true);
-            }}
           />
         ) : viewMode === 'weekly' ? (
           <ScheduleWeekly 

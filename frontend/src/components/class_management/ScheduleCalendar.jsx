@@ -166,8 +166,8 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
     
     const colorMap = {
       'ielts': '#2196F3', // Xanh dương
-      'toeic': '#4CAF50', // Xanh lá
-      'cam': '#FF9800'    // Cam
+      'toeic': '#FF9800', // Cam
+      'cam': '#757575'    // Xám
     };
     
     return colorMap[programType.toLowerCase()] || null;
@@ -298,9 +298,11 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                       {daySchedules.slice(0, 3).map(schedule => {
                         const attendanceStatus = schedule.attendanceStatus;
                         const timeStatus = schedule.timeStatus;
-                        const statusColor = getStatusColor(schedule);
                         const hasAttendance = !!attendanceStatus;
                         const programColor = getProgramTypeColor(schedule.programType);
+                        // Border color: ưu tiên program type, fallback về status color
+                        const borderColor = programColor || getStatusColor(schedule);
+                        const statusColor = getStatusColor(schedule); // Giữ để dùng cho icon
                         
                         // Debug log for calendar rendering
                         if (schedule.programType) {
@@ -435,8 +437,8 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                             key={schedule.id}
                             className="p-1 rounded"
                             style={{ 
-                              borderLeft: `3px solid ${statusColor}`,
-                              background: backgroundColor,
+                              borderLeft: `3px solid ${borderColor}`, // Sử dụng program type color cho border
+                              background: backgroundColor, // Background theo attendance/schedule status
                               fontSize: '10px',
                               cursor: 'pointer',
                               position: 'relative'
@@ -593,7 +595,7 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
             style={{ 
               width: '20px', 
               height: '20px', 
-              backgroundColor: '#4CAF50', 
+              backgroundColor: '#FF9800', 
               borderRadius: '4px',
               border: '1px solid #e0e0e0'
             }}
@@ -605,7 +607,7 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
             style={{ 
               width: '20px', 
               height: '20px', 
-              backgroundColor: '#FF9800', 
+              backgroundColor: '#757575', 
               borderRadius: '4px',
               border: '1px solid #e0e0e0'
             }}

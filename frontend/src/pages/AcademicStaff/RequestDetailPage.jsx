@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Container, Card, Button, Spinner, Alert, Modal, Form } from 'react-bootstrap';
-import AcademicNavigation from '../../components/class_management/AcademicNavigation.jsx';
 import ScheduleCalendar from '../../components/class_management/ScheduleCalendar';
 import { formatDateToYYYYMMDD, parseDateString } from '../../helper/helper';
 import classService from '../../services/classService';
@@ -555,11 +554,9 @@ const RequestDetailPage = ({
   }
 
   return (
-    <div className="d-flex" style={{ minHeight: '100vh' }}>
-      <AcademicNavigation />
-      <div className="flex-grow-1" style={{ backgroundColor: '#f8f9fa' }}>
-        <Container fluid className="p-24">
-          {/* Header với nút quay lại */}
+    <>
+      <Container fluid className="p-24">
+        {/* Header với nút quay lại */}
           <div className="mb-24">
             <div className="d-flex align-items-center gap-12 mb-16">
               <Button
@@ -1478,8 +1475,7 @@ const RequestDetailPage = ({
               {processing ? 'Đang xử lý...' : 'Chấp nhận'}
             </Button>
           </div>
-        </Container>
-      </div>
+      </Container>
 
       {/* Modal từ chối */}
       <Modal show={showRejectModal} onHide={() => {
@@ -1540,7 +1536,7 @@ const RequestDetailPage = ({
           </Button>
         </Modal.Footer>
       </Modal>
-    </div>
+    </>
   );
 };
 

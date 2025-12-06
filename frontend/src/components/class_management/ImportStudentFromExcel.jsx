@@ -96,7 +96,7 @@ const ImportStudentFromExcel = () => {
         return;
       }
 
-      // Helper function to get level order for comparison
+      // Helper function to get band order for comparison
       const getLevelOrder = (level) => {
         const levelMap = {
           'Pre-A1': 0,
@@ -110,7 +110,7 @@ const ImportStudentFromExcel = () => {
         return levelMap[level] !== undefined ? levelMap[level] : -1;
       };
 
-      // Helper function to get level name from order
+      // Helper function to get band name from order
       const getLevelName = (order) => {
         const levelMap = {
           0: 'Pre-A1',
@@ -124,18 +124,55 @@ const ImportStudentFromExcel = () => {
         return levelMap[order] || '';
       };
 
-      // Helper function to calculate levels to study from currentLevel to aim
-      const calculateLevelsToStudy = (currentLevel, aim) => {
+      // Helper function to validate score by type
+      const validateScore = (score, type) => {
+        if (!score || !type) return false;
+        
+        const scoreStr = score.toString().trim();
+        if (type === 'ielts') {
+          const num = parseFloat(scoreStr);
+          return !isNaN(num) && num >= 0 && num <= 9.0;
+        } else if (type === 'toeic') {
+          const num = parseInt(scoreStr);
+          return !isNaN(num) && num >= 0 && num <= 990;
+        }
+        return false;
+      };
+
+      // Helper function to check if a value is numeric (score) or CEFR level
+      const isNumericScore = (value) => {
+        if (!value) return false;
+        const valueStr = value.toString().trim();
+        // Check if it's a number (can be integer or decimal)
+        return /^\d+(\.\d+)?$/.test(valueStr);
+      };
+
+      // Helper function to calculate bands to study from currentLevel to aim
+      const calculateLevelsToStudy = (currentLevel, aim, type) => {
         if (!currentLevel || !aim) return '';
         
-        const currentOrder = getLevelOrder(currentLevel);
-        const aimOrder = getLevelOrder(aim);
+        const currentLevelStr = currentLevel.toString().trim();
+        const aimStr = aim.toString().trim();
+        const typeStr = type ? type.toString().trim().toLowerCase() : '';
+        
+        // Check if values are numeric scores
+        const currentLevelIsNumeric = isNumericScore(currentLevelStr);
+        const aimIsNumeric = isNumericScore(aimStr);
+        
+        if (typeStr && (currentLevelIsNumeric || aimIsNumeric)) {
+          // For numeric scores, return a simple description
+          return `${currentLevelStr} → ${aimStr}`;
+        }
+        
+        // For CEFR levels, calculate progression
+        const currentOrder = getLevelOrder(currentLevelStr);
+        const aimOrder = getLevelOrder(aimStr);
         
         if (currentOrder === -1 || aimOrder === -1 || aimOrder <= currentOrder) {
           return '';
         }
         
-        // Calculate all levels from currentLevel to aim (bao gồm cả currentLevel)
+        // Calculate all bands from currentLevel to aim (bao gồm cả currentLevel)
         const levelsToStudy = [];
         for (let order = currentOrder; order <= aimOrder; order++) {
           const levelName = getLevelName(order);
@@ -197,24 +234,51 @@ const ImportStudentFromExcel = () => {
           errors.push('Địa chỉ không được để trống');
         }
 
-        // Validate aim must be higher than currentLevel
+        // Validate aim and currentLevel based on type
         if (aim && currentLevel) {
-          const aimOrder = getLevelOrder(aim.toString().trim());
-          const currentLevelOrder = getLevelOrder(currentLevel.toString().trim());
+          const aimStr = aim.toString().trim();
+          const currentLevelStr = currentLevel.toString().trim();
+          const typeStr = type ? type.toString().trim().toLowerCase() : '';
           
-          if (aimOrder === -1) {
-            errors.push('Level mục tiêu không hợp lệ');
-          } else if (currentLevelOrder === -1) {
-            errors.push('Trình độ hiện tại không hợp lệ');
-          } else if (aimOrder <= currentLevelOrder) {
-            errors.push('Level mục tiêu phải cao hơn trình độ hiện tại');
+          // Check if values are numeric scores or CEFR levels
+          const aimIsNumeric = isNumericScore(aimStr);
+          const currentLevelIsNumeric = isNumericScore(currentLevelStr);
+          
+          if (typeStr && (aimIsNumeric || currentLevelIsNumeric)) {
+            // Validate as numeric scores based on type
+            if (!validateScore(aimStr, typeStr)) {
+              errors.push(`Điểm mục tiêu không hợp lệ cho ${typeStr.toUpperCase()}. ${typeStr === 'ielts' ? 'Phải là số từ 0.0 đến 9.0' : 'Phải là số từ 0 đến 990'}`);
+            } else if (!validateScore(currentLevelStr, typeStr)) {
+              errors.push(`Trình độ hiện tại không hợp lệ cho ${typeStr.toUpperCase()}. ${typeStr === 'ielts' ? 'Phải là số từ 0.0 đến 9.0' : 'Phải là số từ 0 đến 990'}`);
+            } else {
+              // Compare numeric scores
+              const aimNum = typeStr === 'ielts' ? parseFloat(aimStr) : parseInt(aimStr);
+              const currentLevelNum = typeStr === 'ielts' ? parseFloat(currentLevelStr) : parseInt(currentLevelStr);
+              
+              if (aimNum <= currentLevelNum) {
+                errors.push('Điểm mục tiêu phải cao hơn trình độ hiện tại');
+              }
+            }
+          } else {
+            // Validate as CEFR levels (backward compatibility)
+            const aimOrder = getLevelOrder(aimStr);
+            const currentLevelOrder = getLevelOrder(currentLevelStr);
+            
+            if (aimOrder === -1) {
+              errors.push('Band mục tiêu không hợp lệ');
+            } else if (currentLevelOrder === -1) {
+              errors.push('Trình độ hiện tại không hợp lệ');
+            } else if (aimOrder <= currentLevelOrder) {
+              errors.push('Band mục tiêu phải cao hơn trình độ hiện tại');
+            }
           }
         }
 
-        // Calculate levels to study
+        // Calculate bands to study
         const levelsToStudy = calculateLevelsToStudy(
           currentLevel ? currentLevel.toString().trim() : '',
-          aim ? aim.toString().trim() : ''
+          aim ? aim.toString().trim() : '',
+          type ? type.toString().trim() : ''
         );
 
         previewData.push({
@@ -387,8 +451,8 @@ const ImportStudentFromExcel = () => {
         email: 'student1@email.com',
         phone: '0123456789',
         address: '123 Đường ABC, Quận 1, TP.HCM',
-        aim: 'B2',
-        currentLevel: 'A2',
+        aim: '6.0',
+        currentLevel: '4.0',
         type: 'ielts'
       },
       {
@@ -396,8 +460,8 @@ const ImportStudentFromExcel = () => {
         email: 'student2@email.com',
         phone: '0987654321',
         address: '456 Đường XYZ, Quận 2, TP.HCM',
-        aim: 'C1',
-        currentLevel: 'B1',
+        aim: '600',
+        currentLevel: '400',
         type: 'toeic'
       }
     ];
@@ -477,8 +541,8 @@ const ImportStudentFromExcel = () => {
                 <td>student1@email.com</td>
                 <td>0123456789</td>
                 <td>123 Đường ABC</td>
-                <td>B2</td>
-                <td>A2</td>
+                <td>6.0</td>
+                <td>4.0</td>
                 <td>ielts</td>
               </tr>
               <tr>
@@ -486,8 +550,8 @@ const ImportStudentFromExcel = () => {
                 <td>student2@email.com</td>
                 <td>0987654321</td>
                 <td>456 Đường XYZ</td>
-                <td>C1</td>
-                <td>B1</td>
+                <td>600</td>
+                <td>400</td>
                 <td>toeic</td>
               </tr>
             </tbody>

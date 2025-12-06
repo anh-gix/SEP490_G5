@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Container, Card, Table, Badge, Spinner, Alert, Pagination, Button, Modal, Form, Row, Col, InputGroup } from 'react-bootstrap';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';
 import changeRequestService from '../../services/changeRequestService';
 
@@ -9,6 +11,8 @@ import changeRequestService from '../../services/changeRequestService';
  */
 const TeacherApplications = () => {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [changeRequests, setChangeRequests] = useState([]);
   const [allChangeRequests, setAllChangeRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +99,15 @@ const TeacherApplications = () => {
   useEffect(() => {
     fetchChangeRequests();
   }, []);
+
+  // Check for success toast state from navigation
+  useEffect(() => {
+    if (location.state?.showSuccessToast) {
+      toast.success('Gửi đơn xin nghỉ thành công!');
+      // Clear the state to prevent showing toast again on refresh
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
 
   const fetchChangeRequests = async () => {
     try {

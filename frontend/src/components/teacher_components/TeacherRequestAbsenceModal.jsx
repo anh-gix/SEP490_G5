@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 import changeRequestService from '../../services/changeRequestService';
 
 /**
@@ -7,6 +8,7 @@ import changeRequestService from '../../services/changeRequestService';
  * Modal cho phép giảng viên xin nghỉ dạy
  */
 const TeacherRequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     description: ''
   });
@@ -67,6 +69,9 @@ const TeacherRequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
         }
 
         onHide();
+        
+        // Redirect to applications page with success state
+        navigate('/teacher/applications', { state: { showSuccessToast: true } });
       } else {
         setError(response.message || 'Có lỗi xảy ra khi gửi đơn xin nghỉ. Vui lòng thử lại.');
       }

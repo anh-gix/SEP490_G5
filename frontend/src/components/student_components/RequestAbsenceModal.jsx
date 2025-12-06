@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import changeRequestService from '../../services/changeRequestService';
 
@@ -9,6 +10,7 @@ import changeRequestService from '../../services/changeRequestService';
  */
 const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     description: ''
   });
@@ -81,6 +83,9 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
         }
 
         onHide();
+        
+        // Redirect to applications page with success state
+        navigate('/student/applications', { state: { showSuccessToast: true } });
       } else {
         setError(response.message || 'Có lỗi xảy ra khi gửi đơn xin nghỉ. Vui lòng thử lại.');
       }

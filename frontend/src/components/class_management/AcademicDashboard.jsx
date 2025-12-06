@@ -20,6 +20,7 @@ const AcademicDashboard = () => {
 
   const [absentStudentsList, setAbsentStudentsList] = useState([]);
   const [roomSchedule, setRoomSchedule] = useState([]);
+  const [timeSlots, setTimeSlots] = useState([]); // Time slots from database
   const [recentActivities, setRecentActivities] = useState([]);
   const [todaySchedule, setTodaySchedule] = useState([]);
   const [classProgress, setClassProgress] = useState([]);
@@ -54,6 +55,7 @@ const AcademicDashboard = () => {
         setTodaySchedule(data.todaySchedule || []);
         setAbsentStudentsList(data.absentStudentsList || []);
         setRoomSchedule(data.roomSchedule || []);
+        setTimeSlots(data.timeSlots || []); // Set time slots from API
         setClassProgress(data.classProgress || []);
         setRecentActivities(data.recentActivities || []);
       } else {
@@ -348,10 +350,21 @@ const AcademicDashboard = () => {
                 <thead style={{ backgroundColor: 'var(--neutral-50)' }}>
                   <tr>
                     <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Phòng</th>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">08:00-10:00</th>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">10:30-12:30</th>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">14:00-16:00</th>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">18:00-20:00</th>
+                    {timeSlots.length > 0 ? (
+                      timeSlots.map((timeSlot, idx) => (
+                        <th key={idx} className="text-neutral-700 fw-medium text-12 px-16 py-10">
+                          {timeSlot}
+                        </th>
+                      ))
+                    ) : (
+                      // Fallback to default time slots if not loaded yet
+                      <>
+                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">08:00-10:00</th>
+                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">10:30-12:30</th>
+                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">14:00-16:00</th>
+                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">18:00-20:00</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>

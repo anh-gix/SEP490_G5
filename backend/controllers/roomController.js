@@ -331,14 +331,51 @@ exports.getTodayRoomUsage = async (req, res) => {
       .sort({ startTime: 1 })
       .lean();
 
+    // Get unique time slots from database (from schedules in the current month)
+    // Lấy time slots từ database thay vì hardcode
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    
+    const allSchedulesForTimeSlots = await ClassSchedule.find({
+      date: { $gte: currentMonthStart, $lte: currentMonthEnd },
+      status: { $in: ['temporary', 'fixed'] }
+    })
+      .select('startTime endTime')
+      .lean();
+    
+    // Extract unique time slots and normalize them
+    const normalizeTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : '';
+    const timeSlotSet = new Set();
+    
+    allSchedulesForTimeSlots.forEach(schedule => {
+      if (schedule.startTime && schedule.endTime) {
+        const start = normalizeTime(schedule.startTime);
+        const end = normalizeTime(schedule.endTime);
+        if (start && end) {
+          timeSlotSet.add(`${start}-${end}`);
+        }
+      }
+    });
+    
+    // Convert to array and sort by start time
+    let timeSlots = Array.from(timeSlotSet).sort((a, b) => {
+      const [startA] = a.split('-');
+      const [startB] = b.split('-');
+      return startA.localeCompare(startB);
+    });
+    
+    // Fallback to default time slots if no schedules found
+    if (timeSlots.length === 0) {
+      timeSlots = ['08:00-10:00', '10:30-12:30', '14:00-16:00', '18:00-20:00'];
+    }
+
     // Get all rooms
     const rooms = await Room.find()
       .select('room_name location')
       .sort({ room_name: 1 })
       .lean();
 
-    // Build room schedule data
-    const timeSlots = ['08:00-10:00', '10:30-12:30', '14:00-16:00', '18:00-20:00'];
+    // Build room schedule data using dynamic time slots
     const roomScheduleData = rooms.map(room => {
       const schedules = timeSlots.map(timeSlot => {
         const [startTime, endTime] = timeSlot.split('-');
@@ -374,7 +411,8 @@ exports.getTodayRoomUsage = async (req, res) => {
     res.status(200).json({
       message: "Lấy lịch sử dụng phòng hôm nay thành công",
       success: true,
-      roomSchedule: roomScheduleData
+      roomSchedule: roomScheduleData,
+      timeSlots: timeSlots // Include time slots in response
     });
   } catch (error) {
     console.error("❌ Lỗi khi lấy lịch sử dụng phòng hôm nay:", error);

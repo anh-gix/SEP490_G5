@@ -1625,7 +1625,15 @@ exports.getTeacherSchedule = async (req, res) => {
     const classSchedules = await ClassSchedule.find({ class: { $in: classIds } })
       .populate({
         path: "class",
-        select: "name subject teacherId",
+        select: "name subject teacherId course",
+        populate: {
+          path: "course",
+          select: "name program",
+          populate: {
+            path: "program",
+            select: "type program_name"
+          }
+        }
       })
       .populate({
         path: "room",
@@ -1675,6 +1683,8 @@ exports.getTeacherSchedule = async (req, res) => {
         date: schedule.date,
         topic: schedule.topic,
         status: schedule.status,
+        programType: schedule.class?.course?.program?.type || null,
+        class: schedule.class, // Include full class object for frontend use
       };
     });
 

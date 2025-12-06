@@ -204,10 +204,6 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
     
     if (timeStatus === 'completed') {
       return '#4CAF50'; // Màu xanh lá cho buổi đã kết thúc
-    } else if (timeStatus === 'upcoming') {
-      // Nếu có program type, sử dụng màu program type thay vì xám
-      const programColor = getProgramTypeColor(schedule.programType);
-      return programColor || '#757575'; // Màu xám cho buổi chưa bắt đầu
     }
     
     // Nếu không có timeStatus, kiểm tra attendance status (cho Student/Teacher management)
@@ -224,9 +220,19 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
       }
     }
     
-    // Chưa điểm danh (chưa học) - sử dụng màu program type nếu có
+    // Ưu tiên sử dụng màu program type nếu có (cho Teacher Detail)
     const programColor = getProgramTypeColor(schedule.programType);
-    return programColor || '#757575'; // Màu xám mặc định
+    if (programColor) {
+      return programColor;
+    }
+    
+    // Nếu có timeStatus === 'upcoming' nhưng không có programType
+    if (timeStatus === 'upcoming') {
+      return '#757575'; // Màu xám cho buổi chưa bắt đầu
+    }
+    
+    // Màu xám mặc định
+    return '#757575';
   };
 
   return (
@@ -296,6 +302,17 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                         const hasAttendance = !!attendanceStatus;
                         const programColor = getProgramTypeColor(schedule.programType);
                         
+                        // Debug log for calendar rendering
+                        if (schedule.programType) {
+                          console.log('🎨 Calendar rendering schedule:', {
+                            scheduleId: schedule._id,
+                            className: schedule.className,
+                            programType: schedule.programType,
+                            programColor: programColor,
+                            statusColor: statusColor
+                          });
+                        }
+                        
                         // Màu nền khác nhau theo trạng thái
                         let backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt mặc định
                         
@@ -315,11 +332,11 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                         } else if (timeStatus === 'upcoming') {
                           // Sử dụng màu program type nếu có, nếu không thì xám nhạt
                           if (programColor) {
-                            // Convert hex to rgba với opacity 0.1
+                            // Convert hex to rgba với opacity 0.2 để dễ nhìn hơn
                             const r = parseInt(programColor.slice(1, 3), 16);
                             const g = parseInt(programColor.slice(3, 5), 16);
                             const b = parseInt(programColor.slice(5, 7), 16);
-                            backgroundColor = `rgba(${r}, ${g}, ${b}, 0.1)`;
+                            backgroundColor = `rgba(${r}, ${g}, ${b}, 0.2)`;
                           } else {
                             backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt cho buổi chưa bắt đầu
                           }
@@ -351,8 +368,32 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                             const r = parseInt(programColor.slice(1, 3), 16);
                             const g = parseInt(programColor.slice(3, 5), 16);
                             const b = parseInt(programColor.slice(5, 7), 16);
-                            backgroundColor = `rgba(${r}, ${g}, ${b}, 0.1)`;
+                            backgroundColor = `rgba(${r}, ${g}, ${b}, 0.2)`;
                           }
+                        }
+                        
+                        // Ưu tiên màu programType nếu không có trạng thái đặc biệt nào (cho Teacher Detail)
+                        // Đây là trường hợp phổ biến nhất cho Teacher Detail page
+                        if (!schedule.isOldClassSchedule && 
+                            !schedule.isNewClassSchedule && 
+                            !schedule.isCancelled && 
+                            schedule.scheduleStatus !== 'cancelled' &&
+                            !schedule.isAbsentSchedule && 
+                            schedule.status !== 'absent' &&
+                            !schedule.isMakeupSchedule && 
+                            schedule.status !== 'makeup' && 
+                            schedule.scheduleStatus !== 'rescheduled' &&
+                            timeStatus !== 'completed' &&
+                            timeStatus !== 'ongoing' &&
+                            timeStatus !== 'upcoming' &&
+                            !attendanceStatus && 
+                            programColor &&
+                            (backgroundColor === 'rgba(0,0,0,0.02)' || !backgroundColor)) {
+                          // Áp dụng màu program type với độ đậm hơn
+                          const r = parseInt(programColor.slice(1, 3), 16);
+                          const g = parseInt(programColor.slice(3, 5), 16);
+                          const b = parseInt(programColor.slice(5, 7), 16);
+                          backgroundColor = `rgba(${r}, ${g}, ${b}, 0.25)`;
                         }
                         
                         // Tooltip text
@@ -532,6 +573,46 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
           </div>
         </Card.Body>
       </Card>
+
+      {/* Program Type Color Legend */}
+      <div className="d-flex justify-content-center gap-4 mt-3 mb-2">
+        <div className="d-flex align-items-center gap-2">
+          <div 
+            style={{ 
+              width: '20px', 
+              height: '20px', 
+              backgroundColor: '#2196F3', 
+              borderRadius: '4px',
+              border: '1px solid #e0e0e0'
+            }}
+          ></div>
+          <span className="text-13 text-neutral-700">IELTS</span>
+        </div>
+        <div className="d-flex align-items-center gap-2">
+          <div 
+            style={{ 
+              width: '20px', 
+              height: '20px', 
+              backgroundColor: '#4CAF50', 
+              borderRadius: '4px',
+              border: '1px solid #e0e0e0'
+            }}
+          ></div>
+          <span className="text-13 text-neutral-700">TOEIC</span>
+        </div>
+        <div className="d-flex align-items-center gap-2">
+          <div 
+            style={{ 
+              width: '20px', 
+              height: '20px', 
+              backgroundColor: '#FF9800', 
+              borderRadius: '4px',
+              border: '1px solid #e0e0e0'
+            }}
+          ></div>
+          <span className="text-13 text-neutral-700">Cambridge</span>
+        </div>
+      </div>
 
     </div>
   );

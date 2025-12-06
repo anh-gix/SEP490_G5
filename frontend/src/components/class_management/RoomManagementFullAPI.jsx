@@ -14,6 +14,7 @@ const RoomManagementFull = () => {
   const [rooms, setRooms] = useState([]);
   const [stats, setStats] = useState({});
   const [todayRoomUsage, setTodayRoomUsage] = useState([]);
+  const [timeSlots, setTimeSlots] = useState([]); // Time slots from database
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -70,6 +71,7 @@ const RoomManagementFull = () => {
     try {
       const data = await roomService.getTodayRoomUsage();
       setTodayRoomUsage(data.roomSchedule || []);
+      setTimeSlots(data.timeSlots || []); // Set time slots from API
     } catch (err) {
       console.error('Error fetching today room usage:', err);
     }
@@ -358,10 +360,21 @@ const RoomManagementFull = () => {
                 <thead style={{ backgroundColor: 'var(--neutral-50)' }}>
                   <tr>
                     <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Phòng</th>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">08:00-10:00</th>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">10:30-12:30</th>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">14:00-16:00</th>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">18:00-20:00</th>
+                    {timeSlots.length > 0 ? (
+                      timeSlots.map((timeSlot, idx) => (
+                        <th key={idx} className="text-neutral-700 fw-medium text-12 px-16 py-10">
+                          {timeSlot}
+                        </th>
+                      ))
+                    ) : (
+                      // Fallback to default time slots if not loaded yet
+                      <>
+                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">08:00-10:00</th>
+                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">10:30-12:30</th>
+                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">14:00-16:00</th>
+                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">18:00-20:00</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>

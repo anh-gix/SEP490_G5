@@ -124,14 +124,50 @@ exports.getDashboardData = async (req, res) => {
       };
     });
 
-    // 6. Get rooms (limit to 4 for room schedule display)
+    // 6. Get unique time slots from database (from schedules in the current month)
+    // Lấy time slots từ database thay vì hardcode
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    
+    const allSchedulesForTimeSlots = await ClassSchedule.find({
+      date: { $gte: currentMonthStart, $lte: currentMonthEnd }
+    })
+      .select('startTime endTime')
+      .lean();
+    
+    // Extract unique time slots and normalize them
+    const normalizeTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : '';
+    const timeSlotSet = new Set();
+    
+    allSchedulesForTimeSlots.forEach(schedule => {
+      if (schedule.startTime && schedule.endTime) {
+        const start = normalizeTime(schedule.startTime);
+        const end = normalizeTime(schedule.endTime);
+        if (start && end) {
+          timeSlotSet.add(`${start}-${end}`);
+        }
+      }
+    });
+    
+    // Convert to array and sort by start time
+    let timeSlots = Array.from(timeSlotSet).sort((a, b) => {
+      const [startA] = a.split('-');
+      const [startB] = b.split('-');
+      return startA.localeCompare(startB);
+    });
+    
+    // Fallback to default time slots if no schedules found
+    if (timeSlots.length === 0) {
+      timeSlots = ['08:00-10:00', '10:30-12:30', '14:00-16:00', '18:00-20:00'];
+    }
+
+    // 7. Get rooms (limit to 4 for room schedule display)
     const rooms = await Room.find()
       .select('room_name location')
       .limit(4)
       .lean();
 
-    // 7. Build room schedule data
-    const timeSlots = ['08:00-10:00', '10:30-12:30', '14:00-16:00', '18:00-20:00'];
+    // 8. Build room schedule data using dynamic time slots
     const roomScheduleData = rooms.map(room => {
       const schedules = timeSlots.map(timeSlot => {
         const [startTime, endTime] = timeSlot.split('-');
@@ -164,14 +200,14 @@ exports.getDashboardData = async (req, res) => {
       };
     });
 
-    // 8. Get classes for progress (limit to top 3)
+    // 9. Get classes for progress (limit to top 3)
     const classes = await Class.find({ status: 'active' })
       .populate('course', 'name level')
       .select('name course startDate endDate students')
       .limit(3)
       .lean();
 
-    // 9. Get total schedules count for each class to calculate progress
+    // 10. Get total schedules count for each class to calculate progress
     const classIds = classes.map(c => c._id);
     const classSchedulesCount = await ClassSchedule.aggregate([
       { $match: { class: { $in: classIds } } },
@@ -201,7 +237,7 @@ exports.getDashboardData = async (req, res) => {
       };
     });
 
-    // 10. Get recent change requests (top 5 pending, newest first)
+    // 11. Get recent change requests (top 5 pending, newest first)
     const recentRequests = await ChangeRequest.find({ status: 'pending' })
       .populate('sender', 'username email')
       .select('_id type sender createdAt')
@@ -273,7 +309,7 @@ exports.getDashboardData = async (req, res) => {
       };
     });
 
-    // 11. Count pending change requests by type
+    // 12. Count pending change requests by type
     // Note: pendingLeaveRequests is set to 0 as it wasn't implemented in the original code
     const pendingLeaveRequests = 0;
     
@@ -287,10 +323,10 @@ exports.getDashboardData = async (req, res) => {
       type: 'create_class'
     });
 
-    // 12. Combine absent and late students
+    // 13. Combine absent and late students
     const absentStudentsList = [...absentStudents, ...lateStudents].slice(0, 10);
 
-    // 13. Build response
+    // 14. Build response
     const dashboardData = {
       todayOverview: {
         todaySchedules: todaySchedules.length,
@@ -303,6 +339,7 @@ exports.getDashboardData = async (req, res) => {
       todaySchedule: processedSchedules.slice(0, 10),
       absentStudentsList,
       roomSchedule: roomScheduleData,
+      timeSlots: timeSlots, // Include time slots in response
       classProgress: classProgressData,
       recentActivities
     };

@@ -57,6 +57,7 @@ const RequestFilters = ({
               <option value="oldest">Cũ nhất trước</option>
               <option value="newest">Mới nhất trước</option>
               <option value="sender">Theo người gửi (A-Z)</option>
+              <option value="sender-desc">Theo người gửi (Z-A)</option>
             </Form.Select>
           </Col>
         </Row>

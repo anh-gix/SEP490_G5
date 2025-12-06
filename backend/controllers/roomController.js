@@ -1,21 +1,16 @@
 const Room = require("../models/room");
 const ClassSchedule = require("../models/classScheduleModel");
 
-// =========================
-// 📋 LẤY DANH SÁCH PHÒNG HỌC
-// =========================
 exports.getAllRooms = async (req, res) => {
   try {
     const { status, search } = req.query;
     
     let query = {};
     
-    // Filter by status
     if (status && status !== 'all') {
       query.status = status;
     }
     
-    // Search by room name or location
     if (search) {
       query.$or = [
         { room_name: { $regex: search, $options: 'i' } },
@@ -39,9 +34,6 @@ exports.getAllRooms = async (req, res) => {
   }
 };
 
-// =========================
-// 🔍 LẤY THÔNG TIN 1 PHÒNG
-// =========================
 exports.getRoomById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -65,21 +57,16 @@ exports.getRoomById = async (req, res) => {
   }
 };
 
-// =========================
-// ➕ TẠO PHÒNG MỚI
-// =========================
 exports.createRoom = async (req, res) => {
   try {
     const { room_name, capacity, location, description, status } = req.body;
     
-    // Validate required fields
     if (!room_name || !capacity || !location) {
       return res.status(400).json({ 
         message: "Thiếu thông tin bắt buộc (room_name, capacity, location)" 
       });
     }
     
-    // Check if room name already exists
     const existingRoom = await Room.findOne({ room_name });
     if (existingRoom) {
       return res.status(400).json({ 
@@ -108,9 +95,6 @@ exports.createRoom = async (req, res) => {
   }
 };
 
-// =========================
-// ✏️ CẬP NHẬT PHÒNG
-// =========================
 exports.updateRoom = async (req, res) => {
   try {
     const { id } = req.params;
@@ -122,7 +106,6 @@ exports.updateRoom = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy phòng học" });
     }
     
-    // Check if new room name already exists (excluding current room)
     if (room_name && room_name !== room.room_name) {
       const existingRoom = await Room.findOne({ 
         room_name, 
@@ -135,7 +118,6 @@ exports.updateRoom = async (req, res) => {
       }
     }
     
-    // Update fields
     if (room_name) room.room_name = room_name;
     if (capacity) room.capacity = capacity;
     if (location) room.location = location;
@@ -157,14 +139,10 @@ exports.updateRoom = async (req, res) => {
   }
 };
 
-// =========================
-// 🗑️ XÓA PHÒNG
-// =========================
 exports.deleteRoom = async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Check if room is being used in any schedules
     const schedulesUsingRoom = await ClassSchedule.countDocuments({ room: id });
     
     if (schedulesUsingRoom > 0) {
@@ -193,13 +171,10 @@ exports.deleteRoom = async (req, res) => {
   }
 };
 
-// =========================
-// 📅 LẤY LỊCH SỬ DỤNG PHÒNG
-// =========================
 exports.getRoomSchedule = async (req, res) => {
   try {
     const { id } = req.params;
-    const { date, startDate, endDate } = req.query; // Optional: filter by specific date or date range
+    const { date, startDate, endDate } = req.query;
     
     const room = await Room.findById(id);
     if (!room) {
@@ -208,14 +183,12 @@ exports.getRoomSchedule = async (req, res) => {
     
     let query = { room: id, status: { $in: ['temporary', 'fixed'] } };
     
-    // Filter by date range if provided (priority over single date)
     if (startDate && endDate) {
       query.date = {
         $gte: new Date(startDate),
         $lte: new Date(endDate)
       };
     } else if (date) {
-      // Filter by single date if provided
       const startDate = new Date(date);
       startDate.setHours(0, 0, 0, 0);
       const endDate = new Date(date);
@@ -243,7 +216,7 @@ exports.getRoomSchedule = async (req, res) => {
           }
         ]
       })
-      .populate('session', 'title order') // Populate session để lấy title
+      .populate('session', 'title order')
       .sort({ date: 1, startTime: 1 })
       .lean();
     
@@ -268,9 +241,6 @@ exports.getRoomSchedule = async (req, res) => {
   }
 };
 
-// =========================
-// 📊 THỐNG KÊ PHÒNG HỌC
-// =========================
 exports.getRoomStats = async (req, res) => {
   try {
     const totalRooms = await Room.countDocuments();
@@ -278,7 +248,6 @@ exports.getRoomStats = async (req, res) => {
     const inUseRooms = await Room.countDocuments({ status: 'in_use' });
     const maintenanceRooms = await Room.countDocuments({ status: 'maintenance' });
     
-    // Get today's schedules
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
@@ -307,21 +276,15 @@ exports.getRoomStats = async (req, res) => {
   }
 };
 
-// =========================
-// 📅 LẤY LỊCH SỬ DỤNG PHÒNG HÔM NAY
-// =========================
 exports.getTodayRoomUsage = async (req, res) => {
   try {
-    // Tạo date range cho ngày hôm nay sử dụng date string format
     const now = new Date();
-    const todayString = now.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+    const todayString = now.toISOString().split('T')[0];
     
-    // Tạo start và end của ngày ở UTC midnight để khớp với MongoDB
     const todayStart = new Date(todayString);
     const todayEnd = new Date(todayString);
     todayEnd.setUTCHours(23, 59, 59, 999);
 
-    // Get today's schedules with populated data
     const todaySchedules = await ClassSchedule.find({
       date: { $gte: todayStart, $lte: todayEnd },
       status: { $in: ['temporary', 'fixed'] }
@@ -331,8 +294,6 @@ exports.getTodayRoomUsage = async (req, res) => {
       .sort({ startTime: 1 })
       .lean();
 
-    // Get unique time slots from database (from schedules in the current month)
-    // Lấy time slots từ database thay vì hardcode
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     
@@ -343,7 +304,6 @@ exports.getTodayRoomUsage = async (req, res) => {
       .select('startTime endTime')
       .lean();
     
-    // Extract unique time slots and normalize them
     const normalizeTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : '';
     const timeSlotSet = new Set();
     
@@ -357,29 +317,24 @@ exports.getTodayRoomUsage = async (req, res) => {
       }
     });
     
-    // Convert to array and sort by start time
     let timeSlots = Array.from(timeSlotSet).sort((a, b) => {
       const [startA] = a.split('-');
       const [startB] = b.split('-');
       return startA.localeCompare(startB);
     });
     
-    // Fallback to default time slots if no schedules found
     if (timeSlots.length === 0) {
       timeSlots = ['08:00-10:00', '10:30-12:30', '14:00-16:00', '18:00-20:00'];
     }
 
-    // Get all rooms
     const rooms = await Room.find()
       .select('room_name location')
       .sort({ room_name: 1 })
       .lean();
 
-    // Build room schedule data using dynamic time slots
     const roomScheduleData = rooms.map(room => {
       const schedules = timeSlots.map(timeSlot => {
         const [startTime, endTime] = timeSlot.split('-');
-        // Normalize time strings (remove seconds if present) for comparison
         const normalizeTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : '';
         const matchingSchedule = todaySchedules.find(s => 
           s.room?._id?.toString() === room._id?.toString() &&
@@ -412,7 +367,7 @@ exports.getTodayRoomUsage = async (req, res) => {
       message: "Lấy lịch sử dụng phòng hôm nay thành công",
       success: true,
       roomSchedule: roomScheduleData,
-      timeSlots: timeSlots // Include time slots in response
+      timeSlots: timeSlots
     });
   } catch (error) {
     console.error("❌ Lỗi khi lấy lịch sử dụng phòng hôm nay:", error);

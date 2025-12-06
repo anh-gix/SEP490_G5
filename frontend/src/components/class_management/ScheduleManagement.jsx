@@ -64,10 +64,19 @@ const ScheduleManagement = () => {
           }
         }
         
+        let className = sch.class?.name;
+        if (!className && sch.status === 'temporary') {
+          className = 'Lớp học bù';
+        } else if (!className) {
+          className = 'N/A';
+        }
+        
+        const programType = sch.class?.course?.program?.type || sch.programType || sch.sessionCourse?.program?.type || null;
+        
         return {
           id: sch._id || sch.id,
           classId: sch.class?._id || sch.classId,
-          className: sch.class?.name || 'N/A',
+          className: className,
           teacherId: sch.teacher?._id || sch.class?.teacher?._id || sch.teacherId,
           teacherName: sch.teacher?.username || sch.class?.teacher?.username || 'N/A',
           roomId: sch.room?._id || sch.roomId,
@@ -79,7 +88,7 @@ const ScheduleManagement = () => {
           lessonTopic: sch.session?.title || sch.topic || 'N/A',
           status: sch.status || 'fixed',
           type: sch.type || 'regular',
-          programType: sch.class?.course?.program?.type || null
+          programType: programType
         };
       });
       
@@ -136,7 +145,6 @@ const ScheduleManagement = () => {
     }
   };
 
-  // Fetch data from API
   useEffect(() => {
     const fetchData = async () => {
       await fetchSchedules();
@@ -145,7 +153,6 @@ const ScheduleManagement = () => {
       await fetchRooms();
     };
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   const handleCreateSchedule = async (scheduleData) => {
@@ -242,13 +249,11 @@ const ScheduleManagement = () => {
   };
 
   const handleExportSchedule = () => {
-    // TODO: Implement export functionality (Excel/PDF)
     toast.info('Chức năng xuất lịch học sẽ được triển khai sau!');
   };
 
   return (
     <Container fluid className="p-24">
-      {/* Loading Spinner */}
       {loading && (
         <div className="text-center py-5">
           <Spinner animation="border" variant="primary" />
@@ -256,7 +261,6 @@ const ScheduleManagement = () => {
         </div>
       )}
 
-      {/* Error Alert */}
       {error && (
         <Alert variant="danger" dismissible onClose={() => setError(null)} className="mb-24">
           <Alert.Heading>Lỗi!</Alert.Heading>
@@ -264,7 +268,6 @@ const ScheduleManagement = () => {
         </Alert>
       )}
 
-      {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-24">
         <div>
           <h2 className="text-neutral-900 fw-bold mb-8">Quản lý lịch học</h2>
@@ -272,7 +275,6 @@ const ScheduleManagement = () => {
         </div>
       </div>
 
-      {/* Filters */}
       <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
         <Card.Body className="p-24">
           <Row className="g-3">
@@ -390,7 +392,6 @@ const ScheduleManagement = () => {
         </Card.Body>
       </Card>
 
-      {/* View Toggle */}
       <div className="d-flex justify-content-center mb-24">
         <ButtonGroup>
           <Button 
@@ -420,7 +421,6 @@ const ScheduleManagement = () => {
         </ButtonGroup>
       </div>
 
-      {/* Content */}
       <div>
         {viewMode === 'calendar' ? (
           <ScheduleCalendar 
@@ -460,7 +460,6 @@ const ScheduleManagement = () => {
         )}
       </div>
 
-      {/* Modals */}
       {showCreateModal && (
         <CreateScheduleModal
           classes={classes}

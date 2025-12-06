@@ -47,7 +47,6 @@ exports.getDashboardData = async (req, res) => {
       const scheduleId = schedule._id.toString();
       const scheduleAttendances = attendanceBySchedule[scheduleId] || [];
       
-      // Count absent and late students
       scheduleAttendances.forEach(att => {
         const status = att.attendance?.status;
         if (status === 'absent') {
@@ -71,26 +70,15 @@ exports.getDashboardData = async (req, res) => {
         }
       });
 
-      // Determine schedule status
-      // schedule.date is stored in MongoDB as UTC, but we need to work with local timezone
-      // startTime and endTime are stored as local time strings (e.g., "14:00:00")
-      // Convert schedule.date to local timezone for consistent comparison
       const scheduleDate = new Date(schedule.date);
       
-      // Extract local date components (not UTC) to match local time strings
       const year = scheduleDate.getFullYear();
       const month = String(scheduleDate.getMonth() + 1).padStart(2, '0');
       const day = String(scheduleDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
       
-      // Create Date objects in local timezone for startTime and endTime
-      // ISO string without timezone specifier is parsed as local time
       const startTime = new Date(`${dateStr}T${schedule.startTime}:00`);
       const endTime = new Date(`${dateStr}T${schedule.endTime}:00`);
-      
-      // Ensure 'now' is also in local timezone for consistent comparison
-      // 'now' is already local time from line 14, so comparison should be consistent
-      // All three (now, startTime, endTime) are now in the same timezone (local)
       
       let status = 'upcoming';
       if (startTime <= now && now <= endTime) {
@@ -99,10 +87,17 @@ exports.getDashboardData = async (req, res) => {
         status = 'completed';
       }
 
+      let className = schedule.class?.name;
+      if (!className && schedule.status === 'temporary') {
+        className = 'Lớp học bù';
+      } else if (!className) {
+        className = 'N/A';
+      }
+
       return {
         id: schedule._id,
         time: `${schedule.startTime || 'N/A'} - ${schedule.endTime || 'N/A'}`,
-        className: schedule.class?.name || 'N/A',
+        className: className,
         teacher: schedule.teacher?.username || 'N/A',
         room: schedule.room?.room_name || 'N/A',
         status,
@@ -160,9 +155,16 @@ exports.getDashboardData = async (req, res) => {
         );
         
         if (matchingSchedule) {
+          let className = matchingSchedule.class?.name;
+          if (!className && matchingSchedule.status === 'temporary') {
+            className = 'Lớp học bù';
+          } else if (!className) {
+            className = 'N/A';
+          }
+          
           return {
             time: timeSlot,
-            class: matchingSchedule.class?.name || 'N/A',
+            class: className,
             status: 'occupied'
           };
         }
@@ -322,7 +324,6 @@ exports.getDashboardData = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error getting academic dashboard:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy dữ liệu dashboard',

@@ -455,12 +455,20 @@ const RequestDetailPage = ({
       // Kiểm tra xem có phải buổi học bù không (từ database với scheduleStatus: 'rescheduled')
       const isMakeupFromDB = scheduleStatus === 'rescheduled';
       
+      // Xác định className: nếu không có class và là makeup/temporary thì hiển thị "Lớp học bù"
+      let className = schedule.class?.name;
+      if (!className && (isMakeupFromDB || schedule.status === 'temporary' || displayStatus === 'makeup')) {
+        className = 'Lớp học bù';
+      } else if (!className) {
+        className = 'N/A';
+      }
+      
       return {
         id: scheduleId,
         date: dateStr,
         startTime: schedule.startTime || '',
         endTime: schedule.endTime || '',
-        className: schedule.class?.name || 'N/A',
+        className: className,
         roomName: schedule.room?.room_name || 'N/A',
         topic: schedule.topic || '',
         status: displayStatus,
@@ -480,7 +488,7 @@ const RequestDetailPage = ({
         makeupReason: isMakeupFromDB ? schedule.studentScheduleReason : null, // Lý do học bù
         isOldClassSchedule: isOldClassSchedule, // Đánh dấu buổi của lớp cũ (khi đổi lớp)
         isNewClassSchedule: false, // Đánh dấu buổi của lớp mới (sẽ được thêm ở dưới)
-        programType: schedule.class?.course?.program?.type || null // Thêm program type để hiển thị màu
+        programType: schedule.class?.course?.program?.type || schedule.programType || schedule.sessionCourse?.program?.type || null // Thêm program type để hiển thị màu (ưu tiên từ class, sau đó từ session)
       };
     });
     
@@ -515,7 +523,7 @@ const RequestDetailPage = ({
           date: dateStr,
           startTime: makeup.makeupSchedule.startTime || '',
           endTime: makeup.makeupSchedule.endTime || '',
-          className: makeup.makeupClassInfo?.className || 'N/A',
+          className: makeup.makeupClassInfo?.className || 'Lớp học bù',
           roomName: makeup.makeupSchedule.roomName || 'N/A',
           topic: makeup.makeupSchedule.title || '',
           status: 'makeup',
@@ -526,7 +534,7 @@ const RequestDetailPage = ({
           lessonNumber: makeup.makeupSchedule.order || '',
           lessonTopic: makeup.makeupSchedule.title || '',
           isMakeupSchedule: true,
-          programType: makeup.makeupClassInfo?.programType || makeup.makeupSchedule?.class?.course?.program?.type || null
+          programType: makeup.makeupClassInfo?.programType || makeup.makeupSchedule?.class?.course?.program?.type || makeup.makeupSchedule?.programType || makeup.makeupSchedule?.sessionCourse?.program?.type || null
         };
       })
       .filter(Boolean);
@@ -563,7 +571,7 @@ const RequestDetailPage = ({
           isSubstituteClass: false,
           isOldClassSchedule: false, // Đánh dấu buổi của lớp cũ
           isNewClassSchedule: true, // Đánh dấu buổi của lớp mới
-          programType: newClassInfo?.programType || newSchedule?.class?.course?.program?.type || null
+          programType: newClassInfo?.programType || newSchedule?.class?.course?.program?.type || newSchedule?.programType || newSchedule?.sessionCourse?.program?.type || null
         });
       });
     }

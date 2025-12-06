@@ -202,10 +202,10 @@ const RoomManagementFull = () => {
         }
       }
       
-      // Determine className: if it's a make-up class (temporary) without a class, show "học bù"
+      // Determine className: if it's a make-up class (temporary) without a class, show "Lớp học bù"
       let className = schedule.class?.name;
       if (!className && schedule.status === 'temporary') {
-        className = 'Học bù';
+        className = 'Lớp học bù';
       } else if (!className) {
         className = 'N/A';
       }

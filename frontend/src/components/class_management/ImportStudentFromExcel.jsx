@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Table, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import studentService from '../../services/studentService';
 import teacherService from '../../services/teacherService';
+import programService from '../../services/programService';
 import * as XLSX from 'xlsx';
 
 /**
@@ -15,7 +16,27 @@ const ImportStudentFromExcel = () => {
   const [previewStudents, setPreviewStudents] = useState([]);
   const [importing, setImporting] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [programs, setPrograms] = useState([]);
   const fileInputRef = useRef(null);
+
+  // Fetch active programs from database on component mount
+  useEffect(() => {
+    const fetchPrograms = async () => {
+      try {
+        const response = await programService.getAllPrograms();
+        const allPrograms = response.data || [];
+        // Filter only active programs
+        const activePrograms = allPrograms.filter(p => p.status === 'active');
+        setPrograms(activePrograms);
+        console.log('Loaded active programs:', activePrograms.length);
+      } catch (error) {
+        console.error('Error fetching programs:', error);
+        // Continue with empty array if fetch fails
+        setPrograms([]);
+      }
+    };
+    fetchPrograms();
+  }, []);
 
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
@@ -147,6 +168,87 @@ const ImportStudentFromExcel = () => {
         return /^\d+(\.\d+)?$/.test(valueStr);
       };
 
+      // Helper function to map numeric score to program level based on band ranges
+      const mapScoreToLevel = (score, type, programs) => {
+        if (!score || !type || !programs || programs.length === 0) {
+          return null;
+        }
+
+        const scoreNum = type.toLowerCase() === 'ielts' 
+          ? parseFloat(score.toString().trim())
+          : parseInt(score.toString().trim());
+
+        if (isNaN(scoreNum)) {
+          return null;
+        }
+
+        const typeStr = type.toString().trim().toLowerCase();
+        
+        // Find programs matching the type
+        const matchingPrograms = programs.filter(p => 
+          p.type && p.type.toLowerCase() === typeStr && p.band
+        );
+
+        // Sort programs by level order to find the best match
+        const levelOrder = {
+          'Pre-A1': 0,
+          'A1': 1,
+          'A2': 2,
+          'B1': 3,
+          'B2': 4,
+          'C1': 5,
+          'C2': 6
+        };
+
+        // Try to find a program whose band range contains the score
+        for (const program of matchingPrograms) {
+          if (!program.band) continue;
+
+          const bandStr = program.band.toString().trim();
+          
+          // Parse band range (e.g., "4.0-5.0" or "501-700")
+          const rangeMatch = bandStr.match(/^([\d.]+)\s*-\s*([\d.]+)$/);
+          if (rangeMatch) {
+            const min = typeStr === 'ielts' 
+              ? parseFloat(rangeMatch[1])
+              : parseInt(rangeMatch[1]);
+            const max = typeStr === 'ielts'
+              ? parseFloat(rangeMatch[2])
+              : parseInt(rangeMatch[2]);
+
+            if (!isNaN(min) && !isNaN(max) && scoreNum >= min && scoreNum <= max) {
+              return program.level;
+            }
+          }
+        }
+
+        // If no exact match found, find the closest program level
+        // Sort by level order and find the first level where score is less than or equal to max
+        const sortedPrograms = matchingPrograms
+          .filter(p => p.band && p.level)
+          .sort((a, b) => {
+            const orderA = levelOrder[a.level] || 999;
+            const orderB = levelOrder[b.level] || 999;
+            return orderA - orderB;
+          });
+
+        for (const program of sortedPrograms) {
+          const bandStr = program.band.toString().trim();
+          const rangeMatch = bandStr.match(/^([\d.]+)\s*-\s*([\d.]+)$/);
+          if (rangeMatch) {
+            const max = typeStr === 'ielts'
+              ? parseFloat(rangeMatch[2])
+              : parseInt(rangeMatch[2]);
+            
+            if (!isNaN(max) && scoreNum <= max) {
+              return program.level;
+            }
+          }
+        }
+
+        return null;
+      };
+
       // Helper function to calculate bands to study from currentLevel to aim
       const calculateLevelsToStudy = (currentLevel, aim, type) => {
         if (!currentLevel || !aim) return '';
@@ -160,7 +262,35 @@ const ImportStudentFromExcel = () => {
         const aimIsNumeric = isNumericScore(aimStr);
         
         if (typeStr && (currentLevelIsNumeric || aimIsNumeric)) {
-          // For numeric scores, return a simple description
+          // Try to map numeric scores to program levels
+          const startLevel = mapScoreToLevel(currentLevelStr, typeStr, programs);
+          const endLevel = mapScoreToLevel(aimStr, typeStr, programs);
+          
+          // If both mappings succeeded, calculate progression from start to end level
+          if (startLevel && endLevel) {
+            const startOrder = getLevelOrder(startLevel);
+            const endOrder = getLevelOrder(endLevel);
+            
+            // If start level is higher than end level, we need to find the correct start level
+            // The start level should be the level that contains the current score
+            // The end level should be the level that contains the aim score
+            // But we want to start from the level that contains current score, not necessarily the exact level
+            if (startOrder !== -1 && endOrder !== -1 && endOrder > startOrder) {
+              const levelsToStudy = [];
+              for (let order = startOrder; order <= endOrder; order++) {
+                const levelName = getLevelName(order);
+                if (levelName) {
+                  levelsToStudy.push(levelName);
+                }
+              }
+              return levelsToStudy.join(' → ');
+            } else if (startOrder !== -1 && endOrder !== -1 && endOrder === startOrder) {
+              // If both map to same level, just return that level
+              return startLevel;
+            }
+          }
+          
+          // Fallback: if mapping failed, return simple score format
           return `${currentLevelStr} → ${aimStr}`;
         }
         

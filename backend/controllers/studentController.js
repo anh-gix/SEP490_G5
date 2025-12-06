@@ -1516,6 +1516,109 @@ exports.deleteStudent = async (req, res) => {
 // =========================
 // 📥 IMPORT HỌC VIÊN HÀNG LOẠT
 // =========================
+
+// Helper function to parse levelsToStudy string into array of levels
+// Example: "B1 → B2" → ["B1", "B2"]
+// Example: "A1 → A2 → B1" → ["A1", "A2", "B1"]
+const parseLevelsToStudy = (levelsToStudyStr) => {
+  if (!levelsToStudyStr || typeof levelsToStudyStr !== 'string') {
+    return [];
+  }
+
+  // Remove whitespace and split by various arrow formats
+  const cleaned = levelsToStudyStr.trim();
+  if (!cleaned) {
+    return [];
+  }
+
+  // Split by arrow characters: "→" or "->" (with optional spaces around)
+  // Don't split by single "-" to avoid issues with levels like "Pre-A1"
+  const levels = cleaned
+    .split(/→|->/)
+    .map(level => level.trim())
+    .filter(level => level.length > 0);
+
+  return levels;
+};
+
+// Helper function to enroll student into courses based on levelsToStudy
+const enrollStudentInCourses = async (studentId, levelsToStudyStr, type) => {
+  try {
+    if (!levelsToStudyStr || !type) {
+      console.log(`⚠️ Skipping enrollment for student ${studentId}: missing levelsToStudy or type`);
+      return { enrolled: 0, courses: [] };
+    }
+
+    // Parse levels from string
+    const levels = parseLevelsToStudy(levelsToStudyStr);
+    if (levels.length === 0) {
+      console.log(`⚠️ Skipping enrollment for student ${studentId}: no valid levels parsed from "${levelsToStudyStr}"`);
+      return { enrolled: 0, courses: [] };
+    }
+
+    const typeStr = type.toString().trim().toLowerCase();
+    console.log(`📚 Enrolling student ${studentId} in courses for type: ${typeStr}, levels: ${levels.join(', ')}`);
+
+    // Find programs matching type and levels
+    const programs = await Program.find({
+      type: typeStr,
+      level: { $in: levels },
+      status: 'active'
+    }).select('_id level');
+
+    if (programs.length === 0) {
+      console.log(`⚠️ No active programs found for type: ${typeStr}, levels: ${levels.join(', ')}`);
+      return { enrolled: 0, courses: [] };
+    }
+
+    const programIds = programs.map(p => p._id);
+    console.log(`✅ Found ${programs.length} programs: ${programs.map(p => p.level).join(', ')}`);
+
+    // Find all courses belonging to these programs
+    const courses = await Course.find({
+      program: { $in: programIds },
+      status: 'active'
+    }).select('_id name program');
+
+    if (courses.length === 0) {
+      console.log(`⚠️ No active courses found for programs: ${programIds.join(', ')}`);
+      return { enrolled: 0, courses: [] };
+    }
+
+    console.log(`✅ Found ${courses.length} courses to enroll`);
+
+    // Enroll student in all courses
+    let enrolledCount = 0;
+    const enrolledCourseIds = [];
+
+    for (const course of courses) {
+      try {
+        // Use $addToSet to avoid duplicates
+        const result = await Course.updateOne(
+          { _id: course._id },
+          { $addToSet: { studentEnrollments: studentId } }
+        );
+
+        if (result.modifiedCount > 0 || result.matchedCount > 0) {
+          enrolledCount++;
+          enrolledCourseIds.push(course._id);
+          console.log(`  ✓ Enrolled in course: ${course.name} (${course._id})`);
+        }
+      } catch (courseError) {
+        console.error(`  ✗ Error enrolling in course ${course._id}:`, courseError.message);
+        // Continue with other courses even if one fails
+      }
+    }
+
+    console.log(`✅ Successfully enrolled student ${studentId} in ${enrolledCount} courses`);
+    return { enrolled: enrolledCount, courses: enrolledCourseIds };
+  } catch (error) {
+    console.error(`❌ Error enrolling student ${studentId} in courses:`, error);
+    // Return empty result but don't throw - enrollment failure shouldn't fail the import
+    return { enrolled: 0, courses: [], error: error.message };
+  }
+};
+
 exports.importStudents = async (req, res) => {
   try {
     const { students } = req.body;
@@ -1591,6 +1694,25 @@ exports.importStudents = async (req, res) => {
           password: studentData.password || '123456', // Default password
           roleId: studentRole._id
         });
+        
+        // Enroll student in courses based on levelsToStudy
+        // Note: We don't save aim, currentLevel, type, levelsToStudy to User model
+        // They are only used to determine which courses to enroll in
+        if (studentData.levelsToStudy && studentData.type) {
+          try {
+            const enrollmentResult = await enrollStudentInCourses(
+              newStudent._id,
+              studentData.levelsToStudy,
+              studentData.type
+            );
+            console.log(`📝 Enrollment result for ${newStudent.email}:`, enrollmentResult);
+          } catch (enrollmentError) {
+            // Log error but don't fail the import
+            console.error(`⚠️ Error enrolling student ${newStudent._id} in courses:`, enrollmentError);
+          }
+        } else {
+          console.log(`ℹ️ Skipping enrollment for ${newStudent.email}: missing levelsToStudy or type`);
+        }
         
         results.success.push({
           _id: newStudent._id,

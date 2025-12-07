@@ -152,6 +152,13 @@ const StudentExamListPage2 = () => {
     }
   };
 
+  // Get unique section types from exam sections
+  const getUniqueSectionTypes = (sections) => {
+    if (!sections || sections.length === 0) return [];
+    const uniqueTypes = [...new Set(sections.map(section => section.type))];
+    return uniqueTypes;
+  };
+
   // Get status badge color and label
   const getStatusBadge = (status) => {
     if (!status) return null;
@@ -422,7 +429,7 @@ const StudentExamListPage2 = () => {
                               <i className="ph-bold ph-list-bullets" />
                             </span>
                             <span className="text-neutral-700 text-lg fw-medium">
-                              {exam.sections?.length || 0} phần thi
+                              {getUniqueSectionTypes(exam.sections).length} phần thi
                             </span>
                           </div>
                           <div className="flex-align gap-8">
@@ -441,20 +448,15 @@ const StudentExamListPage2 = () => {
                             Các phần thi:
                           </p>
                           <div className="d-flex flex-wrap gap-8">
-                            {exam.sections?.slice(0, 4).map((section, index) => (
+                            {getUniqueSectionTypes(exam.sections).map((sectionType, index) => (
                               <span
                                 key={index}
                                 className="badge bg-main-25 text-neutral-700 px-12 py-6 rounded-8 text-xs fw-medium"
                                 style={{ textTransform: 'capitalize' }}
                               >
-                                {section.type}
+                                {sectionType}
                               </span>
                             ))}
-                            {exam.sections?.length > 4 && (
-                              <span className="badge bg-main-25 text-neutral-700 px-12 py-6 rounded-8 text-xs fw-medium">
-                                +{exam.sections.length - 4} khác
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>

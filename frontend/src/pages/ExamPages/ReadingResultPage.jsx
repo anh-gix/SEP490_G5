@@ -736,7 +736,7 @@ const ReadingResultPage = () => {
               {/* Actions */}
               <div className='text-center'>
                 <Link
-                  to={`/exams/${examId}`}
+                  to={`/exams/${examId}/2`}
                   className='btn btn-main px-40 py-16 rounded-pill me-16'
                 >
                   <i className='ph ph-arrow-left me-8' />

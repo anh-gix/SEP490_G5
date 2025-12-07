@@ -11,11 +11,11 @@ const mongoose = require('mongoose');
  */
 async function reassignSessionsByOrder(classId) {
   try {
-    console.log('🔄 Bắt đầu sắp xếp lại session cho lớp:', classId);
+    console.log(' Bắt đầu sắp xếp lại session cho lớp:', classId);
     
     const classData = await Class.findById(classId).populate('course', 'sessions').lean();
     if (!classData || !classData.course) {
-      console.log('⚠️ Không tìm thấy lớp hoặc course');
+      console.log(' Không tìm thấy lớp hoặc course');
       return;
     }
     
@@ -24,11 +24,11 @@ async function reassignSessionsByOrder(classId) {
       .lean();
     
     if (allSchedules.length === 0) {
-      console.log('⚠️ Không có buổi học nào trong lớp');
+      console.log(' Không có buổi học nào trong lớp');
       return;
     }
     
-    console.log(`📅 Tìm thấy ${allSchedules.length} buổi học trong lớp`);
+    console.log(` Tìm thấy ${allSchedules.length} buổi học trong lớp`);
     
     const courseData = await Course.findById(classData.course._id || classData.course)
       .populate('sessions', 'order')
@@ -36,12 +36,12 @@ async function reassignSessionsByOrder(classId) {
       .lean();
     
     if (!courseData || !courseData.sessions || courseData.sessions.length === 0) {
-      console.log('⚠️ Course không có sessions');
+      console.log(' Course không có sessions');
       return;
     }
     
     const courseSessions = [...courseData.sessions].sort((a, b) => (a.order || 0) - (b.order || 0));
-    console.log(`📚 Course có ${courseSessions.length} sessions (theo order):`);
+    console.log(` Course có ${courseSessions.length} sessions (theo order):`);
     courseSessions.forEach((s, index) => {
       console.log(`   ${index + 1}. Session ${s.order || index + 1} (ID: ${s._id})`);
     });
@@ -65,10 +65,10 @@ async function reassignSessionsByOrder(classId) {
     });
     
     await Promise.all(updatePromises);
-    console.log(`✅ Đã gán lại session cho ${allSchedules.length} buổi học theo thứ tự date/time`);
+    console.log(` Đã gán lại session cho ${allSchedules.length} buổi học theo thứ tự date/time`);
     
   } catch (error) {
-    console.error('❌ Lỗi khi sắp xếp lại session:', error);
+    console.error(' Lỗi khi sắp xếp lại session:', error);
     throw error;
   }
 }
@@ -592,11 +592,11 @@ exports.createSchedule = async (req, res) => {
           
           if (scheduleDate >= testDate) {
             await Session.findByIdAndUpdate(session, { learningType: 'test' });
-            console.log(`✅ Updated session ${session} learningType to 'test' (schedule date >= test date)`);
+            console.log(` Updated session ${session} learningType to 'test' (schedule date >= test date)`);
           }
         }
       } catch (err) {
-        console.error('⚠️ Error checking/updating test date:', err);
+        console.error(' Error checking/updating test date:', err);
       }
     }
     
@@ -644,7 +644,7 @@ exports.updateSchedule = async (req, res) => {
     const scope = updateScope || 'single';
     
     if (scope === 'future') {
-      console.log('📝 Cập nhật "Buổi học này và các buổi học sau":');
+      console.log(' Cập nhật "Buổi học này và các buổi học sau":');
       
       const currentDate = new Date(schedule.date);
       currentDate.setHours(0, 0, 0, 0);
@@ -772,12 +772,12 @@ exports.updateSchedule = async (req, res) => {
               date: newScheduleDateStr,
               conflicts: validationResult.conflicts
             });
-            console.log(`      ⚠️ Có conflict!`);
+            console.log(`       Có conflict!`);
           } else {
             console.log(`      ✓ Không có conflict`);
           }
         } catch (error) {
-          console.error(`      ❌ Lỗi khi validate:`, error);
+          console.error(`       Lỗi khi validate:`, error);
           validationErrors.push({
             scheduleId: matchingSchedule._id.toString(),
             date: newScheduleDateStr,
@@ -787,7 +787,7 @@ exports.updateSchedule = async (req, res) => {
       }
       
       if (validationErrors.length > 0) {
-        console.log(`  ❌ Có ${validationErrors.length} buổi học bị conflict`);
+        console.log(`   Có ${validationErrors.length} buổi học bị conflict`);
         return res.status(400).json({
           success: false,
           message: `Có ${validationErrors.length} buổi học bị xung đột lịch học`,
@@ -826,9 +826,9 @@ exports.updateSchedule = async (req, res) => {
       });
       
       await Promise.all(updatePromises);
-      console.log(`  ✅ Đã cập nhật ${matchingSchedules.length} buổi học`);
+      console.log(`   Đã cập nhật ${matchingSchedules.length} buổi học`);
       
-      console.log('🔄 Bắt đầu sắp xếp lại session cho tất cả buổi học trong lớp...');
+      console.log(' Bắt đầu sắp xếp lại session cho tất cả buổi học trong lớp...');
       await reassignSessionsByOrder(schedule.class);
       
       const updatedSchedule = await ClassSchedule.findById(schedule._id)
@@ -842,7 +842,7 @@ exports.updateSchedule = async (req, res) => {
         updatedCount: matchingSchedules.length
       });
     } else {
-      console.log('📝 Cập nhật chỉ buổi học này (single):');
+      console.log(' Cập nhật chỉ buổi học này (single):');
       console.log('  - ScheduleId:', schedule._id);
       console.log('  - Date cũ:', schedule.date, '-> Date mới:', date);
       console.log('  - StartTime cũ:', schedule.startTime, '-> StartTime mới:', startTime);
@@ -857,14 +857,14 @@ exports.updateSchedule = async (req, res) => {
       
       await schedule.save();
       
-      console.log('🔄 Bắt đầu sắp xếp lại session cho tất cả buổi học trong lớp...');
+      console.log(' Bắt đầu sắp xếp lại session cho tất cả buổi học trong lớp...');
       await reassignSessionsByOrder(schedule.class);
       
       const updatedSchedule = await ClassSchedule.findById(schedule._id)
         .populate('class', 'name level')
         .populate('room', 'room_name location');
       
-      console.log('✅ Cập nhật thành công buổi học:', schedule._id);
+      console.log(' Cập nhật thành công buổi học:', schedule._id);
       
       res.status(200).json({
         success: true,

@@ -855,7 +855,7 @@ exports.getBandByTypeAndLevel = async (req, res) => {
         // Normalize type to lowercase for case-insensitive matching
         const normalizedType = type.toLowerCase().trim();
         
-        console.log('🔍 Searching for band:', { type: normalizedType, level, originalType: type });
+        console.log(' Searching for band:', { type: normalizedType, level, originalType: type });
         
         const program = await Program.findOne({
             type: normalizedType,
@@ -863,7 +863,7 @@ exports.getBandByTypeAndLevel = async (req, res) => {
             status: 'active'
         });
         
-        console.log('📋 Found program:', program ? { 
+        console.log(' Found program:', program ? { 
             type: program.type, 
             level: program.level, 
             band: program.band 
@@ -881,7 +881,7 @@ exports.getBandByTypeAndLevel = async (req, res) => {
             band: program.band
         });
     } catch (err) {
-        console.error('❌ Error in getBandByTypeAndLevel:', err);
+        console.error(' Error in getBandByTypeAndLevel:', err);
         res.status(500).json({
             success: false,
             message: 'Lỗi máy chủ',
@@ -1110,7 +1110,7 @@ exports.getCourseMaterials = async (req, res) => {
             materials: formattedMaterials
         });
     } catch (err) {
-        console.error('❌ Lỗi khi lấy tài liệu khóa học:', err);
+        console.error(' Lỗi khi lấy tài liệu khóa học:', err);
         res.status(500).json({
             success: false,
             message: 'Lỗi server khi lấy tài liệu khóa học',

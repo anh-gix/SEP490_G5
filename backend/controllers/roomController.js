@@ -28,7 +28,7 @@ exports.getAllRooms = async (req, res) => {
       rooms
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy danh sách phòng:", error);
+    console.error(" Lỗi khi lấy danh sách phòng:", error);
     res.status(500).json({ 
       message: "Lỗi server khi lấy danh sách phòng",
       error: error.message 
@@ -51,7 +51,7 @@ exports.getRoomById = async (req, res) => {
       room
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy thông tin phòng:", error);
+    console.error(" Lỗi khi lấy thông tin phòng:", error);
     res.status(500).json({ 
       message: "Lỗi server khi lấy thông tin phòng",
       error: error.message 
@@ -89,7 +89,7 @@ exports.createRoom = async (req, res) => {
       room: newRoom
     });
   } catch (error) {
-    console.error("❌ Lỗi khi tạo phòng:", error);
+    console.error(" Lỗi khi tạo phòng:", error);
     res.status(500).json({ 
       message: "Lỗi server khi tạo phòng",
       error: error.message 
@@ -133,7 +133,7 @@ exports.updateRoom = async (req, res) => {
       room
     });
   } catch (error) {
-    console.error("❌ Lỗi khi cập nhật phòng:", error);
+    console.error(" Lỗi khi cập nhật phòng:", error);
     res.status(500).json({ 
       message: "Lỗi server khi cập nhật phòng",
       error: error.message 
@@ -165,7 +165,7 @@ exports.deleteRoom = async (req, res) => {
       room
     });
   } catch (error) {
-    console.error("❌ Lỗi khi xóa phòng:", error);
+    console.error(" Lỗi khi xóa phòng:", error);
     res.status(500).json({ 
       message: "Lỗi server khi xóa phòng",
       error: error.message 
@@ -303,7 +303,7 @@ exports.getRoomSchedule = async (req, res) => {
       schedules
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy lịch phòng:", error);
+    console.error(" Lỗi khi lấy lịch phòng:", error);
     res.status(500).json({ 
       message: "Lỗi server khi lấy lịch phòng",
       error: error.message 
@@ -338,7 +338,7 @@ exports.getRoomStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy thống kê phòng:", error);
+    console.error(" Lỗi khi lấy thống kê phòng:", error);
     res.status(500).json({ 
       message: "Lỗi server khi lấy thống kê phòng",
       error: error.message 
@@ -440,7 +440,7 @@ exports.getTodayRoomUsage = async (req, res) => {
       timeSlots: timeSlots
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy lịch sử dụng phòng hôm nay:", error);
+    console.error(" Lỗi khi lấy lịch sử dụng phòng hôm nay:", error);
     res.status(500).json({ 
       message: "Lỗi server khi lấy lịch sử dụng phòng hôm nay",
       error: error.message 

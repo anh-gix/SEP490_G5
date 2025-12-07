@@ -25,7 +25,7 @@ exports.getAttendanceByClassSchedule = async (req, res) => {
       list,
     });
   } catch (err) {
-    console.error("❌ Lỗi khi lấy danh sách:", err);
+    console.error(" Lỗi khi lấy danh sách:", err);
     res.status(500).json({ message: "Lỗi server", error: err.message });
   }
 };

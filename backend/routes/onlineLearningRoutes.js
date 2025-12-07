@@ -4,7 +4,7 @@ const onlineLearningController = require("../controllers/onlineLearningControlle
 const { verifyToken, isStudent } = require("../middlewares/verifyToken");
 
 // ========================
-// 📚 ONLINE LEARNING ROUTES
+//  ONLINE LEARNING ROUTES
 // ========================
 
 // Get student's enrolled online courses

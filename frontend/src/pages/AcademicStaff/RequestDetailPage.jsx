@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Container, Card, Button, Spinner, Alert, Modal, Form } from 'react-bootstrap';
 import ScheduleCalendar from '../../components/class_management/ScheduleCalendar';
+import ChangeClassModal from '../../components/class_management/ChangeClassModal';
 import { formatDateToYYYYMMDD, parseDateString } from '../../helper/helper';
 import classService from '../../services/classService';
 import { studentScheduleService } from '../../services/studentScheduleService';
@@ -21,6 +22,7 @@ const RequestDetailPage = ({
   onApprove,
   onReject,
   onChangeClass,
+  onChangeClassConfirm,
   onAddMakeupClass,
   onRemoveMakeupClass,
   onRemoveClassChange,
@@ -34,6 +36,8 @@ const RequestDetailPage = ({
   const [resolvedStudentScheduleIds, setResolvedStudentScheduleIds] = useState({}); // Map session index -> studentScheduleId
   const [replaceTeacherStudentScheduleId, setReplaceTeacherStudentScheduleId] = useState(null); // studentScheduleId cho đơn replace_teacher
   const [loadingReplaceTeacherScheduleId, setLoadingReplaceTeacherScheduleId] = useState(false); // Loading state cho replace_teacher
+  const [showChangeClassModal, setShowChangeClassModal] = useState(false);
+  const [selectedClassToChange, setSelectedClassToChange] = useState(null);
   // Xác định role của người gửi đơn
   const isStudent = senderRole === 'Student';
   const isTeacher = senderRole === 'Teacher';
@@ -252,13 +256,13 @@ const RequestDetailPage = ({
               ...prev,
               [idx]: foundStudentScheduleId
             }));
-            console.log(`✅ Tìm thấy studentScheduleId từ API cho buổi ${session.sessionOrder}:`, foundStudentScheduleId);
+            console.log(` Tìm thấy studentScheduleId từ API cho buổi ${session.sessionOrder}:`, foundStudentScheduleId);
           } else {
-            console.log(`⚠️ Không tìm thấy studentSchedule cho học sinh ${studentId} trong kết quả API`);
+            console.log(` Không tìm thấy studentSchedule cho học sinh ${studentId} trong kết quả API`);
           }
         }
       } catch (error) {
-        console.error(`❌ Lỗi khi gọi API lấy studentSchedule cho buổi ${session.sessionOrder}:`, error);
+        console.error(` Lỗi khi gọi API lấy studentSchedule cho buổi ${session.sessionOrder}:`, error);
       } finally {
         setLoadingStudentScheduleIds(prev => {
           const newState = { ...prev };
@@ -317,12 +321,12 @@ const RequestDetailPage = ({
           const firstStudentSchedule = response.studentSchedules[0];
           const foundStudentScheduleId = firstStudentSchedule._id || firstStudentSchedule.id;
           setReplaceTeacherStudentScheduleId(foundStudentScheduleId);
-          console.log('✅ Tìm thấy studentScheduleId từ API cho đơn replace_teacher:', foundStudentScheduleId);
+          console.log(' Tìm thấy studentScheduleId từ API cho đơn replace_teacher:', foundStudentScheduleId);
         } else {
-          console.log('⚠️ Không tìm thấy studentSchedule cho classScheduleId:', classScheduleId);
+          console.log(' Không tìm thấy studentSchedule cho classScheduleId:', classScheduleId);
         }
       } catch (error) {
-        console.error('❌ Lỗi khi gọi API lấy studentSchedule cho đơn replace_teacher:', error);
+        console.error(' Lỗi khi gọi API lấy studentSchedule cho đơn replace_teacher:', error);
       } finally {
         setLoadingReplaceTeacherScheduleId(false);
       }
@@ -341,13 +345,13 @@ const RequestDetailPage = ({
     if (senderSchedule && senderSchedule.length > 0) {
       const firstSchedule = senderSchedule[0];
       if (firstSchedule.class?.course?.program) {
-        console.log('✅ Program type data received:', {
+        console.log(' Program type data received:', {
           programType: firstSchedule.class?.course?.program?.type,
           className: firstSchedule.class?.name,
           courseName: firstSchedule.class?.course?.name
         });
       } else {
-        console.warn('⚠️ Program type not found in schedule:', {
+        console.warn(' Program type not found in schedule:', {
           hasClass: !!firstSchedule.class,
           hasCourse: !!firstSchedule.class?.course,
           hasProgram: !!firstSchedule.class?.course?.program,
@@ -1006,12 +1010,24 @@ const RequestDetailPage = ({
                         ).join(', ');
                       };
                       
+                      // Extract courseId - xử lý cả object và ObjectId string
+                      let extractedCourseId = null;
+                      if (courseInfo) {
+                        if (typeof courseInfo === 'object' && courseInfo._id) {
+                          extractedCourseId = courseInfo._id.toString();
+                        } else if (typeof courseInfo === 'string') {
+                          extractedCourseId = courseInfo;
+                        } else if (courseInfo && typeof courseInfo === 'object' && courseInfo.toString) {
+                          extractedCourseId = courseInfo.toString();
+                        }
+                      }
+                      
                       // Tạo classItem để truyền vào onChangeClass
                       const classItemForChange = {
                         classId: String(classInfo?._id || classInfo),
                         className: classInfo?.name || 'N/A',
                         courseName: courseInfo?.name || 'N/A',
-                        courseId: courseInfo?._id || courseInfo || null,
+                        courseId: extractedCourseId,
                         currentSessionTitle: currentSession?.title || 'Chưa có thông tin session',
                         currentSessionOrder: currentSession?.order || null,
                         fixedSchedules: fixedSchedules
@@ -1020,6 +1036,9 @@ const RequestDetailPage = ({
                       // Kiểm tra xem có pendingClassChange không
                       const isPendingChange = pendingClassChange && 
                         String(pendingClassChange.oldClassId) === String(classItemForChange.classId);
+                      
+                      // Kiểm tra xem có thể đổi lớp không (cần có courseId và onChangeClass)
+                      const canChangeClass = !!onChangeClass && !!extractedCourseId;
                       
                       return (
                         <div className="mb-12">
@@ -1098,8 +1117,27 @@ const RequestDetailPage = ({
                                   <Button
                                     variant="outline-primary"
                                     size="sm"
-                                    onClick={() => onChangeClass(classItemForChange)}
+                                    onClick={() => {
+                                      console.log('🔵 Đổi lớp button clicked', { classItemForChange, onChangeClass: !!onChangeClass, courseId: extractedCourseId });
+                                      if (!onChangeClass) {
+                                        console.error(' onChangeClass is undefined');
+                                        return;
+                                      }
+                                      if (!extractedCourseId) {
+                                        console.error(' courseId is null or undefined', { courseInfo });
+                                        return;
+                                      }
+                                      try {
+                                        // Mở modal local trong RequestDetailPage
+                                        setSelectedClassToChange(classItemForChange);
+                                        setShowChangeClassModal(true);
+                                      } catch (error) {
+                                        console.error(' Error opening change class modal:', error);
+                                      }
+                                    }}
                                     className="d-flex align-items-center gap-2"
+                                    disabled={!canChangeClass}
+                                    title={!canChangeClass ? (!extractedCourseId ? 'Không thể đổi lớp: Thiếu thông tin khóa học' : 'Không thể đổi lớp') : 'Đổi lớp học'}
                                   >
                                     <i className="fas fa-exchange-alt"></i>
                                     Đổi lớp
@@ -1184,8 +1222,23 @@ const RequestDetailPage = ({
                                         <Button
                                           variant="outline-primary"
                                           size="sm"
-                                          onClick={() => onChangeClass(classItem)}
+                                          onClick={() => {
+                                            console.log('🔵 Đổi lớp button clicked (fallback)', { classItem, onChangeClass: !!onChangeClass });
+                                            if (!onChangeClass) {
+                                              console.error(' onChangeClass is undefined');
+                                              return;
+                                            }
+                                            try {
+                                              // Mở modal local trong RequestDetailPage
+                                              setSelectedClassToChange(classItem);
+                                              setShowChangeClassModal(true);
+                                            } catch (error) {
+                                              console.error(' Error opening change class modal:', error);
+                                            }
+                                          }}
                                           className="d-flex align-items-center gap-2"
+                                          disabled={!onChangeClass}
+                                          title={!onChangeClass ? 'Không thể đổi lớp' : 'Đổi lớp học'}
                                         >
                                           <i className="fas fa-exchange-alt"></i>
                                           Đổi lớp
@@ -1566,6 +1619,30 @@ const RequestDetailPage = ({
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Change Class Modal */}
+      <ChangeClassModal
+        show={showChangeClassModal}
+        onHide={() => {
+          setShowChangeClassModal(false);
+          setSelectedClassToChange(null);
+        }}
+        selectedClassToChange={selectedClassToChange}
+        senderSchedule={senderSchedule}
+        onConfirm={(data) => {
+          console.log(' ChangeClassModal confirmed', { data });
+          // Gọi onChangeClassConfirm từ parent để cập nhật pendingClassChange
+          if (onChangeClassConfirm) {
+            onChangeClassConfirm(data);
+          } else {
+            console.error(' onChangeClassConfirm is undefined');
+          }
+          // Đóng modal
+          setShowChangeClassModal(false);
+          setSelectedClassToChange(null);
+        }}
+        processing={processing}
+      />
     </>
   );
 };

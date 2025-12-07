@@ -7,7 +7,7 @@ exports.getTeacherDashboard = async (req, res) => {
   try {
     const teacherId = req.user._id;
     
-    console.log('📊 Getting dashboard data for teacher:', teacherId);
+    console.log(' Getting dashboard data for teacher:', teacherId);
 
     const classes = await Class.find({ teacher: teacherId })
       .populate('course', 'name')

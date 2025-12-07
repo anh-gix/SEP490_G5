@@ -9,7 +9,7 @@ const Room = require("../models/room");
 const mongoose = require("mongoose");
 
 // =========================
-// 📋 LẤY DANH SÁCH LỚP HỌC
+//  LẤY DANH SÁCH LỚP HỌC
 // =========================
 exports.getAllClasses = async (req, res) => {
   try {
@@ -94,7 +94,7 @@ exports.getAllClasses = async (req, res) => {
 };
 
 // =========================
-// 🔍 LẤY THÔNG TIN 1 LỚP
+//  LẤY THÔNG TIN 1 LỚP
 // =========================
 exports.getClassById = async (req, res) => {
   try {
@@ -135,7 +135,7 @@ exports.getClassById = async (req, res) => {
       .sort({ date: 1 });
 
     // Log lịch học của lớp hiện tại
-    console.log('\n📚 ========== LỊCH HỌC CỦA LỚP HIỆN TẠI (getClassById) ==========');
+    console.log('\n ========== LỊCH HỌC CỦA LỚP HIỆN TẠI (getClassById) ==========');
     console.log(`  - Tên lớp: ${classData.name || 'N/A'}`);
     console.log(`  - ClassId: ${id}`);
     console.log(`  - Tổng số buổi học: ${schedules.length}`);
@@ -347,7 +347,7 @@ exports.getClassById = async (req, res) => {
 };
 
 // =========================
-// 📊 THỐNG KÊ LỚP HỌC
+//  THỐNG KÊ LỚP HỌC
 // =========================
 exports.getClassStats = async (req, res) => {
   try {
@@ -493,7 +493,7 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
     console.log('  - Số buổi học cần kiểm tra:', classSchedules.length);
     
     // Log lịch học của lớp hiện tại
-    console.log('\n📚 LỊCH HỌC CỦA LỚP HIỆN TẠI:');
+    console.log('\n LỊCH HỌC CỦA LỚP HIỆN TẠI:');
     classSchedules.forEach((s, idx) => {
       const dateStr = formatDateLocal(s.date);
       console.log(`  [${idx + 1}] ${dateStr} - ${s.startTime} - ${s.endTime}`);
@@ -533,7 +533,7 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
       
       // Log chi tiết lịch học của giáo viên
       if (teacherSchedules.length > 0) {
-        console.log('\n📅 LỊCH HỌC CỦA GIÁO VIÊN (từ các lớp khác):');
+        console.log('\n LỊCH HỌC CỦA GIÁO VIÊN (từ các lớp khác):');
         teacherSchedules.forEach((s, idx) => {
           const dateStr = formatDateLocal(s.date);
           const className = s.class?.name || 'N/A';
@@ -556,7 +556,7 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
           const hasOverlap = hasTimeOverlap(newSchedule.startTime, newSchedule.endTime, existingSchedule.startTime, existingSchedule.endTime);
           
           if (sameDate && hasOverlap) {
-            console.log(`\n  ⚠️ PHÁT HIỆN XUNG ĐỘT [${newIdx + 1} vs ${existIdx + 1}]:`);
+            console.log(`\n   PHÁT HIỆN XUNG ĐỘT [${newIdx + 1} vs ${existIdx + 1}]:`);
             console.log(`     - Ngày: ${newDateStr}`);
             console.log(`     - Lớp hiện tại: ${newSchedule.startTime} - ${newSchedule.endTime}`);
             console.log(`     - Lớp khác "${existingSchedule.class?.name || 'N/A'}": ${existingSchedule.startTime} - ${existingSchedule.endTime}`);
@@ -576,7 +576,7 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
       
       console.log('  - Tổng số xung đột tìm thấy:', conflicts.teacher.length);
     } else {
-      console.log('  ✅ Giáo viên không có lớp nào khác, không có xung đột');
+      console.log(' Giáo viên không có lớp nào khác, không có xung đột');
     }
     console.log('  ============================================\n');
   }
@@ -693,7 +693,7 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
 };
 
 // =========================
-// 🔍 KIỂM TRA CONFLICT TRƯỚC KHI TẠO LỚP (KHÔNG TẠO LỚP)
+//  KIỂM TRA CONFLICT TRƯỚC KHI TẠO LỚP (KHÔNG TẠO LỚP)
 // =========================
 exports.validateClassConflicts = async (req, res) => {
   try {
@@ -868,14 +868,14 @@ exports.validateClassConflicts = async (req, res) => {
 };
 
 // =========================
-// 🔍 KIỂM TRA CONFLICT KHI CHỈNH SỬA LỚP (CHỈ KIỂM TRA TEACHER VÀ ROOM)
+//  KIỂM TRA CONFLICT KHI CHỈNH SỬA LỚP (CHỈ KIỂM TRA TEACHER VÀ ROOM)
 // =========================
 exports.checkTeacherRoomConflicts = async (req, res) => {
   try {
     const { id: classId } = req.params;
     const { teacherId, roomId, scheduleEntries, startDate } = req.body;
     
-    console.log('\n🔍 ========== KIỂM TRA CONFLICT TEACHER/ROOM (checkTeacherRoomConflicts) ==========');
+    console.log('\n ========== KIỂM TRA CONFLICT TEACHER/ROOM (checkTeacherRoomConflicts) ==========');
     console.log('  - ClassId:', classId);
     console.log('  - TeacherId:', teacherId || 'Không có');
     console.log('  - RoomId:', roomId || 'Không có');
@@ -1086,7 +1086,7 @@ exports.checkTeacherRoomConflicts = async (req, res) => {
       message: 'Không có schedules để kiểm tra'
     });
   } catch (error) {
-    console.error('❌ Lỗi khi kiểm tra conflict teacher/room:', error);
+    console.error(' Lỗi khi kiểm tra conflict teacher/room:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi khi kiểm tra xung đột',
@@ -1540,15 +1540,15 @@ exports.updateClass = async (req, res) => {
       .session(session)
       .lean();
     
-    console.log('🔍 [DEBUG] Existing schedules count:', existingClassSchedules.length);
+    console.log(' [DEBUG] Existing schedules count:', existingClassSchedules.length);
     
     const oldSchedulePattern = extractSchedulePatternFromClassSchedules(existingClassSchedules);
     const newSchedulePattern = scheduleEntries && scheduleEntries.length > 0 
       ? normalizeScheduleEntries(scheduleEntries) 
       : [];
     
-    console.log('🔍 [DEBUG] Old schedule pattern:', JSON.stringify(oldSchedulePattern, null, 2));
-    console.log('🔍 [DEBUG] New schedule pattern:', JSON.stringify(newSchedulePattern, null, 2));
+    console.log(' [DEBUG] Old schedule pattern:', JSON.stringify(oldSchedulePattern, null, 2));
+    console.log(' [DEBUG] New schedule pattern:', JSON.stringify(newSchedulePattern, null, 2));
     
     // Check if students changed
     const oldStudents = (oldStudentsList || []).map(id => id.toString()).sort();
@@ -1567,7 +1567,7 @@ exports.updateClass = async (req, res) => {
     
     const scheduleEntriesProvided = scheduleEntries && scheduleEntries.length > 0;
     
-    console.log('🔍 [DEBUG] Change flags:', {
+    console.log(' [DEBUG] Change flags:', {
       courseChanged,
       roomChanged,
       teacherChanged,
@@ -1584,7 +1584,7 @@ exports.updateClass = async (req, res) => {
     const shouldRegenerateSchedules = courseChanged || 
       (scheduleEntriesProvided && (roomChanged || teacherChanged || startDateChanged));
     
-    console.log('🔍 [DEBUG] shouldRegenerateSchedules:', shouldRegenerateSchedules);
+    console.log(' [DEBUG] shouldRegenerateSchedules:', shouldRegenerateSchedules);
     
     // Determine final values for schedule generation
     const finalCourse = course || classData.course;
@@ -1595,7 +1595,7 @@ exports.updateClass = async (req, res) => {
     
     // Smart update: Only update future schedules when only scheduleEntries changed
     if (scheduleEntriesOnlyChanged && scheduleEntries && scheduleEntries.length > 0 && finalCourse && finalStartDate) {
-      console.log('🔍 [DEBUG] Entering SMART UPDATE block');
+      console.log(' [DEBUG] Entering SMART UPDATE block');
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Reset time to compare dates only
       
@@ -1659,7 +1659,7 @@ exports.updateClass = async (req, res) => {
           remainingSessions = futureSchedulesCount;
         }
         
-        console.log('🔍 [DEBUG] Schedule counts:', {
+        console.log(' [DEBUG] Schedule counts:', {
           numberOfSessions,
           pastSessionsCount,
           futureSchedulesCount,
@@ -1771,7 +1771,7 @@ exports.updateClass = async (req, res) => {
           
           // Create all new ClassSchedule entries
           if (classSchedules.length > 0) {
-            console.log('🔍 [DEBUG] Creating', classSchedules.length, 'new schedules in SMART UPDATE');
+            console.log(' [DEBUG] Creating', classSchedules.length, 'new schedules in SMART UPDATE');
             const createdSchedules = await ClassSchedule.insertMany(classSchedules, { session });
             
             // Create StudentSchedule entries for each new ClassSchedule
@@ -1792,10 +1792,10 @@ exports.updateClass = async (req, res) => {
               }
             }
           } else {
-            console.log('🔍 [DEBUG] No new schedules to create in SMART UPDATE');
+            console.log(' [DEBUG] No new schedules to create in SMART UPDATE');
           }
         } else {
-          console.log('🔍 [DEBUG] No remaining sessions to create in SMART UPDATE');
+          console.log(' [DEBUG] No remaining sessions to create in SMART UPDATE');
         }
       }
     }
@@ -1803,7 +1803,7 @@ exports.updateClass = async (req, res) => {
     // Only delete if scheduleEntries are provided to ensure new schedules will be created
     // This prevents leaving the class without schedules when only course changes without scheduleEntries
     else if (shouldRegenerateSchedules && scheduleEntries && scheduleEntries.length > 0 && finalCourse && finalStartDate) {
-      console.log('🔍 [DEBUG] Entering FULL REGENERATION block');
+      console.log(' [DEBUG] Entering FULL REGENERATION block');
       // Find all ClassSchedules for this class
       const classSchedules = await ClassSchedule.find({ class: req.params.id }).session(session).select('_id');
       const classScheduleIds = classSchedules.map(schedule => schedule._id);
@@ -1828,7 +1828,7 @@ exports.updateClass = async (req, res) => {
     } else if (shouldRegenerateSchedules && (!scheduleEntries || scheduleEntries.length === 0)) {
       // If course changed but scheduleEntries not provided, warn but don't delete schedules
       // This prevents data loss - old schedules remain until new scheduleEntries are provided
-      console.log('⚠️ [WARNING] Course changed but scheduleEntries not provided. Old schedules will be kept.');
+      console.log(' [WARNING] Course changed but scheduleEntries not provided. Old schedules will be kept.');
     }
     
     // Update fields
@@ -1850,7 +1850,7 @@ exports.updateClass = async (req, res) => {
     // Create new ClassSchedules when schedules need to be regenerated and scheduleEntries are provided
     // (Only if not already handled by smart update above)
     if (shouldRegenerateSchedules && !scheduleEntriesOnlyChanged && scheduleEntries && scheduleEntries.length > 0 && finalCourse && finalStartDate) {
-      console.log('🔍 [DEBUG] Entering CREATE NEW SCHEDULES block (full regeneration)');
+      console.log(' [DEBUG] Entering CREATE NEW SCHEDULES block (full regeneration)');
       // Get course details including numberOfSessions and sessions
       const courseData = await Course.findById(finalCourse)
         .populate('sessions', 'order')
@@ -1946,7 +1946,7 @@ exports.updateClass = async (req, res) => {
         
         // Create all ClassSchedule entries
         if (classSchedules.length > 0) {
-          console.log('🔍 [DEBUG] Creating', classSchedules.length, 'new schedules in FULL REGENERATION');
+          console.log(' [DEBUG] Creating', classSchedules.length, 'new schedules in FULL REGENERATION');
           const createdSchedules = await ClassSchedule.insertMany(classSchedules, { session });
           
           // Create StudentSchedule entries for each ClassSchedule
@@ -1967,18 +1967,17 @@ exports.updateClass = async (req, res) => {
             }
           }
         } else {
-          console.log('🔍 [DEBUG] No new schedules to create in FULL REGENERATION');
+          console.log(' [DEBUG] No new schedules to create in FULL REGENERATION');
         }
       } else {
-        console.log('🔍 [DEBUG] Course data not found or no numberOfSessions');
+        console.log(' [DEBUG] Course data not found or no numberOfSessions');
       }
     } else {
-      console.log('🔍 [DEBUG] Skipping schedule creation - conditions not met');
+      console.log(' [DEBUG] Skipping schedule creation - conditions not met');
     }
-    
-    // Handle StudentSchedule when only students change (no schedule changes)
+
     if (students !== undefined && !shouldRegenerateSchedules && !scheduleEntriesOnlyChanged) {
-      console.log('🔍 [DEBUG] Handling StudentSchedule changes for students only');
+      console.log(' [DEBUG] Handling StudentSchedule changes for students only');
       
       // Get old and new student lists (use captured oldStudentsList before modification)
       const oldStudents = (oldStudentsList || []).map(id => id.toString());
@@ -1988,39 +1987,34 @@ exports.updateClass = async (req, res) => {
       const addedStudents = newStudents.filter(id => !oldStudents.includes(id));
       const removedStudents = oldStudents.filter(id => !newStudents.includes(id));
       
-      console.log('🔍 [DEBUG] Students added:', addedStudents.length, addedStudents);
-      console.log('🔍 [DEBUG] Students removed:', removedStudents.length, removedStudents);
-      
-      // Get all ClassSchedules for this class
+      console.log(' [DEBUG] Students added:', addedStudents.length, addedStudents);
+      console.log(' [DEBUG] Students removed:', removedStudents.length, removedStudents);
+
       const allClassSchedules = await ClassSchedule.find({ class: req.params.id })
         .session(session)
         .select('_id date');
       
       if (allClassSchedules.length > 0) {
         const classScheduleIds = allClassSchedules.map(s => s._id);
-        
-        // 1. Delete StudentSchedule for removed students
+
         if (removedStudents.length > 0) {
           const removedStudentIds = removedStudents.map(id => new mongoose.Types.ObjectId(id));
           const deleteResult = await StudentSchedule.deleteMany({
             student: { $in: removedStudentIds },
             classSchedule: { $in: classScheduleIds }
           }).session(session);
-          console.log(`🔍 [DEBUG] Deleted ${deleteResult.deletedCount} StudentSchedule entries for removed students`);
+          console.log(` [DEBUG] Deleted ${deleteResult.deletedCount} StudentSchedule entries for removed students`);
         }
         
-        // 2. Create StudentSchedule for added students (với kiểm tra conflict)
         if (addedStudents.length > 0) {
-          // ✅ KIỂM TRA CONFLICT LỊCH HỌC CỦA CÁC HỌC VIÊN MỚI THÊM VÀO
-          console.log('🔍 [DEBUG] Checking conflicts for added students:', addedStudents.length);
-          
-          // Lấy thông tin chi tiết của các ClassSchedule (cần date, startTime, endTime để kiểm tra conflict)
+
+          console.log(' [DEBUG] Checking conflicts for added students:', addedStudents.length);
+
           const allClassSchedulesDetails = await ClassSchedule.find({ class: req.params.id })
             .session(session)
             .select('_id date startTime endTime')
             .lean();
-          
-          // Helper function để check time overlap
+
           const hasTimeOverlap = (start1, end1, start2, end2) => {
             const timeToMinutes = (timeStr) => {
               if (!timeStr) return 0;
@@ -2038,8 +2032,7 @@ exports.updateClass = async (req, res) => {
             
             return start1Min < end2Min && end1Min > start2Min;
           };
-          
-          // Helper function để format date
+
           const formatDateLocal = (dateInput) => {
             if (!dateInput) return null;
             const d = new Date(dateInput);
@@ -2214,11 +2207,11 @@ exports.updateClass = async (req, res) => {
           
           if (studentSchedules.length > 0) {
             await StudentSchedule.insertMany(studentSchedules, { session });
-            console.log(`🔍 [DEBUG] Created ${studentSchedules.length} StudentSchedule entries for added students`);
+            console.log(` [DEBUG] Created ${studentSchedules.length} StudentSchedule entries for added students`);
           }
         }
       } else {
-        console.log('🔍 [DEBUG] No ClassSchedules found for this class, skipping StudentSchedule updates');
+        console.log(' [DEBUG] No ClassSchedules found for this class, skipping StudentSchedule updates');
       }
     }
     

@@ -74,7 +74,7 @@ exports.addHomeworkToSchedule = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Lỗi khi thêm homework:', error);
+    console.error(' Lỗi khi thêm homework:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi thêm bài tập',
@@ -160,7 +160,7 @@ exports.updateHomework = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Lỗi khi cập nhật homework:', error);
+    console.error(' Lỗi khi cập nhật homework:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi cập nhật bài tập',
@@ -205,10 +205,10 @@ exports.deleteHomework = async (req, res) => {
         classSchedule: scheduleId,
         homeworkId: homeworkId
       });
-      console.log(`✅ Đã xóa ${deleteResult.deletedCount} bài nộp liên quan`);
+      console.log(` Đã xóa ${deleteResult.deletedCount} bài nộp liên quan`);
     } catch (submissionError) {
       // Log error but don't fail the homework deletion
-      console.log('⚠️ Lỗi khi xóa submissions (không ảnh hưởng):', submissionError.message);
+      console.log(' Lỗi khi xóa submissions (không ảnh hưởng):', submissionError.message);
     }
 
     res.status(200).json({
@@ -217,7 +217,7 @@ exports.deleteHomework = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Lỗi khi xóa homework:', error);
+    console.error(' Lỗi khi xóa homework:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi xóa bài tập',
@@ -249,7 +249,7 @@ exports.getHomeworkSubmissions = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Lỗi khi lấy danh sách submissions:', error);
+    console.error(' Lỗi khi lấy danh sách submissions:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy danh sách bài nộp',
@@ -357,7 +357,7 @@ exports.getTeacherAssignments = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Lỗi khi lấy danh sách assignments:', error);
+    console.error(' Lỗi khi lấy danh sách assignments:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy danh sách bài tập',
@@ -404,7 +404,7 @@ exports.getClassSchedules = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Lỗi khi lấy danh sách schedules:', error);
+    console.error(' Lỗi khi lấy danh sách schedules:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy danh sách buổi học',

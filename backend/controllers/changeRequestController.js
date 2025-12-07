@@ -9,7 +9,7 @@ const mongoose = require('mongoose');
 
 exports.getAllChangeRequests = async (req, res) => {
   try {
-    const { status, type, search, page = 1, limit = 10 } = req.query;
+    const { status, type, search, page = 1, limit = 10, sortBy = 'oldest' } = req.query;
     
     let query = {};
 
@@ -46,6 +46,20 @@ exports.getAllChangeRequests = async (req, res) => {
     const skip = (pageNum - 1) * limitNum;
     
     const total = await ChangeRequest.countDocuments(query);
+    
+    // Build sort object based on sortBy parameter
+    let sortObj = {};
+    if (sortBy === 'newest') {
+      sortObj = { createdAt: -1 };
+    } else if (sortBy === 'oldest') {
+      sortObj = { createdAt: 1 };
+    } else if (sortBy === 'sender' || sortBy === 'sender-asc') {
+      sortObj = { 'sender.username': 1 };
+    } else if (sortBy === 'sender-desc') {
+      sortObj = { 'sender.username': -1 };
+    } else {
+      sortObj = { createdAt: 1 }; // default
+    }
     
     const changeRequests = await ChangeRequest.find(query)
       .populate('sender', 'username email phone')
@@ -115,7 +129,7 @@ exports.getAllChangeRequests = async (req, res) => {
           select: 'name'
         }
       })
-      .sort({ createdAt: 1 })
+      .sort(sortObj)
       .skip(skip)
       .limit(limitNum)
       .lean();
@@ -220,10 +234,82 @@ exports.getAllChangeRequests = async (req, res) => {
       changeRequests
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy danh sách đơn:", error);
+    console.error(" Lỗi khi lấy danh sách đơn:", error);
     res.status(500).json({ 
       success: false,
       message: "Lỗi server khi lấy danh sách đơn",
+      error: error.message 
+    });
+  }
+};
+
+exports.getStats = async (req, res) => {
+  try {
+    const { status } = req.query;
+    
+    // Build base query
+    let matchQuery = {};
+    if (status && status !== 'all') {
+      matchQuery.status = status;
+    }
+    
+    // Use aggregation to get counts efficiently
+    const stats = await ChangeRequest.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          pending: {
+            $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] }
+          },
+          approved: {
+            $sum: { $cond: [{ $eq: ['$status', 'approved'] }, 1, 0] }
+          },
+          rejected: {
+            $sum: { $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0] }
+          },
+          createClass: {
+            $sum: { $cond: [{ $eq: ['$type', 'create_class'] }, 1, 0] }
+          },
+          changeClass: {
+            $sum: { $cond: [{ $eq: ['$type', 'change_class'] }, 1, 0] }
+          },
+          makeupClass: {
+            $sum: { $cond: [{ $eq: ['$type', 'makeup_class'] }, 1, 0] }
+          },
+          replaceTeacher: {
+            $sum: { $cond: [{ $eq: ['$type', 'replace_teacher'] }, 1, 0] }
+          }
+        }
+      }
+    ]);
+    
+    // If no results, return zeros
+    const result = stats.length > 0 ? stats[0] : {
+      total: 0,
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+      createClass: 0,
+      changeClass: 0,
+      makeupClass: 0,
+      replaceTeacher: 0
+    };
+    
+    // Remove _id from result
+    delete result._id;
+    
+    res.status(200).json({
+      success: true,
+      message: "Lấy thống kê thành công",
+      stats: result
+    });
+  } catch (error) {
+    console.error(" Lỗi khi lấy thống kê:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Lỗi server khi lấy thống kê",
       error: error.message 
     });
   }
@@ -291,7 +377,7 @@ exports.createChangeRequest = async (req, res) => {
       changeRequest: populatedRequest
     });
   } catch (error) {
-    console.error('❌ Lỗi khi tạo change request:', error);
+    console.error(' Lỗi khi tạo change request:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi tạo đơn',
@@ -505,7 +591,7 @@ exports.getSenderSchedule = async (req, res) => {
       schedules
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy lịch:", error);
+    console.error(" Lỗi khi lấy lịch:", error);
     res.status(500).json({
       success: false,
       message: "Lỗi server khi lấy lịch",
@@ -539,7 +625,7 @@ exports.approveChangeRequest = async (req, res) => {
     const studentId = changeRequest.sender._id || changeRequest.sender;
     
     if (pendingMakeupClasses && Array.isArray(pendingMakeupClasses) && pendingMakeupClasses.length > 0) {
-      console.log(`📚 Xử lý ${pendingMakeupClasses.length} buổi học bù cho học sinh ${studentId}`);
+      console.log(` Xử lý ${pendingMakeupClasses.length} buổi học bù cho học sinh ${studentId}`);
       
       try {
         for (const makeup of pendingMakeupClasses) {
@@ -559,11 +645,11 @@ exports.approveChangeRequest = async (req, res) => {
           } = makeup;
         
         if (!absentScheduleId) {
-          console.warn('⚠️ Thiếu thông tin buổi nghỉ:', makeup);
+          console.warn(' Thiếu thông tin buổi nghỉ:', makeup);
           continue;
         }
         
-        console.log(`🔍 Bắt đầu tìm ClassSchedule cho buổi nghỉ: ${absentScheduleId}`);
+        console.log(` Bắt đầu tìm ClassSchedule cho buổi nghỉ: ${absentScheduleId}`);
         console.log(`   - Type: ${typeof absentScheduleId}`);
         console.log(`   - isNewMakeup: ${isNewMakeup}`);
         
@@ -574,21 +660,21 @@ exports.approveChangeRequest = async (req, res) => {
           absentClassSchedule = await ClassSchedule.findById(absentScheduleId).session(session);
           if (absentClassSchedule) {
             actualAbsentClassScheduleId = absentScheduleId;
-            console.log(`✅ Tìm thấy ClassSchedule trực tiếp: ${absentScheduleId}`);
+            console.log(` Tìm thấy ClassSchedule trực tiếp: ${absentScheduleId}`);
           }
         } catch (error) {
           console.log(`ℹ️ Không tìm thấy ClassSchedule trực tiếp với ID: ${absentScheduleId}`);
         }
         
         if (!absentClassSchedule) {
-          console.log(`🔍 Thử tìm StudentSchedule với ID: ${absentScheduleId}`);
+          console.log(` Thử tìm StudentSchedule với ID: ${absentScheduleId}`);
           try {
             const absentStudentSchedule = await StudentSchedule.findById(absentScheduleId)
               .populate('classSchedule')
               .session(session);
             
             if (absentStudentSchedule) {
-              console.log(`✅ Tìm thấy StudentSchedule: ${absentScheduleId}`);
+              console.log(` Tìm thấy StudentSchedule: ${absentScheduleId}`);
               
               if (absentStudentSchedule.classSchedule) {
                 actualAbsentClassScheduleId = absentStudentSchedule.classSchedule._id || absentStudentSchedule.classSchedule;
@@ -597,30 +683,30 @@ exports.approveChangeRequest = async (req, res) => {
                 absentClassSchedule = await ClassSchedule.findById(actualAbsentClassScheduleId).session(session);
                 
                 if (absentClassSchedule) {
-                  console.log(`✅ Đã tìm thấy ClassSchedule từ StudentSchedule: ${actualAbsentClassScheduleId}`);
+                  console.log(` Đã tìm thấy ClassSchedule từ StudentSchedule: ${actualAbsentClassScheduleId}`);
                 } else {
-                  console.warn(`⚠️ Không tìm thấy ClassSchedule với ID từ StudentSchedule: ${actualAbsentClassScheduleId}`);
+                  console.warn(` Không tìm thấy ClassSchedule với ID từ StudentSchedule: ${actualAbsentClassScheduleId}`);
                 }
               } else {
-                console.warn(`⚠️ StudentSchedule không có classSchedule: ${absentScheduleId}`);
+                console.warn(` StudentSchedule không có classSchedule: ${absentScheduleId}`);
               }
             } else {
-              console.warn(`⚠️ Không tìm thấy StudentSchedule với ID: ${absentScheduleId}`);
+              console.warn(` Không tìm thấy StudentSchedule với ID: ${absentScheduleId}`);
             }
           } catch (error) {
-            console.error(`❌ Lỗi khi tìm StudentSchedule:`, error);
+            console.error(` Lỗi khi tìm StudentSchedule:`, error);
           }
         }
         
         if (!absentClassSchedule) {
-          console.error(`❌ Không tìm thấy ClassSchedule cho buổi nghỉ: ${absentScheduleId}`);
+          console.error(` Không tìm thấy ClassSchedule cho buổi nghỉ: ${absentScheduleId}`);
           console.error(`   - Đã thử tìm ClassSchedule trực tiếp`);
           console.error(`   - Đã thử tìm qua StudentSchedule`);
           console.error(`   - Makeup data:`, JSON.stringify(makeup, null, 2));
           continue;
         }
         
-        console.log(`✅ Đã xác định ClassSchedule cho buổi nghỉ: ${actualAbsentClassScheduleId}`);
+        console.log(` Đã xác định ClassSchedule cho buổi nghỉ: ${actualAbsentClassScheduleId}`);
         
         let finalMakeupScheduleId = makeupScheduleId;
         
@@ -644,7 +730,7 @@ exports.approveChangeRequest = async (req, res) => {
           
           await absentClassSchedule.save({ session });
           
-          console.log(`✅ Đã cập nhật ClassSchedule với giáo viên dạy thay: ${absentScheduleId}`);
+          console.log(` Đã cập nhật ClassSchedule với giáo viên dạy thay: ${absentScheduleId}`);
           console.log(`   - Giáo viên gốc (đã lưu vào substituteTeacher): ${originalTeacher}`);
           console.log(`   - Giáo viên dạy thay (đã cập nhật vào teacher): ${substituteTeacherId}`);
           
@@ -656,7 +742,7 @@ exports.approveChangeRequest = async (req, res) => {
 
           const dateParts = newMakeupDate.split('-');
           if (dateParts.length !== 3) {
-            console.warn(`⚠️ Định dạng ngày không hợp lệ: ${newMakeupDate}`);
+            console.warn(` Định dạng ngày không hợp lệ: ${newMakeupDate}`);
             continue;
           }
           
@@ -686,7 +772,7 @@ exports.approveChangeRequest = async (req, res) => {
           }).session(session).lean();
           
           if (roomConflict) {
-            console.warn(`⚠️ Phòng học đã được sử dụng vào thời gian này: ${newMakeupRoomId}`);
+            console.warn(` Phòng học đã được sử dụng vào thời gian này: ${newMakeupRoomId}`);
             throw new Error('Phòng học đã được sử dụng vào thời gian này');
           }
           
@@ -711,7 +797,7 @@ exports.approveChangeRequest = async (req, res) => {
             }).session(session).lean();
             
             if (teacherConflict) {
-              console.warn(`⚠️ Giáo viên đã có lớp khác vào thời gian này: ${newMakeupTeacherId}`);
+              console.warn(` Giáo viên đã có lớp khác vào thời gian này: ${newMakeupTeacherId}`);
               throw new Error('Giáo viên đã có lớp khác vào thời gian này');
             }
           }
@@ -734,7 +820,7 @@ exports.approveChangeRequest = async (req, res) => {
             
             const hasOverlap = start1Min < end2Min && end1Min > start2Min;
             
-            console.log(`🔍 Kiểm tra overlap: [${start1}-${end1}] vs [${start2}-${end2}]`);
+            console.log(` Kiểm tra overlap: [${start1}-${end1}] vs [${start2}-${end2}]`);
             console.log(`   - start1Min: ${start1Min}, end1Min: ${end1Min}`);
             console.log(`   - start2Min: ${start2Min}, end2Min: ${end2Min}`);
             console.log(`   - Has overlap: ${hasOverlap}`);
@@ -753,7 +839,7 @@ exports.approveChangeRequest = async (req, res) => {
           };
           
           const makeupDateStr = formatDateLocal(scheduleDate);
-          console.log(`📅 Kiểm tra conflict cho buổi học bù: ${makeupDateStr} ${newMakeupStartTime}-${newMakeupEndTime}`);
+          console.log(` Kiểm tra conflict cho buổi học bù: ${makeupDateStr} ${newMakeupStartTime}-${newMakeupEndTime}`);
           console.log(`   - Học sinh ID: ${studentId}`);
           
           const studentSchedules = await StudentSchedule.find({ 
@@ -796,7 +882,7 @@ exports.approveChangeRequest = async (req, res) => {
               );
               
               if (hasOverlap) {
-                console.log(`     ⚠️ PHÁT HIỆN CONFLICT!`);
+                console.log(`      PHÁT HIỆN CONFLICT!`);
                 studentConflicts.push({
                   className: studentSchedule.classSchedule.class?.name || 'N/A',
                   date: existingScheduleDateStr,
@@ -808,12 +894,12 @@ exports.approveChangeRequest = async (req, res) => {
           });
           
           if (studentConflicts.length > 0) {
-            console.error(`❌ Học sinh có ${studentConflicts.length} conflict với lịch học hiện tại:`, studentConflicts);
+            console.error(` Học sinh có ${studentConflicts.length} conflict với lịch học hiện tại:`, studentConflicts);
             const conflictMessages = studentConflicts.map(c => `${c.className} (${c.date} ${c.time})`).join(', ');
             throw new Error(`Học sinh có lịch học trùng với buổi học bù: ${conflictMessages}`);
           }
           
-          console.log(`✅ Không có conflict với lịch học của học sinh`);
+          console.log(` Không có conflict với lịch học của học sinh`);
           
           const newMakeupSchedule = new ClassSchedule({
             class: null,
@@ -831,27 +917,27 @@ exports.approveChangeRequest = async (req, res) => {
           await newMakeupSchedule.save({ session });
           finalMakeupScheduleId = newMakeupSchedule._id;
           
-          console.log(`✅ Đã tạo ClassSchedule mới cho buổi học bù: ${finalMakeupScheduleId}`);
+          console.log(` Đã tạo ClassSchedule mới cho buổi học bù: ${finalMakeupScheduleId}`);
         } else if (makeupScheduleId) {
           const makeupClassSchedule = await ClassSchedule.findById(makeupScheduleId).session(session);
           
           if (!makeupClassSchedule) {
-            console.warn(`⚠️ Không tìm thấy ClassSchedule cho buổi học bù: ${makeupScheduleId}`);
+            console.warn(` Không tìm thấy ClassSchedule cho buổi học bù: ${makeupScheduleId}`);
             continue;
           }
           
           finalMakeupScheduleId = makeupScheduleId;
         } else {
-          console.warn('⚠️ Thiếu thông tin để tạo hoặc chọn buổi học bù:', makeup);
+          console.warn(' Thiếu thông tin để tạo hoặc chọn buổi học bù:', makeup);
           continue;
         }
         
         if (!finalMakeupScheduleId) {
-          console.error(`❌ finalMakeupScheduleId chưa được set. Makeup data:`, JSON.stringify(makeup, null, 2));
+          console.error(` finalMakeupScheduleId chưa được set. Makeup data:`, JSON.stringify(makeup, null, 2));
           continue;
         }
         
-        console.log(`📝 Bắt đầu xử lý StudentSchedule cho buổi học bù`);
+        console.log(` Bắt đầu xử lý StudentSchedule cho buổi học bù`);
         console.log(`   - finalMakeupScheduleId: ${finalMakeupScheduleId}`);
         console.log(`   - actualAbsentClassScheduleId: ${actualAbsentClassScheduleId}`);
         console.log(`   - studentId: ${studentId}`);
@@ -871,7 +957,7 @@ exports.approveChangeRequest = async (req, res) => {
           });
           
           await newStudentSchedule.save({ session });
-          console.log(`✅ Đã tạo StudentSchedule mới cho buổi học bù:`);
+          console.log(` Đã tạo StudentSchedule mới cho buổi học bù:`);
           console.log(`   - StudentSchedule ID: ${newStudentSchedule._id}`);
           console.log(`   - ClassSchedule ID: ${finalMakeupScheduleId}`);
           console.log(`   - Student ID: ${studentId}`);
@@ -891,7 +977,7 @@ exports.approveChangeRequest = async (req, res) => {
         }).session(session);
         
         if (absentStudentSchedule) {
-          console.log(`✅ Tìm thấy StudentSchedule của buổi nghỉ:`);
+          console.log(` Tìm thấy StudentSchedule của buổi nghỉ:`);
           console.log(`   - StudentSchedule ID: ${absentStudentSchedule._id}`);
           console.log(`   - ClassSchedule ID: ${actualAbsentClassScheduleId}`);
           console.log(`   - Status hiện tại: ${absentStudentSchedule.scheduleStatus}`);
@@ -900,32 +986,32 @@ exports.approveChangeRequest = async (req, res) => {
           absentStudentSchedule.reason = `Học bù tại lớp khác${makeupClassId ? ` (${makeupClassId})` : ''}`;
           await absentStudentSchedule.save({ session });
           
-          console.log(`✅ Đã cập nhật StudentSchedule buổi nghỉ thành cancelled:`);
+          console.log(` Đã cập nhật StudentSchedule buổi nghỉ thành cancelled:`);
           console.log(`   - StudentSchedule ID: ${absentStudentSchedule._id}`);
           console.log(`   - Status mới: cancelled`);
           console.log(`   - Reason: ${absentStudentSchedule.reason}`);
         } else {
-          console.warn(`⚠️ Không tìm thấy StudentSchedule cho buổi nghỉ:`);
+          console.warn(` Không tìm thấy StudentSchedule cho buổi nghỉ:`);
           console.warn(`   - studentId: ${studentId}`);
           console.warn(`   - classSchedule: ${actualAbsentClassScheduleId}`);
           console.warn(`   - absentScheduleId (original): ${absentScheduleId}`);
           
           if (absentScheduleId !== actualAbsentClassScheduleId) {
-            console.log(`🔍 Thử tìm StudentSchedule với absentScheduleId gốc: ${absentScheduleId}`);
+            console.log(` Thử tìm StudentSchedule với absentScheduleId gốc: ${absentScheduleId}`);
             const absentStudentScheduleByOriginalId = await StudentSchedule.findById(absentScheduleId).session(session);
             
             if (absentStudentScheduleByOriginalId) {
-              console.log(`✅ Tìm thấy StudentSchedule với absentScheduleId gốc`);
+              console.log(` Tìm thấy StudentSchedule với absentScheduleId gốc`);
               absentStudentScheduleByOriginalId.scheduleStatus = 'cancelled';
               absentStudentScheduleByOriginalId.reason = `Học bù tại lớp khác${makeupClassId ? ` (${makeupClassId})` : ''}`;
               await absentStudentScheduleByOriginalId.save({ session });
-              console.log(`✅ Đã cập nhật StudentSchedule buổi nghỉ thành cancelled (tìm bằng absentScheduleId gốc)`);
+              console.log(` Đã cập nhật StudentSchedule buổi nghỉ thành cancelled (tìm bằng absentScheduleId gốc)`);
             }
           }
         }
         }
       } catch (makeupError) {
-        console.error(`❌ Lỗi khi xử lý buổi học bù:`, makeupError);
+        console.error(` Lỗi khi xử lý buổi học bù:`, makeupError);
         console.error(`   - Error message: ${makeupError.message}`);
         console.error(`   - Error stack: ${makeupError.stack}`);
         throw makeupError;
@@ -933,7 +1019,7 @@ exports.approveChangeRequest = async (req, res) => {
     }
     
     if (pendingClassChange) {
-      console.log('🔄 Bắt đầu xử lý đổi lớp...');
+      console.log(' Bắt đầu xử lý đổi lớp...');
       
       const { oldClassId, newClassId } = pendingClassChange;
       
@@ -1022,7 +1108,7 @@ exports.approveChangeRequest = async (req, res) => {
         ? newClassSchedules[0].session.order
         : null;
       
-      console.log(`📊 Session order - Lớp cũ: ${oldClassSessionOrder}, Lớp mới: ${newClassSessionOrder}`);
+      console.log(` Session order - Lớp cũ: ${oldClassSessionOrder}, Lớp mới: ${newClassSessionOrder}`);
       
       let caseType = 1;
       if (oldClassSessionOrder !== null && newClassSessionOrder !== null) {
@@ -1033,13 +1119,13 @@ exports.approveChangeRequest = async (req, res) => {
         }
       }
       
-      console.log(`🔍 Trường hợp xử lý: ${caseType}`);
+      console.log(` Trường hợp xử lý: ${caseType}`);
       
       oldClass.students = oldClass.students.filter(
         id => id.toString() !== studentId.toString()
       );
       await oldClass.save({ session });
-      console.log(`✅ Đã xóa học viên khỏi lớp cũ: ${oldClassId}`);
+      console.log(` Đã xóa học viên khỏi lớp cũ: ${oldClassId}`);
       
       const studentInNewClass = newClass.students.some(
         id => id.toString() === studentId.toString()
@@ -1047,7 +1133,7 @@ exports.approveChangeRequest = async (req, res) => {
       if (!studentInNewClass) {
         newClass.students.push(studentId);
         await newClass.save({ session });
-        console.log(`✅ Đã thêm học viên vào lớp mới: ${newClassId}`);
+        console.log(` Đã thêm học viên vào lớp mới: ${newClassId}`);
       }
       
       const allOldClassSchedules = await ClassSchedule.find({
@@ -1073,7 +1159,7 @@ exports.approveChangeRequest = async (req, res) => {
         .session(session)
         .lean();
       
-      console.log(`📋 Tìm thấy ${studentSchedules.length} StudentSchedule của học viên ở lớp cũ`);
+      console.log(` Tìm thấy ${studentSchedules.length} StudentSchedule của học viên ở lớp cũ`);
       
       const allNewClassSchedules = await ClassSchedule.find({
         class: newClassId
@@ -1101,7 +1187,7 @@ exports.approveChangeRequest = async (req, res) => {
           }
         });
       }
-      console.log(`📋 Đã xử lý ${processedAbsentScheduleIds.size} buổi học bù, các buổi này sẽ không bị cancel lại`);
+      console.log(` Đã xử lý ${processedAbsentScheduleIds.size} buổi học bù, các buổi này sẽ không bị cancel lại`);
       
       let updatedCount = 0;
       let cancelledCount = 0;
@@ -1121,13 +1207,13 @@ exports.approveChangeRequest = async (req, res) => {
         
         if (hasAttendance || isPastSchedule) {
           unchangedCount++;
-          console.log(`⏭️ Giữ nguyên StudentSchedule ${studentSchedule._id} (${hasAttendance ? 'đã có điểm danh' : 'đã diễn ra'})`);
+          console.log(` Giữ nguyên StudentSchedule ${studentSchedule._id} (${hasAttendance ? 'đã có điểm danh' : 'đã diễn ra'})`);
           continue;
         }
         
         if (processedAbsentScheduleIds.has(classScheduleId)) {
           unchangedCount++;
-          console.log(`⏭️ Giữ nguyên StudentSchedule ${studentSchedule._id} (đã được xử lý trong buổi học bù)`);
+          console.log(` Giữ nguyên StudentSchedule ${studentSchedule._id} (đã được xử lý trong buổi học bù)`);
           continue;
         }
         
@@ -1142,7 +1228,7 @@ exports.approveChangeRequest = async (req, res) => {
                 { session }
               );
               updatedCount++;
-              console.log(`✅ Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
+              console.log(` Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
             }
           }
         } else if (caseType === 2) {
@@ -1150,7 +1236,7 @@ exports.approveChangeRequest = async (req, res) => {
             if (sessionOrder < newClassSessionOrder) {
               if (pendingMakeupClasses && pendingMakeupClasses.length > 0) {
                 unchangedCount++;
-                console.log(`⏭️ Giữ nguyên StudentSchedule ${studentSchedule._id} (session ${sessionOrder} < ${newClassSessionOrder}, không nằm trong danh sách học bù)`);
+                console.log(` Giữ nguyên StudentSchedule ${studentSchedule._id} (session ${sessionOrder} < ${newClassSessionOrder}, không nằm trong danh sách học bù)`);
               } else {
                 await StudentSchedule.findByIdAndUpdate(
                   studentSchedule._id,
@@ -1173,7 +1259,7 @@ exports.approveChangeRequest = async (req, res) => {
                   { session }
                 );
                 updatedCount++;
-                console.log(`✅ Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
+                console.log(` Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
               }
             }
           }
@@ -1181,7 +1267,7 @@ exports.approveChangeRequest = async (req, res) => {
           if (sessionOrder !== null && sessionOrder !== undefined) {
             if (sessionOrder < oldClassSessionOrder) {
               unchangedCount++;
-              console.log(`⏭️ Giữ nguyên StudentSchedule ${studentSchedule._id} (session ${sessionOrder} < ${oldClassSessionOrder})`);
+              console.log(` Giữ nguyên StudentSchedule ${studentSchedule._id} (session ${sessionOrder} < ${oldClassSessionOrder})`);
             } else if (sessionOrder >= oldClassSessionOrder) {
               const matchingSchedules = newClassScheduleMap.get(sessionOrder);
               if (matchingSchedules && matchingSchedules.length > 0) {
@@ -1192,18 +1278,18 @@ exports.approveChangeRequest = async (req, res) => {
                   { session }
                 );
                 updatedCount++;
-                console.log(`✅ Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
+                console.log(` Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
               }
             }
           }
         }
       }
       
-      console.log(`📊 Kết quả xử lý StudentSchedule:`);
+      console.log(` Kết quả xử lý StudentSchedule:`);
       console.log(`   - Updated: ${updatedCount}`);
       console.log(`   - Cancelled: ${cancelledCount}`);
       console.log(`   - Unchanged: ${unchangedCount}`);
-      console.log(`✅ Hoàn thành xử lý đổi lớp`);
+      console.log(` Hoàn thành xử lý đổi lớp`);
     }
     
     await ChangeRequest.findByIdAndUpdate(
@@ -1234,7 +1320,7 @@ exports.approveChangeRequest = async (req, res) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    console.error("❌ Lỗi khi chấp nhận đơn:", error);
+    console.error(" Lỗi khi chấp nhận đơn:", error);
     res.status(500).json({
       success: false,
       message: "Lỗi server khi chấp nhận đơn",
@@ -1276,7 +1362,7 @@ exports.rejectChangeRequest = async (req, res) => {
       changeRequest
     });
   } catch (error) {
-    console.error("❌ Lỗi khi từ chối đơn:", error);
+    console.error(" Lỗi khi từ chối đơn:", error);
     res.status(500).json({
       success: false,
       message: "Lỗi server khi từ chối đơn",

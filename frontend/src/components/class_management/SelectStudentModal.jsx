@@ -25,25 +25,25 @@ const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents 
       try {
         setStudentsLoading(true);
         setStudentsError(null);
-        console.log('🔍 Fetching students in SelectStudentModal...');
+        console.log(' Fetching students in SelectStudentModal...');
         const response = await studentService.getAllStudents();
-        console.log('📋 Students API Response:', response);
+        console.log(' Students API Response:', response);
         
         if (response && (response.students || response.data)) {
           const fetchedStudents = response.students || response.data || [];
-          console.log('📋 Fetched students count:', fetchedStudents.length);
+          console.log(' Fetched students count:', fetchedStudents.length);
           setStudents(fetchedStudents);
         } else {
-          console.warn('⚠️ API response không có students hoặc data field:', response);
+          console.warn(' API response không có students hoặc data field:', response);
           setStudents([]);
           setStudentsError('Không tìm thấy dữ liệu học viên');
         }
       } catch (error) {
-        console.error('❌ Lỗi khi fetch students:', error);
+        console.error(' Lỗi khi fetch students:', error);
         setStudents([]);
         const errorMessage = error.message || 'Không thể tải danh sách học viên';
         setStudentsError(errorMessage);
-        console.error('❌ Error details:', error);
+        console.error(' Error details:', error);
       } finally {
         setStudentsLoading(false);
       }

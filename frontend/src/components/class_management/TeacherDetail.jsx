@@ -100,17 +100,17 @@ const TeacherDetail = () => {
     try {
       setLoadingSchedule(true);
       const scheduleData = await teacherService.getTeacherSchedule(teacherId);
-      console.log('📅 ========== LỊCH GIẢNG DẠY CỦA GIẢNG VIÊN ==========');
-      console.log('📅 Raw schedule data from API:', scheduleData);
-      console.log('📅 Schedules array:', scheduleData.schedules);
+      console.log(' ========== LỊCH GIẢNG DẠY CỦA GIẢNG VIÊN ==========');
+      console.log(' Raw schedule data from API:', scheduleData);
+      console.log(' Schedules array:', scheduleData.schedules);
       
       if (scheduleData.schedules && scheduleData.schedules.length > 0) {
-        console.log('📅 First schedule example:', scheduleData.schedules[0]);
-        console.log('📅 First schedule programType:', scheduleData.schedules[0].programType);
-        console.log('📅 First schedule class:', scheduleData.schedules[0].class);
-        console.log('📅 First schedule class.course:', scheduleData.schedules[0].class?.course);
-        console.log('📅 First schedule class.course.program:', scheduleData.schedules[0].class?.course?.program);
-        console.log('📅 First schedule class.course.program.type:', scheduleData.schedules[0].class?.course?.program?.type);
+        console.log(' First schedule example:', scheduleData.schedules[0]);
+        console.log(' First schedule programType:', scheduleData.schedules[0].programType);
+        console.log(' First schedule class:', scheduleData.schedules[0].class);
+        console.log(' First schedule class.course:', scheduleData.schedules[0].class?.course);
+        console.log(' First schedule class.course.program:', scheduleData.schedules[0].class?.course?.program);
+        console.log(' First schedule class.course.program.type:', scheduleData.schedules[0].class?.course?.program?.type);
       }
       
       setTeacherSchedule(scheduleData.schedules || []);
@@ -154,7 +154,7 @@ const TeacherDetail = () => {
           endDate: scheduleDate
         });
 
-        console.log('📅 Lịch dạy của giáo viên được chọn vào ngày', scheduleDate, ':', scheduleData);
+        console.log(' Lịch dạy của giáo viên được chọn vào ngày', scheduleDate, ':', scheduleData);
         setSubstituteTeacherSchedule(scheduleData.schedules || []);
       } catch (err) {
         console.error('Error loading substitute teacher schedule:', err);
@@ -237,7 +237,7 @@ const TeacherDetail = () => {
     }
     
     // Log thông tin buổi học được chọn
-    console.log('📋 Thông tin buổi học được chọn:', {
+    console.log(' Thông tin buổi học được chọn:', {
       id: schedule.id || schedule._id,
       date: schedule.date,
       startTime: schedule.startTime,
@@ -376,9 +376,9 @@ const TeacherDetail = () => {
 
   // Transform schedule data for calendar view
   const calendarSchedules = useMemo(() => {
-    console.log('🔄 ========== TRANSFORMING SCHEDULES FOR CALENDAR ==========');
-    console.log('🔄 teacherSchedule:', teacherSchedule);
-    console.log('🔄 teacherSchedule length:', teacherSchedule.length);
+    console.log(' ========== TRANSFORMING SCHEDULES FOR CALENDAR ==========');
+    console.log(' teacherSchedule:', teacherSchedule);
+    console.log(' teacherSchedule length:', teacherSchedule.length);
     
     const transformed = teacherSchedule.map((schedule, index) => {
       const scheduleDate = new Date(schedule.date);
@@ -387,7 +387,7 @@ const TeacherDetail = () => {
       // Extract programType from schedule data
       const programType = schedule.programType || schedule.class?.course?.program?.type || null;
       
-      console.log(`🔄 Schedule ${index + 1}:`, {
+      console.log(` Schedule ${index + 1}:`, {
         scheduleId: schedule._id,
         className: schedule.class?.name,
         programType: programType,
@@ -425,8 +425,8 @@ const TeacherDetail = () => {
       };
     });
     
-    console.log('🔄 Transformed schedules:', transformed);
-    console.log('🔄 Schedules with programType:', transformed.filter(s => s.programType));
+    console.log(' Transformed schedules:', transformed);
+    console.log(' Schedules with programType:', transformed.filter(s => s.programType));
     
     return transformed;
   }, [teacherSchedule, teacher]);

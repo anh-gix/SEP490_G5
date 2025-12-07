@@ -67,11 +67,11 @@ const StudentDetail = () => {
       setLoading(true);
       setDetailError(null);
       
-      console.log('🔍 Fetching student info for:', studentId);
+      console.log(' Fetching student info for:', studentId);
       
       // Fetch Student details
       const data = await studentService.getStudentById(studentId);
-      console.log('📦 Student data response:', data);
+      console.log(' Student data response:', data);
       
       if (!data || !data.student) {
         throw new Error('Không nhận được dữ liệu học viên từ server');
@@ -91,10 +91,10 @@ const StudentDetail = () => {
         studentData.classes = [];
       }
       
-      console.log('✅ Student courses:', studentData.courses?.length || 0, studentData.courses);
+      console.log(' Student courses:', studentData.courses?.length || 0, studentData.courses);
       setSelectedStudent(studentData);
     } catch (err) {
-      console.error('❌ Error fetching Student info:', err);
+      console.error(' Error fetching Student info:', err);
       const errorMessage = err?.response?.data?.message || err?.message || 'Không thể tải thông tin chi tiết';
       setDetailError(errorMessage);
     } finally {
@@ -131,13 +131,13 @@ const StudentDetail = () => {
     
     try {
       setLoadingSchedule(true);
-      console.log('📅 Fetching student schedule...');
+      console.log(' Fetching student schedule...');
       const scheduleData = await studentService.getStudentSchedule(studentId);
-      console.log('📦 Schedule data response:', scheduleData);
+      console.log(' Schedule data response:', scheduleData);
       
       // Check response structure
       const schedules = scheduleData?.schedules || scheduleData?.data?.schedules || [];
-      console.log('✅ Student schedules:', schedules.length, schedules);
+      console.log(' Student schedules:', schedules.length, schedules);
       setStudentSchedule(Array.isArray(schedules) ? schedules : []);
       setSchedulePage(1);
       setScheduleLoaded(true);
@@ -536,6 +536,9 @@ const StudentDetail = () => {
           }
           const dateStr = scheduleDate.toISOString().split('T')[0];
           
+          // Extract programType from schedule data
+          const programType = schedule.programType || schedule.class?.course?.program?.type || null;
+          
           // Get attendance status
           const attendanceStatus = schedule.attendance?.status || null;
           
@@ -545,13 +548,32 @@ const StudentDetail = () => {
           const isCancelled = scheduleStatus === 'cancelled';
           const reason = schedule.reason || null;
           
+          // Determine className: 
+          // 1. Try to get from schedule.className first
+          // 2. If not available, try schedule.class?.name
+          // 3. For makeup schedules without className, show "Lớp học bù"
+          let className = schedule.className || schedule.class?.name;
+          
+          // Normalize empty values to null for easier checking
+          if (className === 'N/A' || className === '' || className === null || className === undefined) {
+            className = null;
+          }
+          
+          // For makeup schedules, show "Lớp học bù" if no className
+          if (isMakeupSchedule && !className) {
+            className = 'Lớp học bù';
+          } else if (!className) {
+            // For non-makeup schedules, use 'N/A' if no className
+            className = 'N/A';
+          }
+          
           return {
             id: schedule._id || `schedule-${index}`,
             studentScheduleId: schedule._id, // Store original StudentSchedule ID
             date: dateStr,
             startTime: schedule.startTime || '',
             endTime: schedule.endTime || '',
-            className: schedule.className || 'N/A',
+            className: className,
             roomName: schedule.room?.room_name || schedule.roomName || 'N/A',
             roomId: schedule.room?._id || null,
             topic: schedule.topic || schedule.sessionTitle || '',
@@ -567,7 +589,8 @@ const StudentDetail = () => {
             reason: reason,
             isMakeupSchedule: isMakeupSchedule,
             isCancelled: isCancelled,
-            cancellationReason: isCancelled ? reason : null
+            cancellationReason: isCancelled ? reason : null,
+            programType: programType
           };
         } catch (error) {
           console.error('Error transforming schedule:', error, schedule);

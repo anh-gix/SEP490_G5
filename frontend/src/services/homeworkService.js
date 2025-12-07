@@ -10,7 +10,7 @@ const getAuthHeader = () => {
 
 const homeworkService = {
   // ========================
-  // 📝 TEACHER - HOMEWORK ASSIGNMENT
+  //  TEACHER - HOMEWORK ASSIGNMENT
   // ========================
 
   /**
@@ -197,7 +197,7 @@ const homeworkService = {
   },
 
   // ========================
-  // 📚 STUDENT - HOMEWORK SUBMISSION
+  //  STUDENT - HOMEWORK SUBMISSION
   // ========================
 
   /**

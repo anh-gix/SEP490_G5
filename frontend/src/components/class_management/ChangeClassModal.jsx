@@ -26,6 +26,8 @@ const ChangeClassModal = ({
   useEffect(() => {
     if (show && selectedClassToChange?.courseId) {
       loadAvailableClasses();
+    } else if (show && !selectedClassToChange?.courseId) {
+      console.error(' ChangeClassModal: courseId is missing', { selectedClassToChange });
     }
   }, [show, selectedClassToChange?.courseId]);
 
@@ -39,7 +41,11 @@ const ChangeClassModal = ({
   }, [selectedNewClassId]);
 
   const loadAvailableClasses = async () => {
-    if (!selectedClassToChange?.courseId) return;
+    if (!selectedClassToChange?.courseId) {
+      console.error(' loadAvailableClasses: courseId is missing', { selectedClassToChange });
+      toast.error('Không tìm thấy thông tin khóa học. Vui lòng thử lại.');
+      return;
+    }
     
     setLoadingAvailableClasses(true);
     try {
@@ -52,9 +58,15 @@ const ChangeClassModal = ({
           return clsId.toString() !== selectedClassToChange.classId?.toString();
         });
         setAvailableClasses(otherClasses);
+        console.log(' Loaded available classes', { count: otherClasses.length });
+      } else {
+        console.error(' Failed to load available classes', response);
+        toast.error('Không thể tải danh sách lớp học. Vui lòng thử lại.');
+        setAvailableClasses([]);
       }
     } catch (err) {
-      console.error('Error fetching available classes:', err);
+      console.error(' Error fetching available classes:', err);
+      toast.error('Có lỗi xảy ra khi tải danh sách lớp học. Vui lòng thử lại.');
       setAvailableClasses([]);
     } finally {
       setLoadingAvailableClasses(false);
@@ -265,12 +277,21 @@ const ChangeClassModal = ({
 
   if (!selectedClassToChange) return null;
 
+  // Kiểm tra courseId
+  const hasCourseId = !!selectedClassToChange?.courseId;
+
   return (
     <Modal show={show} onHide={handleClose} size="lg" centered>
       <Modal.Header closeButton className="pb-12">
         <Modal.Title className="text-16">Đổi lớp</Modal.Title>
       </Modal.Header>
       <Modal.Body className="py-16">
+        {!hasCourseId && (
+          <div className="alert alert-danger mb-16" role="alert">
+            <i className="fas fa-exclamation-triangle me-2"></i>
+            <strong>Lỗi:</strong> Không tìm thấy thông tin khóa học. Vui lòng đóng modal và thử lại.
+          </div>
+        )}
         <div className="row g-3">
           {/* Left: Current Class */}
           <div className="col-md-6">

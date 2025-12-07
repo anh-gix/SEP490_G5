@@ -72,7 +72,7 @@ exports.getCurrentStudent = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy thông tin học viên hiện tại:', error);
+    console.error(' Lỗi khi lấy thông tin học viên hiện tại:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy thông tin học viên',
@@ -82,7 +82,7 @@ exports.getCurrentStudent = async (req, res) => {
 };
 
 // =========================
-// 📚 LẤY DANH SÁCH LỚP HỌC CỦA HỌC VIÊN
+//  LẤY DANH SÁCH LỚP HỌC CỦA HỌC VIÊN
 // =========================
 exports.getMyClasses = async (req, res) => {
   try {
@@ -148,7 +148,7 @@ exports.getMyClasses = async (req, res) => {
       classes: classesWithStats
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy danh sách lớp học:', error);
+    console.error(' Lỗi khi lấy danh sách lớp học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy danh sách lớp học',
@@ -158,7 +158,7 @@ exports.getMyClasses = async (req, res) => {
 };
 
 // =========================
-// 📅 LẤY LỊCH HỌC CỦA HỌC VIÊN
+//  LẤY LỊCH HỌC CỦA HỌC VIÊN
 // =========================
 exports.getMySchedule = async (req, res) => {
   try {
@@ -243,7 +243,7 @@ exports.getMySchedule = async (req, res) => {
       schedules: formattedSchedules
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy lịch học:', error);
+    console.error(' Lỗi khi lấy lịch học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy lịch học',
@@ -253,7 +253,7 @@ exports.getMySchedule = async (req, res) => {
 };
 
 // =========================
-// 📖 LẤY CHI TIẾT BUỔI HỌC
+//  LẤY CHI TIẾT BUỔI HỌC
 // =========================
 exports.getLessonDetail = async (req, res) => {
   try {
@@ -354,7 +354,7 @@ exports.getLessonDetail = async (req, res) => {
       lesson: lessonDetail
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy chi tiết buổi học:', error);
+    console.error(' Lỗi khi lấy chi tiết buổi học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy chi tiết buổi học',
@@ -419,7 +419,7 @@ exports.getClassMaterials = async (req, res) => {
       materials
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy tài liệu lớp học:', error);
+    console.error(' Lỗi khi lấy tài liệu lớp học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy tài liệu',
@@ -429,7 +429,7 @@ exports.getClassMaterials = async (req, res) => {
 };
 
 // =========================
-// 📝 LẤY BÀI TẬP CỦA LỚP HỌC
+//  LẤY BÀI TẬP CỦA LỚP HỌC
 // =========================
 exports.getClassHomework = async (req, res) => {
   try {
@@ -506,7 +506,7 @@ exports.getClassHomework = async (req, res) => {
       homework: homeworkList
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy bài tập lớp học:', error);
+    console.error(' Lỗi khi lấy bài tập lớp học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy bài tập',
@@ -516,7 +516,7 @@ exports.getClassHomework = async (req, res) => {
 };
 
 // =========================
-// 📊 LẤY TIẾN ĐỘ HỌC TẬP
+//  LẤY TIẾN ĐỘ HỌC TẬP
 // =========================
 exports.getClassProgress = async (req, res) => {
   try {
@@ -657,7 +657,7 @@ exports.getClassProgress = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy tiến độ học tập:', error);
+    console.error(' Lỗi khi lấy tiến độ học tập:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy tiến độ',
@@ -667,7 +667,7 @@ exports.getClassProgress = async (req, res) => {
 };
 
 // =========================
-// 📝 NỘP BÀI TẬP
+//  NỘP BÀI TẬP
 // =========================
 exports.submitHomework = async (req, res) => {
   try {
@@ -772,7 +772,7 @@ exports.submitHomework = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Lỗi khi nộp bài tập:', error);
+    console.error(' Lỗi khi nộp bài tập:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi nộp bài tập',
@@ -829,7 +829,7 @@ exports.getMySubmission = async (req, res) => {
       submission: submissionData
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy thông tin bài nộp:', error);
+    console.error(' Lỗi khi lấy thông tin bài nộp:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy thông tin bài nộp',
@@ -938,12 +938,12 @@ exports.getDashboardData = async (req, res) => {
     });
 
     // 5. Get practice test results (from Submission model)
-    console.log('📊 [Dashboard] Bắt đầu lấy dữ liệu luyện đề cho studentId:', studentId);
+    console.log(' [Dashboard] Bắt đầu lấy dữ liệu luyện đề cho studentId:', studentId);
     
     const Submission = require('../models/submissionModel');
     const Exam = require('../models/examModel');
     
-    console.log('🔍 [Dashboard] Query Submission model với điều kiện:', {
+    console.log(' [Dashboard] Query Submission model với điều kiện:', {
       studentId,
       status: { $in: ['completed', 'graded'] }
     });
@@ -960,10 +960,10 @@ exports.getDashboardData = async (req, res) => {
       .limit(10)
       .lean();
 
-    console.log(`✅ [Dashboard] Tìm thấy ${submissions.length} submissions`);
+    console.log(` [Dashboard] Tìm thấy ${submissions.length} submissions`);
     
     if (submissions.length > 0) {
-      console.log('📋 [Dashboard] Chi tiết submissions:');
+      console.log(' [Dashboard] Chi tiết submissions:');
       submissions.forEach((sub, index) => {
         console.log(`  [${index + 1}] Submission ID: ${sub._id}`);
         console.log(`      - Exam: ${sub.examId?.title || 'N/A'}`);
@@ -979,20 +979,20 @@ exports.getDashboardData = async (req, res) => {
         }
       });
     } else {
-      console.log('⚠️ [Dashboard] Không tìm thấy submission nào cho student này');
+      console.log(' [Dashboard] Không tìm thấy submission nào cho student này');
     }
 
     const practiceTests = submissions
       .filter(sub => {
         const hasExam = sub.examId && sub.totalScore !== undefined;
         if (!hasExam) {
-          console.log(`⚠️ [Dashboard] Submission ${sub._id} bị loại: examId=${!!sub.examId}, totalScore=${sub.totalScore}`);
+          console.log(` [Dashboard] Submission ${sub._id} bị loại: examId=${!!sub.examId}, totalScore=${sub.totalScore}`);
         }
         return hasExam;
       })
       .map((sub, index) => {
         const exam = sub.examId;
-        console.log(`🔄 [Dashboard] Processing submission ${index + 1}/${submissions.length}: ${sub._id}`);
+        console.log(` [Dashboard] Processing submission ${index + 1}/${submissions.length}: ${sub._id}`);
         
         const result = {
           id: sub._id.toString(),
@@ -1035,7 +1035,7 @@ exports.getDashboardData = async (req, res) => {
         return result;
       });
 
-    console.log(`✅ [Dashboard] Đã xử lý xong ${practiceTests.length} practice tests`);
+    console.log(` [Dashboard] Đã xử lý xong ${practiceTests.length} practice tests`);
 
     // 6. Calculate class details with progress
     const classesWithDetails = await Promise.all(
@@ -1137,7 +1137,7 @@ exports.getDashboardData = async (req, res) => {
     console.log(`   - Active classes: ${classesWithDetails.length} classes`);
     
   } catch (error) {
-    console.error('❌ [Dashboard] Lỗi khi lấy dữ liệu dashboard:', error);
+    console.error(' [Dashboard] Lỗi khi lấy dữ liệu dashboard:', error);
     console.error('   Stack trace:', error.stack);
     res.status(500).json({
       success: false,
@@ -1267,7 +1267,7 @@ exports.getAllStudents = async (req, res) => {
       totalPages: Math.ceil(total / limitNum)
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy danh sách học viên:', error);
+    console.error(' Lỗi khi lấy danh sách học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy danh sách học viên',
@@ -1277,7 +1277,7 @@ exports.getAllStudents = async (req, res) => {
 };
 
 // =========================
-// 📊 THỐNG KÊ HỌC VIÊN
+//  THỐNG KÊ HỌC VIÊN
 // =========================
 exports.getStudentStats = async (req, res) => {
   try {
@@ -1313,7 +1313,7 @@ exports.getStudentStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy thống kê học viên:', error);
+    console.error(' Lỗi khi lấy thống kê học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy thống kê học viên',
@@ -1391,7 +1391,7 @@ exports.getStudentById = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy thông tin học viên:', error);
+    console.error(' Lỗi khi lấy thông tin học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy thông tin học viên',
@@ -1465,7 +1465,7 @@ exports.createStudent = async (req, res) => {
       student: studentData
     });
   } catch (error) {
-    console.error('❌ Lỗi khi tạo học viên:', error);
+    console.error(' Lỗi khi tạo học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi tạo học viên',
@@ -1528,19 +1528,19 @@ const parseLevelsToStudy = (levelsToStudyStr) => {
 const enrollStudentInCourses = async (studentId, levelsToStudyStr, type) => {
   try {
     if (!levelsToStudyStr || !type) {
-      console.log(`⚠️ Skipping enrollment for student ${studentId}: missing levelsToStudy or type`);
+      console.log(` Skipping enrollment for student ${studentId}: missing levelsToStudy or type`);
       return { enrolled: 0, courses: [] };
     }
 
     // Parse levels from string
     const levels = parseLevelsToStudy(levelsToStudyStr);
     if (levels.length === 0) {
-      console.log(`⚠️ Skipping enrollment for student ${studentId}: no valid levels parsed from "${levelsToStudyStr}"`);
+      console.log(` Skipping enrollment for student ${studentId}: no valid levels parsed from "${levelsToStudyStr}"`);
       return { enrolled: 0, courses: [] };
     }
 
     const typeStr = type.toString().trim().toLowerCase();
-    console.log(`📚 Enrolling student ${studentId} in courses for type: ${typeStr}, levels: ${levels.join(', ')}`);
+    console.log(` Enrolling student ${studentId} in courses for type: ${typeStr}, levels: ${levels.join(', ')}`);
 
     // Find programs matching type and levels
     const programs = await Program.find({
@@ -1550,12 +1550,12 @@ const enrollStudentInCourses = async (studentId, levelsToStudyStr, type) => {
     }).select('_id level');
 
     if (programs.length === 0) {
-      console.log(`⚠️ No active programs found for type: ${typeStr}, levels: ${levels.join(', ')}`);
+      console.log(` No active programs found for type: ${typeStr}, levels: ${levels.join(', ')}`);
       return { enrolled: 0, courses: [] };
     }
 
     const programIds = programs.map(p => p._id);
-    console.log(`✅ Found ${programs.length} programs: ${programs.map(p => p.level).join(', ')}`);
+    console.log(` Found ${programs.length} programs: ${programs.map(p => p.level).join(', ')}`);
 
     // Find all courses belonging to these programs
     const courses = await Course.find({
@@ -1564,11 +1564,11 @@ const enrollStudentInCourses = async (studentId, levelsToStudyStr, type) => {
     }).select('_id name program');
 
     if (courses.length === 0) {
-      console.log(`⚠️ No active courses found for programs: ${programIds.join(', ')}`);
+      console.log(` No active courses found for programs: ${programIds.join(', ')}`);
       return { enrolled: 0, courses: [] };
     }
 
-    console.log(`✅ Found ${courses.length} courses to enroll`);
+    console.log(` Found ${courses.length} courses to enroll`);
 
     // Enroll student in all courses
     let enrolledCount = 0;
@@ -1593,10 +1593,10 @@ const enrollStudentInCourses = async (studentId, levelsToStudyStr, type) => {
       }
     }
 
-    console.log(`✅ Successfully enrolled student ${studentId} in ${enrolledCount} courses`);
+    console.log(` Successfully enrolled student ${studentId} in ${enrolledCount} courses`);
     return { enrolled: enrolledCount, courses: enrolledCourseIds };
   } catch (error) {
-    console.error(`❌ Error enrolling student ${studentId} in courses:`, error);
+    console.error(` Error enrolling student ${studentId} in courses:`, error);
     // Return empty result but don't throw - enrollment failure shouldn't fail the import
     return { enrolled: 0, courses: [], error: error.message };
   }
@@ -1688,10 +1688,10 @@ exports.importStudents = async (req, res) => {
               studentData.levelsToStudy,
               studentData.type
             );
-            console.log(`📝 Enrollment result for ${newStudent.email}:`, enrollmentResult);
+            console.log(` Enrollment result for ${newStudent.email}:`, enrollmentResult);
           } catch (enrollmentError) {
             // Log error but don't fail the import
-            console.error(`⚠️ Error enrolling student ${newStudent._id} in courses:`, enrollmentError);
+            console.error(` Error enrolling student ${newStudent._id} in courses:`, enrollmentError);
           }
         } else {
           console.log(`ℹ️ Skipping enrollment for ${newStudent.email}: missing levelsToStudy or type`);
@@ -1721,7 +1721,7 @@ exports.importStudents = async (req, res) => {
       results
     });
   } catch (error) {
-    console.error('❌ Lỗi khi import học viên:', error);
+    console.error(' Lỗi khi import học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi import học viên',
@@ -1731,7 +1731,7 @@ exports.importStudents = async (req, res) => {
 };
 
 // =========================
-// 📝 CẬP NHẬT KHÓA HỌC CỦA HỌC VIÊN
+//  CẬP NHẬT KHÓA HỌC CỦA HỌC VIÊN
 // =========================
 exports.updateStudentCourseEnrollments = async (req, res) => {
   const session = await require('mongoose').startSession();
@@ -1800,7 +1800,7 @@ exports.updateStudentCourseEnrollments = async (req, res) => {
         { session }
       );
       updatedCourses.push(...coursesToAdd);
-      console.log(`✅ Đã thêm học viên ${studentId} vào ${result.modifiedCount} course(s)`);
+      console.log(` Đã thêm học viên ${studentId} vào ${result.modifiedCount} course(s)`);
     }
 
     // Remove student from courses using $pull
@@ -1812,7 +1812,7 @@ exports.updateStudentCourseEnrollments = async (req, res) => {
         { session }
       );
       updatedCourses.push(...coursesToRemove);
-      console.log(`✅ Đã xóa học viên ${studentId} khỏi ${result.modifiedCount} course(s)`);
+      console.log(` Đã xóa học viên ${studentId} khỏi ${result.modifiedCount} course(s)`);
     }
 
     // Commit transaction
@@ -1829,7 +1829,7 @@ exports.updateStudentCourseEnrollments = async (req, res) => {
     // Rollback transaction on error
     await session.abortTransaction();
     session.endSession();
-    console.error('❌ Lỗi khi cập nhật khóa học của học viên:', error);
+    console.error(' Lỗi khi cập nhật khóa học của học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi cập nhật khóa học của học viên',
@@ -1839,7 +1839,7 @@ exports.updateStudentCourseEnrollments = async (req, res) => {
 };
 
 // =========================
-// 🔄 ĐỔI LỚP HỌC CỦA HỌC VIÊN
+//  ĐỔI LỚP HỌC CỦA HỌC VIÊN
 // =========================
 exports.changeStudentClass = async (req, res) => {
   const mongoose = require('mongoose');
@@ -1971,7 +1971,7 @@ exports.changeStudentClass = async (req, res) => {
       ? newClassSchedules[0].session.order
       : null;
     
-    console.log(`📊 Session order - Lớp cũ: ${oldClassSessionOrder}, Lớp mới: ${newClassSessionOrder}`);
+    console.log(` Session order - Lớp cũ: ${oldClassSessionOrder}, Lớp mới: ${newClassSessionOrder}`);
     
     // Xác định trường hợp
     let caseType = 1; // Mặc định là trường hợp 1
@@ -1983,7 +1983,7 @@ exports.changeStudentClass = async (req, res) => {
       }
     }
     
-    console.log(`🔍 Trường hợp xử lý: ${caseType}`);
+    console.log(` Trường hợp xử lý: ${caseType}`);
     
     // 3. Xử lý Class model
     // Xóa học viên khỏi lớp cũ
@@ -1991,7 +1991,7 @@ exports.changeStudentClass = async (req, res) => {
       id => id.toString() !== studentId.toString()
     );
     await oldClass.save({ session });
-    console.log(`✅ Đã xóa học viên khỏi lớp cũ: ${oldClassId}`);
+    console.log(` Đã xóa học viên khỏi lớp cũ: ${oldClassId}`);
     
     // Thêm học viên vào lớp mới (nếu chưa có)
     const studentInNewClass = newClass.students.some(
@@ -2000,7 +2000,7 @@ exports.changeStudentClass = async (req, res) => {
     if (!studentInNewClass) {
       newClass.students.push(studentId);
       await newClass.save({ session });
-      console.log(`✅ Đã thêm học viên vào lớp mới: ${newClassId}`);
+      console.log(` Đã thêm học viên vào lớp mới: ${newClassId}`);
     }
     
     // 4. Xử lý StudentSchedule
@@ -2029,7 +2029,7 @@ exports.changeStudentClass = async (req, res) => {
       .session(session)
       .lean();
     
-    console.log(`📋 Tìm thấy ${studentSchedules.length} StudentSchedule của học viên ở lớp cũ`);
+    console.log(` Tìm thấy ${studentSchedules.length} StudentSchedule của học viên ở lớp cũ`);
     
     // c) Lấy tất cả ClassSchedule của lớp mới để match
     const allNewClassSchedules = await ClassSchedule.find({
@@ -2069,7 +2069,7 @@ exports.changeStudentClass = async (req, res) => {
       // Nếu đã có điểm danh hoặc đã diễn ra, giữ nguyên
       if (hasAttendance || isPastSchedule) {
         unchangedCount++;
-        console.log(`⏭️ Giữ nguyên StudentSchedule ${studentSchedule._id} (${hasAttendance ? 'đã có điểm danh' : 'đã diễn ra'})`);
+        console.log(` Giữ nguyên StudentSchedule ${studentSchedule._id} (${hasAttendance ? 'đã có điểm danh' : 'đã diễn ra'})`);
         continue;
       }
       
@@ -2087,7 +2087,7 @@ exports.changeStudentClass = async (req, res) => {
               { session }
             );
             updatedCount++;
-            console.log(`✅ Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
+            console.log(` Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
           }
         }
       } else if (caseType === 2) {
@@ -2116,7 +2116,7 @@ exports.changeStudentClass = async (req, res) => {
                 { session }
               );
               updatedCount++;
-              console.log(`✅ Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
+              console.log(` Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
             }
           }
         }
@@ -2126,7 +2126,7 @@ exports.changeStudentClass = async (req, res) => {
           if (sessionOrder < oldClassSessionOrder) {
             // Session order < lớp cũ: không thay đổi gì
             unchangedCount++;
-            console.log(`⏭️ Giữ nguyên StudentSchedule ${studentSchedule._id} (session ${sessionOrder} < ${oldClassSessionOrder})`);
+            console.log(` Giữ nguyên StudentSchedule ${studentSchedule._id} (session ${sessionOrder} < ${oldClassSessionOrder})`);
           } else if (sessionOrder >= oldClassSessionOrder) {
             // Session order >= lớp cũ: update classSchedule
             const matchingSchedules = newClassScheduleMap.get(sessionOrder);
@@ -2138,7 +2138,7 @@ exports.changeStudentClass = async (req, res) => {
                 { session }
               );
               updatedCount++;
-              console.log(`✅ Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
+              console.log(` Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
             }
           }
         }
@@ -2165,7 +2165,7 @@ exports.changeStudentClass = async (req, res) => {
             classSchedule: classSchedule._id,
             scheduleStatus: 'scheduled'
           }], { session });
-          console.log(`✅ Tạo StudentSchedule mới cho ClassSchedule ${classSchedule._id}`);
+          console.log(` Tạo StudentSchedule mới cho ClassSchedule ${classSchedule._id}`);
         }
       } else {
         // Nếu không có session order, tạo cho tất cả buổi tương lai
@@ -2174,15 +2174,15 @@ exports.changeStudentClass = async (req, res) => {
           classSchedule: classSchedule._id,
           scheduleStatus: 'scheduled'
         }], { session });
-        console.log(`✅ Tạo StudentSchedule mới cho ClassSchedule ${classSchedule._id}`);
+        console.log(` Tạo StudentSchedule mới cho ClassSchedule ${classSchedule._id}`);
       }
     }
     
-    console.log(`📊 Kết quả xử lý StudentSchedule:`);
+    console.log(` Kết quả xử lý StudentSchedule:`);
     console.log(`   - Updated: ${updatedCount}`);
     console.log(`   - Cancelled: ${cancelledCount}`);
     console.log(`   - Unchanged: ${unchangedCount}`);
-    console.log(`✅ Hoàn thành xử lý đổi lớp`);
+    console.log(` Hoàn thành xử lý đổi lớp`);
     
     // Commit transaction
     await session.commitTransaction();
@@ -2202,7 +2202,7 @@ exports.changeStudentClass = async (req, res) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    console.error('❌ Lỗi khi đổi lớp học:', error);
+    console.error(' Lỗi khi đổi lớp học:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi đổi lớp học',

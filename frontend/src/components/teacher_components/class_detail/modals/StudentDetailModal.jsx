@@ -19,7 +19,7 @@ const StudentDetailModal = ({
   if (!student) return null;
 
   const handleEditMocktest = (sessionOrder, scheduleId, currentScores) => {
-    console.log('🔍 Edit Mocktest Debug:', {
+    console.log(' Edit Mocktest Debug:', {
       sessionOrder,
       scheduleId,
       currentScores,

@@ -1,17 +1,17 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Container, Spinner, Alert } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import changeRequestService from '../../services/changeRequestService';
 import academicStaffService from '../../services/academicStaffService';
 import classService from '../../services/classService';
-import { naturalCompare } from '../../utils/requestHelpers';
 import RequestStats from './RequestStats';
 import RequestFilters from './RequestFilters';
 import RequestTable from './RequestTable';
 import RejectRequestModal from './RejectRequestModal';
 import ChangeClassModal from './ChangeClassModal';
+import MakeupClassModalForAcademicStaff from './MakeupClassModalForAcademicStaff';
 import RequestDetailPage from '../../pages/AcademicStaff/RequestDetailPage';
-import { formatDate } from '../../utils/requestHelpers';
+import { formatDate, naturalCompare } from '../../utils/requestHelpers';
 
 /**
  * RequestManagement Component
@@ -19,7 +19,6 @@ import { formatDate } from '../../utils/requestHelpers';
  */
 const RequestManagement = () => {
   const [changeRequests, setChangeRequests] = useState([]);
-  const [allChangeRequests, setAllChangeRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
@@ -35,6 +34,7 @@ const RequestManagement = () => {
     replaceTeacher: 0
   });
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('pending');
   const [filterType, setFilterType] = useState('all');
   const [sortBy, setSortBy] = useState('oldest');
@@ -52,74 +52,55 @@ const RequestManagement = () => {
   const [pendingClassChange, setPendingClassChange] = useState(null);
   const [pendingMakeupClasses, setPendingMakeupClasses] = useState([]);
   const [pendingMakeupSessions, setPendingMakeupSessions] = useState([]);
+  const [showMakeupModal, setShowMakeupModal] = useState(false);
+  const [selectedStudentScheduleId, setSelectedStudentScheduleId] = useState(null);
+  const searchTimeoutRef = useRef(null);
+
+  // Debounce search term
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setPage(1); // Reset to first page when search changes
+    }, 500); // 500ms debounce delay
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm]);
 
   // Fetch requests when filters change
   useEffect(() => {
     fetchChangeRequests();
-  }, [page, searchTerm, filterStatus, filterType]);
+  }, [page, debouncedSearchTerm, filterStatus, filterType, sortBy]);
 
   // Fetch stats separately
   useEffect(() => {
     fetchStats();
   }, [filterStatus]);
 
-  // Sort requests
-  const sortedRequests = useMemo(() => {
-    if (!allChangeRequests || allChangeRequests.length === 0) return [];
-    
-    let sorted = [...allChangeRequests];
-    
-    if (sortBy === 'newest') {
-      sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    } else if (sortBy === 'oldest') {
-      sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    } else if (sortBy === 'sender') {
-      sorted.sort((a, b) => {
-        const nameA = a.sender?.username || a.sender?.fullName || a.sender?.name || '';
-        const nameB = b.sender?.username || b.sender?.fullName || b.sender?.name || '';
-        return naturalCompare(nameA, nameB);
-      });
-    } else if (sortBy === 'sender-desc') {
-      sorted.sort((a, b) => {
-        const nameA = a.sender?.username || a.sender?.fullName || a.sender?.name || '';
-        const nameB = b.sender?.username || b.sender?.fullName || b.sender?.name || '';
-        return naturalCompare(nameB, nameA);
-      });
-    }
-    
-    return sorted;
-  }, [allChangeRequests, sortBy]);
-
-  // Paginate sorted requests
-  useEffect(() => {
-    if (sortedRequests.length > 0) {
-      const startIndex = (page - 1) * 10;
-      const endIndex = startIndex + 10;
-      const paginatedRequests = sortedRequests.slice(startIndex, endIndex);
-      setChangeRequests(paginatedRequests);
-      setTotalPages(Math.ceil(sortedRequests.length / 10));
-    }
-  }, [sortedRequests, page]);
-
   const fetchStats = async () => {
     try {
-      const params = { limit: 10000 };
+      const params = {};
       if (filterStatus && filterStatus !== 'all') {
         params.status = filterStatus;
       }
       
-      const response = await changeRequestService.getAllChangeRequests(params);
-      if (response.success) {
-        const requests = response.changeRequests || [];
-        
+      const response = await changeRequestService.getStats(params);
+      if (response.success && response.stats) {
         setStats({
-          pending: requests.filter(r => r.status === 'pending').length,
-          approved: requests.filter(r => r.status === 'approved').length,
-          rejected: requests.filter(r => r.status === 'rejected').length,
-          createClass: requests.filter(r => r.type === 'create_class').length,
-          changeClass: requests.filter(r => r.type === 'change_class').length,
-          makeupClass: requests.filter(r => r.type === 'makeup_class').length,
-          replaceTeacher: requests.filter(r => r.type === 'replace_teacher').length
+          pending: response.stats.pending || 0,
+          approved: response.stats.approved || 0,
+          rejected: response.stats.rejected || 0,
+          createClass: response.stats.createClass || 0,
+          changeClass: response.stats.changeClass || 0,
+          makeupClass: response.stats.makeupClass || 0,
+          replaceTeacher: response.stats.replaceTeacher || 0
         });
       }
     } catch (err) {
@@ -131,16 +112,38 @@ const RequestManagement = () => {
     try {
       setLoading(true);
       setError(null);
-      const params = { limit: 10000 };
-      if (searchTerm) params.search = searchTerm;
+      
+      // For sender sorting, we need to handle it on frontend after fetching
+      // because MongoDB can't sort by populated fields
+      const needsSenderSort = sortBy === 'sender' || sortBy === 'sender-desc';
+      const backendSortBy = needsSenderSort ? 'oldest' : sortBy;
+      
+      const params = {
+        page,
+        limit: 10,
+        sortBy: backendSortBy
+      };
+      if (debouncedSearchTerm) params.search = debouncedSearchTerm;
       if (filterStatus && filterStatus !== 'all') params.status = filterStatus;
       if (filterType && filterType !== 'all') params.type = filterType;
       
       const response = await changeRequestService.getAllChangeRequests(params);
       if (response.success) {
-        const requests = response.changeRequests || [];
-        setAllChangeRequests(requests);
-        setTotal(requests.length);
+        let requests = response.changeRequests || [];
+        
+        // Sort by sender on frontend if needed
+        if (needsSenderSort) {
+          requests = [...requests].sort((a, b) => {
+            const nameA = a.sender?.username || a.sender?.fullName || a.sender?.name || '';
+            const nameB = b.sender?.username || b.sender?.fullName || b.sender?.name || '';
+            const comparison = naturalCompare(nameA, nameB);
+            return sortBy === 'sender-desc' ? -comparison : comparison;
+          });
+        }
+        
+        setChangeRequests(requests);
+        setTotal(response.total || 0);
+        setTotalPages(response.totalPages || 1);
       } else {
         setError(response.message || 'Không thể tải danh sách đơn');
       }
@@ -256,75 +259,114 @@ const RequestManagement = () => {
   };
 
   const handleChangeClassClick = async (classItem) => {
-    const classSchedules = senderSchedule.filter(sch => {
-      const classId = sch.class?._id?.toString() || sch.class?.toString();
-      const targetClassId = (classItem.classId?._id?.toString() || classItem.classId?.toString() || String(classItem.classId));
-      return classId === targetClassId;
-    });
-
-    let fixedSchedulesList = [];
-    let courseId = null;
-
-    if (classSchedules.length > 0) {
-      const fixedSchedules = classSchedules.filter(sch => {
-        const status = sch.status || 'fixed';
-        return status === 'fixed';
-      });
+    try {
+      console.log(' handleChangeClassClick called', { classItem });
       
-      const sortedSchedules = [...fixedSchedules].sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        if (dateA.getTime() !== dateB.getTime()) {
-          return dateA - dateB;
-        }
-        return (a.startTime || '').localeCompare(b.startTime || '');
+      if (!classItem) {
+        console.error(' classItem is undefined');
+        toast.error('Không tìm thấy thông tin lớp học');
+        return;
+      }
+
+      const classSchedules = senderSchedule.filter(sch => {
+        const classId = sch.class?._id?.toString() || sch.class?.toString();
+        const targetClassId = (classItem.classId?._id?.toString() || classItem.classId?.toString() || String(classItem.classId));
+        return classId === targetClassId;
       });
 
-      fixedSchedulesList = sortedSchedules.map(sch => ({
-        title: sch.session?.title || 'N/A',
-        order: sch.session?.order || null,
-        date: sch.date || null,
-        startTime: sch.startTime || 'N/A',
-        endTime: sch.endTime || 'N/A',
-        roomName: sch.room?.room_name || 'N/A'
-      }));
+      let fixedSchedulesList = [];
+      let courseId = null;
 
-      courseId = classSchedules[0]?.class?.course?._id || classSchedules[0]?.class?.course || null;
-    } else if (classItem.fixedSchedules && Array.isArray(classItem.fixedSchedules) && classItem.fixedSchedules.length > 0) {
-      const sortedSchedules = [...classItem.fixedSchedules].sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        if (dateA.getTime() !== dateB.getTime()) {
-          return dateA - dateB;
+      if (classSchedules.length > 0) {
+        const fixedSchedules = classSchedules.filter(sch => {
+          const status = sch.status || 'fixed';
+          return status === 'fixed';
+        });
+        
+        const sortedSchedules = [...fixedSchedules].sort((a, b) => {
+          const dateA = new Date(a.date);
+          const dateB = new Date(b.date);
+          if (dateA.getTime() !== dateB.getTime()) {
+            return dateA - dateB;
+          }
+          return (a.startTime || '').localeCompare(b.startTime || '');
+        });
+
+        fixedSchedulesList = sortedSchedules.map(sch => ({
+          title: sch.session?.title || 'N/A',
+          order: sch.session?.order || null,
+          date: sch.date || null,
+          startTime: sch.startTime || 'N/A',
+          endTime: sch.endTime || 'N/A',
+          roomName: sch.room?.room_name || 'N/A'
+        }));
+
+        // Extract courseId - xử lý cả object và ObjectId string
+        const courseInfo = classSchedules[0]?.class?.course;
+        if (courseInfo) {
+          if (typeof courseInfo === 'object' && courseInfo._id) {
+            courseId = courseInfo._id.toString();
+          } else if (typeof courseInfo === 'string') {
+            courseId = courseInfo;
+          } else if (courseInfo && typeof courseInfo === 'object' && courseInfo.toString) {
+            courseId = courseInfo.toString();
+          }
         }
-        return (a.startTime || '').localeCompare(b.startTime || '');
-      });
+      } else if (classItem.fixedSchedules && Array.isArray(classItem.fixedSchedules) && classItem.fixedSchedules.length > 0) {
+        const sortedSchedules = [...classItem.fixedSchedules].sort((a, b) => {
+          const dateA = new Date(a.date);
+          const dateB = new Date(b.date);
+          if (dateA.getTime() !== dateB.getTime()) {
+            return dateA - dateB;
+          }
+          return (a.startTime || '').localeCompare(b.startTime || '');
+        });
 
-      fixedSchedulesList = sortedSchedules.map(sch => ({
-        title: sch.session?.title || sch.title || 'N/A',
-        order: sch.session?.order || sch.order || null,
-        date: sch.date || null,
-        startTime: sch.startTime || 'N/A',
-        endTime: sch.endTime || 'N/A',
-        roomName: sch.roomName || sch.room?.room_name || 'N/A'
-      }));
+        fixedSchedulesList = sortedSchedules.map(sch => ({
+          title: sch.session?.title || sch.title || 'N/A',
+          order: sch.session?.order || sch.order || null,
+          date: sch.date || null,
+          startTime: sch.startTime || 'N/A',
+          endTime: sch.endTime || 'N/A',
+          roomName: sch.roomName || sch.room?.room_name || 'N/A'
+        }));
 
-      courseId = classItem.courseId || null;
+        // Extract courseId từ classItem - xử lý cả object và ObjectId string
+        if (classItem.courseId) {
+          if (typeof classItem.courseId === 'object' && classItem.courseId._id) {
+            courseId = classItem.courseId._id.toString();
+          } else if (typeof classItem.courseId === 'string') {
+            courseId = classItem.courseId;
+          } else if (classItem.courseId && typeof classItem.courseId === 'object' && classItem.courseId.toString) {
+            courseId = classItem.courseId.toString();
+          }
+        }
+      }
+
+      if (!courseId) {
+        console.error(' courseId is null or undefined', { classItem, classSchedules });
+        toast.error('Không tìm thấy thông tin khóa học. Vui lòng thử lại sau.');
+        return;
+      }
+
+      const currentClassInfo = {
+        classId: classItem.classId,
+        className: classItem.className,
+        courseName: classItem.courseName,
+        courseId: courseId,
+        fixedSchedules: fixedSchedulesList,
+        roomName: fixedSchedulesList.length > 0 ? fixedSchedulesList[0].roomName : null,
+        currentSessionTitle: classItem.currentSessionTitle || 'Chưa có session',
+        currentSessionOrder: classItem.currentSessionOrder || null
+      };
+
+      console.log(' Opening ChangeClassModal', { currentClassInfo });
+      setSelectedClassToChange(currentClassInfo);
+      setShowChangeClassModal(true);
+    } catch (error) {
+      console.error(' Error in handleChangeClassClick:', error);
+      toast.error('Có lỗi xảy ra khi mở form đổi lớp. Vui lòng thử lại.');
     }
-
-    const currentClassInfo = {
-      classId: classItem.classId,
-      className: classItem.className,
-      courseName: classItem.courseName,
-      courseId: courseId,
-      fixedSchedules: fixedSchedulesList,
-      roomName: fixedSchedulesList.length > 0 ? fixedSchedulesList[0].roomName : null,
-      currentSessionTitle: classItem.currentSessionTitle || 'Chưa có session',
-      currentSessionOrder: classItem.currentSessionOrder || null
-    };
-
-    setSelectedClassToChange(currentClassInfo);
-    setShowChangeClassModal(true);
   };
 
   const handleChangeClassConfirm = (data) => {
@@ -349,6 +391,33 @@ const RequestManagement = () => {
 
   const handleRemoveClassChange = () => {
     setPendingClassChange(null);
+  };
+
+  const handleMakeupClassSubmit = (makeupData) => {
+    // Add the makeup class data to pendingMakeupClasses
+    setPendingMakeupClasses(prev => {
+      // Check if this absentScheduleId already exists (for replace_teacher or duplicate)
+      const existingIndex = prev.findIndex(m => {
+        const existingAbsentId = m.absentScheduleId?.toString();
+        const newAbsentId = makeupData.absentScheduleId?.toString();
+        return existingAbsentId === newAbsentId;
+      });
+
+      if (existingIndex >= 0) {
+        // Replace existing entry
+        const newList = [...prev];
+        newList[existingIndex] = makeupData;
+        return newList;
+      } else {
+        // Add new entry
+        return [...prev, makeupData];
+      }
+    });
+    
+    // Close modal
+    setShowMakeupModal(false);
+    setSelectedStudentScheduleId(null);
+    toast.success('Đã thêm buổi học bù thành công!');
   };
 
   const renderClassInfo = (classInfo, isOldClass = true) => {
@@ -386,39 +455,55 @@ const RequestManagement = () => {
   // If showing detail modal, render RequestDetailPage
   if (showDetailModal && selectedRequest) {
     return (
-      <RequestDetailPage
-        selectedRequest={selectedRequest}
-        senderSchedule={senderSchedule}
-        senderRole={senderRole}
-        loadingSchedule={loadingSchedule}
-        pendingClassChange={pendingClassChange}
-        pendingMakeupClasses={pendingMakeupClasses}
-        pendingMakeupSessions={pendingMakeupSessions}
-        onBack={() => {
-          setShowDetailModal(false);
-          setRejectReason('');
-          setSelectedRequest(null);
-          setSenderSchedule([]);
-          setSenderRole(null);
-          setPendingClassChange(null);
-          setPendingMakeupClasses([]);
-          setPendingMakeupSessions([]);
-        }}
-        onApprove={handleApprove}
-        onReject={handleReject}
-        onChangeClass={handleChangeClassClick}
-        onAddMakeupClass={(studentScheduleId) => {
-          // TODO: Implement MakeupClassModal component
-          // The MakeupClassModal is very complex (~1200 lines) and needs to be refactored separately
-          // For now, this is a placeholder - the functionality should be restored in a future refactoring
-          toast.info('Chức năng thêm buổi học bù đang được refactor. Vui lòng quay lại sau.');
-        }}
-        onRemoveMakeupClass={handleRemoveMakeupClass}
-        onRemoveClassChange={handleRemoveClassChange}
-        processing={processing}
-        formatDate={formatDate}
-        renderClassInfo={renderClassInfo}
-      />
+      <>
+        <RequestDetailPage
+          selectedRequest={selectedRequest}
+          senderSchedule={senderSchedule}
+          senderRole={senderRole}
+          loadingSchedule={loadingSchedule}
+          pendingClassChange={pendingClassChange}
+          pendingMakeupClasses={pendingMakeupClasses}
+          pendingMakeupSessions={pendingMakeupSessions}
+          onBack={() => {
+            setShowDetailModal(false);
+            setRejectReason('');
+            setSelectedRequest(null);
+            setSenderSchedule([]);
+            setSenderRole(null);
+            setPendingClassChange(null);
+            setPendingMakeupClasses([]);
+            setPendingMakeupSessions([]);
+            setShowMakeupModal(false);
+            setSelectedStudentScheduleId(null);
+          }}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          onChangeClass={handleChangeClassClick}
+          onChangeClassConfirm={handleChangeClassConfirm}
+          onAddMakeupClass={(studentScheduleId) => {
+            setSelectedStudentScheduleId(studentScheduleId);
+            setShowMakeupModal(true);
+          }}
+          onRemoveMakeupClass={handleRemoveMakeupClass}
+          onRemoveClassChange={handleRemoveClassChange}
+          processing={processing}
+          formatDate={formatDate}
+          renderClassInfo={renderClassInfo}
+        />
+        {/* Makeup Class Modal - render here so it's available when detail page is shown */}
+        <MakeupClassModalForAcademicStaff
+          show={showMakeupModal}
+          studentScheduleId={selectedStudentScheduleId}
+          requestType={selectedRequest?.type || 'makeup_class'}
+          senderSchedule={senderSchedule}
+          onClose={() => {
+            setShowMakeupModal(false);
+            setSelectedStudentScheduleId(null);
+          }}
+          onSubmit={handleMakeupClassSubmit}
+          loading={processing}
+        />
+      </>
     );
   }
 
@@ -447,13 +532,15 @@ const RequestManagement = () => {
         sortBy={sortBy}
         onSearchChange={(value) => {
           setSearchTerm(value);
-          setPage(1);
         }}
         onFilterStatusChange={(value) => {
           setFilterStatus(value);
           setPage(1);
         }}
-        onSortChange={setSortBy}
+        onSortChange={(value) => {
+          setSortBy(value);
+          setPage(1);
+        }}
       />
 
       {/* Loading */}

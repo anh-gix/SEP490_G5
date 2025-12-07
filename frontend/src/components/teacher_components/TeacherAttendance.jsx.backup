@@ -166,7 +166,7 @@ const TeacherAttendance = () => {
       
       if (response.success) {
         setShowConfirmModal(false);
-        alert('✅ Đã lưu điểm danh thành công!');
+        alert(' Đã lưu điểm danh thành công!');
         // Refresh data
         fetchScheduleAttendance(scheduleId);
       }

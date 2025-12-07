@@ -34,11 +34,11 @@ const ClassMaterials = ({ classId, courseId, setShowMaterialModal, onMaterialsLo
         console.error('Error fetching class materials:', classErr);
         // If endpoint doesn't exist yet, set empty array
         if (classErr.message?.includes('Route not found') || classErr.message?.includes('404')) {
-          console.warn('⚠️ Class materials API not implemented yet, using empty data');
+          console.warn(' Class materials API not implemented yet, using empty data');
           setClassMaterials([]);
         } else {
           // For other errors, set empty and log
-          console.error('❌ Critical error fetching class materials:', classErr);
+          console.error(' Critical error fetching class materials:', classErr);
           setClassMaterials([]);
         }
       }
@@ -51,7 +51,7 @@ const ClassMaterials = ({ classId, courseId, setShowMaterialModal, onMaterialsLo
             setCourseMaterials(courseResponse.materials || []);
           }
         } catch (err) {
-          console.warn('⚠️ Course materials API not available:', err.message);
+          console.warn(' Course materials API not available:', err.message);
           // Not critical, continue with empty course materials
           setCourseMaterials([]);
         }
@@ -62,7 +62,7 @@ const ClassMaterials = ({ classId, courseId, setShowMaterialModal, onMaterialsLo
         onMaterialsLoaded();
       }
     } catch (err) {
-      console.error('❌ Unexpected error in fetchMaterials:', err);
+      console.error(' Unexpected error in fetchMaterials:', err);
       // Don't show error for missing API endpoints
       if (!err.message?.includes('Route not found') && !err.message?.includes('404')) {
         setError(err.message || 'Không thể tải danh sách tài liệu');

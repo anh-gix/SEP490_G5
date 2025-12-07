@@ -142,9 +142,9 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
         
         // Debug log to check if schedules are present
         if (classDataWithSchedules && classDataWithSchedules.schedules) {
-          console.log('✅ Full class data loaded with schedules:', classDataWithSchedules.schedules.length);
+          console.log(' Full class data loaded with schedules:', classDataWithSchedules.schedules.length);
         } else {
-          console.log('⚠️ Full class data loaded but no schedules found');
+          console.log(' Full class data loaded but no schedules found');
         }
       } catch (error) {
         console.error('Error fetching full class data:', error);
@@ -384,7 +384,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
       const day = String(scheduleDate.getDate()).padStart(2, '0');
       const dateString = `${year}-${month}-${day}`;
 
-      console.log('🔍 [VALIDATE] Convert thứ sang date:');
+      console.log(' [VALIDATE] Convert thứ sang date:');
       console.log('  - Thứ được chọn:', newScheduleData.day);
       console.log('  - targetDay (0=CN, 1=T2, ..., 6=T7):', targetDay);
       console.log('  - Hôm nay là thứ:', today.getDay(), `(${['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][today.getDay()]})`);
@@ -493,9 +493,9 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           excludeScheduleId: excludeScheduleId
         };
         
-        console.log('\n🔍 ========== FRONTEND: VALIDATE SCHEDULE EDIT ==========');
-        console.log('📋 Request data:', JSON.stringify(validationData, null, 2));
-        console.log('📅 Thông tin buổi học:');
+        console.log('\n ========== FRONTEND: VALIDATE SCHEDULE EDIT ==========');
+        console.log(' Request data:', JSON.stringify(validationData, null, 2));
+        console.log(' Thông tin buổi học:');
         console.log('  - ClassId:', classId);
         console.log('  - Date:', editedSchedule.date);
         console.log('  - Time:', `${editedSchedule.startTime} - ${editedSchedule.endTime}`);
@@ -507,7 +507,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
         
         const response = await classScheduleService.validateAddClassSchedule(validationData);
         
-        console.log('✅ Response từ server:');
+        console.log(' Response từ server:');
         console.log('  - Success:', response.success);
         console.log('  - HasConflict:', response.conflicts?.hasConflict);
         console.log('  - Room conflicts:', response.conflicts?.room?.length || 0);
@@ -542,7 +542,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
         
         setScheduleValidationResult(response);
       } catch (error) {
-        console.error('❌ Error validating schedule edit:', error);
+        console.error(' Error validating schedule edit:', error);
         console.error('  - Error message:', error.message);
         console.error('  - Error response:', error.response?.data);
         setScheduleValidationResult({
@@ -969,7 +969,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
             };
           }).filter(s => s.date);
 
-          console.log('📅 Lịch dạy hiện tại của giáo viên được chọn:', {
+          console.log(' Lịch dạy hiện tại của giáo viên được chọn:', {
             teacherId: teacherId,
             totalSchedules: teacherSchedules.length,
             schedules: teacherSchedules.map(s => ({
@@ -984,7 +984,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           });
 
           // Log current class schedule with detailed info
-          console.log('📚 Lịch học của lớp hiện tại:', {
+          console.log(' Lịch học của lớp hiện tại:', {
             classId: classId,
             className: fullClassData?.name || 'N/A',
             totalSchedules: currentClassSchedules.length,
@@ -1000,7 +1000,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           
           // Log which dates have schedules
           const classScheduleDates = currentClassSchedules.map(s => s.date);
-          console.log('📅 Các ngày có lịch học của lớp hiện tại:', classScheduleDates);
+          console.log(' Các ngày có lịch học của lớp hiện tại:', classScheduleDates);
 
           // Check which teacher schedules have attendance (already taught)
           // Get schedule IDs from teacher schedules
@@ -1123,7 +1123,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
 
                 // Check time overlap
                 if (hasTimeOverlap(classStart, classEnd, teacherStart, teacherEnd)) {
-                  console.log('🔍 [DEBUG] Phát hiện xung đột:', {
+                  console.log(' [DEBUG] Phát hiện xung đột:', {
                     date: classSchedule.date,
                     currentClass: {
                       startTime: classSchedule.startTime,
@@ -1160,7 +1160,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           // Log comparison results and update state for filtering
           try {
             if (conflicts.length > 0) {
-              console.warn('⚠️ PHÁT HIỆN XUNG ĐỘT LỊCH:', {
+              console.warn(' PHÁT HIỆN XUNG ĐỘT LỊCH:', {
                 totalConflicts: conflicts.length,
                 conflicts: conflicts.map(c => {
                   try {
@@ -1217,7 +1217,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                 conflictingRoomIds: prev.conflictingRoomIds || []
               }));
             } else {
-              console.log('✅ KHÔNG CÓ XUNG ĐỘT: Lịch giáo viên và lịch lớp hiện tại không trùng nhau (đã loại trừ các buổi của chính lớp hiện tại)');
+              console.log(' KHÔNG CÓ XUNG ĐỘT: Lịch giáo viên và lịch lớp hiện tại không trùng nhau (đã loại trừ các buổi của chính lớp hiện tại)');
               
               // Clear teacher conflicts for this teacher if no conflicts found
               setTeacherRoomConflicts(prev => {
@@ -1236,13 +1236,13 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
               });
             }
           } catch (error) {
-            console.error('❌ Lỗi khi xử lý conflicts:', error);
+            console.error(' Lỗi khi xử lý conflicts:', error);
             // Don't update state on error to prevent breaking the UI
           }
         } else {
-          console.log('📅 Giáo viên được chọn chưa có lịch dạy nào:', teacherId);
+          console.log(' Giáo viên được chọn chưa có lịch dạy nào:', teacherId);
           if (currentClassSchedules.length > 0) {
-            console.log('📚 Lịch học của lớp hiện tại:', {
+            console.log(' Lịch học của lớp hiện tại:', {
               classId: classId,
               className: fullClassData?.name || 'N/A',
               totalSchedules: currentClassSchedules.length,
@@ -1251,7 +1251,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           }
         }
       } catch (error) {
-        console.error('❌ Lỗi khi lấy và so sánh lịch:', error);
+        console.error(' Lỗi khi lấy và so sánh lịch:', error);
       }
     };
 
@@ -1348,7 +1348,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
             };
           }).filter(s => s.date);
 
-          console.log('📅 Lịch sử dụng hiện tại của phòng được chọn:', {
+          console.log(' Lịch sử dụng hiện tại của phòng được chọn:', {
             roomId: roomId,
             totalSchedules: roomSchedules.length,
             schedules: roomSchedules.map(s => ({
@@ -1363,7 +1363,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           });
 
           // Log current class schedule with detailed info
-          console.log('📚 Lịch học của lớp hiện tại:', {
+          console.log(' Lịch học của lớp hiện tại:', {
             classId: classId,
             className: fullClassData?.name || 'N/A',
             totalSchedules: currentClassSchedules.length,
@@ -1379,7 +1379,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           
           // Log which dates have schedules
           const classScheduleDates = currentClassSchedules.map(s => s.date);
-          console.log('📅 Các ngày có lịch học của lớp hiện tại:', classScheduleDates);
+          console.log(' Các ngày có lịch học của lớp hiện tại:', classScheduleDates);
 
           // Check which room schedules have attendance (already taught)
           // Get schedule IDs from room schedules
@@ -1520,7 +1520,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           // Log comparison results and update state for filtering
           try {
             if (conflicts.length > 0) {
-              console.warn('⚠️ PHÁT HIỆN XUNG ĐỘT PHÒNG HỌC:', {
+              console.warn(' PHÁT HIỆN XUNG ĐỘT PHÒNG HỌC:', {
                 totalConflicts: conflicts.length,
                 conflicts: conflicts.map(c => {
                   try {
@@ -1571,7 +1571,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                 conflictingTeacherIds: prev.conflictingTeacherIds || []
               }));
             } else {
-              console.log('✅ KHÔNG CÓ XUNG ĐỘT PHÒNG: Lịch phòng và lịch lớp hiện tại không trùng nhau (đã loại trừ các buổi của chính lớp hiện tại)');
+              console.log(' KHÔNG CÓ XUNG ĐỘT PHÒNG: Lịch phòng và lịch lớp hiện tại không trùng nhau (đã loại trừ các buổi của chính lớp hiện tại)');
               
               // Clear room conflicts for this room if no conflicts found
               setTeacherRoomConflicts(prev => {
@@ -1590,13 +1590,13 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
               });
             }
           } catch (error) {
-            console.error('❌ Lỗi khi xử lý conflicts phòng học:', error);
+            console.error(' Lỗi khi xử lý conflicts phòng học:', error);
             // Don't update state on error to prevent breaking the UI
           }
         } else {
-          console.log('📅 Phòng được chọn chưa có lịch sử dụng nào:', roomId);
+          console.log(' Phòng được chọn chưa có lịch sử dụng nào:', roomId);
           if (currentClassSchedules.length > 0) {
-            console.log('📚 Lịch học của lớp hiện tại:', {
+            console.log(' Lịch học của lớp hiện tại:', {
               classId: classId,
               className: fullClassData?.name || 'N/A',
               totalSchedules: currentClassSchedules.length,
@@ -1605,7 +1605,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           }
         }
       } catch (error) {
-        console.error('❌ Lỗi khi lấy và so sánh lịch phòng:', error);
+        console.error(' Lỗi khi lấy và so sánh lịch phòng:', error);
       }
     };
 
@@ -2421,7 +2421,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
         if (roomCapacity && studentCount > roomCapacity) {
           setCapacityWarning({
             type: 'danger',
-            message: `⚠️ Cảnh báo: Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`
+            message: ` Cảnh báo: Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`
           });
         } else {
           setCapacityWarning(null);
@@ -3395,7 +3395,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                    teacherRoomConflicts.teacherConflicts.some(c => c.teacherId === (formData.teacherId?.toString() || String(formData.teacherId))) && (
                     <Alert variant="warning" className="mt-12 mb-0">
                       <i className="fas fa-exclamation-triangle me-2"></i>
-                      <strong>⚠️ CẢNH BÁO XUNG ĐỘT LỊCH HỌC:</strong> Giáo viên đã chọn có <strong>{teacherRoomConflicts.teacherConflicts.filter(c => c.teacherId === (formData.teacherId?.toString() || String(formData.teacherId))).length} xung đột</strong> với các lớp khác.
+                      <strong> CẢNH BÁO XUNG ĐỘT LỊCH HỌC:</strong> Giáo viên đã chọn có <strong>{teacherRoomConflicts.teacherConflicts.filter(c => c.teacherId === (formData.teacherId?.toString() || String(formData.teacherId))).length} xung đột</strong> với các lớp khác.
                       <div className="mt-8">
                         <details>
                           <summary className="cursor-pointer fw-medium text-13 mb-8">
@@ -3447,7 +3447,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                                     
                                     // Nếu vẫn không có, log warning và dùng fallback
                                     if (!currentClassTime || currentClassTime === 'N/A') {
-                                      console.warn('⚠️ [DEBUG] Không tìm thấy thời gian lớp hiện tại cho conflict:', {
+                                      console.warn(' [DEBUG] Không tìm thấy thời gian lớp hiện tại cho conflict:', {
                                         conflict,
                                         currentSchedule,
                                         currentClassSchedulesForRender: currentClassSchedulesForRender?.filter(s => s?.date === conflict?.date)
@@ -3459,7 +3459,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                                     
                                     // Log để debug
                                     if (conflict.date === '2025-12-01') {
-                                      console.log('🔍 [DEBUG] Hiển thị conflict cho ngày 2025-12-01:', {
+                                      console.log(' [DEBUG] Hiển thị conflict cho ngày 2025-12-01:', {
                                         conflict,
                                         currentSchedule,
                                         currentClassTime,
@@ -3539,7 +3539,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                    teacherRoomConflicts.roomConflicts.some(c => c.roomId === (formData.roomId?.toString() || String(formData.roomId))) && (
                     <Alert variant="warning" className="mt-12 mb-0">
                       <i className="fas fa-exclamation-triangle me-2"></i>
-                      <strong>⚠️ CẢNH BÁO XUNG ĐỘT LỊCH HỌC:</strong> Phòng học đã chọn có <strong>{teacherRoomConflicts.roomConflicts.filter(c => c.roomId === (formData.roomId?.toString() || String(formData.roomId))).length} xung đột</strong> với các lớp khác.
+                      <strong> CẢNH BÁO XUNG ĐỘT LỊCH HỌC:</strong> Phòng học đã chọn có <strong>{teacherRoomConflicts.roomConflicts.filter(c => c.roomId === (formData.roomId?.toString() || String(formData.roomId))).length} xung đột</strong> với các lớp khác.
                       <div className="mt-8">
                         <details>
                           <summary className="cursor-pointer fw-medium text-13 mb-8">
@@ -4355,7 +4355,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                 // Check if schedule has real ID (from database)
                 const scheduleId = selectedScheduleDetail.id;
 
-                console.log('📝 Cập nhật buổi học:');
+                console.log(' Cập nhật buổi học:');
                 console.log('  - ScheduleId:', scheduleId);
                 console.log('  - UpdateScope:', updateScope);
                 console.log('  - Date:', updateData.date);
@@ -4631,7 +4631,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                 const calculatedDay = scheduleDate.getDay();
                 const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
                 console.log('   - Ngày được tính:', scheduleDate.toLocaleDateString('vi-VN'), `(${dayNames[calculatedDay]})`);
-                console.log('   - Kiểm tra: Ngày tính có đúng thứ được chọn không?', calculatedDay === targetDay ? '✅ ĐÚNG' : '❌ SAI');
+                console.log('   - Kiểm tra: Ngày tính có đúng thứ được chọn không?', calculatedDay === targetDay ? ' ĐÚNG' : ' SAI');
                 
                 // Format date để tránh timezone issues (dùng local time, không dùng UTC)
                 const year = scheduleDate.getFullYear();
@@ -4653,8 +4653,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                 };
 
                 // ========== LOGGING: Trước khi tạo ==========
-                console.log('📋 ========== TẠO BUỔI HỌC ==========');
-                console.log('📅 Thông tin buổi học sẽ được thêm:');
+                console.log(' ========== TẠO BUỔI HỌC ==========');
+                console.log(' Thông tin buổi học sẽ được thêm:');
                 console.log('   - Lớp học ID:', classId);
                 console.log('   - Lặp lại vào các tuần:', newScheduleData.repeatWeekly ? 'Có' : 'Không');
                 console.log('   - Ngày đầu tiên:', scheduleData.date);
@@ -4671,8 +4671,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                 const response = await classScheduleService.createClassSchedule(scheduleData);
 
                 // ========== LOGGING: Kết quả từ API ==========
-                console.log('✅ ========== KẾT QUẢ TẠO BUỔI HỌC ==========');
-                console.log('📊 Response:', response);
+                console.log(' ========== KẾT QUẢ TẠO BUỔI HỌC ==========');
+                console.log(' Response:', response);
                 console.log('');
                 
                 if (response.cleanupInfo) {
@@ -4717,7 +4717,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                     
                     if (updatedClassData) {
                       setFullClassData(updatedClassData);
-                      console.log('✅ Đã refresh lại class data với schedules mới');
+                      console.log(' Đã refresh lại class data với schedules mới');
                     }
                   } catch (refreshError) {
                     console.error('Error refreshing class data:', refreshError);

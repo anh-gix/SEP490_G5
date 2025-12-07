@@ -36,11 +36,11 @@ const StudentDetailModal = ({
       setDetailLoading(true);
       setDetailError(null);
       
-      console.log('🔍 Fetching student details for:', studentId);
+      console.log(' Fetching student details for:', studentId);
       
       // Fetch Student details
       const data = await studentService.getStudentById(studentId);
-      console.log('📦 Student data response:', data);
+      console.log(' Student data response:', data);
       
       if (!data || !data.student) {
         throw new Error('Không nhận được dữ liệu học viên từ server');
@@ -52,22 +52,22 @@ const StudentDetailModal = ({
         classes: data.student.classes || [],
         courses: data.student.courses || []
       };
-      console.log('✅ Student classes:', studentData.classes?.length || 0, studentData.classes);
-      console.log('✅ Student courses:', studentData.courses?.length || 0, studentData.courses);
+      console.log(' Student classes:', studentData.classes?.length || 0, studentData.classes);
+      console.log(' Student courses:', studentData.courses?.length || 0, studentData.courses);
       setSelectedStudent(studentData);
       
       // Fetch Student's schedule
-      console.log('📅 Fetching student schedule...');
+      console.log(' Fetching student schedule...');
       const scheduleData = await studentService.getStudentSchedule(studentId);
-      console.log('📦 Schedule data response:', scheduleData);
+      console.log(' Schedule data response:', scheduleData);
       
       // Check response structure
       const schedules = scheduleData?.schedules || scheduleData?.data?.schedules || [];
-      console.log('✅ Student schedules:', schedules.length, schedules);
+      console.log(' Student schedules:', schedules.length, schedules);
       setStudentSchedule(Array.isArray(schedules) ? schedules : []);
       setSchedulePage(1); // Reset to first page when opening modal
     } catch (err) {
-      console.error('❌ Error fetching Student details:', err);
+      console.error(' Error fetching Student details:', err);
       const errorMessage = err?.response?.data?.message || err?.message || 'Không thể tải thông tin chi tiết';
       setDetailError(errorMessage);
       

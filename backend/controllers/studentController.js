@@ -781,15 +781,11 @@ exports.submitHomework = async (req, res) => {
   }
 };
 
-// =========================
-// 📄 LẤY THÔNG TIN BÀI NỘP CỦA HỌC VIÊN
-// =========================
 exports.getMySubmission = async (req, res) => {
   try {
     const studentId = req.user._id;
     const { classId, scheduleId, homeworkId } = req.params;
 
-    // Verify student is enrolled in the class
     const studentClass = await Class.findOne({
       _id: classId,
       students: studentId
@@ -802,7 +798,6 @@ exports.getMySubmission = async (req, res) => {
       });
     }
 
-    // Find submission
     const submission = await HomeworkSubmission.findOne({
       classSchedule: scheduleId,
       homeworkId: homeworkId,
@@ -816,7 +811,6 @@ exports.getMySubmission = async (req, res) => {
       });
     }
 
-    // Format response
     const submissionData = {
       _id: submission._id,
       submittedAt: submission.submittedAt,
@@ -844,14 +838,10 @@ exports.getMySubmission = async (req, res) => {
   }
 };
 
-// =========================
-// 📊 LẤY DỮ LIỆU DASHBOARD CỦA HỌC VIÊN
-// =========================
 exports.getDashboardData = async (req, res) => {
   try {
     const studentId = req.user._id;
 
-    // 1. Get student basic info
     const student = await User.findById(studentId)
       .select('-password -token')
       .populate('roleId', 'name')
@@ -864,7 +854,6 @@ exports.getDashboardData = async (req, res) => {
       });
     }
 
-    // 2. Get active classes
     const activeClasses = await Class.find({
       students: studentId,
       status: 'active'
@@ -875,7 +864,6 @@ exports.getDashboardData = async (req, res) => {
       .select('name course teacher room startDate endDate')
       .lean();
 
-    // 3. Get week schedule (current week)
     const startOfWeek = new Date();
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
@@ -900,7 +888,6 @@ exports.getDashboardData = async (req, res) => {
       .sort({ date: 1, startTime: 1 })
       .lean();
 
-    // 4. Get pending/overdue homework
     const allSchedules = await ClassSchedule.find({
       class: { $in: classIds },
       'homework.assignment': { $exists: true, $ne: null }
@@ -916,7 +903,6 @@ exports.getDashboardData = async (req, res) => {
     const assignments = [];
     for (const schedule of allSchedules) {
       if (schedule.homework?.assignment) {
-        // Get submission status
         const submission = await HomeworkSubmission.findOne({
           classSchedule: schedule._id,
           homeworkId: schedule.homework._id,
@@ -1161,9 +1147,6 @@ exports.getDashboardData = async (req, res) => {
   }
 };
 
-// =========================
-// 📋 LẤY TẤT CẢ HỌC VIÊN (cho Academic Staff/Admin)
-// =========================
 exports.getAllStudents = async (req, res) => {
   try {
     const { search, status, programType, level, page = 1, limit = 50 } = req.query;
@@ -1465,7 +1448,7 @@ exports.createStudent = async (req, res) => {
     // Create student
     const student = await User.create({
       email,
-      password,
+      password: password || '123456', // Default password nếu không có
       username,
       phone,
       address,

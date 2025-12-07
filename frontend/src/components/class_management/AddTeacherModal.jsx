@@ -70,22 +70,27 @@ const AddTeacherModal = ({
             <Col md={6}>
               <Form.Group>
                 <Form.Label>
-                  Mật khẩu <span className="text-danger">*</span>
-                </Form.Label>
-                <Form.Control
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={onInputChange}
-                  placeholder="Nhập mật khẩu"
-                  required
-                  isInvalid={!!formErrors.password}
-                />
-                {formErrors.password && (
-                  <Form.Control.Feedback type="invalid">
-                    {formErrors.password}
-                  </Form.Control.Feedback>
-                )}
+                    Mật khẩu
+                    <span className="text-muted" style={{ fontSize: '12px', fontWeight: 'normal' }}>
+                      {' '}(Mặc định: 123456)
+                    </span>
+                  </Form.Label>
+                  <Form.Control
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={onInputChange}
+                    placeholder="Để trống sẽ dùng mật khẩu mặc định: 123456"
+                    isInvalid={!!formErrors.password}
+                  />
+                  {formErrors.password && (
+                    <Form.Control.Feedback type="invalid">
+                      {formErrors.password}
+                    </Form.Control.Feedback>
+                  )}
+                  <Form.Text className="text-muted">
+                    Nếu không nhập, mật khẩu mặc định sẽ là: <strong>123456</strong>
+                  </Form.Text>
               </Form.Group>
             </Col>
 

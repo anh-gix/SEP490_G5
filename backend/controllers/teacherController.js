@@ -420,8 +420,8 @@ exports.createTeacher = async (req, res) => {
   try {
     const { username, email, password, phone, address } = req.body;
     
-    // Validate required fields
-    if (!username || !email || !password || !phone || !address) {
+    // Validate required fields (password không bắt buộc, sẽ dùng mặc định nếu không có)
+    if (!username || !email || !phone || !address) {
       return res.status(400).json({ 
         message: "Thiếu thông tin bắt buộc" 
       });
@@ -460,7 +460,7 @@ exports.createTeacher = async (req, res) => {
     const newTeacher = await User.create({
       username,
       email,
-      password,
+      password: password || '123456', // Default password nếu không có
       phone,
       address,
       roleId: teacherRole._id

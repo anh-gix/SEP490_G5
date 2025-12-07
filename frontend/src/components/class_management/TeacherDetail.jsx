@@ -26,6 +26,9 @@ const TeacherDetail = () => {
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [classesLoaded, setClassesLoaded] = useState(false);
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
+  
+  // Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Substitute teacher states
   const [showSubstituteModal, setShowSubstituteModal] = useState(false);
@@ -470,6 +473,16 @@ const TeacherDetail = () => {
           </Button>
           <h4 className="text-neutral-900 fw-bold mb-8">Chi tiết giảng viên - {teacher.username}</h4>
         </div>
+        <div>
+          <Button
+            variant={isEditMode ? 'danger' : 'primary'}
+            onClick={() => setIsEditMode(!isEditMode)}
+            className="mb-3"
+          >
+            <i className={`fas ${isEditMode ? 'fa-times' : 'fa-edit'} me-2`}></i>
+            {isEditMode ? 'Tắt chỉnh sửa' : 'Chỉnh sửa'}
+          </Button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -776,6 +789,7 @@ const TeacherDetail = () => {
                         console.log('Delete schedule:', scheduleId);
                       }}
                       onAssignSubstitute={handleAssignSubstitute}
+                      readOnly={!isEditMode}
                     />
                   )}
                 </>

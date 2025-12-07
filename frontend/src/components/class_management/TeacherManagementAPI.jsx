@@ -157,12 +157,6 @@ const TeacherManagementAPI = () => {
     // Clear previous errors
     setFormErrors({});
     
-    // Validate password
-    if (!formData.password) {
-      setFormErrors({ password: 'Vui lòng nhập mật khẩu!' });
-      return;
-    }
-    
     try {
       setLoading(true);
       await teacherService.createTeacher(formData);
@@ -988,15 +982,17 @@ const TeacherManagementAPI = () => {
               <Col md={6}>
                 <Form.Group>
                   <Form.Label>
-                    Mật khẩu <span className="text-danger">*</span>
+                    Mật khẩu
+                    <span className="text-muted" style={{ fontSize: '12px', fontWeight: 'normal' }}>
+                      {' '}(Mặc định: 123456)
+                    </span>
                   </Form.Label>
                   <Form.Control
                     type="password"
                     name="password"
                     value={formData.password}
                     onChange={handleInputChange}
-                    placeholder="Nhập mật khẩu"
-                    required
+                    placeholder="Để trống sẽ dùng mật khẩu mặc định: 123456"
                     isInvalid={!!formErrors.password}
                   />
                   {formErrors.password && (
@@ -1004,6 +1000,9 @@ const TeacherManagementAPI = () => {
                       {formErrors.password}
                     </Form.Control.Feedback>
                   )}
+                  <Form.Text className="text-muted">
+                    Nếu không nhập, mật khẩu mặc định sẽ là: <strong>123456</strong>
+                  </Form.Text>
                 </Form.Group>
               </Col>
 

@@ -735,69 +735,6 @@ const TeacherSchedule = () => {
         </>
       )}
 
-      {/* Recent Applications Preview */}
-      <div className="mt-24">
-        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
-          <Card.Header className="bg-neutral-25 border-0 px-20 py-16 d-flex justify-content-between align-items-center">
-            <div>
-              <h5 className="text-neutral-900 fw-bold mb-0">Đơn đã gửi gần đây</h5>
-              <p className="text-neutral-600 text-13 mb-0 mt-4">Xem các đơn bạn đã gửi</p>
-            </div>
-            <Link to="/teacher/applications">
-              <Button className="btn-main">
-                <i className="fas fa-eye me-2"></i>
-                Xem tất cả
-              </Button>
-            </Link>
-          </Card.Header>
-          <Card.Body className="p-0">
-            {loadingApplications ? (
-              <div className="text-center py-40">
-                <div className="spinner-border text-main-600" role="status">
-                  <span className="visually-hidden">Đang tải...</span>
-                </div>
-                <p className="text-neutral-600 mt-12 mb-0">Đang tải đơn...</p>
-              </div>
-            ) : recentApplications.length === 0 ? (
-              <div className="text-center py-40">
-                <i className="fas fa-file-alt text-neutral-400 mb-12" style={{ fontSize: '48px' }}></i>
-                <p className="text-neutral-500 mb-0">Chưa có đơn nào</p>
-              </div>
-            ) : (
-              <Table hover className="mb-0">
-                <thead>
-                  <tr className="bg-neutral-25">
-                    <th className="px-20 py-12 text-neutral-900 fw-semibold text-13 border-0">Loại đơn</th>
-                    <th className="px-20 py-12 text-neutral-900 fw-semibold text-13 border-0">Nội dung</th>
-                    <th className="px-20 py-12 text-neutral-900 fw-semibold text-13 border-0">Ngày gửi</th>
-                    <th className="px-20 py-12 text-neutral-900 fw-semibold text-13 border-0">Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentApplications.map((request) => (
-                    <tr key={request._id}>
-                      <td className="px-20 py-12">
-                        {getTypeBadge(request.type)}
-                      </td>
-                      <td className="px-20 py-12">
-                        <div className="text-neutral-700 text-13" style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {request.content}
-                        </div>
-                      </td>
-                      <td className="px-20 py-12 text-neutral-600 text-13">
-                        {formatRequestDate(request.createdAt)}
-                      </td>
-                      <td className="px-20 py-12">
-                        {getRequestStatusBadge(request.status)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            )}
-          </Card.Body>
-        </Card>
-      </div>
     </Container>
   );
 };

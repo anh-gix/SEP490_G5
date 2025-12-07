@@ -105,7 +105,10 @@ const ClassDetails = () => {
             email: student.email || 'N/A',
             phone: student.phone || 'N/A',
             joinDate: response.class.startDate ? new Date(response.class.startDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-            attendance: student.attendance || 0
+            attendance: student.attendance || 0,
+            homeworkCompletionRate: student.homeworkCompletionRate,
+            submittedAssignments: student.submittedAssignments,
+            totalAssignments: student.totalAssignments
           }));
           setStudents(transformedStudents);
           // Set CLOs from course
@@ -277,6 +280,148 @@ const ClassDetails = () => {
           </Card>
         </div>
       </div>
+
+      {/* Hoạt động lớp học */}
+      <div className="row g-3 g-md-4 mt-3" style={{ marginLeft: 0, marginRight: 0 }}>
+        <div className="col-12">
+          <Card className="border-0 shadow-sm" style={{ transition: 'all 0.3s ease', borderRadius: '12px', maxWidth: '100%' }}>
+            <Card.Header className="bg-gradient text-white d-flex align-items-center" style={{ padding: '16px 24px', borderRadius: '12px 12px 0 0', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+              <i className="fas fa-chart-line me-2" style={{ fontSize: '18px' }}></i>
+              <strong style={{ fontSize: '16px', fontWeight: 600 }}>Hoạt động lớp học</strong>
+            </Card.Header>
+            <Card.Body style={{ padding: '24px' }}>
+              <div className="row g-4">
+                {/* Next Mocktest */}
+                {displayData.classActivity?.nextMocktest && (
+                  <div className="col-12 col-md-6">
+                    <div className="d-flex align-items-start gap-3 p-3" style={{ backgroundColor: '#F8F9FA', borderRadius: '8px' }}>
+                      <div className="bg-warning text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px', minWidth: '48px', fontSize: '20px' }}>
+                        <i className="fas fa-clipboard-check"></i>
+                      </div>
+                      <div className="flex-grow-1">
+                        <h6 className="mb-1" style={{ fontSize: '14px', fontWeight: 600, color: '#262626' }}>Mock test sắp tới</h6>
+                        <p className="mb-1" style={{ fontSize: '16px', fontWeight: 700, color: '#262626' }}>
+                          {displayData.classActivity.nextMocktest.title}
+                        </p>
+                        <p className="mb-1" style={{ fontSize: '13px', color: '#595959' }}>
+                          <i className="fas fa-calendar me-1"></i>
+                          {displayData.classActivity.nextMocktest.date ? new Date(displayData.classActivity.nextMocktest.date).toLocaleDateString('vi-VN') : 'N/A'}
+                        </p>
+                        <Badge bg="warning" style={{ fontSize: '12px', padding: '4px 8px' }}>
+                          Còn {displayData.classActivity.nextMocktest.daysUntil} ngày
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Next Lesson */}
+                {displayData.classActivity?.nextLesson && (
+                  <div className="col-12 col-md-6">
+                    <div className="d-flex align-items-start gap-3 p-3" style={{ backgroundColor: '#F8F9FA', borderRadius: '8px' }}>
+                      <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px', minWidth: '48px', fontSize: '20px' }}>
+                        <i className="fas fa-book-open"></i>
+                      </div>
+                      <div className="flex-grow-1">
+                        <h6 className="mb-1" style={{ fontSize: '14px', fontWeight: 600, color: '#262626' }}>Buổi học tiếp theo</h6>
+                        <p className="mb-1" style={{ fontSize: '14px', fontWeight: 600, color: '#262626' }}>
+                          {displayData.classActivity.nextLesson.topic}
+                        </p>
+                        <p className="mb-1" style={{ fontSize: '13px', color: '#595959' }}>
+                          <i className="fas fa-calendar me-1"></i>
+                          {displayData.classActivity.nextLesson.date ? new Date(displayData.classActivity.nextLesson.date).toLocaleDateString('vi-VN') : 'N/A'}
+                        </p>
+                        <p className="mb-0" style={{ fontSize: '13px', color: '#595959' }}>
+                          <i className="fas fa-clock me-1"></i>
+                          {displayData.classActivity.nextLesson.startTime} - {displayData.classActivity.nextLesson.endTime}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Mocktest Milestones */}
+                {displayData.classActivity?.mocktestMilestones && displayData.classActivity.mocktestMilestones.length > 0 && (
+                  <div className="col-12">
+                    <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#262626' }}>
+                      <i className="fas fa-list-check me-2"></i>
+                      Các mốc mock test
+                    </h6>
+                    <div className="d-flex flex-wrap gap-2">
+                      {displayData.classActivity.mocktestMilestones.map((milestone, index) => (
+                        <div key={index} className="p-2" style={{ backgroundColor: '#F8F9FA', borderRadius: '8px', minWidth: '200px' }}>
+                          <div className="d-flex align-items-center gap-2 mb-1">
+                            <Badge bg={milestone.status === 'completed' ? 'success' : 'warning'} style={{ fontSize: '11px', padding: '4px 8px' }}>
+                              {milestone.status === 'completed' ? 'Đã hoàn thành' : 'Sắp tới'}
+                            </Badge>
+                            {milestone.status === 'upcoming' && milestone.daysUntil !== null && (
+                              <span style={{ fontSize: '12px', color: '#595959' }}>
+                                ({milestone.daysUntil} ngày)
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: '#262626' }}>{milestone.title}</div>
+                          <div style={{ fontSize: '12px', color: '#595959' }}>
+                            {milestone.date ? new Date(milestone.date).toLocaleDateString('vi-VN') : 'N/A'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card.Body>
+          </Card>
+        </div>
+      </div>
+
+      {/* Chuyên cần giáo viên */}
+      <div className="row g-3 g-md-4 mt-3" style={{ marginLeft: 0, marginRight: 0 }}>
+        <div className="col-12 col-md-6">
+          <Card className="border-0 shadow-sm" style={{ transition: 'all 0.3s ease', borderRadius: '12px', maxWidth: '100%' }}>
+            <Card.Header className="bg-info text-white d-flex align-items-center" style={{ padding: '16px 24px', borderRadius: '12px 12px 0 0' }}>
+              <i className="fas fa-user-check me-2" style={{ fontSize: '18px' }}></i>
+              <strong style={{ fontSize: '16px', fontWeight: 600 }}>Chuyên cần giáo viên</strong>
+            </Card.Header>
+            <Card.Body style={{ padding: '24px' }}>
+              {displayData.teacherAttendance ? (
+                <div className="d-flex flex-column gap-3">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-muted" style={{ fontSize: '14px', fontWeight: 500 }}>Tỷ lệ chuyên cần:</span>
+                    <Badge 
+                      bg={
+                        displayData.teacherAttendance.rate >= 90 ? 'success' :
+                        displayData.teacherAttendance.rate >= 70 ? 'warning' : 'danger'
+                      }
+                      style={{ borderRadius: '6px', padding: '6px 12px', fontSize: '14px', fontWeight: 600 }}
+                    >
+                      {displayData.teacherAttendance.rate}%
+                    </Badge>
+                  </div>
+                  <div>
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <span className="text-muted" style={{ fontSize: '13px' }}>
+                        {displayData.teacherAttendance.presentCount} / {displayData.teacherAttendance.totalCount} buổi
+                      </span>
+                    </div>
+                    <ProgressBar 
+                      now={displayData.teacherAttendance.rate} 
+                      label={`${displayData.teacherAttendance.rate}%`}
+                      variant={
+                        displayData.teacherAttendance.rate >= 90 ? 'success' :
+                        displayData.teacherAttendance.rate >= 70 ? 'warning' : 'danger'
+                      }
+                      style={{ height: '10px', borderRadius: '5px' }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <p className="text-muted mb-0" style={{ fontSize: '14px' }}>Chưa có dữ liệu chuyên cần</p>
+              )}
+            </Card.Body>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 
@@ -392,6 +537,7 @@ const ClassDetails = () => {
                   <th style={{padding: '16px', fontSize: '14px', fontWeight: 600, color: '#262626'}}>Số điện thoại</th>
                   <th style={{padding: '16px', fontSize: '14px', fontWeight: 600, color: '#262626'}}>Ngày tham gia</th>
                   <th style={{width: '120px', padding: '16px', fontSize: '14px', fontWeight: 600, color: '#262626', textAlign: 'center'}}>Điểm danh</th>
+                  <th style={{width: '150px', padding: '16px', fontSize: '14px', fontWeight: 600, color: '#262626', textAlign: 'center'}}>Hoàn thành bài tập</th>
                   <th style={{width: '100px', padding: '16px', fontSize: '14px', fontWeight: 600, color: '#262626', textAlign: 'center'}}>Hành động</th>
                 </tr>
               </thead>
@@ -410,6 +556,26 @@ const ClassDetails = () => {
                       >
                         {student.attendance}%
                       </Badge>
+                    </td>
+                    <td className="text-center" style={{padding: '16px'}}>
+                      {student.homeworkCompletionRate !== undefined ? (
+                        <div className="d-flex flex-column align-items-center gap-1">
+                          <Badge 
+                            bg={
+                              student.homeworkCompletionRate >= 80 ? 'success' :
+                              student.homeworkCompletionRate >= 60 ? 'warning' : 'danger'
+                            }
+                            style={{ borderRadius: '6px', padding: '6px 12px', fontSize: '12px', fontWeight: 500 }}
+                          >
+                            {student.homeworkCompletionRate}%
+                          </Badge>
+                          <small className="text-muted" style={{ fontSize: '11px' }}>
+                            {student.submittedAssignments || 0}/{student.totalAssignments || 0} bài
+                          </small>
+                        </div>
+                      ) : (
+                        <span className="text-muted" style={{ fontSize: '12px' }}>N/A</span>
+                      )}
                     </td>
                     <td className="text-center" style={{padding: '16px'}}>
                       <Button 
@@ -552,109 +718,6 @@ const ClassDetails = () => {
 
   const renderStatsTab = () => (
     <div className="p-3 p-md-4" style={{ maxWidth: '100%', overflowX: 'hidden' }}>
-      <div className="row g-3 g-md-4 mb-4" style={{ marginLeft: 0, marginRight: 0 }}>
-        <div className="col-md-6 col-lg-3">
-          <Card className="text-center border-0 shadow-sm h-100" style={{ borderRadius: '12px', transition: 'all 0.3s ease' }}>
-            <Card.Body style={{ padding: '32px 24px' }}>
-              <div 
-                className="bg-primary bg-opacity-10 text-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
-                style={{width: '72px', height: '72px'}}
-              >
-                <i className="fas fa-users" style={{ fontSize: '32px' }}></i>
-              </div>
-              <h3 className="mb-2" style={{ fontSize: '32px', fontWeight: 700, color: '#262626' }}>{students.length}</h3>
-              <p className="text-muted mb-0" style={{ fontSize: '14px', fontWeight: 500 }}>Học viên</p>
-            </Card.Body>
-          </Card>
-        </div>
-
-        <div className="col-md-6 col-lg-3">
-          <Card className="text-center border-0 shadow-sm h-100" style={{ borderRadius: '12px', transition: 'all 0.3s ease' }}>
-            <Card.Body style={{ padding: '32px 24px' }}>
-              <div 
-                className="bg-success bg-opacity-10 text-success rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
-                style={{width: '72px', height: '72px'}}
-              >
-                <i className="fas fa-check-circle" style={{ fontSize: '32px' }}></i>
-              </div>
-              <h3 className="mb-2" style={{ fontSize: '32px', fontWeight: 700, color: '#262626' }}>{displayData.completedSchedules || 0}</h3>
-              <p className="text-muted mb-0" style={{ fontSize: '14px', fontWeight: 500 }}>Buổi đã học</p>
-            </Card.Body>
-          </Card>
-        </div>
-
-        <div className="col-md-6 col-lg-3">
-          <Card className="text-center border-0 shadow-sm h-100" style={{ borderRadius: '12px', transition: 'all 0.3s ease' }}>
-            <Card.Body style={{ padding: '32px 24px' }}>
-              <div 
-                className="bg-warning bg-opacity-10 text-warning rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
-                style={{width: '72px', height: '72px'}}
-              >
-                <i className="fas fa-clock" style={{ fontSize: '32px' }}></i>
-              </div>
-              <h3 className="mb-2" style={{ fontSize: '32px', fontWeight: 700, color: '#262626' }}>
-                {(displayData.totalSchedules || 0) - (displayData.completedSchedules || 0)}
-              </h3>
-              <p className="text-muted mb-0" style={{ fontSize: '14px', fontWeight: 500 }}>Buổi còn lại</p>
-            </Card.Body>
-          </Card>
-        </div>
-
-        <div className="col-md-6 col-lg-3">
-          <Card className="text-center border-0 shadow-sm h-100" style={{ borderRadius: '12px', transition: 'all 0.3s ease' }}>
-            <Card.Body style={{ padding: '32px 24px' }}>
-              <div 
-                className="bg-info bg-opacity-10 text-info rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
-                style={{width: '72px', height: '72px'}}
-              >
-                <i className="fas fa-percentage" style={{ fontSize: '32px' }}></i>
-              </div>
-              <h3 className="mb-2" style={{ fontSize: '32px', fontWeight: 700, color: '#262626' }}>
-                {(displayData.completionRate || 0).toFixed(0)}%
-              </h3>
-              <p className="text-muted mb-0" style={{ fontSize: '14px', fontWeight: 500 }}>Tiến độ</p>
-            </Card.Body>
-          </Card>
-        </div>
-      </div>
-
-      <Card className="border-0 shadow-sm" style={{ borderRadius: '12px' }}>
-        <Card.Header className="bg-white border-bottom" style={{ padding: '20px 24px', borderRadius: '12px 12px 0 0' }}>
-          <h5 className="mb-0" style={{ fontSize: '18px', fontWeight: 600, color: '#262626' }}>
-            <i className="fas fa-chart-bar me-2 text-primary"></i>
-            Tỷ lệ điểm danh trung bình
-          </h5>
-        </Card.Header>
-        <Card.Body className="text-center" style={{ padding: '48px 24px' }}>
-          <div className="d-flex justify-content-center align-items-end gap-3" style={{height: '200px', marginBottom: '24px'}}>
-            <div 
-              className="bg-success d-flex flex-column justify-content-end align-items-center rounded-top" 
-              style={{
-                width: '60px', 
-                height: '90%', 
-                position: 'relative',
-                borderRadius: '8px 8px 0 0'
-              }}
-            >
-              <div 
-                className="bg-success text-white fw-bold px-3 py-2 rounded"
-                style={{
-                  position: 'absolute', 
-                  top: '-40px',
-                  fontSize: '14px',
-                  borderRadius: '6px'
-                }}
-              >
-                90%
-              </div>
-            </div>
-          </div>
-          <p className="text-muted mb-0" style={{ fontSize: '14px' }}>
-            <i className="fas fa-info-circle me-2"></i>
-            Biểu đồ điểm danh theo tuần (TODO: Tích hợp Chart.js)
-          </p>
-        </Card.Body>
-      </Card>
     </div>
   );
 

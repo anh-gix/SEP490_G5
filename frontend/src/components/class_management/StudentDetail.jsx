@@ -34,6 +34,9 @@ const StudentDetail = () => {
   const [classesLoaded, setClassesLoaded] = useState(false);
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
   
+  // Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  
   // Edit courses modal state
   const [showEditCoursesModal, setShowEditCoursesModal] = useState(false);
   const [allCourses, setAllCourses] = useState([]);
@@ -579,19 +582,29 @@ const StudentDetail = () => {
       {/* Header with Back Button */}
       <div className="d-flex justify-content-between align-items-center mb-24">
         <div>
+          <Button 
+            variant="outline-secondary" 
+            onClick={handleGoBack}
+            className="mb-3"
+          >
+            <i className="fas fa-arrow-left me-2"></i>
+            Quay lại
+          </Button>
           <h4 className="text-neutral-900 fw-bold mb-8">
             Chi tiết Học viên - {selectedStudent?.username || 'Đang tải...'}
           </h4>
           <p className="text-neutral-600 mb-0">Xem và quản lý thông tin chi tiết học viên</p>
         </div>
-        <Button 
-          variant="secondary" 
-          onClick={handleGoBack}
-          className="px-20 py-10 radius-8"
-        >
-          <i className="fas fa-arrow-left me-2"></i>
-          Quay lại
-        </Button>
+        <div>
+          <Button
+            variant={isEditMode ? 'danger' : 'primary'}
+            onClick={() => setIsEditMode(!isEditMode)}
+            className="mb-3"
+          >
+            <i className={`fas ${isEditMode ? 'fa-times' : 'fa-edit'} me-2`}></i>
+            {isEditMode ? 'Tắt chỉnh sửa' : 'Chỉnh sửa'}
+          </Button>
+        </div>
       </div>
 
       {/* Error Message */}
@@ -910,6 +923,7 @@ const StudentDetail = () => {
                           console.log('Delete schedule:', scheduleId);
                         }}
                         onCreateMakeup={handleCreateMakeup}
+                        readOnly={!isEditMode}
                       />
                     )}
                   </>

@@ -297,6 +297,18 @@ exports.getDashboardData = async (req, res) => {
       status: 'pending',
       type: 'create_class'
     });
+      
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const totalRequestsLastWeek = await ChangeRequest.countDocuments({ 
+      createdAt: { $gte: sevenDaysAgo }
+    });
+    
+    const pendingChangeClassRequests = await ChangeRequest.countDocuments({ 
+      status: 'pending',
+      type: 'change_class'
+    });
 
     const absentStudentsList = [...absentStudents, ...lateStudents].slice(0, 10);
 
@@ -307,7 +319,9 @@ exports.getDashboardData = async (req, res) => {
         lateStudents: lateStudents.length,
         pendingLeaveRequests,
         pendingMakeupClasses,
-        newClassRequests
+        newClassRequests,
+        totalRequestsLastWeek,
+        pendingChangeClassRequests
       },
       todaySchedule: processedSchedules.slice(0, 10),
       absentStudentsList,

@@ -74,17 +74,8 @@ const ClassList = ({ classes, onEdit, onViewDetails }) => {
                       label={`${classItem.completionRate.toFixed(1)}%`}
                       className="bg-neutral-50"
                       style={{ height: '8px' }}
-                    >
-                      <div 
-                        className="bg-success-600"
-                        style={{ 
-                          width: `${classItem.completionRate}%`,
-                          height: '100%',
-                          borderRadius: '4px',
-                          transition: 'width 0.3s ease'
-                        }}
-                      />
-                    </ProgressBar>
+                      variant="success"
+                    />
                   </div>
                 )}
               </Card.Body>

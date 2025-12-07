@@ -193,7 +193,78 @@ exports.getClassById = async (req, res) => {
     // Get students array for attendance calculation
     const students = classData.students || [];
     
-    // Calculate attendance for each student
+    // Get course info to check mocktest sessions
+    const course = await Course.findById(classData.course?._id);
+    const mocktestSessionOrders = course?.mocktestSessionOrders || [];
+    
+    // Calculate mock test information
+    const now = new Date();
+    const mocktestMilestones = [];
+    let nextMocktest = null;
+    
+    for (const sessionOrder of mocktestSessionOrders) {
+      const mocktestSchedule = schedules.find(s => s.session?.order === sessionOrder);
+      if (mocktestSchedule) {
+        const mocktestDate = new Date(mocktestSchedule.date);
+        const daysUntil = Math.ceil((mocktestDate - now) / (1000 * 60 * 60 * 24));
+        const status = mocktestDate < now ? 'completed' : 'upcoming';
+        
+        const milestone = {
+          date: mocktestSchedule.date,
+          sessionOrder: sessionOrder,
+          title: `Mocktest ${sessionOrder}`,
+          status: status,
+          daysUntil: status === 'upcoming' ? daysUntil : null
+        };
+        
+        mocktestMilestones.push(milestone);
+        
+        // Find next upcoming mocktest
+        if (!nextMocktest && status === 'upcoming') {
+          nextMocktest = {
+            date: mocktestSchedule.date,
+            daysUntil: daysUntil,
+            sessionOrder: sessionOrder,
+            title: `Mocktest ${sessionOrder}`
+          };
+        }
+      }
+    }
+    
+    // Find next lesson
+    const nextLesson = schedules.find(s => {
+      const scheduleDate = new Date(s.date);
+      return scheduleDate > now;
+    });
+    
+    const classActivity = {
+      nextMocktest: nextMocktest,
+      mocktestMilestones: mocktestMilestones,
+      nextLesson: nextLesson ? {
+        date: nextLesson.date,
+        startTime: nextLesson.startTime,
+        endTime: nextLesson.endTime,
+        topic: nextLesson.session?.title || 'N/A'
+      } : null
+    };
+    
+    // Calculate teacher attendance
+    const teacherTotalSchedules = schedules.length;
+    const teacherPresentSchedules = schedules.filter(s => {
+      // Teacher is considered present if schedule is completed or has attendance
+      return s.status === 'completed' || s.hasAttendance === true;
+    }).length;
+    const teacherAttendanceRate = teacherTotalSchedules > 0 
+      ? Math.round((teacherPresentSchedules / teacherTotalSchedules) * 100) 
+      : 0;
+    
+    const teacherAttendance = {
+      rate: teacherAttendanceRate,
+      presentCount: teacherPresentSchedules,
+      totalCount: teacherTotalSchedules
+    };
+    
+    // Calculate attendance and homework completion for each student
     const studentsWithAttendance = await Promise.all(
       students.map(async (student) => {
         // Get all student schedules for this class
@@ -211,12 +282,34 @@ exports.getClassById = async (req, res) => {
           attendanceRate = Math.round((presentCount / studentSchedules.length) * 100);
         }
         
+        // Get homework submissions
+        const homeworkIds = schedules
+          .flatMap(s => s.homework || [])
+          .map(hw => hw._id);
+        
+        const totalAssignments = homeworkIds.length;
+        
+        const submissions = await HomeworkSubmission.find({
+          student: student._id,
+          homeworkId: { $in: homeworkIds }
+        });
+        
+        const submittedCount = submissions.filter(
+          s => s.status === 'submitted' || s.status === 'late'
+        ).length;
+        const homeworkCompletionRate = totalAssignments > 0
+          ? Math.round((submittedCount / totalAssignments) * 100)
+          : 0;
+        
         return {
           _id: student._id,
           username: student.username,
           email: student.email,
           phone: student.phone,
-          attendance: attendanceRate
+          attendance: attendanceRate,
+          homeworkCompletionRate: homeworkCompletionRate,
+          submittedAssignments: submittedCount,
+          totalAssignments: totalAssignments
         };
       })
     );
@@ -239,7 +332,9 @@ exports.getClassById = async (req, res) => {
         band: classData.course?.program?.band || 'N/A',
         courseType: classData.course?.program?.type || 'N/A',
         roomName: classData.room?.room_name || 'N/A',
-        roomLocation: classData.room?.location || 'N/A'
+        roomLocation: classData.room?.location || 'N/A',
+        classActivity: classActivity,
+        teacherAttendance: teacherAttendance
       }
     });
   } catch (error) {

@@ -11,7 +11,9 @@ const AcademicDashboard = () => {
     lateStudents: 0,
     pendingLeaveRequests: 0,
     pendingMakeupClasses: 0,
-    newClassRequests: 0
+    newClassRequests: 0,
+    totalRequestsLastWeek: 0,
+    pendingChangeClassRequests: 0
   });
 
   const [absentStudentsList, setAbsentStudentsList] = useState([]);
@@ -45,7 +47,9 @@ const AcademicDashboard = () => {
           lateStudents: 0,
           pendingLeaveRequests: 0,
           pendingMakeupClasses: 0,
-          newClassRequests: 0
+          newClassRequests: 0,
+          totalRequestsLastWeek: 0,
+          pendingChangeClassRequests: 0
         });
         
         setTodaySchedule(data.todaySchedule || []);
@@ -114,6 +118,9 @@ const AcademicDashboard = () => {
     );
   }
 
+  // Filter only absent students (not late) for the sidebar
+  const absentOnlyStudents = absentStudentsList.filter(student => student.status === 'absent');
+
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
       {/* Header */}
@@ -147,54 +154,60 @@ const AcademicDashboard = () => {
           </div>
 
           <Row className="g-2">
-            {/* Học viên vắng */}
-            {/* <Col md={6} lg>
-              <Card className="bg-danger-50 border border-danger-200 rounded-8 h-100 cursor-pointer transition-2 item-hover">
-                <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
-                  <div className="d-flex justify-content-between align-items-start">
-                    <div className="text-danger-700 fw-bold" style={{ fontSize: '14px' }}>
-                      Học viên vắng
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <h1 className="text-danger-600 fw-bold mb-2" style={{ fontSize: '36px', lineHeight: '1' }}>
-                      {todayOverview.absentStudents}
-                    </h1>
-                    <div className="text-danger-600" style={{ fontSize: '12px' }}>
-                      <i className="fas fa-user-times me-1"></i>
-                      +{todayOverview.lateStudents} đi muộn
-                    </div>
-                  </div>
-                  <div className="text-end">
-                    <Link to="/academic/class-management" className="text-decoration-none">
-                    <span className="text-danger-700 text-11 fw-medium cursor-pointer">
-                      Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
-                    </span>
-                    </Link>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col> */}
 
-            {/* Yêu cầu xếp lớp mới */}
+            {/* Tổng số đơn trong 1 tuần qua */}
             <Col md={4} lg>
                 <Card className="bg-purple-50 border border-purple-200 rounded-8 h-100 transition-2 item-hover">
                   <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
                     <div className="d-flex justify-content-between align-items-start">
                       <div className="text-purple-700 fw-bold" style={{ fontSize: '14px' }}>
-                        Yêu cầu xếp lớp
+                        Tổng số đơn trong 1 tuần qua
                       </div>
                     </div>
                     <div className="text-center">
                       <h1 className="text-purple-600 fw-bold mb-2" style={{ fontSize: '36px', lineHeight: '1' }}>
-                        {todayOverview.newClassRequests}
+                        {todayOverview.totalRequestsLastWeek || 0}
                       </h1>
-                      <div className="text-purple-600" style={{ fontSize: '12px' }}>
-                        <i className="fas fa-users-cog me-1"></i>
-                        Chờ xử lý
-                      </div>
                     </div>
                     <div className="text-end">
+                    <Link to="/academic/request-management" className="text-decoration-none">
+                      <span className="text-purple-700 text-11 fw-medium">
+                        Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
+                      </span>
+                    </Link>
+                    </div>
+                  </Card.Body>
+                </Card>
+            </Col>
+
+            {/* đơn lâu nhất chưa xử lý (bao nhiêu ngày chưa giải quyết) */}
+            <Col md={4} lg>
+              <Card className="bg-purple-50 border border-purple-200 rounded-8 h-100 transition-2 item-hover">
+                <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
+                  <div className="d-flex justify-content-between align-items-start">
+                    <div className="text-purple-700 fw-bold" style={{ fontSize: '14px' }}>
+                      Đơn lâu nhất chưa xử lý
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <h1 className="text-purple-600 fw-bold mb-2" style={{ fontSize: '36px', lineHeight: '1' }}>
+                    {recentActivities && recentActivities.length > 0 ? (
+                      <>
+                        <div>
+                          <div className="fw-bold text-15 mb-0">
+                            {recentActivities[recentActivities.length - 1].message}
+                          </div>
+                          <div className="text-12 text-muted">
+                            {recentActivities[recentActivities.length - 1].time}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-13 text-muted">Không có đơn chờ xử lý</span>
+                    )}
+                    </h1>
+                  </div>
+                  <div className="text-end">
                     <Link to="/academic/class-management" className="text-decoration-none">
                       <span className="text-purple-700 text-11 fw-medium">
                         Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
@@ -205,63 +218,7 @@ const AcademicDashboard = () => {
                 </Card>
             </Col>
 
-            {/* Yêu cầu xin nghỉ */}
-            <Col md={4} lg>
-              <Card className="bg-warning-50 border border-warning-200 rounded-8 h-100 cursor-pointer transition-2 item-hover">
-                <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
-                  <div className="d-flex justify-content-between align-items-start">
-                    <div className="text-warning-700 fw-bold" style={{ fontSize: '14px' }}>
-                      Yêu cầu xin nghỉ
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <h1 className="text-warning-600 fw-bold mb-2" style={{ fontSize: '36px', lineHeight: '1' }}>
-                      {todayOverview.pendingLeaveRequests}
-                    </h1>
-                    <div className="text-warning-600" style={{ fontSize: '12px' }}>
-                      <i className="fas fa-clock me-1"></i>
-                      Chờ duyệt
-                    </div>
-                  </div>
-                  <div className="text-end">
-                    <Link to="/academic/class-management" className="text-decoration-none">
-                    <span className="text-warning-700 text-11 fw-medium cursor-pointer">
-                      Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
-                    </span>
-                    </Link>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
 
-            {/* Buổi học bù chờ xếp */}
-            <Col md={4} lg>
-              <Card className="bg-info-50 border border-info-200 rounded-8 h-100 cursor-pointer transition-2 item-hover">
-                <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
-                  <div className="d-flex justify-content-between align-items-start">
-                    <div className="text-info-700 fw-bold" style={{ fontSize: '14px' }}>
-                      Học bù chờ xếp
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <h1 className="text-info-600 fw-bold mb-2" style={{ fontSize: '36px', lineHeight: '1' }}>
-                      {todayOverview.pendingMakeupClasses}
-                    </h1>
-                    <div className="text-info-600" style={{ fontSize: '12px' }}>
-                      <i className="fas fa-calendar-plus me-1"></i>
-                      Cần xếp lịch
-                    </div>
-                  </div>
-                  <div className="text-end">
-                    <Link to="/academic/class-management" className="text-decoration-none">
-                    <span className="text-info-700 text-11 fw-medium cursor-pointer">
-                      Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
-                    </span>
-                    </Link>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
           </Row>
         </Card.Body>
       </Card>
@@ -270,59 +227,6 @@ const AcademicDashboard = () => {
       <Row className="g-3">
 
         <Col lg={8}>
-
-          <Card className="bg-white border-0 rounded-12 mb-24" 
-                style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-            <Card.Header className="bg-main-25 border-0 p-20">
-              <div className="d-flex justify-content-between align-items-center">
-                <h6 className="text-neutral-900 fw-bold mb-0">
-                  <i className="fas fa-calendar-check text-main-600 me-2"></i>
-                  Lịch học hôm nay ({todaySchedule.length} buổi)
-                </h6>
-                <Link to="/academic/schedule-management">
-                  <Button className="btn-outline-main text-12 fw-medium px-12 py-6 radius-8">
-                    Xem tất cả
-                  </Button>
-                </Link>
-              </div>
-            </Card.Header>
-            <Card.Body className="p-20">
-              <Row className="g-2">
-                {todaySchedule.map(schedule => (
-                  <Col md={6} key={schedule.id}>
-                    <Card className={`border-0 rounded-8 ${
-                      schedule.status === 'ongoing' ? 'bg-success-50 border-success-200' : 'bg-white border-neutral-200'
-                    }`} style={{ border: '1px solid' }}>
-                      <Card.Body className="p-12">
-                        <div className="d-flex justify-content-between align-items-start mb-8">
-                          <div>
-                            <h6 className="text-neutral-900 fw-bold mb-4 text-13">
-                              {schedule.className}
-                            </h6>
-                            <p className="text-neutral-600 mb-0 text-11">
-                              <i className="fas fa-user-tie me-1"></i>
-                              {schedule.teacher}
-                            </p>
-                          </div>
-                          {getStatusBadge(schedule.status)}
-                        </div>
-                        <div className="d-flex justify-content-between text-11 text-neutral-500">
-                          <span>
-                            <i className="fas fa-clock me-1"></i>
-                            {schedule.time}
-                          </span>
-                          <span>
-                            <i className="fas fa-door-open me-1"></i>
-                            {schedule.room}
-                          </span>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                ))}
-              </Row>
-            </Card.Body>
-          </Card>
 
           <Card className="bg-white border-0 rounded-12 mb-24" 
                 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
@@ -445,27 +349,52 @@ const AcademicDashboard = () => {
         <Col lg={4}>
           <Card className="bg-white border-0 rounded-12 mb-24" 
                 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-            <Card.Header className="bg-main-25 border-0 p-20">
+            <Card.Header className="bg-danger-25 border-0 p-20">
               <h6 className="text-neutral-900 fw-bold mb-0">
-                <i className="fas fa-history text-main-600 me-2"></i>
-                Yêu cầu gần đây
+                <i className="fas fa-user-times text-danger-600 me-2"></i>
+                Học sinh vắng hôm nay
               </h6>
-              <p>Xem tất cả</p>
             </Card.Header>
             <Card.Body className="p-20" style={{ maxHeight: '600px', overflowY: 'auto' }}>
               <div className="d-flex flex-column gap-16">
-                {recentActivities.map(activity => (
-                  <div key={activity.id} className="d-flex gap-12 pb-16 border-bottom border-neutral-100">
-                    {getActivityIcon(activity)}
-                    <div className="flex-grow-1">
-                      <p className="text-neutral-700 mb-4 text-14">{activity.message}</p>
-                      <span className="text-neutral-400 text-12">
-                        <i className="fas fa-clock me-1"></i>
-                        {activity.time}
-                      </span>
+                {absentOnlyStudents.length > 0 ? (
+                  absentOnlyStudents.map(student => (
+                    <div key={student.id} className="d-flex gap-12 pb-16 border-bottom border-neutral-100">
+                      <div 
+                        className="d-flex align-items-center justify-content-center rounded-circle text-danger-600"
+                        style={{ 
+                          width: '40px', 
+                          height: '40px', 
+                          backgroundColor: 'var(--danger-50)',
+                          minWidth: '40px'
+                        }}
+                      >
+                        <i className="fas fa-user-times"></i>
+                      </div>
+                      <div className="flex-grow-1">
+                        <p className="text-neutral-900 fw-medium mb-2 text-14">{student.name}</p>
+                        <div className="d-flex align-items-center gap-8 mb-2">
+                          <Badge className="bg-danger-100 text-danger-700 px-8 py-2 text-11">
+                            <i className="fas fa-times me-1"></i>
+                            Vắng
+                          </Badge>
+                        </div>
+                        <div className="text-neutral-500 text-12 mb-1">
+                          <i className="fas fa-users me-1"></i>
+                          {student.class}
+                        </div>
+                        <span className="text-neutral-400 text-12">
+                          <i className="fas fa-clock me-1"></i>
+                          {student.time}
+                        </span>
+                      </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-neutral-500 text-14 mb-0">Không có học sinh vắng hôm nay</p>
                   </div>
-                ))}
+                )}
               </div>
             </Card.Body>
           </Card>

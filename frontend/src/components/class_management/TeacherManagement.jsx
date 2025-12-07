@@ -162,12 +162,6 @@ const TeacherManagement = () => {
     // Clear previous errors
     setFormErrors({});
     
-    // Validate password
-    if (!formData.password) {
-      setFormErrors({ password: 'Vui lòng nhập mật khẩu!' });
-      return;
-    }
-    
     try {
       setLoading(true);
       await teacherService.createTeacher(formData);

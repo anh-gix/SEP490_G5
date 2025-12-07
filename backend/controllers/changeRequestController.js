@@ -189,16 +189,19 @@ exports.getAllChangeRequests = async (req, res) => {
           const schedules = schedulesByClass[classId] || [];
           
           let currentSession = null;
-          const pastSessions = schedules.filter(s => {
+          // Tìm các buổi SẮP TỚI (chưa học)
+          const upcomingSessions = schedules.filter(s => {
             const scheduleDate = new Date(s.date);
             scheduleDate.setHours(0, 0, 0, 0);
-            return scheduleDate < now;
+            return scheduleDate >= now;  // Lọc buổi SẮP TỚI
           });
           
-          if (pastSessions.length > 0) {
-            currentSession = pastSessions[pastSessions.length - 1];
+          if (upcomingSessions.length > 0) {
+            // Nếu có buổi sắp tới → lấy buổi sắp tới ĐẦU TIÊN (session đang học)
+            currentSession = upcomingSessions[0];
           } else if (schedules.length > 0) {
-            currentSession = schedules[0];
+            // Nếu không có buổi sắp tới → lấy buổi CUỐI CÙNG (đã học hết)
+            currentSession = schedules[schedules.length - 1];
           }
           
           if (request.classId) {

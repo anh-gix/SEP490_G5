@@ -84,16 +84,24 @@ const RequestDetailPage = ({
         return (a.sessionOrder || 0) - (b.sessionOrder || 0);
       });
 
-      // Tìm session gần nhất (đã học hoặc sắp học)
+      // Tìm session sắp học tiếp theo (chưa học)
       let currentSession = null;
       
-      // Tìm session đã học gần nhất
-      const pastSessions = sortedSchedules.filter(s => s.date <= now);
-      if (pastSessions.length > 0) {
-        currentSession = pastSessions[pastSessions.length - 1];
+      // Tìm session sắp học tiếp theo (chưa học)
+      const upcomingSessions = sortedSchedules.filter(s => {
+        const scheduleDate = new Date(s.date);
+        scheduleDate.setHours(0, 0, 0, 0);
+        const nowDate = new Date(now);
+        nowDate.setHours(0, 0, 0, 0);
+        return scheduleDate >= nowDate;  // Lọc buổi SẮP TỚI
+      });
+      
+      if (upcomingSessions.length > 0) {
+        // Nếu có buổi sắp tới → lấy buổi sắp tới ĐẦU TIÊN (session đang học)
+        currentSession = upcomingSessions[0];
       } else if (sortedSchedules.length > 0) {
-        // Nếu chưa có session nào đã học, lấy session đầu tiên (sắp học)
-        currentSession = sortedSchedules[0];
+        // Nếu không có buổi sắp tới → lấy buổi CUỐI CÙNG (đã học hết)
+        currentSession = sortedSchedules[sortedSchedules.length - 1];
       }
 
       return {

@@ -293,57 +293,6 @@ const AcademicDashboard = () => {
               </Table>
             </Card.Body>
           </Card>
-
-          {absentStudentsList.length > 0 && (
-            <Card className="bg-white border-0 rounded-12" 
-                  style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-              <Card.Header className="bg-danger-25 border-0 p-20">
-                <h6 className="text-neutral-900 fw-bold mb-0">
-                  <i className="fas fa-exclamation-triangle text-danger-600 me-2"></i>
-                  Danh sách học viên vắng/muộn hôm nay
-                </h6>
-              </Card.Header>
-              <Card.Body className="p-0">
-                <Table className="mb-0" hover size="sm">
-                  <thead style={{ backgroundColor: 'var(--neutral-50)' }}>
-                    <tr>
-                      <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Mã SV</th>
-                      <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Họ tên</th>
-                      <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Lớp</th>
-                      <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Thời gian</th>
-                      <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Trạng thái</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {absentStudentsList.map(student => (
-                      <tr key={student.id}>
-                        <td className="px-16 py-12 text-neutral-700 text-12">{student.studentId}</td>
-                        <td className="px-16 py-12 text-neutral-900 fw-medium text-13">{student.name}</td>
-                        <td className="px-16 py-12 text-neutral-700 text-12">{student.class}</td>
-                        <td className="px-16 py-12 text-neutral-600 text-12">
-                          <i className="fas fa-clock me-1"></i>
-                          {student.time}
-                        </td>
-                        <td className="px-16 py-12">
-                          {student.status === 'absent' ? (
-                            <Badge className="bg-danger-100 text-danger-700 px-8 py-4 text-11">
-                              <i className="fas fa-times me-1"></i>
-                              Vắng
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-warning-100 text-warning-700 px-8 py-4 text-11">
-                              <i className="fas fa-clock me-1"></i>
-                              Muộn
-                            </Badge>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </Card.Body>
-            </Card>
-          )}
         </Col>
 
         <Col lg={4}>

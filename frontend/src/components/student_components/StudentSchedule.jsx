@@ -132,14 +132,15 @@ const StudentSchedule = () => {
       setLoading(true);
       setError(null);
     
-      // Get current month's date range for initial load
+      // Get date range from current month to 6 months ahead to ensure all sessions are included
       const today = new Date();
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      // Extend to 6 months ahead to capture all upcoming sessions
+      const endDate = new Date(today.getFullYear(), today.getMonth() + 6, 0);
       
       const params = {
         startDate: startOfMonth.toISOString().split('T')[0],
-        endDate: endOfMonth.toISOString().split('T')[0]
+        endDate: endDate.toISOString().split('T')[0]
       };
 
       console.log('Fetching schedules with params:', params);

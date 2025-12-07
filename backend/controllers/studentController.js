@@ -165,76 +165,121 @@ exports.getMySchedule = async (req, res) => {
     const studentId = req.user._id;
     const { startDate, endDate } = req.query;
 
-    // Find all classes where student is enrolled
-    const studentClasses = await Class.find({ students: studentId })
-      .select('_id name course')
-      .populate('course', 'name')
+    // Query StudentSchedule entries for this student first
+    let studentSchedulesQuery = StudentSchedule.find({ student: studentId })
+      .populate({
+        path: 'classSchedule',
+        select: 'date startTime endTime room class topic session status',
+        populate: [
+          {
+            path: 'class',
+            select: 'name course',
+            populate: {
+              path: 'course',
+              select: 'name'
+            }
+          },
+          {
+            path: 'room',
+            select: 'room_name location'
+          },
+          {
+            path: 'session',
+            select: 'title order content'
+          }
+        ]
+      })
       .lean();
 
-    if (!studentClasses || studentClasses.length === 0) {
+    const studentSchedules = await studentSchedulesQuery;
+
+    console.log(`[getMySchedule] Found ${studentSchedules.length} StudentSchedule entries for student ${studentId}`);
+
+    if (!studentSchedules || studentSchedules.length === 0) {
       return res.status(200).json({
         success: true,
-        message: 'Học viên chưa tham gia lớp nào',
+        message: 'Học viên chưa có lịch học nào',
         total: 0,
         schedules: []
       });
     }
 
-    const classIds = studentClasses.map(cls => cls._id);
+    // Count how many have classSchedule populated
+    const withClassSchedule = studentSchedules.filter(ss => ss.classSchedule).length;
+    const withoutClassSchedule = studentSchedules.length - withClassSchedule;
+    console.log(`[getMySchedule] StudentSchedules with classSchedule: ${withClassSchedule}, without: ${withoutClassSchedule}`);
 
-    let query = { class: { $in: classIds } };
-
-    // Filter by date range if provided
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      query.date = { $gte: start, $lte: end };
-    }
-
-    const classSchedules = await ClassSchedule.find(query)
-      .populate('class', 'name course')
-      .populate({
-        path: 'class',
-        populate: {
-          path: 'course',
-          select: 'name'
+    // Filter by date range if provided (filter after populate)
+    let filteredSchedules = studentSchedules.filter(ss => {
+      if (!ss.classSchedule) {
+        console.log(`[getMySchedule] StudentSchedule ${ss._id} missing classSchedule`);
+        return false;
+      }
+      
+      if (startDate && endDate) {
+        // Normalize dates to avoid timezone issues - compare only date part
+        const scheduleDate = new Date(ss.classSchedule.date);
+        const scheduleDateOnly = new Date(scheduleDate.getFullYear(), scheduleDate.getMonth(), scheduleDate.getDate());
+        
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        
+        const isInRange = scheduleDateOnly >= start && scheduleDateOnly <= end;
+        
+        if (!isInRange) {
+          console.log(`[getMySchedule] Schedule ${ss._id} date ${scheduleDateOnly.toISOString().split('T')[0]} is outside range ${start.toISOString().split('T')[0]} - ${end.toISOString().split('T')[0]}`);
         }
-      })
-      .populate('room', 'room_name location')
-      .populate('session', 'title order content')
-      .sort({ date: 1, startTime: 1 })
-      .lean();
+        
+        return isInRange;
+      }
+      
+      return true;
+    });
+    
+    console.log(`[getMySchedule] Total StudentSchedules: ${studentSchedules.length}, After filter: ${filteredSchedules.length}, Date range: ${startDate || 'none'} to ${endDate || 'none'}`);
 
-    // Get student schedule info (attendance, status)
-    const scheduleIds = classSchedules.map(s => s._id);
-    const studentSchedules = await StudentSchedule.find({
-      student: studentId,
-      classSchedule: { $in: scheduleIds }
-    }).lean();
-
-    // Map student schedule info to class schedules
-    const studentScheduleMap = {};
-    studentSchedules.forEach(ss => {
-      studentScheduleMap[ss.classSchedule.toString()] = ss;
+    // Sort by date and startTime
+    filteredSchedules.sort((a, b) => {
+      if (!a.classSchedule || !b.classSchedule) return 0;
+      const dateA = new Date(a.classSchedule.date);
+      const dateB = new Date(b.classSchedule.date);
+      if (dateA.getTime() !== dateB.getTime()) {
+        return dateA - dateB;
+      }
+      return (a.classSchedule.startTime || "").localeCompare(b.classSchedule.startTime || "");
     });
 
-    const formattedSchedules = classSchedules.map(schedule => {
-      const studentSchedule = studentScheduleMap[schedule._id.toString()];
+    // Format schedules to match expected response structure
+    const formattedSchedules = filteredSchedules.map(ss => {
+      const classSchedule = ss.classSchedule;
+      
+      if (!classSchedule) {
+        return null;
+      }
       
       return {
-        ...schedule,
-        className: schedule.class?.name,
-        courseName: schedule.class?.course?.name,
-        sessionTitle: schedule.session?.title,
-        sessionOrder: schedule.session?.order,
-        roomName: schedule.room?.room_name,
-        location: schedule.room?.location,
-        attendance: studentSchedule?.attendance || null,
-        scheduleStatus: studentSchedule?.scheduleStatus || 'scheduled'
+        _id: classSchedule._id,
+        date: classSchedule.date,
+        startTime: classSchedule.startTime,
+        endTime: classSchedule.endTime,
+        className: classSchedule.class?.name,
+        courseName: classSchedule.class?.course?.name,
+        sessionTitle: classSchedule.session?.title,
+        sessionOrder: classSchedule.session?.order,
+        roomName: classSchedule.room?.room_name,
+        location: classSchedule.room?.location,
+        topic: classSchedule.topic,
+        status: classSchedule.status,
+        attendance: ss.attendance || null,
+        scheduleStatus: ss.scheduleStatus || 'scheduled',
+        class: classSchedule.class,
+        room: classSchedule.room,
+        session: classSchedule.session
       };
-    });
+    }).filter(schedule => schedule !== null); // Remove null entries
 
     res.status(200).json({
       success: true,

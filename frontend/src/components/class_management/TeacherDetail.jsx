@@ -42,6 +42,103 @@ const TeacherDetail = () => {
   const [substituteTeacherSchedule, setSubstituteTeacherSchedule] = useState([]);
   const [loadingSubstituteTeacherSchedule, setLoadingSubstituteTeacherSchedule] = useState(false);
 
+  // Helper function to normalize date from various formats
+  const normalizeDate = (dateInput) => {
+    if (!dateInput) {
+      console.debug('normalizeDate: dateInput is null/undefined');
+      return null;
+    }
+    
+    // If already a Date object
+    if (dateInput instanceof Date) {
+      if (isNaN(dateInput.getTime())) {
+        console.debug('normalizeDate: Invalid Date object');
+        return null;
+      }
+      return dateInput;
+    }
+    
+    // If it's an object (might be MongoDB date serialization)
+    if (typeof dateInput === 'object' && dateInput !== null) {
+      // Try common MongoDB date formats
+      if (dateInput.$date) {
+        return normalizeDate(dateInput.$date);
+      }
+      if (dateInput.toString) {
+        const dateStr = dateInput.toString();
+        const date = new Date(dateStr);
+        if (!isNaN(date.getTime())) return date;
+      }
+    }
+    
+    // If string, try parsing
+    if (typeof dateInput === 'string') {
+      // First, try DD/MM/YYYY format (common Vietnamese format from backend)
+      const ddmmyyyyMatch = dateInput.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (ddmmyyyyMatch) {
+        const day = parseInt(ddmmyyyyMatch[1]);
+        const month = parseInt(ddmmyyyyMatch[2]) - 1; // Month is 0-indexed
+        const year = parseInt(ddmmyyyyMatch[3]);
+        const date = new Date(year, month, day);
+        if (!isNaN(date.getTime())) {
+          console.debug('normalizeDate: Parsed as DD/MM/YYYY:', dateInput, '->', date);
+          return date;
+        }
+      }
+      
+      // Try YYYY-MM-DD format (ISO date format, parse as local time to avoid UTC conversion)
+      const yyyymmddMatch = dateInput.match(/^(\d{4})-(\d{2})-(\d{2})(?:T|$)/);
+      if (yyyymmddMatch) {
+        const year = parseInt(yyyymmddMatch[1]);
+        const month = parseInt(yyyymmddMatch[2]) - 1; // Month is 0-indexed
+        const day = parseInt(yyyymmddMatch[3]);
+        const date = new Date(year, month, day);
+        if (!isNaN(date.getTime())) {
+          console.debug('normalizeDate: Parsed ISO string as local date:', dateInput, '->', date);
+          return date;
+        }
+      }
+      
+      // Try full ISO format parsing (with time)
+      let date = new Date(dateInput);
+      if (!isNaN(date.getTime())) {
+        console.debug('normalizeDate: Parsed as ISO string:', dateInput, '->', date);
+        return date;
+      }
+      
+      console.debug('normalizeDate: Could not parse string:', dateInput);
+    }
+    
+    console.debug('normalizeDate: Failed to parse dateInput:', dateInput, 'type:', typeof dateInput);
+    return null;
+  };
+
+  // Helper to format date to YYYY-MM-DD for calendar matching (using local time, not UTC)
+  const formatDateForCalendar = (date) => {
+    if (!date) return null;
+    const d = normalizeDate(date);
+    if (!d) return null;
+    
+    // Use local date components to avoid UTC conversion
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Helper to format date for display (Vietnamese locale, avoids UTC issues)
+  const formatDateForDisplay = (date) => {
+    if (!date) return 'N/A';
+    const d = normalizeDate(date);
+    if (!d) return 'N/A';
+    
+    try {
+      return d.toLocaleDateString('vi-VN');
+    } catch {
+      return 'N/A';
+    }
+  };
+
   useEffect(() => {
     if (teacherId) {
       fetchTeacherInfo();
@@ -225,8 +322,15 @@ const TeacherDetail = () => {
 
   // Handle assign substitute teacher
   const handleAssignSubstitute = async (schedule) => {
+    // Validate date using normalizeDate helper
+    const scheduleDate = normalizeDate(schedule.date);
+    if (!scheduleDate) {
+      alert('Buổi học không có thông tin ngày hợp lệ');
+      return;
+    }
+    
     // Kiểm tra xem buổi học có phải là quá khứ không
-    const scheduleDate = new Date(schedule.date);
+    
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     scheduleDate.setHours(0, 0, 0, 0);
@@ -380,9 +484,26 @@ const TeacherDetail = () => {
     console.log(' teacherSchedule:', teacherSchedule);
     console.log(' teacherSchedule length:', teacherSchedule.length);
     
-    const transformed = teacherSchedule.map((schedule, index) => {
-      const scheduleDate = new Date(schedule.date);
-      const dateStr = scheduleDate.toISOString().split('T')[0];
+    const transformed = teacherSchedule
+      .map((schedule, index) => {
+        // Debug: Log the raw date value
+        console.log(`Schedule ${index + 1} raw date:`, schedule.date, 'type:', typeof schedule.date);
+        
+        // Use normalizeDate helper to parse date
+        const scheduleDate = normalizeDate(schedule.date);
+        if (!scheduleDate) {
+          console.warn(`Schedule ${index + 1} has invalid date:`, schedule.date, 'Full schedule:', schedule);
+          return null; // Skip invalid schedules
+        }
+        
+        // Use formatDateForCalendar to format date (using local time, not UTC)
+        const dateStr = formatDateForCalendar(schedule.date);
+        if (!dateStr) {
+          console.warn(`Schedule ${index + 1} could not format date:`, schedule.date, 'normalized:', scheduleDate);
+          return null;
+        }
+        
+        console.log(`Schedule ${index + 1} formatted date:`, dateStr);
       
       // Extract programType from schedule data
       const programType = schedule.programType || schedule.class?.course?.program?.type || null;
@@ -423,7 +544,8 @@ const TeacherDetail = () => {
         classId: schedule.class?._id || schedule.class?.id || schedule.class,
         programType: programType // Add programType for color coding
       };
-    });
+      })
+      .filter(Boolean); // Remove null entries from invalid dates
     
     console.log(' Transformed schedules:', transformed);
     console.log(' Schedules with programType:', transformed.filter(s => s.programType));
@@ -704,11 +826,17 @@ const TeacherDetail = () => {
                         <tbody>
                           {teacherSchedule
                             .slice((schedulePage - 1) * 10, schedulePage * 10)
-                            .map((schedule, index) => (
+                            .map((schedule, index) => {
+                              // Debug logging for table view
+                              const displayDate = formatDateForDisplay(schedule.date);
+                              if (displayDate === 'N/A') {
+                                console.warn(`Table view - Schedule ${index + 1} date is N/A:`, schedule.date, 'type:', typeof schedule.date);
+                              }
+                              return (
                               <tr key={index}>
                                 <td className="px-16 py-12">
                                   <div className="text-14">
-                                    {new Date(schedule.date).toLocaleDateString('vi-VN')}
+                                    {displayDate}
                                   </div>
                                   <div className="text-13 text-muted">
                                     {schedule.startTime} - {schedule.endTime}
@@ -723,7 +851,8 @@ const TeacherDetail = () => {
                                   </Badge>
                                 </td>
                               </tr>
-                            ))}
+                            );
+                            })}
                         </tbody>
                       </Table>
                       {teacherSchedule.length > 10 && (
@@ -828,7 +957,7 @@ const TeacherDetail = () => {
                     <Col md={6}>
                       <div className="text-13 text-neutral-600">Ngày:</div>
                       <div className="text-14 fw-semibold">
-                        {new Date(selectedScheduleForSubstitute.date).toLocaleDateString('vi-VN')}
+                        {formatDateForDisplay(selectedScheduleForSubstitute?.date)}
                       </div>
                     </Col>
                     <Col md={6}>
@@ -945,7 +1074,7 @@ const TeacherDetail = () => {
                     <h6 className="mb-3">
                       <i className="fas fa-calendar-alt me-2"></i>
                       Lịch dạy của giáo viên được chọn vào ngày{' '}
-                      {selectedScheduleForSubstitute && new Date(selectedScheduleForSubstitute.date).toLocaleDateString('vi-VN')}
+                      {formatDateForDisplay(selectedScheduleForSubstitute?.date)}
                     </h6>
                     {loadingSubstituteTeacherSchedule ? (
                       <div className="text-center py-3">
@@ -964,7 +1093,9 @@ const TeacherDetail = () => {
                         </thead>
                         <tbody>
                           {substituteTeacherSchedule.map((schedule, idx) => {
-                            const scheduleDate = new Date(schedule.date);
+                            // Use normalizeDate helper for consistency
+                            const scheduleDate = normalizeDate(schedule.date);
+                            
                             const isSameTime = 
                               schedule.startTime === selectedScheduleForSubstitute.startTime &&
                               schedule.endTime === selectedScheduleForSubstitute.endTime;

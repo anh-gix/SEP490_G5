@@ -35,13 +35,13 @@ ChartJS.register(
   Filler
 );
 
-// Mock data cho biểu đồ tăng trưởng học viên tích lũy
+// Mock data cho biểu đồ học viên mới theo tháng
 const monthlyStudentData = {
-  labels: ['01/01', '08/01', '15/01', '22/01', '29/01', '05/02', '12/02', '19/02', '26/02', '05/03', '12/03', '19/03'],
+  labels: ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'],
   datasets: [
     {
-      label: 'Tổng số học viên',
-      data: [50, 65, 75, 88, 95, 110, 135, 152, 158, 2850, 2980, 3456],
+      label: 'Học viên mới',
+      data: [245, 312, 289, 356, 423, 398, 267, 445, 512, 489, 534, 456],
       borderColor: 'rgba(93, 135, 255, 1)',
       backgroundColor: 'rgba(93, 135, 255, 0.1)',
       borderWidth: 2,
@@ -123,7 +123,7 @@ const StudentGrowthChart = () => {
       },
       title: {
         display: true,
-        text: 'Xu hướng tăng trưởng học viên',
+        text: 'Số lượng học viên mới theo tháng',
         align: 'start',
         font: {
           size: 18,

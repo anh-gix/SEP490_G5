@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';
 import changeRequestService from '../../services/changeRequestService';
+import CreateChangeRequestModal from './CreateChangeRequestModal';
 
 /**
  * Student Applications Component
@@ -26,6 +27,7 @@ const StudentApplications = () => {
   const [sortBy, setSortBy] = useState('newest');
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const itemsPerPage = 10;
 
@@ -145,7 +147,7 @@ const StudentApplications = () => {
       create_class: { variant: 'info', text: 'Tạo lớp' },
       change_class: { variant: 'primary', text: 'Đổi lớp' },
       makeup_class: { variant: 'warning', text: 'Học bù' },
-      replace_teacher: { variant: 'secondary', text: 'Thay giáo viên' }
+      request_replace_teacher: { variant: 'secondary', text: 'Thay giáo viên' }
     };
     const config = typeConfig[type] || { variant: 'secondary', text: type || 'N/A' };
     return <Badge bg={config.variant}>{config.text}</Badge>;
@@ -166,6 +168,11 @@ const StudentApplications = () => {
   const handleViewDetails = (request) => {
     setSelectedRequest(request);
     setShowDetailModal(true);
+  };
+
+  const handleCreateSuccess = () => {
+    toast.success('Gửi đơn thành công!');
+    fetchChangeRequests();
   };
 
   return (
@@ -222,6 +229,17 @@ const StudentApplications = () => {
                 <option value="newest">Mới nhất trước</option>
                 <option value="oldest">Cũ nhất trước</option>
               </Form.Select>
+            </Col>
+
+            <Col md={2} className="d-flex justify-content-end">
+              <Button
+                variant="primary"
+                onClick={() => setShowCreateModal(true)}
+                className="w-100"
+              >
+                <i className="fas fa-plus me-2"></i>
+                Tạo đơn
+              </Button>
             </Col>
           </Row>
         </Card.Body>
@@ -452,6 +470,13 @@ const StudentApplications = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Create Change Request Modal */}
+      <CreateChangeRequestModal
+        show={showCreateModal}
+        onHide={() => setShowCreateModal(false)}
+        onSuccess={handleCreateSuccess}
+      />
     </Container>
   );
 };

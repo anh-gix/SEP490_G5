@@ -9,10 +9,34 @@ const Program = require('../models/programModel');
 /**
  * Get all courses
  * GET /api/courses
+ * Query params: status, program, search
  */
 exports.getAllCourses = async (req, res) => {
     try {
-        const courses = await Course.find()
+        const { status, program, search } = req.query;
+        
+        // Build query
+        let query = {};
+        
+        // Filter by status if provided
+        if (status) {
+            query.status = status;
+        }
+        
+        // Filter by program if provided
+        if (program) {
+            query.program = program;
+        }
+        
+        // Search by name or courseCode
+        if (search) {
+            query.$or = [
+                { name: { $regex: search, $options: 'i' } },
+                { courseCode: { $regex: search, $options: 'i' } }
+            ];
+        }
+        
+        const courses = await Course.find(query)
             .populate('program', 'program_name code')
             .populate('createdBy', 'fullname email')
             .sort({ createdAt: -1 });

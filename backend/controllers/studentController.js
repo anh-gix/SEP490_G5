@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const User = require("../models/userModel");
 const Role = require("../models/roleModel");
 const Class = require("../models/classModel");
@@ -89,11 +90,40 @@ exports.getMyClasses = async (req, res) => {
     const studentId = req.user._id;
     const { status } = req.query;
 
+    // Ensure studentId is ObjectId
+    const studentObjectId = mongoose.Types.ObjectId.isValid(studentId) 
+      ? (studentId instanceof mongoose.Types.ObjectId ? studentId : new mongoose.Types.ObjectId(studentId))
+      : studentId;
+
+    console.log('[getMyClasses] Student ID:', studentId);
+    console.log('[getMyClasses] Student ObjectId:', studentObjectId);
+
     // Find all classes where student is enrolled
-    let query = { students: studentId };
+    // Query: find classes where students array contains this studentId
+    // MongoDB automatically searches in array when using { students: studentId }
+    // But we can also use $in to be explicit: { students: { $in: [studentObjectId] } }
+    let query = { students: studentObjectId };
     if (status && status !== 'all') {
       query.status = status;
     }
+
+    console.log('[getMyClasses] Query:', JSON.stringify(query, null, 2));
+
+    // Also try to find all classes and filter manually to debug
+    const allClasses = await Class.find({}).select('_id name students status').lean();
+    console.log('[getMyClasses] Total classes in DB:', allClasses.length);
+    const classesWithStudent = allClasses.filter(cls => {
+      if (!cls.students || !Array.isArray(cls.students)) return false;
+      return cls.students.some(s => {
+        const sId = s.toString ? s.toString() : s;
+        const studentIdStr = studentObjectId.toString ? studentObjectId.toString() : studentObjectId;
+        return sId === studentIdStr;
+      });
+    });
+    console.log('[getMyClasses] Classes with this student (manual filter):', classesWithStudent.length);
+    classesWithStudent.forEach(cls => {
+      console.log(`  - Class: ${cls.name} (${cls._id}), Status: ${cls.status}`);
+    });
 
     const classes = await Class.find(query)
       .populate('course', 'name description')
@@ -101,6 +131,28 @@ exports.getMyClasses = async (req, res) => {
       .populate('room', 'room_name')
       .sort({ startDate: -1 })
       .lean();
+
+    console.log('[getMyClasses] Found classes with query:', classes.length);
+    
+    // If no classes found and status filter is active, try without status filter
+    if (classes.length === 0 && status && status !== 'all') {
+      console.log('[getMyClasses] No classes found with status filter, trying without status...');
+      const queryWithoutStatus = { students: studentObjectId };
+      const classesWithoutStatus = await Class.find(queryWithoutStatus)
+        .populate('course', 'name description')
+        .populate('teacher', 'username email')
+        .populate('room', 'room_name')
+        .sort({ startDate: -1 })
+        .lean();
+      console.log('[getMyClasses] Found classes without status filter:', classesWithoutStatus.length);
+      if (classesWithoutStatus.length > 0) {
+        console.log('[getMyClasses] Classes found (without status filter):', classesWithoutStatus.map(c => ({
+          name: c.name,
+          status: c.status,
+          _id: c._id
+        })));
+      }
+    }
 
     // Get additional stats for each class
     const classesWithStats = await Promise.all(
@@ -261,7 +313,8 @@ exports.getMySchedule = async (req, res) => {
       }
       
       return {
-        _id: classSchedule._id,
+        _id: classSchedule._id, // ClassSchedule ID
+        studentScheduleId: ss._id, // StudentSchedule ID - needed for makeup_class requests
         date: classSchedule.date,
         startTime: classSchedule.startTime,
         endTime: classSchedule.endTime,
@@ -305,6 +358,17 @@ exports.getLessonDetail = async (req, res) => {
     const studentId = req.user._id;
     const { scheduleId } = req.params;
 
+      console.log('test class :', scheduleId); 
+
+
+const makeup_class = await ClassSchedule.findById(scheduleId)
+      .populate('room', 'room_name location')
+      .populate('session', 'title order content objectives')
+      .populate('teacher', 'username email')
+      .lean();
+
+      console.log('make up class:', makeup_class); 
+
     // Find the class schedule
     const classSchedule = await ClassSchedule.findById(scheduleId)
       .populate({
@@ -318,8 +382,19 @@ exports.getLessonDetail = async (req, res) => {
       .populate('session', 'title order content objectives')
       .lean();
 
+
+     
+
     if (!classSchedule) {
-      return res.status(404).json({
+      // const makeup_class = await ClassSchedule.findById(scheduleId)
+      // .populate('room', 'room_name location')
+      // .populate('session', 'title order content objectives')
+      // .populate('teacher', 'username email')
+      // .lean();
+
+      // console.log(makeup_class);
+
+        return res.status(404).json({
         success: false,
         message: 'Không tìm thấy buổi học'
       });

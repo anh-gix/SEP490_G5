@@ -7,6 +7,21 @@ const Program = require("../models/programModel");
 const Course = require("../models/courseModel");
 
 // =========================
+// HELPER FUNCTIONS
+// =========================
+
+// Helper function to format date to Vietnamese locale (DD/MM/YYYY)
+// Uses UTC methods to avoid timezone conversion issues
+const formatDateToVN = (date) => {
+  if (!date) return null;
+  const d = new Date(date);
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const year = d.getUTCFullYear();
+  return `${day}/${month}/${year}`;
+};
+
+// =========================
 //  LẤY DANH SÁCH GIẢNG VIÊN
 // =========================
 exports.getAllTeachers = async (req, res) => {
@@ -181,6 +196,13 @@ exports.getCurrentTeacher = async (req, res) => {
       .populate('course', 'name')
       .lean();
     
+    // Format dates for classes
+    const formattedClasses = classes.map(cls => ({
+      ...cls,
+      startDate: formatDateToVN(cls.startDate),
+      endDate: formatDateToVN(cls.endDate)
+    }));
+    
     const totalStudents = classes.reduce((sum, cls) => sum + (cls.students?.length || 0), 0);
     
     res.status(200).json({
@@ -188,6 +210,7 @@ exports.getCurrentTeacher = async (req, res) => {
       message: 'Lấy thông tin giảng viên thành công',
       teacher: {
         ...teacher.toObject(),
+        classes: formattedClasses,
         stats: {
           classCount: classes.length,
           totalStudents
@@ -354,8 +377,8 @@ exports.getTeacherById = async (req, res) => {
         level: cls.course?.program?.level || 'N/A',
         students: cls.students || [],
         status: cls.status,
-        startDate: cls.startDate,
-        endDate: cls.endDate,
+        startDate: formatDateToVN(cls.startDate),
+        endDate: formatDateToVN(cls.endDate),
         stats: {
           totalSessions,
           actualTeachingSessions,
@@ -594,54 +617,29 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
     const teacherId = req.user._id;
     const { startDate, endDate } = req.query;
     
-    // Find all classes taught by this teacher
-    const teacherClasses = await Class.find({ teacher: teacherId })
-      .select('_id name course startDate endDate')
-      .populate('course', 'name')
-      .lean();
-    
-    if (!teacherClasses || teacherClasses.length === 0) {
-      return res.status(200).json({
-        success: true,
-        message: 'Chưa có lớp học nào',
-        total: 0,
-        schedules: []
-      });
-    }
-    
-    
-    const classIds = teacherClasses.map(cls => cls._id);
-    
-    console.log(' Get Current Teacher Schedule:', {
-      teacherId,
-      startDate,
-      endDate,
-      classIds: classIds.length
-    });
-    
-    let query = { class: { $in: classIds } };
+    // Simple query: get all ClassSchedules where teacher is this teacher
+    let query = { teacher: teacherId };
     
     // Filter by date range if provided
     if (startDate && endDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
+      // Parse dates carefully to avoid timezone issues
+      // Expecting YYYY-MM-DD format from frontend
+      const parseDate = (dateStr) => {
+        const [year, month, day] = dateStr.split('-').map(Number);
+        return new Date(Date.UTC(year, month - 1, day));
+      };
       
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
+      const start = parseDate(startDate);
+      start.setUTCHours(0, 0, 0, 0);
+      
+      const end = parseDate(endDate);
+      end.setUTCHours(23, 59, 59, 999);
       
       query.date = {
         $gte: start,
         $lte: end
       };
-      console.log(' Date filter:', {
-        startDate,
-        endDate,
-        startObj: start,
-        endObj: end
-      });
     }
-    
-    console.log(' Query:', JSON.stringify(query));
     
     const schedules = await ClassSchedule.find(query)
       .populate('class', 'name course startDate endDate')
@@ -657,27 +655,21 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
       .sort({ date: 1, startTime: 1 })
       .lean();
     
-    console.log(' Schedules found:', {
-      total: schedules.length,
-      sample: schedules[0] ? {
-        date: schedules[0].date,
-        status: schedules[0].status,
-        className: schedules[0].class?.name
-      } : 'No schedules'
-    });
-    
     // Format schedules with additional info
-    const formattedSchedules = schedules.map(schedule => ({
-      ...schedule,
-      className: schedule.class?.name,
-      courseName: schedule.class?.course?.name,
-      sessionTitle: schedule.session?.title,
-      sessionOrder: schedule.session?.order,
-      roomName: schedule.room?.room_name,
-      location: schedule.room?.location,
-      classStartDate: schedule.class?.startDate,
-      classEndDate: schedule.class?.endDate
-    }));
+    const formattedSchedules = schedules.map(schedule => {
+      return {
+        ...schedule,
+        date: formatDateToVN(schedule.date),
+        className: schedule.class?.name,
+        courseName: schedule.class?.course?.name,
+        sessionTitle: schedule.session?.title,
+        sessionOrder: schedule.session?.order,
+        roomName: schedule.room?.room_name,
+        location: schedule.room?.location,
+        classStartDate: formatDateToVN(schedule.class?.startDate),
+        classEndDate: formatDateToVN(schedule.class?.endDate)
+      };
+    });
     
     res.status(200).json({
       success: true,
@@ -781,8 +773,9 @@ exports.getTeacherSchedule = async (req, res) => {
       const classInfo = teacherClasses.find(c => c._id.toString() === schedule.class._id.toString());
       return {
         ...schedule,
-        classStartDate: classInfo?.startDate,
-        classEndDate: classInfo?.endDate,
+        date: formatDateToVN(schedule.date),
+        classStartDate: formatDateToVN(classInfo?.startDate),
+        classEndDate: formatDateToVN(classInfo?.endDate),
         programType: schedule.class?.course?.program?.type || null
       };
     });
@@ -900,12 +893,12 @@ exports.getMyClasses = async (req, res) => {
           completedLessons,
           totalLessons: allSchedules.length,
           ungradedSubmissions,
-          startDate: cls.startDate,
-          endDate: cls.endDate,
+          startDate: formatDateToVN(cls.startDate),
+          endDate: formatDateToVN(cls.endDate),
           status: classStatus,
           nextLesson: nextLesson ? {
             topic: nextLesson.session?.title || 'Chưa có chủ đề',
-            date: nextLesson.date,
+            date: formatDateToVN(nextLesson.date),
             time: `${nextLesson.startTime} - ${nextLesson.endTime}`
           } : null
         };
@@ -1029,7 +1022,7 @@ exports.getMyClassDetail = async (req, res) => {
             title: hw.assignment?.title || 'Bài tập',
             files: hw.assignment?.files || [],
             answerFiles: hw.answerFiles || [],
-            deadline: hw.deadline,
+            deadline: formatDateToVN(hw.deadline),
             submitted: submittedCount,
             late: lateCount,
             pending: totalStudents - submittedCount,
@@ -1041,7 +1034,7 @@ exports.getMyClassDetail = async (req, res) => {
       return {
         _id: lesson._id,
         lessonNumber: index + 1,
-        date: lesson.date,
+        date: formatDateToVN(lesson.date),
         time: `${lesson.startTime} - ${lesson.endTime}`,
         topic: lesson.session?.title || 'Chưa có chủ đề',
         sessionOrder: lesson.session?.order,
@@ -1066,7 +1059,7 @@ exports.getMyClassDetail = async (req, res) => {
             type: mat.file?.endsWith('.pdf') ? 'document' : 
                   mat.file?.endsWith('.mp3') ? 'audio' : 
                   mat.file?.endsWith('.mp4') ? 'video' : 'document',
-            uploadedAt: lesson.date,
+            uploadedAt: formatDateToVN(lesson.date),
             size: '2.5 MB', // Placeholder
             downloads: Math.floor(Math.random() * 50) // Placeholder
           });
@@ -1223,7 +1216,7 @@ exports.getMyClassDetail = async (req, res) => {
           sessionOrder: sessionOrder,
           lessonNumber: lessonIndex + 1,
           lessonId: mocktestLesson._id,
-          date: mocktestLesson.date,
+          date: formatDateToVN(mocktestLesson.date),
           status: formattedLessons[lessonIndex]?.status || 'scheduled',
           title: `Mocktest ${sessionOrder}`
         });
@@ -1258,7 +1251,7 @@ exports.getMyClassDetail = async (req, res) => {
             lessonNumber: lesson.lessonNumber,
             sessionOrder: lesson.sessionOrder,
             title: hw.title,
-            deadline: hw.deadline,
+            deadline: formatDateToVN(hw.deadline),
             onTime: onTime,
             late: hw.late,
             pending: hw.pending,
@@ -1311,8 +1304,8 @@ exports.getMyClassDetail = async (req, res) => {
         completedLessons,
         totalLessons: lessons.length,
         averageAttendance,
-        startDate: classInfo.startDate,
-        endDate: classInfo.endDate,
+        startDate: formatDateToVN(classInfo.startDate),
+        endDate: formatDateToVN(classInfo.endDate),
         status: classStatus,
         nextLesson: nextLesson ? {
           topic: nextLesson.topic,
@@ -1413,7 +1406,7 @@ exports.getLessonDetail = async (req, res) => {
     // Format response
     const lessonDetail = {
       _id: schedule._id,
-      date: schedule.date,
+      date: formatDateToVN(schedule.date),
       startTime: schedule.startTime,
       endTime: schedule.endTime,
       status: schedule.status,
@@ -1422,8 +1415,8 @@ exports.getLessonDetail = async (req, res) => {
       className: schedule.class?.name,
       courseName: schedule.class?.course?.name,
       courseDescription: schedule.class?.course?.description,
-      classStartDate: schedule.class?.startDate,
-      classEndDate: schedule.class?.endDate,
+      classStartDate: formatDateToVN(schedule.class?.startDate),
+      classEndDate: formatDateToVN(schedule.class?.endDate),
       
       // Session info
       sessionTitle: schedule.session?.title,
@@ -1952,7 +1945,7 @@ exports.getClassMaterials = async (req, res) => {
             lessonNumber: schedule.session?.order || 0,
             lessonTitle: schedule.session?.title || schedule.topic || 'Chưa có tiêu đề',
             url: materialObj.file,
-            uploadDate: schedule.date,
+            uploadDate: formatDateToVN(schedule.date),
             scheduleId: schedule._id
           });
         });

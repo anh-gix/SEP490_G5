@@ -8,7 +8,7 @@ import studentScheduleService from '../../services/studentScheduleService';
 const MakeupClassModalForAcademicStaff = ({ 
   show,
   studentScheduleId,
-  requestType = 'makeup_class', // 'makeup_class' or 'replace_teacher'
+  requestType = 'makeup_class', // 'makeup_class' or 'request_replace_teacher'
   senderSchedule = [],
   onClose, 
   onSubmit,
@@ -36,8 +36,10 @@ const MakeupClassModalForAcademicStaff = ({
   const [sessionId, setSessionId] = useState(null);
   const [currentClassScheduleId, setCurrentClassScheduleId] = useState(null);
   
-  // State for substitute teacher (for replace_teacher)
+  // State for substitute teacher (for request_replace_teacher)
   const [selectedSubstituteTeacherId, setSelectedSubstituteTeacherId] = useState('');
+  const [teacherConflict, setTeacherConflict] = useState(null);
+  const [checkingTeacherConflict, setCheckingTeacherConflict] = useState(false);
   
   // Original schedule info
   const [originalScheduleInfo, setOriginalScheduleInfo] = useState(null);
@@ -95,7 +97,10 @@ const MakeupClassModalForAcademicStaff = ({
           date: classSchedule.date,
           startTime: classSchedule.startTime,
           endTime: classSchedule.endTime,
+          room: classSchedule.room?._id || classSchedule.room,
           roomName: classSchedule.room?.room_name || 'N/A',
+          teacher: classSchedule.teacher?._id || classSchedule.teacher,
+          teacherName: classSchedule.teacher?.username || classSchedule.teacher?.fullName || 'N/A',
           sessionId: classSchedule.session?._id,
           sessionTitle: classSchedule.session?.title,
           sessionOrder: classSchedule.session?.order
@@ -142,14 +147,44 @@ const MakeupClassModalForAcademicStaff = ({
     }
   };
 
+  // Helper function to parse date string to local date (avoid timezone issues)
+  const parseDateToLocal = (dateString) => {
+    if (!dateString) return null;
+    
+    // If date string is in YYYY-MM-DD format, parse directly
+    const dateMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (dateMatch) {
+      const year = parseInt(dateMatch[1], 10);
+      const month = parseInt(dateMatch[2], 10) - 1; // Month is 0-indexed
+      const day = parseInt(dateMatch[3], 10);
+      return new Date(year, month, day);
+    }
+    
+    // Fallback to regular Date parsing
+    return new Date(dateString);
+  };
+
   // Helper function to format date to YYYY-MM-DD
   const formatDateToYYYYMMDD = (date) => {
     if (!date) return '';
-    const d = new Date(date);
+    const d = parseDateToLocal(date);
+    if (!d || isNaN(d.getTime())) return '';
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  // Helper function to format date for display (avoid timezone issues)
+  const formatDateForDisplay = (dateString) => {
+    if (!dateString) return '';
+    const date = parseDateToLocal(dateString);
+    if (!date || isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
   };
 
   // Helper function to check time overlap
@@ -298,11 +333,58 @@ const MakeupClassModalForAcademicStaff = ({
     }
   };
 
+  const checkSubstituteTeacherConflict = async (teacherId) => {
+    if (!teacherId || !originalScheduleInfo) {
+      setTeacherConflict(null);
+      return;
+    }
+
+    // Validate that we have all required info
+    if (!originalScheduleInfo.date || !originalScheduleInfo.startTime || 
+        !originalScheduleInfo.endTime || !originalScheduleInfo.room) {
+      console.error('Missing schedule info:', originalScheduleInfo);
+      setError('Thiếu thông tin buổi học để kiểm tra xung đột');
+      return;
+    }
+
+    try {
+      setCheckingTeacherConflict(true);
+      setTeacherConflict(null);
+
+      const response = await classScheduleService.validateScheduleConflictSimple({
+        date: originalScheduleInfo.date,
+        startTime: originalScheduleInfo.startTime,
+        endTime: originalScheduleInfo.endTime,
+        room: originalScheduleInfo.room,
+        teacher: teacherId,
+        studentId: null,
+        excludeScheduleId: originalScheduleInfo.classScheduleId
+      });
+
+      if (response.success && response.conflicts?.teacher?.length > 0) {
+        setTeacherConflict({
+          hasConflict: true,
+          conflicts: response.conflicts.teacher
+        });
+      } else {
+        setTeacherConflict({
+          hasConflict: false,
+          conflicts: []
+        });
+      }
+    } catch (err) {
+      console.error('Error checking teacher conflict:', err);
+      setError('Không thể kiểm tra xung đột lịch dạy của giáo viên');
+    } finally {
+      setCheckingTeacherConflict(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
 
-    if (requestType === 'replace_teacher') {
+    if (requestType === 'request_replace_teacher') {
       // Handle substitute teacher
       if (!selectedSubstituteTeacherId) {
         setError('Vui lòng chọn giáo viên dạy thay');
@@ -430,10 +512,10 @@ const MakeupClassModalForAcademicStaff = ({
 
   if (!show) return null;
 
-  const modalTitle = requestType === 'replace_teacher' 
+  const modalTitle = requestType === 'request_replace_teacher' 
     ? 'Xếp giáo viên dạy thay' 
     : 'Xếp buổi học bù';
-  const modalHeaderClass = requestType === 'replace_teacher' 
+  const modalHeaderClass = requestType === 'request_replace_teacher' 
     ? 'bg-info text-white' 
     : 'bg-warning text-white';
 
@@ -471,7 +553,7 @@ const MakeupClassModalForAcademicStaff = ({
                     <div className="text-14">
                       <strong className="text-neutral-900">Ngày học:</strong> 
                       <span className="text-neutral-700 ms-2">
-                        {originalScheduleInfo.date ? new Date(originalScheduleInfo.date).toLocaleDateString('vi-VN') : 'N/A'}
+                        {formatDateForDisplay(originalScheduleInfo.date) || 'N/A'}
                       </span>
                     </div>
                   </div>
@@ -548,7 +630,7 @@ const MakeupClassModalForAcademicStaff = ({
           )}
 
           {/* Content based on request type */}
-          {requestType === 'replace_teacher' ? (
+          {requestType === 'request_replace_teacher' ? (
             // Substitute teacher selection
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold">
@@ -556,16 +638,73 @@ const MakeupClassModalForAcademicStaff = ({
               </Form.Label>
               <Form.Select
                 value={selectedSubstituteTeacherId}
-                onChange={(e) => setSelectedSubstituteTeacherId(e.target.value)}
+                onChange={(e) => {
+                  const teacherId = e.target.value;
+                  setSelectedSubstituteTeacherId(teacherId);
+                  if (teacherId) {
+                    checkSubstituteTeacherConflict(teacherId);
+                  } else {
+                    setTeacherConflict(null);
+                  }
+                }}
+                disabled={checkingTeacherConflict || loadingOriginalSchedule || !originalScheduleInfo}
                 required
               >
                 <option value="">-- Chọn giáo viên dạy thay --</option>
-                {teachers.map(teacher => (
-                  <option key={teacher._id || teacher.id} value={teacher._id || teacher.id}>
-                    {teacher.username || teacher.fullName || teacher.name || 'N/A'}
-                  </option>
-                ))}
+                {teachers
+                  .filter(teacher => {
+                    const teacherId = (teacher._id || teacher.id)?.toString();
+                    const currentTeacherId = originalScheduleInfo?.teacher?.toString();
+                    return teacherId !== currentTeacherId;
+                  })
+                  .map(teacher => (
+                    <option key={teacher._id || teacher.id} value={teacher._id || teacher.id}>
+                      {teacher.username || teacher.fullName || teacher.name || 'N/A'}
+                    </option>
+                  ))
+                }
               </Form.Select>
+              
+              {/* Loading original schedule indicator */}
+              {loadingOriginalSchedule && (
+                <div className="mt-2 text-muted">
+                  <i className="fas fa-spinner fa-spin me-2"></i>
+                  Đang tải thông tin buổi học...
+                </div>
+              )}
+              
+              {/* Loading conflict check indicator */}
+              {checkingTeacherConflict && (
+                <div className="mt-2 text-info">
+                  <i className="fas fa-spinner fa-spin me-2"></i>
+                  Đang kiểm tra xung đột lịch dạy...
+                </div>
+              )}
+
+              {/* Conflict warning */}
+              {teacherConflict && teacherConflict.hasConflict && (
+                <Alert variant="danger" className="mt-3 mb-0">
+                  <Alert.Heading className="h6">
+                    <i className="fas fa-exclamation-triangle me-2"></i>
+                    Giáo viên đã có lịch dạy trùng giờ!
+                  </Alert.Heading>
+                  <ul className="mb-0 mt-2">
+                    {teacherConflict.conflicts.map((conflict, idx) => (
+                      <li key={idx}>
+                        Lớp {conflict.className} - {conflict.date} ({conflict.time})
+                      </li>
+                    ))}
+                  </ul>
+                </Alert>
+              )}
+
+              {/* Success message */}
+              {teacherConflict && !teacherConflict.hasConflict && selectedSubstituteTeacherId && (
+                <Alert variant="success" className="mt-3 mb-0">
+                  <i className="fas fa-check-circle me-2"></i>
+                  Giáo viên không có xung đột lịch dạy
+                </Alert>
+              )}
             </Form.Group>
           ) : (
             // Makeup class options
@@ -617,9 +756,7 @@ const MakeupClassModalForAcademicStaff = ({
                         <option value="">-- Chọn buổi học bù --</option>
                         {availableSchedules.map((schedule) => {
                           const scheduleId = (schedule._id || schedule.id)?.toString();
-                          const dateStr = schedule.date 
-                            ? new Date(schedule.date).toLocaleDateString('vi-VN') 
-                            : '';
+                          const dateStr = formatDateForDisplay(schedule.date);
                           const timeStr = `${schedule.startTime || ''} - ${schedule.endTime || ''}`;
                           const className = schedule.class?.name || 'N/A';
                           const sessionTitle = schedule.session?.title || 'N/A';
@@ -640,9 +777,7 @@ const MakeupClassModalForAcademicStaff = ({
                         
                         if (!selectedSchedule) return null;
                         
-                        const scheduleDate = selectedSchedule.date 
-                          ? new Date(selectedSchedule.date).toLocaleDateString('vi-VN')
-                          : 'N/A';
+                        const scheduleDate = formatDateForDisplay(selectedSchedule.date) || 'N/A';
                         
                         return (
                           <Card className="mt-3 bg-success-25 border border-success-200 rounded-12" style={{ borderLeft: '4px solid #4CAF50' }}>
@@ -824,12 +959,14 @@ const MakeupClassModalForAcademicStaff = ({
             Hủy
           </Button>
           <Button 
-            variant={requestType === 'replace_teacher' ? 'info' : 'warning'}
+            variant={requestType === 'request_replace_teacher' ? 'info' : 'warning'}
             type="submit" 
             disabled={
               loading || 
               validating || 
-              (requestType === 'replace_teacher' && !selectedSubstituteTeacherId) ||
+              checkingTeacherConflict ||
+              (requestType === 'request_replace_teacher' && !selectedSubstituteTeacherId) ||
+              (requestType === 'request_replace_teacher' && teacherConflict?.hasConflict) ||
               (requestType === 'makeup_class' && makeupOption === 'new' && conflicts && conflicts.hasConflict) ||
               (requestType === 'makeup_class' && makeupOption === 'existing' && !selectedExistingScheduleId)
             }
@@ -842,7 +979,7 @@ const MakeupClassModalForAcademicStaff = ({
             ) : (
               <>
                 <i className="fas fa-save me-2"></i>
-                {requestType === 'replace_teacher' 
+                {requestType === 'request_replace_teacher' 
                   ? 'Xác nhận chọn giáo viên dạy thay'
                   : makeupOption === 'existing' 
                     ? 'Xác nhận chọn buổi học bù' 

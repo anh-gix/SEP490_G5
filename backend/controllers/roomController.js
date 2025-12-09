@@ -1,5 +1,6 @@
 const Room = require("../models/room");
 const ClassSchedule = require("../models/classScheduleModel");
+const Class = require("../models/classModel");
 const Course = require("../models/courseModel");
 const mongoose = require("mongoose");
 
@@ -116,6 +117,32 @@ exports.updateRoom = async (req, res) => {
       if (existingRoom) {
         return res.status(400).json({ 
           message: "Tên phòng đã tồn tại" 
+        });
+      }
+    }
+    
+    // Validate capacity reduction - check if existing classes would be affected
+    if (capacity && capacity < room.capacity) {
+      // Find all active classes using this room
+      const classesUsingRoom = await Class.find({ 
+        room: id,
+        status: { $in: ['pending', 'active'] }
+      }).select('name students').lean();
+      
+      // Check if any class has more students than the new capacity
+      const problematicClasses = classesUsingRoom.filter(
+        cls => cls.students.length > capacity
+      );
+      
+      if (problematicClasses.length > 0) {
+        const classNames = problematicClasses.map(cls => cls.name).join(', ');
+        const maxStudents = Math.max(...problematicClasses.map(cls => cls.students.length));
+        
+        return res.status(400).json({ 
+          message: `Không thể giảm sức chứa phòng xuống ${capacity}. Có ${problematicClasses.length} lớp học đang sử dụng phòng này với số học viên nhiều hơn (tối đa ${maxStudents} học viên).`,
+          affectedClasses: problematicClasses.length,
+          classNames: classNames,
+          maxStudentsInClasses: maxStudents
         });
       }
     }

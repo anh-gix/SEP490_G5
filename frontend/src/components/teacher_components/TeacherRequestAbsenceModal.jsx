@@ -48,7 +48,7 @@ const TeacherRequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
 
       // Prepare request data
       const requestData = {
-        type: 'replace_teacher',
+        type: 'request_replace_teacher',
         classScheduleId: schedule.classScheduleId,
         content: formData.description
       };
@@ -207,32 +207,6 @@ const TeacherRequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
               Cung cấp thông tin chi tiết giúp giáo vụ xử lý đơn nhanh hơn
             </Form.Text>
           </Form.Group>
-
-          {/* Important Notice */}
-          <Alert variant="info" className="bg-info-50 border-info-200 rounded-8 mb-0">
-            <div className="d-flex gap-12">
-              <i className="fas fa-info-circle text-info-500 mt-1"></i>
-              <div>
-                <h6 className="text-neutral-900 fw-semibold text-13 mb-8">
-                  Lưu ý quan trọng:
-                </h6>
-                <ul className="text-neutral-700 text-13 mb-0 ps-20">
-                  <li className="mb-4">
-                    Đơn xin nghỉ cần được gửi trước buổi dạy ít nhất 2 giờ
-                  </li>
-                  <li className="mb-4">
-                    Giáo vụ sẽ xem xét và phản hồi trong vòng 24 giờ
-                  </li>
-                  <li className="mb-4">
-                    Bạn có thể theo dõi trạng thái đơn trong mục quản lý đơn
-                  </li>
-                  <li>
-                    Giáo vụ sẽ sắp xếp giáo viên dạy thay cho buổi học này
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </Alert>
         </Form>
       </Modal.Body>
 

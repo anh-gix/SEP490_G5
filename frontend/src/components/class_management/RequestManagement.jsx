@@ -3,7 +3,9 @@ import { Container, Spinner, Alert } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import changeRequestService from '../../services/changeRequestService';
 import academicStaffService from '../../services/academicStaffService';
+import academicWorkRequestService from '../../services/academicWorkRequestService';
 import classService from '../../services/classService';
+import { useAuth } from '../../contexts/AuthContext';
 import RequestStats from './RequestStats';
 import RequestFilters from './RequestFilters';
 import RequestTable from './RequestTable';
@@ -11,6 +13,7 @@ import RejectRequestModal from './RejectRequestModal';
 import ChangeClassModal from './ChangeClassModal';
 import MakeupClassModalForAcademicStaff from './MakeupClassModalForAcademicStaff';
 import RequestDetailPage from '../../pages/AcademicStaff/RequestDetailPage';
+import WorkRequestDetail from '../AcademicStaff/WorkRequestDetail';
 import { formatDate, naturalCompare } from '../../utils/requestHelpers';
 
 /**
@@ -18,7 +21,10 @@ import { formatDate, naturalCompare } from '../../utils/requestHelpers';
  * Component chính quản lý đơn xin đổi buổi/lớp học
  */
 const RequestManagement = () => {
+  const { user } = useAuth();
   const [changeRequests, setChangeRequests] = useState([]);
+  const [workRequests, setWorkRequests] = useState([]);
+  const [mergedRequests, setMergedRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
@@ -28,14 +34,14 @@ const RequestManagement = () => {
     pending: 0,
     approved: 0,
     rejected: 0,
-    createClass: 0,
     changeClass: 0,
     makeupClass: 0,
-    replaceTeacher: 0
+    requestReplaceTeacher: 0,
+    assignStudents: 0
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('pending');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [sortBy, setSortBy] = useState('oldest');
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -56,6 +62,9 @@ const RequestManagement = () => {
   const [selectedStudentScheduleId, setSelectedStudentScheduleId] = useState(null);
   const searchTimeoutRef = useRef(null);
 
+  // WorkRequest detail state
+  const [showWorkRequestDetail, setShowWorkRequestDetail] = useState(false);
+
   // Debounce search term
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -74,15 +83,19 @@ const RequestManagement = () => {
     };
   }, [searchTerm]);
 
-  // Fetch requests when filters change
+  // Fetch both ChangeRequests and WorkRequests when filters change
   useEffect(() => {
-    fetchChangeRequests();
-  }, [page, debouncedSearchTerm, filterStatus, filterType, sortBy]);
+    if (user?._id) {
+      fetchAllRequests();
+    }
+  }, [user, page, debouncedSearchTerm, filterStatus, filterType, sortBy]);
 
   // Fetch stats separately
   useEffect(() => {
-    fetchStats();
-  }, [filterStatus]);
+    if (user?._id) {
+      fetchStats();
+    }
+  }, [user, filterStatus]);
 
   const fetchStats = async () => {
     try {
@@ -91,16 +104,28 @@ const RequestManagement = () => {
         params.status = filterStatus;
       }
       
-      const response = await changeRequestService.getStats(params);
-      if (response.success && response.stats) {
+      // Fetch ChangeRequest stats
+      const changeResponse = await changeRequestService.getStats(params);
+      
+      // Fetch WorkRequest stats
+      const workParams = { userId: user._id };
+      if (filterStatus && filterStatus !== 'all') {
+        workParams.status = filterStatus;
+      }
+      const workResponse = await academicWorkRequestService.getStats(workParams);
+      
+      if (changeResponse.success && workResponse.success) {
+        const changeStats = changeResponse.stats || {};
+        const workStats = workResponse.stats || {};
+        
         setStats({
-          pending: response.stats.pending || 0,
-          approved: response.stats.approved || 0,
-          rejected: response.stats.rejected || 0,
-          createClass: response.stats.createClass || 0,
-          changeClass: response.stats.changeClass || 0,
-          makeupClass: response.stats.makeupClass || 0,
-          replaceTeacher: response.stats.replaceTeacher || 0
+          pending: (changeStats.pending || 0) + (workStats.pending || 0),
+          approved: changeStats.approved || 0,
+          rejected: (changeStats.rejected || 0) + (workStats.rejected || 0),
+          changeClass: changeStats.changeClass || 0,
+          makeupClass: changeStats.makeupClass || 0,
+          requestReplaceTeacher: changeStats.requestReplaceTeacher || 0,
+          assignStudents: workStats.assign_students || 0
         });
       }
     } catch (err) {
@@ -108,47 +133,103 @@ const RequestManagement = () => {
     }
   };
 
-  const fetchChangeRequests = async () => {
+  // Normalize request data structure
+  const normalizeRequest = (req, source) => ({
+    ...req,
+    _source: source,
+    _id: req._id,
+    type: source === 'changeRequest' ? req.type : req.requestType,
+    createdAt: source === 'changeRequest' ? req.createdAt : req.requestedAt,
+    sender: source === 'changeRequest' ? req.sender : req.requestedBy,
+    content: source === 'changeRequest' ? req.content : req.requestNote,
+    status: req.status
+  });
+
+  const fetchAllRequests = async () => {
     try {
       setLoading(true);
       setError(null);
       
       // For sender sorting, we need to handle it on frontend after fetching
-      // because MongoDB can't sort by populated fields
       const needsSenderSort = sortBy === 'sender' || sortBy === 'sender-desc';
       const backendSortBy = needsSenderSort ? 'oldest' : sortBy;
       
-      const params = {
+      const changeParams = {
         page,
         limit: 10,
         sortBy: backendSortBy
       };
-      if (debouncedSearchTerm) params.search = debouncedSearchTerm;
-      if (filterStatus && filterStatus !== 'all') params.status = filterStatus;
-      if (filterType && filterType !== 'all') params.type = filterType;
+      if (debouncedSearchTerm) changeParams.search = debouncedSearchTerm;
+      if (filterStatus && filterStatus !== 'all') changeParams.status = filterStatus;
       
-      const response = await changeRequestService.getAllChangeRequests(params);
-      if (response.success) {
-        let requests = response.changeRequests || [];
+      // Only filter by ChangeRequest types or fetch all if 'all' or WorkRequest type
+      if (filterType && filterType !== 'all' && 
+          ['change_class', 'makeup_class', 'request_replace_teacher'].includes(filterType)) {
+        changeParams.type = filterType;
+      }
+      
+      const workParams = { userId: user._id };
+      if (filterStatus && filterStatus !== 'all') workParams.status = filterStatus;
+      
+      // Fetch both ChangeRequests and WorkRequests in parallel
+      const [changeResponse, workResponse] = await Promise.all([
+        changeRequestService.getAllChangeRequests(changeParams),
+        academicWorkRequestService.getAssignedRequests(workParams)
+      ]);
+      
+      if (changeResponse.success && workResponse.success) {
+        let changeReqs = (changeResponse.changeRequests || []).map(req => 
+          normalizeRequest(req, 'changeRequest')
+        );
+        let workReqs = (workResponse.data || []).map(req => 
+          normalizeRequest(req, 'workRequest')
+        );
+        
+        // Filter by type if needed (for WorkRequest types)
+        if (filterType && filterType === 'assign_students') {
+          workReqs = workReqs.filter(req => req.requestType === 'assign_students');
+          changeReqs = []; // Don't show ChangeRequests
+        } else if (filterType && ['change_class', 'makeup_class', 'request_replace_teacher'].includes(filterType)) {
+          workReqs = []; // Don't show WorkRequests
+        }
+        
+        // Filter by search term
+        if (debouncedSearchTerm) {
+          const searchLower = debouncedSearchTerm.toLowerCase();
+          workReqs = workReqs.filter(req => {
+            const content = (req.content || '').toLowerCase();
+            const sender = (req.sender?.username || '').toLowerCase();
+            return content.includes(searchLower) || sender.includes(searchLower);
+          });
+        }
+        
+        // Merge requests
+        let merged = [...changeReqs, ...workReqs];
         
         // Sort by sender on frontend if needed
         if (needsSenderSort) {
-          requests = [...requests].sort((a, b) => {
+          merged = merged.sort((a, b) => {
             const nameA = a.sender?.username || a.sender?.fullName || a.sender?.name || '';
             const nameB = b.sender?.username || b.sender?.fullName || b.sender?.name || '';
             const comparison = naturalCompare(nameA, nameB);
             return sortBy === 'sender-desc' ? -comparison : comparison;
           });
+        } else if (sortBy === 'newest') {
+          merged = merged.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        } else if (sortBy === 'oldest') {
+          merged = merged.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
         }
         
-        setChangeRequests(requests);
-        setTotal(response.total || 0);
-        setTotalPages(response.totalPages || 1);
+        setChangeRequests(changeReqs);
+        setWorkRequests(workReqs);
+        setMergedRequests(merged);
+        setTotal(merged.length);
+        setTotalPages(Math.ceil(merged.length / 10));
       } else {
-        setError(response.message || 'Không thể tải danh sách đơn');
+        setError('Không thể tải danh sách đơn');
       }
     } catch (err) {
-      console.error('Error fetching change requests:', err);
+      console.error('Error fetching requests:', err);
       setError(err.message || 'Có lỗi xảy ra khi tải danh sách đơn');
     } finally {
       setLoading(false);
@@ -156,25 +237,33 @@ const RequestManagement = () => {
   };
 
   const handleApproveClick = async (request) => {
-    setSelectedRequest(request);
-    setShowDetailModal(true);
-    setRejectReason('');
-    setLoadingSchedule(true);
-    setSenderSchedule([]);
-    setSenderRole(null);
-    
-    try {
-      const response = await changeRequestService.getSenderSchedule(request._id);
-      if (response.success) {
-        setSenderSchedule(response.schedules || []);
-        setSenderRole(response.sender?.role || null);
-      }
-    } catch (err) {
-      console.error('Error fetching schedule:', err);
+    // Check if this is a WorkRequest or ChangeRequest
+    if (request._source === 'workRequest') {
+      // Show WorkRequest detail
+      setSelectedRequest(request);
+      setShowWorkRequestDetail(true);
+    } else {
+      // Show ChangeRequest detail (existing flow)
+      setSelectedRequest(request);
+      setShowDetailModal(true);
+      setRejectReason('');
+      setLoadingSchedule(true);
       setSenderSchedule([]);
       setSenderRole(null);
-    } finally {
-      setLoadingSchedule(false);
+      
+      try {
+        const response = await changeRequestService.getSenderSchedule(request._id);
+        if (response.success) {
+          setSenderSchedule(response.schedules || []);
+          setSenderRole(response.sender?.role || null);
+        }
+      } catch (err) {
+        console.error('Error fetching schedule:', err);
+        setSenderSchedule([]);
+        setSenderRole(null);
+      } finally {
+        setLoadingSchedule(false);
+      }
     }
   };
 
@@ -184,11 +273,163 @@ const RequestManagement = () => {
     setRejectReason('');
   };
 
+  // Helper function to format date for display
+  const formatDateForResponse = (dateString) => {
+    if (!dateString) return '';
+    const dateMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (dateMatch) {
+      const year = parseInt(dateMatch[1], 10);
+      const month = parseInt(dateMatch[2], 10) - 1;
+      const day = parseInt(dateMatch[3], 10);
+      const date = new Date(year, month, day);
+      return date.toLocaleDateString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    }
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  // Generate response content automatically
+  const generateResponseContent = () => {
+    const parts = [];
+    
+    // Handle makeup classes
+    if (pendingMakeupClasses && pendingMakeupClasses.length > 0) {
+      pendingMakeupClasses.forEach((makeup) => {
+        // Get absent date and time - try multiple sources
+        let absentDate = '';
+        let absentTime = '';
+        
+        // Try 1: Find from senderSchedule
+        const absentSchedule = senderSchedule.find(sch => {
+          const schId = sch.studentScheduleId || sch._id || sch.id;
+          const absentId = makeup.absentScheduleId?.toString();
+          if (!schId || !absentId) return false;
+          return schId.toString() === absentId;
+        });
+        
+        if (absentSchedule) {
+          absentDate = formatDateForResponse(absentSchedule.date);
+          absentTime = absentSchedule.startTime && absentSchedule.endTime
+            ? `${absentSchedule.startTime} - ${absentSchedule.endTime}`
+            : '';
+        } else if (makeup.absentSchedule?.date) {
+          // Try 2: From makeup.absentSchedule
+          absentDate = formatDateForResponse(makeup.absentSchedule.date);
+          absentTime = makeup.absentSchedule.startTime && makeup.absentSchedule.endTime
+            ? `${makeup.absentSchedule.startTime} - ${makeup.absentSchedule.endTime}`
+            : '';
+        }
+        
+        // Try 3: From selectedRequest (for makeup_class type)
+        if (!absentDate && selectedRequest?.studentScheduleId) {
+          const studentSchedule = selectedRequest.studentScheduleId;
+          const classSchedule = studentSchedule?.classSchedule;
+          if (classSchedule?.date) {
+            absentDate = formatDateForResponse(classSchedule.date);
+            absentTime = classSchedule.startTime && classSchedule.endTime
+              ? `${classSchedule.startTime} - ${classSchedule.endTime}`
+              : '';
+          }
+        }
+        
+        // Try 4: Search in all senderSchedule items by matching IDs more flexibly
+        if (!absentDate && senderSchedule.length > 0) {
+          const absentId = makeup.absentScheduleId?.toString();
+          for (const sch of senderSchedule) {
+            // Try different ID fields
+            const possibleIds = [
+              sch.studentScheduleId,
+              sch._id,
+              sch.id,
+              sch.classSchedule?._id,
+              sch.classSchedule?.id
+            ].filter(Boolean).map(id => id?.toString());
+            
+            if (possibleIds.includes(absentId)) {
+              absentDate = formatDateForResponse(sch.date);
+              absentTime = sch.startTime && sch.endTime
+                ? `${sch.startTime} - ${sch.endTime}`
+                : '';
+              break;
+            }
+          }
+        }
+        
+        // Get makeup schedule info
+        let makeupDate = '';
+        let makeupTime = '';
+        
+        if (makeup.isSubstituteClass && makeup.substituteTeacherInfo) {
+          // Giáo viên dạy thay
+          const teacherName = makeup.substituteTeacherInfo.username || 
+                             makeup.substituteTeacherInfo.fullName || 
+                             makeup.substituteTeacherInfo.name || 
+                             'giáo viên';
+          
+          // Try to get date from selectedRequest.classScheduleId for request_replace_teacher
+          if (!absentDate && selectedRequest?.classScheduleId) {
+            const classSchedule = selectedRequest.classScheduleId;
+            if (classSchedule?.date) {
+              absentDate = formatDateForResponse(classSchedule.date);
+              absentTime = classSchedule.startTime && classSchedule.endTime
+                ? `${classSchedule.startTime} - ${classSchedule.endTime}`
+                : '';
+            }
+          }
+          
+          parts.push(`Đã xếp ${teacherName} dạy thay cho buổi học ngày ${absentDate || 'N/A'}${absentTime ? ` (${absentTime})` : ''}`);
+        } else if (makeup.isNewMakeup) {
+          // Buổi học bù mới
+          makeupDate = formatDateForResponse(makeup.newMakeupDate);
+          makeupTime = makeup.newMakeupStartTime && makeup.newMakeupEndTime
+            ? `${makeup.newMakeupStartTime} - ${makeup.newMakeupEndTime}`
+            : '';
+          if (absentDate && makeupDate) {
+            parts.push(`Đã chuyển buổi học ngày ${absentDate}${absentTime ? ` (${absentTime})` : ''} sang buổi học bù ngày ${makeupDate}${makeupTime ? ` (${makeupTime})` : ''}`);
+          }
+        } else if (makeup.makeupSchedule) {
+          // Buổi học bù từ schedule có sẵn
+          makeupDate = formatDateForResponse(makeup.makeupSchedule.date);
+          makeupTime = makeup.makeupSchedule.startTime && makeup.makeupSchedule.endTime
+            ? `${makeup.makeupSchedule.startTime} - ${makeup.makeupSchedule.endTime}`
+            : '';
+          if (absentDate && makeupDate) {
+            parts.push(`Đã chuyển buổi học ngày ${absentDate}${absentTime ? ` (${absentTime})` : ''} sang buổi học bù ngày ${makeupDate}${makeupTime ? ` (${makeupTime})` : ''}`);
+          }
+        }
+      });
+    }
+    
+    // Handle class change
+    if (pendingClassChange) {
+      const oldClassName = pendingClassChange.oldClassInfo?.className || pendingClassChange.oldClassInfo?.name || 'N/A';
+      const newClassName = pendingClassChange.newClassInfo?.className || pendingClassChange.newClassInfo?.name || 'N/A';
+      parts.push(`Đã chuyển từ lớp ${oldClassName} sang lớp ${newClassName}`);
+    }
+    
+    return parts.length > 0 ? parts.join('. ') : 'Đã chấp nhận đơn';
+  };
+
   const handleApprove = async () => {
     if (!selectedRequest) return;
     
     try {
       setProcessing(true);
+      
+      // Generate response content automatically
+      const responseContent = generateResponseContent();
       
       const approvalData = {
         pendingMakeupClasses: pendingMakeupClasses.map(makeup => ({
@@ -208,7 +449,8 @@ const RequestManagement = () => {
         pendingClassChange: pendingClassChange ? {
           oldClassId: pendingClassChange.oldClassId,
           newClassId: pendingClassChange.newClassId
-        } : null
+        } : null,
+        responseContent: responseContent
       };
       
       await academicStaffService.approveChangeRequest(selectedRequest._id, approvalData);
@@ -220,7 +462,7 @@ const RequestManagement = () => {
       setPendingClassChange(null);
       setPendingMakeupClasses([]);
       setPendingMakeupSessions([]);
-      fetchChangeRequests();
+      fetchAllRequests();
       fetchStats();
     } catch (err) {
       console.error('Error approving request:', err);
@@ -248,7 +490,7 @@ const RequestManagement = () => {
       setPendingClassChange(null);
       setPendingMakeupClasses([]);
       setPendingMakeupSessions([]);
-      fetchChangeRequests();
+      fetchAllRequests();
       fetchStats();
     } catch (err) {
       console.error('Error rejecting request:', err);
@@ -507,12 +749,25 @@ const RequestManagement = () => {
     );
   }
 
+  // If showing WorkRequest detail, render that instead
+  if (showWorkRequestDetail && selectedRequest) {
+    return (
+      <WorkRequestDetail 
+        requestId={selectedRequest._id}
+        onBack={() => {
+          setShowWorkRequestDetail(false);
+          setSelectedRequest(null);
+        }}
+      />
+    );
+  }
+
   return (
     <Container fluid className="p-24">
       {/* Header */}
       <div className="mb-24">
-        <h4 className="text-neutral-900 fw-bold mb-8">Quản lý đơn</h4>
-        <p className="text-neutral-600 mb-0">Quản lý đơn xin đổi buổi/lớp học từ học viên và giảng viên</p>
+        <h4 className="text-neutral-900 fw-bold mb-8">Quản lý yêu cầu</h4>
+        <p className="text-neutral-600 mb-0">Quản lý đơn xin và công việc được giao</p>
       </div>
 
       {/* Stats Cards */}
@@ -521,6 +776,7 @@ const RequestManagement = () => {
         filterType={filterType}
         onFilterTypeChange={(type) => {
           setFilterType(type);
+          setFilterStatus('all'); // Reset status when changing type
           setPage(1);
         }}
       />
@@ -529,6 +785,7 @@ const RequestManagement = () => {
       <RequestFilters
         searchTerm={searchTerm}
         filterStatus={filterStatus}
+        filterType={filterType}
         sortBy={sortBy}
         onSearchChange={(value) => {
           setSearchTerm(value);
@@ -559,10 +816,10 @@ const RequestManagement = () => {
         </Alert>
       )}
 
-      {/* Table */}
+      {/* Table - showing merged requests */}
       {!loading && !error && (
         <RequestTable
-          requests={changeRequests}
+          requests={mergedRequests}
           loading={loading}
           error={error}
           page={page}

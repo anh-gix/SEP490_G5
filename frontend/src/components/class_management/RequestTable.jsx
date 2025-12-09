@@ -94,21 +94,18 @@ const RequestTable = ({
                     {formatDate(request.approvedDate)}
                   </td>
                   <td className="px-20 py-16">
-                    {request.status === 'pending' ? (
-                      <Button
-                        variant="success"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onViewDetails(request);
-                        }}
-                        disabled={processing}
-                      >
-                        Xem chi tiết
-                      </Button>
-                    ) : (
-                      <span className="text-neutral-500 text-13">-</span>
-                    )}
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewDetails(request);
+                      }}
+                      disabled={processing}
+                    >
+                      <i className="fas fa-eye me-1"></i>
+                      Xem chi tiết
+                    </Button>
                   </td>
                 </tr>
               ))

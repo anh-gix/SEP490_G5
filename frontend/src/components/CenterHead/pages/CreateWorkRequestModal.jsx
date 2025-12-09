@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import Button from '../compo/Button';
 import { workRequestService } from '../../../services/workRequestService';
+import { userService } from '../../../services/userService';
+import { courseService } from '../../../services/courseService';
 
 const CreateWorkRequestModal = ({ show, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -29,7 +32,7 @@ const CreateWorkRequestModal = ({ show, onClose, onSuccess }) => {
     inputFile: null
   });
 
-  // Mock data - Replace with actual API calls
+  // Data from API
   const [users, setUsers] = useState([]);
   const [courses, setCourses] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -47,18 +50,14 @@ const CreateWorkRequestModal = ({ show, onClose, onSuccess }) => {
   const fetchUsers = async () => {
     try {
       setLoadingUsers(true);
-      // TODO: Replace with actual API call to get users (Subject Leader, Academic Staff)
-      // const response = await userService.getStaffUsers();
-      // setUsers(response.data);
-
-      // Mock data for now
-      setUsers([
-        { _id: '1', username: 'Nguyễn Văn A', email: 'a@example.com', role: 'subject_leader' },
-        { _id: '2', username: 'Trần Thị B', email: 'b@example.com', role: 'academic_staff' },
-        { _id: '3', username: 'Lê Văn C', email: 'c@example.com', role: 'subject_leader' }
-      ]);
+      const response = await userService.getUsersByRoles(['Subject Leader', 'Academic Staff']);
+      
+      if (response.success) {
+        setUsers(response.data);
+      }
     } catch (error) {
       console.error('Error fetching users:', error);
+      toast.error('Không thể lấy danh sách nhân viên: ' + (error.message || 'Unknown error'));
     } finally {
       setLoadingUsers(false);
     }
@@ -67,18 +66,14 @@ const CreateWorkRequestModal = ({ show, onClose, onSuccess }) => {
   const fetchCourses = async () => {
     try {
       setLoadingCourses(true);
-      // TODO: Replace with actual API call to get completed courses
-      // const response = await courseService.getCourses({ status: 'completed' });
-      // setCourses(response.data);
-
-      // Mock data for now
-      setCourses([
-        { _id: '1', name: 'IELTS Foundation', code: 'IELTS-F1', status: 'completed' },
-        { _id: '2', name: 'TOEIC Basic', code: 'TOEIC-B1', status: 'completed' },
-        { _id: '3', name: 'Business English', code: 'BE-01', status: 'completed' }
-      ]);
+      const response = await courseService.getCourses({ status: 'completed' });
+      
+      if (response.success) {
+        setCourses(response.data);
+      }
     } catch (error) {
       console.error('Error fetching courses:', error);
+      toast.error('Không thể lấy danh sách khóa học: ' + (error.message || 'Unknown error'));
     } finally {
       setLoadingCourses(false);
     }
@@ -119,40 +114,40 @@ const CreateWorkRequestModal = ({ show, onClose, onSuccess }) => {
 
   const validateForm = () => {
     if (!requestType) {
-      alert('Vui lòng chọn loại yêu cầu');
+      toast.warning('Vui lòng chọn loại yêu cầu');
       return false;
     }
 
     if (!formData.assignedTo) {
-      alert('Vui lòng chọn người được giao việc');
+      toast.warning('Vui lòng chọn người được giao việc');
       return false;
     }
 
     switch (requestType) {
       case 'create_program':
         if (!formData.programName || !formData.programCode) {
-          alert('Vui lòng nhập tên và mã chương trình');
+          toast.warning('Vui lòng nhập tên và mã chương trình');
           return false;
         }
         break;
 
       case 'edit_course':
         if (!formData.courseId || !formData.courseChangeDetails) {
-          alert('Vui lòng chọn khóa học và mô tả thay đổi');
+          toast.warning('Vui lòng chọn khóa học và mô tả thay đổi');
           return false;
         }
         break;
 
       case 'create_exam':
         if (!formData.examTitle || !formData.examLevel) {
-          alert('Vui lòng nhập tiêu đề và cấp độ đề thi');
+          toast.warning('Vui lòng nhập tiêu đề và cấp độ đề thi');
           return false;
         }
         break;
 
       case 'assign_students':
         if (!formData.inputFile) {
-          alert('Vui lòng upload file Excel danh sách học viên');
+          toast.warning('Vui lòng upload file Excel danh sách học viên');
           return false;
         }
         break;
@@ -174,10 +169,19 @@ const CreateWorkRequestModal = ({ show, onClose, onSuccess }) => {
     try {
       setLoading(true);
 
+      // Get current user (Center Head)
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      if (!currentUser._id) {
+        toast.error('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.');
+        setLoading(false);
+        return;
+      }
+
       // Prepare form data for multipart/form-data
       const submitData = new FormData();
       submitData.append('requestType', requestType);
       submitData.append('assignedTo', formData.assignedTo);
+      submitData.append('requestedBy', currentUser._id);
       submitData.append('direction', 'top_down');
 
       if (formData.requestNote) {
@@ -222,19 +226,25 @@ const CreateWorkRequestModal = ({ show, onClose, onSuccess }) => {
           break;
       }
 
+      // Debug: Log FormData contents
+      console.log('📤 Sending FormData with:');
+      for (let [key, value] of submitData.entries()) {
+        console.log(`  ${key}:`, value instanceof File ? `File: ${value.name}` : value);
+      }
+
       // Call API to create work request
       const response = await workRequestService.createRequest(submitData);
 
       if (response.success) {
-        alert('Tạo yêu cầu thành công!');
+        toast.success('Tạo yêu cầu thành công!');
         onSuccess();
         handleClose();
       } else {
-        alert(response.message || 'Có lỗi xảy ra khi tạo yêu cầu');
+        toast.error(response.message || 'Có lỗi xảy ra khi tạo yêu cầu');
       }
     } catch (error) {
       console.error('Error creating work request:', error);
-      alert(error.message || 'Có lỗi xảy ra khi tạo yêu cầu');
+      toast.error(error.message || 'Có lỗi xảy ra khi tạo yêu cầu');
     } finally {
       setLoading(false);
     }
@@ -637,7 +647,7 @@ const CreateWorkRequestModal = ({ show, onClose, onSuccess }) => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .request-type-card {
           border: 2px solid #dee2e6;
           transition: all 0.2s;

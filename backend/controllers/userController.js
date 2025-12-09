@@ -413,6 +413,65 @@ const saveBulkUsers = async (req, res) => {
   }
 };
 
+// Get users by roles
+const getUsersByRoles = async (req, res) => {
+  try {
+    const { roles } = req.query; 
+    
+    if (!roles) {
+      return res.status(400).json({
+        success: false,
+        message: 'roles query parameter is required'
+      });
+    }
+
+    // Parse roles
+    const roleNames = roles.split(',').map(r => r.trim());
+    
+    // Find role IDs
+    const roleObjects = await Role.find({ name: { $in: roleNames } });
+    
+    if (roleObjects.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No matching roles found',
+        searchedRoles: roleNames
+      });
+    }
+
+    const roleIds = roleObjects.map(r => r._id);
+    
+    // Get users with these roles
+    const users = await User.find({ roleId: { $in: roleIds } })
+      .select('_id username email phone roleId')
+      .populate('roleId', 'name')
+      .sort({ username: 1 })
+      .lean();
+    
+    // Transform to include role name
+    const usersWithRole = users.map(user => ({
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      phone: user.phone,
+      role: user.roleId?.name || 'Unknown'
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: usersWithRole,
+      count: usersWithRole.length
+    });
+  } catch (error) {
+    console.error('Error getting users by roles:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching users',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUserById,
@@ -420,5 +479,6 @@ module.exports = {
   updateUser,
   deleteUser,
   uploadExcel,
-  saveBulkUsers
+  saveBulkUsers,
+  getUsersByRoles
 };

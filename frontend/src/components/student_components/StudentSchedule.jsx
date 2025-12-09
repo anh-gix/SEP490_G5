@@ -61,6 +61,10 @@ const StudentSchedule = () => {
   function getCurrentWeek() {
     const today = new Date();
     const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 1));
+
+    console.log('First day of week:', firstDayOfWeek);
+
+    console.log('Last day of week:', new Date(today.setDate(today.getDate() - today.getDay() + 7)));
     return firstDayOfWeek;
   }
 
@@ -96,6 +100,23 @@ const StudentSchedule = () => {
       const status = calculateStatus(item.date, item.endTime);
       const attendanceStatus = item.attendance?.status || null;
 
+      // Xác định className: nếu là buổi học bù (không có class hoặc status là temporary/rescheduled) thì hiển thị "Lớp học bù"
+      let className = item.className;
+      if (!className || className === 'N/A' || className === null || className === undefined) {
+        // Kiểm tra nếu là buổi học bù
+        const isMakeupClass = 
+          item.scheduleStatus === 'rescheduled' || 
+          item.status === 'temporary' || 
+          !item.class || 
+          item.class === null;
+        
+        if (isMakeupClass) {
+          className = 'Lớp học bù';
+        } else {
+          className = 'N/A';
+        }
+      }
+
       return {
         id: item._id,
         date: scheduleDate.toISOString().split('T')[0],
@@ -108,7 +129,7 @@ const StudentSchedule = () => {
         room: item.roomName ? `${item.roomName}${item.location ? ` - ${item.location}` : ''}` : 'Chưa có phòng',
         status: item.scheduleStatus === 'completed' ? 'completed' : status,
         attendanceStatus: attendanceStatus,
-        className: item.className || 'N/A',
+        className: className,
         subject: item.courseName || 'N/A',
         rawData: item
       };
@@ -151,8 +172,24 @@ const StudentSchedule = () => {
       
       if (response.success && response.schedules && Array.isArray(response.schedules)) {
         const transformed = transformScheduleData(response.schedules);
-        console.log('Transformed schedules:', transformed);
-        setSchedules(transformed);
+        
+        // Filter out cancelled schedules
+        const activeSchedules = transformed.filter(schedule => {
+          const rawData = schedule.rawData;
+          if (!rawData) return true;
+          
+          // Check both scheduleStatus (from StudentSchedule) and status (from ClassSchedule)
+          const isCancelled = 
+            rawData.scheduleStatus === 'cancelled' || 
+            rawData.scheduleStatus === 'canceled' ||
+            rawData.status === 'cancelled' || 
+            rawData.status === 'canceled';
+          
+          return !isCancelled;
+        });
+        
+        console.log('Transformed schedules:', transformed.length, 'Active schedules (excluding cancelled):', activeSchedules.length);
+        setSchedules(activeSchedules);
       } else {
         setSchedules([]);
       }

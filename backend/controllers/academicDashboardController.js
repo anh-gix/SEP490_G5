@@ -267,7 +267,7 @@ exports.getDashboardData = async (req, res) => {
         message = `${senderName} đã gửi đơn tạo lớp mới`;
         icon = 'fa-plus-circle';
         color = 'success';
-      } else if (requestType === 'replace_teacher') {
+      } else if (requestType === 'request_replace_teacher') {
         message = `${senderName} đã gửi đơn thay giáo viên`;
         icon = 'fa-user-tie';
         color = 'info';

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import studentService from '../../services/studentService';
 import teacherService from '../../services/teacherService';
 import programService from '../../services/programService';
+import { courseService } from '../../services/courseService';
 import * as XLSX from 'xlsx';
 
 /**
@@ -19,6 +20,55 @@ const ImportStudentFromExcel = () => {
   const [programs, setPrograms] = useState([]);
   const fileInputRef = useRef(null);
 
+  // Helper function to parse levelsToStudy string into array of levels
+  // Example: "B1 → B2" → ["B1", "B2"]
+  // Example: "A1 → A2 → B1" → ["A1", "A2", "B1"]
+  const parseLevelsToStudy = (levelsToStudyStr) => {
+    if (!levelsToStudyStr || typeof levelsToStudyStr !== 'string') {
+      return [];
+    }
+    const cleaned = levelsToStudyStr.trim();
+    if (!cleaned) return [];
+    const levels = cleaned
+      .split(/→|->/)
+      .map(level => level.trim())
+      .filter(level => level.length > 0);
+    return levels;
+  };
+
+  // Function to get courses for a student based on levelsToStudy and type
+  const getCoursesForStudent = async (levelsToStudy, type) => {
+    if (!levelsToStudy || !type) return [];
+    
+    const levels = parseLevelsToStudy(levelsToStudy);
+    if (levels.length === 0) return [];
+    
+    const typeStr = type.toString().trim().toLowerCase();
+    const programNameMap = {
+      'ielts': 'IELTS',
+      'toeic': 'TOEIC',
+      'cam': 'Cambridge'
+    };
+    const programName = programNameMap[typeStr] || typeStr;
+    
+    // Lấy courses cho tất cả levels
+    const allCourses = [];
+    for (const level of levels) {
+      try {
+        const response = await courseService.getCoursesByProgram(programName, level);
+        if (response?.success && response.courses) {
+          allCourses.push(...response.courses);
+        }
+      } catch (error) {
+        // Error fetching courses
+      }
+    }
+    
+    // Loại bỏ duplicates và trả về tên courses
+    const uniqueCourseNames = [...new Set(allCourses.map(c => c.name))];
+    return uniqueCourseNames;
+  };
+
   // Fetch active programs from database on component mount
   useEffect(() => {
     const fetchPrograms = async () => {
@@ -28,9 +78,7 @@ const ImportStudentFromExcel = () => {
         // Filter only active programs
         const activePrograms = allPrograms.filter(p => p.status === 'active');
         setPrograms(activePrograms);
-        console.log('Loaded active programs:', activePrograms.length);
       } catch (error) {
-        console.error('Error fetching programs:', error);
         // Continue with empty array if fetch fails
         setPrograms([]);
       }
@@ -422,9 +470,25 @@ const ImportStudentFromExcel = () => {
           type: type ? type.toString().trim() : '',
           levelsToStudy: levelsToStudy,
           hasError: errors.length > 0,
-          errors
+          errors,
+          warnings: [],
+          isExistingAccount: false,
+          courses: [] // Will be populated later
         });
       });
+
+      // Fetch courses for each student
+      for (let i = 0; i < previewData.length; i++) {
+        const item = previewData[i];
+        if (item.levelsToStudy && item.type && !item.hasError) {
+          try {
+            const courses = await getCoursesForStudent(item.levelsToStudy, item.type);
+            item.courses = courses;
+          } catch (error) {
+            item.courses = [];
+          }
+        }
+      }
 
       // Normalize phone numbers - ensure they all have leading zero for comparison
       const normalizePhone = (phone) => {
@@ -440,20 +504,14 @@ const ImportStudentFromExcel = () => {
       const emailMap = new Map();
       const phoneMap = new Map();
       
-      console.log('=== Checking duplicates in Excel file ===');
-      console.log('Total rows:', previewData.length);
-      
       previewData.forEach((item, index) => {
         const email = item.email.toLowerCase();
         // Normalize phone before checking duplicates
         const phone = normalizePhone(item.phone);
         
-        console.log(`Row ${index + 1}: email="${email}", phone="${item.phone}" -> normalized="${phone}"`);
-        
         // Check duplicate email in file
         if (email && emailMap.has(email)) {
           const firstIndex = emailMap.get(email);
-          console.log(`  -> Email duplicate found! First at row ${firstIndex + 1}`);
           if (!previewData[firstIndex].errors.includes('Email trùng lặp trong file Excel')) {
             previewData[firstIndex].errors.push('Email trùng lặp trong file Excel');
             previewData[firstIndex].hasError = true;
@@ -469,7 +527,6 @@ const ImportStudentFromExcel = () => {
         // Check duplicate phone in file
         if (phone && phoneMap.has(phone)) {
           const firstIndex = phoneMap.get(phone);
-          console.log(`  -> Phone duplicate found! First at row ${firstIndex + 1}, phone="${phone}"`);
           if (!previewData[firstIndex].errors.includes('Số điện thoại trùng lặp trong file Excel')) {
             previewData[firstIndex].errors.push('Số điện thoại trùng lặp trong file Excel');
             previewData[firstIndex].hasError = true;
@@ -482,10 +539,6 @@ const ImportStudentFromExcel = () => {
           phoneMap.set(phone, index);
         }
       });
-      
-      console.log('Email map:', Array.from(emailMap.keys()));
-      console.log('Phone map:', Array.from(phoneMap.keys()));
-      console.log('=== End checking duplicates ===');
 
       // Check for duplicates with existing data in database
       try {
@@ -499,11 +552,6 @@ const ImportStudentFromExcel = () => {
         const allTeachers = teachersResponse.teachers || [];
         const allUsers = [...allStudents, ...allTeachers];
         
-        console.log('=== Checking duplicates with database ===');
-        console.log('Students in DB:', allStudents.length);
-        console.log('Teachers in DB:', allTeachers.length);
-        console.log('Total users in DB:', allUsers.length);
-        
         const existingEmails = new Set(allUsers.map(u => u.email?.toLowerCase()).filter(Boolean));
         
         const existingPhones = new Set(
@@ -512,36 +560,30 @@ const ImportStudentFromExcel = () => {
             .filter(Boolean)
         );
         
-        console.log('Existing emails in DB:', Array.from(existingEmails));
-        console.log('Existing phones in DB:', Array.from(existingPhones));
-        
         previewData.forEach((item) => {
           const email = item.email.toLowerCase();
           const phone = normalizePhone(item.phone);
           
-          console.log(`Checking row: email="${email}", phone="${phone}"`);
-          
           if (email && existingEmails.has(email)) {
-            console.log(`  -> Email "${email}" found in DB!`);
-            item.errors.push('Email đã tồn tại trong hệ thống');
-            item.hasError = true;
+            if (!item.warnings.includes('Học viên đã có tài khoản trong hệ thống')) {
+              item.warnings.push('Học viên đã có tài khoản trong hệ thống');
+              item.isExistingAccount = true;
+            }
           }
           
           if (phone && existingPhones.has(phone)) {
-            console.log(`  -> Phone "${phone}" found in DB!`);
-            item.errors.push('Số điện thoại đã tồn tại trong hệ thống');
-            item.hasError = true;
+            if (!item.warnings.includes('Học viên đã có tài khoản trong hệ thống')) {
+              item.warnings.push('Học viên đã có tài khoản trong hệ thống');
+              item.isExistingAccount = true;
+            }
           }
         });
-        
-        console.log('=== End checking duplicates with database ===');
       } catch (err) {
-        console.error('Error checking existing users:', err);
+        // Error checking existing users
       }
 
       setPreviewStudents(previewData);
     } catch (error) {
-      console.error('Error reading Excel file:', error);
       alert('Lỗi khi đọc file Excel: ' + (error.message || 'Vui lòng thử lại'));
     } finally {
       setImporting(false);
@@ -560,12 +602,34 @@ const ImportStudentFromExcel = () => {
       setLoading(true);
       const result = await studentService.importStudents(validStudents);
       
-      alert(`Import thành công: ${result.success} học viên\nThất bại: ${result.failed} học viên`);
+      const createdCount = result.createdCount || result.results?.created?.length || 0;
+      const enrolledCount = result.enrolledCount || result.results?.enrolled?.length || 0;
+      const skippedCount = result.skippedCount || result.results?.skipped?.length || 0;
+      const failedCount = result.failedCount || result.results?.failed?.length || 0;
+      
+      let message = '';
+      if (createdCount > 0) {
+        message += `Tạo mới: ${createdCount} học viên\n`;
+      }
+      if (enrolledCount > 0) {
+        message += `Đăng ký khóa học: ${enrolledCount} học viên đã có\n`;
+      }
+      if (skippedCount > 0) {
+        message += `Bỏ qua: ${skippedCount} học viên (không có thông tin lộ trình)\n`;
+      }
+      if (failedCount > 0) {
+        message += `Thất bại: ${failedCount} học viên\n`;
+      }
+      
+      if (!message) {
+        message = 'Không có học viên nào được xử lý';
+      }
+      
+      alert(message.trim());
       
       // Navigate back to student management page after successful import
       navigate('/academic/student-management');
     } catch (err) {
-      console.error('Error importing students:', err);
       const errorMessage = err.message || (typeof err === 'string' ? err : 'Không thể import học viên');
       alert(errorMessage);
     } finally {
@@ -611,6 +675,46 @@ const ImportStudentFromExcel = () => {
     XLSX.writeFile(wb, fileName);
   };
 
+  const handleExportReport = () => {
+    if (previewStudents.length === 0) {
+      alert('Không có dữ liệu để xuất báo cáo');
+      return;
+    }
+
+    try {
+      // Tạo data cho Excel
+      const reportData = previewStudents.map(student => ({
+        Username: student.username,
+        Email: student.email,
+        Phone: student.phone,
+        Address: student.address,
+        Aim: student.aim || '',
+        'Trình độ hiện tại': student.currentLevel || '',
+        Type: student.type || '',
+        'Các khóa học đăng ký': student.courses && student.courses.length > 0 
+          ? student.courses.join(', ') 
+          : ''
+      }));
+      
+      // Tạo worksheet
+      const ws = XLSX.utils.json_to_sheet(reportData);
+      
+      // Tạo workbook
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Báo cáo Import');
+      
+      // Tạo tên file với timestamp
+      const now = new Date();
+      const timestamp = now.toISOString().slice(0, 19).replace(/[:-]/g, '').replace('T', '_');
+      const fileName = `BaoCao_Import_HocVien_${timestamp}.xlsx`;
+      
+      // Download
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      alert('Lỗi khi xuất báo cáo: ' + (error.message || 'Vui lòng thử lại'));
+    }
+  };
+
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#f8f9fa' }}>
       {/* Header */}
@@ -638,7 +742,6 @@ const ImportStudentFromExcel = () => {
           </h6>
           <p className="mb-2">Vui lòng đảm bảo file Excel của bạn có đúng format như bảng trên</p>
           <p className="mb-3 text-muted">
-            <i className="fas fa-key me-1"></i>
             Lưu ý: Password sẽ tự động được tạo cho mỗi học viên
           </p>
           
@@ -742,16 +845,30 @@ const ImportStudentFromExcel = () => {
           <Card.Body>
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h6 className="mb-0">Preview dữ liệu</h6>
-              <div>
-                <Badge bg="secondary" className="me-2">
-                  Tổng số: {previewStudents.length}
-                </Badge>
-                <Badge bg="success" className="me-2">
-                  Hợp lệ: {previewStudents.filter(s => !s.hasError).length}
-                </Badge>
-                <Badge bg="danger">
-                  Lỗi: {previewStudents.filter(s => s.hasError).length}
-                </Badge>
+              <div className="d-flex align-items-center gap-3">
+                <div>
+                  <Badge bg="secondary" className="me-2">
+                    Tổng số: {previewStudents.length}
+                  </Badge>
+                  <Badge bg="success" className="me-2">
+                    Hợp lệ: {previewStudents.filter(s => !s.hasError && s.warnings.length === 0).length}
+                  </Badge>
+                  <Badge bg="warning" className="me-2">
+                    Cảnh báo: {previewStudents.filter(s => !s.hasError && s.warnings.length > 0).length}
+                  </Badge>
+                  <Badge bg="danger">
+                    Lỗi: {previewStudents.filter(s => s.hasError).length}
+                  </Badge>
+                </div>
+                <Button
+                  variant="info"
+                  size="sm"
+                  onClick={handleExportReport}
+                  disabled={previewStudents.length === 0}
+                >
+                  <i className="fas fa-file-excel me-2"></i>
+                  Xuất báo cáo
+                </Button>
               </div>
             </div>
             
@@ -773,40 +890,54 @@ const ImportStudentFromExcel = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {previewStudents.map((student, index) => (
-                    <tr 
-                      key={index}
-                      className={student.hasError ? 'table-danger' : 'table-success'}
-                    >
-                      <td>{student.rowNumber}</td>
-                      <td>{student.username}</td>
-                      <td>{student.email}</td>
-                      <td>{student.phone}</td>
-                      <td>{student.address}</td>
-                      <td>{student.aim || '-'}</td>
-                      <td>{student.currentLevel || '-'}</td>
-                      <td>{student.levelsToStudy || '-'}</td>
-                      <td>{student.type || '-'}</td>
-                      <td>
-                        {student.hasError ? (
-                          <Badge bg="danger">Lỗi</Badge>
-                        ) : (
-                          <Badge bg="success">Hợp lệ</Badge>
-                        )}
-                      </td>
-                      <td>
-                        {student.errors.length > 0 ? (
-                          <ul className="mb-0" style={{ fontSize: '12px', paddingLeft: '20px' }}>
-                            {student.errors.map((error, i) => (
-                              <li key={i} className="text-danger">{error}</li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <span className="text-muted">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {previewStudents.map((student, index) => {
+                    const hasWarnings = student.warnings.length > 0;
+                    const rowClassName = student.hasError 
+                      ? 'table-danger' 
+                      : hasWarnings 
+                        ? 'table-warning' 
+                        : 'table-success';
+                    
+                    return (
+                      <tr key={index} className={rowClassName}>
+                        <td>{student.rowNumber}</td>
+                        <td>{student.username}</td>
+                        <td>{student.email}</td>
+                        <td>{student.phone}</td>
+                        <td>{student.address}</td>
+                        <td>{student.aim || '-'}</td>
+                        <td>{student.currentLevel || '-'}</td>
+                        <td>{student.levelsToStudy || '-'}</td>
+                        <td>{student.type || '-'}</td>
+                        <td>
+                          {student.hasError ? (
+                            <Badge bg="danger">Lỗi</Badge>
+                          ) : hasWarnings ? (
+                            <Badge bg="warning">Cảnh báo</Badge>
+                          ) : (
+                            <Badge bg="success">Hợp lệ</Badge>
+                          )}
+                        </td>
+                        <td>
+                          {student.errors.length > 0 ? (
+                            <ul className="mb-0" style={{ fontSize: '12px', paddingLeft: '20px' }}>
+                              {student.errors.map((error, i) => (
+                                <li key={i} className="text-danger">{error}</li>
+                              ))}
+                            </ul>
+                          ) : student.warnings.length > 0 ? (
+                            <ul className="mb-0" style={{ fontSize: '12px', paddingLeft: '20px' }}>
+                              {student.warnings.map((warning, i) => (
+                                <li key={i} className="text-warning">{warning}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span className="text-muted">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </Table>
             </div>

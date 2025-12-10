@@ -73,7 +73,6 @@ exports.getCurrentStudent = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(' Lỗi khi lấy thông tin học viên hiện tại:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy thông tin học viên',
@@ -95,8 +94,6 @@ exports.getMyClasses = async (req, res) => {
       ? (studentId instanceof mongoose.Types.ObjectId ? studentId : new mongoose.Types.ObjectId(studentId))
       : studentId;
 
-    console.log('[getMyClasses] Student ID:', studentId);
-    console.log('[getMyClasses] Student ObjectId:', studentObjectId);
 
     // Find all classes where student is enrolled
     // Query: find classes where students array contains this studentId
@@ -107,11 +104,9 @@ exports.getMyClasses = async (req, res) => {
       query.status = status;
     }
 
-    console.log('[getMyClasses] Query:', JSON.stringify(query, null, 2));
 
     // Also try to find all classes and filter manually to debug
     const allClasses = await Class.find({}).select('_id name students status').lean();
-    console.log('[getMyClasses] Total classes in DB:', allClasses.length);
     const classesWithStudent = allClasses.filter(cls => {
       if (!cls.students || !Array.isArray(cls.students)) return false;
       return cls.students.some(s => {
@@ -120,9 +115,7 @@ exports.getMyClasses = async (req, res) => {
         return sId === studentIdStr;
       });
     });
-    console.log('[getMyClasses] Classes with this student (manual filter):', classesWithStudent.length);
     classesWithStudent.forEach(cls => {
-      console.log(`  - Class: ${cls.name} (${cls._id}), Status: ${cls.status}`);
     });
 
     const classes = await Class.find(query)
@@ -132,11 +125,9 @@ exports.getMyClasses = async (req, res) => {
       .sort({ startDate: -1 })
       .lean();
 
-    console.log('[getMyClasses] Found classes with query:', classes.length);
     
     // If no classes found and status filter is active, try without status filter
     if (classes.length === 0 && status && status !== 'all') {
-      console.log('[getMyClasses] No classes found with status filter, trying without status...');
       const queryWithoutStatus = { students: studentObjectId };
       const classesWithoutStatus = await Class.find(queryWithoutStatus)
         .populate('course', 'name description')
@@ -144,13 +135,12 @@ exports.getMyClasses = async (req, res) => {
         .populate('room', 'room_name')
         .sort({ startDate: -1 })
         .lean();
-      console.log('[getMyClasses] Found classes without status filter:', classesWithoutStatus.length);
       if (classesWithoutStatus.length > 0) {
-        console.log('[getMyClasses] Classes found (without status filter):', classesWithoutStatus.map(c => ({
+        classesWithoutStatus.map(c => ({
           name: c.name,
           status: c.status,
           _id: c._id
-        })));
+        }));
       }
     }
 
@@ -200,7 +190,6 @@ exports.getMyClasses = async (req, res) => {
       classes: classesWithStats
     });
   } catch (error) {
-    console.error(' Lỗi khi lấy danh sách lớp học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy danh sách lớp học',
@@ -245,7 +234,6 @@ exports.getMySchedule = async (req, res) => {
 
     const studentSchedules = await studentSchedulesQuery;
 
-    console.log(`[getMySchedule] Found ${studentSchedules.length} StudentSchedule entries for student ${studentId}`);
 
     if (!studentSchedules || studentSchedules.length === 0) {
       return res.status(200).json({
@@ -259,12 +247,10 @@ exports.getMySchedule = async (req, res) => {
     // Count how many have classSchedule populated
     const withClassSchedule = studentSchedules.filter(ss => ss.classSchedule).length;
     const withoutClassSchedule = studentSchedules.length - withClassSchedule;
-    console.log(`[getMySchedule] StudentSchedules with classSchedule: ${withClassSchedule}, without: ${withoutClassSchedule}`);
 
     // Filter by date range if provided (filter after populate)
     let filteredSchedules = studentSchedules.filter(ss => {
       if (!ss.classSchedule) {
-        console.log(`[getMySchedule] StudentSchedule ${ss._id} missing classSchedule`);
         return false;
       }
       
@@ -282,7 +268,6 @@ exports.getMySchedule = async (req, res) => {
         const isInRange = scheduleDateOnly >= start && scheduleDateOnly <= end;
         
         if (!isInRange) {
-          console.log(`[getMySchedule] Schedule ${ss._id} date ${scheduleDateOnly.toISOString().split('T')[0]} is outside range ${start.toISOString().split('T')[0]} - ${end.toISOString().split('T')[0]}`);
         }
         
         return isInRange;
@@ -291,7 +276,6 @@ exports.getMySchedule = async (req, res) => {
       return true;
     });
     
-    console.log(`[getMySchedule] Total StudentSchedules: ${studentSchedules.length}, After filter: ${filteredSchedules.length}, Date range: ${startDate || 'none'} to ${endDate || 'none'}`);
 
     // Sort by date and startTime
     filteredSchedules.sort((a, b) => {
@@ -341,7 +325,6 @@ exports.getMySchedule = async (req, res) => {
       schedules: formattedSchedules
     });
   } catch (error) {
-    console.error(' Lỗi khi lấy lịch học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy lịch học',
@@ -358,7 +341,6 @@ exports.getLessonDetail = async (req, res) => {
     const studentId = req.user._id;
     const { scheduleId } = req.params;
 
-      console.log('test class :', scheduleId); 
 
 
 const makeup_class = await ClassSchedule.findById(scheduleId)
@@ -367,7 +349,6 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       .populate('teacher', 'username email')
       .lean();
 
-      console.log('make up class:', makeup_class); 
 
     // Find the class schedule
     const classSchedule = await ClassSchedule.findById(scheduleId)
@@ -392,7 +373,6 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       // .populate('teacher', 'username email')
       // .lean();
 
-      // console.log(makeup_class);
 
         return res.status(404).json({
         success: false,
@@ -474,7 +454,6 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       lesson: lessonDetail
     });
   } catch (error) {
-    console.error(' Lỗi khi lấy chi tiết buổi học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy chi tiết buổi học',
@@ -539,7 +518,6 @@ exports.getClassMaterials = async (req, res) => {
       materials
     });
   } catch (error) {
-    console.error(' Lỗi khi lấy tài liệu lớp học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy tài liệu',
@@ -626,7 +604,6 @@ exports.getClassHomework = async (req, res) => {
       homework: homeworkList
     });
   } catch (error) {
-    console.error(' Lỗi khi lấy bài tập lớp học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy bài tập',
@@ -777,7 +754,6 @@ exports.getClassProgress = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(' Lỗi khi lấy tiến độ học tập:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy tiến độ',
@@ -892,7 +868,6 @@ exports.submitHomework = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(' Lỗi khi nộp bài tập:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi nộp bài tập',
@@ -949,7 +924,6 @@ exports.getMySubmission = async (req, res) => {
       submission: submissionData
     });
   } catch (error) {
-    console.error(' Lỗi khi lấy thông tin bài nộp:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy thông tin bài nộp',
@@ -1058,15 +1032,9 @@ exports.getDashboardData = async (req, res) => {
     });
 
     // 5. Get practice test results (from Submission model)
-    console.log(' [Dashboard] Bắt đầu lấy dữ liệu luyện đề cho studentId:', studentId);
     
     const Submission = require('../models/submissionModel');
     const Exam = require('../models/examModel');
-    
-    console.log(' [Dashboard] Query Submission model với điều kiện:', {
-      studentId,
-      status: { $in: ['completed', 'graded'] }
-    });
     
     const submissions = await Submission.find({
       studentId,
@@ -1080,39 +1048,14 @@ exports.getDashboardData = async (req, res) => {
       .limit(10)
       .lean();
 
-    console.log(` [Dashboard] Tìm thấy ${submissions.length} submissions`);
-    
-    if (submissions.length > 0) {
-      console.log(' [Dashboard] Chi tiết submissions:');
-      submissions.forEach((sub, index) => {
-        console.log(`  [${index + 1}] Submission ID: ${sub._id}`);
-        console.log(`      - Exam: ${sub.examId?.title || 'N/A'}`);
-        console.log(`      - Type: ${sub.examId?.type || sub.examId?.examType || 'N/A'}`);
-        console.log(`      - Status: ${sub.status}`);
-        console.log(`      - Total Score: ${sub.totalScore}`);
-        console.log(`      - Band Score: ${sub.bandScore || 'N/A'}`);
-        console.log(`      - Sections: ${sub.sections?.length || 0}`);
-        if (sub.sections && sub.sections.length > 0) {
-          sub.sections.forEach(section => {
-            console.log(`        • ${section.sectionType}: ${section.sectionScore || 0}`);
-          });
-        }
-      });
-    } else {
-      console.log(' [Dashboard] Không tìm thấy submission nào cho student này');
-    }
 
     const practiceTests = submissions
       .filter(sub => {
         const hasExam = sub.examId && sub.totalScore !== undefined;
-        if (!hasExam) {
-          console.log(` [Dashboard] Submission ${sub._id} bị loại: examId=${!!sub.examId}, totalScore=${sub.totalScore}`);
-        }
         return hasExam;
       })
       .map((sub, index) => {
         const exam = sub.examId;
-        console.log(` [Dashboard] Processing submission ${index + 1}/${submissions.length}: ${sub._id}`);
         
         const result = {
           id: sub._id.toString(),
@@ -1120,8 +1063,6 @@ exports.getDashboardData = async (req, res) => {
           date: sub.createdAt,
           type: exam.examType || exam.type || 'toeic'
         };
-
-        console.log(`   Type detected: ${result.type}`);
 
         // Calculate scores by section type
         if (exam.type === 'toeic' || exam.examType === 'toeic') {
@@ -1135,8 +1076,6 @@ exports.getDashboardData = async (req, res) => {
           result.writing = writingSection?.sectionScore || 0;
           result.speaking = speakingSection?.sectionScore || 0;
           result.total = sub.totalScore || 0;
-          
-          console.log(`   TOEIC Scores - L:${result.listening} R:${result.reading} W:${result.writing} S:${result.speaking} Total:${result.total}`);
         } else if (exam.type === 'ielts' || exam.examType === 'ielts') {
           const listeningSection = sub.sections?.find(s => s.sectionType === 'listening');
           const readingSection = sub.sections?.find(s => s.sectionType === 'reading');
@@ -1148,14 +1087,11 @@ exports.getDashboardData = async (req, res) => {
           result.writing = writingSection?.sectionScore || 0;
           result.speaking = speakingSection?.sectionScore || 0;
           result.overallBand = sub.bandScore || 0;
-          
-          console.log(`   IELTS Scores - L:${result.listening} R:${result.reading} W:${result.writing} S:${result.speaking} Band:${result.overallBand}`);
         }
 
         return result;
       });
 
-    console.log(` [Dashboard] Đã xử lý xong ${practiceTests.length} practice tests`);
 
     // 6. Calculate class details with progress
     const classesWithDetails = await Promise.all(
@@ -1249,16 +1185,8 @@ exports.getDashboardData = async (req, res) => {
       }
     });
     
-    console.log('🎉 [Dashboard] Response gửi thành công với:');
-    console.log(`   - Student: ${student.username}`);
-    console.log(`   - Week schedule: ${formattedWeekSchedule.length} days`);
-    console.log(`   - Assignments: ${assignments.length} items`);
-    console.log(`   - Practice tests: ${practiceTests.length} items`);
-    console.log(`   - Active classes: ${classesWithDetails.length} classes`);
     
   } catch (error) {
-    console.error(' [Dashboard] Lỗi khi lấy dữ liệu dashboard:', error);
-    console.error('   Stack trace:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy dữ liệu dashboard',
@@ -1387,7 +1315,6 @@ exports.getAllStudents = async (req, res) => {
       totalPages: Math.ceil(total / limitNum)
     });
   } catch (error) {
-    console.error(' Lỗi khi lấy danh sách học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy danh sách học viên',
@@ -1433,7 +1360,6 @@ exports.getStudentStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(' Lỗi khi lấy thống kê học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy thống kê học viên',
@@ -1511,7 +1437,6 @@ exports.getStudentById = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error(' Lỗi khi lấy thông tin học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy thông tin học viên',
@@ -1585,7 +1510,6 @@ exports.createStudent = async (req, res) => {
       student: studentData
     });
   } catch (error) {
-    console.error(' Lỗi khi tạo học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi tạo học viên',
@@ -1605,9 +1529,6 @@ exports.updateStudent = async (req, res) => {
   });
 };
 
-// =========================
-// 🗑️ XÓA HỌC VIÊN - ĐÃ VÔ HIỆU HÓA
-// =========================
 exports.deleteStudent = async (req, res) => {
   // Không cho phép xóa thông tin học viên
   return res.status(403).json({
@@ -1615,10 +1536,6 @@ exports.deleteStudent = async (req, res) => {
     message: 'Không được phép xóa học viên'
   });
 };
-
-// =========================
-// 📥 IMPORT HỌC VIÊN HÀNG LOẠT
-// =========================
 
 // Helper function to parse levelsToStudy string into array of levels
 // Example: "B1 → B2" → ["B1", "B2"]
@@ -1644,23 +1561,43 @@ const parseLevelsToStudy = (levelsToStudyStr) => {
   return levels;
 };
 
+// Helper function to find existing student by email or phone
+const findExistingStudent = async (email, phone, studentRole) => {
+  try {
+    // Find by email first
+    if (email) {
+      const byEmail = await User.findOne({ email: email.toLowerCase() });
+      if (byEmail && byEmail.roleId && byEmail.roleId.toString() === studentRole._id.toString()) {
+        return byEmail;
+      }
+    }
+    // If not found, find by phone
+    if (phone) {
+      const byPhone = await User.findOne({ phone: phone });
+      if (byPhone && byPhone.roleId && byPhone.roleId.toString() === studentRole._id.toString()) {
+        return byPhone;
+      }
+    }
+    return null;
+  } catch (error) {
+    return null;
+  }
+};
+
 // Helper function to enroll student into courses based on levelsToStudy
 const enrollStudentInCourses = async (studentId, levelsToStudyStr, type) => {
   try {
     if (!levelsToStudyStr || !type) {
-      console.log(` Skipping enrollment for student ${studentId}: missing levelsToStudy or type`);
       return { enrolled: 0, courses: [] };
     }
 
     // Parse levels from string
     const levels = parseLevelsToStudy(levelsToStudyStr);
     if (levels.length === 0) {
-      console.log(` Skipping enrollment for student ${studentId}: no valid levels parsed from "${levelsToStudyStr}"`);
       return { enrolled: 0, courses: [] };
     }
 
     const typeStr = type.toString().trim().toLowerCase();
-    console.log(` Enrolling student ${studentId} in courses for type: ${typeStr}, levels: ${levels.join(', ')}`);
 
     // Find programs matching type and levels
     const programs = await Program.find({
@@ -1670,12 +1607,10 @@ const enrollStudentInCourses = async (studentId, levelsToStudyStr, type) => {
     }).select('_id level');
 
     if (programs.length === 0) {
-      console.log(` No active programs found for type: ${typeStr}, levels: ${levels.join(', ')}`);
       return { enrolled: 0, courses: [] };
     }
 
     const programIds = programs.map(p => p._id);
-    console.log(` Found ${programs.length} programs: ${programs.map(p => p.level).join(', ')}`);
 
     // Find all courses belonging to these programs
     const courses = await Course.find({
@@ -1684,11 +1619,8 @@ const enrollStudentInCourses = async (studentId, levelsToStudyStr, type) => {
     }).select('_id name program');
 
     if (courses.length === 0) {
-      console.log(` No active courses found for programs: ${programIds.join(', ')}`);
       return { enrolled: 0, courses: [] };
     }
-
-    console.log(` Found ${courses.length} courses to enroll`);
 
     // Enroll student in all courses
     let enrolledCount = 0;
@@ -1705,18 +1637,14 @@ const enrollStudentInCourses = async (studentId, levelsToStudyStr, type) => {
         if (result.modifiedCount > 0 || result.matchedCount > 0) {
           enrolledCount++;
           enrolledCourseIds.push(course._id);
-          console.log(`  ✓ Enrolled in course: ${course.name} (${course._id})`);
         }
       } catch (courseError) {
-        console.error(`  ✗ Error enrolling in course ${course._id}:`, courseError.message);
         // Continue with other courses even if one fails
       }
     }
 
-    console.log(` Successfully enrolled student ${studentId} in ${enrolledCount} courses`);
     return { enrolled: enrolledCount, courses: enrolledCourseIds };
   } catch (error) {
-    console.error(` Error enrolling student ${studentId} in courses:`, error);
     // Return empty result but don't throw - enrollment failure shouldn't fail the import
     return { enrolled: 0, courses: [], error: error.message };
   }
@@ -1743,26 +1671,60 @@ exports.importStudents = async (req, res) => {
     }
     
     const results = {
-      success: [],
+      created: [],
+      enrolled: [],
+      skipped: [],
       failed: []
     };
     
     // Process each student
     for (const studentData of students) {
       try {
-        // Check if email exists
-        const emailExists = await User.findOne({ email: studentData.email });
-        if (emailExists) {
-          results.failed.push({
-            email: studentData.email,
-            username: studentData.username,
-            phone: studentData.phone || '',
-            reason: 'Email đã tồn tại trong hệ thống'
-          });
+        // Check if email or phone exists (existing account)
+        const existingStudent = await findExistingStudent(
+          studentData.email,
+          studentData.phone,
+          studentRole
+        );
+        
+        if (existingStudent) {
+          // Student already exists, try to enroll in courses
+          if (studentData.levelsToStudy && studentData.type) {
+            try {
+              const enrollmentResult = await enrollStudentInCourses(
+                existingStudent._id,
+                studentData.levelsToStudy,
+                studentData.type
+              );
+              results.enrolled.push({
+                _id: existingStudent._id,
+                email: existingStudent.email,
+                username: existingStudent.username,
+                phone: existingStudent.phone || '',
+                enrolledCourses: enrollmentResult.enrolled || 0
+              });
+            } catch (enrollmentError) {
+              // Log error but add to skipped
+              results.skipped.push({
+                email: studentData.email,
+                username: studentData.username,
+                phone: studentData.phone || '',
+                reason: 'Không thể đăng ký khóa học: ' + (enrollmentError.message || 'Lỗi không xác định')
+              });
+            }
+          } else {
+            // No course information, skip
+            results.skipped.push({
+              email: studentData.email,
+              username: studentData.username,
+              phone: studentData.phone || '',
+              reason: 'Học viên đã có tài khoản nhưng không có thông tin lộ trình học'
+            });
+          }
           continue;
         }
         
-        // Check if username exists
+        // Check if username exists (different from email/phone)
         const usernameExists = await User.findOne({ username: studentData.username });
         if (usernameExists) {
           results.failed.push({
@@ -1774,21 +1736,7 @@ exports.importStudents = async (req, res) => {
           continue;
         }
         
-        // Check if phone number exists
-        if (studentData.phone) {
-          const phoneExists = await User.findOne({ phone: studentData.phone });
-          if (phoneExists) {
-            results.failed.push({
-              email: studentData.email,
-              username: studentData.username,
-              phone: studentData.phone,
-              reason: 'Số điện thoại đã tồn tại trong hệ thống'
-            });
-            continue;
-          }
-        }
-        
-        // Create student
+        // Create new student
         const newStudent = await User.create({
           email: studentData.email,
           username: studentData.username,
@@ -1808,16 +1756,12 @@ exports.importStudents = async (req, res) => {
               studentData.levelsToStudy,
               studentData.type
             );
-            console.log(` Enrollment result for ${newStudent.email}:`, enrollmentResult);
           } catch (enrollmentError) {
             // Log error but don't fail the import
-            console.error(` Error enrolling student ${newStudent._id} in courses:`, enrollmentError);
           }
-        } else {
-          console.log(`ℹ️ Skipping enrollment for ${newStudent.email}: missing levelsToStudy or type`);
         }
         
-        results.success.push({
+        results.created.push({
           _id: newStudent._id,
           email: newStudent.email,
           username: newStudent.username
@@ -1832,16 +1776,39 @@ exports.importStudents = async (req, res) => {
       }
     }
     
+    const createdCount = results.created.length;
+    const enrolledCount = results.enrolled.length;
+    const skippedCount = results.skipped.length;
+    const failedCount = results.failed.length;
+    
+    let message = '';
+    if (createdCount > 0) {
+      message += `Tạo mới ${createdCount} học viên. `;
+    }
+    if (enrolledCount > 0) {
+      message += `Đăng ký khóa học cho ${enrolledCount} học viên đã có. `;
+    }
+    if (skippedCount > 0) {
+      message += `Bỏ qua ${skippedCount} học viên. `;
+    }
+    if (failedCount > 0) {
+      message += `Thất bại ${failedCount} học viên. `;
+    }
+    if (!message) {
+      message = 'Không có học viên nào được xử lý';
+    }
+    
     res.status(200).json({
       success: true,
-      message: `Import thành công ${results.success.length} học viên, thất bại ${results.failed.length} học viên`,
+      message: message.trim(),
       total: students.length,
-      successCount: results.success.length,
-      failedCount: results.failed.length,
+      createdCount: createdCount,
+      enrolledCount: enrolledCount,
+      skippedCount: skippedCount,
+      failedCount: failedCount,
       results
     });
   } catch (error) {
-    console.error(' Lỗi khi import học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi import học viên',
@@ -1920,7 +1887,6 @@ exports.updateStudentCourseEnrollments = async (req, res) => {
         { session }
       );
       updatedCourses.push(...coursesToAdd);
-      console.log(` Đã thêm học viên ${studentId} vào ${result.modifiedCount} course(s)`);
     }
 
     // Remove student from courses using $pull
@@ -1932,7 +1898,6 @@ exports.updateStudentCourseEnrollments = async (req, res) => {
         { session }
       );
       updatedCourses.push(...coursesToRemove);
-      console.log(` Đã xóa học viên ${studentId} khỏi ${result.modifiedCount} course(s)`);
     }
 
     // Commit transaction
@@ -1949,7 +1914,6 @@ exports.updateStudentCourseEnrollments = async (req, res) => {
     // Rollback transaction on error
     await session.abortTransaction();
     session.endSession();
-    console.error(' Lỗi khi cập nhật khóa học của học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi cập nhật khóa học của học viên',
@@ -2091,7 +2055,6 @@ exports.changeStudentClass = async (req, res) => {
       ? newClassSchedules[0].session.order
       : null;
     
-    console.log(` Session order - Lớp cũ: ${oldClassSessionOrder}, Lớp mới: ${newClassSessionOrder}`);
     
     // Xác định trường hợp
     let caseType = 1; // Mặc định là trường hợp 1
@@ -2103,7 +2066,6 @@ exports.changeStudentClass = async (req, res) => {
       }
     }
     
-    console.log(` Trường hợp xử lý: ${caseType}`);
     
     // 3. Xử lý Class model
     // Xóa học viên khỏi lớp cũ
@@ -2111,7 +2073,6 @@ exports.changeStudentClass = async (req, res) => {
       id => id.toString() !== studentId.toString()
     );
     await oldClass.save({ session });
-    console.log(` Đã xóa học viên khỏi lớp cũ: ${oldClassId}`);
     
     // Thêm học viên vào lớp mới (nếu chưa có)
     const studentInNewClass = newClass.students.some(
@@ -2120,7 +2081,6 @@ exports.changeStudentClass = async (req, res) => {
     if (!studentInNewClass) {
       newClass.students.push(studentId);
       await newClass.save({ session });
-      console.log(` Đã thêm học viên vào lớp mới: ${newClassId}`);
     }
     
     // 4. Xử lý StudentSchedule
@@ -2148,8 +2108,6 @@ exports.changeStudentClass = async (req, res) => {
       })
       .session(session)
       .lean();
-    
-    console.log(` Tìm thấy ${studentSchedules.length} StudentSchedule của học viên ở lớp cũ`);
     
     // c) Lấy tất cả ClassSchedule của lớp mới để match
     const allNewClassSchedules = await ClassSchedule.find({
@@ -2189,7 +2147,6 @@ exports.changeStudentClass = async (req, res) => {
       // Nếu đã có điểm danh hoặc đã diễn ra, giữ nguyên
       if (hasAttendance || isPastSchedule) {
         unchangedCount++;
-        console.log(` Giữ nguyên StudentSchedule ${studentSchedule._id} (${hasAttendance ? 'đã có điểm danh' : 'đã diễn ra'})`);
         continue;
       }
       
@@ -2207,7 +2164,6 @@ exports.changeStudentClass = async (req, res) => {
               { session }
             );
             updatedCount++;
-            console.log(` Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
           }
         }
       } else if (caseType === 2) {
@@ -2224,7 +2180,6 @@ exports.changeStudentClass = async (req, res) => {
               { session }
             );
             cancelledCount++;
-            console.log(`🚫 Cancelled StudentSchedule ${studentSchedule._id} (session ${sessionOrder} < ${newClassSessionOrder})`);
           } else if (sessionOrder >= newClassSessionOrder) {
             // Session order >= lớp mới: update classSchedule
             const matchingSchedules = newClassScheduleMap.get(sessionOrder);
@@ -2246,7 +2201,6 @@ exports.changeStudentClass = async (req, res) => {
           if (sessionOrder < oldClassSessionOrder) {
             // Session order < lớp cũ: không thay đổi gì
             unchangedCount++;
-            console.log(` Giữ nguyên StudentSchedule ${studentSchedule._id} (session ${sessionOrder} < ${oldClassSessionOrder})`);
           } else if (sessionOrder >= oldClassSessionOrder) {
             // Session order >= lớp cũ: update classSchedule
             const matchingSchedules = newClassScheduleMap.get(sessionOrder);
@@ -2285,7 +2239,6 @@ exports.changeStudentClass = async (req, res) => {
             classSchedule: classSchedule._id,
             scheduleStatus: 'scheduled'
           }], { session });
-          console.log(` Tạo StudentSchedule mới cho ClassSchedule ${classSchedule._id}`);
         }
       } else {
         // Nếu không có session order, tạo cho tất cả buổi tương lai
@@ -2294,15 +2247,9 @@ exports.changeStudentClass = async (req, res) => {
           classSchedule: classSchedule._id,
           scheduleStatus: 'scheduled'
         }], { session });
-        console.log(` Tạo StudentSchedule mới cho ClassSchedule ${classSchedule._id}`);
       }
     }
     
-    console.log(` Kết quả xử lý StudentSchedule:`);
-    console.log(`   - Updated: ${updatedCount}`);
-    console.log(`   - Cancelled: ${cancelledCount}`);
-    console.log(`   - Unchanged: ${unchangedCount}`);
-    console.log(` Hoàn thành xử lý đổi lớp`);
     
     // Commit transaction
     await session.commitTransaction();
@@ -2322,7 +2269,6 @@ exports.changeStudentClass = async (req, res) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    console.error(' Lỗi khi đổi lớp học:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi đổi lớp học',

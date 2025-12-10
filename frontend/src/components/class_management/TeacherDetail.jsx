@@ -45,14 +45,12 @@ const TeacherDetail = () => {
   // Helper function to normalize date from various formats
   const normalizeDate = (dateInput) => {
     if (!dateInput) {
-      console.debug('normalizeDate: dateInput is null/undefined');
       return null;
     }
     
     // If already a Date object
     if (dateInput instanceof Date) {
       if (isNaN(dateInput.getTime())) {
-        console.debug('normalizeDate: Invalid Date object');
         return null;
       }
       return dateInput;
@@ -81,7 +79,6 @@ const TeacherDetail = () => {
         const year = parseInt(ddmmyyyyMatch[3]);
         const date = new Date(year, month, day);
         if (!isNaN(date.getTime())) {
-          console.debug('normalizeDate: Parsed as DD/MM/YYYY:', dateInput, '->', date);
           return date;
         }
       }
@@ -94,7 +91,6 @@ const TeacherDetail = () => {
         const day = parseInt(yyyymmddMatch[3]);
         const date = new Date(year, month, day);
         if (!isNaN(date.getTime())) {
-          console.debug('normalizeDate: Parsed ISO string as local date:', dateInput, '->', date);
           return date;
         }
       }
@@ -102,14 +98,10 @@ const TeacherDetail = () => {
       // Try full ISO format parsing (with time)
       let date = new Date(dateInput);
       if (!isNaN(date.getTime())) {
-        console.debug('normalizeDate: Parsed as ISO string:', dateInput, '->', date);
         return date;
       }
-      
-      console.debug('normalizeDate: Could not parse string:', dateInput);
     }
     
-    console.debug('normalizeDate: Failed to parse dateInput:', dateInput, 'type:', typeof dateInput);
     return null;
   };
 
@@ -197,18 +189,6 @@ const TeacherDetail = () => {
     try {
       setLoadingSchedule(true);
       const scheduleData = await teacherService.getTeacherSchedule(teacherId);
-      console.log(' ========== LỊCH GIẢNG DẠY CỦA GIẢNG VIÊN ==========');
-      console.log(' Raw schedule data from API:', scheduleData);
-      console.log(' Schedules array:', scheduleData.schedules);
-      
-      if (scheduleData.schedules && scheduleData.schedules.length > 0) {
-        console.log(' First schedule example:', scheduleData.schedules[0]);
-        console.log(' First schedule programType:', scheduleData.schedules[0].programType);
-        console.log(' First schedule class:', scheduleData.schedules[0].class);
-        console.log(' First schedule class.course:', scheduleData.schedules[0].class?.course);
-        console.log(' First schedule class.course.program:', scheduleData.schedules[0].class?.course?.program);
-        console.log(' First schedule class.course.program.type:', scheduleData.schedules[0].class?.course?.program?.type);
-      }
       
       setTeacherSchedule(scheduleData.schedules || []);
       setSchedulePage(1);
@@ -251,7 +231,6 @@ const TeacherDetail = () => {
           endDate: scheduleDate
         });
 
-        console.log(' Lịch dạy của giáo viên được chọn vào ngày', scheduleDate, ':', scheduleData);
         setSubstituteTeacherSchedule(scheduleData.schedules || []);
       } catch (err) {
         console.error('Error loading substitute teacher schedule:', err);
@@ -339,22 +318,6 @@ const TeacherDetail = () => {
       alert('Không thể xếp người dạy thay cho buổi học đã qua');
       return;
     }
-    
-    // Log thông tin buổi học được chọn
-    console.log(' Thông tin buổi học được chọn:', {
-      id: schedule.id || schedule._id,
-      date: schedule.date,
-      startTime: schedule.startTime,
-      endTime: schedule.endTime,
-      className: schedule.className,
-      roomName: schedule.roomName,
-      roomId: schedule.roomId,
-      teacherId: schedule.teacherId,
-      teacher: schedule.teacher,
-      class: schedule.class,
-      classId: schedule.classId,
-      fullSchedule: schedule
-    });
     
     setSelectedScheduleForSubstitute(schedule);
     setSelectedSubstituteTeacherId(null);
@@ -480,46 +443,22 @@ const TeacherDetail = () => {
 
   // Transform schedule data for calendar view
   const calendarSchedules = useMemo(() => {
-    console.log(' ========== TRANSFORMING SCHEDULES FOR CALENDAR ==========');
-    console.log(' teacherSchedule:', teacherSchedule);
-    console.log(' teacherSchedule length:', teacherSchedule.length);
-    
     const transformed = teacherSchedule
       .map((schedule, index) => {
-        // Debug: Log the raw date value
-        console.log(`Schedule ${index + 1} raw date:`, schedule.date, 'type:', typeof schedule.date);
-        
         // Use normalizeDate helper to parse date
         const scheduleDate = normalizeDate(schedule.date);
         if (!scheduleDate) {
-          console.warn(`Schedule ${index + 1} has invalid date:`, schedule.date, 'Full schedule:', schedule);
           return null; // Skip invalid schedules
         }
         
         // Use formatDateForCalendar to format date (using local time, not UTC)
         const dateStr = formatDateForCalendar(schedule.date);
         if (!dateStr) {
-          console.warn(`Schedule ${index + 1} could not format date:`, schedule.date, 'normalized:', scheduleDate);
           return null;
         }
-        
-        console.log(`Schedule ${index + 1} formatted date:`, dateStr);
       
       // Extract programType from schedule data
       const programType = schedule.programType || schedule.class?.course?.program?.type || null;
-      
-      console.log(` Schedule ${index + 1}:`, {
-        scheduleId: schedule._id,
-        className: schedule.class?.name,
-        programType: programType,
-        hasProgramType: !!schedule.programType,
-        hasClass: !!schedule.class,
-        hasCourse: !!schedule.class?.course,
-        hasProgram: !!schedule.class?.course?.program,
-        classData: schedule.class,
-        courseData: schedule.class?.course,
-        programData: schedule.class?.course?.program
-      });
       
       return {
         id: schedule._id || index,
@@ -546,9 +485,6 @@ const TeacherDetail = () => {
       };
       })
       .filter(Boolean); // Remove null entries from invalid dates
-    
-    console.log(' Transformed schedules:', transformed);
-    console.log(' Schedules with programType:', transformed.filter(s => s.programType));
     
     return transformed;
   }, [teacherSchedule, teacher]);
@@ -826,17 +762,11 @@ const TeacherDetail = () => {
                         <tbody>
                           {teacherSchedule
                             .slice((schedulePage - 1) * 10, schedulePage * 10)
-                            .map((schedule, index) => {
-                              // Debug logging for table view
-                              const displayDate = formatDateForDisplay(schedule.date);
-                              if (displayDate === 'N/A') {
-                                console.warn(`Table view - Schedule ${index + 1} date is N/A:`, schedule.date, 'type:', typeof schedule.date);
-                              }
-                              return (
+                            .map((schedule, index) => (
                               <tr key={index}>
                                 <td className="px-16 py-12">
                                   <div className="text-14">
-                                    {displayDate}
+                                    {formatDateForDisplay(schedule.date)}
                                   </div>
                                   <div className="text-13 text-muted">
                                     {schedule.startTime} - {schedule.endTime}
@@ -851,8 +781,7 @@ const TeacherDetail = () => {
                                   </Badge>
                                 </td>
                               </tr>
-                            );
-                            })}
+                            ))}
                         </tbody>
                       </Table>
                       {teacherSchedule.length > 10 && (
@@ -911,11 +840,9 @@ const TeacherDetail = () => {
                       schedules={calendarSchedules}
                       onEditSchedule={(schedule) => {
                         // Optional: Handle edit if needed
-                        console.log('Edit schedule:', schedule);
                       }}
                       onDeleteSchedule={(scheduleId) => {
                         // Optional: Handle delete if needed
-                        console.log('Delete schedule:', scheduleId);
                       }}
                       onAssignSubstitute={handleAssignSubstitute}
                       readOnly={!isEditMode}

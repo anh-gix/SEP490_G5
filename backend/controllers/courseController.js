@@ -477,7 +477,6 @@ exports.submitCourse = async (req, res) => {
             data: course
         });
     } catch (err) {
-        console.error('Error submitting course:', err);
         res.status(500).json({
             success: false,
             message: 'Lỗi khi nộp giáo trình',
@@ -547,7 +546,6 @@ exports.approveCourse = async (req, res) => {
             data: course
         });
     } catch (err) {
-        console.error('Error approving course:', err);
         res.status(500).json({
             success: false,
             message: 'Lỗi khi duyệt giáo trình',
@@ -624,7 +622,6 @@ exports.rejectCourse = async (req, res) => {
             data: course
         });
     } catch (err) {
-        console.error('Error rejecting course:', err);
         res.status(500).json({
             success: false,
             message: 'Lỗi khi từ chối giáo trình',
@@ -684,7 +681,6 @@ exports.archiveCourse = async (req, res) => {
             data: course
         });
     } catch (err) {
-        console.error('Error archiving course:', err);
         res.status(500).json({
             success: false,
             message: 'Lỗi khi lưu trữ giáo trình',
@@ -879,19 +875,12 @@ exports.getBandByTypeAndLevel = async (req, res) => {
         // Normalize type to lowercase for case-insensitive matching
         const normalizedType = type.toLowerCase().trim();
         
-        console.log(' Searching for band:', { type: normalizedType, level, originalType: type });
-        
         const program = await Program.findOne({
             type: normalizedType,
             level: level.trim(),
             status: 'active'
         });
         
-        console.log(' Found program:', program ? { 
-            type: program.type, 
-            level: program.level, 
-            band: program.band 
-        } : 'null');
         
         if (!program || !program.band) {
             return res.status(200).json({
@@ -905,7 +894,6 @@ exports.getBandByTypeAndLevel = async (req, res) => {
             band: program.band
         });
     } catch (err) {
-        console.error(' Error in getBandByTypeAndLevel:', err);
         res.status(500).json({
             success: false,
             message: 'Lỗi máy chủ',
@@ -1134,7 +1122,6 @@ exports.getCourseMaterials = async (req, res) => {
             materials: formattedMaterials
         });
     } catch (err) {
-        console.error(' Lỗi khi lấy tài liệu khóa học:', err);
         res.status(500).json({
             success: false,
             message: 'Lỗi server khi lấy tài liệu khóa học',

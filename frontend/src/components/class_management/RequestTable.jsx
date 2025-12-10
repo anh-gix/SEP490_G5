@@ -103,7 +103,6 @@ const RequestTable = ({
                       }}
                       disabled={processing}
                     >
-                      <i className="fas fa-eye me-1"></i>
                       Xem chi tiết
                     </Button>
                   </td>

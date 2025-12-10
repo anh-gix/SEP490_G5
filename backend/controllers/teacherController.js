@@ -43,8 +43,6 @@ exports.getAllTeachers = async (req, res) => {
       });
     }
     
-    console.log(' Found teacher role:', teacherRole.name, teacherRole._id);
-    
     let query = { roleId: teacherRole._id };
     
     // Search by username or email
@@ -122,8 +120,6 @@ exports.getAllTeachers = async (req, res) => {
       .limit(limitNum)
       .lean();
     
-    console.log(` Found ${teachers.length} users with roleId: ${teacherRole._id} (${teacherRole.name})`);
-    
     // Get additional info for each teacher
     const teachersWithStats = await Promise.all(
       teachers.map(async (teacher) => {
@@ -141,8 +137,6 @@ exports.getAllTeachers = async (req, res) => {
         };
       })
     );
-    
-    console.log(` Returning ${teachersWithStats.length} teachers to frontend`);
     
     res.status(200).json({
       success: true,
@@ -1743,9 +1737,6 @@ exports.saveAttendance = async (req, res) => {
   }
 };
 
-// =========================
-// 📥 IMPORT GIẢNG VIÊN HÀNG LOẠT
-// =========================
 exports.importTeachers = async (req, res) => {
   try {
     const { teachers } = req.body;

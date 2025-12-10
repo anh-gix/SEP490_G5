@@ -134,27 +134,6 @@ exports.getClassById = async (req, res) => {
       .populate('session', 'title order')
       .sort({ date: 1 });
 
-    // Log lịch học của lớp hiện tại
-    console.log('\n ========== LỊCH HỌC CỦA LỚP HIỆN TẠI (getClassById) ==========');
-    console.log(`  - Tên lớp: ${classData.name || 'N/A'}`);
-    console.log(`  - ClassId: ${id}`);
-    console.log(`  - Tổng số buổi học: ${schedules.length}`);
-    if (schedules.length > 0) {
-      console.log('  - Chi tiết các buổi học:');
-      const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-      schedules.forEach((schedule, idx) => {
-        const scheduleDate = new Date(schedule.date);
-        const year = scheduleDate.getFullYear();
-        const month = String(scheduleDate.getMonth() + 1).padStart(2, '0');
-        const day = String(scheduleDate.getDate()).padStart(2, '0');
-        const scheduleDateStr = `${year}-${month}-${day}`;
-        const dayOfWeek = scheduleDate.getDay();
-        console.log(`    [${idx + 1}] ${scheduleDateStr} (${dayNames[dayOfWeek]}) - ${schedule.startTime} - ${schedule.endTime} [${schedule.status || 'fixed'}]`);
-      });
-    } else {
-      console.log('  - Lớp này chưa có buổi học nào');
-    }
-    console.log('  ============================================\n');
 
     // compute some convenient stats for frontend
     const totalSchedules = await ClassSchedule.countDocuments({ class: id, status: { $in: ['temporary', 'fixed'] } });
@@ -487,18 +466,6 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
 
   // 2. Kiểm tra conflict GIÁO VIÊN
   if (teacherId) {
-    console.log('\n👨‍🏫 ========== KIỂM TRA XUNG ĐỘT GIÁO VIÊN (validateClassSchedulesConflicts) ==========');
-    console.log('  - TeacherId:', teacherId.toString());
-    console.log('  - ClassId (lớp hiện tại):', classId ? classId.toString() : 'Không có (tạo mới)');
-    console.log('  - Số buổi học cần kiểm tra:', classSchedules.length);
-    
-    // Log lịch học của lớp hiện tại
-    console.log('\n LỊCH HỌC CỦA LỚP HIỆN TẠI:');
-    classSchedules.forEach((s, idx) => {
-      const dateStr = formatDateLocal(s.date);
-      console.log(`  [${idx + 1}] ${dateStr} - ${s.startTime} - ${s.endTime}`);
-    });
-    
     // Find all classes taught by this teacher (excluding current class if classId is provided)
     const teacherQuery = {
       $or: [
@@ -510,11 +477,6 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
       teacherQuery._id = { $ne: classId };
     }
     const teacherClasses = await Class.find(teacherQuery).select('_id name').lean();
-
-    console.log('  - Tổng số lớp khác của giáo viên (không bao gồm lớp hiện tại):', teacherClasses.length);
-    teacherClasses.forEach((cls, idx) => {
-      console.log(`    [${idx + 1}] ${cls.name} (ID: ${cls._id})`);
-    });
 
     if (teacherClasses.length > 0) {
       const teacherClassIds = teacherClasses.map(c => c._id);
@@ -528,18 +490,6 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
         .populate('class', 'name')
         .select('date startTime endTime class')
         .lean();
-
-      console.log('  - Tổng số buổi học của giáo viên (từ các lớp khác) trong các ngày cần kiểm tra:', teacherSchedules.length);
-      
-      // Log chi tiết lịch học của giáo viên
-      if (teacherSchedules.length > 0) {
-        console.log('\n LỊCH HỌC CỦA GIÁO VIÊN (từ các lớp khác):');
-        teacherSchedules.forEach((s, idx) => {
-          const dateStr = formatDateLocal(s.date);
-          const className = s.class?.name || 'N/A';
-          console.log(`  [${idx + 1}] ${dateStr} - ${s.startTime} - ${s.endTime} | Lớp: ${className}`);
-        });
-      }
 
       classSchedules.forEach((newSchedule, newIdx) => {
         const scheduleDate = new Date(newSchedule.date);

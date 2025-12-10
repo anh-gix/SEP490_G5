@@ -423,7 +423,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       setShowImportResultModal(true);
 
     } catch (error) {
-      console.error('Error reading Excel file:', error);
       setImportResult({
         success: 0,
         notFound: [],
@@ -440,44 +439,31 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   // Auto-fetch band when program and level are selected
   useEffect(() => {
     const fetchBand = async () => {
-      console.log(' useEffect triggered - program:', formData.program, 'level:', formData.level);
-      
       if (!formData.program || !formData.level) {
         // Clear band if program or level is empty
-        console.log(' Program or level is empty, clearing band');
         setFormData(prev => ({ ...prev, band: '' }));
         return;
       }
 
       const type = getTypeFromProgram(formData.program);
-      console.log(' Mapped program to type:', formData.program, '→', type);
       
       if (!type) {
-        console.warn(' Không tìm thấy type cho program:', formData.program);
         return;
       }
 
       try {
-        console.log('🌐 Fetching band from API with params:', { type, level: formData.level });
         const response = await courseService.getBandByTypeAndLevel(type, formData.level);
-
-        console.log(' API Response:', response);
 
         if (response && response.success) {
           if (response.band && response.band.trim() !== '') {
-            console.log(' Setting band to:', response.band);
             setFormData(prev => ({ ...prev, band: response.band }));
           } else {
-            console.warn(' No band found in response (band is null or empty), clearing band');
             setFormData(prev => ({ ...prev, band: '' }));
           }
         } else {
-          console.warn(' API response not successful, clearing band');
           setFormData(prev => ({ ...prev, band: '' }));
         }
       } catch (error) {
-        console.error(' Error fetching band:', error);
-        console.error(' Error details:', error.response?.data || error.message);
         // Clear band on error to avoid showing stale data
         setFormData(prev => ({ ...prev, band: '' }));
       }
@@ -490,6 +476,14 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   useEffect(() => {
     const fetchCourses = async () => {
       if (!formData.program) {
+        setCourses([]);
+        setSelectedCourse(null);
+        setFormData(prev => ({ ...prev, course: '' }));
+        return;
+      }
+
+      // Don't fetch if level is not selected (backend requires both programName and level)
+      if (!formData.level) {
         setCourses([]);
         setSelectedCourse(null);
         setFormData(prev => ({ ...prev, course: '' }));
@@ -516,7 +510,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           setCourses([]);
         }
       } catch (error) {
-        console.error(' Error fetching courses:', error);
         setCourses([]);
       } finally {
         setCoursesLoading(false);
@@ -554,7 +547,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           }
         }
       } catch (error) {
-        console.error(' Error fetching course details:', error);
         // Fallback to course from list if available
         if (courseFromList) {
           setSelectedCourse(courseFromList);
@@ -675,7 +667,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           });
         }
       } catch (error) {
-        console.error('Error checking conflicts:', error);
         // Don't show error to user, just silently fail
         setConflicts({
           hasConflict: false,
@@ -819,19 +810,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         
         if (typesResponse?.success && typesResponse.types) {
           const allTypes = typesResponse.types;
-          console.log(' Types from API:', allTypes);
           const allPrograms = allTypes.map(type => getProgramFromType(type)).filter(Boolean);
           setAvailablePrograms(allPrograms);
-          console.log(' Loaded types from program table:', allTypes.length);
-          console.log(' Available programs:', allPrograms);
-        } else {
-          console.warn(' Types response:', typesResponse);
         }
         
         if (levelsResponse?.success && levelsResponse.levels) {
           const allLevels = levelsResponse.levels;
           setAvailableLevels(allLevels);
-          console.log(' Loaded levels from program table:', allLevels.length);
         }
         
         // Also fetch mappings for band lookup (still needed for band display)
@@ -839,13 +824,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           const mappingsResponse = await courseService.getCourseMappings();
           if (mappingsResponse && mappingsResponse.success && mappingsResponse.mappings) {
             setMappings(mappingsResponse.mappings);
-            console.log(' Loaded mappings from program table:', mappingsResponse.mappings.length);
           }
         } catch (mappingsError) {
-          console.error(' Error fetching mappings:', mappingsError);
+          // Error fetching mappings
         }
       } catch (error) {
-        console.error(' Error fetching course data:', error);
+        // Error fetching course data
       }
     };
     fetchCourseData();
@@ -862,7 +846,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             setAvailableLevels(response.levels);
           }
         } catch (error) {
-          console.error(' Error fetching all levels:', error);
+          // Error fetching all levels
         }
         return;
       }
@@ -885,7 +869,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           }
         }
       } catch (error) {
-        console.error(' Error fetching levels by type:', error);
+        // Error fetching levels by type
       }
     };
     
@@ -905,7 +889,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             setAvailablePrograms(allPrograms);
           }
         } catch (error) {
-          console.error(' Error fetching all types:', error);
+          // Error fetching all types
         }
         return;
       }
@@ -925,7 +909,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           }
         }
       } catch (error) {
-        console.error(' Error fetching types by level:', error);
+        // Error fetching types by level
       }
     };
     
@@ -985,26 +969,15 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   useEffect(() => {
     const fetchTeachers = async () => {
       try {
-        console.log(' Fetching teachers...');
         const response = await teacherService.getAllTeachers();
-        console.log(' API Response:', response);
         
         if (response && (response.teachers || response.data)) {
           const fetchedTeachers = response.teachers || response.data || [];
-          console.log(' Fetched teachers count:', fetchedTeachers.length);
-          if (fetchedTeachers.length > 0) {
-            console.log(' Teacher đầu tiên:', fetchedTeachers[0]);
-            console.log(' Tất cả keys trong teacher:', Object.keys(fetchedTeachers[0]));
-          } else {
-            console.warn(' Không có giáo viên nào được trả về từ API');
-          }
           setTeachers(fetchedTeachers);
         } else {
-          console.warn(' API response không có teachers hoặc data field:', response);
           setTeachers([]);
         }
       } catch (error) {
-        console.error(' Lỗi khi fetch teachers:', error);
         setTeachers([]);
       }
     };
@@ -1017,25 +990,19 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       try {
         setStudentsLoading(true);
         setStudentsError(null);
-        console.log(' Fetching students...');
         const response = await studentService.getAllStudents();
-        console.log(' Students API Response:', response);
         
         if (response && (response.students || response.data)) {
           const fetchedStudents = response.students || response.data || [];
-          console.log(' Fetched students count:', fetchedStudents.length);
           setStudents(fetchedStudents);
         } else {
-          console.warn(' API response không có students hoặc data field:', response);
           setStudents([]);
           setStudentsError('Không tìm thấy dữ liệu học viên');
         }
       } catch (error) {
-        console.error(' Lỗi khi fetch students:', error);
         setStudents([]);
         const errorMessage = error.message || 'Không thể tải danh sách học viên';
         setStudentsError(errorMessage);
-        console.error(' Error details:', error);
       } finally {
         setStudentsLoading(false);
       }
@@ -1269,7 +1236,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           return;
         }
 
-        const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
+        // Validate date before creating Date object
+        const dateObj = new Date(scheduleDate);
+        if (isNaN(dateObj.getTime())) {
+          return; // Invalid date, skip this schedule
+        }
+
+        const scheduleDateStr = dateObj.toISOString().split('T')[0];
 
         if (scheduleDateStr !== sessionDate) {
           return;
@@ -1292,13 +1265,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
 
         if (hasTimeConflict) {
-          console.log('🔴 CONFLICT Room:', {
-            room: scheduleRoomName || `Room ID: ${scheduleRoomId}`,
-            sessionDate: sessionDate,
-            sessionTime: `${sessionStart} - ${sessionEnd}`,
-            scheduleDate: scheduleDateStr,
-            scheduleTime: `${scheduleStart} - ${scheduleEnd}`
-          });
           if (scheduleRoomId) {
             conflicts.add(String(scheduleRoomId));
           }
@@ -1341,7 +1307,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               schedulesMap[String(teacherId)] = response.schedules;
             }
           } catch (error) {
-            console.error(`Error fetching schedule for teacher ${teacherId}:`, error);
             schedulesMap[String(teacherId)] = [];
           }
         })
@@ -1384,7 +1349,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               schedulesMap[String(studentId)] = [];
             }
           } catch (error) {
-            console.error(`Error fetching schedule for student ${studentId}:`, error);
             schedulesMap[String(studentId)] = [];
           }
         })
@@ -1415,7 +1379,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
           if (!scheduleDate) return;
 
-          const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
+          // Validate date before creating Date object
+          const dateObj = new Date(scheduleDate);
+          if (isNaN(dateObj.getTime())) {
+            return; // Invalid date, skip this schedule
+          }
+
+          const scheduleDateStr = dateObj.toISOString().split('T')[0];
 
           if (scheduleDateStr !== sessionDate) {
             return;
@@ -1426,21 +1396,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
 
           if (hasTimeConflict) {
-            console.log('🔴 CONFLICT Teacher:', {
-              teacherId,
-              scheduleId: schedule._id || schedule.id,
-              sessionDate: sessionDate,
-              sessionTime: `${sessionStart} - ${sessionEnd}`,
-              scheduleDate: scheduleDateStr,
-              scheduleTime: `${scheduleStart} - ${scheduleEnd}`
-            });
             conflicts.add(teacherId);
           }
         });
       });
     });
 
-    console.log(' Conflicting Teacher IDs:', Array.from(conflicts));
     return conflicts;
   }, [generatedSessions, teacherSchedules]);
 
@@ -1465,7 +1426,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate || schedule.classSchedule?.date;
           if (!scheduleDate) return;
 
-          const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
+          // Validate date before creating Date object
+          const dateObj = new Date(scheduleDate);
+          if (isNaN(dateObj.getTime())) {
+            return; // Invalid date, skip this schedule
+          }
+
+          const scheduleDateStr = dateObj.toISOString().split('T')[0];
 
           if (scheduleDateStr !== sessionDate) {
             return;
@@ -1513,16 +1480,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             };
 
             studentConflicts.push(conflictDetail);
-
-            console.log('🔴 CONFLICT Student:', {
-              studentId,
-              scheduleId: schedule._id || schedule.id || schedule.classSchedule?._id,
-              className,
-              sessionDate: sessionDate,
-              sessionTime: `${sessionStart} - ${sessionEnd}`,
-              scheduleDate: scheduleDateStr,
-              scheduleTime: `${scheduleStart} - ${scheduleEnd}`
-            });
           }
         });
       });
@@ -1532,7 +1489,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       }
     });
 
-    console.log(' Conflicting Student IDs:', Array.from(conflicts.keys()));
     return conflicts;
   }, [generatedSessions, studentSchedules]);
 
@@ -1554,34 +1510,15 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                                 conflictingRoomIds.has(room.roomName) || 
                                 conflictingRoomIds.has(room.room_name);
         
-        if (hasIdConflict || hasNameConflict) {
-          console.log('🚫 Room filtered out:', {
-            roomId,
-            roomIdStr,
-            roomName,
-            hasIdConflict,
-            hasNameConflict,
-            conflictingIds: Array.from(conflictingRoomIds)
-          });
-        }
-        
         return !hasIdConflict && !hasNameConflict;
       }
     );
-    
-    console.log(' Filtered rooms:', {
-      total: rooms.length,
-      filtered: filtered.length,
-      conflicting: conflictingRoomIds.size,
-      conflictingIds: Array.from(conflictingRoomIds)
-    });
     
     return filtered;
   }, [generatedSessions, existingSchedules, rooms, conflictingRoomIds]);
 
   const filteredTeachers = useMemo(() => {
     if (!generatedSessions.length || Object.keys(teacherSchedules).length === 0) {
-      console.log(' Showing all teachers (no filter conditions):', teachers.length);
       return teachers;
     }
 
@@ -1595,12 +1532,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         return !hasIdConflict;
       }
     );
-    
-    console.log(' Filtered teachers:', {
-      total: teachers.length,
-      filtered: filtered.length,
-      conflicting: conflictingTeacherIds.size
-    });
     
     return filtered;
   }, [generatedSessions, teacherSchedules, teachers, conflictingTeacherIds]);
@@ -2109,7 +2040,9 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     variant="outline-primary"
                     size="sm"
                     onClick={() => setShowSelectStudentModal(true)}
+                    disabled={!formData.course}
                     className="text-13 fw-medium px-16 py-8 radius-8"
+                    title={!formData.course ? 'Vui lòng chọn course trước khi thêm học viên' : ''}
                   >
                     <i className="fas fa-plus me-2"></i>
                     Thêm học viên
@@ -2312,6 +2245,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         onConfirm={handleStudentsConfirmed}
         initialSelectedStudents={formData.selectedStudents}
         generatedSessions={generatedSessions}
+        courseId={formData.course}
       />
 
       {/* Import Result Modal */}

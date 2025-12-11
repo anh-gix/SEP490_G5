@@ -18,8 +18,10 @@ const AcademicDashboard = () => {
 
   const [absentStudentsList, setAbsentStudentsList] = useState([]);
   const [roomSchedule, setRoomSchedule] = useState([]);
-  const [timeSlots, setTimeSlots] = useState([]);
+  const [timeSlots, setTimeSlots] = useState([]); // Time slots from database
   const [recentActivities, setRecentActivities] = useState([]);
+  const [todaySchedule, setTodaySchedule] = useState([]);
+  const [classProgress, setClassProgress] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 

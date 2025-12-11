@@ -142,7 +142,10 @@ const RequestManagement = () => {
     createdAt: source === 'changeRequest' ? req.createdAt : req.requestedAt,
     sender: source === 'changeRequest' ? req.sender : req.requestedBy,
     content: source === 'changeRequest' ? req.content : req.requestNote,
-    status: req.status
+    status: req.status,
+    // Map handler and handled date for work requests
+    approver: source === 'changeRequest' ? req.approver : req.processedBy,
+    approvedDate: source === 'changeRequest' ? req.approvedDate : req.processedAt
   });
 
   const fetchAllRequests = async () => {

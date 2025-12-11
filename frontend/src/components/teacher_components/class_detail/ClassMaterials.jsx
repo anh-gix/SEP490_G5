@@ -321,7 +321,7 @@ const ClassMaterials = ({ classId, courseId, setShowMaterialModal, onMaterialsLo
               className="btn-main px-16 py-8 radius-8 text-13" 
               onClick={() => setShowMaterialModal(true)}
             >
-              <i className="fas fa-upload me-2"></i>
+              
               Thêm tài liệu
             </Button>
           </div>
@@ -337,7 +337,7 @@ const ClassMaterials = ({ classId, courseId, setShowMaterialModal, onMaterialsLo
               size="sm"
               onClick={() => setShowMaterialModal(true)}
             >
-              <i className="fas fa-upload me-2"></i>
+              
               Thêm tài liệu đầu tiên
             </Button>
           </div>

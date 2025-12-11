@@ -52,8 +52,8 @@ const RequestTable = ({
               <th className="px-20 py-16 text-neutral-900 fw-semibold text-21 border-0">Nội dung</th>
               <th className="px-20 py-16 text-neutral-900 fw-semibold text-21 border-0">Ngày gửi</th>
               <th className="px-20 py-16 text-neutral-900 fw-semibold text-21 border-0">Trạng thái</th>
-              <th className="px-20 py-16 text-neutral-900 fw-semibold text-21 border-0">Người duyệt</th>
-              <th className="px-20 py-16 text-neutral-900 fw-semibold text-21 border-0">Ngày duyệt</th>
+              <th className="px-20 py-16 text-neutral-900 fw-semibold text-21 border-0">Người xử lý</th>
+              <th className="px-20 py-16 text-neutral-900 fw-semibold text-21 border-0">Ngày xử lý</th>
               <th className="px-20 py-16 text-neutral-900 fw-semibold text-21 border-0">Hành động</th>
             </tr>
           </thead>

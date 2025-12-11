@@ -1863,13 +1863,29 @@ exports.getTeacherStats = async (req, res) => {
     const teachers = await User.find({ roleId: teacherRole._id }).select('_id');
     const teacherIds = teachers.map(t => t._id);
     
+    // Count total classes - check both teacher and teacherId fields
     const totalClasses = await Class.countDocuments({ 
-      teacherId: { $in: teacherIds } 
+      $or: [
+        { teacher: { $in: teacherIds } },
+        { teacherId: { $in: teacherIds } }
+      ]
     });
     
     // Count teachers who have classes (active teachers)
-    const activeTeacherIds = await Class.distinct('teacherId');
-    const activeTeachers = activeTeacherIds.length;
+    // Query both teacher and teacherId fields to get all teachers with classes
+    const teacherIdsFromTeacherField = await Class.distinct('teacher');
+    const teacherIdsFromTeacherIdField = await Class.distinct('teacherId');
+    
+    // Merge and get unique teacher IDs
+    const allActiveTeacherIds = new Set();
+    teacherIdsFromTeacherField.forEach(id => {
+      if (id) allActiveTeacherIds.add(id.toString());
+    });
+    teacherIdsFromTeacherIdField.forEach(id => {
+      if (id) allActiveTeacherIds.add(id.toString());
+    });
+    
+    const activeTeachers = allActiveTeacherIds.size;
     
     res.status(200).json({
       message: "Lấy thống kê giảng viên thành công",

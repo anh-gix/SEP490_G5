@@ -770,7 +770,6 @@ const TeacherManagementAPI = () => {
                       onClick={() => handleViewDetail(teacher)}
                       className="flex-grow-1"
                     >
-                      <i className="fas fa-eye me-1"></i>
                       Chi tiết
                     </Button>
                   </div>
@@ -821,7 +820,6 @@ const TeacherManagementAPI = () => {
                           size="sm"
                           onClick={() => handleViewDetail(teacher)}
                         >
-                          <i className="fas fa-eye me-1"></i>
                           Chi tiết
                         </Button>
                       </div>
@@ -1105,7 +1103,7 @@ const TeacherManagementAPI = () => {
                     </>
                   ) : (
                     <>
-                      <i className="fas fa-upload me-2"></i>
+                      
                       Tải lên và xem trước
                     </>
                   )}

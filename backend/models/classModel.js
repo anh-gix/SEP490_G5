@@ -29,7 +29,6 @@ const classSchema = new mongoose.Schema({
   endDate: {
     type: Date
   },
-  //Luu lai so luong sinh vien toi da cua lop luc khai giang
   maxStudents: {
     type: Number,
   },

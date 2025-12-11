@@ -492,7 +492,7 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
                                 </>
                               ) : (
                                 <>
-                                  <i className="fas fa-upload me-2"></i>
+                                  
                                   Nộp lại ({selectedFiles.filter(f => !f.isExisting).length} file mới)
                                 </>
                               )}
@@ -659,7 +659,7 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
                       </>
                     ) : (
                       <>
-                        <i className="fas fa-upload me-2"></i>
+                        
                         Nộp bài
                       </>
                     )}

@@ -830,7 +830,7 @@ const ImportStudentFromExcel = () => {
                 </>
               ) : (
                 <>
-                  <i className="fas fa-upload me-2"></i>
+                  
                   Tải lên và xem trước
                 </>
               )}

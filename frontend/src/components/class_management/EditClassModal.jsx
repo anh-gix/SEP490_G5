@@ -2221,6 +2221,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
       // Match students by email or phone
       const matchedStudentIds = [];
       const notFound = [];
+      const matchedStudentMap = new Map(); // Map<studentId, studentObject> for later use
 
       emailsOrPhones.forEach((value) => {
         const normalizedValue = value.toLowerCase().trim();
@@ -2238,25 +2239,69 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           const studentId = foundStudent._id || foundStudent.id;
           if (studentId && !matchedStudentIds.includes(String(studentId))) {
             matchedStudentIds.push(String(studentId));
+            matchedStudentMap.set(String(studentId), foundStudent);
           }
         } else {
           notFound.push(value);
         }
       });
 
-      // Add matched students to selectedStudents (avoid duplicates)
-      if (matchedStudentIds.length > 0) {
+      // Validate student enrollment in course if course is selected
+      let validStudentIds = matchedStudentIds;
+      let invalidStudents = [];
+      
+      if (formData.course && matchedStudentIds.length > 0) {
+        try {
+          // Fetch course details to get studentEnrollments
+          const courseResponse = await courseService.getCourseDetails(formData.course);
+          
+          if (courseResponse && courseResponse.success && courseResponse.data) {
+            const course = courseResponse.data;
+            const enrolledStudentIds = (course.studentEnrollments || []).map(id => String(id));
+            
+            // Separate valid and invalid students
+            validStudentIds = matchedStudentIds.filter(studentId => 
+              enrolledStudentIds.includes(studentId)
+            );
+            
+            const invalidStudentIds = matchedStudentIds.filter(studentId => 
+              !enrolledStudentIds.includes(studentId)
+            );
+            
+            // Get student info for invalid students
+            invalidStudents = invalidStudentIds.map(studentId => {
+              const student = matchedStudentMap.get(studentId);
+              const studentName = student?.fullName || student?.name || student?.username || 
+                                 student?.email?.split('@')[0] || `Học viên ${studentId}`;
+              return {
+                studentId: studentId,
+                studentName: studentName,
+                reason: 'Học viên chưa có trong danh sách đăng ký khóa học'
+              };
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching course details for validation:', error);
+          // If error fetching course, proceed with all matched students but log warning
+          console.warn('Could not validate student enrollment, proceeding with all matched students');
+        }
+      }
+
+      // Add only valid students to selectedStudents (avoid duplicates)
+      if (validStudentIds.length > 0) {
         setSelectedStudents(prev => {
-          const newSelected = [...new Set([...prev, ...matchedStudentIds])];
+          const newSelected = [...new Set([...prev, ...validStudentIds])];
           return newSelected;
         });
       }
 
       // Show results in modal
       setImportResult({
-        success: matchedStudentIds.length,
+        success: validStudentIds.length,
         notFound: notFound,
-        total: emailsOrPhones.length
+        total: emailsOrPhones.length,
+        invalidStudents: invalidStudents.length > 0 ? invalidStudents : undefined,
+        courseName: formData.course && selectedCourse ? (selectedCourse.name || 'N/A') : undefined
       });
       setShowImportResultModal(true);
 
@@ -2286,6 +2331,26 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    
+    // Auto-update maxStudents when room is selected/deselected
+    if (name === 'roomId') {
+      if (value) {
+        // Find selected room and set maxStudents to room capacity
+        const selectedRoom = rooms.find(r => {
+          const roomId = r._id || r.id;
+          return String(roomId) === String(value);
+        });
+        if (selectedRoom) {
+          const capacity = selectedRoom.capacity || selectedRoom.maxCapacity || selectedRoom.maxStudents;
+          setFormData(prev => ({ ...prev, roomId: value, maxStudents: capacity }));
+          return; // Don't process further
+        }
+      } else {
+        // Room deselected, clear maxStudents
+        setFormData(prev => ({ ...prev, roomId: '', maxStudents: null }));
+        return; // Don't process further
+      }
+    }
     
     // If program or level changes, clear course if it doesn't belong to the new program/level
     if (name === 'program' || name === 'level') {
@@ -3901,7 +3966,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
               )}
 
               {importResult?.notFound && importResult.notFound.length > 0 && (
-                <div className="mb-0">
+                <div className="mb-16">
                   <div className="text-neutral-700 fw-medium mb-8">
                     <i className="fas fa-info-circle me-2"></i>
                     Không tìm thấy {importResult.notFound.length} học viên:
@@ -3922,6 +3987,46 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                         </div>
                       )}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {importResult?.invalidStudents && importResult.invalidStudents.length > 0 && (
+                <div className="mb-0">
+                  <Alert variant="warning" className="mb-8">
+                    <i className="fas fa-exclamation-triangle me-2"></i>
+                    <strong>
+                      {importResult.invalidStudents.length} học viên chưa đăng ký khóa học
+                      {importResult.courseName && ` "${importResult.courseName}"`}
+                    </strong>
+                  </Alert>
+                  <div className="text-neutral-700 fw-medium mb-8">
+                    <i className="fas fa-user-times me-2"></i>
+                    Danh sách học viên chưa đăng ký:
+                  </div>
+                  <div 
+                    className="border border-warning rounded-8 p-12 bg-warning-25"
+                    style={{ maxHeight: '200px', overflowY: 'auto' }}
+                  >
+                    <div className="d-flex flex-column gap-4">
+                      {importResult.invalidStudents.slice(0, 20).map((student, index) => (
+                        <div key={student.studentId || index} className="text-neutral-700 text-13">
+                          • <strong>{student.studentName}</strong>
+                          <span className="text-neutral-500 text-12 ms-2">
+                            ({student.reason || 'Chưa đăng ký khóa học'})
+                          </span>
+                        </div>
+                      ))}
+                      {importResult.invalidStudents.length > 20 && (
+                        <div className="text-neutral-500 text-12 mt-4">
+                          ... và {importResult.invalidStudents.length - 20} học viên khác
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-neutral-600 text-12 mt-8">
+                    <i className="fas fa-info-circle me-2"></i>
+                    Các học viên này sẽ không được thêm vào lớp. Vui lòng đăng ký khóa học cho họ trước.
                   </div>
                 </div>
               )}

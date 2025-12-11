@@ -41,7 +41,6 @@ const ImportTeacherModal = ({
             </h6>
             <p className="mb-2">Vui lòng đảm bảo file Excel của bạn có đúng format như bảng trên</p>
             <p className="mb-3 text-muted">
-              <i className="fas fa-key me-1"></i>
               Lưu ý: Password sẽ tự động được tạo cho mỗi giảng viên (mặc định: 123456)
             </p>
             
@@ -121,7 +120,7 @@ const ImportTeacherModal = ({
                   </>
                 ) : (
                   <>
-                    <i className="fas fa-upload me-2"></i>
+                    
                     Tải lên và xem trước
                   </>
                 )}

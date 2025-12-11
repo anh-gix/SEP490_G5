@@ -212,6 +212,26 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
+    // Auto-update maxStudents when room is selected/deselected
+    if (name === 'roomId') {
+      if (value) {
+        // Find selected room and set maxStudents to room capacity
+        const selectedRoom = rooms.find(r => {
+          const roomId = r._id || r.id;
+          return String(roomId) === String(value);
+        });
+        if (selectedRoom) {
+          const capacity = selectedRoom.capacity || selectedRoom.maxCapacity || selectedRoom.maxStudents;
+          setFormData(prev => ({ ...prev, roomId: value, maxStudents: capacity }));
+          return; // Don't process further
+        }
+      } else {
+        // Room deselected, clear maxStudents
+        setFormData(prev => ({ ...prev, roomId: '', maxStudents: null }));
+        return; // Don't process further
+      }
+    }
+    
     // Validate start date when it changes
     if (name === 'startDate') {
       const today = getTodayDate();

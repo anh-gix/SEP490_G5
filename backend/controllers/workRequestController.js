@@ -473,6 +473,8 @@ exports.getAssignedToMe = async (req, res) => {
 
     const requests = await WorkRequest.find(query)
       .populate('requestedBy', 'name email username')
+      .populate('assignedTo', 'name email username')
+      .populate('processedBy', 'name email username')
       .populate('entityId')
       .sort({ requestedAt: -1 });
 

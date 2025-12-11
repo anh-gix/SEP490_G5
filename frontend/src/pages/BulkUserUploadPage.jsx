@@ -354,7 +354,7 @@ const BulkUserUploadPage = () => {
                   </>
                 ) : (
                   <>
-                    <i className="fas fa-upload me-2"></i>
+                    
                     Generate
                   </>
                 )}

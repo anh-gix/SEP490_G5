@@ -1,18 +1,18 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Breadcrumb from '../compo/Breadcrumb';
-import Card from '../compo/Card';
-import Table from '../compo/Table';
-import Button from '../compo/Button';
-import SearchBox from '../compo/SearchBox';
-import FilterBar from '../compo/FilterBar';
-import StatusBadge from '../compo/StatusBadge';
-import { formatDate } from '../../../helper/helper';
-import programService from '../../../services/programService';
+import Card from '../CenterHead/compo/Card';
+import Table from '../CenterHead/compo/Table';
+import Button from '../CenterHead/compo/Button';
+import SearchBox from '../CenterHead/compo/SearchBox';
+import FilterBar from '../CenterHead/compo/FilterBar';
+import StatusBadge from '../CenterHead/compo/StatusBadge';
+import { formatDate } from '../../helper/helper';
+import programService from '../../services/programService';
 
-const ProgramList = () => {
+const TeacherProgramList = () => {
   const navigate = useNavigate();
   const [programs, setPrograms] = useState([]);
+  const [myPrograms, setMyPrograms] = useState([]);
   const [filteredPrograms, setFilteredPrograms] = useState([]);
   const [paginatedPrograms, setPaginatedPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,9 +22,11 @@ const ProgramList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
+  const [activeTab, setActiveTab] = useState('my-programs'); // 'my-programs' or 'all-programs'
 
   const applyFilters = useCallback(() => {
-    let filtered = [...programs];
+    const sourceData = activeTab === 'my-programs' ? myPrograms : programs;
+    let filtered = [...sourceData];
 
     if (searchKeyword) {
       const keyword = searchKeyword.toLowerCase();
@@ -39,8 +41,8 @@ const ProgramList = () => {
     }
 
     setFilteredPrograms(filtered);
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [programs, searchKeyword, filterValues]);
+    setCurrentPage(1);
+  }, [programs, myPrograms, searchKeyword, filterValues, activeTab]);
 
   const applyPagination = useCallback(() => {
     const totalItems = filteredPrograms.length;
@@ -58,26 +60,35 @@ const ProgramList = () => {
     try {
       setLoading(true);
 
-      const response = await programService.getAllPrograms();
-      const programsData = response.data || [];
+      // Fetch all programs
+      const allResponse = await programService.getAllPrograms();
+      const allProgramsData = allResponse.data || [];
+      setPrograms(allProgramsData);
 
-      setPrograms(programsData);
-
-      // Set stats from API response
-      if (response.stats) {
-        setStats(response.stats);
-      } else {
-        // Calculate stats if not provided by API
-        const calculatedStats = {
-          total: programsData.length,
-          active: programsData.filter(p => p.status === 'active').length,
-          draft: programsData.filter(p => p.status === 'draft').length,
-          archived: programsData.filter(p => p.status === 'archived').length
-        };
-        setStats(calculatedStats);
+      // Fetch my programs (created by current teacher)
+      let myProgramsData = [];
+      try {
+        const myResponse = await programService.getMyPrograms();
+        myProgramsData = myResponse.data || [];
+        setMyPrograms(myProgramsData);
+      } catch (myError) {
+        console.error('Error fetching my programs:', myError);
+        // If getMyPrograms fails, set empty array
+        setMyPrograms([]);
       }
 
-      console.log('Programs loaded from API:', programsData);
+      // Calculate stats based on active tab
+      const sourceData = activeTab === 'my-programs' ? myProgramsData : allProgramsData;
+      const calculatedStats = {
+        total: sourceData.length,
+        active: sourceData.filter(p => p.status === 'active').length,
+        draft: sourceData.filter(p => p.status === 'draft').length,
+        archived: sourceData.filter(p => p.status === 'archived').length
+      };
+      setStats(calculatedStats);
+
+      console.log('Programs loaded from API:', allProgramsData);
+      console.log('My Programs loaded from API:', myProgramsData);
     } catch (err) {
       console.error('Error fetching programs:', err);
       alert('Không thể tải danh sách chương trình!');
@@ -93,7 +104,7 @@ const ProgramList = () => {
   const handleItemsPerPageChange = (e) => {
     const newItemsPerPage = parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1); // Reset to first page when items per page changes
+    setCurrentPage(1);
   };
 
   const handleDeleteProgram = async (programId, programName) => {
@@ -113,15 +124,19 @@ const ProgramList = () => {
 
     try {
       await programService.deleteProgram(programId);
-
-      // Reload programs after deletion
       await fetchPrograms();
-
       alert('Đã xóa chương trình và toàn bộ dữ liệu liên quan thành công!');
     } catch (err) {
       console.error('Error deleting program:', err);
       alert(err.message || 'Có lỗi xảy ra khi xóa chương trình.');
     }
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setSearchKeyword('');
+    setFilterValues({});
+    setCurrentPage(1);
   };
 
   useEffect(() => {
@@ -130,16 +145,23 @@ const ProgramList = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [searchKeyword, filterValues, programs, applyFilters]);
+  }, [searchKeyword, filterValues, programs, myPrograms, activeTab, applyFilters]);
 
   useEffect(() => {
     applyPagination();
   }, [filteredPrograms, currentPage, itemsPerPage, applyPagination]);
 
-  const breadcrumbItems = [
-    { label: 'Dashboard', path: '/center-head/dashboard' },
-    { label: 'Chương trình đào tạo', path: '/center-head/programs' },
-  ];
+  useEffect(() => {
+    // Recalculate stats when tab changes
+    const sourceData = activeTab === 'my-programs' ? myPrograms : programs;
+    const calculatedStats = {
+      total: sourceData.length,
+      active: sourceData.filter(p => p.status === 'active').length,
+      draft: sourceData.filter(p => p.status === 'draft').length,
+      archived: sourceData.filter(p => p.status === 'archived').length
+    };
+    setStats(calculatedStats);
+  }, [activeTab, programs, myPrograms]);
 
   const filters = [
     {
@@ -199,12 +221,36 @@ const ProgramList = () => {
             className="btn btn-sm btn-outline-primary"
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/center-head/programs/${row._id}`);
+              navigate(`/teacher/programs/${row._id}`);
             }}
             title="Xem chi tiết"
           >
             <i className="ph ph-eye"></i>
           </button>
+          {activeTab === 'my-programs' && (
+            <>
+              <button
+                className="btn btn-sm btn-outline-secondary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/teacher/programs/${row._id}/edit`);
+                }}
+                title="Chỉnh sửa"
+              >
+                <i className="ph ph-pencil"></i>
+              </button>
+              <button
+                className="btn btn-sm btn-outline-danger"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteProgram(row._id, row.program_name);
+                }}
+                title="Xóa chương trình"
+              >
+                <i className="ph ph-trash"></i>
+              </button>
+            </>
+          )}
         </div>
       ),
     },
@@ -219,14 +265,45 @@ const ProgramList = () => {
   }
 
   return (
-    <div className="program-list-container">
-      <Breadcrumb items={breadcrumbItems} />
-
+    <div className="program-list-container p-4">
       <div className="d-flex justify-content-between align-items-center mb-24">
         <div>
           <h4 className="mb-8 text-neutral-900 fw-bold">Chương trình đào tạo</h4>
-          <p className="text-neutral-600 mb-0">Xem tất cả các chương trình trong hệ thống</p>
+          <p className="text-neutral-600 mb-0">Quản lý các chương trình và PLOs</p>
         </div>
+        {activeTab === 'my-programs' && (
+          <Button
+            variant="primary"
+            icon="ph ph-plus"
+            onClick={() => navigate('/teacher/programs/create')}
+          >
+            Tạo chương trình mới
+          </Button>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="mb-24">
+        <ul className="nav nav-tabs">
+          <li className="nav-item">
+            <button
+              className={`nav-link ${activeTab === 'my-programs' ? 'active' : ''}`}
+              onClick={() => handleTabChange('my-programs')}
+            >
+              <i className="ph ph-user me-2"></i>
+              Chương trình của tôi ({myPrograms.length})
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              className={`nav-link ${activeTab === 'all-programs' ? 'active' : ''}`}
+              onClick={() => handleTabChange('all-programs')}
+            >
+              <i className="ph ph-list me-2"></i>
+              Tất cả chương trình ({programs.length})
+            </button>
+          </li>
+        </ul>
       </div>
 
       {/* Stats */}
@@ -279,7 +356,7 @@ const ProgramList = () => {
         <Table
           columns={columns}
           data={paginatedPrograms}
-          onRowClick={(row) => navigate(`/center-head/programs/${row._id}`)}
+          onRowClick={(row) => navigate(`/teacher/programs/${row._id}`)}
         />
       </Card>
 
@@ -363,4 +440,4 @@ const ProgramList = () => {
   );
 };
 
-export default ProgramList;
+export default TeacherProgramList;

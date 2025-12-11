@@ -14,6 +14,16 @@ export const programService = {
     }
   },
 
+  // Lấy programs của teacher hiện tại
+  getMyPrograms: async (params = {}) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/my-programs`, { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy danh sách chương trình của tôi' };
+    }
+  },
+
   // Lấy program theo ID
   getProgramById: async (id) => {
     try {

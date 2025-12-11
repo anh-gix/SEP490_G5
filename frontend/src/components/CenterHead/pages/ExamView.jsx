@@ -9,9 +9,13 @@ import { formatDate } from '../../../helper/helper';
 
 const API_BASE_URL = 'http://localhost:8080';
 
-const ExamView = () => {
+const ExamView = ({ viewMode = 'center-head' }) => {
   const { id } = useParams();
   const navigate = useNavigate();
+
+  // Determine base path
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
+  const isViewOnly = viewMode === 'center-head';
   const [exam, setExam] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -197,7 +201,7 @@ const ExamView = () => {
           <Button
             variant="primary"
             icon="ph ph-pencil"
-            onClick={() => navigate(`/center-head/exams/${exam._id}/edit`)}
+            onClick={() => navigate(`${basePath}/exams/${exam._id}/edit`)}
           >
             Chỉnh sửa
           </Button>
@@ -351,7 +355,7 @@ const ExamView = () => {
                       variant="outline"
                       size="sm"
                       icon="ph ph-pencil"
-                      onClick={() => navigate(`/center-head/exams/${exam._id}/edit`)}
+                      onClick={() => navigate(`${basePath}/exams/${exam._id}/edit`)}
                     >
                       Sửa
                     </Button>

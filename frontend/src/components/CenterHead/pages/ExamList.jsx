@@ -10,8 +10,12 @@ import StatusBadge from '../compo/StatusBadge';
 import examService from '../../../services/examService';
 import { formatDate } from '../../../helper/helper';
 
-const ExamList = () => {
+const ExamList = ({ viewMode = 'center-head' }) => {
   const navigate = useNavigate();
+
+  // Determine base path
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
+  const isViewOnly = viewMode === 'center-head';
   const [exams, setExams] = useState([]);
   const [filteredExams, setFilteredExams] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -166,7 +170,7 @@ const ExamList = () => {
             className="btn btn-sm btn-outline-primary"
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/center-head/exams/${row._id}`);
+              navigate(`${basePath}/exams/${row._id}`);
             }}
             title="Xem chi tiết"
           >
@@ -178,7 +182,7 @@ const ExamList = () => {
             className="btn btn-sm btn-outline-secondary"
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/center-head/exams/${row._id}/edit`);
+              navigate(`${basePath}/exams/${row._id}/edit`);
             }}
             title="Chỉnh sửa"
           >
@@ -271,7 +275,7 @@ const ExamList = () => {
         <Table
           columns={columns}
           data={filteredExams}
-          onRowClick={(row) => navigate(`/center-head/exams/${row._id}`)}
+          onRowClick={(row) => navigate(`${basePath}/exams/${row._id}`)}
         />
       </Card>
     </div>

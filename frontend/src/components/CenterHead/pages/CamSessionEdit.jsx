@@ -17,9 +17,12 @@ const emptyVocabularyItem = () => ({
   img: '',
 });
 
-const CamSessionEdit = () => {
+const CamSessionEdit = ({ viewMode = 'center-head' }) => {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+
+  // Determine base path
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(null);

@@ -14,10 +14,13 @@ import CourseStep4CLOMapping from './course-wizard-steps/CourseStep3CLOMapping';
 import CourseStep5Sessions from './course-wizard-steps/CourseStep4Sessions';
 import CamSession from './CamSession';
 
-const CourseWizard = () => {
+const CourseWizard = ({ viewMode = 'center-head' }) => {
   const navigate = useNavigate();
   const { programId, courseId } = useParams();
   const isEdit = Boolean(courseId);
+
+  // Determine base path
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
 
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -100,9 +103,9 @@ const CourseWizard = () => {
 
   // Breadcrumb
   const breadcrumbItems = [
-    { label: 'Dashboard', path: '/center-head/dashboard' },
-    { label: 'Quản lý chương trình', path: '/center-head/programs' },
-    { label: 'Chi tiết chương trình', path: `/center-head/programs/${programId}` },
+    { label: 'Dashboard', path: `${basePath}/dashboard` },
+    { label: 'Quản lý chương trình', path: `${basePath}/programs` },
+    { label: 'Chi tiết chương trình', path: `${basePath}/programs/${programId}` },
     { label: isEdit ? 'Chỉnh sửa học phần' : 'Tạo học phần mới' }
   ];
 
@@ -199,7 +202,7 @@ const CourseWizard = () => {
       );
       if (!confirm) return;
     }
-    navigate(`/center-head/programs/${programId}`);
+    navigate(`${basePath}/programs/${programId}`);
   };
 
   // Calculate completion percentage
@@ -268,7 +271,7 @@ const CourseWizard = () => {
                       const programId = typeof courseData.program === 'object'
                         ? (courseData.program._id || courseData.program.id)
                         : courseData.program;
-                      navigate(`/center-head/programs/${programId}`);
+                      navigate(`${basePath}/programs/${programId}`);
                     } catch (error) {
                       console.error('Error updating course status:', error);
                       alert('Có lỗi khi cập nhật trạng thái học phần!');

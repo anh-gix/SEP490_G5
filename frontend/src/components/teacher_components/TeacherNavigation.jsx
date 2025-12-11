@@ -68,15 +68,15 @@ const TeacherNavigation = () => {
     // }
     {
       title: 'Chương trình đào tạo',
-      icon: 'fa-user-check',
+      icon: 'fa-book',
       path: '/teacher/programs',
-      color: 'main'
+      color: 'warning'
     },
     {
       title: 'Đề thi',
-      icon: 'fa-user-check',
+      icon: 'fa-file-alt',
       path: '/teacher/exams',
-      color: 'main'
+      color: 'info'
     }
   ];
 

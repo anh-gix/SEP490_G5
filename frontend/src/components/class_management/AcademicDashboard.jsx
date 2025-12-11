@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Table, Spinner, Alert } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import academicStaffService from '../../services/academicStaffService';
 
 const AcademicDashboard = () => {
+  const navigate = useNavigate();
 
   const [todayOverview, setTodayOverview] = useState({
     todaySchedules: 0,
@@ -151,7 +152,7 @@ const AcademicDashboard = () => {
                 onClick={() => {
                   const longestPendingRequest = recentActivities && recentActivities.length > 0 ? recentActivities[recentActivities.length - 1] : null;
                   if (longestPendingRequest?.id) {
-                    window.location.href = `/academic/request-management?requestId=${longestPendingRequest.id}`;
+                    navigate(`/academic/request-management/${longestPendingRequest.id}`);
                   }
                 }}
               >
@@ -182,7 +183,7 @@ const AcademicDashboard = () => {
                   <div className="text-end">
                     {recentActivities && recentActivities.length > 0 && recentActivities[recentActivities.length - 1]?.id ? (
                       <Link 
-                        to={`/academic/request-management?requestId=${recentActivities[recentActivities.length - 1].id}`} 
+                        to={`/academic/request-management/${recentActivities[recentActivities.length - 1].id}`} 
                         className="text-decoration-none"
                         onClick={(e) => e.stopPropagation()}
                       >

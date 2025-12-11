@@ -105,11 +105,8 @@ const RequestManagement = () => {
   useEffect(() => {
     const requestId = searchParams.get('requestId');
     if (requestId && user?._id && !loading && !loadingRequestById) {
-      // Small delay to ensure requests are fully loaded and state is updated
-      const timer = setTimeout(() => {
-        handleOpenRequestById(requestId);
-      }, 500);
-      return () => clearTimeout(timer);
+      // Execute immediately without delay for better performance
+      handleOpenRequestById(requestId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, user, loading]);
@@ -173,7 +170,8 @@ const RequestManagement = () => {
       setSelectedRequest(request);
       setShowWorkRequestDetail(true);
     } else {
-      // Show ChangeRequest detail (existing flow)
+      // Show ChangeRequest detail - optimized for better UX
+      // Set request and show modal immediately for instant feedback
       setSelectedRequest(request);
       setShowDetailModal(true);
       setRejectReason('');
@@ -181,19 +179,23 @@ const RequestManagement = () => {
       setSenderSchedule([]);
       setSenderRole(null);
       
-      try {
-        const response = await changeRequestService.getSenderSchedule(request._id);
-        if (response.success) {
-          setSenderSchedule(response.schedules || []);
-          setSenderRole(response.sender?.role || null);
-        }
-      } catch (err) {
-        console.error('Error fetching schedule:', err);
-        setSenderSchedule([]);
-        setSenderRole(null);
-      } finally {
-        setLoadingSchedule(false);
-      }
+      // Fetch schedule immediately without blocking (non-blocking)
+      // This allows the modal to show immediately while schedule loads in background
+      changeRequestService.getSenderSchedule(request._id)
+        .then((response) => {
+          if (response.success) {
+            setSenderSchedule(response.schedules || []);
+            setSenderRole(response.sender?.role || null);
+          }
+        })
+        .catch((err) => {
+          console.error('Error fetching schedule:', err);
+          setSenderSchedule([]);
+          setSenderRole(null);
+        })
+        .finally(() => {
+          setLoadingSchedule(false);
+        });
     }
   };
 
@@ -204,7 +206,7 @@ const RequestManagement = () => {
     try {
       setLoadingRequestById(true);
       
-      // Try to find in already loaded requests first
+      // Step 1: Try to find in already loaded requests first (fastest)
       const foundInMerged = mergedRequests.find(req => req._id === requestId);
       if (foundInMerged) {
         // Request already loaded, just open it
@@ -216,10 +218,29 @@ const RequestManagement = () => {
         return;
       }
 
-      // Try to fetch as ChangeRequest first
+      // Step 2: Try to fetch as WorkRequest first (has fast getById endpoint)
+      try {
+        const workResponse = await academicWorkRequestService.getRequestById(requestId);
+        if (workResponse.success && workResponse.data) {
+          const workReq = normalizeRequest(workResponse.data, 'workRequest');
+          await openRequestDetail(workReq);
+          // Remove query parameter
+          searchParams.delete('requestId');
+          setSearchParams(searchParams, { replace: true });
+          setLoadingRequestById(false);
+          return;
+        }
+      } catch (err) {
+        // Not a WorkRequest or not found, continue to try ChangeRequest
+        console.log('Not a WorkRequest, trying ChangeRequest...');
+      }
+
+      // Step 3: Try to fetch as ChangeRequest (slower, requires fetching all)
+      // Only fetch a reasonable limit instead of 10000
       try {
         const changeResponse = await changeRequestService.getAllChangeRequests({ 
-          limit: 10000 
+          limit: 100,  // Reduced from 10000 for better performance
+          page: 1
         });
         if (changeResponse.success) {
           const changeReqs = (changeResponse.changeRequests || []).map(req => 
@@ -238,22 +259,6 @@ const RequestManagement = () => {
         }
       } catch (err) {
         console.error('Error fetching change request:', err);
-      }
-
-      // Try to fetch as WorkRequest
-      try {
-        const workResponse = await academicWorkRequestService.getRequestById(requestId);
-        if (workResponse.success && workResponse.data) {
-          const workReq = normalizeRequest(workResponse.data, 'workRequest');
-          await openRequestDetail(workReq);
-          // Remove query parameter
-          searchParams.delete('requestId');
-          setSearchParams(searchParams, { replace: true });
-          setLoadingRequestById(false);
-          return;
-        }
-      } catch (err) {
-        console.error('Error fetching work request:', err);
       }
 
       // If not found, show error
@@ -889,7 +894,41 @@ const RequestManagement = () => {
   }
 
   return (
-    <Container fluid className="p-24">
+    <Container fluid className="p-24" style={{ position: 'relative' }}>
+      {/* Loading overlay when fetching request by ID */}
+      {loadingRequestById && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999
+          }}
+        >
+          <div 
+            style={{
+              backgroundColor: 'white',
+              padding: '24px',
+              borderRadius: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+            }}
+          >
+            <Spinner animation="border" variant="primary" />
+            <p className="text-neutral-700 mb-0 fw-medium">Đang tải chi tiết đơn...</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-24">
         <h4 className="text-neutral-900 fw-bold mb-8">Quản lý yêu cầu</h4>

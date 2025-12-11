@@ -144,25 +144,41 @@ exports.getClassById = async (req, res) => {
     // Tạo chuỗi thời gian học từ schedules
     let scheduleTimeString = 'N/A';
     if (schedules.length > 0) {
-      // Lấy các khung giờ và ngày trong tuần từ schedules
-      const timeSlots = new Set();
-      const daysOfWeek = new Set();
+      // Nhóm schedules theo thứ trong tuần
       const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+      const scheduleByDay = new Map(); // Map<dayIndex, Set<timeSlot>>
       
       schedules.forEach(schedule => {
-        if (schedule.startTime && schedule.endTime) {
-          timeSlots.add(`${schedule.startTime}-${schedule.endTime}`);
-        }
-        if (schedule.date) {
+        if (schedule.date && schedule.startTime && schedule.endTime) {
           const date = new Date(schedule.date);
-          daysOfWeek.add(dayNames[date.getDay()]);
+          const dayIndex = date.getDay(); // 0 = Chủ nhật, 1 = Thứ 2, ..., 6 = Thứ 7
+          const timeSlot = `${schedule.startTime}-${schedule.endTime}`;
+          
+          if (!scheduleByDay.has(dayIndex)) {
+            scheduleByDay.set(dayIndex, new Set());
+          }
+          scheduleByDay.get(dayIndex).add(timeSlot);
         }
       });
       
-      if (timeSlots.size > 0 && daysOfWeek.size > 0) {
-        const daysArray = Array.from(daysOfWeek).sort();
-        const timeArray = Array.from(timeSlots);
-        scheduleTimeString = `${daysArray.join(', ')}: ${timeArray.join(', ')}`;
+      if (scheduleByDay.size > 0) {
+        // Sắp xếp thứ theo thứ tự trong tuần (Thứ 2 -> Chủ nhật)
+        // Chuyển đổi: 1,2,3,4,5,6,0 -> Thứ 2,3,4,5,6,7,CN
+        const sortedDays = Array.from(scheduleByDay.keys()).sort((a, b) => {
+          // Sắp xếp: Thứ 2(1) -> Thứ 7(6) -> Chủ nhật(0)
+          if (a === 0) return 1; // Chủ nhật xuống cuối
+          if (b === 0) return -1;
+          return a - b;
+        });
+        
+        // Format: "Thứ X: time1, time2 | Thứ Y: time1"
+        const formattedParts = sortedDays.map(dayIndex => {
+          const dayName = dayNames[dayIndex];
+          const timeSlots = Array.from(scheduleByDay.get(dayIndex)).sort();
+          return `${dayName}: ${timeSlots.join(', ')}`;
+        });
+        
+        scheduleTimeString = formattedParts.join(' | ');
       }
     }
     

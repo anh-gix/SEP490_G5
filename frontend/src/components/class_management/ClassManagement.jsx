@@ -88,33 +88,6 @@ const ClassManagement = () => {
     navigate(`/academic/class-management/${classItem.id}/edit`);
   };
 
-  const handleDeleteClass = async (classId) => {
-    const result = await Swal.fire({
-      title: 'Xác nhận xóa',
-      text: 'Bạn có chắc chắn muốn xóa lớp học này?',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Xóa',
-      cancelButtonText: 'Hủy',
-      confirmButtonColor: '#dc3545',
-      cancelButtonColor: '#6c757d'
-    });
-    
-    if (!result.isConfirmed) return;
-    
-    try {
-      setLoading(true);
-      await classService.deleteClass(classId);
-      toast.success('Xóa lớp học thành công!');
-      await fetchClasses();
-    } catch (err) {
-      console.error('Error deleting class:', err);
-      toast.error(err.message || 'Có lỗi xảy ra khi xóa lớp học!');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleViewDetails = (classItem) => {
     navigate(`/academic/class-management/${classItem.id}`);
   };

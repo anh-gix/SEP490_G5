@@ -258,22 +258,37 @@ const StudentDetail = () => {
 
     try {
       // Get course ID from class
+      console.log('Class item:', classItem);
       const courseId = classItem.course?._id || classItem.course;
+      console.log('Course ID extracted:', courseId);
+      
       if (courseId) {
         // Get all classes with the same course
         const response = await classService.getAllClasses({ courseId });
+        console.log('API response for getAllClasses:', response);
+        
         if (response.success) {
           const classes = response.classes || [];
+          console.log(`Found ${classes.length} classes with courseId ${courseId}`);
+          
           // Filter out current class
           const otherClasses = classes.filter(cls => {
             const clsId = cls._id || cls;
-            return clsId.toString() !== classItem._id?.toString();
+            const isCurrentClass = clsId.toString() === classItem._id?.toString();
+            if (isCurrentClass) {
+              console.log('Filtering out current class:', cls.name, clsId);
+            }
+            return !isCurrentClass;
           });
+          
+          console.log(`After filtering, ${otherClasses.length} classes available`);
           setAvailableClasses(otherClasses);
         } else {
+          console.warn('API response not successful:', response);
           setAvailableClasses([]);
         }
       } else {
+        console.warn('No courseId found in classItem');
         setAvailableClasses([]);
       }
     } catch (err) {
@@ -689,39 +704,45 @@ const StudentDetail = () => {
                   <Col md={12}>
                     <Card className="border-0 bg-neutral-25">
                       <Card.Body className="p-16">
-                        <div className="d-flex align-items-start">
-                          <span className="text-13 text-neutral-500 me-2" style={{ minWidth: '120px' }}>Khóa học đang học:</span>
+                        <div className="d-flex align-items-start justify-content-between">
                           <div className="flex-grow-1">
-                            {selectedStudent.courses && selectedStudent.courses.length > 0 ? (
-                              <div className="d-flex flex-wrap gap-2">
-                                {selectedStudent.courses.map((course, idx) => (
-                                  <Badge 
-                                    key={idx} 
-                                    bg="info" 
-                                    className="text-13 px-12 py-6"
-                                  >
-                                    {course.name}
-                                    {course.program && (
-                                      <span className="ms-1 text-12">
-                                        ({course.program.program_name || course.program.name || course.program.type || 'N/A'})
-                                      </span>
-                                    )}
-                                  </Badge>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-14 text-neutral-600">Chưa đăng ký khóa học nào</span>
-                            )}
+                            <div className="d-flex align-items-center mb-2">
+                              <span className="text-13 text-neutral-500 me-2" style={{ minWidth: '120px' }}>Khóa học đang học:</span>
+                            </div>
+                            <div>
+                              {selectedStudent.courses && selectedStudent.courses.length > 0 ? (
+                                <div className="d-flex flex-wrap gap-2">
+                                  {selectedStudent.courses.map((course, idx) => (
+                                    <Badge 
+                                      key={idx} 
+                                      bg="info" 
+                                      className="text-13 px-12 py-6"
+                                    >
+                                      {course.name}
+                                      {course.program && (
+                                        <span className="ms-1 text-12">
+                                          ({course.program.program_name || course.program.name || course.program.type || 'N/A'})
+                                        </span>
+                                      )}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-14 text-neutral-600">Chưa đăng ký khóa học nào</span>
+                              )}
+                            </div>
                           </div>
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="p-0 ms-2"
-                            onClick={handleEditCourses}
-                            title="Chỉnh sửa khóa học"
-                          >
-                            <i className="fas fa-edit"></i>
-                          </Button>
+                          {isEditMode && (
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              className="ms-3"
+                              onClick={handleEditCourses}
+                            >
+                              <i className="fas fa-edit me-2"></i>
+                              Chỉnh sửa khóa học
+                            </Button>
+                          )}
                         </div>
                       </Card.Body>
                     </Card>
@@ -752,7 +773,9 @@ const StudentDetail = () => {
                         <th className="px-16 py-12 text-13">Trình độ</th>
                         <th className="px-16 py-12 text-13">Học viên</th>
                         <th className="px-16 py-12 text-13">Trạng thái</th>
-                        <th className="px-16 py-12 text-13">Thao tác</th>
+                        {isEditMode && (
+                          <th className="px-16 py-12 text-13">Thao tác</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -769,17 +792,19 @@ const StudentDetail = () => {
                               {getClassStatusText(cls.status)}
                             </Badge>
                           </td>
-                          <td className="px-16 py-12">
-                            <Button
-                              variant="outline-primary"
-                              size="sm"
-                              onClick={() => handleChangeClassClick(cls)}
-                              className="px-12 py-6"
-                            >
-                              <i className="fas fa-exchange-alt me-1"></i>
-                              Đổi lớp
-                            </Button>
-                          </td>
+                          {isEditMode && (
+                            <td className="px-16 py-12">
+                              <Button
+                                variant="outline-primary"
+                                size="sm"
+                                onClick={() => handleChangeClassClick(cls)}
+                                className="px-12 py-6"
+                              >
+                                <i className="fas fa-exchange-alt me-1"></i>
+                                Đổi lớp
+                              </Button>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>

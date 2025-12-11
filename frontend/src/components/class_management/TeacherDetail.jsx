@@ -532,14 +532,16 @@ const TeacherDetail = () => {
           <h4 className="text-neutral-900 fw-bold mb-8">Chi tiết giảng viên - {teacher.username}</h4>
         </div>
         <div>
-          <Button
-            variant={isEditMode ? 'danger' : 'primary'}
-            onClick={() => setIsEditMode(!isEditMode)}
-            className="mb-3"
-          >
-            <i className={`fas ${isEditMode ? 'fa-times' : 'fa-edit'} me-2`}></i>
-            {isEditMode ? 'Tắt chỉnh sửa' : 'Chỉnh sửa'}
-          </Button>
+          {activeTab === 'schedule' && (
+            <Button
+              variant={isEditMode ? 'danger' : 'primary'}
+              onClick={() => setIsEditMode(!isEditMode)}
+              className="mb-3"
+            >
+              <i className={`fas ${isEditMode ? 'fa-times' : 'fa-edit'} me-2`}></i>
+              {isEditMode ? 'Tắt chỉnh sửa' : 'Chỉnh sửa'}
+            </Button>
+          )}
         </div>
       </div>
 

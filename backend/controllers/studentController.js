@@ -1403,17 +1403,21 @@ exports.getStudentById = async (req, res) => {
     const classes = await Class.find({ students: id })
       .populate({
         path: 'course',
-        select: 'name',
+        select: '_id name',
         populate: { path: 'program', select: 'level' }
       })
       .populate('students', 'username email')
-      .select('name course status students')
+      .select('_id name course status students')
       .lean();
     
     // Format classes with level from program
     const formattedClasses = classes.map(cls => ({
+      _id: cls._id,
       name: cls.name,
-      course: cls.course ? { name: cls.course.name } : null,
+      course: cls.course ? { 
+        _id: cls.course._id,
+        name: cls.course.name 
+      } : null,
       level: cls.course?.program?.level || 'N/A',
       status: cls.status,
       students: cls.students || []

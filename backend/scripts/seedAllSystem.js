@@ -151,27 +151,23 @@ async function seedClasses() {
             status: 'pending'
         },
         {
-            name: 'IELTS Elementary A2 - Lớp Có Conflict',
+            name: 'IELTS Elementary A2 - Lớp 1',
             course: course3._id,
-            teacher: teachers[1]._id, // Teacher 2 (khác teacher để tránh conflict teacher)
-            students: [
-                students[0]._id, // Học viên chung với lớp đang học (sẽ bị conflict)
-                students[1]._id, // Học viên chung với lớp đang học (sẽ bị conflict)
-                students[3]._id  // Học viên mới
-            ],
-            room: rooms[2]._id, // Phòng khác để tránh conflict room
-            startDate: activeClassStartDate, // Cùng thời gian với lớp đang học
-            endDate: activeClassEndDate,
+            teacher: teachers[Math.min(2, teachers.length - 1)]._id || teachers[0]._id, // Teacher khác
+            students: [students[5]._id, students[6]._id, students[7]._id], // Students khác
+            room: rooms[2]._id, // Room khác
+            startDate: class2StartDate, // Thời gian khác (1 tuần trước)
+            endDate: class2EndDate,
             maxStudents: 25,
             status: 'active'
         },
         // 5 lớp mới cùng course với "IELTS Foundation A1 - Lớp Đang Học"
         {
             name: 'IELTS Foundation A1 - Lớp 2',
-            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: teachers[0]._id, // Teacher 1
-            students: [students[5]._id, students[6]._id, students[7]._id, students[8]._id],
-            room: rooms[1]._id, // Phòng 201
+            course: course1._id,
+            teacher: teachers[1]._id, // Teacher 2 (khác với lớp 0)
+            students: [students[8]._id, students[9]._id, students[Math.min(10, students.length - 1)]._id, students[Math.min(11, students.length - 1)]._id], // Students khác
+            room: rooms[2]._id, // Room khác
             startDate: class2StartDate, // 1 tuần trước
             endDate: class2EndDate,
             maxStudents: 25,
@@ -179,10 +175,10 @@ async function seedClasses() {
         },
         {
             name: 'IELTS Foundation A1 - Lớp 3',
-            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: teachers[1]._id, // Teacher 2
-            students: [students[9]._id, students[Math.min(10, students.length - 1)]._id, students[Math.min(11, students.length - 1)]._id, students[Math.min(12, students.length - 1)]._id],
-            room: rooms[2]._id, // Phòng 301
+            course: course1._id,
+            teacher: teachers[Math.min(2, teachers.length - 1)]._id || teachers[0]._id, // Teacher khác
+            students: [students[Math.min(12, students.length - 1)]._id, students[Math.min(13, students.length - 1)]._id, students[Math.min(14, students.length - 1)]._id, students[Math.min(15, students.length - 1)]._id], // Students khác
+            room: rooms[Math.min(3, rooms.length - 1)]._id, // Room khác
             startDate: class3StartDate, // Hôm nay
             endDate: class3EndDate,
             maxStudents: 25,
@@ -190,33 +186,33 @@ async function seedClasses() {
         },
         {
             name: 'IELTS Foundation A1 - Lớp 4',
-            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: teachers[0]._id, // Teacher 1
-            students: [students[Math.min(13, students.length - 1)]._id, students[Math.min(14, students.length - 1)]._id, students[Math.min(15, students.length - 1)]._id, students[Math.min(16, students.length - 1)]._id],
-            room: rooms[Math.min(3, rooms.length - 1)]._id, // Phòng Lab 401
-            startDate: class4StartDate, // 1 tuần sau
+            course: course1._id,
+            teacher: teachers[0]._id, // Teacher 1 (có thể dùng lại nếu lịch khác)
+            students: [students[Math.min(16, students.length - 1)]._id, students[Math.min(17, students.length - 1)]._id, students[Math.min(18, students.length - 1)]._id, students[Math.min(19, students.length - 1)]._id], // Students khác
+            room: rooms[Math.min(4, rooms.length - 1)]._id, // Room khác
+            startDate: class4StartDate, // 1 tuần sau (thời gian khác)
             endDate: class4EndDate,
             maxStudents: 25,
             status: 'pending'
         },
         {
             name: 'IELTS Foundation A1 - Lớp 5',
-            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
+            course: course1._id,
             teacher: teachers[1]._id, // Teacher 2
-            students: [students[Math.min(17, students.length - 1)]._id, students[Math.min(18, students.length - 1)]._id, students[Math.min(19, students.length - 1)]._id, students[Math.min(20, students.length - 1)]._id],
-            room: rooms[Math.min(4, rooms.length - 1)]._id, // Phòng 501
-            startDate: class5StartDate, // 2 tuần sau
+            students: [students[Math.min(20, students.length - 1)]._id, students[Math.min(21, students.length - 1)]._id, students[Math.min(22, students.length - 1)]._id, students[Math.min(23, students.length - 1)]._id], // Students khác
+            room: rooms[0]._id, // Room có thể dùng lại nếu lịch khác
+            startDate: class5StartDate, // 2 tuần sau (thời gian khác)
             endDate: class5EndDate,
             maxStudents: 25,
             status: 'pending'
         },
         {
             name: 'IELTS Foundation A1 - Lớp 6',
-            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: teachers[0]._id, // Teacher 1
-            students: [students[5]._id, students[6]._id], // Dùng lại một số students (không conflict vì lịch khác)
-            room: rooms[0]._id, // Phòng 101 (có thể dùng lại nếu lịch khác)
-            startDate: class6StartDate, // 3 tuần sau
+            course: course1._id,
+            teacher: teachers[Math.min(2, teachers.length - 1)]._id || teachers[0]._id, // Teacher khác
+            students: [students[Math.min(24, students.length - 1)]._id, students[Math.min(25, students.length - 1)]._id, students[Math.min(26, students.length - 1)]._id], // Students khác
+            room: rooms[1]._id, // Room khác
+            startDate: class6StartDate, // 3 tuần sau (thời gian khác)
             endDate: class6EndDate,
             maxStudents: 25,
             status: 'pending'
@@ -228,14 +224,14 @@ async function seedClasses() {
     console.log(`✅ Created ${created.length} classes`);
     console.log(`   - Lớp đang học: ${classes[0].name} (${activeClassStartDate.toISOString().split('T')[0]} - ${activeClassEndDate.toISOString().split('T')[0]})`);
     console.log(`   - Lớp chưa học: ${classes[1].name} (${pendingClassStartDate.toISOString().split('T')[0]} - ${pendingClassEndDate.toISOString().split('T')[0]})`);
-    console.log(`   - Lớp có conflict: ${classes[2].name} (${activeClassStartDate.toISOString().split('T')[0]} - ${activeClassEndDate.toISOString().split('T')[0]})`);
-    console.log(`     ⚠️ Lớp này có học viên chung với lớp đang học và sẽ có lịch trùng thời gian`);
-    console.log(`   - 5 lớp cùng course IELTS Foundation A1 - Nghe:`);
+    console.log(`   - Lớp khác: ${classes[2].name} (${class2StartDate.toISOString().split('T')[0]} - ${class2EndDate.toISOString().split('T')[0]})`);
+    console.log(`   - 5 lớp cùng course IELTS Foundation A1:`);
     console.log(`     • ${classes[3].name} (${class2StartDate.toISOString().split('T')[0]} - ${class2EndDate.toISOString().split('T')[0]})`);
     console.log(`     • ${classes[4].name} (${class3StartDate.toISOString().split('T')[0]} - ${class3EndDate.toISOString().split('T')[0]})`);
     console.log(`     • ${classes[5].name} (${class4StartDate.toISOString().split('T')[0]} - ${class4EndDate.toISOString().split('T')[0]})`);
     console.log(`     • ${classes[6].name} (${class5StartDate.toISOString().split('T')[0]} - ${class5EndDate.toISOString().split('T')[0]})`);
-    console.log(`     • ${classes[7].name} (${class6StartDate.toISOString().split('T')[0]} - ${class6EndDate.toISOString().split('T')[0]})\n`);
+    console.log(`     • ${classes[7].name} (${class6StartDate.toISOString().split('T')[0]} - ${class6EndDate.toISOString().split('T')[0]})`);
+    console.log(`   ✅ Tất cả các lớp đã được phân bổ để tránh conflict về teacher, room, students và lịch học\n`);
 }
 
 async function seedClassSchedules() {
@@ -364,15 +360,17 @@ async function seedClassSchedules() {
         // Lấy số buổi học từ course.numberOfSessions
         const numberOfSessions = course.numberOfSessions || sessions.length;
         
-        // Chọn pattern lịch cho lớp này (mỗi lớp có thể khác nhau)
-        // Lớp conflict (index 2) sẽ dùng pattern 5 (index 4, trùng với pattern 0) để tạo conflict
+        // Chọn pattern lịch cho lớp này (mỗi lớp có pattern khác nhau để tránh conflict)
         let selectedPattern;
-        if (classIndex === 2) {
-            // Lớp conflict: dùng pattern 5 (index 4, trùng thời gian với pattern 0 - lớp đang học)
-            selectedPattern = schedulePatterns[4];
-        } else if (classIndex === 0) {
+        if (classIndex === 0) {
             // Lớp 0 (IELTS Foundation A1 - Lớp Đang Học): Pattern 0 (Thứ 2, Thứ 3)
             selectedPattern = schedulePatterns[0];
+        } else if (classIndex === 1) {
+            // Lớp 1 (TOEIC Beginner A1 - Lớp Chưa Học): Pattern 1 (Thứ 2, Thứ 3, Thứ 5)
+            selectedPattern = schedulePatterns[1];
+        } else if (classIndex === 2) {
+            // Lớp 2 (IELTS Elementary A2 - Lớp 1): Pattern 2 (Thứ 2, Thứ 3, Thứ 6)
+            selectedPattern = schedulePatterns[2];
         } else if (classIndex === 3) {
             // Lớp 3 (IELTS Foundation A1 - Lớp 2): Pattern 6 (Thứ 4, Thứ 5)
             selectedPattern = schedulePatterns[6];

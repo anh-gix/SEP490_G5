@@ -513,7 +513,6 @@ const BulkUserUploadPage = () => {
                 onClick={handleSave}
                 disabled={!selectedRoleId || saving}
               >
-                <i className="fas fa-eye me-2"></i>
                 Preview
               </Button>
             </div>

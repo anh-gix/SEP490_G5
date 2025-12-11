@@ -485,7 +485,6 @@ const StudentSchedule = () => {
                                   className="btn-outline-main w-100 py-4 radius-6"
                                   style={{ fontSize: '10px' }}
                                 >
-                                  <i className="fas fa-eye me-1"></i>
                                   Chi tiết
                                 </Button>
                               </Link>
@@ -700,7 +699,6 @@ const StudentSchedule = () => {
                           <Button
                             className="btn-outline-main text-13 fw-medium px-12 py-6 radius-6"
                           >
-                            <i className="fas fa-eye me-1"></i>
                             Chi tiết
                           </Button>
                         </Link>

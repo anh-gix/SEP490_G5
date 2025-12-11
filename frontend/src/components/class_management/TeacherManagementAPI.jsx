@@ -526,20 +526,6 @@ const TeacherManagementAPI = () => {
     navigate(`/academic/teacher-management/${teacher._id}`);
   };
 
-  const getStatusBadge = (status) => {
-    const config = {
-      active: { bg: 'bg-success-600', text: 'Hoạt động', icon: 'fa-check-circle' },
-      inactive: { bg: 'bg-danger-600', text: 'Tạm nghỉ', icon: 'fa-times-circle' }
-    };
-    const { bg, text, icon } = config[status] || config.active;
-    return (
-      <Badge className={`${bg} text-white px-12 py-6`}>
-        <i className={`fas ${icon} me-1`}></i>
-        {text}
-      </Badge>
-    );
-  };
-
   const filteredTeachers = teachers;
 
   return (
@@ -590,29 +576,6 @@ const TeacherManagementAPI = () => {
                 <div>
                   <div className="text-neutral-500 text-13 mb-4">Tổng giảng viên</div>
                   <div className="text-neutral-900 fw-bold text-32">{stats.total || 0}</div>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
-                <div 
-                  className="rounded-12 d-flex align-items-center justify-content-center"
-                  style={{ 
-                    width: '56px',
-                    height: '56px',
-                    background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
-                  }}
-                >
-                  <i className="fas fa-user-check text-white" style={{ fontSize: '24px' }}></i>
-                </div>
-                <div>
-                  <div className="text-neutral-500 text-13 mb-4">Đang hoạt động</div>
-                  <div className="text-neutral-900 fw-bold text-32">{stats.active || 0}</div>
                 </div>
               </div>
             </Card.Body>
@@ -783,7 +746,6 @@ const TeacherManagementAPI = () => {
                       <h6 className="text-neutral-900 fw-semibold mb-4">{teacher.username}</h6>
                       <p className="text-neutral-600 text-13 mb-0">{teacher.email}</p>
                     </div>
-                    {getStatusBadge(teacher.status)}
                   </div>
 
                   <div className="mb-16">
@@ -830,7 +792,6 @@ const TeacherManagementAPI = () => {
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Email</th>
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Số điện thoại</th>
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Lớp học</th>
-                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Trạng thái</th>
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Thao tác</th>
                 </tr>
               </thead>
@@ -852,9 +813,6 @@ const TeacherManagementAPI = () => {
                     <td className="px-20 py-16 text-neutral-700 text-14">{teacher.phone || 'N/A'}</td>
                     <td className="px-20 py-16 text-center text-neutral-700 fw-medium text-14">
                       {teacher.stats?.classCount || 0}
-                    </td>
-                    <td className="px-20 py-16">
-                      {getStatusBadge(teacher.status)}
                     </td>
                     <td className="px-20 py-16">
                       <div className="d-flex gap-8">
@@ -1068,7 +1026,6 @@ const TeacherManagementAPI = () => {
               </h6>
               <p className="mb-2">Vui lòng đảm bảo file Excel của bạn có đúng format như bảng trên</p>
               <p className="mb-3 text-muted">
-                <i className="fas fa-key me-1"></i>
                 Lưu ý: Password sẽ tự động được tạo cho mỗi giảng viên (mặc định: 123456)
               </p>
               

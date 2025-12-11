@@ -16,6 +16,20 @@ export const courseService = {
   },
 
   /**
+   * Get all courses (alias for getCourses)
+   * @returns {Promise} Response with courses data
+   */
+  getAllCourses: async () => {
+    try {
+      const response = await api.get('/courses');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching all courses:', error);
+      throw error.response?.data || { message: 'Không thể lấy danh sách khóa học' };
+    }
+  },
+
+  /**
    * Get courses by program name and level
    * @param {string} programName - Program name (IELTS, TOEIC, Cambridge)
    * @param {string} level - Level (A1, A2, B1, B2, C1, C2, Pre-A1)

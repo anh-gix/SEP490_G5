@@ -1330,18 +1330,23 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           
           // Get class IDs from room schedules to filter out current class
           const roomSchedules = roomResponse.schedules.map(schedule => {
-            // Try to get classId from various possible fields
-            const scheduleClassId = schedule.class?._id?.toString() || 
-                                   schedule.classId?.toString() || 
-                                   schedule.class?.id?.toString() ||
-                                   schedule._id?.toString(); // Fallback to schedule ID if class info not available
+            // Get class ID from various possible paths in API response
+            // Primary path from API: class._id
+            const scheduleClassId = 
+              schedule.class?._id?.toString() ||  // Primary path from API
+              schedule.class?._id ||              // In case it's already a string
+              schedule.classId?.toString() ||
+              schedule.classId ||
+              schedule.class?.id?.toString() ||
+              schedule.class?.id ||
+              null; // Don't use schedule._id as fallback - that's wrong
             
             return {
               date: formatDateLocal(schedule.date),
               startTime: schedule.startTime,
               endTime: schedule.endTime,
               className: schedule.className || schedule.class?.name || 'N/A',
-              classId: scheduleClassId,
+              classId: scheduleClassId, // Can be null if no class info
               room: roomName, // Use room name from response
               status: schedule.status,
               _id: schedule._id
@@ -1478,9 +1483,13 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
               // Skip if it's from the same class (compare by classId)
               const roomClassIdStr = roomSchedule.classId ? String(roomSchedule.classId) : null;
               
-              // Also check by className as fallback
-              const isSameClass = roomClassIdStr && roomClassIdStr === currentClassIdStr;
-              const isSameClassByName = roomSchedule.className === (fullClassData?.name || 'Lớp hiện tại');
+              // Exclude if same class ID
+              const isSameClass = currentClassIdStr && roomClassIdStr && roomClassIdStr === currentClassIdStr;
+              
+              // Also check by class name as fallback
+              const scheduleClassName = roomSchedule.className || 'N/A';
+              const currentClassName = fullClassData?.name || formData.name || 'Lớp hiện tại';
+              const isSameClassByName = currentClassName && scheduleClassName && scheduleClassName === currentClassName;
               
               if (isSameClass || isSameClassByName) {
                 return; // Skip schedules from the same class
@@ -1830,22 +1839,34 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
       // Loại trừ các schedules của lớp hiện tại khỏi lịch học của học sinh
       // để tránh báo conflict với chính lớp đang chỉnh sửa
       const studentScheduleList = allStudentSchedules.filter(studentSchedule => {
-        // Kiểm tra xem schedule này có thuộc về lớp hiện tại không
+        // Get class ID from various possible paths in API response
+        // Primary path from API: classSchedule.class._id
         const scheduleClassId = 
+          studentSchedule.classSchedule?.class?._id ||  // Primary path from API
+          studentSchedule.classSchedule?.class?.id ||
           studentSchedule.classId ||
           studentSchedule.class?._id ||
-          studentSchedule.class?.id ||
-          studentSchedule.classSchedule?.class?._id ||
-          studentSchedule.classSchedule?.class?.id;
+          studentSchedule.class?.id;
         
         const scheduleClassIdStr = scheduleClassId ? String(scheduleClassId) : null;
         
-        // Loại trừ nếu là lớp hiện tại
+        // Exclude if same class ID
         if (currentClassIdStr && scheduleClassIdStr && scheduleClassIdStr === currentClassIdStr) {
-          return false; // Loại trừ schedule của lớp hiện tại
+          return false; // Exclude schedule of current class
         }
         
-        return true; // Giữ lại schedule của lớp khác
+        // Also check by class name as fallback
+        const scheduleClassName = 
+          studentSchedule.classSchedule?.class?.name ||
+          studentSchedule.className ||
+          studentSchedule.class?.name;
+        const currentClassName = fullClassData?.name || formData.name;
+        
+        if (currentClassName && scheduleClassName && scheduleClassName === currentClassName) {
+          return false; // Exclude schedule of current class by name
+        }
+        
+        return true; // Keep schedule from other classes
       });
       
       const studentConflictsList = [];
@@ -3264,22 +3285,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
               </h5>
               
               <div className="d-flex align-items-center gap-2">
-                <Button
-                  className="btn-main text-14 fw-medium px-16 py-8"
-                  onClick={() => {
-                    setShowAddScheduleModal(true);
-                    // Reset form data
-                    setNewScheduleData({
-                      day: '',
-                      startTime: '08:00',
-                      endTime: '10:00',
-                      repeatWeekly: false
-                    });
-                  }}
-                >
-                  <i className="fas fa-plus me-2"></i>
-                  Thêm buổi học
-                </Button>
                 
                 {calendarSchedules.length > 0 && (
                   <ButtonGroup>
@@ -3857,6 +3862,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
         onConfirm={handleStudentsConfirmed}
         initialSelectedStudents={selectedStudents}
         generatedSessions={generatedSessions}
+        courseId={formData.course || fullClassData?.course?._id || fullClassData?.course?.id || fullClassData?.course || null}
       />
 
       {/* Import Result Modal */}

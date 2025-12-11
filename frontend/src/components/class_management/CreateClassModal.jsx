@@ -278,6 +278,19 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate course selection first
+    if (!formData.course) {
+      setImportResult({
+        success: 0,
+        notFound: [],
+        total: 0,
+        error: 'Vui lòng chọn course trước khi import học viên từ Excel'
+      });
+      setShowImportResultModal(true);
+      e.target.value = '';
+      return;
+    }
+
     // Validate file type
     const validTypes = [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -376,6 +389,24 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         return;
       }
 
+      // Get studentEnrollments from selectedCourse
+      let enrolledStudentIds = [];
+      if (selectedCourse && selectedCourse.studentEnrollments) {
+        enrolledStudentIds = selectedCourse.studentEnrollments.map(id => String(id));
+      } else {
+        // Fetch course details if not available
+        try {
+          const response = await courseService.getCourseDetails(formData.course);
+          if (response && response.success && response.data) {
+            const course = response.data;
+            enrolledStudentIds = (course.studentEnrollments || []).map(id => String(id));
+          }
+        } catch (error) {
+          console.error('Error fetching course details:', error);
+          // Continue with empty array - will check enrollment later
+        }
+      }
+
       // Match students by email or phone
       const matchedStudentIds = [];
       const notFound = [];
@@ -394,10 +425,20 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
         if (foundStudent) {
           const studentId = foundStudent._id || foundStudent.id;
-          if (studentId && !matchedStudentIds.includes(String(studentId))) {
-            matchedStudentIds.push(String(studentId));
+          const studentIdStr = String(studentId);
+          
+          // Check if student is enrolled in the selected course
+          if (studentId && enrolledStudentIds.includes(studentIdStr)) {
+            // Student found and enrolled in course
+            if (!matchedStudentIds.includes(studentIdStr)) {
+              matchedStudentIds.push(studentIdStr);
+            }
+          } else {
+            // Student found but not enrolled in course
+            notFound.push(`${value} (chưa enroll vào course này)`);
           }
         } else {
+          // Student not found in database
           notFound.push(value);
         }
       });
@@ -434,6 +475,31 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       setImportingExcel(false);
       e.target.value = ''; // Reset file input
     }
+  };
+
+  // Handle download Excel template
+  const handleDownloadTemplate = () => {
+    // Create sample data - only first column with Email or Phone
+    const sampleData = [
+      ['Email hoặc Số điện thoại'], // Header row
+      ['student1@email.com'], // Example email
+      ['0123456789'], // Example phone
+      ['student2@email.com'] // Another example email
+    ];
+
+    // Create worksheet from array
+    const ws = XLSX.utils.aoa_to_sheet(sampleData);
+    
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Danh sách học viên');
+
+    // Generate file name
+    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const fileName = `Mau_Import_Hoc_Vien_Lop_Hoc_${timestamp}.xlsx`;
+
+    // Write and download
+    XLSX.writeFile(wb, fileName);
   };
 
   // Auto-fetch band when program and level are selected
@@ -2164,10 +2230,23 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                 )}
               </div>
 
-              <Form.Text className="text-neutral-500 text-12 mt-8">
-                <i className="fas fa-info-circle me-1"></i>
-                Có thể thêm học viên sau khi tạo lớp. File Excel cần có cột đầu tiên chứa Email hoặc Số điện thoại của học viên.
-              </Form.Text>
+              <div className="d-flex align-items-center gap-8 mt-8">
+                <Form.Text className="text-neutral-500 text-12 mb-0">
+                  <i className="fas fa-info-circle me-1"></i>
+                  Có thể thêm học viên sau khi tạo lớp.
+                </Form.Text>
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  onClick={handleDownloadTemplate}
+                  className="text-12 p-0 text-decoration-none"
+                  style={{ padding: 0, lineHeight: 'inherit' }}
+                >
+                  <i className="fas fa-download me-1"></i>
+                  Tải file mẫu Excel
+                </Button>
+              </div>
               {checkingConflicts && formData.selectedStudents && formData.selectedStudents.length > 0 && (
                 <div className="mt-12">
                   <Form.Text className="text-info text-12">
@@ -2287,7 +2366,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                 <div className="mb-0">
                   <div className="text-neutral-700 fw-medium mb-8">
                     <i className="fas fa-info-circle me-2"></i>
-                    Không tìm thấy {importResult.notFound.length} học viên:
+                    Không tìm thấy hoặc chưa enroll vào course: {importResult.notFound.length} học viên
                   </div>
                   <div 
                     className="border border-neutral-100 rounded-8 p-12 bg-neutral-25"

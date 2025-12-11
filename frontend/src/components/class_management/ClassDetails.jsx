@@ -35,8 +35,10 @@ const tabStyles = `
     transition: all 0.3s ease;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     white-space: nowrap;
     flex-shrink: 0;
+    text-align: center;
   }
   .nav-tabs .nav-link:hover {
     border-bottom-color: #4A90E2;
@@ -280,7 +282,6 @@ const ClassDetails = () => {
                   <th style={{padding: '16px', fontSize: '14px', fontWeight: 600, color: '#262626'}}>Họ và tên</th>
                   <th style={{padding: '16px', fontSize: '14px', fontWeight: 600, color: '#262626'}}>Email</th>
                   <th style={{padding: '16px', fontSize: '14px', fontWeight: 600, color: '#262626'}}>Số điện thoại</th>
-                  <th style={{padding: '16px', fontSize: '14px', fontWeight: 600, color: '#262626'}}>Ngày tham gia</th>
                   <th style={{width: '120px', padding: '16px', fontSize: '14px', fontWeight: 600, color: '#262626', textAlign: 'center'}}>Điểm danh</th>
                   <th style={{width: '150px', padding: '16px', fontSize: '14px', fontWeight: 600, color: '#262626', textAlign: 'center'}}>Hoàn thành bài tập</th>
                 </tr>
@@ -292,7 +293,6 @@ const ClassDetails = () => {
                     <td style={{padding: '16px', fontSize: '14px', color: '#262626', fontWeight: 500}}>{student.name}</td>
                     <td style={{padding: '16px', fontSize: '14px', color: '#595959'}}>{student.email}</td>
                     <td style={{padding: '16px', fontSize: '14px', color: '#595959'}}>{student.phone}</td>
-                    <td style={{padding: '16px', fontSize: '14px', color: '#595959'}}>{student.joinDate}</td>
                     <td className="text-center" style={{padding: '16px'}}>
                       <Badge 
                         bg={student.attendance >= 80 ? 'success' : student.attendance > 0 ? 'warning' : 'secondary'}
@@ -344,7 +344,7 @@ const ClassDetails = () => {
     return (
       <div className="p-3 p-md-4" style={{ maxWidth: '100%', overflowX: 'hidden' }}>
         {/* Hoạt động lớp học */}
-        <div className="row g-3 g-md-4" style={{ marginLeft: 0, marginRight: 0 }}>
+        <div className="row g-3 g-md-4 mb-24" style={{ marginLeft: 0, marginRight: 0 }}>
           <div className="col-12">
             <Card className="border-0 shadow-sm" style={{ transition: 'all 0.3s ease', borderRadius: '12px', maxWidth: '100%' }}>
               <Card.Header className="bg-gradient text-white d-flex align-items-center" style={{ padding: '16px 24px', borderRadius: '12px 12px 0 0', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
@@ -356,77 +356,161 @@ const ClassDetails = () => {
                   {/* Next Mocktest */}
                   {displayData.classActivity?.nextMocktest && (
                     <div className="col-12 col-md-6">
-                      <div className="d-flex align-items-start gap-3 p-3" style={{ backgroundColor: '#F8F9FA', borderRadius: '8px' }}>
-                        <div className="bg-warning text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px', minWidth: '48px', fontSize: '20px' }}>
-                          <i className="fas fa-clipboard-check"></i>
-                        </div>
-                        <div className="flex-grow-1">
-                          <h6 className="mb-1" style={{ fontSize: '14px', fontWeight: 600, color: '#262626' }}>Mock test sắp tới</h6>
-                          <p className="mb-1" style={{ fontSize: '16px', fontWeight: 700, color: '#262626' }}>
-                            {displayData.classActivity.nextMocktest.title}
-                          </p>
-                          <p className="mb-1" style={{ fontSize: '13px', color: '#595959' }}>
-                            <i className="fas fa-calendar me-1"></i>
-                            {displayData.classActivity.nextMocktest.date ? new Date(displayData.classActivity.nextMocktest.date).toLocaleDateString('vi-VN') : 'N/A'}
-                          </p>
-                          <Badge bg="warning" style={{ fontSize: '12px', padding: '4px 8px' }}>
-                            Còn {displayData.classActivity.nextMocktest.daysUntil} ngày
-                          </Badge>
-                        </div>
-                      </div>
+                      <Card className="border-0 h-100" style={{ 
+                        background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+                        borderRadius: '12px',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                      >
+                        <Card.Body className="p-20">
+                          <div className="d-flex align-items-start gap-16">
+                            <div 
+                              className="rounded-12 d-flex align-items-center justify-content-center"
+                              style={{ 
+                                width: '56px',
+                                height: '56px',
+                                background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                                flexShrink: 0
+                              }}
+                            >
+                              <i className="fas fa-clipboard-check text-white" style={{ fontSize: '24px' }}></i>
+                            </div>
+                            <div className="flex-grow-1">
+                              <h6 className="mb-8 text-neutral-600 fw-medium" style={{ fontSize: '13px' }}>Mock test sắp tới</h6>
+                              <h5 className="mb-12 text-neutral-900 fw-bold" style={{ fontSize: '18px' }}>
+                                {displayData.classActivity.nextMocktest.title}
+                              </h5>
+                              <div className="mb-12">
+                                <p className="mb-4 text-neutral-600" style={{ fontSize: '13px' }}>
+                                  <i className="fas fa-calendar me-1"></i>
+                                  {displayData.classActivity.nextMocktest.date ? new Date(displayData.classActivity.nextMocktest.date).toLocaleDateString('vi-VN') : 'N/A'}
+                                </p>
+                              </div>
+                              <Badge 
+                                bg="warning" 
+                                className="text-dark"
+                                style={{ fontSize: '12px', padding: '6px 12px', fontWeight: 600, borderRadius: '6px' }}
+                              >
+                                Còn {displayData.classActivity.nextMocktest.daysUntil} ngày
+                              </Badge>
+                            </div>
+                          </div>
+                        </Card.Body>
+                      </Card>
                     </div>
                   )}
 
                   {/* Next Lesson */}
                   {displayData.classActivity?.nextLesson && (
                     <div className="col-12 col-md-6">
-                      <div className="d-flex align-items-start gap-3 p-3" style={{ backgroundColor: '#F8F9FA', borderRadius: '8px' }}>
-                        <div className="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '48px', height: '48px', minWidth: '48px', fontSize: '20px' }}>
-                          <i className="fas fa-book-open"></i>
-                        </div>
-                        <div className="flex-grow-1">
-                          <h6 className="mb-1" style={{ fontSize: '14px', fontWeight: 600, color: '#262626' }}>Buổi học tiếp theo</h6>
-                          <p className="mb-1" style={{ fontSize: '14px', fontWeight: 600, color: '#262626' }}>
-                            {displayData.classActivity.nextLesson.topic}
-                          </p>
-                          <p className="mb-1" style={{ fontSize: '13px', color: '#595959' }}>
-                            <i className="fas fa-calendar me-1"></i>
-                            {displayData.classActivity.nextLesson.date ? new Date(displayData.classActivity.nextLesson.date).toLocaleDateString('vi-VN') : 'N/A'}
-                          </p>
-                          <p className="mb-0" style={{ fontSize: '13px', color: '#595959' }}>
-                            <i className="fas fa-clock me-1"></i>
-                            {displayData.classActivity.nextLesson.startTime} - {displayData.classActivity.nextLesson.endTime}
-                          </p>
-                        </div>
-                      </div>
+                      <Card className="border-0 h-100" style={{ 
+                        background: 'linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%)',
+                        borderRadius: '12px',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                      >
+                        <Card.Body className="p-20">
+                          <div className="d-flex align-items-start gap-16">
+                            <div 
+                              className="rounded-12 d-flex align-items-center justify-content-center"
+                              style={{ 
+                                width: '56px',
+                                height: '56px',
+                                background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
+                                flexShrink: 0
+                              }}
+                            >
+                              <i className="fas fa-book-open text-white" style={{ fontSize: '24px' }}></i>
+                            </div>
+                            <div className="flex-grow-1">
+                              <h6 className="mb-8 text-neutral-600 fw-medium" style={{ fontSize: '13px' }}>Buổi học tiếp theo</h6>
+                              <h5 className="mb-12 text-neutral-900 fw-bold" style={{ fontSize: '18px' }}>
+                                {displayData.classActivity.nextLesson.topic}
+                              </h5>
+                              <div className="mb-0">
+                                <p className="mb-4 text-neutral-600" style={{ fontSize: '13px' }}>
+                                  <i className="fas fa-calendar me-1"></i>
+                                  {displayData.classActivity.nextLesson.date ? new Date(displayData.classActivity.nextLesson.date).toLocaleDateString('vi-VN') : 'N/A'}
+                                </p>
+                                <p className="mb-0 text-neutral-600" style={{ fontSize: '13px' }}>
+                                  <i className="fas fa-clock me-1"></i>
+                                  {displayData.classActivity.nextLesson.startTime} - {displayData.classActivity.nextLesson.endTime}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </Card.Body>
+                      </Card>
                     </div>
                   )}
 
                   {/* Mocktest Milestones */}
                   {displayData.classActivity?.mocktestMilestones && displayData.classActivity.mocktestMilestones.length > 0 && (
-                    <div className="col-12">
-                      <h6 className="mb-3" style={{ fontSize: '15px', fontWeight: 600, color: '#262626' }}>
+                    <div className="col-12 mt-3">
+                      <h6 className="mb-16 fw-semibold" style={{ fontSize: '15px', color: '#262626' }}>
                         <i className="fas fa-list-check me-2"></i>
                         Các mốc mock test
                       </h6>
-                      <div className="d-flex flex-wrap gap-2">
+                      <div className="d-flex flex-wrap gap-3">
                         {displayData.classActivity.mocktestMilestones.map((milestone, index) => (
-                          <div key={index} className="p-2" style={{ backgroundColor: '#F8F9FA', borderRadius: '8px', minWidth: '200px' }}>
-                            <div className="d-flex align-items-center gap-2 mb-1">
-                              <Badge bg={milestone.status === 'completed' ? 'success' : 'warning'} style={{ fontSize: '11px', padding: '4px 8px' }}>
-                                {milestone.status === 'completed' ? 'Đã hoàn thành' : 'Sắp tới'}
-                              </Badge>
-                              {milestone.status === 'upcoming' && milestone.daysUntil !== null && (
-                                <span style={{ fontSize: '12px', color: '#595959' }}>
-                                  ({milestone.daysUntil} ngày)
-                                </span>
-                              )}
-                            </div>
-                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#262626' }}>{milestone.title}</div>
-                            <div style={{ fontSize: '12px', color: '#595959' }}>
-                              {milestone.date ? new Date(milestone.date).toLocaleDateString('vi-VN') : 'N/A'}
-                            </div>
-                          </div>
+                          <Card 
+                            key={index} 
+                            className="border-0"
+                            style={{ 
+                              backgroundColor: '#F8F9FA',
+                              borderRadius: '12px',
+                              minWidth: '220px',
+                              flex: '1 1 auto',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#F1F5F9';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#F8F9FA';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}
+                          >
+                            <Card.Body className="p-16">
+                              <div className="d-flex align-items-center gap-2 mb-12">
+                                <Badge 
+                                  bg={milestone.status === 'completed' ? 'success' : 'warning'} 
+                                  style={{ fontSize: '11px', padding: '4px 10px', fontWeight: 600, borderRadius: '6px' }}
+                                >
+                                  {milestone.status === 'completed' ? 'Đã hoàn thành' : 'Sắp tới'}
+                                </Badge>
+                                {milestone.status === 'upcoming' && milestone.daysUntil !== null && (
+                                  <span className="text-neutral-600 fw-medium" style={{ fontSize: '12px' }}>
+                                    ({milestone.daysUntil} ngày)
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-neutral-900 fw-bold mb-8" style={{ fontSize: '14px' }}>
+                                {milestone.title}
+                              </div>
+                              <div className="text-neutral-600" style={{ fontSize: '12px' }}>
+                                <i className="fas fa-calendar me-1"></i>
+                                {milestone.date ? new Date(milestone.date).toLocaleDateString('vi-VN') : 'N/A'}
+                              </div>
+                            </Card.Body>
+                          </Card>
                         ))}
                       </div>
                     </div>
@@ -437,19 +521,30 @@ const ClassDetails = () => {
           </div>
         </div>
 
-        {/* Chuyên cần giáo viên */}
-        <div className="row g-3 g-md-4 mt-3" style={{ marginLeft: 0, marginRight: 0 }}>
-          <div className="col-12 col-md-6">
-            <Card className="border-0 shadow-sm" style={{ transition: 'all 0.3s ease', borderRadius: '12px', maxWidth: '100%' }}>
-              <Card.Header className="bg-info text-white d-flex align-items-center" style={{ padding: '16px 24px', borderRadius: '12px 12px 0 0' }}>
-                <i className="fas fa-user-check me-2" style={{ fontSize: '18px' }}></i>
-                <strong style={{ fontSize: '16px', fontWeight: 600 }}>Chuyên cần giáo viên</strong>
-              </Card.Header>
-              <Card.Body style={{ padding: '24px' }}>
-                {displayData.teacherAttendance ? (
+        {/* Chuyên cần giáo viên - Chi tiết */}
+        {displayData.teacherAttendance && (
+          <div className="row g-3 g-md-4" style={{ marginLeft: 0, marginRight: 0 }}>
+            <div className="col-12 col-md-6">
+              <Card className="border-0 shadow-sm" style={{ transition: 'all 0.3s ease', borderRadius: '12px', maxWidth: '100%' }}>
+                <Card.Header 
+                  className="text-white d-flex align-items-center" 
+                  style={{ 
+                    padding: '16px 24px', 
+                    borderRadius: '12px 12px 0 0',
+                    background: displayData.teacherAttendance.rate >= 90 
+                      ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
+                      : displayData.teacherAttendance.rate >= 70
+                      ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                      : 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)'
+                  }}
+                >
+                  <i className="fas fa-user-check me-2" style={{ fontSize: '18px' }}></i>
+                  <strong style={{ fontSize: '16px', fontWeight: 600 }}>Chi tiết chuyên cần giáo viên</strong>
+                </Card.Header>
+                <Card.Body style={{ padding: '24px' }}>
                   <div className="d-flex flex-column gap-3">
                     <div className="d-flex justify-content-between align-items-center">
-                      <span className="text-muted" style={{ fontSize: '14px', fontWeight: 500 }}>Tỷ lệ chuyên cần:</span>
+                      <span className="text-neutral-600 fw-medium" style={{ fontSize: '14px' }}>Tỷ lệ chuyên cần:</span>
                       <Badge 
                         bg={
                           displayData.teacherAttendance.rate >= 90 ? 'success' :
@@ -462,7 +557,7 @@ const ClassDetails = () => {
                     </div>
                     <div>
                       <div className="d-flex justify-content-between align-items-center mb-2">
-                        <span className="text-muted" style={{ fontSize: '13px' }}>
+                        <span className="text-neutral-600" style={{ fontSize: '13px' }}>
                           {displayData.teacherAttendance.presentCount} / {displayData.teacherAttendance.totalCount} buổi
                         </span>
                       </div>
@@ -473,17 +568,15 @@ const ClassDetails = () => {
                           displayData.teacherAttendance.rate >= 90 ? 'success' :
                           displayData.teacherAttendance.rate >= 70 ? 'warning' : 'danger'
                         }
-                        style={{ height: '10px', borderRadius: '5px' }}
+                        style={{ height: '12px', borderRadius: '6px' }}
                       />
                     </div>
                   </div>
-                ) : (
-                  <p className="text-muted mb-0" style={{ fontSize: '14px' }}>Chưa có dữ liệu chuyên cần</p>
-                )}
-              </Card.Body>
-            </Card>
+                </Card.Body>
+              </Card>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
   };

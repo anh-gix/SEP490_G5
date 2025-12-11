@@ -1,7 +1,7 @@
 import React from 'react';
 import { Table, Badge, Button } from 'react-bootstrap';
 
-const ClassStudents = ({ students, onViewStudentDetail }) => {
+const ClassStudents = ({ students, onViewStudentDetail, hideActions = false }) => {
   return (
     <div className="p-0">
       <Table hover className="mb-0">
@@ -13,7 +13,9 @@ const ClassStudents = ({ students, onViewStudentDetail }) => {
             <th className="px-12 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center" style={{ width: '110px' }}>Điểm danh</th>
             <th className="px-12 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center" style={{ width: '110px' }}>Bài tập</th>
             <th className="px-16 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Mocktest</th>
-            <th className="px-12 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center" style={{ width: '130px', minWidth: '130px' }}>Thao tác</th>
+            {!hideActions && (
+              <th className="px-12 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center" style={{ width: '130px', minWidth: '130px' }}>Thao tác</th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -113,16 +115,18 @@ const ClassStudents = ({ students, onViewStudentDetail }) => {
                   )}
                 </div>
               </td>
-              <td className="px-12 py-16 text-center">
-                <Button 
-                  className="btn-outline-main text-11 px-10 py-6 radius-6" 
-                  style={{ whiteSpace: 'nowrap' }}
-                  onClick={() => onViewStudentDetail(student)}
-                >
-                  <i className="fas fa-eye me-1"></i>
-                  Chi tiết
-                </Button>
-              </td>
+              {!hideActions && (
+                <td className="px-12 py-16 text-center">
+                  <Button 
+                    className="btn-outline-main text-11 px-10 py-6 radius-6" 
+                    style={{ whiteSpace: 'nowrap' }}
+                    onClick={() => onViewStudentDetail(student)}
+                  >
+                    <i className="fas fa-eye me-1"></i>
+                    Chi tiết
+                  </Button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

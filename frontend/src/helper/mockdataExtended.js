@@ -6,55 +6,229 @@
 // I. ROLES & PERMISSIONS
 // ============================================================================
 
+// Cấu trúc theo model Permission:
+// - name: Tên vai trò/nhóm quyền
+// - description: Mô tả
+// - permissions: Map object với key là module, value là array các action
+
+export const mockPermissions = [
+  {
+    _id: "perm001",
+    name: "Center Head Permission",
+    description: "Toàn quyền quản trị hệ thống",
+    permissions: {
+      "user": ["view", "create", "edit", "delete", "block", "import"],
+      "role": ["view", "create", "edit", "delete", "assign"],
+      "program": ["view", "create", "edit", "delete", "approve"],
+      "course": ["view", "create", "edit", "delete", "approve"],
+      "class": ["view", "create", "edit", "delete", "assign_teacher", "manage_student"],
+      "schedule": ["view", "create", "edit", "delete", "approve"],
+      "attendance": ["take"],
+      "leave": ["approve"],
+      "room": ["view", "create", "edit", "delete"],
+      "exam": ["view", "create", "edit", "delete", "publish", "grade", "view_result"],
+      "report": ["view", "export"]
+    }
+  },
+  {
+    _id: "perm002",
+    name: "Subject Leader Permission",
+    description: "Quản lý chương trình và khóa học",
+    permissions: {
+      "user": ["view"],
+      "program": ["view", "create", "edit"],
+      "course": ["view", "create", "edit", "approve"],
+      "class": ["view"],
+      "schedule": ["view"],
+      "exam": ["view", "create", "edit", "publish", "grade", "view_result"],
+      "report": ["view", "export"]
+    }
+  },
+  {
+    _id: "perm003",
+    name: "Giáo vụ Permission",
+    description: "Quản lý lớp học, lịch học và học viên",
+    permissions: {
+      "user": ["view", "create", "edit", "import"],
+      "class": ["view", "create", "edit", "assign_teacher", "manage_student"],
+      "schedule": ["view", "create", "edit", "approve"],
+      "attendance": ["take"],
+      "leave": ["approve"],
+      "room": ["view", "create", "edit"],
+      "exam": ["view_result"],
+      "report": ["view"]
+    }
+  },
+  {
+    _id: "perm004",
+    name: "Giảng viên Permission",
+    description: "Giảng dạy và quản lý lớp học được phân công",
+    permissions: {
+      "user": ["view"],
+      "course": ["view", "create", "edit"],
+      "class": ["view"],
+      "schedule": ["view", "create"],
+      "attendance": ["take"],
+      "leave": ["approve"],
+      "room": ["view"],
+      "exam": ["view", "create", "edit", "grade", "view_result"]
+    }
+  },
+  {
+    _id: "perm005",
+    name: "Học viên Permission",
+    description: "Học tập và tham gia các hoạt động học",
+    permissions: {
+      "class": ["view"],
+      "schedule": ["view"],
+      "exam": ["take", "view_result"]
+    }
+  },
+  {
+    _id: "perm006",
+    name: "Cashier Permission",
+    description: "Quản lý thanh toán học phí",
+    permissions: {
+      "user": ["view"],
+      "class": ["view"],
+      "report": ["view"]
+    }
+  },
+  {
+    _id: "perm007",
+    name: "Lễ tân Permission",
+    description: "Tiếp đón và hỗ trợ học viên",
+    permissions: {
+      "user": ["view"],
+      "class": ["view"],
+      "schedule": ["view"],
+      "room": ["view"]
+    }
+  }
+];
+
+// Helper: Chuyển đổi permissions Map sang array chi tiết để hiển thị UI
+export const getPermissionDetails = (permissionObj) => {
+  if (!permissionObj || !permissionObj.permissions) return [];
+
+  const details = [];
+  const moduleNames = {
+    "user": "Quản lý người dùng",
+    "role": "Quản lý vai trò",
+    "program": "Quản lý chương trình",
+    "course": "Quản lý khóa học",
+    "class": "Quản lý lớp học",
+    "schedule": "Quản lý lịch học",
+    "attendance": "Điểm danh",
+    "leave": "Quản lý nghỉ phép",
+    "room": "Quản lý phòng học",
+    "exam": "Quản lý thi & kiểm tra",
+    "report": "Báo cáo & Thống kê"
+  };
+
+  const actionNames = {
+    "view": "Xem",
+    "create": "Tạo mới",
+    "edit": "Chỉnh sửa",
+    "delete": "Xóa",
+    "block": "Khóa/Mở khóa",
+    "import": "Import",
+    "assign": "Phân quyền",
+    "approve": "Duyệt",
+    "assign_teacher": "Phân giảng viên",
+    "manage_student": "Quản lý học viên",
+    "take": "Điểm danh",
+    "publish": "Xuất bản",
+    "grade": "Chấm điểm",
+    "view_result": "Xem kết quả",
+    "export": "Xuất file"
+  };
+
+  Object.entries(permissionObj.permissions).forEach(([module, actions]) => {
+    actions.forEach(action => {
+      details.push({
+        _id: `${permissionObj._id}_${module}_${action}`,
+        module: moduleNames[module] || module,
+        name: `${actionNames[action] || action} ${moduleNames[module] || module}`,
+        code: `${module}.${action}`,
+        description: `Quyền ${actionNames[action]?.toLowerCase() || action} trong module ${moduleNames[module] || module}`
+      });
+    });
+  });
+
+  return details;
+};
+
+// Tạo danh sách tất cả permissions chi tiết để dùng cho UI
+export const mockPermissionsList = mockPermissions.flatMap(getPermissionDetails);
+
+// Cấu trúc theo model Role:
+// - name: Tên vai trò
+// - description: Mô tả
+// - permissionId: ObjectId tham chiếu đến Permission
 export const mockRoles = [
   {
     _id: "role001",
     name: "Center Head",
-    description: "Trưởng trung tâm",
+    description: "Trưởng trung tâm - Quyền quản trị cao nhất",
     permissionId: "perm001",
+    permission: mockPermissions.find(p => p._id === "perm001"), // Populate permission details
     userCount: 1,
+    createdAt: "2024-01-01T00:00:00Z",
   },
   {
     _id: "role002",
     name: "Subject Leader",
-    description: "Trưởng môn",
+    description: "Trưởng môn - Quản lý chương trình và khóa học",
     permissionId: "perm002",
+    permission: mockPermissions.find(p => p._id === "perm002"),
     userCount: 8,
+    createdAt: "2024-01-01T00:00:00Z",
   },
   {
     _id: "role003",
     name: "Giáo vụ",
-    description: "Quản lý lớp học và lịch học",
+    description: "Quản lý lớp học, lịch học và học viên",
     permissionId: "perm003",
+    permission: mockPermissions.find(p => p._id === "perm003"),
     userCount: 15,
+    createdAt: "2024-01-01T00:00:00Z",
   },
   {
     _id: "role004",
     name: "Giảng viên",
-    description: "Giảng dạy",
+    description: "Giảng dạy và quản lý lớp học được phân công",
     permissionId: "perm004",
+    permission: mockPermissions.find(p => p._id === "perm004"),
     userCount: 45,
+    createdAt: "2024-01-01T00:00:00Z",
   },
   {
     _id: "role005",
     name: "Học viên",
-    description: "Học tập",
+    description: "Học tập và tham gia các hoạt động học",
     permissionId: "perm005",
+    permission: mockPermissions.find(p => p._id === "perm005"),
     userCount: 3456,
+    createdAt: "2024-01-01T00:00:00Z",
   },
   {
     _id: "role006",
     name: "Cashier",
-    description: "Thu ngân",
+    description: "Thu ngân - Quản lý thanh toán học phí",
     permissionId: "perm006",
+    permission: mockPermissions.find(p => p._id === "perm006"),
     userCount: 3,
+    createdAt: "2024-01-01T00:00:00Z",
   },
   {
     _id: "role007",
     name: "Lễ tân",
-    description: "Tiếp đón",
+    description: "Tiếp đón và hỗ trợ học viên",
     permissionId: "perm007",
+    permission: mockPermissions.find(p => p._id === "perm007"),
     userCount: 5,
+    createdAt: "2024-01-01T00:00:00Z",
   },
 ];
 

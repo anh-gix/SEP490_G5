@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Container, Spinner, Alert } from 'react-bootstrap';
 import { toast } from 'react-toastify';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import changeRequestService from '../../services/changeRequestService';
 import academicStaffService from '../../services/academicStaffService';
 import academicWorkRequestService from '../../services/academicWorkRequestService';
@@ -22,6 +23,8 @@ import { formatDate, naturalCompare } from '../../utils/requestHelpers';
  */
 const RequestManagement = () => {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [changeRequests, setChangeRequests] = useState([]);
   const [workRequests, setWorkRequests] = useState([]);
   const [mergedRequests, setMergedRequests] = useState([]);
@@ -61,6 +64,7 @@ const RequestManagement = () => {
   const [showMakeupModal, setShowMakeupModal] = useState(false);
   const [selectedStudentScheduleId, setSelectedStudentScheduleId] = useState(null);
   const searchTimeoutRef = useRef(null);
+  const [loadingRequestById, setLoadingRequestById] = useState(false);
 
   // WorkRequest detail state
   const [showWorkRequestDetail, setShowWorkRequestDetail] = useState(false);
@@ -96,6 +100,20 @@ const RequestManagement = () => {
       fetchStats();
     }
   }, [user, filterStatus]);
+
+  // Handle requestId from URL query parameter - wait for initial load to complete
+  useEffect(() => {
+    const requestId = searchParams.get('requestId');
+    if (requestId && user?._id && !loading && !loadingRequestById) {
+      // Small delay to ensure requests are fully loaded and state is updated
+      const timer = setTimeout(() => {
+        handleOpenRequestById(requestId);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user, loading]);
+
 
   const fetchStats = async () => {
     try {
@@ -147,6 +165,111 @@ const RequestManagement = () => {
     approver: source === 'changeRequest' ? req.approver : req.processedBy,
     approvedDate: source === 'changeRequest' ? req.approvedDate : req.processedAt
   });
+
+  // Helper function to open request detail
+  const openRequestDetail = async (request) => {
+    if (request._source === 'workRequest') {
+      // Show WorkRequest detail
+      setSelectedRequest(request);
+      setShowWorkRequestDetail(true);
+    } else {
+      // Show ChangeRequest detail (existing flow)
+      setSelectedRequest(request);
+      setShowDetailModal(true);
+      setRejectReason('');
+      setLoadingSchedule(true);
+      setSenderSchedule([]);
+      setSenderRole(null);
+      
+      try {
+        const response = await changeRequestService.getSenderSchedule(request._id);
+        if (response.success) {
+          setSenderSchedule(response.schedules || []);
+          setSenderRole(response.sender?.role || null);
+        }
+      } catch (err) {
+        console.error('Error fetching schedule:', err);
+        setSenderSchedule([]);
+        setSenderRole(null);
+      } finally {
+        setLoadingSchedule(false);
+      }
+    }
+  };
+
+  // Function to fetch and open request by ID
+  const handleOpenRequestById = async (requestId) => {
+    if (!requestId) return;
+    
+    try {
+      setLoadingRequestById(true);
+      
+      // Try to find in already loaded requests first
+      const foundInMerged = mergedRequests.find(req => req._id === requestId);
+      if (foundInMerged) {
+        // Request already loaded, just open it
+        await openRequestDetail(foundInMerged);
+        // Remove query parameter
+        searchParams.delete('requestId');
+        setSearchParams(searchParams, { replace: true });
+        setLoadingRequestById(false);
+        return;
+      }
+
+      // Try to fetch as ChangeRequest first
+      try {
+        const changeResponse = await changeRequestService.getAllChangeRequests({ 
+          limit: 10000 
+        });
+        if (changeResponse.success) {
+          const changeReqs = (changeResponse.changeRequests || []).map(req => 
+            normalizeRequest(req, 'changeRequest')
+          );
+          const foundRequest = changeReqs.find(req => req._id === requestId);
+          
+          if (foundRequest) {
+            await openRequestDetail(foundRequest);
+            // Remove query parameter
+            searchParams.delete('requestId');
+            setSearchParams(searchParams, { replace: true });
+            setLoadingRequestById(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching change request:', err);
+      }
+
+      // Try to fetch as WorkRequest
+      try {
+        const workResponse = await academicWorkRequestService.getRequestById(requestId);
+        if (workResponse.success && workResponse.data) {
+          const workReq = normalizeRequest(workResponse.data, 'workRequest');
+          await openRequestDetail(workReq);
+          // Remove query parameter
+          searchParams.delete('requestId');
+          setSearchParams(searchParams, { replace: true });
+          setLoadingRequestById(false);
+          return;
+        }
+      } catch (err) {
+        console.error('Error fetching work request:', err);
+      }
+
+      // If not found, show error
+      toast.error('Không tìm thấy đơn với ID này');
+      searchParams.delete('requestId');
+      setSearchParams(searchParams, { replace: true });
+      
+    } catch (error) {
+      console.error('Error opening request by ID:', error);
+      toast.error('Có lỗi xảy ra khi mở đơn');
+      searchParams.delete('requestId');
+      setSearchParams(searchParams, { replace: true });
+    } finally {
+      setLoadingRequestById(false);
+    }
+  };
 
   const fetchAllRequests = async () => {
     try {

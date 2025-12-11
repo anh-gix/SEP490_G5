@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, ProgressBar, Table, Spinner, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, Table, Spinner, Alert } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import academicStaffService from '../../services/academicStaffService';
 
@@ -18,10 +18,8 @@ const AcademicDashboard = () => {
 
   const [absentStudentsList, setAbsentStudentsList] = useState([]);
   const [roomSchedule, setRoomSchedule] = useState([]);
-  const [timeSlots, setTimeSlots] = useState([]); // Time slots from database
+  const [timeSlots, setTimeSlots] = useState([]);
   const [recentActivities, setRecentActivities] = useState([]);
-  const [todaySchedule, setTodaySchedule] = useState([]);
-  const [classProgress, setClassProgress] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -68,43 +66,6 @@ const AcademicDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'ongoing':
-        return <Badge className="bg-success-600 text-white px-12 py-6">Đang học</Badge>;
-      case 'upcoming':
-        return <Badge className="bg-info-500 text-white px-12 py-6">Sắp diễn ra</Badge>;
-      case 'completed':
-        return <Badge className="bg-neutral-600 text-white px-12 py-6">Đã hoàn thành</Badge>;
-      default:
-        return <Badge className="bg-neutral-400 text-white px-12 py-6">{status}</Badge>;
-    }
-  };
-
-  const getActivityIcon = (activity) => {
-    const colors = {
-      success: 'text-success-600',
-      info: 'text-info-500',
-      primary: 'text-main-600',
-      warning: 'text-warning-600',
-      danger: 'text-danger-600'
-    };
-
-    return (
-      <div 
-        className={`d-flex align-items-center justify-content-center rounded-circle ${colors[activity.color]}`}
-        style={{ 
-          width: '40px', 
-          height: '40px', 
-          backgroundColor: `var(--${activity.color}-50)`,
-          minWidth: '40px'
-        }}
-      >
-        <i className={`fas ${activity.icon}`}></i>
-      </div>
-    );
   };
 
   if (loading) {
@@ -182,7 +143,16 @@ const AcademicDashboard = () => {
 
             {/* đơn lâu nhất chưa xử lý (bao nhiêu ngày chưa giải quyết) */}
             <Col md={4} lg>
-              <Card className="bg-purple-50 border border-purple-200 rounded-8 h-100 transition-2 item-hover">
+              <Card 
+                className="bg-purple-50 border border-purple-200 rounded-8 h-100 transition-2 item-hover"
+                style={{ cursor: recentActivities && recentActivities.length > 0 && recentActivities[recentActivities.length - 1]?.id ? 'pointer' : 'default' }}
+                onClick={() => {
+                  const longestPendingRequest = recentActivities && recentActivities.length > 0 ? recentActivities[recentActivities.length - 1] : null;
+                  if (longestPendingRequest?.id) {
+                    window.location.href = `/academic/request-management?requestId=${longestPendingRequest.id}`;
+                  }
+                }}
+              >
                 <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
                   <div className="d-flex justify-content-between align-items-start">
                     <div className="text-purple-700 fw-bold" style={{ fontSize: '14px' }}>
@@ -208,11 +178,21 @@ const AcademicDashboard = () => {
                     </h1>
                   </div>
                   <div className="text-end">
-                    <Link to="/academic/class-management" className="text-decoration-none">
+                    {recentActivities && recentActivities.length > 0 && recentActivities[recentActivities.length - 1]?.id ? (
+                      <Link 
+                        to={`/academic/request-management?requestId=${recentActivities[recentActivities.length - 1].id}`} 
+                        className="text-decoration-none"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span className="text-purple-700 text-11 fw-medium">
+                          Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
+                        </span>
+                      </Link>
+                    ) : (
                       <span className="text-purple-700 text-11 fw-medium">
                         Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
                       </span>
-                    </Link>
+                    )}
                     </div>
                   </Card.Body>
                 </Card>

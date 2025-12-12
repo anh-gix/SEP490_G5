@@ -10,6 +10,7 @@ import StudentManagementPage from "../pages/AcademicStaff/StudentManagementPage.
 import StudentDetailPage from "../pages/AcademicStaff/StudentDetailPage.jsx";
 import ImportStudentPage from "../pages/AcademicStaff/ImportStudentPage.jsx";
 import RequestManagementPage from "../pages/AcademicStaff/RequestManagementPage.jsx";
+import RequestDetailStandalonePage from "../pages/AcademicStaff/RequestDetailStandalonePage.jsx";
 import AcademicLessonDetailPage from "../pages/AcademicStaff/AcademicLessonDetailPage.jsx";
 import AcademicProfilePage from "../pages/AcademicStaff/AcademicProfilePage.jsx";
 
@@ -38,6 +39,8 @@ export const academicRoutes = [
   { path: '/academic/room-management', element: <RoomManagementPage /> },
 
   // IV. Request Management
+  // Request Detail (must be before request-management to match correctly)
+  { path: '/academic/request-management/:requestId', element: <RequestDetailStandalonePage /> },
   { path: '/academic/request-management', element: <RequestManagementPage /> },
 
   // V. Teacher Management

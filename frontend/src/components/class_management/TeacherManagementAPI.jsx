@@ -157,12 +157,6 @@ const TeacherManagementAPI = () => {
     // Clear previous errors
     setFormErrors({});
     
-    // Validate password
-    if (!formData.password) {
-      setFormErrors({ password: 'Vui lòng nhập mật khẩu!' });
-      return;
-    }
-    
     try {
       setLoading(true);
       await teacherService.createTeacher(formData);
@@ -532,20 +526,6 @@ const TeacherManagementAPI = () => {
     navigate(`/academic/teacher-management/${teacher._id}`);
   };
 
-  const getStatusBadge = (status) => {
-    const config = {
-      active: { bg: 'bg-success-600', text: 'Hoạt động', icon: 'fa-check-circle' },
-      inactive: { bg: 'bg-danger-600', text: 'Tạm nghỉ', icon: 'fa-times-circle' }
-    };
-    const { bg, text, icon } = config[status] || config.active;
-    return (
-      <Badge className={`${bg} text-white px-12 py-6`}>
-        <i className={`fas ${icon} me-1`}></i>
-        {text}
-      </Badge>
-    );
-  };
-
   const filteredTeachers = teachers;
 
   return (
@@ -596,29 +576,6 @@ const TeacherManagementAPI = () => {
                 <div>
                   <div className="text-neutral-500 text-13 mb-4">Tổng giảng viên</div>
                   <div className="text-neutral-900 fw-bold text-32">{stats.total || 0}</div>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
-                <div 
-                  className="rounded-12 d-flex align-items-center justify-content-center"
-                  style={{ 
-                    width: '56px',
-                    height: '56px',
-                    background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
-                  }}
-                >
-                  <i className="fas fa-user-check text-white" style={{ fontSize: '24px' }}></i>
-                </div>
-                <div>
-                  <div className="text-neutral-500 text-13 mb-4">Đang hoạt động</div>
-                  <div className="text-neutral-900 fw-bold text-32">{stats.active || 0}</div>
                 </div>
               </div>
             </Card.Body>
@@ -789,7 +746,6 @@ const TeacherManagementAPI = () => {
                       <h6 className="text-neutral-900 fw-semibold mb-4">{teacher.username}</h6>
                       <p className="text-neutral-600 text-13 mb-0">{teacher.email}</p>
                     </div>
-                    {getStatusBadge(teacher.status)}
                   </div>
 
                   <div className="mb-16">
@@ -814,7 +770,6 @@ const TeacherManagementAPI = () => {
                       onClick={() => handleViewDetail(teacher)}
                       className="flex-grow-1"
                     >
-                      <i className="fas fa-eye me-1"></i>
                       Chi tiết
                     </Button>
                   </div>
@@ -836,7 +791,6 @@ const TeacherManagementAPI = () => {
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Email</th>
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Số điện thoại</th>
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Lớp học</th>
-                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Trạng thái</th>
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Thao tác</th>
                 </tr>
               </thead>
@@ -860,16 +814,12 @@ const TeacherManagementAPI = () => {
                       {teacher.stats?.classCount || 0}
                     </td>
                     <td className="px-20 py-16">
-                      {getStatusBadge(teacher.status)}
-                    </td>
-                    <td className="px-20 py-16">
                       <div className="d-flex gap-8">
                         <Button
                           variant="outline-info"
                           size="sm"
                           onClick={() => handleViewDetail(teacher)}
                         >
-                          <i className="fas fa-eye me-1"></i>
                           Chi tiết
                         </Button>
                       </div>
@@ -947,7 +897,7 @@ const TeacherManagementAPI = () => {
             <Row className="g-3">
               <Col md={6}>
                 <Form.Group>
-                  <Form.Label>Tên đăng nhập <span className="text-danger">*</span></Form.Label>
+                  <Form.Label>Tên người dùng <span className="text-danger">*</span></Form.Label>
                   <Form.Control
                     type="text"
                     name="username"
@@ -988,15 +938,17 @@ const TeacherManagementAPI = () => {
               <Col md={6}>
                 <Form.Group>
                   <Form.Label>
-                    Mật khẩu <span className="text-danger">*</span>
+                    Mật khẩu
+                    <span className="text-muted" style={{ fontSize: '12px', fontWeight: 'normal' }}>
+                      {' '}(Mặc định: 123456)
+                    </span>
                   </Form.Label>
                   <Form.Control
                     type="password"
                     name="password"
                     value={formData.password}
                     onChange={handleInputChange}
-                    placeholder="Nhập mật khẩu"
-                    required
+                    placeholder="Để trống sẽ dùng mật khẩu mặc định: 123456"
                     isInvalid={!!formErrors.password}
                   />
                   {formErrors.password && (
@@ -1004,6 +956,9 @@ const TeacherManagementAPI = () => {
                       {formErrors.password}
                     </Form.Control.Feedback>
                   )}
+                  <Form.Text className="text-muted">
+                    Nếu không nhập, mật khẩu mặc định sẽ là: <strong>123456</strong>
+                  </Form.Text>
                 </Form.Group>
               </Col>
 
@@ -1069,7 +1024,6 @@ const TeacherManagementAPI = () => {
               </h6>
               <p className="mb-2">Vui lòng đảm bảo file Excel của bạn có đúng format như bảng trên</p>
               <p className="mb-3 text-muted">
-                <i className="fas fa-key me-1"></i>
                 Lưu ý: Password sẽ tự động được tạo cho mỗi giảng viên (mặc định: 123456)
               </p>
               
@@ -1149,7 +1103,7 @@ const TeacherManagementAPI = () => {
                     </>
                   ) : (
                     <>
-                      <i className="fas fa-upload me-2"></i>
+                      
                       Tải lên và xem trước
                     </>
                   )}

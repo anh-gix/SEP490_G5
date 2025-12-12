@@ -9,7 +9,10 @@ export const getStatusBadge = (status) => {
   const statusConfig = {
     pending: { variant: 'warning', text: 'Chờ duyệt' },
     approved: { variant: 'success', text: 'Đã duyệt' },
-    rejected: { variant: 'danger', text: 'Từ chối' }
+    rejected: { variant: 'danger', text: 'Từ chối' },
+    in_progress: { variant: 'info', text: 'Đang xử lý' },
+    completed: { variant: 'success', text: 'Hoàn thành' },
+    cancelled: { variant: 'secondary', text: 'Đã hủy' }
   };
   const config = statusConfig[status] || { variant: 'secondary', text: status };
   return <Badge bg={config.variant}>{config.text}</Badge>;
@@ -22,10 +25,13 @@ export const getStatusBadge = (status) => {
  */
 export const getTypeBadge = (type) => {
   const typeConfig = {
-    create_class: { variant: 'info', text: 'Tạo lớp' },
     change_class: { variant: 'primary', text: 'Đổi lớp' },
     makeup_class: { variant: 'warning', text: 'Học bù' },
-    replace_teacher: { variant: 'secondary', text: 'Thay giáo viên' }
+    request_replace_teacher: { variant: 'secondary', text: 'Dạy thay' },
+    assign_students: { variant: 'success', text: 'Sắp xếp học viên' },
+    create_program: { variant: 'info', text: 'Tạo chương trình' },
+    edit_course: { variant: 'warning', text: 'Chỉnh sửa khóa học' },
+    create_exam: { variant: 'primary', text: 'Tạo đề thi' }
   };
   const config = typeConfig[type] || { variant: 'secondary', text: type || 'N/A' };
   return <Badge bg={config.variant}>{config.text}</Badge>;
@@ -88,4 +94,8 @@ export const naturalCompare = (nameA, nameB) => {
   // Nếu các phần đầu giống nhau, phần nào dài hơn thì lớn hơn
   return partsA.length - partsB.length;
 };
+
+
+
+
 

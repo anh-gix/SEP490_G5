@@ -125,7 +125,7 @@ const TeacherClassDetailLayout = () => {
         scores
       );
       
-      console.log('📥 API Response:', response);
+      console.log('API Response:', response);
 
       alert('Cập nhật điểm thành công!');
       // Refresh students list to update table and modal

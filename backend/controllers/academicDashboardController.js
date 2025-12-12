@@ -4,23 +4,15 @@ const Class = require('../models/classModel');
 const Room = require('../models/room');
 const ChangeRequest = require('../models/changeRequestModel');
 
-// =========================
-// 📊 LẤY DỮ LIỆU DASHBOARD GIÁO VỤ
-// =========================
 exports.getDashboardData = async (req, res) => {
   try {
-    // Tạo date range cho ngày hôm nay sử dụng date string format (giống scheduleController)
-    // Sử dụng date string format để đảm bảo tạo dates ở midnight UTC, khớp với cách MongoDB lưu trữ
     const now = new Date();
-    const todayString = now.toISOString().split('T')[0]; // Format: YYYY-MM-DD
-    
-    // Tạo start và end của ngày ở UTC midnight để khớp với MongoDB
-    // new Date("2025-12-03") tạo date ở 00:00:00 UTC của ngày đó
+    const todayString = now.toISOString().split('T')[0];
+
     const todayStart = new Date(todayString);
     const todayEnd = new Date(todayString);
     todayEnd.setUTCHours(23, 59, 59, 999);
 
-    // 1. Get today's schedules with populated data
     const todaySchedules = await ClassSchedule.find({
       date: { $gte: todayStart, $lte: todayEnd }
     })
@@ -31,10 +23,8 @@ exports.getDashboardData = async (req, res) => {
       .sort({ startTime: 1 })
       .lean();
 
-    // 2. Get all schedule IDs for today
     const scheduleIds = todaySchedules.map(s => s._id);
 
-    // 3. Get attendance data for all today's schedules in one query (BATCH)
     const attendances = await StudentSchedule.find({
       classSchedule: { $in: scheduleIds }
     })
@@ -42,7 +32,6 @@ exports.getDashboardData = async (req, res) => {
       .select('student classSchedule attendance')
       .lean();
 
-    // 4. Group attendances by schedule ID for quick lookup
     const attendanceBySchedule = {};
     attendances.forEach(att => {
       const scheduleId = att.classSchedule?.toString() || att.classSchedule;
@@ -52,14 +41,12 @@ exports.getDashboardData = async (req, res) => {
       attendanceBySchedule[scheduleId].push(att);
     });
 
-    // 5. Process today's schedules with attendance data
     const absentStudents = [];
     const lateStudents = [];
     const processedSchedules = todaySchedules.map(schedule => {
       const scheduleId = schedule._id.toString();
       const scheduleAttendances = attendanceBySchedule[scheduleId] || [];
       
-      // Count absent and late students
       scheduleAttendances.forEach(att => {
         const status = att.attendance?.status;
         if (status === 'absent') {
@@ -83,26 +70,15 @@ exports.getDashboardData = async (req, res) => {
         }
       });
 
-      // Determine schedule status
-      // schedule.date is stored in MongoDB as UTC, but we need to work with local timezone
-      // startTime and endTime are stored as local time strings (e.g., "14:00:00")
-      // Convert schedule.date to local timezone for consistent comparison
       const scheduleDate = new Date(schedule.date);
       
-      // Extract local date components (not UTC) to match local time strings
       const year = scheduleDate.getFullYear();
       const month = String(scheduleDate.getMonth() + 1).padStart(2, '0');
       const day = String(scheduleDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
       
-      // Create Date objects in local timezone for startTime and endTime
-      // ISO string without timezone specifier is parsed as local time
       const startTime = new Date(`${dateStr}T${schedule.startTime}:00`);
       const endTime = new Date(`${dateStr}T${schedule.endTime}:00`);
-      
-      // Ensure 'now' is also in local timezone for consistent comparison
-      // 'now' is already local time from line 14, so comparison should be consistent
-      // All three (now, startTime, endTime) are now in the same timezone (local)
       
       let status = 'upcoming';
       if (startTime <= now && now <= endTime) {
@@ -111,10 +87,17 @@ exports.getDashboardData = async (req, res) => {
         status = 'completed';
       }
 
+      let className = schedule.class?.name;
+      if (!className && schedule.status === 'temporary') {
+        className = 'Lớp học bù';
+      } else if (!className) {
+        className = 'N/A';
+      }
+
       return {
         id: schedule._id,
         time: `${schedule.startTime || 'N/A'} - ${schedule.endTime || 'N/A'}`,
-        className: schedule.class?.name || 'N/A',
+        className: className,
         teacher: schedule.teacher?.username || 'N/A',
         room: schedule.room?.room_name || 'N/A',
         status,
@@ -124,18 +107,46 @@ exports.getDashboardData = async (req, res) => {
       };
     });
 
-    // 6. Get rooms (limit to 4 for room schedule display)
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    
+    const allSchedulesForTimeSlots = await ClassSchedule.find({
+      date: { $gte: currentMonthStart, $lte: currentMonthEnd }
+    })
+      .select('startTime endTime')
+      .lean();
+
+    const normalizeTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : '';
+    const timeSlotSet = new Set();
+    
+    allSchedulesForTimeSlots.forEach(schedule => {
+      if (schedule.startTime && schedule.endTime) {
+        const start = normalizeTime(schedule.startTime);
+        const end = normalizeTime(schedule.endTime);
+        if (start && end) {
+          timeSlotSet.add(`${start}-${end}`);
+        }
+      }
+    });
+
+    let timeSlots = Array.from(timeSlotSet).sort((a, b) => {
+      const [startA] = a.split('-');
+      const [startB] = b.split('-');
+      return startA.localeCompare(startB);
+    });
+
+    if (timeSlots.length === 0) {
+      timeSlots = ['08:00-10:00', '10:30-12:30', '14:00-16:00', '18:00-20:00'];
+    }
+
     const rooms = await Room.find()
       .select('room_name location')
       .limit(4)
       .lean();
 
-    // 7. Build room schedule data
-    const timeSlots = ['08:00-10:00', '10:30-12:30', '14:00-16:00', '18:00-20:00'];
     const roomScheduleData = rooms.map(room => {
       const schedules = timeSlots.map(timeSlot => {
         const [startTime, endTime] = timeSlot.split('-');
-        // Normalize time strings (remove seconds if present) for comparison
         const normalizeTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : '';
         const matchingSchedule = todaySchedules.find(s => 
           s.room?._id?.toString() === room._id?.toString() &&
@@ -144,9 +155,16 @@ exports.getDashboardData = async (req, res) => {
         );
         
         if (matchingSchedule) {
+          let className = matchingSchedule.class?.name;
+          if (!className && matchingSchedule.status === 'temporary') {
+            className = 'Lớp học bù';
+          } else if (!className) {
+            className = 'N/A';
+          }
+          
           return {
             time: timeSlot,
-            class: matchingSchedule.class?.name || 'N/A',
+            class: className,
             status: 'occupied'
           };
         }
@@ -164,14 +182,12 @@ exports.getDashboardData = async (req, res) => {
       };
     });
 
-    // 8. Get classes for progress (limit to top 3)
     const classes = await Class.find({ status: 'active' })
       .populate('course', 'name level')
       .select('name course startDate endDate students')
       .limit(3)
       .lean();
 
-    // 9. Get total schedules count for each class to calculate progress
     const classIds = classes.map(c => c._id);
     const classSchedulesCount = await ClassSchedule.aggregate([
       { $match: { class: { $in: classIds } } },
@@ -201,7 +217,6 @@ exports.getDashboardData = async (req, res) => {
       };
     });
 
-    // 10. Get recent change requests (top 5 pending, newest first)
     const recentRequests = await ChangeRequest.find({ status: 'pending' })
       .populate('sender', 'username email')
       .select('_id type sender createdAt')
@@ -209,8 +224,6 @@ exports.getDashboardData = async (req, res) => {
       .limit(5)
       .lean();
 
-    // Capture fresh timestamp right before calculating time differences
-    // to ensure accurate "time ago" values after async operations
     const currentTime = new Date();
     const recentActivities = recentRequests.map(request => {
       const createdAt = new Date(request.createdAt);
@@ -254,7 +267,7 @@ exports.getDashboardData = async (req, res) => {
         message = `${senderName} đã gửi đơn tạo lớp mới`;
         icon = 'fa-plus-circle';
         color = 'success';
-      } else if (requestType === 'replace_teacher') {
+      } else if (requestType === 'request_replace_teacher') {
         message = `${senderName} đã gửi đơn thay giáo viên`;
         icon = 'fa-user-tie';
         color = 'info';
@@ -273,8 +286,6 @@ exports.getDashboardData = async (req, res) => {
       };
     });
 
-    // 11. Count pending change requests by type
-    // Note: pendingLeaveRequests is set to 0 as it wasn't implemented in the original code
     const pendingLeaveRequests = 0;
     
     const pendingMakeupClasses = await ChangeRequest.countDocuments({ 
@@ -286,11 +297,21 @@ exports.getDashboardData = async (req, res) => {
       status: 'pending',
       type: 'create_class'
     });
+      
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const totalRequestsLastWeek = await ChangeRequest.countDocuments({ 
+      createdAt: { $gte: sevenDaysAgo }
+    });
+    
+    const pendingChangeClassRequests = await ChangeRequest.countDocuments({ 
+      status: 'pending',
+      type: 'change_class'
+    });
 
-    // 12. Combine absent and late students
     const absentStudentsList = [...absentStudents, ...lateStudents].slice(0, 10);
 
-    // 13. Build response
     const dashboardData = {
       todayOverview: {
         todaySchedules: todaySchedules.length,
@@ -298,11 +319,14 @@ exports.getDashboardData = async (req, res) => {
         lateStudents: lateStudents.length,
         pendingLeaveRequests,
         pendingMakeupClasses,
-        newClassRequests
+        newClassRequests,
+        totalRequestsLastWeek,
+        pendingChangeClassRequests
       },
       todaySchedule: processedSchedules.slice(0, 10),
       absentStudentsList,
       roomSchedule: roomScheduleData,
+      timeSlots: timeSlots,
       classProgress: classProgressData,
       recentActivities
     };
@@ -314,7 +338,6 @@ exports.getDashboardData = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error getting academic dashboard:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy dữ liệu dashboard',

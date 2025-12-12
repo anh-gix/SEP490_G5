@@ -1,241 +1,158 @@
-import axios from 'axios';
+import api from './api';
 
-const API_BASE_URL = 'http://localhost:8080/api/courses';
-
-// Course service functions
 export const courseService = {
-  // Lấy tất cả courses
-  getAllCourses: async (params = {}) => {
+  /**
+   * Get courses with filters
+   * @param {object} params - { status, program, search }
+   */
+  getCourses: async (params = {}) => {
     try {
-      const response = await axios.get(API_BASE_URL, { params });
+      const response = await api.get('/courses', { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy danh sách giáo trình' };
+      console.error('Error fetching courses:', error);
+      throw error.response?.data || { message: 'Không thể lấy danh sách khóa học' };
     }
   },
 
-  // Lấy course theo ID
-  getCourseById: async (id) => {
+  /**
+   * Get all courses (alias for getCourses)
+   * @returns {Promise} Response with courses data
+   */
+  getAllCourses: async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/${id}`);
+      const response = await api.get('/courses');
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy thông tin giáo trình' };
+      console.error('Error fetching all courses:', error);
+      throw error.response?.data || { message: 'Không thể lấy danh sách khóa học' };
     }
   },
 
-  // Tạo course mới
-  createCourse: async (courseData) => {
-    try {
-      const response = await axios.post(API_BASE_URL, courseData);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Tạo giáo trình thất bại' };
-    }
-  },
-
-  // Cập nhật course
-  updateCourse: async (id, courseData) => {
-    try {
-      const response = await axios.put(`${API_BASE_URL}/${id}`, courseData);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Cập nhật giáo trình thất bại' };
-    }
-  },
-
-  // Xóa course
-  deleteCourse: async (id) => {
-    try {
-      const response = await axios.delete(`${API_BASE_URL}/${id}`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Xóa giáo trình thất bại' };
-    }
-  },
-
-  // Lấy danh sách courses chờ phê duyệt
-  getPendingCourses: async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/pending`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy danh sách giáo trình chờ duyệt' };
-    }
-  },
-
-  // Lấy chi tiết course (với sessions, CLOs)
-  getCourseDetails: async (id) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/${id}/details`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy chi tiết giáo trình' };
-    }
-  },
-
-  // Submit course for approval
-  submitCourse: async (id, data) => {
-    try {
-      const response = await axios.patch(`${API_BASE_URL}/${id}/submit`, data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Nộp giáo trình thất bại' };
-    }
-  },
-
-  // Phê duyệt course
-  approveCourse: async (id, data) => {
-    try {
-      const response = await axios.patch(`${API_BASE_URL}/${id}/approve`, data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Phê duyệt giáo trình thất bại' };
-    }
-  },
-
-  // Reject course
-  rejectCourse: async (id, data) => {
-    try {
-      const response = await axios.patch(`${API_BASE_URL}/${id}/reject`, data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Từ chối giáo trình thất bại' };
-    }
-  },
-
-  // Yêu cầu chỉnh sửa course
-  requestRevision: async (id, data) => {
-    try {
-      const response = await axios.patch(`${API_BASE_URL}/${id}/revise`, data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Gửi yêu cầu chỉnh sửa thất bại' };
-    }
-  },
-
-  // Accept course to program (Program Head)
-  acceptCourseToProgram: async (id, data) => {
-    try {
-      const response = await axios.patch(`${API_BASE_URL}/${id}/accept`, data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Chấp nhận giáo trình thất bại' };
-    }
-  },
-
-  // Reject course from program (Program Head)
-  rejectCourseFromProgram: async (id, data) => {
-    try {
-      const response = await axios.patch(`${API_BASE_URL}/${id}/reject`, data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Từ chối giáo trình thất bại' };
-    }
-  },
-
-  // Get all course mappings (type, level, band)
-  getCourseMappings: async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/mappings`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy danh sách mappings' };
-    }
-  },
-
-  // Get types by level
-  getTypesByLevel: async (level) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/types-by-level`, {
-        params: { level }
-      });
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy types theo level' };
-    }
-  },
-
-  // Get all types from Program collection
-  getAllTypes: async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/all-types`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy danh sách types' };
-    }
-  },
-
-  // Get all levels from Program collection
-  getAllLevels: async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/all-levels`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy danh sách levels' };
-    }
-  },
-
-  // Get levels by type
-  getLevelsByType: async (type) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/levels`, {
-        params: { type }
-      });
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy levels theo type' };
-    }
-  },
-
-  // Get band by type and level
-  getBandByTypeAndLevel: async (type, level) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/band`, {
-        params: { type, level }
-      });
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy band theo type và level' };
-    }
-  },
-
-  // Get courses by program name and level
+  /**
+   * Get courses by program name and level
+   * @param {string} programName - Program name (IELTS, TOEIC, Cambridge)
+   * @param {string} level - Level (A1, A2, B1, B2, C1, C2, Pre-A1)
+   */
   getCoursesByProgram: async (programName, level) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/by-program`, {
+      const response = await api.get('/courses/by-program', {
         params: { programName, level }
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy danh sách courses theo program và level' };
-      }
-  },
-  // =========================
-  // PLO MAPPING FUNCTIONS
-  // =========================
-
-  // Get PLOs of a Course's Program
-  getProgramPLOs: async (courseId) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/${courseId}/program-plos`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy danh sách PLO của chương trình' };
+      console.error('Error fetching courses by program:', error);
+      throw error.response?.data || { message: 'Không thể lấy danh sách khóa học' };
     }
   },
 
-  // Update Course PLO Mapping
-  updateCoursePLOMapping: async (courseId, mappedPLOs) => {
+  /**
+   * Get all unique types from Program collection
+   * GET /api/courses/all-types
+   */
+  getAllTypes: async () => {
     try {
-      const response = await axios.put(`${API_BASE_URL}/${courseId}/map-plos`, {
-        mappedPLOs
+      const response = await api.get('/courses/all-types');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching all types:', error);
+      throw error.response?.data || { message: 'Không thể lấy danh sách types' };
+    }
+  },
+
+  /**
+   * Get all unique levels from Program collection
+   * GET /api/courses/all-levels
+   */
+  getAllLevels: async () => {
+    try {
+      const response = await api.get('/courses/all-levels');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching all levels:', error);
+      throw error.response?.data || { message: 'Không thể lấy danh sách levels' };
+    }
+  },
+
+  /**
+   * Get levels by type
+   * GET /api/courses/levels?type=ielts
+   * @param {string} type - Type (ielts, toeic, cam)
+   */
+  getLevelsByType: async (type) => {
+    try {
+      const response = await api.get('/courses/levels', {
+        params: { type }
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'Cập nhật PLO mapping thất bại' };
+      console.error('Error fetching levels by type:', error);
+      throw error.response?.data || { message: 'Không thể lấy danh sách levels' };
     }
   },
+
+  /**
+   * Get types by level
+   * GET /api/courses/types-by-level?level=A1
+   * @param {string} level - Level (A1, A2, B1, B2, C1, C2, Pre-A1)
+   */
+  getTypesByLevel: async (level) => {
+    try {
+      const response = await api.get('/courses/types-by-level', {
+        params: { level }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching types by level:', error);
+      throw error.response?.data || { message: 'Không thể lấy danh sách types' };
+    }
+  },
+
+  /**
+   * Get band by type and level
+   * GET /api/courses/band?type=ielts&level=B1
+   * @param {string} type - Type (ielts, toeic, cam)
+   * @param {string} level - Level (A1, A2, B1, B2, C1, C2, Pre-A1)
+   */
+  getBandByTypeAndLevel: async (type, level) => {
+    try {
+      const response = await api.get('/courses/band', {
+        params: { type, level }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching band:', error);
+      throw error.response?.data || { message: 'Không thể lấy band' };
+    }
+  },
+
+  /**
+   * Get all course mappings (type, level, band) from Program model
+   * GET /api/courses/mappings
+   */
+  getCourseMappings: async () => {
+    try {
+      const response = await api.get('/courses/mappings');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching course mappings:', error);
+      throw error.response?.data || { message: 'Không thể lấy course mappings' };
+    }
+  },
+
+  /**
+   * Get course details by ID
+   * @param {string} courseId - Course ID
+   */
+  getCourseDetails: async (courseId) => {
+    try {
+      const response = await api.get(`/courses/${courseId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching course details:', error);
+      throw error.response?.data || { message: 'Không thể lấy chi tiết khóa học' };
+    }
+  }
 };
 
 export default courseService;

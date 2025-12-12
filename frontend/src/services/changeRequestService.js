@@ -25,6 +25,17 @@ api.interceptors.request.use(
 );
 
 const changeRequestService = {
+  // Get stats (counts) for change requests
+  getStats: async (params = {}) => {
+    try {
+      const response = await api.get('/change-requests/stats', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching change request stats:', error);
+      throw error.response?.data || error.message;
+    }
+  },
+
   // Get all change requests with optional filters
   getAllChangeRequests: async (params = {}) => {
     try {

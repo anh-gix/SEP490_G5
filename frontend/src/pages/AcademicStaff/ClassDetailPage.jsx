@@ -1,16 +1,28 @@
 import React from 'react';
 import AcademicLayout from '../../components/class_management/AcademicLayout';
-import ClassDetails from '../../components/class_management/ClassDetails';
+import AcademicClassDetailLayout from '../../components/class_management/AcademicClassDetailLayout';
 
 const ClassDetailPage = () => {
   return (
     <AcademicLayout>
-      <ClassDetails />
+      <AcademicClassDetailLayout />
     </AcademicLayout>
   );
 };
 
 export default ClassDetailPage;
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

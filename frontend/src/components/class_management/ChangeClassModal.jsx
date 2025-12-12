@@ -26,6 +26,8 @@ const ChangeClassModal = ({
   useEffect(() => {
     if (show && selectedClassToChange?.courseId) {
       loadAvailableClasses();
+    } else if (show && !selectedClassToChange?.courseId) {
+      console.error(' ChangeClassModal: courseId is missing', { selectedClassToChange });
     }
   }, [show, selectedClassToChange?.courseId]);
 
@@ -39,7 +41,11 @@ const ChangeClassModal = ({
   }, [selectedNewClassId]);
 
   const loadAvailableClasses = async () => {
-    if (!selectedClassToChange?.courseId) return;
+    if (!selectedClassToChange?.courseId) {
+      console.error(' loadAvailableClasses: courseId is missing', { selectedClassToChange });
+      toast.error('Không tìm thấy thông tin khóa học. Vui lòng thử lại.');
+      return;
+    }
     
     setLoadingAvailableClasses(true);
     try {
@@ -52,9 +58,15 @@ const ChangeClassModal = ({
           return clsId.toString() !== selectedClassToChange.classId?.toString();
         });
         setAvailableClasses(otherClasses);
+        console.log(' Loaded available classes', { count: otherClasses.length });
+      } else {
+        console.error(' Failed to load available classes', response);
+        toast.error('Không thể tải danh sách lớp học. Vui lòng thử lại.');
+        setAvailableClasses([]);
       }
     } catch (err) {
-      console.error('Error fetching available classes:', err);
+      console.error(' Error fetching available classes:', err);
+      toast.error('Có lỗi xảy ra khi tải danh sách lớp học. Vui lòng thử lại.');
       setAvailableClasses([]);
     } finally {
       setLoadingAvailableClasses(false);
@@ -116,17 +128,24 @@ const ChangeClassModal = ({
             return (a.order || 0) - (b.order || 0);
           });
 
-          const pastSessions = sortedSessions.filter(s => {
+          // Tìm session sắp học tiếp theo (chưa học)
+          const upcomingSessions = sortedSessions.filter(s => {
             if (!s.date) return false;
-            return new Date(s.date) <= now;
+            const scheduleDate = new Date(s.date);
+            scheduleDate.setHours(0, 0, 0, 0);
+            const nowDate = new Date(now);
+            nowDate.setHours(0, 0, 0, 0);
+            return scheduleDate >= nowDate;  // Lọc buổi SẮP TỚI
           });
           
-          if (pastSessions.length > 0) {
-            const currentSession = pastSessions[pastSessions.length - 1];
+          if (upcomingSessions.length > 0) {
+            // Nếu có buổi sắp tới → lấy buổi sắp tới ĐẦU TIÊN (session đang học)
+            const currentSession = upcomingSessions[0];
             currentSessionTitle = currentSession.title || 'Chưa có session';
             currentSessionOrder = currentSession.order;
           } else if (sortedSessions.length > 0) {
-            const currentSession = sortedSessions[0];
+            // Nếu không có buổi sắp tới → lấy buổi CUỐI CÙNG (đã học hết)
+            const currentSession = sortedSessions[sortedSessions.length - 1];
             currentSessionTitle = currentSession.title || 'Chưa có session';
             currentSessionOrder = currentSession.order;
           }
@@ -265,12 +284,21 @@ const ChangeClassModal = ({
 
   if (!selectedClassToChange) return null;
 
+  // Kiểm tra courseId
+  const hasCourseId = !!selectedClassToChange?.courseId;
+
   return (
     <Modal show={show} onHide={handleClose} size="lg" centered>
       <Modal.Header closeButton className="pb-12">
         <Modal.Title className="text-16">Đổi lớp</Modal.Title>
       </Modal.Header>
       <Modal.Body className="py-16">
+        {!hasCourseId && (
+          <div className="alert alert-danger mb-16" role="alert">
+            <i className="fas fa-exclamation-triangle me-2"></i>
+            <strong>Lỗi:</strong> Không tìm thấy thông tin khóa học. Vui lòng đóng modal và thử lại.
+          </div>
+        )}
         <div className="row g-3">
           {/* Left: Current Class */}
           <div className="col-md-6">

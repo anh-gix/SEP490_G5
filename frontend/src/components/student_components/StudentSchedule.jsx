@@ -61,6 +61,10 @@ const StudentSchedule = () => {
   function getCurrentWeek() {
     const today = new Date();
     const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 1));
+
+    console.log('First day of week:', firstDayOfWeek);
+
+    console.log('Last day of week:', new Date(today.setDate(today.getDate() - today.getDay() + 7)));
     return firstDayOfWeek;
   }
 
@@ -96,6 +100,23 @@ const StudentSchedule = () => {
       const status = calculateStatus(item.date, item.endTime);
       const attendanceStatus = item.attendance?.status || null;
 
+      // Xác định className: nếu là buổi học bù (không có class hoặc status là temporary/rescheduled) thì hiển thị "Lớp học bù"
+      let className = item.className;
+      if (!className || className === 'N/A' || className === null || className === undefined) {
+        // Kiểm tra nếu là buổi học bù
+        const isMakeupClass = 
+          item.scheduleStatus === 'rescheduled' || 
+          item.status === 'temporary' || 
+          !item.class || 
+          item.class === null;
+        
+        if (isMakeupClass) {
+          className = 'Lớp học bù';
+        } else {
+          className = 'N/A';
+        }
+      }
+
       return {
         id: item._id,
         date: scheduleDate.toISOString().split('T')[0],
@@ -108,7 +129,7 @@ const StudentSchedule = () => {
         room: item.roomName ? `${item.roomName}${item.location ? ` - ${item.location}` : ''}` : 'Chưa có phòng',
         status: item.scheduleStatus === 'completed' ? 'completed' : status,
         attendanceStatus: attendanceStatus,
-        className: item.className || 'N/A',
+        className: className,
         subject: item.courseName || 'N/A',
         rawData: item
       };
@@ -132,14 +153,15 @@ const StudentSchedule = () => {
       setLoading(true);
       setError(null);
     
-      // Get current month's date range for initial load
+      // Get date range from current month to 6 months ahead to ensure all sessions are included
       const today = new Date();
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      // Extend to 6 months ahead to capture all upcoming sessions
+      const endDate = new Date(today.getFullYear(), today.getMonth() + 6, 0);
       
       const params = {
         startDate: startOfMonth.toISOString().split('T')[0],
-        endDate: endOfMonth.toISOString().split('T')[0]
+        endDate: endDate.toISOString().split('T')[0]
       };
 
       console.log('Fetching schedules with params:', params);
@@ -150,8 +172,24 @@ const StudentSchedule = () => {
       
       if (response.success && response.schedules && Array.isArray(response.schedules)) {
         const transformed = transformScheduleData(response.schedules);
-        console.log('Transformed schedules:', transformed);
-        setSchedules(transformed);
+        
+        // Filter out cancelled schedules
+        const activeSchedules = transformed.filter(schedule => {
+          const rawData = schedule.rawData;
+          if (!rawData) return true;
+          
+          // Check both scheduleStatus (from StudentSchedule) and status (from ClassSchedule)
+          const isCancelled = 
+            rawData.scheduleStatus === 'cancelled' || 
+            rawData.scheduleStatus === 'canceled' ||
+            rawData.status === 'cancelled' || 
+            rawData.status === 'canceled';
+          
+          return !isCancelled;
+        });
+        
+        console.log('Transformed schedules:', transformed.length, 'Active schedules (excluding cancelled):', activeSchedules.length);
+        setSchedules(activeSchedules);
       } else {
         setSchedules([]);
       }
@@ -447,7 +485,6 @@ const StudentSchedule = () => {
                                   className="btn-outline-main w-100 py-4 radius-6"
                                   style={{ fontSize: '10px' }}
                                 >
-                                  <i className="fas fa-eye me-1"></i>
                                   Chi tiết
                                 </Button>
                               </Link>
@@ -662,7 +699,6 @@ const StudentSchedule = () => {
                           <Button
                             className="btn-outline-main text-13 fw-medium px-12 py-6 radius-6"
                           >
-                            <i className="fas fa-eye me-1"></i>
                             Chi tiết
                           </Button>
                         </Link>

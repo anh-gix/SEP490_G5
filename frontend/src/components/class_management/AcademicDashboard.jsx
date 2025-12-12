@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, ProgressBar, Table, Spinner, Alert } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
+import { Container, Row, Col, Card, Button, Badge, Table, Spinner, Alert } from 'react-bootstrap';
+import { Link, useNavigate } from 'react-router-dom';
 import academicStaffService from '../../services/academicStaffService';
 
-/**
- * Academic Dashboard Component
- * Trang tổng quan cho module Giáo vụ
- */
 const AcademicDashboard = () => {
+  const navigate = useNavigate();
 
   const [todayOverview, setTodayOverview] = useState({
     todaySchedules: 0,
@@ -15,11 +12,14 @@ const AcademicDashboard = () => {
     lateStudents: 0,
     pendingLeaveRequests: 0,
     pendingMakeupClasses: 0,
-    newClassRequests: 0
+    newClassRequests: 0,
+    totalRequestsLastWeek: 0,
+    pendingChangeClassRequests: 0
   });
 
   const [absentStudentsList, setAbsentStudentsList] = useState([]);
   const [roomSchedule, setRoomSchedule] = useState([]);
+  const [timeSlots, setTimeSlots] = useState([]); // Time slots from database
   const [recentActivities, setRecentActivities] = useState([]);
   const [todaySchedule, setTodaySchedule] = useState([]);
   const [classProgress, setClassProgress] = useState([]);
@@ -48,12 +48,15 @@ const AcademicDashboard = () => {
           lateStudents: 0,
           pendingLeaveRequests: 0,
           pendingMakeupClasses: 0,
-          newClassRequests: 0
+          newClassRequests: 0,
+          totalRequestsLastWeek: 0,
+          pendingChangeClassRequests: 0
         });
         
         setTodaySchedule(data.todaySchedule || []);
         setAbsentStudentsList(data.absentStudentsList || []);
         setRoomSchedule(data.roomSchedule || []);
+        setTimeSlots(data.timeSlots || []); // Set time slots from API
         setClassProgress(data.classProgress || []);
         setRecentActivities(data.recentActivities || []);
       } else {
@@ -68,43 +71,6 @@ const AcademicDashboard = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'ongoing':
-        return <Badge className="bg-success-600 text-white px-12 py-6">Đang học</Badge>;
-      case 'upcoming':
-        return <Badge className="bg-info-500 text-white px-12 py-6">Sắp diễn ra</Badge>;
-      case 'completed':
-        return <Badge className="bg-neutral-600 text-white px-12 py-6">Đã hoàn thành</Badge>;
-      default:
-        return <Badge className="bg-neutral-400 text-white px-12 py-6">{status}</Badge>;
-    }
-  };
-
-  const getActivityIcon = (activity) => {
-    const colors = {
-      success: 'text-success-600',
-      info: 'text-info-500',
-      primary: 'text-main-600',
-      warning: 'text-warning-600',
-      danger: 'text-danger-600'
-    };
-
-    return (
-      <div 
-        className={`d-flex align-items-center justify-content-center rounded-circle ${colors[activity.color]}`}
-        style={{ 
-          width: '40px', 
-          height: '40px', 
-          backgroundColor: `var(--${activity.color}-50)`,
-          minWidth: '40px'
-        }}
-      >
-        <i className={`fas ${activity.icon}`}></i>
-      </div>
-    );
-  };
-
   if (loading) {
     return (
       <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
@@ -115,6 +81,9 @@ const AcademicDashboard = () => {
       </Container>
     );
   }
+
+  // Filter only absent students (not late) for the sidebar
+  const absentOnlyStudents = absentStudentsList.filter(student => student.status === 'absent');
 
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
@@ -138,7 +107,6 @@ const AcademicDashboard = () => {
         </Alert>
       )}
 
-      {/* Today Overview - Priority Section */}
       <Card className="bg-white border-0 rounded-12 mb-20" 
             style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
         <Card.Body className="p-20">
@@ -150,55 +118,23 @@ const AcademicDashboard = () => {
           </div>
 
           <Row className="g-2">
-            {/* Học viên vắng */}
-            <Col md={6} lg>
-              <Card className="bg-danger-50 border border-danger-200 rounded-8 h-100 cursor-pointer transition-2 item-hover">
-                <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
-                  <div className="d-flex justify-content-between align-items-start">
-                    <div className="text-danger-700 fw-bold" style={{ fontSize: '14px' }}>
-                      Học viên vắng
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <h1 className="text-danger-600 fw-bold mb-2" style={{ fontSize: '36px', lineHeight: '1' }}>
-                      {todayOverview.absentStudents}
-                    </h1>
-                    <div className="text-danger-600" style={{ fontSize: '12px' }}>
-                      <i className="fas fa-user-times me-1"></i>
-                      +{todayOverview.lateStudents} đi muộn
-                    </div>
-                  </div>
-                  <div className="text-end">
-                    <Link to="/academic/class-management" className="text-decoration-none">
-                    <span className="text-danger-700 text-11 fw-medium cursor-pointer">
-                      Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
-                    </span>
-                    </Link>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
 
-            {/* Yêu cầu xếp lớp mới */}
-            <Col md={6} lg>
+            {/* Tổng số đơn trong 1 tuần qua */}
+            <Col md={4} lg>
                 <Card className="bg-purple-50 border border-purple-200 rounded-8 h-100 transition-2 item-hover">
                   <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
                     <div className="d-flex justify-content-between align-items-start">
                       <div className="text-purple-700 fw-bold" style={{ fontSize: '14px' }}>
-                        Yêu cầu xếp lớp
+                        Tổng số đơn trong 1 tuần qua
                       </div>
                     </div>
                     <div className="text-center">
                       <h1 className="text-purple-600 fw-bold mb-2" style={{ fontSize: '36px', lineHeight: '1' }}>
-                        {todayOverview.newClassRequests}
+                        {todayOverview.totalRequestsLastWeek || 0}
                       </h1>
-                      <div className="text-purple-600" style={{ fontSize: '12px' }}>
-                        <i className="fas fa-users-cog me-1"></i>
-                        Chờ xử lý
-                      </div>
                     </div>
                     <div className="text-end">
-                    <Link to="/academic/class-management" className="text-decoration-none">
+                    <Link to="/academic/request-management" className="text-decoration-none">
                       <span className="text-purple-700 text-11 fw-medium">
                         Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
                       </span>
@@ -208,126 +144,73 @@ const AcademicDashboard = () => {
                 </Card>
             </Col>
 
-            {/* Yêu cầu xin nghỉ */}
-            <Col md={6} lg>
-              <Card className="bg-warning-50 border border-warning-200 rounded-8 h-100 cursor-pointer transition-2 item-hover">
+            {/* đơn lâu nhất chưa xử lý (bao nhiêu ngày chưa giải quyết) */}
+            <Col md={4} lg>
+              <Card 
+                className="bg-purple-50 border border-purple-200 rounded-8 h-100 transition-2 item-hover"
+                style={{ cursor: recentActivities && recentActivities.length > 0 && recentActivities[recentActivities.length - 1]?.id ? 'pointer' : 'default' }}
+                onClick={() => {
+                  const longestPendingRequest = recentActivities && recentActivities.length > 0 ? recentActivities[recentActivities.length - 1] : null;
+                  if (longestPendingRequest?.id) {
+                    navigate(`/academic/request-management/${longestPendingRequest.id}`);
+                  }
+                }}
+              >
                 <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
                   <div className="d-flex justify-content-between align-items-start">
-                    <div className="text-warning-700 fw-bold" style={{ fontSize: '14px' }}>
-                      Yêu cầu xin nghỉ
+                    <div className="text-purple-700 fw-bold" style={{ fontSize: '14px' }}>
+                      Đơn lâu nhất chưa xử lý
                     </div>
                   </div>
                   <div className="text-center">
-                    <h1 className="text-warning-600 fw-bold mb-2" style={{ fontSize: '36px', lineHeight: '1' }}>
-                      {todayOverview.pendingLeaveRequests}
+                    <h1 className="text-purple-600 fw-bold mb-2" style={{ fontSize: '36px', lineHeight: '1' }}>
+                    {recentActivities && recentActivities.length > 0 ? (
+                      <>
+                        <div>
+                          <div className="fw-bold text-15 mb-0">
+                            {recentActivities[recentActivities.length - 1].message}
+                          </div>
+                          <div className="text-12 text-muted">
+                            {recentActivities[recentActivities.length - 1].time}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-13 text-muted">Không có đơn chờ xử lý</span>
+                    )}
                     </h1>
-                    <div className="text-warning-600" style={{ fontSize: '12px' }}>
-                      <i className="fas fa-clock me-1"></i>
-                      Chờ duyệt
-                    </div>
                   </div>
                   <div className="text-end">
-                    <Link to="/academic/class-management" className="text-decoration-none">
-                    <span className="text-warning-700 text-11 fw-medium cursor-pointer">
-                      Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
-                    </span>
-                    </Link>
-                  </div>
-                </Card.Body>
-              </Card>
+                    {recentActivities && recentActivities.length > 0 && recentActivities[recentActivities.length - 1]?.id ? (
+                      <Link 
+                        to={`/academic/request-management/${recentActivities[recentActivities.length - 1].id}`} 
+                        className="text-decoration-none"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span className="text-purple-700 text-11 fw-medium">
+                          Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
+                        </span>
+                      </Link>
+                    ) : (
+                      <span className="text-purple-700 text-11 fw-medium">
+                        Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
+                      </span>
+                    )}
+                    </div>
+                  </Card.Body>
+                </Card>
             </Col>
 
-            {/* Buổi học bù chờ xếp */}
-            <Col md={6} lg>
-              <Card className="bg-info-50 border border-info-200 rounded-8 h-100 cursor-pointer transition-2 item-hover">
-                <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
-                  <div className="d-flex justify-content-between align-items-start">
-                    <div className="text-info-700 fw-bold" style={{ fontSize: '14px' }}>
-                      Học bù chờ xếp
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <h1 className="text-info-600 fw-bold mb-2" style={{ fontSize: '36px', lineHeight: '1' }}>
-                      {todayOverview.pendingMakeupClasses}
-                    </h1>
-                    <div className="text-info-600" style={{ fontSize: '12px' }}>
-                      <i className="fas fa-calendar-plus me-1"></i>
-                      Cần xếp lịch
-                    </div>
-                  </div>
-                  <div className="text-end">
-                    <Link to="/academic/class-management" className="text-decoration-none">
-                    <span className="text-info-700 text-11 fw-medium cursor-pointer">
-                      Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
-                    </span>
-                    </Link>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
+
           </Row>
         </Card.Body>
       </Card>
 
 
       <Row className="g-3">
-        {/* Left Column - Schedule & Room Usage */}
-        <Col lg={8}>
-          {/* Today's Schedule - Compact */}
-          <Card className="bg-white border-0 rounded-12 mb-24" 
-                style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-            <Card.Header className="bg-main-25 border-0 p-20">
-              <div className="d-flex justify-content-between align-items-center">
-                <h6 className="text-neutral-900 fw-bold mb-0">
-                  <i className="fas fa-calendar-check text-main-600 me-2"></i>
-                  Lịch học hôm nay ({todaySchedule.length} buổi)
-                </h6>
-                <Link to="/academic/schedule-management">
-                  <Button className="btn-outline-main text-12 fw-medium px-12 py-6 radius-8">
-                    Xem tất cả
-                  </Button>
-                </Link>
-              </div>
-            </Card.Header>
-            <Card.Body className="p-20">
-              <Row className="g-2">
-                {todaySchedule.map(schedule => (
-                  <Col md={6} key={schedule.id}>
-                    <Card className={`border-0 rounded-8 ${
-                      schedule.status === 'ongoing' ? 'bg-success-50 border-success-200' : 'bg-white border-neutral-200'
-                    }`} style={{ border: '1px solid' }}>
-                      <Card.Body className="p-12">
-                        <div className="d-flex justify-content-between align-items-start mb-8">
-                          <div>
-                            <h6 className="text-neutral-900 fw-bold mb-4 text-13">
-                              {schedule.className}
-                            </h6>
-                            <p className="text-neutral-600 mb-0 text-11">
-                              <i className="fas fa-user-tie me-1"></i>
-                              {schedule.teacher}
-                            </p>
-                          </div>
-                          {getStatusBadge(schedule.status)}
-                        </div>
-                        <div className="d-flex justify-content-between text-11 text-neutral-500">
-                          <span>
-                            <i className="fas fa-clock me-1"></i>
-                            {schedule.time}
-                          </span>
-                          <span>
-                            <i className="fas fa-door-open me-1"></i>
-                            {schedule.room}
-                          </span>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                ))}
-              </Row>
-            </Card.Body>
-          </Card>
 
-          {/* Room Schedule */}
+        <Col lg={8}>
+
           <Card className="bg-white border-0 rounded-12 mb-24" 
                 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
             <Card.Header className="bg-main-25 border-0 p-20">
@@ -348,10 +231,21 @@ const AcademicDashboard = () => {
                 <thead style={{ backgroundColor: 'var(--neutral-50)' }}>
                   <tr>
                     <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Phòng</th>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">08:00-10:00</th>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">10:30-12:30</th>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">14:00-16:00</th>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">18:00-20:00</th>
+                    {timeSlots.length > 0 ? (
+                      timeSlots.map((timeSlot, idx) => (
+                        <th key={idx} className="text-neutral-700 fw-medium text-12 px-16 py-10">
+                          {timeSlot}
+                        </th>
+                      ))
+                    ) : (
+                      // Fallback to default time slots if not loaded yet
+                      <>
+                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">08:00-10:00</th>
+                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">10:30-12:30</th>
+                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">14:00-16:00</th>
+                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">18:00-20:00</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -382,92 +276,64 @@ const AcademicDashboard = () => {
               </Table>
             </Card.Body>
           </Card>
-
-          {/* Absent Students List */}
-          {absentStudentsList.length > 0 && (
-            <Card className="bg-white border-0 rounded-12" 
-                  style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-              <Card.Header className="bg-danger-25 border-0 p-20">
-                <h6 className="text-neutral-900 fw-bold mb-0">
-                  <i className="fas fa-exclamation-triangle text-danger-600 me-2"></i>
-                  Danh sách học viên vắng/muộn hôm nay
-                </h6>
-              </Card.Header>
-              <Card.Body className="p-0">
-                <Table className="mb-0" hover size="sm">
-                  <thead style={{ backgroundColor: 'var(--neutral-50)' }}>
-                    <tr>
-                      <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Mã SV</th>
-                      <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Họ tên</th>
-                      <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Lớp</th>
-                      <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Thời gian</th>
-                      <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Trạng thái</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {absentStudentsList.map(student => (
-                      <tr key={student.id}>
-                        <td className="px-16 py-12 text-neutral-700 text-12">{student.studentId}</td>
-                        <td className="px-16 py-12 text-neutral-900 fw-medium text-13">{student.name}</td>
-                        <td className="px-16 py-12 text-neutral-700 text-12">{student.class}</td>
-                        <td className="px-16 py-12 text-neutral-600 text-12">
-                          <i className="fas fa-clock me-1"></i>
-                          {student.time}
-                        </td>
-                        <td className="px-16 py-12">
-                          {student.status === 'absent' ? (
-                            <Badge className="bg-danger-100 text-danger-700 px-8 py-4 text-11">
-                              <i className="fas fa-times me-1"></i>
-                              Vắng
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-warning-100 text-warning-700 px-8 py-4 text-11">
-                              <i className="fas fa-clock me-1"></i>
-                              Muộn
-                            </Badge>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </Card.Body>
-            </Card>
-          )}
         </Col>
 
-        {/* Right Column - Activities */}
         <Col lg={4}>
           <Card className="bg-white border-0 rounded-12 mb-24" 
                 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-            <Card.Header className="bg-main-25 border-0 p-20">
+            <Card.Header className="bg-danger-25 border-0 p-20">
               <h6 className="text-neutral-900 fw-bold mb-0">
-                <i className="fas fa-history text-main-600 me-2"></i>
-                Hoạt động gần đây
+                <i className="fas fa-user-times text-danger-600 me-2"></i>
+                Học sinh vắng hôm nay
               </h6>
             </Card.Header>
             <Card.Body className="p-20" style={{ maxHeight: '600px', overflowY: 'auto' }}>
               <div className="d-flex flex-column gap-16">
-                {recentActivities.map(activity => (
-                  <div key={activity.id} className="d-flex gap-12 pb-16 border-bottom border-neutral-100">
-                    {getActivityIcon(activity)}
-                    <div className="flex-grow-1">
-                      <p className="text-neutral-700 mb-4 text-14">{activity.message}</p>
-                      <span className="text-neutral-400 text-12">
-                        <i className="fas fa-clock me-1"></i>
-                        {activity.time}
-                      </span>
+                {absentOnlyStudents.length > 0 ? (
+                  absentOnlyStudents.map(student => (
+                    <div key={student.id} className="d-flex gap-12 pb-16 border-bottom border-neutral-100">
+                      <div 
+                        className="d-flex align-items-center justify-content-center rounded-circle text-danger-600"
+                        style={{ 
+                          width: '40px', 
+                          height: '40px', 
+                          backgroundColor: 'var(--danger-50)',
+                          minWidth: '40px'
+                        }}
+                      >
+                        <i className="fas fa-user-times"></i>
+                      </div>
+                      <div className="flex-grow-1">
+                        <p className="text-neutral-900 fw-medium mb-2 text-14">{student.name}</p>
+                        <div className="d-flex align-items-center gap-8 mb-2">
+                          <Badge className="bg-danger-100 text-danger-700 px-8 py-2 text-11">
+                            <i className="fas fa-times me-1"></i>
+                            Vắng
+                          </Badge>
+                        </div>
+                        <div className="text-neutral-500 text-12 mb-1">
+                          <i className="fas fa-users me-1"></i>
+                          {student.class}
+                        </div>
+                        <span className="text-neutral-400 text-12">
+                          <i className="fas fa-clock me-1"></i>
+                          {student.time}
+                        </span>
+                      </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-neutral-500 text-14 mb-0">Không có học sinh vắng hôm nay</p>
                   </div>
-                ))}
+                )}
               </div>
             </Card.Body>
           </Card>
         </Col>
       </Row>
 
-      {/* Class Progress - Compact */}
-      <Row>
+      {/* <Row>
         <Col>
           <Card className="bg-white border-0 rounded-12" 
                 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
@@ -528,7 +394,7 @@ const AcademicDashboard = () => {
             </Card.Body>
           </Card>
         </Col>
-      </Row>
+      </Row> */}
     </Container>
   );
 };

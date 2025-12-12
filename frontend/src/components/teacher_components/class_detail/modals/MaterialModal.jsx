@@ -273,7 +273,7 @@ const MaterialModal = ({ show, onHide, onSuccess, classId }) => {
               </>
             ) : (
               <>
-                <i className="fas fa-upload me-2"></i>
+                
                 Thêm tài liệu
               </>
             )}

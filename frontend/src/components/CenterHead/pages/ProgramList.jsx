@@ -97,7 +97,7 @@ const ProgramList = () => {
   };
 
   const handleDeleteProgram = async (programId, programName) => {
-    const confirmMessage = `⚠️ CẢNH BÁO: Bạn có chắc muốn xóa chương trình "${programName}"?\n\n` +
+    const confirmMessage = ` CẢNH BÁO: Bạn có chắc muốn xóa chương trình "${programName}"?\n\n` +
       `Hành động này sẽ XÓA TOÀN BỘ:\n` +
       `• Tất cả PLO trong chương trình\n` +
       `• Tất cả Course (học phần)\n` +

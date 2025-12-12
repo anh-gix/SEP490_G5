@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Container, Card, Table, Badge, Spinner, Alert, Pagination, Button, Modal, Form, Row, Col, InputGroup } from 'react-bootstrap';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';
 import changeRequestService from '../../services/changeRequestService';
+import CreateTeacherChangeRequestModal from './CreateTeacherChangeRequestModal';
 
 /**
  * Teacher Applications Component
@@ -9,6 +12,8 @@ import changeRequestService from '../../services/changeRequestService';
  */
 const TeacherApplications = () => {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [changeRequests, setChangeRequests] = useState([]);
   const [allChangeRequests, setAllChangeRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +27,7 @@ const TeacherApplications = () => {
   const [sortBy, setSortBy] = useState('newest');
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const itemsPerPage = 10;
 
@@ -96,6 +102,15 @@ const TeacherApplications = () => {
     fetchChangeRequests();
   }, []);
 
+  // Check for success toast state from navigation
+  useEffect(() => {
+    if (location.state?.showSuccessToast) {
+      toast.success('Gửi đơn xin nghỉ thành công!');
+      // Clear the state to prevent showing toast again on refresh
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
+
   const fetchChangeRequests = async () => {
     try {
       setLoading(true);
@@ -110,7 +125,6 @@ const TeacherApplications = () => {
         setError(response.message || 'Không thể tải danh sách đơn');
       }
     } catch (err) {
-      console.error('Error fetching change requests:', err);
       setError(err.message || 'Có lỗi xảy ra khi tải danh sách đơn');
     } finally {
       setLoading(false);
@@ -132,7 +146,7 @@ const TeacherApplications = () => {
       create_class: { variant: 'info', text: 'Tạo lớp' },
       change_class: { variant: 'primary', text: 'Đổi lớp' },
       makeup_class: { variant: 'warning', text: 'Học bù' },
-      replace_teacher: { variant: 'secondary', text: 'Thay giáo viên' }
+      request_replace_teacher: { variant: 'secondary', text: 'Thay giáo viên' }
     };
     const config = typeConfig[type] || { variant: 'secondary', text: type || 'N/A' };
     return <Badge bg={config.variant}>{config.text}</Badge>;
@@ -209,6 +223,17 @@ const TeacherApplications = () => {
                 <option value="newest">Mới nhất trước</option>
                 <option value="oldest">Cũ nhất trước</option>
               </Form.Select>
+            </Col>
+
+            <Col md={2} className="d-flex justify-content-end">
+              <Button
+                variant="primary"
+                onClick={() => setShowCreateModal(true)}
+                className="w-100"
+              >
+                <i className="fas fa-plus me-2"></i>
+                Tạo đơn
+              </Button>
             </Col>
           </Row>
         </Card.Body>
@@ -439,6 +464,16 @@ const TeacherApplications = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Create Request Modal */}
+      <CreateTeacherChangeRequestModal
+        show={showCreateModal}
+        onHide={() => setShowCreateModal(false)}
+        onSuccess={() => {
+          fetchChangeRequests();
+          setShowCreateModal(false);
+        }}
+      />
     </Container>
   );
 };

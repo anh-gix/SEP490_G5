@@ -14,6 +14,7 @@ const RoomManagementFull = () => {
   const [rooms, setRooms] = useState([]);
   const [stats, setStats] = useState({});
   const [todayRoomUsage, setTodayRoomUsage] = useState([]);
+  const [timeSlots, setTimeSlots] = useState([]); // Time slots from database
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -70,6 +71,7 @@ const RoomManagementFull = () => {
     try {
       const data = await roomService.getTodayRoomUsage();
       setTodayRoomUsage(data.roomSchedule || []);
+      setTimeSlots(data.timeSlots || []); // Set time slots from API
     } catch (err) {
       console.error('Error fetching today room usage:', err);
     }
@@ -200,16 +202,17 @@ const RoomManagementFull = () => {
         }
       }
       
-      // Determine className: if it's a make-up class (temporary) without a class, show "học bù"
+      // Determine className: if it's a make-up class (temporary) without a class, show "Lớp học bù"
       let className = schedule.class?.name;
       if (!className && schedule.status === 'temporary') {
-        className = 'Học bù';
+        className = 'Lớp học bù';
       } else if (!className) {
         className = 'N/A';
       }
       
-      // Extract program type from schedule.class.course.program.type
-      const programType = schedule.class?.course?.program?.type || null;
+      // Extract program type: ưu tiên schedule.programType (từ backend cho buổi học bù),
+      // sau đó mới fallback về schedule.class?.course?.program?.type
+      const programType = schedule.programType || schedule.class?.course?.program?.type || schedule._course?.program?.type || null;
       
       return {
         id: schedule._id || schedule.id,
@@ -342,7 +345,7 @@ const RoomManagementFull = () => {
       {/* Two Column Layout: Room Schedule (Left) and Room Management (Right) */}
       <Row className="g-3">
         {/* Left Column - Room Schedule */}
-        <Col lg={7}>
+        {/* <Col lg={7}>
           <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24" 
                 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
             <Card.Header className="bg-main-25 border-0 p-20">
@@ -358,10 +361,21 @@ const RoomManagementFull = () => {
                 <thead style={{ backgroundColor: 'var(--neutral-50)' }}>
                   <tr>
                     <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Phòng</th>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">08:00-10:00</th>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">10:30-12:30</th>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">14:00-16:00</th>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">18:00-20:00</th>
+                    {timeSlots.length > 0 ? (
+                      timeSlots.map((timeSlot, idx) => (
+                        <th key={idx} className="text-neutral-700 fw-medium text-12 px-16 py-10">
+                          {timeSlot}
+                        </th>
+                      ))
+                    ) : (
+                      // Fallback to default time slots if not loaded yet
+                      <>
+                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">08:00-10:00</th>
+                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">10:30-12:30</th>
+                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">14:00-16:00</th>
+                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">18:00-20:00</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -392,10 +406,10 @@ const RoomManagementFull = () => {
               </Table>
             </Card.Body>
           </Card>
-        </Col>
+        </Col> */}
 
         {/* Right Column - Room Management */}
-        <Col lg={5}>
+        <Col>
           {/* Filters and View Toggle */}
           <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24">
             <Card.Body className="p-20">
@@ -462,39 +476,57 @@ const RoomManagementFull = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredRooms.map(room => (
-                      <tr key={room._id}>
-                        <td className="px-20 py-16">
-                          <div className="text-neutral-900 fw-semibold text-14">{room.room_name}</div>
-                        </td>
-                        <td className="px-20 py-16 text-neutral-700 text-14">{room.location}</td>
-                        <td className="px-20 py-16 text-center text-neutral-700 fw-medium text-14">
-                          {room.capacity}
-                        </td>
-                        <td className="px-20 py-16">
-                          {getStatusBadge(room.status)}
-                        </td>
-                        <td className="px-20 py-16">
-                          <div className="d-flex gap-8">
-                            <Button
-                              variant="outline-info"
-                              size="sm"
-                              onClick={() => handleViewSchedule(room)}
-                            >
-                              <i className="fas fa-calendar me-1"></i>
-                              Lịch
-                            </Button>
-                            <Button
-                              variant="outline-secondary"
-                              size="sm"
-                              onClick={() => handleEdit(room)}
-                            >
-                              <i className="fas fa-edit"></i>
-                            </Button>
+                    {filteredRooms.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-20 py-40 text-center">
+                          <div className="d-flex flex-column align-items-center justify-content-center">
+                            <i className="fas fa-search text-neutral-400 mb-3" style={{ fontSize: '48px' }}></i>
+                            <div className="text-neutral-600 fw-medium text-16 mb-2">
+                              Không tìm thấy phòng học
+                            </div>
+                            <div className="text-neutral-500 text-14">
+                              {searchTerm || filterStatus !== 'all' 
+                                ? 'Thử thay đổi điều kiện tìm kiếm hoặc bộ lọc'
+                                : 'Chưa có phòng học nào trong hệ thống'}
+                            </div>
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredRooms.map(room => (
+                        <tr key={room._id}>
+                          <td className="px-20 py-16">
+                            <div className="text-neutral-900 fw-semibold text-14">{room.room_name}</div>
+                          </td>
+                          <td className="px-20 py-16 text-neutral-700 text-14">{room.location}</td>
+                          <td className="px-20 py-16 text-center text-neutral-700 fw-medium text-14">
+                            {room.capacity}
+                          </td>
+                          <td className="px-20 py-16">
+                            {getStatusBadge(room.status)}
+                          </td>
+                          <td className="px-20 py-16">
+                            <div className="d-flex gap-8">
+                              <Button
+                                variant="outline-info"
+                                size="sm"
+                                onClick={() => handleViewSchedule(room)}
+                              >
+                                <i className="fas fa-calendar me-1"></i>
+                                Lịch
+                              </Button>
+                              <Button
+                                variant="outline-secondary"
+                                size="sm"
+                                onClick={() => handleEdit(room)}
+                              >
+                                <i className="fas fa-edit"></i>
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </Table>
               </Card.Body>
@@ -703,21 +735,6 @@ const RoomManagementFull = () => {
                     onCreateMakeup={() => {}}
                     readOnly={true}
                   />
-                  {/* Program Type Color Legend */}
-                  <div className="d-flex justify-content-center gap-4 mt-3">
-                    <div className="d-flex align-items-center gap-2">
-                      <div style={{ width: '16px', height: '16px', backgroundColor: '#2196F3', borderRadius: '2px' }}></div>
-                      <span className="text-13">IELTS</span>
-                    </div>
-                    <div className="d-flex align-items-center gap-2">
-                      <div style={{ width: '16px', height: '16px', backgroundColor: '#4CAF50', borderRadius: '2px' }}></div>
-                      <span className="text-13">TOEIC</span>
-                    </div>
-                    <div className="d-flex align-items-center gap-2">
-                      <div style={{ width: '16px', height: '16px', backgroundColor: '#FF9800', borderRadius: '2px' }}></div>
-                      <span className="text-13">Cambridge</span>
-                    </div>
-                  </div>
                 </>
               ) : (
                 <div className="text-center py-4 text-muted">

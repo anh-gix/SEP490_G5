@@ -1,7 +1,7 @@
 const Tip = require('../models/tipModel');
 
 // =========================
-// 📚 LẤY TẤT CẢ TIPS (Public - không cần auth)
+//  LẤY TẤT CẢ TIPS (Public - không cần auth)
 // =========================
 exports.getAllTips = async (req, res) => {
   try {
@@ -31,7 +31,7 @@ exports.getAllTips = async (req, res) => {
       tips
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy danh sách tips:', error);
+    console.error(' Lỗi khi lấy danh sách tips:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy danh sách tips',
@@ -41,7 +41,7 @@ exports.getAllTips = async (req, res) => {
 };
 
 // =========================
-// 📖 LẤY TIPS THEO SECTION
+//  LẤY TIPS THEO SECTION
 // =========================
 exports.getTipsBySection = async (req, res) => {
   try {
@@ -89,7 +89,7 @@ exports.getTipsBySection = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy tips theo section:', error);
+    console.error(' Lỗi khi lấy tips theo section:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy tips',
@@ -99,7 +99,7 @@ exports.getTipsBySection = async (req, res) => {
 };
 
 // =========================
-// 📊 LẤY THỐNG KÊ TIPS
+//  LẤY THỐNG KÊ TIPS
 // =========================
 exports.getTipsStatistics = async (req, res) => {
   try {
@@ -130,7 +130,7 @@ exports.getTipsStatistics = async (req, res) => {
       statistics
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy thống kê tips:', error);
+    console.error(' Lỗi khi lấy thống kê tips:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy thống kê',
@@ -167,7 +167,7 @@ exports.createTip = async (req, res) => {
       tip
     });
   } catch (error) {
-    console.error('❌ Lỗi khi tạo tip:', error);
+    console.error(' Lỗi khi tạo tip:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi tạo tip',
@@ -203,7 +203,7 @@ exports.updateTip = async (req, res) => {
       tip
     });
   } catch (error) {
-    console.error('❌ Lỗi khi cập nhật tip:', error);
+    console.error(' Lỗi khi cập nhật tip:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi cập nhật tip',
@@ -233,7 +233,7 @@ exports.deleteTip = async (req, res) => {
       message: 'Xóa tip thành công'
     });
   } catch (error) {
-    console.error('❌ Lỗi khi xóa tip:', error);
+    console.error(' Lỗi khi xóa tip:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi xóa tip',

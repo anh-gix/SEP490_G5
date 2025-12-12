@@ -41,7 +41,7 @@ const StudentClassDetailLayout = () => {
       if (response.success && response.classes) {
         const currentClass = response.classes.find(c => c._id === classId);
         if (currentClass) {
-          console.log('✅ Class Info:', currentClass); // Debug log
+          console.log(' Class Info:', currentClass); // Debug log
           setClassInfo(currentClass);
         } else {
           setError('Không tìm thấy lớp học');

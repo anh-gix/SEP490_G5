@@ -45,7 +45,7 @@ const MakeupClassModalForStudent = ({
       // Reset form when modal opens
       if (originalSchedule) {
         // Log session information
-        console.log('📋 Buổi học được chọn:', {
+        console.log(' Buổi học được chọn:', {
           scheduleId: originalSchedule.id,
           studentScheduleId: originalSchedule.studentScheduleId,
           className: originalSchedule.className,
@@ -113,14 +113,14 @@ const MakeupClassModalForStudent = ({
 
   const fetchAndLogClassSchedule = async (studentScheduleId) => {
     try {
-      console.log('🔍 Đang lấy thông tin ClassSchedule từ studentScheduleId:', studentScheduleId);
+      console.log(' Đang lấy thông tin ClassSchedule từ studentScheduleId:', studentScheduleId);
       const response = await studentScheduleService.getClassScheduleByStudentScheduleId(studentScheduleId);
       
       if (response.success && response.classSchedule) {
         const classSchedule = response.classSchedule;
         const sessionId = classSchedule.session?._id;
         
-        console.log('✅ Thông tin ClassSchedule được chọn:', {
+        console.log(' Thông tin ClassSchedule được chọn:', {
           classScheduleId: classSchedule._id,
           date: classSchedule.date,
           startTime: classSchedule.startTime,
@@ -158,19 +158,19 @@ const MakeupClassModalForStudent = ({
           // Lấy danh sách các ClassSchedule có cùng session id
           await fetchAndLogClassSchedulesBySessionId(sessionId, classSchedule._id);
         } else {
-          console.warn('⚠️ ClassSchedule không có session id');
+          console.warn(' ClassSchedule không có session id');
         }
       } else {
-        console.warn('⚠️ Không tìm thấy ClassSchedule cho studentScheduleId:', studentScheduleId);
+        console.warn(' Không tìm thấy ClassSchedule cho studentScheduleId:', studentScheduleId);
       }
     } catch (err) {
-      console.error('❌ Lỗi khi lấy ClassSchedule:', err);
+      console.error(' Lỗi khi lấy ClassSchedule:', err);
     }
   };
 
   const fetchAndLogClassSchedulesBySessionId = async (sessionId, excludeClassScheduleId = null) => {
     try {
-      console.log('🔍 Đang lấy danh sách ClassSchedule có cùng session id:', sessionId);
+      console.log(' Đang lấy danh sách ClassSchedule có cùng session id:', sessionId);
       
       const apiPort = import.meta.env.VITE_API_PORT || 8080;
       const today = new Date().toISOString();
@@ -193,7 +193,7 @@ const MakeupClassModalForStudent = ({
           ? classSchedules.filter(s => (s._id || s.id)?.toString() !== excludeClassScheduleId.toString())
           : classSchedules;
 
-        console.log('📋 Danh sách các ClassSchedule có cùng session id:', {
+        console.log(' Danh sách các ClassSchedule có cùng session id:', {
           sessionId: sessionId,
           total: filteredSchedules.length,
           schedules: filteredSchedules.map(schedule => ({
@@ -212,10 +212,10 @@ const MakeupClassModalForStudent = ({
         });
       } else {
         const errorData = await response.json().catch(() => ({}));
-        console.error('❌ Lỗi khi lấy danh sách ClassSchedule:', response.status, errorData);
+        console.error(' Lỗi khi lấy danh sách ClassSchedule:', response.status, errorData);
       }
     } catch (error) {
-      console.error('❌ Lỗi khi lấy danh sách ClassSchedule có cùng session id:', error);
+      console.error(' Lỗi khi lấy danh sách ClassSchedule có cùng session id:', error);
     }
   };
 
@@ -316,7 +316,7 @@ const MakeupClassModalForStudent = ({
       if (!sessionIdToUse) {
         const sessionOrder = originalSchedule.lessonNumber || originalSchedule.sessionOrder;
         if (!sessionOrder) {
-          console.warn('⚠️ Không có sessionId hoặc sessionOrder');
+          console.warn(' Không có sessionId hoặc sessionOrder');
           setAvailableSchedules([]);
           return;
         }
@@ -386,7 +386,7 @@ const MakeupClassModalForStudent = ({
           return true;
         });
         
-        console.log('✅ Đã load danh sách buổi học có sẵn (đã filter conflict):', {
+        console.log(' Đã load danh sách buổi học có sẵn (đã filter conflict):', {
           sessionId: sessionIdToUse,
           total: filtered.length,
           totalBeforeFilter: classSchedules.length,
@@ -396,7 +396,7 @@ const MakeupClassModalForStudent = ({
         setAvailableSchedules(filtered);
       } else {
         const errorData = await response.json().catch(() => ({}));
-        console.error('❌ Lỗi khi lấy danh sách ClassSchedule:', response.status, errorData);
+        console.error(' Lỗi khi lấy danh sách ClassSchedule:', response.status, errorData);
         setAvailableSchedules([]);
       }
     } catch (error) {

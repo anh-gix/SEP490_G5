@@ -31,7 +31,7 @@ const AssignmentDetail = ({ assignmentId, onBack, onDelete }) => {
           a => a._id === assignmentId
         );
         
-        console.log('📋 Found Assignment:', foundAssignment); // Debug log
+        console.log(' Found Assignment:', foundAssignment); // Debug log
         
         if (!foundAssignment) {
           toast.error('Không tìm thấy bài tập');
@@ -70,7 +70,7 @@ const AssignmentDetail = ({ assignmentId, onBack, onDelete }) => {
             }))
           };
 
-          console.log('🔄 Transformed Assignment:', transformedAssignment); // Debug transformed data
+          console.log(' Transformed Assignment:', transformedAssignment); // Debug transformed data
           setAssignment(transformedAssignment);
         }
       }

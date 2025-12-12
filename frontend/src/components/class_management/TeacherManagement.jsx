@@ -34,6 +34,7 @@ const TeacherManagement = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [selectedStatCard, setSelectedStatCard] = useState('total'); // 'total' or 'inactive'
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -78,7 +79,7 @@ const TeacherManagement = () => {
   useEffect(() => {
     setPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, filterStatus, programType, level]);
+  }, [searchTerm, filterStatus, programType, level, selectedStatCard]);
 
   useEffect(() => {
     fetchTeachers();
@@ -161,12 +162,6 @@ const TeacherManagement = () => {
     
     // Clear previous errors
     setFormErrors({});
-    
-    // Validate password
-    if (!formData.password) {
-      setFormErrors({ password: 'Vui lòng nhập mật khẩu!' });
-      return;
-    }
     
     try {
       setLoading(true);
@@ -525,7 +520,11 @@ const TeacherManagement = () => {
       </div>
 
       {/* Stats Cards */}
-      <TeacherStats stats={stats} />
+      <TeacherStats 
+        stats={stats} 
+        selectedCard={selectedStatCard}
+        onCardClick={setSelectedStatCard}
+      />
 
       {/* Filters */}
       <TeacherFilters
@@ -571,24 +570,40 @@ const TeacherManagement = () => {
         </Alert>
       )}
 
-      {/* Grid View */}
-      {!loading && !error && viewMode === 'grid' && (
-        <TeacherGridView
-          teachers={teachers}
-          onViewDetail={handleViewDetail}
-        />
-      )}
+      {/* Filter teachers based on selected stat card */}
+      {(() => {
+        let filteredTeachers = teachers;
+        if (selectedStatCard === 'inactive') {
+          // Only show teachers with no classes
+          filteredTeachers = teachers.filter(teacher => 
+            !teacher.stats || teacher.stats.classCount === 0
+          );
+        }
+        // If selectedStatCard === 'total', show all teachers (no filter)
 
-      {/* List View */}
-      {!loading && !error && viewMode === 'list' && (
-        <TeacherListView
-          teachers={teachers}
-          page={page}
-          totalPages={totalPages}
-          onViewDetail={handleViewDetail}
-          onPageChange={setPage}
-        />
-      )}
+        return (
+          <>
+            {/* Grid View */}
+            {!loading && !error && viewMode === 'grid' && (
+              <TeacherGridView
+                teachers={filteredTeachers}
+                onViewDetail={handleViewDetail}
+              />
+            )}
+
+            {/* List View */}
+            {!loading && !error && viewMode === 'list' && (
+              <TeacherListView
+                teachers={filteredTeachers}
+                page={page}
+                totalPages={totalPages}
+                onViewDetail={handleViewDetail}
+                onPageChange={setPage}
+              />
+            )}
+          </>
+        );
+      })()}
 
       {/* Add Teacher Modal */}
       <AddTeacherModal

@@ -35,6 +35,7 @@ const StudentManagementAPI = () => {
     address: ''
   });
   const [formErrors, setFormErrors] = useState({});
+  const [filterNoClass, setFilterNoClass] = useState(null); // null = all, true = no class only
 
   // Fetch program types and levels on mount
   useEffect(() => {
@@ -99,30 +100,42 @@ const StudentManagementAPI = () => {
   useEffect(() => {
     setPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, programType, level]);
+  }, [searchTerm, programType, level, filterNoClass]);
 
   useEffect(() => {
     fetchStudents();
     fetchStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, programType, level, page]);
+  }, [searchTerm, programType, level, page, filterNoClass]);
 
   const fetchStudents = async () => {
     try {
       setLoading(true);
       setError(null);
-      const params = {
-        page,
-        limit: 10
-      };
+      const params = {};
+      
+      // When filtering by noClass, fetch all students to filter on frontend
+      if (filterNoClass === true) {
+        params.limit = 10000; // Fetch all students
+        params.page = 1; // Start from page 1
+      } else {
+        params.page = page;
+        params.limit = 10;
+      }
+      
       if (searchTerm) params.search = searchTerm;
       if (programType) params.programType = programType;
       if (level) params.level = level;
       
       const data = await studentService.getAllStudents(params);
       setStudents(data.students || []);
-      setTotal(data.total || 0);
-      setTotalPages(data.totalPages || 1);
+      
+      // Only set total/totalPages from API when not filtering by noClass
+      // When filtering by noClass, we'll calculate these after filtering
+      if (filterNoClass !== true) {
+        setTotal(data.total || 0);
+        setTotalPages(data.totalPages || 1);
+      }
     } catch (err) {
       console.error('Error fetching students:', err);
       // Handle 404 errors more gracefully
@@ -200,12 +213,6 @@ const StudentManagementAPI = () => {
     // Clear previous errors
     setFormErrors({});
     
-    // Validate password
-    if (!formData.password) {
-      setFormErrors({ password: 'Vui lòng nhập mật khẩu!' });
-      return;
-    }
-    
     try {
       setLoading(true);
       await studentService.createStudent(formData);
@@ -274,7 +281,34 @@ const StudentManagementAPI = () => {
     setFormErrors({});
   };
 
-  const filteredStudents = students;
+  // Handle click on stats cards to filter students
+  const handleStatsCardClick = (filterType) => {
+    if (filterType === 'all') {
+      setFilterNoClass(null);
+    } else if (filterType === 'noClass') {
+      setFilterNoClass(true);
+    }
+    setPage(1); // Reset to first page when filter changes
+  };
+
+  // Filter students based on filterNoClass
+  const allFilteredStudents = filterNoClass === true
+    ? students.filter(student => !student.stats?.classNames || student.stats.classNames.length === 0)
+    : students;
+
+  // Calculate total and totalPages for filtered results
+  useEffect(() => {
+    if (filterNoClass === true) {
+      const filteredCount = students.filter(student => !student.stats?.classNames || student.stats.classNames.length === 0).length;
+      setTotal(filteredCount);
+      setTotalPages(Math.ceil(filteredCount / 10));
+    }
+  }, [filterNoClass, students]);
+
+  // Paginate filtered students
+  const filteredStudents = filterNoClass === true
+    ? allFilteredStudents.slice((page - 1) * 10, page * 10)
+    : allFilteredStudents;
 
 
   return (
@@ -308,8 +342,17 @@ const StudentManagementAPI = () => {
 
       {/* Stats Cards */}
       <Row className="g-3 mb-24">
-        <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+        <Col md={6}>
+          <Card 
+            className="bg-white rounded-12 box-shadow-sm"
+            style={{ 
+              cursor: 'pointer',
+              border: filterNoClass === null ? '3px solid #0D74FF' : '2px solid #E5E7EB',
+              boxShadow: filterNoClass === null ? '0 4px 16px rgba(13, 116, 255, 0.4)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+              transition: 'all 0.2s ease'
+            }}
+            onClick={() => handleStatsCardClick('all')}
+          >
             <Card.Body className="p-20">
               <div className="d-flex align-items-center gap-16">
                 <div 
@@ -320,7 +363,7 @@ const StudentManagementAPI = () => {
                     background: 'linear-gradient(135deg, #0D74FF 0%, #0A5FD9 100%)'
                   }}
                 >
-                  <i className="fas fa-chalkboard-Student text-white" style={{ fontSize: '24px' }}></i>
+                  <i className="fas fa-user-graduate text-white" style={{ fontSize: '24px' }}></i>
                 </div>
                 <div>
                   <div className="text-neutral-500 text-13 mb-4">Tổng Học viên</div>
@@ -331,54 +374,17 @@ const StudentManagementAPI = () => {
           </Card>
         </Col>
 
-        <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
-                <div 
-                  className="rounded-12 d-flex align-items-center justify-content-center"
-                  style={{ 
-                    width: '56px',
-                    height: '56px',
-                    background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
-                  }}
-                >
-                  <i className="fas fa-user-check text-white" style={{ fontSize: '24px' }}></i>
-                </div>
-                <div>
-                  <div className="text-neutral-500 text-13 mb-4">Đang hoạt động</div>
-                  <div className="text-neutral-900 fw-bold text-32">{stats.active || 0}</div>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
-                <div 
-                  className="rounded-12 d-flex align-items-center justify-content-center"
-                  style={{ 
-                    width: '56px',
-                    height: '56px',
-                    background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
-                  }}
-                >
-                  <i className="fas fa-door-open text-white" style={{ fontSize: '24px' }}></i>
-                </div>
-                <div>
-                  <div className="text-neutral-500 text-13 mb-4">Tổng lớp</div>
-                  <div className="text-neutral-900 fw-bold text-32">{stats.totalClasses || 0}</div>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+        <Col md={6}>
+          <Card 
+            className="bg-white rounded-12 box-shadow-sm"
+            style={{ 
+              cursor: 'pointer',
+              border: filterNoClass === true ? '3px solid #EF4444' : '2px solid #E5E7EB',
+              boxShadow: filterNoClass === true ? '0 4px 16px rgba(239, 68, 68, 0.4)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+              transition: 'all 0.2s ease'
+            }}
+            onClick={() => handleStatsCardClick('noClass')}
+          >
             <Card.Body className="p-20">
               <div className="d-flex align-items-center gap-16">
                 <div 
@@ -392,7 +398,7 @@ const StudentManagementAPI = () => {
                   <i className="fas fa-user-slash text-white" style={{ fontSize: '24px' }}></i>
                 </div>
                 <div>
-                  <div className="text-neutral-500 text-13 mb-4">Tạm nghỉ</div>
+                  <div className="text-neutral-500 text-13 mb-4">Chưa có lớp</div>
                   <div className="text-neutral-900 fw-bold text-32">{stats.inactive || 0}</div>
                 </div>
               </div>
@@ -711,21 +717,30 @@ const StudentManagementAPI = () => {
               <Col md={6}>
                 <Form.Group>
                   <Form.Label>
-                    Mật khẩu {!editingStudent && <span className="text-danger">*</span>}
+                    Mật khẩu
+                    {!editingStudent && (
+                      <span className="text-muted" style={{ fontSize: '12px', fontWeight: 'normal' }}>
+                        {' '}(Mặc định: 123456)
+                      </span>
+                    )}
                   </Form.Label>
                   <Form.Control
                     type="password"
                     name="password"
                     value={formData.password}
                     onChange={handleInputChange}
-                    placeholder={editingStudent ? "Để trống nếu không đổi" : "Nhập mật khẩu"}
-                    required={!editingStudent}
+                    placeholder={editingStudent ? "Để trống nếu không đổi" : "Để trống sẽ dùng mật khẩu mặc định: 123456"}
                     isInvalid={!!formErrors.password}
                   />
                   {formErrors.password && (
                     <Form.Control.Feedback type="invalid">
                       {formErrors.password}
                     </Form.Control.Feedback>
+                  )}
+                  {!editingStudent && (
+                    <Form.Text className="text-muted">
+                      Nếu không nhập, mật khẩu mặc định sẽ là: <strong>123456</strong>
+                    </Form.Text>
                   )}
                 </Form.Group>
               </Col>

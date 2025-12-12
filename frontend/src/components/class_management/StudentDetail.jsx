@@ -34,6 +34,9 @@ const StudentDetail = () => {
   const [classesLoaded, setClassesLoaded] = useState(false);
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
   
+  // Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  
   // Edit courses modal state
   const [showEditCoursesModal, setShowEditCoursesModal] = useState(false);
   const [allCourses, setAllCourses] = useState([]);
@@ -64,11 +67,11 @@ const StudentDetail = () => {
       setLoading(true);
       setDetailError(null);
       
-      console.log('🔍 Fetching student info for:', studentId);
+      console.log(' Fetching student info for:', studentId);
       
       // Fetch Student details
       const data = await studentService.getStudentById(studentId);
-      console.log('📦 Student data response:', data);
+      console.log(' Student data response:', data);
       
       if (!data || !data.student) {
         throw new Error('Không nhận được dữ liệu học viên từ server');
@@ -88,10 +91,10 @@ const StudentDetail = () => {
         studentData.classes = [];
       }
       
-      console.log('✅ Student courses:', studentData.courses?.length || 0, studentData.courses);
+      console.log(' Student courses:', studentData.courses?.length || 0, studentData.courses);
       setSelectedStudent(studentData);
     } catch (err) {
-      console.error('❌ Error fetching Student info:', err);
+      console.error(' Error fetching Student info:', err);
       const errorMessage = err?.response?.data?.message || err?.message || 'Không thể tải thông tin chi tiết';
       setDetailError(errorMessage);
     } finally {
@@ -128,13 +131,13 @@ const StudentDetail = () => {
     
     try {
       setLoadingSchedule(true);
-      console.log('📅 Fetching student schedule...');
+      console.log(' Fetching student schedule...');
       const scheduleData = await studentService.getStudentSchedule(studentId);
-      console.log('📦 Schedule data response:', scheduleData);
+      console.log(' Schedule data response:', scheduleData);
       
       // Check response structure
       const schedules = scheduleData?.schedules || scheduleData?.data?.schedules || [];
-      console.log('✅ Student schedules:', schedules.length, schedules);
+      console.log(' Student schedules:', schedules.length, schedules);
       setStudentSchedule(Array.isArray(schedules) ? schedules : []);
       setSchedulePage(1);
       setScheduleLoaded(true);
@@ -255,22 +258,37 @@ const StudentDetail = () => {
 
     try {
       // Get course ID from class
+      console.log('Class item:', classItem);
       const courseId = classItem.course?._id || classItem.course;
+      console.log('Course ID extracted:', courseId);
+      
       if (courseId) {
         // Get all classes with the same course
         const response = await classService.getAllClasses({ courseId });
+        console.log('API response for getAllClasses:', response);
+        
         if (response.success) {
           const classes = response.classes || [];
+          console.log(`Found ${classes.length} classes with courseId ${courseId}`);
+          
           // Filter out current class
           const otherClasses = classes.filter(cls => {
             const clsId = cls._id || cls;
-            return clsId.toString() !== classItem._id?.toString();
+            const isCurrentClass = clsId.toString() === classItem._id?.toString();
+            if (isCurrentClass) {
+              console.log('Filtering out current class:', cls.name, clsId);
+            }
+            return !isCurrentClass;
           });
+          
+          console.log(`After filtering, ${otherClasses.length} classes available`);
           setAvailableClasses(otherClasses);
         } else {
+          console.warn('API response not successful:', response);
           setAvailableClasses([]);
         }
       } else {
+        console.warn('No courseId found in classItem');
         setAvailableClasses([]);
       }
     } catch (err) {
@@ -533,6 +551,9 @@ const StudentDetail = () => {
           }
           const dateStr = scheduleDate.toISOString().split('T')[0];
           
+          // Extract programType from schedule data
+          const programType = schedule.programType || schedule.class?.course?.program?.type || null;
+          
           // Get attendance status
           const attendanceStatus = schedule.attendance?.status || null;
           
@@ -542,13 +563,32 @@ const StudentDetail = () => {
           const isCancelled = scheduleStatus === 'cancelled';
           const reason = schedule.reason || null;
           
+          // Determine className: 
+          // 1. Try to get from schedule.className first
+          // 2. If not available, try schedule.class?.name
+          // 3. For makeup schedules without className, show "Lớp học bù"
+          let className = schedule.className || schedule.class?.name;
+          
+          // Normalize empty values to null for easier checking
+          if (className === 'N/A' || className === '' || className === null || className === undefined) {
+            className = null;
+          }
+          
+          // For makeup schedules, show "Lớp học bù" if no className
+          if (isMakeupSchedule && !className) {
+            className = 'Lớp học bù';
+          } else if (!className) {
+            // For non-makeup schedules, use 'N/A' if no className
+            className = 'N/A';
+          }
+          
           return {
             id: schedule._id || `schedule-${index}`,
             studentScheduleId: schedule._id, // Store original StudentSchedule ID
             date: dateStr,
             startTime: schedule.startTime || '',
             endTime: schedule.endTime || '',
-            className: schedule.className || 'N/A',
+            className: className,
             roomName: schedule.room?.room_name || schedule.roomName || 'N/A',
             roomId: schedule.room?._id || null,
             topic: schedule.topic || schedule.sessionTitle || '',
@@ -564,7 +604,8 @@ const StudentDetail = () => {
             reason: reason,
             isMakeupSchedule: isMakeupSchedule,
             isCancelled: isCancelled,
-            cancellationReason: isCancelled ? reason : null
+            cancellationReason: isCancelled ? reason : null,
+            programType: programType
           };
         } catch (error) {
           console.error('Error transforming schedule:', error, schedule);
@@ -579,19 +620,29 @@ const StudentDetail = () => {
       {/* Header with Back Button */}
       <div className="d-flex justify-content-between align-items-center mb-24">
         <div>
+          <Button 
+            variant="outline-secondary" 
+            onClick={handleGoBack}
+            className="mb-3"
+          >
+            <i className="fas fa-arrow-left me-2"></i>
+            Quay lại
+          </Button>
           <h4 className="text-neutral-900 fw-bold mb-8">
             Chi tiết Học viên - {selectedStudent?.username || 'Đang tải...'}
           </h4>
           <p className="text-neutral-600 mb-0">Xem và quản lý thông tin chi tiết học viên</p>
         </div>
-        <Button 
-          variant="secondary" 
-          onClick={handleGoBack}
-          className="px-20 py-10 radius-8"
-        >
-          <i className="fas fa-arrow-left me-2"></i>
-          Quay lại
-        </Button>
+        <div>
+          <Button
+            variant={isEditMode ? 'danger' : 'primary'}
+            onClick={() => setIsEditMode(!isEditMode)}
+            className="mb-3"
+          >
+            <i className={`fas ${isEditMode ? 'fa-times' : 'fa-edit'} me-2`}></i>
+            {isEditMode ? 'Tắt chỉnh sửa' : 'Chỉnh sửa'}
+          </Button>
+        </div>
       </div>
 
       {/* Error Message */}
@@ -653,39 +704,45 @@ const StudentDetail = () => {
                   <Col md={12}>
                     <Card className="border-0 bg-neutral-25">
                       <Card.Body className="p-16">
-                        <div className="d-flex align-items-start">
-                          <span className="text-13 text-neutral-500 me-2" style={{ minWidth: '120px' }}>Khóa học đang học:</span>
+                        <div className="d-flex align-items-start justify-content-between">
                           <div className="flex-grow-1">
-                            {selectedStudent.courses && selectedStudent.courses.length > 0 ? (
-                              <div className="d-flex flex-wrap gap-2">
-                                {selectedStudent.courses.map((course, idx) => (
-                                  <Badge 
-                                    key={idx} 
-                                    bg="info" 
-                                    className="text-13 px-12 py-6"
-                                  >
-                                    {course.name}
-                                    {course.program && (
-                                      <span className="ms-1 text-12">
-                                        ({course.program.program_name || course.program.name || course.program.type || 'N/A'})
-                                      </span>
-                                    )}
-                                  </Badge>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-14 text-neutral-600">Chưa đăng ký khóa học nào</span>
-                            )}
+                            <div className="d-flex align-items-center mb-2">
+                              <span className="text-13 text-neutral-500 me-2" style={{ minWidth: '120px' }}>Khóa học đang học:</span>
+                            </div>
+                            <div>
+                              {selectedStudent.courses && selectedStudent.courses.length > 0 ? (
+                                <div className="d-flex flex-wrap gap-2">
+                                  {selectedStudent.courses.map((course, idx) => (
+                                    <Badge 
+                                      key={idx} 
+                                      bg="info" 
+                                      className="text-13 px-12 py-6"
+                                    >
+                                      {course.name}
+                                      {course.program && (
+                                        <span className="ms-1 text-12">
+                                          ({course.program.program_name || course.program.name || course.program.type || 'N/A'})
+                                        </span>
+                                      )}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-14 text-neutral-600">Chưa đăng ký khóa học nào</span>
+                              )}
+                            </div>
                           </div>
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="p-0 ms-2"
-                            onClick={handleEditCourses}
-                            title="Chỉnh sửa khóa học"
-                          >
-                            <i className="fas fa-edit"></i>
-                          </Button>
+                          {isEditMode && (
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              className="ms-3"
+                              onClick={handleEditCourses}
+                            >
+                              <i className="fas fa-edit me-2"></i>
+                              Chỉnh sửa khóa học
+                            </Button>
+                          )}
                         </div>
                       </Card.Body>
                     </Card>
@@ -716,7 +773,9 @@ const StudentDetail = () => {
                         <th className="px-16 py-12 text-13">Trình độ</th>
                         <th className="px-16 py-12 text-13">Học viên</th>
                         <th className="px-16 py-12 text-13">Trạng thái</th>
-                        <th className="px-16 py-12 text-13">Thao tác</th>
+                        {isEditMode && (
+                          <th className="px-16 py-12 text-13">Thao tác</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -733,17 +792,19 @@ const StudentDetail = () => {
                               {getClassStatusText(cls.status)}
                             </Badge>
                           </td>
-                          <td className="px-16 py-12">
-                            <Button
-                              variant="outline-primary"
-                              size="sm"
-                              onClick={() => handleChangeClassClick(cls)}
-                              className="px-12 py-6"
-                            >
-                              <i className="fas fa-exchange-alt me-1"></i>
-                              Đổi lớp
-                            </Button>
-                          </td>
+                          {isEditMode && (
+                            <td className="px-16 py-12">
+                              <Button
+                                variant="outline-primary"
+                                size="sm"
+                                onClick={() => handleChangeClassClick(cls)}
+                                className="px-12 py-6"
+                              >
+                                <i className="fas fa-exchange-alt me-1"></i>
+                                Đổi lớp
+                              </Button>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -910,6 +971,7 @@ const StudentDetail = () => {
                           console.log('Delete schedule:', scheduleId);
                         }}
                         onCreateMakeup={handleCreateMakeup}
+                        readOnly={!isEditMode}
                       />
                     )}
                   </>

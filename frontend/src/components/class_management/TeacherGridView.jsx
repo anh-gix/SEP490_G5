@@ -70,7 +70,6 @@ const TeacherGridView = ({ teachers, onViewDetail }) => {
                   onClick={() => onViewDetail(teacher)}
                   className="flex-grow-1"
                 >
-                  <i className="fas fa-eye me-1"></i>
                   Chi tiết
                 </Button>
               </div>

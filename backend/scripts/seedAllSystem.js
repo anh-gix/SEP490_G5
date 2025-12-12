@@ -151,27 +151,23 @@ async function seedClasses() {
             status: 'pending'
         },
         {
-            name: 'IELTS Elementary A2 - Lớp Có Conflict',
+            name: 'IELTS Elementary A2 - Lớp 1',
             course: course3._id,
-            teacher: teachers[1]._id, // Teacher 2 (khác teacher để tránh conflict teacher)
-            students: [
-                students[0]._id, // Học viên chung với lớp đang học (sẽ bị conflict)
-                students[1]._id, // Học viên chung với lớp đang học (sẽ bị conflict)
-                students[3]._id  // Học viên mới
-            ],
-            room: rooms[2]._id, // Phòng khác để tránh conflict room
-            startDate: activeClassStartDate, // Cùng thời gian với lớp đang học
-            endDate: activeClassEndDate,
+            teacher: teachers[Math.min(2, teachers.length - 1)]._id || teachers[0]._id, // Teacher khác
+            students: [students[5]._id, students[6]._id, students[7]._id], // Students khác
+            room: rooms[2]._id, // Room khác
+            startDate: class2StartDate, // Thời gian khác (1 tuần trước)
+            endDate: class2EndDate,
             maxStudents: 25,
             status: 'active'
         },
         // 5 lớp mới cùng course với "IELTS Foundation A1 - Lớp Đang Học"
         {
             name: 'IELTS Foundation A1 - Lớp 2',
-            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: teachers[0]._id, // Teacher 1
-            students: [students[5]._id, students[6]._id, students[7]._id, students[8]._id],
-            room: rooms[1]._id, // Phòng 201
+            course: course1._id,
+            teacher: teachers[1]._id, // Teacher 2 (khác với lớp 0)
+            students: [students[8]._id, students[9]._id, students[Math.min(10, students.length - 1)]._id, students[Math.min(11, students.length - 1)]._id], // Students khác
+            room: rooms[2]._id, // Room khác
             startDate: class2StartDate, // 1 tuần trước
             endDate: class2EndDate,
             maxStudents: 25,
@@ -179,10 +175,10 @@ async function seedClasses() {
         },
         {
             name: 'IELTS Foundation A1 - Lớp 3',
-            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: teachers[1]._id, // Teacher 2
-            students: [students[9]._id, students[Math.min(10, students.length - 1)]._id, students[Math.min(11, students.length - 1)]._id, students[Math.min(12, students.length - 1)]._id],
-            room: rooms[2]._id, // Phòng 301
+            course: course1._id,
+            teacher: teachers[Math.min(2, teachers.length - 1)]._id || teachers[0]._id, // Teacher khác
+            students: [students[Math.min(12, students.length - 1)]._id, students[Math.min(13, students.length - 1)]._id, students[Math.min(14, students.length - 1)]._id, students[Math.min(15, students.length - 1)]._id], // Students khác
+            room: rooms[Math.min(3, rooms.length - 1)]._id, // Room khác
             startDate: class3StartDate, // Hôm nay
             endDate: class3EndDate,
             maxStudents: 25,
@@ -190,33 +186,33 @@ async function seedClasses() {
         },
         {
             name: 'IELTS Foundation A1 - Lớp 4',
-            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: teachers[0]._id, // Teacher 1
-            students: [students[Math.min(13, students.length - 1)]._id, students[Math.min(14, students.length - 1)]._id, students[Math.min(15, students.length - 1)]._id, students[Math.min(16, students.length - 1)]._id],
-            room: rooms[Math.min(3, rooms.length - 1)]._id, // Phòng Lab 401
-            startDate: class4StartDate, // 1 tuần sau
+            course: course1._id,
+            teacher: teachers[0]._id, // Teacher 1 (có thể dùng lại nếu lịch khác)
+            students: [students[Math.min(16, students.length - 1)]._id, students[Math.min(17, students.length - 1)]._id, students[Math.min(18, students.length - 1)]._id, students[Math.min(19, students.length - 1)]._id], // Students khác
+            room: rooms[Math.min(4, rooms.length - 1)]._id, // Room khác
+            startDate: class4StartDate, // 1 tuần sau (thời gian khác)
             endDate: class4EndDate,
             maxStudents: 25,
             status: 'pending'
         },
         {
             name: 'IELTS Foundation A1 - Lớp 5',
-            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
+            course: course1._id,
             teacher: teachers[1]._id, // Teacher 2
-            students: [students[Math.min(17, students.length - 1)]._id, students[Math.min(18, students.length - 1)]._id, students[Math.min(19, students.length - 1)]._id, students[Math.min(20, students.length - 1)]._id],
-            room: rooms[Math.min(4, rooms.length - 1)]._id, // Phòng 501
-            startDate: class5StartDate, // 2 tuần sau
+            students: [students[Math.min(20, students.length - 1)]._id, students[Math.min(21, students.length - 1)]._id, students[Math.min(22, students.length - 1)]._id, students[Math.min(23, students.length - 1)]._id], // Students khác
+            room: rooms[0]._id, // Room có thể dùng lại nếu lịch khác
+            startDate: class5StartDate, // 2 tuần sau (thời gian khác)
             endDate: class5EndDate,
             maxStudents: 25,
             status: 'pending'
         },
         {
             name: 'IELTS Foundation A1 - Lớp 6',
-            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: teachers[0]._id, // Teacher 1
-            students: [students[5]._id, students[6]._id], // Dùng lại một số students (không conflict vì lịch khác)
-            room: rooms[0]._id, // Phòng 101 (có thể dùng lại nếu lịch khác)
-            startDate: class6StartDate, // 3 tuần sau
+            course: course1._id,
+            teacher: teachers[Math.min(2, teachers.length - 1)]._id || teachers[0]._id, // Teacher khác
+            students: [students[Math.min(24, students.length - 1)]._id, students[Math.min(25, students.length - 1)]._id, students[Math.min(26, students.length - 1)]._id], // Students khác
+            room: rooms[1]._id, // Room khác
+            startDate: class6StartDate, // 3 tuần sau (thời gian khác)
             endDate: class6EndDate,
             maxStudents: 25,
             status: 'pending'
@@ -228,14 +224,14 @@ async function seedClasses() {
     console.log(`✅ Created ${created.length} classes`);
     console.log(`   - Lớp đang học: ${classes[0].name} (${activeClassStartDate.toISOString().split('T')[0]} - ${activeClassEndDate.toISOString().split('T')[0]})`);
     console.log(`   - Lớp chưa học: ${classes[1].name} (${pendingClassStartDate.toISOString().split('T')[0]} - ${pendingClassEndDate.toISOString().split('T')[0]})`);
-    console.log(`   - Lớp có conflict: ${classes[2].name} (${activeClassStartDate.toISOString().split('T')[0]} - ${activeClassEndDate.toISOString().split('T')[0]})`);
-    console.log(`     ⚠️ Lớp này có học viên chung với lớp đang học và sẽ có lịch trùng thời gian`);
-    console.log(`   - 5 lớp cùng course IELTS Foundation A1 - Nghe:`);
+    console.log(`   - Lớp khác: ${classes[2].name} (${class2StartDate.toISOString().split('T')[0]} - ${class2EndDate.toISOString().split('T')[0]})`);
+    console.log(`   - 5 lớp cùng course IELTS Foundation A1:`);
     console.log(`     • ${classes[3].name} (${class2StartDate.toISOString().split('T')[0]} - ${class2EndDate.toISOString().split('T')[0]})`);
     console.log(`     • ${classes[4].name} (${class3StartDate.toISOString().split('T')[0]} - ${class3EndDate.toISOString().split('T')[0]})`);
     console.log(`     • ${classes[5].name} (${class4StartDate.toISOString().split('T')[0]} - ${class4EndDate.toISOString().split('T')[0]})`);
     console.log(`     • ${classes[6].name} (${class5StartDate.toISOString().split('T')[0]} - ${class5EndDate.toISOString().split('T')[0]})`);
-    console.log(`     • ${classes[7].name} (${class6StartDate.toISOString().split('T')[0]} - ${class6EndDate.toISOString().split('T')[0]})\n`);
+    console.log(`     • ${classes[7].name} (${class6StartDate.toISOString().split('T')[0]} - ${class6EndDate.toISOString().split('T')[0]})`);
+    console.log(`   ✅ Tất cả các lớp đã được phân bổ để tránh conflict về teacher, room, students và lịch học\n`);
 }
 
 async function seedClassSchedules() {
@@ -364,15 +360,17 @@ async function seedClassSchedules() {
         // Lấy số buổi học từ course.numberOfSessions
         const numberOfSessions = course.numberOfSessions || sessions.length;
         
-        // Chọn pattern lịch cho lớp này (mỗi lớp có thể khác nhau)
-        // Lớp conflict (index 2) sẽ dùng pattern 5 (index 4, trùng với pattern 0) để tạo conflict
+        // Chọn pattern lịch cho lớp này (mỗi lớp có pattern khác nhau để tránh conflict)
         let selectedPattern;
-        if (classIndex === 2) {
-            // Lớp conflict: dùng pattern 5 (index 4, trùng thời gian với pattern 0 - lớp đang học)
-            selectedPattern = schedulePatterns[4];
-        } else if (classIndex === 0) {
+        if (classIndex === 0) {
             // Lớp 0 (IELTS Foundation A1 - Lớp Đang Học): Pattern 0 (Thứ 2, Thứ 3)
             selectedPattern = schedulePatterns[0];
+        } else if (classIndex === 1) {
+            // Lớp 1 (TOEIC Beginner A1 - Lớp Chưa Học): Pattern 1 (Thứ 2, Thứ 3, Thứ 5)
+            selectedPattern = schedulePatterns[1];
+        } else if (classIndex === 2) {
+            // Lớp 2 (IELTS Elementary A2 - Lớp 1): Pattern 2 (Thứ 2, Thứ 3, Thứ 6)
+            selectedPattern = schedulePatterns[2];
         } else if (classIndex === 3) {
             // Lớp 3 (IELTS Foundation A1 - Lớp 2): Pattern 6 (Thứ 4, Thứ 5)
             selectedPattern = schedulePatterns[6];
@@ -726,20 +724,7 @@ async function seedChangeRequests() {
     // Get Academic Staff user for approver (if available)
     const approver = academicStaffUsers.length > 0 ? academicStaffUsers[0] : null;
     
-    // Filter FUTURE student schedules for makeup_class
-    // Chỉ lấy các buổi học TƯƠNG LAI (chưa diễn ra, chưa có attendance)
-    // Các buổi học quá khứ đã bị đánh vắng mặt rồi, không thể xin học bù
-    const futureStudentSchedules = studentSchedules.filter(ss => {
-        const classSchedule = classSchedules.find(cs => cs._id.toString() === ss.classSchedule.toString());
-        if (!classSchedule) return false;
-        const scheduleDate = new Date(classSchedule.date);
-        scheduleDate.setHours(0, 0, 0, 0);
-        // Chỉ lấy các buổi học TƯƠNG LAI (scheduleDate >= today)
-        // Các buổi học này chưa diễn ra, chưa có attendance, nên có thể xin học bù
-        return scheduleDate >= today;
-    });
-    
-    console.log(`   - Found ${classes.length} classes, ${classSchedules.length} class schedules, ${futureStudentSchedules.length} future student schedules`);
+    console.log(`   - Found ${classes.length} classes, ${classSchedules.length} class schedules`);
     console.log(`   - Found ${teachers.length} teachers, ${students.length} students, ${academicStaffUsers.length} academic staff, ${centerHeadUsers.length} center heads`);
     
     // Helper function to generate approved date (1-7 days ago)
@@ -751,333 +736,7 @@ async function seedChangeRequests() {
     };
     
     // ============================================
-    // 1. CREATE_CLASS requests (20-25 requests)
-    // ============================================
-    const createClassContents = [
-        'Yêu cầu tạo lớp mới IELTS Foundation A1 với 20 học viên, học vào Thứ 2 và Thứ 4 hàng tuần từ 18:00-20:00',
-        'Đề nghị mở lớp TOEIC Intermediate B1, thời gian học Thứ 3, Thứ 5, Thứ 7 từ 14:00-16:00, số lượng học viên tối đa 25',
-        'Xin phép tạo lớp IELTS Advanced C1, lịch học Thứ 2, Thứ 4, Thứ 6 từ 08:00-10:00, dự kiến 15 học viên',
-        'Yêu cầu mở lớp TOEIC Advanced B2, học vào Thứ 2, Thứ 4, Thứ 6 từ 19:00-21:00, tối đa 20 học viên',
-        'Đề nghị tạo lớp IELTS Intermediate B1, lịch học Thứ 3, Thứ 5 từ 09:00-11:00, dự kiến 18 học viên',
-        'Xin phép mở lớp Business English C1, học Thứ 2, Thứ 3, Thứ 5, Thứ 6 từ 17:00-19:00, tối đa 22 học viên',
-        'Yêu cầu tạo lớp Conversation English A2, lịch học Thứ 4, Thứ 7 từ 10:00-12:00, dự kiến 16 học viên',
-        'Đề nghị mở lớp IELTS Foundation A2, học Thứ 2, Thứ 4 từ 14:00-16:00, số lượng học viên tối đa 20',
-        'Xin phép tạo lớp TOEIC Foundation A1, lịch học Thứ 3, Thứ 5, Thứ 7 từ 18:00-20:00, dự kiến 22 học viên',
-        'Yêu cầu mở lớp IELTS Upper Intermediate B2, học vào Thứ 2, Thứ 4, Thứ 6 từ 08:30-10:30, tối đa 18 học viên',
-        'Đề nghị tạo lớp TOEIC Intermediate B2, lịch học Thứ 3, Thứ 5 từ 15:00-17:00, dự kiến 20 học viên',
-        'Xin phép mở lớp Academic Writing B2, học Thứ 2, Thứ 4 từ 19:00-21:00, tối đa 15 học viên',
-        'Yêu cầu tạo lớp Speaking Practice A2, lịch học Thứ 5, Thứ 7 từ 09:00-11:00, dự kiến 16 học viên',
-        'Đề nghị mở lớp Listening Skills B1, học Thứ 2, Thứ 3, Thứ 5 từ 14:00-16:00, số lượng học viên tối đa 24',
-        'Xin phép tạo lớp Reading Comprehension B2, lịch học Thứ 4, Thứ 6 từ 17:00-19:00, dự kiến 18 học viên',
-        'Yêu cầu mở lớp Grammar Advanced C1, học vào Thứ 2, Thứ 4, Thứ 6 từ 08:00-10:00, tối đa 20 học viên',
-        'Đề nghị tạo lớp Vocabulary Building B1, lịch học Thứ 3, Thứ 5 từ 10:00-12:00, dự kiến 22 học viên',
-        'Xin phép mở lớp Pronunciation Practice A2, học Thứ 6, Chủ nhật từ 14:00-16:00, tối đa 16 học viên',
-        'Yêu cầu tạo lớp Exam Preparation IELTS, lịch học Thứ 2, Thứ 4, Thứ 6 từ 18:00-20:00, dự kiến 20 học viên',
-        'Đề nghị mở lớp Exam Preparation TOEIC, học Thứ 3, Thứ 5, Thứ 7 từ 15:00-17:00, số lượng học viên tối đa 25',
-        'Xin phép tạo lớp Kids English A1, lịch học Thứ 7, Chủ nhật từ 09:00-11:00, dự kiến 15 học viên',
-        'Yêu cầu mở lớp Teen English B1, học Thứ 2, Thứ 4 từ 17:00-19:00, tối đa 20 học viên',
-        'Đề nghị tạo lớp Professional English B2, lịch học Thứ 3, Thứ 5 từ 18:30-20:30, dự kiến 18 học viên',
-        'Xin phép mở lớp Medical English C1, học Thứ 2, Thứ 4, Thứ 6 từ 19:00-21:00, tối đa 12 học viên',
-        'Yêu cầu tạo lớp Legal English C1, lịch học Thứ 3, Thứ 5 từ 14:00-16:00, dự kiến 14 học viên'
-    ];
-    
-    // Chỉ cho phép Center Head gửi yêu cầu tạo lớp
-    const createClassSenders = [];
-    if (centerHeadUsers.length === 0) {
-        console.log('⚠️  Không tìm thấy Center Head users. Không thể tạo CREATE_CLASS requests.');
-    } else {
-        // Chỉ lấy Center Head users làm senders
-        for (let i = 0; i < centerHeadUsers.length; i++) {
-            createClassSenders.push(centerHeadUsers[i % centerHeadUsers.length]);
-        }
-        // Nếu cần nhiều requests hơn số Center Head, cycle through
-        const neededSenders = Math.min(25, createClassContents.length);
-        while (createClassSenders.length < neededSenders && centerHeadUsers.length > 0) {
-            createClassSenders.push(centerHeadUsers[createClassSenders.length % centerHeadUsers.length]);
-        }
-    }
-    
-    const createClassCount = Math.min(25, createClassSenders.length, createClassContents.length);
-    for (let i = 0; i < createClassCount; i++) {
-        const sender = createClassSenders[i % createClassSenders.length];
-        let status = 'pending';
-        let approverId = null;
-        let approvedDate = null;
-        let responseContent = null;
-        
-        // Distribute status: ~30% rejected, ~70% pending (no approved)
-        // Reject approximately every 3rd request (indices 2, 5, 8, 11, 14, 17, 20, 23)
-        if (approver && (i % 3 === 2 || i === 5 || i === 8 || i === 11 || i === 14 || i === 17 || i === 20 || i === 23)) {
-            status = 'rejected';
-            approverId = approver._id;
-            approvedDate = getApprovedDate(Math.floor(Math.random() * 7) + 1); // 1-7 days ago
-            const rejectionReasons = [
-                'Đơn bị từ chối do không đủ số lượng học viên đăng ký tối thiểu.',
-                'Đơn bị từ chối do không có phòng học phù hợp trong thời gian yêu cầu.',
-                'Đơn bị từ chối do không có giáo viên phù hợp trong thời gian yêu cầu.',
-                'Đơn bị từ chối do lịch học trùng với các lớp hiện có.',
-                'Đơn bị từ chối do không đủ điều kiện mở lớp mới tại thời điểm này.'
-            ];
-            responseContent = rejectionReasons[Math.floor(Math.random() * rejectionReasons.length)];
-        }
-        // Rest are pending
-        
-        // Tạo đường dẫn file Excel mẫu cho mỗi yêu cầu tạo lớp
-        // Format: excel-{timestamp}-{random}.xlsx (giống với format lưu file trong hệ thống)
-        const excelTimestamp = Date.now() - (createClassCount - i) * 1000; // Tạo timestamp khác nhau cho mỗi file
-        const excelRandom = Math.round(Math.random() * 1E9);
-        const excelFileName = `excel-${excelTimestamp}-${excelRandom}.xlsx`;
-        const excelFilePath = `uploads/${excelFileName}`;
-        
-        changeRequests.push({
-            sender: sender._id,
-            type: 'create_class',
-            excelFile: excelFilePath, // File Excel bắt buộc cho yêu cầu tạo lớp
-            content: createClassContents[i],
-            status: status,
-            approver: approverId,
-            approvedDate: approvedDate,
-            responseContent: responseContent
-        });
-    }
-    
-    // ============================================
-    // 2. CHANGE_CLASS requests (20-25 requests)
-    // ============================================
-    const changeClassContents = [
-        'Xin chuyển từ lớp IELTS Foundation A1 - Lớp Đang Học sang lớp IELTS Foundation A1 - Lớp 2 do lịch học phù hợp hơn',
-        'Yêu cầu đổi lớp vì lịch học hiện tại trùng với công việc, muốn chuyển sang lớp có lịch học buổi tối',
-        'Đề nghị chuyển lớp do không theo kịp tiến độ học, muốn chuyển sang lớp có trình độ phù hợp hơn',
-        'Xin chuyển lớp vì muốn học cùng bạn bè ở lớp khác, lớp đích có lịch học tương tự',
-        'Yêu cầu đổi lớp do giáo viên hiện tại không phù hợp với phong cách học của em',
-        'Đề nghị chuyển lớp vì lịch học hiện tại quá sớm, muốn chuyển sang lớp học buổi chiều',
-        'Xin đổi lớp do lớp hiện tại quá đông, muốn chuyển sang lớp có ít học viên hơn để được quan tâm tốt hơn',
-        'Yêu cầu chuyển lớp vì muốn học với giáo viên khác có phương pháp dạy phù hợp hơn',
-        'Xin chuyển lớp do lịch học hiện tại không phù hợp với lịch làm việc mới của em',
-        'Đề nghị đổi lớp vì muốn học vào buổi sáng thay vì buổi tối',
-        'Yêu cầu chuyển lớp do lớp hiện tại quá xa nhà, muốn chuyển sang lớp gần hơn',
-        'Xin đổi lớp vì muốn học cùng nhóm bạn mới, lớp đích có trình độ tương đương',
-        'Đề nghị chuyển lớp do không hài lòng với chất lượng giảng dạy của giáo viên hiện tại',
-        'Yêu cầu đổi lớp vì lịch học hiện tại trùng với lịch học của con, cần điều chỉnh',
-        'Xin chuyển lớp do muốn học vào cuối tuần thay vì các ngày trong tuần',
-        'Đề nghị đổi lớp vì lớp hiện tại có quá nhiều học viên, khó tập trung',
-        'Yêu cầu chuyển lớp do muốn học với giáo viên bản ngữ thay vì giáo viên Việt Nam',
-        'Xin đổi lớp vì lịch học hiện tại không phù hợp với lịch thi của em',
-        'Đề nghị chuyển lớp do muốn học lớp có tốc độ nhanh hơn, phù hợp với khả năng',
-        'Yêu cầu đổi lớp vì muốn học lớp có nhiều hoạt động thực hành hơn',
-        'Xin chuyển lớp do lớp hiện tại quá dễ, muốn chuyển sang lớp có trình độ cao hơn',
-        'Đề nghị đổi lớp vì muốn học lớp có ít học viên hơn để được hỗ trợ tốt hơn',
-        'Yêu cầu chuyển lớp do lịch học hiện tại trùng với lịch tập thể thao',
-        'Xin đổi lớp vì muốn học lớp có giáo trình mới hơn, cập nhật hơn',
-        'Đề nghị chuyển lớp do muốn học lớp có môi trường học tập tích cực hơn'
-    ];
-    
-    // Tạo mapping: studentId -> [classes that student is enrolled in]
-    // Chỉ lấy các học sinh đang học ít nhất 1 lớp
-    const studentClassesMap = {};
-    const studentsWithClasses = [];
-    
-    for (const student of students) {
-        const studentId = student._id.toString();
-        const enrolledClasses = classes.filter(classItem => {
-            // Kiểm tra xem student có trong danh sách students của lớp không
-            return classItem.students && classItem.students.some(s => s.toString() === studentId);
-        });
-        
-        if (enrolledClasses.length > 0) {
-            studentClassesMap[studentId] = enrolledClasses;
-            studentsWithClasses.push(student);
-        }
-    }
-    
-    console.log(`   - Found ${studentsWithClasses.length} students enrolled in classes`);
-    
-    if (studentsWithClasses.length === 0) {
-        console.log('⚠️  Không tìm thấy học sinh nào đang học lớp. Không thể tạo CHANGE_CLASS requests.');
-    } else {
-        // Mở rộng danh sách học sinh bằng cách lặp lại để có đủ số lượng requests
-        const expandedStudentsWithClasses = [];
-        for (let i = 0; i < Math.min(25, studentsWithClasses.length * 3); i++) {
-            expandedStudentsWithClasses.push(studentsWithClasses[i % studentsWithClasses.length]);
-        }
-        
-        const changeClassCount = Math.min(25, expandedStudentsWithClasses.length, changeClassContents.length);
-        for (let i = 0; i < changeClassCount; i++) {
-            const sender = expandedStudentsWithClasses[i % expandedStudentsWithClasses.length];
-            const senderId = sender._id.toString();
-            
-            // Lấy danh sách lớp mà học sinh này đang học
-            const enrolledClasses = studentClassesMap[senderId] || [];
-            if (enrolledClasses.length === 0) {
-                console.log(`    ⚠️ Student ${sender.username || sender._id} không có lớp đang học, bỏ qua`);
-                continue;
-            }
-            
-            // Chọn một lớp từ danh sách lớp mà học sinh đang học
-            // Sử dụng modulo để phân bổ đều các lớp
-            const classItem = enrolledClasses[i % enrolledClasses.length];
-            
-            let status = 'pending';
-            let approverId = null;
-            let approvedDate = null;
-            let responseContent = null;
-            
-            // Distribute status: ~30% rejected, ~70% pending (no approved)
-            // Reject approximately every 3rd request
-            if (approver && (i % 3 === 2 || i === 5 || i === 8 || i === 11 || i === 14 || i === 17 || i === 20 || i === 23)) {
-                status = 'rejected';
-                approverId = approver._id;
-                approvedDate = getApprovedDate(Math.floor(Math.random() * 7) + 1); // 1-7 days ago
-                const rejectionReasons = [
-                    'Đơn bị từ chối do lớp đích đã đầy. Vui lòng chọn lớp khác.',
-                    'Đơn bị từ chối do không đủ điều kiện chuyển lớp. Vui lòng liên hệ phòng đào tạo.',
-                    'Đơn bị từ chối do lớp đích không phù hợp với trình độ hiện tại của học viên.',
-                    'Đơn bị từ chối do lịch học của lớp đích trùng với lịch học khác của học viên.',
-                    'Đơn bị từ chối do đã quá thời hạn cho phép chuyển lớp trong học kỳ này.'
-                ];
-                responseContent = rejectionReasons[Math.floor(Math.random() * rejectionReasons.length)];
-            }
-            // Rest are pending
-            
-            changeRequests.push({
-                sender: sender._id,
-                type: 'change_class',
-                classId: classItem._id,
-                content: changeClassContents[i],
-                status: status,
-                approver: approverId,
-                approvedDate: approvedDate,
-                responseContent: responseContent
-            });
-        }
-    }
-    
-    // ============================================
-    // 3. MAKEUP_CLASS requests (20-25 requests)
-    // ============================================
-    const makeupClassContents = [
-        'Xin học bù buổi học sắp tới do sẽ bị ốm, có giấy xác nhận của bác sĩ',
-        'Yêu cầu học bù buổi học tới do có việc đột xuất trong gia đình, không thể tham gia',
-        'Đề nghị học bù buổi học sắp tới do đi công tác, muốn bù vào buổi học khác trong tuần',
-        'Xin học bù buổi học tới do tham gia kỳ thi quan trọng, có giấy xác nhận',
-        'Yêu cầu học bù do nghỉ phép có phép, muốn bù vào buổi học cuối tuần',
-        'Đề nghị học bù buổi học sắp tới do có việc gia đình quan trọng, không thể tham gia',
-        'Xin học bù buổi học tới do đi khám sức khỏe, có giấy hẹn khám',
-        'Yêu cầu học bù buổi học sắp tới do tham gia sự kiện gia đình quan trọng',
-        'Xin học bù do nghỉ buổi học tới vì đi du lịch cùng gia đình, có giấy xác nhận',
-        'Đề nghị học bù buổi học sắp tới do tham gia cuộc thi thể thao của trường',
-        'Yêu cầu học bù buổi học tới do đi thăm người thân ốm ở bệnh viện',
-        'Xin học bù do nghỉ buổi học tới vì tham gia hoạt động tình nguyện, có giấy xác nhận',
-        'Đề nghị học bù buổi học sắp tới do tham gia kỳ thi học sinh giỏi',
-        'Yêu cầu học bù buổi học tới do đi dự đám cưới người thân',
-        'Xin học bù do nghỉ buổi học tới vì tham gia hội thảo học thuật, có giấy mời',
-        'Đề nghị học bù buổi học sắp tới do tham gia cuộc thi ngoại ngữ',
-        'Yêu cầu học bù buổi học tới do đi khám răng định kỳ',
-        'Xin học bù do nghỉ buổi học tới vì tham gia hoạt động ngoại khóa của trường',
-        'Đề nghị học bù buổi học sắp tới do tham gia kỳ thi chứng chỉ quốc tế',
-        'Yêu cầu học bù buổi học tới do đi thăm ông bà ở quê',
-        'Xin học bù do nghỉ buổi học tới vì tham gia hội thảo về du học',
-        'Đề nghị học bù buổi học sắp tới do tham gia cuộc thi hùng biện tiếng Anh',
-        'Yêu cầu học bù buổi học tới do đi khám mắt định kỳ',
-        'Xin học bù do nghỉ buổi học tới vì tham gia hoạt động từ thiện',
-        'Đề nghị học bù buổi học sắp tới do tham gia kỳ thi tốt nghiệp THPT'
-    ];
-    
-    // Use FUTURE student schedules - đảm bảo studentSchedule thuộc về sender
-    // Nhóm futureStudentSchedules theo student
-    const studentSchedulesByStudent = {};
-    futureStudentSchedules.forEach(ss => {
-        const studentId = ss.student.toString();
-        if (!studentSchedulesByStudent[studentId]) {
-            studentSchedulesByStudent[studentId] = [];
-        }
-        studentSchedulesByStudent[studentId].push(ss);
-    });
-    
-    // Tìm các học sinh có ít nhất 1 buổi học tương lai
-    const studentsWithFutureSchedules = students.filter(s => {
-        const studentId = s._id.toString();
-        return studentSchedulesByStudent[studentId] && studentSchedulesByStudent[studentId].length > 0;
-    });
-    
-    console.log(`   - Found ${studentsWithFutureSchedules.length} students with future schedules`);
-    
-    // Expand to use more students by cycling through
-    const expandedStudentsWithFutureSchedules = [];
-    for (let i = 0; i < Math.min(25, studentsWithFutureSchedules.length * 3); i++) {
-        expandedStudentsWithFutureSchedules.push(studentsWithFutureSchedules[i % studentsWithFutureSchedules.length]);
-    }
-    
-    const makeupClassCount = Math.min(25, expandedStudentsWithFutureSchedules.length, makeupClassContents.length);
-    for (let i = 0; i < makeupClassCount; i++) {
-        const sender = expandedStudentsWithFutureSchedules[i % expandedStudentsWithFutureSchedules.length];
-        const senderId = sender._id.toString();
-        
-        // Lấy một studentSchedule của học sinh này (đảm bảo khớp)
-        const studentSchedulesForThisStudent = studentSchedulesByStudent[senderId] || [];
-        if (studentSchedulesForThisStudent.length === 0) {
-            console.log(`    ⚠️ Student ${sender.username || sender._id} không có buổi học tương lai, bỏ qua`);
-            continue;
-        }
-        
-        // Lấy buổi học của học sinh này (cycle through available schedules)
-        const studentSchedule = studentSchedulesForThisStudent[i % studentSchedulesForThisStudent.length];
-        
-        // Validation: Đảm bảo studentSchedule thực sự là FUTURE schedule (chưa diễn ra)
-        const classScheduleForValidation = classSchedules.find(cs => 
-            cs._id.toString() === studentSchedule.classSchedule.toString()
-        );
-        if (!classScheduleForValidation) {
-            console.log(`    ⚠️ Không tìm thấy classSchedule cho studentSchedule ${studentSchedule._id}, bỏ qua`);
-            continue;
-        }
-        
-        const scheduleDateForValidation = new Date(classScheduleForValidation.date);
-        scheduleDateForValidation.setHours(0, 0, 0, 0);
-        
-        // Đảm bảo buổi học là TƯƠNG LAI (chưa diễn ra, chưa có attendance)
-        // Chỉ cho phép yêu cầu học bù cho các buổi học chưa diễn ra
-        if (scheduleDateForValidation < today) {
-            console.log(`    ⚠️ StudentSchedule ${studentSchedule._id} có ngày ${scheduleDateForValidation.toISOString().split('T')[0]} là quá khứ (cần >= ${today.toISOString().split('T')[0]}), bỏ qua`);
-            continue;
-        }
-        
-        let status = 'pending';
-        let approverId = null;
-        let approvedDate = null;
-        let responseContent = null;
-        
-        // Distribute status: ~30% rejected, ~70% pending (no approved)
-        // Reject approximately every 3rd request
-        if (approver && (i % 3 === 2 || i === 5 || i === 8 || i === 11 || i === 14 || i === 17 || i === 20 || i === 23)) {
-            status = 'rejected';
-            approverId = approver._id;
-            approvedDate = getApprovedDate(Math.floor(Math.random() * 7) + 1); // 1-7 days ago
-            const rejectionReasons = [
-                'Đơn bị từ chối do không có lịch học bù phù hợp trong thời gian yêu cầu.',
-                'Đơn bị từ chối do đã quá thời hạn yêu cầu học bù (quá 2 tuần).',
-                'Đơn bị từ chối do không có giấy xác nhận hợp lệ cho lý do nghỉ học.',
-                'Đơn bị từ chối do số lượng buổi học bù đã vượt quá quy định của học kỳ.',
-                'Đơn bị từ chối do không có giáo viên và phòng học phù hợp để sắp xếp học bù.'
-            ];
-            responseContent = rejectionReasons[Math.floor(Math.random() * rejectionReasons.length)];
-        }
-        // Rest are pending
-        
-        changeRequests.push({
-            sender: sender._id,
-            type: 'makeup_class',
-            studentScheduleId: studentSchedule._id,
-            content: makeupClassContents[i],
-            status: status,
-            approver: approverId,
-            approvedDate: approvedDate,
-            responseContent: responseContent
-        });
-    }
-    
-    // ============================================
-    // 4. REPLACE_TEACHER requests (20-25 requests)
+    // 1. REPLACE_TEACHER requests (20-25 requests)
     // ============================================
     const replaceTeacherContents = [
         'Yêu cầu thay giáo viên cho buổi học ngày mai do giáo viên hiện tại có việc đột xuất',
@@ -1173,7 +832,7 @@ async function seedChangeRequests() {
         
         changeRequests.push({
             sender: sender._id,
-            type: 'replace_teacher',
+            type: 'request_replace_teacher',
             classScheduleId: classSchedule._id,
             content: replaceTeacherContents[i],
             status: status,
@@ -1195,13 +854,10 @@ async function seedChangeRequests() {
     const approvedCount = created.filter(cr => cr.status === 'approved').length;
     const rejectedCount = created.filter(cr => cr.status === 'rejected').length;
     
-    const createClassTypeCount = created.filter(cr => cr.type === 'create_class').length;
-    const changeClassTypeCount = created.filter(cr => cr.type === 'change_class').length;
-    const makeupClassTypeCount = created.filter(cr => cr.type === 'makeup_class').length;
-    const replaceTeacherTypeCount = created.filter(cr => cr.type === 'replace_teacher').length;
+    const replaceTeacherTypeCount = created.filter(cr => cr.type === 'request_replace_teacher').length;
     
     console.log(`✅ Created ${created.length} change requests`);
-    console.log(`   - By type: create_class (${createClassTypeCount}), change_class (${changeClassTypeCount}), makeup_class (${makeupClassTypeCount}), replace_teacher (${replaceTeacherTypeCount})`);
+    console.log(`   - By type: request_replace_teacher (${replaceTeacherTypeCount})`);
     console.log(`   - By status: pending (${pendingCount}), approved (${approvedCount}), rejected (${rejectedCount})\n`);
 }
 

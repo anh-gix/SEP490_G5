@@ -454,6 +454,8 @@ exports.getAssignedToMe = async (req, res) => {
   try {
     const { userId, status } = req.query;
 
+    console.log('🔍 Get Assigned To Me - Query params:', { userId, status });
+
     if (!userId) {
       return res.status(400).json({
         success: false,
@@ -467,10 +469,16 @@ exports.getAssignedToMe = async (req, res) => {
     };
     if (status) query.status = status;
 
+    console.log('🔎 Searching with query:', query);
+
     const requests = await WorkRequest.find(query)
       .populate('requestedBy', 'name email username')
+      .populate('assignedTo', 'name email username')
+      .populate('processedBy', 'name email username')
       .populate('entityId')
       .sort({ requestedAt: -1 });
+
+    console.log('📦 Found', requests.length, 'work requests for user', userId);
 
     res.status(200).json({
       success: true,
@@ -479,7 +487,7 @@ exports.getAssignedToMe = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error getting assigned requests:', error);
+    console.error('❌ Error getting assigned requests:', error);
     res.status(500).json({
       success: false,
       message: 'Error getting assigned requests'
@@ -1083,12 +1091,22 @@ exports.createTopDownRequest = async (req, res) => {
       requestedBy
     } = req.body;
 
+    // Debug logging
+    console.log('📝 Create Work Request - Received data:', {
+      requestType,
+      assignedTo,
+      requestedBy,
+      hasFiles: !!req.files,
+      files: req.files ? Object.keys(req.files) : []
+    });
+
     // Validation
     if (!requestType || !assignedTo || !requestedBy) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: 'requestType, assignedTo, and requestedBy are required'
+        message: 'requestType, assignedTo, and requestedBy are required',
+        received: { requestType, assignedTo, requestedBy }
       });
     }
 
@@ -1147,13 +1165,12 @@ exports.createTopDownRequest = async (req, res) => {
     }
 
     // Handle file uploads (if using multer)
-    // For now, we'll store file references if provided
     if (req.files) {
       if (req.files.attachmentFile) {
         const file = req.files.attachmentFile[0];
         workRequestData.attachmentFile = {
           fileName: file.originalname,
-          fileUrl: file.path, // or S3 URL if uploaded to cloud
+          fileUrl: `/uploads/work-requests/${file.filename}`,
           fileSize: file.size,
           uploadedAt: new Date(),
           uploadedBy: requestedBy
@@ -1164,7 +1181,7 @@ exports.createTopDownRequest = async (req, res) => {
         const file = req.files.inputFile[0];
         workRequestData.inputFile = {
           fileName: file.originalname,
-          fileUrl: file.path,
+          fileUrl: `/uploads/work-requests/${file.filename}`,
           uploadedAt: new Date(),
           uploadedBy: requestedBy
         };
@@ -1197,5 +1214,311 @@ exports.createTopDownRequest = async (req, res) => {
     });
   } finally {
     session.endSession();
+  }
+};
+
+exports.startProcessing = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    const request = await WorkRequest.findById(id).session(session);
+
+    if (!request) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Work request not found'
+      });
+    }
+
+    // Validate: chỉ top_down requests mới có thể start processing
+    if (request.direction !== 'top_down') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Only top-down requests can be processed'
+      });
+    }
+
+    // Validate: chỉ assignee mới được xử lý
+    if (request.assignedTo.toString() !== userId.toString()) {
+      await session.abortTransaction();
+      return res.status(403).json({
+        success: false,
+        message: 'You are not assigned to this request'
+      });
+    }
+
+    // Validate: request phải ở trạng thái pending
+    if (request.status !== 'pending') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot start processing: request is ${request.status}`
+      });
+    }
+
+    // Update status
+    await WorkRequest.findByIdAndUpdate(id, {
+      status: 'in_progress',
+      $push: {
+        history: {
+          action: 'in_progress',
+          performedBy: userId,
+          performedAt: new Date(),
+          previousStatus: 'pending'
+        }
+      }
+    }, { session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: 'Started processing request'
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error starting processing:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error starting processing'
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+/**
+ * Upload output file
+ * POST /api/work-requests/:id/upload-output
+ * Body: { userId } + file upload
+ */
+exports.uploadOutputFile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+
+    const request = await WorkRequest.findById(id);
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: 'Work request not found'
+      });
+    }
+
+    // Validate
+    if (request.direction !== 'top_down') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only top-down requests can upload output file'
+      });
+    }
+
+    if (request.assignedTo.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not assigned to this request'
+      });
+    }
+
+    if (request.status !== 'in_progress') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot upload file: request must be in_progress (current: ${request.status})`
+      });
+    }
+
+    // Update outputFile
+    const outputFile = {
+      fileName: req.file.originalname,
+      fileUrl: `/uploads/work-requests/${req.file.filename}`,
+      uploadedAt: new Date(),
+      uploadedBy: userId
+    };
+
+    await WorkRequest.findByIdAndUpdate(id, { outputFile });
+
+    res.status(200).json({
+      success: true,
+      message: 'Output file uploaded successfully',
+      file: outputFile
+    });
+
+  } catch (error) {
+    console.error('Error uploading output file:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading output file'
+    });
+  }
+};
+
+exports.completeRequest = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { userId, note } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    const request = await WorkRequest.findById(id).session(session);
+
+    if (!request) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Work request not found'
+      });
+    }
+
+    // Validate
+    if (request.direction !== 'top_down') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Only top-down requests can be completed'
+      });
+    }
+
+    if (request.assignedTo.toString() !== userId.toString()) {
+      await session.abortTransaction();
+      return res.status(403).json({
+        success: false,
+        message: 'You are not assigned to this request'
+      });
+    }
+
+    if (request.status !== 'in_progress') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot complete: request must be in_progress (current: ${request.status})`
+      });
+    }
+
+    // Validate: phải có outputFile (cho assign_students)
+    if (request.requestType === 'assign_students' && !request.outputFile) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Must upload output file before completing'
+      });
+    }
+
+    // Update to completed
+    await WorkRequest.findByIdAndUpdate(id, {
+      status: 'completed',
+      processedBy: userId,
+      processedAt: new Date(),
+      responseNote: note,
+      $push: {
+        history: {
+          action: 'completed',
+          performedBy: userId,
+          performedAt: new Date(),
+          note: note,
+          previousStatus: 'in_progress'
+        }
+      }
+    }, { session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: 'Request completed successfully'
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error completing request:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error completing request'
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+exports.getWorkRequestStats = async (req, res) => {
+  try {
+    const { userId, status } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required'
+      });
+    }
+
+    const query = {
+      assignedTo: userId,
+      direction: 'top_down'
+    };
+
+    // Add status filter if provided and not 'all'
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    const stats = {
+      assign_students: await WorkRequest.countDocuments({ ...query, requestType: 'assign_students' }),
+      create_program: await WorkRequest.countDocuments({ ...query, requestType: 'create_program' }),
+      edit_course: await WorkRequest.countDocuments({ ...query, requestType: 'edit_course' }),
+      create_exam: await WorkRequest.countDocuments({ ...query, requestType: 'create_exam' }),
+      total: await WorkRequest.countDocuments(query)
+    };
+
+    console.log('📊 WorkRequest stats for user', userId, ':', stats);
+
+    res.status(200).json({
+      success: true,
+      stats
+    });
+
+  } catch (error) {
+    console.error('❌ Error getting WorkRequest stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting stats'
+    });
   }
 };

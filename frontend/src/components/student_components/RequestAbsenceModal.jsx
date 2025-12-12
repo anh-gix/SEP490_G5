@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import changeRequestService from '../../services/changeRequestService';
 
@@ -9,6 +10,7 @@ import changeRequestService from '../../services/changeRequestService';
  */
 const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     description: ''
   });
@@ -81,6 +83,9 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
         }
 
         onHide();
+        
+        // Redirect to applications page with success state
+        navigate('/student/applications', { state: { showSuccessToast: true } });
       } else {
         setError(response.message || 'Có lỗi xảy ra khi gửi đơn xin nghỉ. Vui lòng thử lại.');
       }
@@ -216,32 +221,6 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
               Cung cấp thông tin chi tiết giúp giáo vụ xử lý đơn nhanh hơn
             </Form.Text>
           </Form.Group>
-
-          {/* Important Notice */}
-          <Alert variant="info" className="bg-info-50 border-info-200 rounded-8 mb-0">
-            <div className="d-flex gap-12">
-              <i className="fas fa-info-circle text-info-500 mt-1"></i>
-              <div>
-                <h6 className="text-neutral-900 fw-semibold text-13 mb-8">
-                  Lưu ý quan trọng:
-                </h6>
-                <ul className="text-neutral-700 text-13 mb-0 ps-20">
-                  <li className="mb-4">
-                    Đơn xin nghỉ cần được gửi trước buổi học ít nhất 2 giờ
-                  </li>
-                  <li className="mb-4">
-                    Giáo vụ sẽ xem xét và phản hồi trong vòng 24 giờ
-                  </li>
-                  <li className="mb-4">
-                    Bạn có thể theo dõi trạng thái đơn trong mục "Lịch sử xin nghỉ"
-                  </li>
-                  <li>
-                    Nghỉ quá 3 buổi không phép có thể ảnh hưởng đến kết quả học tập
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </Alert>
         </Form>
       </Modal.Body>
 

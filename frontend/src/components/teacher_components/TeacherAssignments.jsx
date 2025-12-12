@@ -7,6 +7,10 @@ import CreateHomeworkModal from './class_detail/modals/CreateHomeworkModal';
  * Teacher Assignments Component
  * Quản lý bài tập - giao bài, xem submissions
  */
+
+// KHÔNG CÒN SỬ DỤNG
+
+
 const TeacherAssignments = () => {
   const [assignments, setAssignments] = useState([]);
   const [filterClass, setFilterClass] = useState('all');

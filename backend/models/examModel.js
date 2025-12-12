@@ -59,13 +59,15 @@ const examSchema = new mongoose.Schema(
         'pending_approval',   // Đã submit, chờ Center Head duyệt
         'approved',           // Center Head đã duyệt
         'needs_revision',     // Center Head yêu cầu chỉnh sửa
-        'active'            // Đã lưu trữ
+        
+        'archived'            // có submission từ học viên -> archived -> không thể chỉnh sửa nội dung nữa
       ],
       default: 'draft'
     },
 
     // Giữ lại isPublished để quản lý việc publish exam cho học viên
-    isPublished: { type: Boolean, default: false },
+    // isPublished: { type: Boolean, default: false }, 
+    isPublished: { type: Boolean, default: false },  // exam có đang được mở cho học viên làm hay không
     publishedAt: { type: Date },
     unpublishedAt: { type: Date },
   },

@@ -198,13 +198,15 @@ const ExamView = ({ viewMode = 'center-head' }) => {
             </Button>
           )}
 
-          <Button
-            variant="primary"
-            icon="ph ph-pencil"
-            onClick={() => navigate(`${basePath}/exams/${exam._id}/edit`)}
-          >
-            Chỉnh sửa
-          </Button>
+          {!isViewOnly && (
+            <Button
+              variant="primary"
+              icon="ph ph-pencil"
+              onClick={() => navigate(`${basePath}/exams/${exam._id}/edit`)}
+            >
+              Chỉnh sửa
+            </Button>
+          )}
         </div>
       </div>
 
@@ -351,14 +353,16 @@ const ExamView = ({ viewMode = 'center-head' }) => {
                         {section.answerKey?.length || 0} câu
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      icon="ph ph-pencil"
-                      onClick={() => navigate(`${basePath}/exams/${exam._id}/edit`)}
-                    >
-                      Sửa
-                    </Button>
+                    {!isViewOnly && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon="ph ph-pencil"
+                        onClick={() => navigate(`${basePath}/exams/${exam._id}/edit`)}
+                      >
+                        Sửa
+                      </Button>
+                    )}
                   </div>
                 </div>
 

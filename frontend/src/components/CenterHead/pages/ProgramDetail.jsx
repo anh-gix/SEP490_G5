@@ -474,19 +474,25 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
 
       {/* Stats Cards */}
       <div className="row g-3 g-md-4 mb-24">
-        <div className="col-6 col-md-4">
+        <div className="col-6 col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng PLOs</h6>
             <h4 className="text-main-600 fw-bold mb-0">{program.plos?.length || 0}</h4>
           </Card>
         </div>
-        <div className="col-6 col-md-4">
+        <div className="col-6 col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng Courses</h6>
             <h4 className="text-success-600 fw-bold mb-0">{courses.length}</h4>
           </Card>
         </div>
-        <div className="col-6 col-md-4">
+        <div className="col-6 col-md-3">
+          <Card>
+            <h6 className="text-neutral-600 mb-8">Người tạo</h6>
+            <h6 className="text-neutral-900 fw-bold mb-0">{program.createdBy?.username || 'N/A'}</h6>
+          </Card>
+        </div>
+        <div className="col-6 col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Cập nhật lần cuối</h6>
             <h6 className="text-neutral-600 fw-bold mb-0">{formatDate(program.updatedAt)}</h6>

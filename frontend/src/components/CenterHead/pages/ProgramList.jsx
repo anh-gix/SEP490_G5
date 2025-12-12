@@ -96,34 +96,6 @@ const ProgramList = () => {
     setCurrentPage(1); // Reset to first page when items per page changes
   };
 
-  const handleDeleteProgram = async (programId, programName) => {
-    const confirmMessage = `⚠️ CẢNH BÁO: Bạn có chắc muốn xóa chương trình "${programName}"?\n\n` +
-      `Hành động này sẽ XÓA TOÀN BỘ:\n` +
-      `• Tất cả PLO trong chương trình\n` +
-      `• Tất cả Course (học phần)\n` +
-      `• Tất cả CLO trong các course\n` +
-      `• Tất cả Session trong các course\n` +
-      `• Tất cả Materials trong các course\n\n` +
-      `Hành động này KHÔNG THỂ HOÀN TÁC!\n\n` +
-      `Nhấn OK để xác nhận xóa.`;
-
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
-
-    try {
-      await programService.deleteProgram(programId);
-
-      // Reload programs after deletion
-      await fetchPrograms();
-
-      alert('Đã xóa chương trình và toàn bộ dữ liệu liên quan thành công!');
-    } catch (err) {
-      console.error('Error deleting program:', err);
-      alert(err.message || 'Có lỗi xảy ra khi xóa chương trình.');
-    }
-  };
-
   useEffect(() => {
     fetchPrograms();
   }, []);
@@ -182,6 +154,13 @@ const ProgramList = () => {
       header: 'Trạng thái',
       field: 'status',
       render: (row) => <StatusBadge status={row.status} size="sm" />,
+    },
+    {
+      header: 'Người tạo',
+      field: 'createdBy',
+      render: (row) => (
+        <span className="text-neutral-700">{row.createdBy?.username || 'N/A'}</span>
+      ),
     },
     {
       header: 'Cập nhật',

@@ -17,19 +17,19 @@ const FeaturesTwo = () => {
         <div className='section-heading style-flex'>
           <div className='section-heading__inner'>
             <h2 className='mb-24 wow bounceInLeft'>
-              Build better growth skills, faster. Ignite Your Learning Journey
+              Xây dựng kỹ năng phát triển tốt hơn, nhanh hơn. Khơi Dậy Hành Trình Học Tập Của Bạn
             </h2>
           </div>
           <div className='section-heading__content wow bounceInRight'>
             <p className='text-line-2'>
-              Explore new skills, deepen existing passions, and get lost in
-              creativity. What you find just might...
+              Khám phá kỹ năng mới, đào sâu đam mê hiện tại và đắm chìm trong
+              sự sáng tạo. Những gì bạn tìm thấy có thể...
             </p>
             <Link
               to='/course-list-view'
               className='item-hover__text flex-align d-inline-flex gap-8 text-main-600 mt-24 hover-text-decoration-underline transition-1 fw-semibold'
             >
-              Read More
+              Đọc Thêm
               <i className='ph ph-arrow-right' />
             </Link>
           </div>
@@ -49,11 +49,11 @@ const FeaturesTwo = () => {
                 />
               </span>
               <h4 className='mb-16 transition-1 item-hover__text'>
-                Learn the latest skills
+                Học các kỹ năng mới nhất
               </h4>
               <p className='transition-1 item-hover__text text-line-2'>
-                Quality education shouldn't break the bank. We offer competitive
-                pricing and payment options
+                Giáo dục chất lượng không nên quá đắt đỏ. Chúng tôi cung cấp
+                giá cả cạnh tranh và các tùy chọn thanh toán
               </p>
               <span className='item-hover__bg w-48 h-1 bg-neutral-500 mt-32' />
             </div>
@@ -72,11 +72,11 @@ const FeaturesTwo = () => {
                 />
               </span>
               <h4 className='mb-16 transition-1 item-hover__text'>
-                Get ready for a career
+                Chuẩn bị cho sự nghiệp
               </h4>
               <p className='transition-1 item-hover__text text-line-2'>
-                Engage in dynamic and interactive learning experiences. Our
-                courses are designed
+                Tham gia vào các trải nghiệm học tập năng động và tương tác. Các
+                khóa học của chúng tôi được thiết kế
               </p>
               <span className='item-hover__bg w-48 h-1 bg-neutral-500 mt-32' />
             </div>
@@ -95,11 +95,11 @@ const FeaturesTwo = () => {
                 />
               </span>
               <h4 className='mb-16 transition-1 item-hover__text'>
-                Earn a Certificate
+                Nhận Chứng Chỉ
               </h4>
               <p className='transition-1 item-hover__text text-line-2'>
-                Join a vibrant and supportive learning community. Connect with
-                fellow learners
+                Tham gia cộng đồng học tập sôi động và hỗ trợ. Kết nối với
+                các học viên khác
               </p>
               <span className='item-hover__bg w-48 h-1 bg-neutral-500 mt-32' />
             </div>

@@ -47,6 +47,59 @@ export const classScheduleService = {
     }
   },
 
+  // Validate: Kiểm tra conflict trước khi thêm buổi học
+  validateAddClassSchedule: async (scheduleData) => {
+    try {
+      const response = await api.post('/validate', scheduleData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể validate buổi học' };
+    }
+  },
+
+  // Validate học bù: Kiểm tra conflict với buổi học của học sinh
+  validateMakeupClassSchedule: async (makeupClassScheduleId, studentId) => {
+    try {
+      const response = await api.post('/validate-makeup', {
+        makeupClassScheduleId,
+        studentId
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể validate học bù' };
+    }
+  },
+
+  // Validate conflict đơn giản: Kiểm tra conflict với teacher và room (không cần classId)
+  validateScheduleConflictSimple: async (scheduleData) => {
+    try {
+      const response = await api.post('/validate-simple', scheduleData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể validate conflict' };
+    }
+  },
+
+  // Tạo buổi học bù mới (không cần classId)
+  createMakeupClassSchedule: async (scheduleData) => {
+    try {
+      const response = await api.post('/makeup', scheduleData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể tạo buổi học bù' };
+    }
+  },
+
+  // Preview: Xem trước khi thêm buổi học (chỉ log, không tạo)
+  previewAddClassSchedule: async (scheduleData) => {
+    try {
+      const response = await api.post('/preview', scheduleData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể preview buổi học' };
+    }
+  },
+
   // Tạo buổi học mới
   createClassSchedule: async (scheduleData) => {
     try {
@@ -70,9 +123,15 @@ export const classScheduleService = {
   // Lấy danh sách điểm danh của một buổi học
   getAttendanceByClassSchedule: async (classScheduleId) => {
     try {
-      const response = await api.get(`/${classScheduleId}/attendance`);
+      const response = await api.get(`/${classScheduleId}/attendance`, {
+        timeout: 5000 // 5 seconds timeout
+      });
       return response.data;
     } catch (error) {
+      // Handle timeout specifically
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        throw { message: 'Timeout: Request mất quá nhiều thời gian' };
+      }
       throw error.response?.data || { message: 'Không thể lấy danh sách điểm danh' };
     }
   },
@@ -84,6 +143,18 @@ export const classScheduleService = {
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy danh sách phòng học' };
+    }
+  },
+
+  // Xếp người dạy thay cho buổi học
+  assignSubstituteTeacher: async (scheduleId, substituteTeacherId) => {
+    try {
+      const response = await api.patch(`/${scheduleId}/assign-substitute`, {
+        substituteTeacherId
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể xếp người dạy thay' };
     }
   }
 };

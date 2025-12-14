@@ -564,10 +564,10 @@ dashbord settimgs end
 .btn {
   position: relative;
   border-radius: 5px;
-  border: 1px solid transparent;
+  /* border: 1px solid transparent; */
   font-weight: 500;
   font-family: var(--body-font);
-  color: hsl(var(--white)) !important;
+  /* color: hsl(var(--white)) !important; */
   z-index: 1;
   line-height: 1;
   text-transform: capitalize;
@@ -14812,3 +14812,28 @@ table.dataTable.display > tbody > tr > * {
   color: #fff !important;
 }
 
+/* Custom modal width for makeup class modal */
+.modal-xl-custom {
+  max-width: 1700px !important;
+}
+
+.modal-xl-custom .modal-content {
+  max-height: 90vh !important;
+}
+
+.modal-xl-custom .modal-body {
+  max-height: calc(90vh - 120px) !important;
+  overflow-y: auto !important;
+}
+
+/* Pulse animation for pending approval indicator */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}

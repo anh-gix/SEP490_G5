@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Container, Card, Row, Col, Badge, Button, Spinner } from 'react-bootstrap';
+import { Container, Card, Row, Col, Badge, Button, Spinner, Alert } from 'react-bootstrap';
 import EditScheduleModal from './EditScheduleModal';
 import MakeupClassModal from './MakeupClassModal';
+import scheduleService from '../../services/scheduleService';
+import classService from '../../services/classService';
+import teacherService from '../../services/teacherService';
+import roomService from '../../services/roomService';
+import { formatDateToYYYYMMDD } from '../../helper/helper';
 
 /**
  * Academic Lesson Detail Component
@@ -11,6 +16,8 @@ import MakeupClassModal from './MakeupClassModal';
 const AcademicLessonDetail = () => {
   const { lessonId } = useParams();
   const [lessonData, setLessonData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showMakeupModal, setShowMakeupModal] = useState(false);
   const [classes, setClasses] = useState([]);
@@ -19,64 +26,104 @@ const AcademicLessonDetail = () => {
   const [schedules, setSchedules] = useState([]);
 
   const fetchLessonData = async () => {
-    // TODO: Replace with actual API call
-    // Mock data based on lessonId
-    const mockLesson = {
-      id: lessonId,
-      topic: 'TOEIC Listening Part 3-4: Conversations & Talks',
-      date: '2025-11-17',
-      time: '08:00 - 10:00',
-      startTime: '08:00',
-      endTime: '10:00',
-      className: 'TOEIC 450 - A1',
-      classId: 'c1',
-      level: 'A1',
-      room: 'P.101',
-      roomId: 'r1',
-      students: 25,
-      attendedStudents: 22,
-      teacherId: 't1',
-      teacherName: 'Nguyễn Văn A',
-      lessonNumber: 5,
-      lessonTopic: 'Listening Practice',
-      status: 'scheduled',
-      type: 'regular',
-      description: 'Buổi học tập trung vào kỹ năng nghe hiểu phần 3 và 4 của bài thi TOEIC. Học viên sẽ được luyện tập với các đoạn hội thoại và bài nói chuyên sâu.',
-      objectives: [
-        'Nắm vững cấu trúc câu hỏi trong Part 3-4',
-        'Phát triển kỹ năng nghe và ghi chú nhanh',
-        'Học từ vựng chuyên ngành thông dụng trong TOEIC',
-        'Luyện tập với 20 câu hỏi thực tế'
-      ],
-      materials: [
-        'TOEIC Listening Part 3-4 Practice.pdf',
-        'Answer Key & Transcript.pdf',
-        'Vocabulary List - Business Context.pdf'
-      ],
-      homework: 'Hoàn thành 15 câu hỏi Part 3-4 trong sách bài tập',
-      homeworkDeadline: '20/11/2025',
-      notes: 'Lưu ý: Học viên cần mang theo tai nghe cho buổi học này. Phòng 101 đã được trang bị hệ thống âm thanh chất lượng cao.'
-    };
-    
-    setLessonData(mockLesson);
+    try {
+      setLoading(true);
+      setError(null);
 
-    // Mock data for modals
-    setClasses([
-      { id: 'c1', name: 'TOEIC 450 - A1', level: 'A1', students: 25 },
-      { id: 'c2', name: 'TOEIC 650 - B1', level: 'B1', students: 20 }
-    ]);
+      // Fetch schedule by ID
+      const response = await scheduleService.getScheduleById(lessonId);
+      const schedule = response.schedule;
 
-    setTeachers([
-      { id: 't1', name: 'Nguyễn Văn A', email: 'nguyenvana@example.com' },
-      { id: 't2', name: 'Trần Thị B', email: 'tranthib@example.com' }
-    ]);
+      if (!schedule) {
+        setError('Không tìm thấy lịch học');
+        return;
+      }
 
-    setRooms([
-      { id: 'r1', name: 'P.101', capacity: 30 },
-      { id: 'r2', name: 'P.102', capacity: 25 }
-    ]);
+      // Format date to YYYY-MM-DD (using helper to avoid timezone issues)
+      let dateStr = 'N/A';
+      if (schedule.date) {
+        if (typeof schedule.date === 'string') {
+          dateStr = schedule.date.split('T')[0];
+        } else {
+          // Use helper function to format date correctly
+          dateStr = formatDateToYYYYMMDD(schedule.date);
+        }
+      }
 
-    setSchedules([]);
+      // Transform API response to component format
+      const transformedLesson = {
+        id: schedule._id || schedule.id,
+        topic: schedule.session?.title || schedule.topic || 'N/A',
+        date: dateStr,
+        time: `${schedule.startTime || 'N/A'} - ${schedule.endTime || 'N/A'}`,
+        startTime: schedule.startTime || 'N/A',
+        endTime: schedule.endTime || 'N/A',
+        className: schedule.class?.name || 'N/A',
+        classId: schedule.class?._id || schedule.class,
+        level: schedule.class?.course?.level || schedule.class?.level || 'N/A',
+        room: schedule.room?.room_name || 'N/A',
+        roomId: schedule.room?._id || schedule.room,
+        students: schedule.class?.students?.length || 0,
+        attendedStudents: 0, // TODO: Calculate from attendance records
+        teacherId: schedule.teacher?._id || schedule.class?.teacher?._id,
+        teacherName: schedule.teacher?.username || schedule.class?.teacher?.username || 'N/A',
+        lessonNumber: schedule.session?.order || 0,
+        lessonTopic: schedule.session?.title || schedule.topic || 'N/A',
+        status: schedule.status || 'fixed',
+        type: schedule.type || 'regular',
+        description: schedule.session?.description || schedule.session?.content || schedule.topic || 'Chưa có mô tả',
+        objectives: schedule.session?.clos?.map(clo => clo.detail || clo.name) || [
+          'Nắm vững kiến thức bài học',
+          'Hoàn thành bài tập thực hành',
+          'Áp dụng kiến thức vào thực tế'
+        ],
+        clos: schedule.session?.clos || [],
+        materials: schedule.class?.course?.materials || [],
+        homework: schedule.session?.homework || 'Chưa có bài tập về nhà',
+        homeworkDeadline: schedule.session?.homeworkDeadline || 'N/A',
+        notes: schedule.notes || schedule.reason || 'Không có ghi chú'
+      };
+
+      setLessonData(transformedLesson);
+
+      // Fetch data for modals
+      try {
+        const [classesRes, teachersRes, roomsRes, schedulesRes] = await Promise.all([
+          classService.getAllClasses(),
+          teacherService.getAllTeachers(),
+          roomService.getAllRooms(),
+          scheduleService.getAllSchedules()
+        ]);
+
+        setClasses((classesRes.classes || classesRes.data || []).map(cls => ({
+          id: cls._id || cls.id,
+          name: cls.name,
+          level: cls.level,
+          students: cls.totalStudents || cls.students?.length || 0
+        })));
+
+        setTeachers((teachersRes.teachers || teachersRes.data || []).map(teacher => ({
+          id: teacher._id || teacher.id,
+          name: teacher.username || teacher.name,
+          email: teacher.email
+        })));
+
+        setRooms((roomsRes.rooms || roomsRes.data || []).map(room => ({
+          id: room._id || room.id,
+          name: room.room_name || room.name,
+          capacity: room.capacity
+        })));
+
+        setSchedules(schedulesRes.schedules || schedulesRes.data || []);
+      } catch (err) {
+        console.error('Error fetching modal data:', err);
+      }
+    } catch (err) {
+      console.error('Error fetching lesson data:', err);
+      setError(err.message || 'Không thể tải thông tin buổi học');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -109,13 +156,27 @@ const AcademicLessonDetail = () => {
     }
   };
 
-  if (!lessonData) {
+  if (loading) {
     return (
       <Container fluid className="py-24 px-24">
         <div className="text-center py-5">
           <Spinner animation="border" variant="primary" />
           <p className="mt-3 text-neutral-500">Đang tải dữ liệu...</p>
         </div>
+      </Container>
+    );
+  }
+
+  if (error || !lessonData) {
+    return (
+      <Container fluid className="py-24 px-24">
+        <Alert variant="danger">
+          <Alert.Heading>Lỗi</Alert.Heading>
+          <p>{error || 'Không tìm thấy thông tin buổi học'}</p>
+          <Link to="/academic/schedule" className="btn btn-primary">
+            Quay lại lịch học
+          </Link>
+        </Alert>
       </Container>
     );
   }
@@ -247,24 +308,56 @@ const AcademicLessonDetail = () => {
           <h5 className="text-neutral-900 fw-bold mb-0">Mục tiêu học tập</h5>
         </Card.Header>
         <Card.Body className="p-20">
-          <div className="d-flex flex-column gap-12">
-            {lessonData.objectives.map((objective, index) => (
-              <div key={index} className="d-flex align-items-start gap-12">
-                <div 
-                  className="rounded-circle d-flex align-items-center justify-content-center"
-                  style={{ 
-                    width: '24px', 
-                    height: '24px', 
-                    backgroundColor: '#E6F2FF',
-                    flexShrink: 0
-                  }}
-                >
-                  <i className="fas fa-check text-main-600" style={{ fontSize: '10px' }}></i>
+          {lessonData.clos && lessonData.clos.length > 0 ? (
+            <div className="d-flex flex-column gap-12">
+              {lessonData.clos.map((clo, index) => (
+                <div key={index} className="d-flex align-items-start gap-12">
+                  <div 
+                    className="rounded-circle d-flex align-items-center justify-content-center"
+                    style={{ 
+                      width: '24px', 
+                      height: '24px', 
+                      backgroundColor: '#E6F2FF',
+                      flexShrink: 0
+                    }}
+                  >
+                    <i className="fas fa-check text-main-600" style={{ fontSize: '10px' }}></i>
+                  </div>
+                  <div className="flex-grow-1">
+                    <div className="text-neutral-900 text-14 fw-semibold mb-2">
+                      {clo.code}: {clo.name}
+                    </div>
+                    <div className="text-neutral-700 text-13">
+                      {clo.detail}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-neutral-900 text-14">{objective}</div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : lessonData.objectives && lessonData.objectives.length > 0 ? (
+            <div className="d-flex flex-column gap-12">
+              {lessonData.objectives.map((objective, index) => (
+                <div key={index} className="d-flex align-items-start gap-12">
+                  <div 
+                    className="rounded-circle d-flex align-items-center justify-content-center"
+                    style={{ 
+                      width: '24px', 
+                      height: '24px', 
+                      backgroundColor: '#E6F2FF',
+                      flexShrink: 0
+                    }}
+                  >
+                    <i className="fas fa-check text-main-600" style={{ fontSize: '10px' }}></i>
+                  </div>
+                  <div className="text-neutral-900 text-14">{objective}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-neutral-500">
+              Chưa có mục tiêu học tập
+            </div>
+          )}
         </Card.Body>
       </Card>
 
@@ -274,31 +367,51 @@ const AcademicLessonDetail = () => {
           <h5 className="text-neutral-900 fw-bold mb-0">Tài liệu học tập</h5>
         </Card.Header>
         <Card.Body className="p-20">
-          <div className="d-flex flex-column gap-12">
-            {lessonData.materials.map((material, index) => (
-              <div 
-                key={index} 
-                className="border border-neutral-100 rounded-12 p-16 d-flex align-items-center gap-12 transition-2"
-                style={{ cursor: 'pointer' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F8F9FA'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-              >
-                <div 
-                  className="rounded-8 d-flex align-items-center justify-content-center"
-                  style={{ width: '40px', height: '40px', backgroundColor: '#FFF4E6', flexShrink: 0 }}
-                >
-                  <i className="fas fa-file-pdf text-warning-600"></i>
-                </div>
-                <div className="flex-grow-1">
-                  <div className="text-neutral-900 fw-semibold text-14">{material}</div>
-                </div>
-                <Button className="btn-outline-main text-12 px-12 py-6 radius-6">
-                  <i className="fas fa-download me-2"></i>
-                  Tải xuống
-                </Button>
-              </div>
-            ))}
-          </div>
+          {lessonData.materials && lessonData.materials.length > 0 ? (
+            <div className="d-flex flex-column gap-12">
+              {lessonData.materials.map((material, index) => {
+                // Course materials is array of strings (URLs)
+                const materialUrl = typeof material === 'string' ? material : (material.url || null);
+                // Extract filename from URL or use default name
+                const materialName = typeof material === 'string' 
+                  ? (material.split('/').pop() || 'Tài liệu')
+                  : (material.name || 'Tài liệu');
+                
+                return (
+                  <div 
+                    key={index} 
+                    className="border border-neutral-100 rounded-12 p-16 d-flex align-items-center gap-12 transition-2"
+                    style={{ cursor: materialUrl ? 'pointer' : 'default' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F8F9FA'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                  >
+                    <div 
+                      className="rounded-8 d-flex align-items-center justify-content-center"
+                      style={{ width: '40px', height: '40px', backgroundColor: '#FFF4E6', flexShrink: 0 }}
+                    >
+                      <i className="fas fa-file-pdf text-warning-600"></i>
+                    </div>
+                    <div className="flex-grow-1">
+                      <div className="text-neutral-900 fw-semibold text-14">{materialName}</div>
+                    </div>
+                    {materialUrl && (
+                      <Button 
+                        className="btn-outline-main text-12 px-12 py-6 radius-6"
+                        onClick={() => window.open(materialUrl, '_blank')}
+                      >
+                        <i className="fas fa-download me-2"></i>
+                        Tải xuống
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-neutral-500">
+              Chưa có tài liệu học tập
+            </div>
+          )}
         </Card.Body>
       </Card>
 

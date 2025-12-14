@@ -138,3 +138,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 *.md
+/backend/scripts
+/backend/uploads
+
+# Seed files
+**/seed*.js
+**/seeds/
+**/seed/

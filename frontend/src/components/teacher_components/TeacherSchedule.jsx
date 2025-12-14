@@ -1,39 +1,195 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table } from 'react-bootstrap';
-import { teacherScheduleMock } from './teacher_mockdata';
+import teacherService from '../../services/teacherService';
+import { useAuth } from '../../contexts/AuthContext';
+import changeRequestService from '../../services/changeRequestService';
 
 /**
  * Teacher Schedule Component
  * Lịch dạy của giảng viên - tương tự student schedule
  */
 const TeacherSchedule = () => {
+  const { user } = useAuth();
+  
+  const getCurrentWeek = () => {
+    const today = new Date();
+    const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 1));
+    return firstDayOfWeek;
+  };
+
   const [viewMode, setViewMode] = useState('week'); // 'week', 'month', or 'list'
   const [selectedWeek, setSelectedWeek] = useState(getCurrentWeek());
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [schedules, setSchedules] = useState([]);
   const [filterStatus, setFilterStatus] = useState('all');
-
-  useEffect(() => {
-    fetchSchedules();
-  }, [selectedWeek, filterStatus]);
-
-  function getCurrentWeek() {
-    const today = new Date();
-    const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 1));
-    return firstDayOfWeek;
-  }
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // Recent applications preview
+  const [recentApplications, setRecentApplications] = useState([]);
+  const [loadingApplications, setLoadingApplications] = useState(false);
 
   const fetchSchedules = async () => {
     try {
-      // TODO: Replace with actual API call
-      // const response = await teacherAPI.getSchedules(selectedWeek);
-      // setSchedules(response.data);
+      setLoading(true);
+      setError(null);
+
+      // Calculate date range based on view mode
+      let startDate, endDate;
       
-      // Using mock data
-      setSchedules(teacherScheduleMock);
+      if (viewMode === 'week') {
+        startDate = new Date(selectedWeek);
+        endDate = new Date(selectedWeek);
+        endDate.setDate(endDate.getDate() + 6);
+      } else if (viewMode === 'month') {
+        const year = selectedMonth.getFullYear();
+        const month = selectedMonth.getMonth();
+        startDate = new Date(year, month, 1);
+        endDate = new Date(year, month + 1, 0);
+      } else {
+        // List view - don't limit date range, get all schedules
+        startDate = null;
+        endDate = null;
+      }
+
+      const params = {};
+      if (startDate && endDate) {
+        // Format dates as YYYY-MM-DD to avoid timezone issues
+        const formatDateForAPI = (date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+        
+        params.startDate = formatDateForAPI(startDate);
+        params.endDate = formatDateForAPI(endDate);
+      }
+
+      console.log('[TeacherSchedule] Fetching schedules:', {
+        viewMode,
+        params,
+        hasDateRange: !!(startDate && endDate),
+        startDate: startDate ,
+        endDate: endDate
+      });
+
+      const response = await teacherService.getCurrentTeacherSchedule(params);
+      
+      console.log('[TeacherSchedule] Response received:', {
+        success: response.success,
+        total: response.total,
+        schedulesCount: response.schedules?.length || 0
+      });
+
+      if (response.success) {
+        // Transform schedules to match frontend format
+        const transformedSchedules = response.schedules.map(schedule => {
+          // Determine className: use provided className, or class name, or "Lớp học bù" for makeup classes (class is null)
+          let className = schedule.className || schedule.class?.name;
+          if (!className && (schedule.class === null || schedule.class === undefined)) {
+            className = 'Lớp học bù';
+          }
+          return {
+            _id: schedule._id,
+            date: schedule.date,
+            startTime: schedule.startTime,
+            endTime: schedule.endTime,
+            className: className,
+            courseName: schedule.courseName || schedule.class?.course?.name,
+            session: schedule.session,
+            sessionTitle: schedule.sessionTitle || schedule.session?.title,
+            sessionOrder: schedule.sessionOrder || schedule.session?.order,
+            room: schedule.room,
+            roomName: schedule.roomName || schedule.room?.room_name,
+            location: schedule.location || schedule.room?.location,
+            homework: schedule.homework || [],
+            material: schedule.material || [],
+            mocktest: schedule.mocktest,
+            status: schedule.status,
+            // Determine schedule status for filtering
+            scheduleStatus: getScheduleStatus(schedule.date, schedule.startTime)
+          };
+        });
+
+        setSchedules(transformedSchedules);
+      }
     } catch (error) {
-      console.error('Error fetching schedules:', error);
+      console.error('Lỗi khi tải lịch dạy:', error);
+      setError(error.message || 'Không thể tải lịch dạy');
+      setSchedules([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+
+  const getScheduleStatus = (date, startTime) => {
+    // Parse date string safely to avoid timezone issues
+    let scheduleDate;
+    if (date instanceof Date) {
+      scheduleDate = new Date(date);
+    } else {
+      // If date is a string, parse it as local date (YYYY-MM-DD)
+      const dateParts = date.split('T')[0].split('-');
+      if (dateParts.length === 3) {
+        scheduleDate = new Date(
+          parseInt(dateParts[0]), 
+          parseInt(dateParts[1]) - 1, 
+          parseInt(dateParts[2])
+        );
+      } else {
+        scheduleDate = new Date(date);
+      }
+    }
+    
+    const [hours, minutes] = startTime.split(':');
+    scheduleDate.setHours(parseInt(hours), parseInt(minutes));
+    
+    const now = new Date();
+    
+    if (scheduleDate < now) {
+      return 'completed';
+    } else {
+      return 'upcoming';
+    }
+  };
+
+  useEffect(() => {
+    fetchSchedules();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedWeek, selectedMonth, viewMode]);
+
+  // Fetch recent applications for preview
+  useEffect(() => {
+    if (user?._id) {
+      fetchRecentApplications();
+    }
+  }, [user]);
+
+  const fetchRecentApplications = async () => {
+    try {
+      setLoadingApplications(true);
+      const params = { limit: 5 }; // Get only 5 most recent
+      
+      const response = await changeRequestService.getAllChangeRequests(params);
+      if (response.success) {
+        const requests = response.changeRequests || [];
+        // Filter by current user (sender)
+        const userRequests = requests.filter(request => {
+          const senderId = request.sender?._id || request.sender;
+          return senderId?.toString() === user._id.toString();
+        });
+        // Sort by newest and take first 5
+        userRequests.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setRecentApplications(userRequests.slice(0, 5));
+      }
+    } catch (err) {
+      console.error('Error fetching recent applications:', err);
+    } finally {
+      setLoadingApplications(false);
     }
   };
 
@@ -67,8 +223,34 @@ const TeacherSchedule = () => {
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    
+    // Parse date string to avoid timezone conversion issues
+    // If date is already a Date object
+    if (dateString instanceof Date) {
+      const year = dateString.getUTCFullYear();
+      const month = String(dateString.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(dateString.getUTCDate()).padStart(2, '0');
+      return `${day}/${month}/${year}`;
+    }
+    
+    // If date is a string, extract YYYY-MM-DD part
+    const dateStr = typeof dateString === 'string' ? dateString : dateString.toString();
+    const dateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    
+    if (dateMatch) {
+      const year = dateMatch[1];
+      const month = dateMatch[2];
+      const day = dateMatch[3];
+      return `${day}/${month}/${year}`;
+    }
+    
+    // Fallback: use UTC methods to avoid timezone conversion
     const date = new Date(dateString);
-    return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    return `${day}/${month}/${year}`;
   };
 
   const getStatusBadge = (status) => {
@@ -79,6 +261,40 @@ const TeacherSchedule = () => {
     };
     const config = statusConfig[status] || statusConfig.upcoming;
     return <Badge className={`${config.bg} text-white px-12 py-6`}>{config.text}</Badge>;
+  };
+
+  // Helper functions for change requests
+  const getRequestStatusBadge = (status) => {
+    const statusConfig = {
+      pending: { variant: 'warning', text: 'Chờ duyệt' },
+      approved: { variant: 'success', text: 'Đã duyệt' },
+      rejected: { variant: 'danger', text: 'Từ chối' }
+    };
+    const config = statusConfig[status] || { variant: 'secondary', text: status };
+    return <Badge bg={config.variant}>{config.text}</Badge>;
+  };
+
+  const getTypeBadge = (type) => {
+    const typeConfig = {
+      create_class: { variant: 'info', text: 'Tạo lớp' },
+      change_class: { variant: 'primary', text: 'Đổi lớp' },
+      makeup_class: { variant: 'warning', text: 'Học bù' },
+      request_replace_teacher: { variant: 'secondary', text: 'Thay giáo viên' }
+    };
+    const config = typeConfig[type] || { variant: 'secondary', text: type || 'N/A' };
+    return <Badge bg={config.variant}>{config.text}</Badge>;
+  };
+
+  const formatRequestDate = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   const getMonthDays = () => {
@@ -106,20 +322,65 @@ const TeacherSchedule = () => {
 
   const filteredSchedules = schedules.filter(schedule => {
     if (filterStatus === 'all') return true;
-    if (filterStatus === 'upcoming') return schedule.status === 'upcoming';
-    if (filterStatus === 'completed') return schedule.status === 'completed';
+    if (filterStatus === 'upcoming') return schedule.scheduleStatus === 'upcoming';
+    if (filterStatus === 'completed') return schedule.scheduleStatus === 'completed';
     return true;
   });
 
   const renderWeekView = () => {
     const weekDays = getWeekDays();
+    
+    const timeSlots = [
+      '08:00 - 10:00',
+      '10:00 - 12:00',
+      '12:00 - 14:00',
+      '14:00 - 16:00',
+      '16:00 - 18:00',
+      '18:00 - 20:00',
+      '20:00 - 22:00'
+    ];
+
+    // Helper function to check if schedule fits in time slot
+    const isScheduleInTimeSlot = (schedule, timeSlot) => {
+      if (!schedule.startTime || !schedule.endTime) return false;
+      
+      const [slotStart, slotEnd] = timeSlot.split(' - ');
+      const scheduleStart = schedule.startTime.trim();
+      const scheduleEnd = schedule.endTime.trim();
+      
+      // Convert time strings to minutes for accurate comparison
+      const timeToMinutes = (timeStr) => {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return hours * 60 + (minutes || 0);
+      };
+      
+      const slotStartMinutes = timeToMinutes(slotStart);
+      const slotEndMinutes = timeToMinutes(slotEnd);
+      const scheduleStartMinutes = timeToMinutes(scheduleStart);
+      const scheduleEndMinutes = timeToMinutes(scheduleEnd);
+      
+      // Check if schedule starts exactly at slot start, or overlaps with time slot
+      // A schedule matches if:
+      // 1. Schedule starts at slot start (exact match)
+      // 2. Schedule overlaps with slot (starts before slot end and ends after slot start)
+      return (scheduleStartMinutes === slotStartMinutes) ||
+             (scheduleStartMinutes < slotEndMinutes && scheduleEndMinutes > slotStartMinutes);
+    };
 
     return (
       <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
         <Card.Body className="p-0">
-          <div className="schedule-week-view d-flex flex-column">
+          <div className="schedule-week-view">
             {/* Week Days Header */}
             <div className="d-flex border-bottom border-neutral-100">
+              {/* Time column header */}
+              <div className="bg-neutral-50 text-center py-16" style={{ width: '100px', minWidth: '100px', borderRight: '1px solid #E9ECEF' }}>
+                <div className="text-12 fw-semibold text-neutral-700">
+                  Thời gian
+                </div>
+              </div>
+              
+              {/* Day headers */}
               {weekDays.map((day, index) => {
                 const isToday = day.toDateString() === new Date().toDateString();
                 return (
@@ -144,116 +405,143 @@ const TeacherSchedule = () => {
               })}
             </div>
 
-            {/* Schedule Content */}
-            <div className="d-flex" style={{ minHeight: '500px' }}>
-              {weekDays.map((day, index) => {
-                const daySchedules = schedules.filter(s => {
-                  const scheduleDate = new Date(s.date);
-                  return scheduleDate.toDateString() === day.toDateString();
-                });
+            {/* Schedule Content with Time Slots */}
+            {timeSlots.map((timeSlot, slotIndex) => (
+              <div key={slotIndex} className="d-flex border-bottom border-neutral-100">
+                {/* Time column */}
+                <div 
+                  className="bg-neutral-25 d-flex align-items-center justify-content-center text-neutral-700 fw-medium text-12"
+                  style={{ width: '100px', minWidth: '100px', borderRight: '1px solid #E9ECEF', padding: '12px 8px' }}
+                >
+                  {timeSlot}
+                </div>
+                
+                {/* Day columns */}
+                {weekDays.map((day, dayIndex) => {
+                  const daySchedules = filteredSchedules.filter(s => {
+                    // Backend returns date as DD/MM/YYYY string
+                    const dateStr = s.date;
+                    if (!dateStr) return false;
+                    
+                    // Parse DD/MM/YYYY format
+                    const dateMatch = dateStr.toString().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                    if (!dateMatch) return false;
+                    
+                    const scheduleDay = parseInt(dateMatch[1], 10);
+                    const scheduleMonth = parseInt(dateMatch[2], 10) - 1; // Month is 0-indexed
+                    const scheduleYear = parseInt(dateMatch[3], 10);
+                    
+                    // Extract date components from day (local timezone)
+                    const dayYear = day.getFullYear();
+                    const dayMonth = day.getMonth();
+                    const dayDay = day.getDate();
+                    
+                    // Compare date components directly
+                    const dateMatches = scheduleYear === dayYear && 
+                                       scheduleMonth === dayMonth && 
+                                       scheduleDay === dayDay;
+                    
+                    if (!dateMatches) return false;
+                    
+                    // Check time slot match
+                    const timeSlotMatches = isScheduleInTimeSlot(s, timeSlot);
+                    
+                    return timeSlotMatches;
+                  });
 
-                const isToday = day.toDateString() === new Date().toDateString();
+                  const isToday = day.toDateString() === new Date().toDateString();
 
-                return (
-                  <div 
-                    key={index}
-                    className={`p-12 ${
-                      isToday ? 'bg-main-25' : 'bg-white'
-                    }`}
-                    style={{ 
-                      flex: '1 1 0', 
-                      minWidth: '0',
-                      borderRight: index < 6 ? '1px solid #E9ECEF' : 'none'
-                    }}
-                  >
-                    {daySchedules.length > 0 ? (
-                      <div className="d-flex flex-column gap-8">
-                        {daySchedules.map(schedule => (
-                          <Link 
-                            key={schedule.id}
-                            to={`/teacher/lessons/${schedule.id}`}
-                            className="text-decoration-none"
-                          >
-                            <div
-                              className={`border rounded-8 p-12 cursor-pointer transition-2 ${
-                                schedule.status === 'upcoming'
-                                  ? 'border-main-200 bg-main-50 hover-shadow-sm'
-                                  : schedule.status === 'completed'
-                                  ? 'border-success-200 bg-success-50'
-                                  : 'border-neutral-200 bg-neutral-50'
-                              }`}
-                              style={{ cursor: 'pointer' }}
+                  return (
+                    <div 
+                      key={dayIndex}
+                      className={`p-8 ${
+                        isToday ? 'bg-main-25' : 'bg-white'
+                      }`}
+                      style={{ 
+                        flex: '1 1 0', 
+                        minWidth: '0',
+                        minHeight: '100px',
+                        borderRight: dayIndex < 6 ? '1px solid #E9ECEF' : 'none'
+                      }}
+                    >
+                      {daySchedules.length > 0 ? (
+                        <div className="d-flex flex-column gap-6">
+                          {daySchedules.map(schedule => (
+                            <Link 
+                              key={schedule._id}
+                              to={`/teacher/lessons/${schedule._id}`}
+                              className="text-decoration-none"
                             >
-                            <div className="d-flex align-items-start justify-content-between mb-8">
-                              <div className="text-neutral-900 fw-bold text-13">
-                                {schedule.startTime}
+                              <div
+                                className={`border rounded-8 p-10 cursor-pointer transition-2 ${
+                                  schedule.scheduleStatus === 'upcoming'
+                                    ? 'border-main-200 bg-main-50 hover-shadow-sm'
+                                    : schedule.scheduleStatus === 'completed'
+                                    ? 'border-success-200 bg-success-50'
+                                    : 'border-neutral-200 bg-neutral-50'
+                                }`}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                <div className="d-flex align-items-start justify-content-between mb-6">
+                                  <div className="text-neutral-900 fw-bold text-11">
+                                    {schedule.startTime} - {schedule.endTime}
+                                  </div>
+                                  {/* {schedule.homework?.length > 0 && (
+                                    <div className="rounded-circle bg-warning-600" style={{ width: '6px', height: '6px' }}></div>
+                                  )} */}
+                                </div>
+                                
+                                {/* Class Name */}
+                                <div className="text-main-600 fw-bold text-11 mb-4" style={{
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 1,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden'
+                                }}>
+                                  <i className="fas fa-chalkboard-teacher me-1" style={{ fontSize: '9px' }}></i>
+                                  {schedule.className}
+                                </div>
+
+                                {/* Session Title */}
+                                <div className="text-neutral-900 fw-semibold text-11 mb-4" style={{
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                  lineHeight: '1.3'
+                                }}>
+                                  {schedule.sessionTitle || 'Chưa có tiêu đề'}
+                                </div>
+
+                                {/* Course Name */}
+                                <div className="text-neutral-600 text-10 mb-4">
+                                  <i className="fas fa-book me-1" style={{ fontSize: '9px' }}></i>
+                                  {schedule.courseName}
+                                </div>
+
+                                {/* Room */}
+                                <div className="text-neutral-500 text-10 mb-6">
+                                  <i className="fas fa-door-open me-1" style={{ fontSize: '9px' }}></i>
+                                  {schedule.roomName || 'Chưa xác định'}
+                                </div>
+
+                                <Button
+                                  className={schedule.scheduleStatus === 'upcoming' ? 'btn-main w-100 py-4 radius-6' : 'btn-outline-success w-100 py-4 radius-6'}
+                                  style={{ fontSize: '10px' }}
+                                >
+                                  <i className={`fas ${schedule.scheduleStatus === 'upcoming' ? 'fa-chalkboard-teacher' : 'fa-check-circle'} me-1`}></i>
+                                  {schedule.scheduleStatus === 'upcoming' ? 'Vào lớp' : 'Đã dạy'}
+                                </Button>
                               </div>
-                              {!schedule.attendanceCompleted && schedule.status === 'completed' && (
-                                <div className="rounded-circle bg-warning-600" style={{ width: '8px', height: '8px' }}></div>
-                              )}
-                            </div>
-                            
-                            {/* Class Name */}
-                            <div className="text-main-600 fw-bold text-12 mb-6" style={{
-                              display: '-webkit-box',
-                              WebkitLineClamp: 1,
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden'
-                            }}>
-                              {schedule.className}
-                            </div>
-
-                            <div className="text-neutral-900 fw-semibold text-13 mb-6" style={{
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden',
-                              lineHeight: '1.4'
-                            }}>
-                              {schedule.topic}
-                            </div>
-
-                            <div className="text-neutral-600 text-11 mb-6">
-                              <i className="fas fa-users me-1" style={{ fontSize: '10px' }}></i>
-                              {schedule.totalStudents} học viên
-                            </div>
-
-                            <div className="text-neutral-500 text-11 mb-8">
-                              <i className="fas fa-door-open me-1" style={{ fontSize: '10px' }}></i>
-                              {schedule.room}
-                            </div>
-
-                            {schedule.status === 'upcoming' && (
-                              <Button
-                                className="btn-main w-100 py-6 radius-6"
-                                style={{ fontSize: '11px' }}
-                              >
-                                <i className="fas fa-chalkboard-teacher me-1"></i>
-                                Vào lớp
-                              </Button>
-                            )}
-                            {schedule.status === 'completed' && !schedule.attendanceCompleted && (
-                              <Button
-                                className="btn-outline-warning w-100 py-6 radius-6"
-                                style={{ fontSize: '11px' }}
-                              >
-                                <i className="fas fa-user-check me-1"></i>
-                                Điểm danh
-                              </Button>
-                            )}
-                          </div>
-                        </Link>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-40 text-neutral-300">
-                        <i className="fas fa-calendar-times" style={{ fontSize: '20px' }}></i>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                            </Link>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </Card.Body>
       </Card>
@@ -283,9 +571,28 @@ const TeacherSchedule = () => {
           {/* Calendar Grid */}
           <div className="d-flex flex-wrap">
             {monthDays.map((dayInfo, index) => {
-              const daySchedules = schedules.filter(s => {
-                const scheduleDate = new Date(s.date);
-                return scheduleDate.toDateString() === dayInfo.date.toDateString();
+              const daySchedules = filteredSchedules.filter(s => {
+                // Backend returns date as DD/MM/YYYY string
+                const dateStr = s.date;
+                if (!dateStr) return false;
+                
+                // Parse DD/MM/YYYY format
+                const dateMatch = dateStr.toString().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                if (!dateMatch) return false;
+                
+                const scheduleDay = parseInt(dateMatch[1], 10);
+                const scheduleMonth = parseInt(dateMatch[2], 10) - 1; // Month is 0-indexed
+                const scheduleYear = parseInt(dateMatch[3], 10);
+                
+                // Extract date components from dayInfo.date (local timezone)
+                const dayYear = dayInfo.date.getFullYear();
+                const dayMonth = dayInfo.date.getMonth();
+                const dayDay = dayInfo.date.getDate();
+                
+                // Compare date components directly
+                return scheduleYear === dayYear && 
+                       scheduleMonth === dayMonth && 
+                       scheduleDay === dayDay;
               });
 
               const isToday = dayInfo.date.toDateString() === new Date().toDateString();
@@ -311,9 +618,9 @@ const TeacherSchedule = () => {
                     <div className="d-flex flex-column gap-4">
                       {daySchedules.slice(0, 2).map(schedule => (
                         <div
-                          key={schedule.id}
+                          key={schedule._id}
                           className={`rounded-6 px-6 py-4 cursor-pointer ${
-                            schedule.status === 'upcoming'
+                            schedule.scheduleStatus === 'upcoming'
                               ? 'bg-main-100 border-start border-main-600 border-2'
                               : 'bg-success-100 border-start border-success-600 border-2'
                           }`}
@@ -356,10 +663,9 @@ const TeacherSchedule = () => {
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Ngày</th>
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Thời gian</th>
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Lớp học</th>
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Khóa học</th>
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Buổi học</th>
-                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Chủ đề</th>
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Phòng</th>
-                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Học viên</th>
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Trạng thái</th>
                   <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Thao tác</th>
                 </tr>
@@ -367,64 +673,56 @@ const TeacherSchedule = () => {
               <tbody>
                 {filteredSchedules.length > 0 ? (
                   filteredSchedules.map((schedule) => (
-                    <tr key={schedule.id} className="transition-2" style={{ cursor: 'pointer' }}>
+                    <tr key={schedule._id} className="transition-2" style={{ cursor: 'pointer' }}>
                       <td className="px-20 py-16 text-neutral-700 text-13">
-                        <Link to={`/teacher/lessons/${schedule.id}`} className="text-decoration-none text-neutral-700">
-                          {formatDate(schedule.date)}
+                        <Link to={`/teacher/lessons/${schedule._id}`} className="text-decoration-none text-neutral-700">
+                          {schedule.date}
                         </Link>
                       </td>
                       <td className="px-20 py-16 text-neutral-700 text-13">
-                        <Link to={`/teacher/lessons/${schedule.id}`} className="text-decoration-none text-neutral-700">
+                        <Link to={`/teacher/lessons/${schedule._id}`} className="text-decoration-none text-neutral-700">
                           {schedule.startTime} - {schedule.endTime}
                         </Link>
                       </td>
                       <td className="px-20 py-16 text-main-600 fw-semibold text-13">
-                        <Link to={`/teacher/lessons/${schedule.id}`} className="text-decoration-none text-main-600">
+                        <Link to={`/teacher/lessons/${schedule._id}`} className="text-decoration-none text-main-600">
                           {schedule.className}
                         </Link>
                       </td>
                       <td className="px-20 py-16 text-neutral-700 text-13">
-                        <Link to={`/teacher/lessons/${schedule.id}`} className="text-decoration-none text-neutral-700">
-                          Buổi {schedule.lessonNumber}
+                        <Link to={`/teacher/lessons/${schedule._id}`} className="text-decoration-none text-neutral-700">
+                          {schedule.courseName}
                         </Link>
                       </td>
                       <td className="px-20 py-16 text-neutral-900 fw-medium text-13">
-                        <Link to={`/teacher/lessons/${schedule.id}`} className="text-decoration-none text-neutral-900">
-                          {schedule.topic}
+                        <Link to={`/teacher/lessons/${schedule._id}`} className="text-decoration-none text-neutral-900">
+                          {schedule.sessionTitle || 'Chưa có tiêu đề'}
                         </Link>
                       </td>
                       <td className="px-20 py-16 text-neutral-700 text-13">
-                        <Link to={`/teacher/lessons/${schedule.id}`} className="text-decoration-none text-neutral-700">
-                          {schedule.room}
+                        <Link to={`/teacher/lessons/${schedule._id}`} className="text-decoration-none text-neutral-700">
+                          {schedule.roomName || 'Chưa xác định'}
                         </Link>
                       </td>
-                      <td className="px-20 py-16 text-neutral-700 text-13">
-                        <Link to={`/teacher/lessons/${schedule.id}`} className="text-decoration-none text-neutral-700">
-                          {schedule.totalStudents}
-                        </Link>
-                      </td>
-                      <td className="px-20 py-16 text-13">{getStatusBadge(schedule.status)}</td>
+                      <td className="px-20 py-16 text-13">{getStatusBadge(schedule.scheduleStatus)}</td>
                       <td className="px-20 py-16 text-center">
-                        <Link to={`/teacher/lessons/${schedule.id}`}>
+                        <Link to={`/teacher/lessons/${schedule._id}`}>
                           <Button className="btn-outline-main text-13 fw-medium px-12 py-6 radius-6 me-2">
                             <i className="fas fa-eye me-1"></i>
                             Chi tiết
                           </Button>
                         </Link>
-                        {schedule.status === 'completed' && !schedule.attendanceCompleted && (
-                          <Link to={`/teacher/attendance/${schedule.id}`}>
-                            <Button className="btn-outline-warning text-13 fw-medium px-12 py-6 radius-6">
-                              <i className="fas fa-user-check me-1"></i>
-                              Điểm danh
-                            </Button>
-                          </Link>
-                        )}
+                        {/* {schedule.homework?.length > 0 && (
+                          <Badge bg="warning" className="ms-2">
+                            {schedule.homework.length} BTVN
+                          </Badge>
+                        )} */}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="9" className="text-center py-40">
+                    <td colSpan="8" className="text-center py-40">
                       <i className="fas fa-calendar-times fa-3x text-neutral-400 mb-16"></i>
                       <p className="text-neutral-500 mb-0">Không có lịch dạy nào</p>
                     </td>
@@ -527,10 +825,52 @@ const TeacherSchedule = () => {
         </Card.Body>
       </Card>
 
+      {/* Loading State */}
+      {loading && (
+        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+          <Card.Body className="text-center py-40">
+            <div className="spinner-border text-main-600" role="status">
+              <span className="visually-hidden">Đang tải...</span>
+            </div>
+            <p className="text-neutral-600 mt-12 mb-0">Đang tải lịch dạy...</p>
+          </Card.Body>
+        </Card>
+      )}
+
+      {/* Error State */}
+      {error && !loading && (
+        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+          <Card.Body className="text-center py-40">
+            <i className="fas fa-exclamation-circle text-danger-600 mb-12" style={{ fontSize: '48px' }}></i>
+            <p className="text-danger-600 mb-12">{error}</p>
+            <Button onClick={fetchSchedules} className="btn-main">
+              <i className="fas fa-redo me-2"></i>
+              Thử lại
+            </Button>
+          </Card.Body>
+        </Card>
+      )}
+
+
+
       {/* Schedule View */}
-      {viewMode === 'week' && renderWeekView()}
-      {viewMode === 'month' && renderMonthView()}
-      {viewMode === 'list' && renderListView()}
+      {!loading && !error && (
+        <>
+          {viewMode === 'week' && renderWeekView()}
+          {viewMode === 'month' && renderMonthView()}
+          {viewMode === 'list' && schedules.length > 0 ? renderListView() : (
+            schedules.length === 0 && (
+              <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+                <Card.Body className="text-center py-40">
+                  <i className="fas fa-calendar-times text-neutral-400 mb-12" style={{ fontSize: '48px' }}></i>
+                  <p className="text-neutral-600 mb-0">Chưa có lịch dạy nào</p>
+                </Card.Body>
+              </Card>
+            )
+          )}
+        </>
+      )}
+
     </Container>
   );
 };

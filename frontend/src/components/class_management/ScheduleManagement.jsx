@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Container, Card, Button, ButtonGroup, Form, Row, Col, Badge, Spinner, Alert } from 'react-bootstrap';
+import { toast } from 'react-toastify';
+import Swal from 'sweetalert2';
 import ScheduleCalendar from './ScheduleCalendar';
 import ScheduleWeekly from './ScheduleWeekly';
 import ScheduleList from './ScheduleList';
@@ -48,77 +50,49 @@ const ScheduleManagement = () => {
       if (filters.endDate) params.endDate = filters.endDate;
       if (filters.status) params.status = filters.status;
       
-      // const response = await scheduleService.getAllSchedules(params);
+      const response = await scheduleService.getAllSchedules(params);
       
-      // const transformedSchedules = response.schedules.map(sch => ({
-      //   id: sch._id,
-      //   classId: sch.class?._id,
-      //   className: sch.class?.name || 'N/A',
-      //   teacherId: sch.class?.teacher?._id,
-      //   teacherName: sch.class?.teacher ? `${sch.class.teacher.firstName} ${sch.class.teacher.lastName}` : 'N/A',
-      //   roomId: sch.room?._id,
-      //   roomName: sch.room?.room_name || 'N/A',
-      //   date: sch.date ? new Date(sch.date).toISOString().split('T')[0] : 'N/A',
-      //   startTime: sch.startTime || 'N/A',
-      //   endTime: sch.endTime || 'N/A',
-      //   lessonNumber: sch.session?.sessionNumber || 0,
-      //   lessonTopic: sch.topic || sch.session?.topic || 'N/A',
-      //   status: sch.status || 'draft',
-      //   type: 'regular'
-      // }));
+      // Transform API response to match component's expected format
+      const transformedSchedules = (response.schedules || response.data || []).map(sch => {
+        // Format date to YYYY-MM-DD
+        let dateStr = 'N/A';
+        if (sch.date) {
+          if (sch.date instanceof Date) {
+            dateStr = sch.date.toISOString().split('T')[0];
+          } else if (typeof sch.date === 'string') {
+            dateStr = sch.date.split('T')[0];
+          }
+        }
+        
+        let className = sch.class?.name;
+        if (!className && sch.status === 'temporary') {
+          className = 'Lớp học bù';
+        } else if (!className) {
+          className = 'N/A';
+        }
+        
+        const programType = sch.class?.course?.program?.type || sch.programType || sch.sessionCourse?.program?.type || null;
+        
+        return {
+          id: sch._id || sch.id,
+          classId: sch.class?._id || sch.classId,
+          className: className,
+          teacherId: sch.teacher?._id || sch.class?.teacher?._id || sch.teacherId,
+          teacherName: sch.teacher?.username || sch.class?.teacher?.username || 'N/A',
+          roomId: sch.room?._id || sch.roomId,
+          roomName: sch.room?.room_name || 'N/A',
+          date: dateStr,
+          startTime: sch.startTime || 'N/A',
+          endTime: sch.endTime || 'N/A',
+          lessonNumber: sch.session?.order || sch.session?.sessionNumber || 0,
+          lessonTopic: sch.session?.title || sch.topic || 'N/A',
+          status: sch.status || 'fixed',
+          type: sch.type || 'regular',
+          programType: programType
+        };
+      });
       
-      // Mock data for testing - Multiple classes in same time slots
-      const mockSchedules = [
-        // Monday - Multiple classes at 8:00
-        { id: 1, classId: 'c1', className: 'TOEIC 450 - A1', teacherId: 't1', teacherName: 'Nguyễn Văn A', roomId: 'r1', roomName: 'P.101', date: '2025-11-17', startTime: '08:00', endTime: '10:00', lessonNumber: 5, lessonTopic: 'Listening Practice', status: 'scheduled', type: 'regular' },
-        { id: 2, classId: 'c2', className: 'TOEIC 650 - B1', teacherId: 't2', teacherName: 'Trần Thị B', roomId: 'r2', roomName: 'P.102', date: '2025-11-17', startTime: '08:00', endTime: '10:00', lessonNumber: 8, lessonTopic: 'Reading Comprehension', status: 'scheduled', type: 'regular' },
-        { id: 3, classId: 'c3', className: 'TOEIC 850 - C1', teacherId: 't3', teacherName: 'Lê Văn C', roomId: 'r3', roomName: 'P.103', date: '2025-11-17', startTime: '08:00', endTime: '10:00', lessonNumber: 12, lessonTopic: 'Advanced Grammar', status: 'scheduled', type: 'regular' },
-        
-        // Monday - Multiple classes at 10:00
-        { id: 4, classId: 'c4', className: 'TOEIC 550 - A2', teacherId: 't4', teacherName: 'Phạm Thị D', roomId: 'r4', roomName: 'P.104', date: '2025-11-17', startTime: '10:00', endTime: '12:00', lessonNumber: 6, lessonTopic: 'Vocabulary Building', status: 'scheduled', type: 'regular' },
-        { id: 5, classId: 'c5', className: 'TOEIC 750 - B2', teacherId: 't5', teacherName: 'Hoàng Văn E', roomId: 'r5', roomName: 'P.105', date: '2025-11-17', startTime: '10:00', endTime: '12:00', lessonNumber: 10, lessonTopic: 'Business English', status: 'scheduled', type: 'regular' },
-        
-        // Monday afternoon
-        { id: 6, classId: 'c1', className: 'TOEIC 450 - A1', teacherId: 't1', teacherName: 'Nguyễn Văn A', roomId: 'r1', roomName: 'P.101', date: '2025-11-17', startTime: '14:00', endTime: '16:00', lessonNumber: 6, lessonTopic: 'Speaking Practice', status: 'scheduled', type: 'regular' },
-        { id: 7, classId: 'c6', className: 'TOEIC 900+ - Expert', teacherId: 't6', teacherName: 'Vũ Thị F', roomId: 'r6', roomName: 'P.106', date: '2025-11-17', startTime: '14:00', endTime: '16:00', lessonNumber: 15, lessonTopic: 'Mock Test', status: 'scheduled', type: 'regular' },
-        
-        // Monday evening - Multiple classes
-        { id: 8, classId: 'c2', className: 'TOEIC 650 - B1', teacherId: 't2', teacherName: 'Trần Thị B', roomId: 'r2', roomName: 'P.102', date: '2025-11-17', startTime: '18:00', endTime: '20:00', lessonNumber: 9, lessonTopic: 'Writing Skills', status: 'scheduled', type: 'regular' },
-        { id: 9, classId: 'c7', className: 'TOEIC Intensive', teacherId: 't7', teacherName: 'Đỗ Văn G', roomId: 'r7', roomName: 'P.107', date: '2025-11-17', startTime: '18:00', endTime: '20:00', lessonNumber: 4, lessonTopic: 'Part 5-6 Practice', status: 'scheduled', type: 'regular' },
-        
-        // Tuesday - Multiple classes throughout the day
-        { id: 10, classId: 'c3', className: 'TOEIC 850 - C1', teacherId: 't3', teacherName: 'Lê Văn C', roomId: 'r3', roomName: 'P.103', date: '2025-11-18', startTime: '08:00', endTime: '10:00', lessonNumber: 13, lessonTopic: 'Advanced Listening', status: 'scheduled', type: 'regular' },
-        { id: 11, classId: 'c8', className: 'TOEIC Foundation', teacherId: 't8', teacherName: 'Bùi Thị H', roomId: 'r8', roomName: 'P.108', date: '2025-11-18', startTime: '08:00', endTime: '10:00', lessonNumber: 2, lessonTopic: 'Basic Grammar', status: 'scheduled', type: 'regular' },
-        { id: 12, classId: 'c4', className: 'TOEIC 550 - A2', teacherId: 't4', teacherName: 'Phạm Thị D', roomId: 'r4', roomName: 'P.104', date: '2025-11-18', startTime: '08:00', endTime: '10:00', lessonNumber: 7, lessonTopic: 'Part 1-2 Practice', status: 'scheduled', type: 'regular' },
-        
-        { id: 13, classId: 'c5', className: 'TOEIC 750 - B2', teacherId: 't5', teacherName: 'Hoàng Văn E', roomId: 'r5', roomName: 'P.105', date: '2025-11-18', startTime: '10:00', endTime: '12:00', lessonNumber: 11, lessonTopic: 'Professional Communication', status: 'scheduled', type: 'regular' },
-        { id: 14, classId: 'c9', className: 'TOEIC 600 Weekend', teacherId: 't9', teacherName: 'Ngô Văn I', roomId: 'r9', roomName: 'P.109', date: '2025-11-18', startTime: '10:00', endTime: '12:00', lessonNumber: 5, lessonTopic: 'Reading Strategies', status: 'scheduled', type: 'regular' },
-        
-        // Wednesday
-        { id: 15, classId: 'c1', className: 'TOEIC 450 - A1', teacherId: 't1', teacherName: 'Nguyễn Văn A', roomId: 'r1', roomName: 'P.101', date: '2025-11-19', startTime: '08:00', endTime: '10:00', lessonNumber: 7, lessonTopic: 'Pronunciation', status: 'scheduled', type: 'regular' },
-        { id: 16, classId: 'c2', className: 'TOEIC 650 - B1', teacherId: 't2', teacherName: 'Trần Thị B', roomId: 'r2', roomName: 'P.102', date: '2025-11-19', startTime: '14:00', endTime: '16:00', lessonNumber: 10, lessonTopic: 'Part 7 Practice', status: 'scheduled', type: 'regular' },
-        { id: 17, classId: 'c3', className: 'TOEIC 850 - C1', teacherId: 't3', teacherName: 'Lê Văn C', roomId: 'r3', roomName: 'P.103', date: '2025-11-19', startTime: '16:00', endTime: '18:00', lessonNumber: 14, lessonTopic: 'Test Strategy', status: 'scheduled', type: 'regular' },
-        
-        // Thursday - High density day
-        { id: 18, classId: 'c4', className: 'TOEIC 550 - A2', teacherId: 't4', teacherName: 'Phạm Thị D', roomId: 'r4', roomName: 'P.104', date: '2025-11-20', startTime: '08:00', endTime: '10:00', lessonNumber: 8, lessonTopic: 'Part 3-4 Practice', status: 'scheduled', type: 'regular' },
-        { id: 19, classId: 'c5', className: 'TOEIC 750 - B2', teacherId: 't5', teacherName: 'Hoàng Văn E', roomId: 'r5', roomName: 'P.105', date: '2025-11-20', startTime: '08:00', endTime: '10:00', lessonNumber: 12, lessonTopic: 'Email Writing', status: 'scheduled', type: 'regular' },
-        { id: 20, classId: 'c6', className: 'TOEIC 900+ - Expert', teacherId: 't6', teacherName: 'Vũ Thị F', roomId: 'r6', roomName: 'P.106', date: '2025-11-20', startTime: '08:00', endTime: '10:00', lessonNumber: 16, lessonTopic: 'Full Practice Test', status: 'completed', type: 'regular' },
-        { id: 21, classId: 'c7', className: 'TOEIC Intensive', teacherId: 't7', teacherName: 'Đỗ Văn G', roomId: 'r7', roomName: 'P.107', date: '2025-11-20', startTime: '08:00', endTime: '10:00', lessonNumber: 5, lessonTopic: 'Grammar Review', status: 'scheduled', type: 'regular' },
-        
-        // Friday
-        { id: 22, classId: 'c8', className: 'TOEIC Foundation', teacherId: 't8', teacherName: 'Bùi Thị H', roomId: 'r8', roomName: 'P.108', date: '2025-11-21', startTime: '14:00', endTime: '16:00', lessonNumber: 3, lessonTopic: 'Sentence Structure', status: 'scheduled', type: 'regular' },
-        { id: 23, classId: 'c9', className: 'TOEIC 600 Weekend', teacherId: 't9', teacherName: 'Ngô Văn I', roomId: 'r9', roomName: 'P.109', date: '2025-11-21', startTime: '16:00', endTime: '18:00', lessonNumber: 6, lessonTopic: 'Listening Part 3', status: 'scheduled', type: 'regular' },
-        
-        // Saturday - Weekend classes
-        { id: 24, classId: 'c1', className: 'TOEIC 450 - A1', teacherId: 't1', teacherName: 'Nguyễn Văn A', roomId: 'r1', roomName: 'P.101', date: '2025-11-22', startTime: '08:00', endTime: '10:00', lessonNumber: 8, lessonTopic: 'Weekend Practice', status: 'scheduled', type: 'regular' },
-        { id: 25, classId: 'c2', className: 'TOEIC 650 - B1', teacherId: 't2', teacherName: 'Trần Thị B', roomId: 'r2', roomName: 'P.102', date: '2025-11-22', startTime: '10:00', endTime: '12:00', lessonNumber: 11, lessonTopic: 'Mock Test Review', status: 'scheduled', type: 'regular' },
-        { id: 26, classId: 'c10', className: 'TOEIC Makeup Class', teacherId: 't1', teacherName: 'Nguyễn Văn A', roomId: 'r10', roomName: 'P.110', date: '2025-11-22', startTime: '14:00', endTime: '16:00', lessonNumber: 5, lessonTopic: 'Makeup: Vocabulary', status: 'scheduled', type: 'makeup' },
-        
-        // Sunday
-        { id: 27, classId: 'c3', className: 'TOEIC 850 - C1', teacherId: 't3', teacherName: 'Lê Văn C', roomId: 'r3', roomName: 'P.103', date: '2025-11-23', startTime: '10:00', endTime: '12:00', lessonNumber: 15, lessonTopic: 'Final Review', status: 'scheduled', type: 'regular' },
-      ];
-      
-      setSchedules(mockSchedules);
+      setSchedules(transformedSchedules);
     } catch (err) {
       console.error('Error fetching schedules:', err);
       setError(err.message || 'Không thể tải danh sách lịch học');
@@ -147,7 +121,7 @@ const ScheduleManagement = () => {
       const response = await teacherService.getAllTeachers();
       const transformedTeachers = response.teachers.map(t => ({
         id: t._id,
-        name: `${t.firstName} ${t.lastName}`,
+        name: t.username || t.email || 'N/A',
         email: t.email
       }));
       setTeachers(transformedTeachers);
@@ -171,7 +145,6 @@ const ScheduleManagement = () => {
     }
   };
 
-  // Fetch data from API
   useEffect(() => {
     const fetchData = async () => {
       await fetchSchedules();
@@ -180,7 +153,6 @@ const ScheduleManagement = () => {
       await fetchRooms();
     };
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   const handleCreateSchedule = async (scheduleData) => {
@@ -188,14 +160,14 @@ const ScheduleManagement = () => {
       setLoading(true);
       await scheduleService.createSchedule(scheduleData);
       setShowCreateModal(false);
-      alert('Tạo lịch học thành công!');
+      toast.success('Tạo lịch học thành công!');
       await fetchSchedules();
     } catch (err) {
       console.error('Error creating schedule:', err);
       if (err.message && err.message.includes('conflict')) {
-        alert(`Xung đột lịch học: ${err.message}`);
+        toast.error(`Xung đột lịch học: ${err.message}`);
       } else {
-        alert(err.message || 'Có lỗi xảy ra khi tạo lịch học!');
+        toast.error(err.message || 'Có lỗi xảy ra khi tạo lịch học!');
       }
     } finally {
       setLoading(false);
@@ -208,27 +180,38 @@ const ScheduleManagement = () => {
       await scheduleService.updateSchedule(scheduleData.id, scheduleData);
       setShowEditModal(false);
       setSelectedSchedule(null);
-      alert('Cập nhật lịch học thành công!');
+      toast.success('Cập nhật lịch học thành công!');
       await fetchSchedules();
     } catch (err) {
       console.error('Error updating schedule:', err);
-      alert(err.message || 'Có lỗi xảy ra khi cập nhật lịch học!');
+      toast.error(err.message || 'Có lỗi xảy ra khi cập nhật lịch học!');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteSchedule = async (scheduleId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa lịch học này?')) return;
+    const result = await Swal.fire({
+      title: 'Xác nhận xóa',
+      text: 'Bạn có chắc chắn muốn xóa lịch học này?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+      confirmButtonColor: '#dc3545',
+      cancelButtonColor: '#6c757d'
+    });
+    
+    if (!result.isConfirmed) return;
     
     try {
       setLoading(true);
       await scheduleService.deleteSchedule(scheduleId);
-      alert('Xóa lịch học thành công!');
+      toast.success('Xóa lịch học thành công!');
       await fetchSchedules();
     } catch (err) {
       console.error('Error deleting schedule:', err);
-      alert(err.message || 'Có lỗi xảy ra khi xóa lịch học!');
+      toast.error(err.message || 'Có lỗi xảy ra khi xóa lịch học!');
     } finally {
       setLoading(false);
     }
@@ -239,11 +222,11 @@ const ScheduleManagement = () => {
       setLoading(true);
       await scheduleService.createSchedule({ ...makeupData, type: 'makeup' });
       setShowMakeupModal(false);
-      alert('Tạo lịch học bù thành công!');
+      toast.success('Tạo lịch học bù thành công!');
       await fetchSchedules();
     } catch (err) {
       console.error('Error creating makeup class:', err);
-      alert(err.message || 'Có lỗi xảy ra khi tạo lịch học bù!');
+      toast.error(err.message || 'Có lỗi xảy ra khi tạo lịch học bù!');
     } finally {
       setLoading(false);
     }
@@ -266,13 +249,11 @@ const ScheduleManagement = () => {
   };
 
   const handleExportSchedule = () => {
-    // TODO: Implement export functionality (Excel/PDF)
-    alert('Chức năng xuất lịch học sẽ được triển khai sau!');
+    toast.info('Chức năng xuất lịch học sẽ được triển khai sau!');
   };
 
   return (
     <Container fluid className="p-24">
-      {/* Loading Spinner */}
       {loading && (
         <div className="text-center py-5">
           <Spinner animation="border" variant="primary" />
@@ -280,7 +261,6 @@ const ScheduleManagement = () => {
         </div>
       )}
 
-      {/* Error Alert */}
       {error && (
         <Alert variant="danger" dismissible onClose={() => setError(null)} className="mb-24">
           <Alert.Heading>Lỗi!</Alert.Heading>
@@ -288,35 +268,13 @@ const ScheduleManagement = () => {
         </Alert>
       )}
 
-      {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-24">
         <div>
           <h2 className="text-neutral-900 fw-bold mb-8">Quản lý lịch học</h2>
           <p className="text-neutral-500 mb-0">Sắp xếp và quản lý lịch học cho các lớp</p>
         </div>
-        <div className="d-flex gap-12">
-          <Button 
-            className="btn-outline-main text-15 fw-medium px-20 py-10 radius-8"
-            onClick={() => setShowRoomManagement(true)}
-          >
-            <i className="fas fa-door-open me-2"></i> Quản lý phòng học
-          </Button>
-          <Button 
-            className="btn-outline-main text-15 fw-medium px-20 py-10 radius-8"
-            onClick={handleExportSchedule}
-          >
-            <i className="fas fa-download me-2"></i> Xuất lịch học
-          </Button>
-          <Button 
-            className="btn-main text-15 fw-semibold px-24 py-12 radius-8"
-            onClick={() => setShowCreateModal(true)}
-          >
-            <i className="fas fa-plus me-2"></i> Tạo lịch học
-          </Button>
-        </div>
       </div>
 
-      {/* Filters */}
       <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
         <Card.Body className="p-24">
           <Row className="g-3">
@@ -434,7 +392,6 @@ const ScheduleManagement = () => {
         </Card.Body>
       </Card>
 
-      {/* View Toggle */}
       <div className="d-flex justify-content-center mb-24">
         <ButtonGroup>
           <Button 
@@ -464,7 +421,6 @@ const ScheduleManagement = () => {
         </ButtonGroup>
       </div>
 
-      {/* Content */}
       <div>
         {viewMode === 'calendar' ? (
           <ScheduleCalendar 
@@ -474,10 +430,6 @@ const ScheduleManagement = () => {
               setShowEditModal(true);
             }}
             onDeleteSchedule={handleDeleteSchedule}
-            onCreateMakeup={(schedule) => {
-              setSelectedSchedule(schedule);
-              setShowMakeupModal(true);
-            }}
           />
         ) : viewMode === 'weekly' ? (
           <ScheduleWeekly 
@@ -508,7 +460,6 @@ const ScheduleManagement = () => {
         )}
       </div>
 
-      {/* Modals */}
       {showCreateModal && (
         <CreateScheduleModal
           classes={classes}

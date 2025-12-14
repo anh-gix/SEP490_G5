@@ -2,7 +2,6 @@ import AboutTwo from "../components/AboutTwo";
 import BannerTwo from "../components/BannerTwo";
 import CategoryOne from "../components/CategoryOne";
 import CertificateTwo from "../components/CertificateTwo";
-import ExploreCourseTwo from "../components/ExploreCourseTwo";
 import FaqOne from "../components/FaqOne";
 import FeaturesTwo from "../components/FeaturesTwo";
 import FooterTwo from "../components/FooterTwo";
@@ -43,8 +42,6 @@ const HomePageTwo = () => {
       {/* CertificateTwo */}
       <CertificateTwo />
 
-      {/* ExploreCourseTwo */}
-      <ExploreCourseTwo />
 
       {/* TestimonialsTwo */}
       <TestimonialsTwo />

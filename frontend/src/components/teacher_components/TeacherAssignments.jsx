@@ -1,57 +1,62 @@
 import React, { useState } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal } from 'react-bootstrap';
-import { teacherAssignmentsMock } from './teacher_mockdata';
+import homeworkService from '../../services/homeworkService';
+import CreateHomeworkModal from './class_detail/modals/CreateHomeworkModal';
 
 /**
  * Teacher Assignments Component
  * Quản lý bài tập - giao bài, xem submissions
  */
+
+// KHÔNG CÒN SỬ DỤNG
+
+
 const TeacherAssignments = () => {
   const [assignments, setAssignments] = useState([]);
   const [filterClass, setFilterClass] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  // const [loading, setLoading] = useState(false);
 
   React.useEffect(() => {
     fetchAssignments();
   }, []);
 
   const fetchAssignments = async () => {
-    // TODO: Replace with actual API call
-    // const response = await teacherAPI.getAssignments();
-    // setAssignments(response.data);
-    
-    // Using mock data
-    setAssignments(teacherAssignmentsMock);
+    try {
+      // setLoading(true);
+      const response = await homeworkService.getTeacherAssignments();
+      
+      if (response.success) {
+        setAssignments(response.assignments || []);
+      }
+    } catch (err) {
+      console.error('Error fetching assignments:', err);
+    } finally {
+      // setLoading(false);
+    }
+  };
+
+  const handleCreateSuccess = () => {
+    fetchAssignments(); // Reload assignments
   };
 
   const getStatusBadge = (assignment) => {
     const now = new Date();
-    const dueDate = new Date(assignment.dueDate);
+    const deadline = new Date(assignment.deadline);
     
-    if (assignment.graded === assignment.totalStudents) {
-      return <Badge className="bg-success-600 text-white px-12 py-6">Đã chấm xong</Badge>;
+    if (assignment.submitted === assignment.totalStudents) {
+      return <Badge className="bg-success-600 text-white px-12 py-6">Đã nộp đủ</Badge>;
     }
-    if (now > dueDate) {
+    if (now > deadline) {
       return <Badge className="bg-danger-600 text-white px-12 py-6">Quá hạn</Badge>;
     }
     return <Badge className="bg-main-600 text-white px-12 py-6">Đang mở</Badge>;
   };
 
-  const getTypeBadge = (type) => {
-    const typeConfig = {
-      homework: { bg: 'bg-info-100', text: 'text-info-600', label: 'Bài tập' },
-      practice: { bg: 'bg-warning-100', text: 'text-warning-600', label: 'Luyện tập' },
-      test: { bg: 'bg-danger-100', text: 'text-danger-600', label: 'Kiểm tra' }
-    };
-    const config = typeConfig[type] || typeConfig.homework;
-    return <Badge className={`${config.bg} ${config.text} px-12 py-6`}>{config.label}</Badge>;
-  };
-
   const filteredAssignments = assignments.filter(a => {
-    const matchesClass = filterClass === 'all' || a.classId === parseInt(filterClass);
-    const matchesStatus = filterStatus === 'all' || a.status === filterStatus;
-    return matchesClass && matchesStatus;
+    const matchesClass = filterClass === 'all' || a.className?.includes(filterClass);
+    return matchesClass;
   });
 
   return (
@@ -220,7 +225,7 @@ const TeacherAssignments = () => {
                     </div>
                   </td>
                   <td className="px-20 py-16 text-neutral-700 text-13">{assignment.className}</td>
-                  <td className="px-20 py-16">{getTypeBadge(assignment.type)}</td>
+                  {/* <td className="px-20 py-16">{getTypeBadge(assignment.type)}</td> */}
                   <td className="px-20 py-16 text-neutral-700 text-13">
                     {new Date(assignment.dueDate).toLocaleDateString('vi-VN')}
                   </td>
@@ -264,67 +269,12 @@ const TeacherAssignments = () => {
         </Card.Body>
       </Card>
 
-      {/* Create Assignment Modal - Simple placeholder */}
-      <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Tạo bài tập mới</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <Form.Group className="mb-16">
-              <Form.Label>Tên bài tập</Form.Label>
-              <Form.Control type="text" placeholder="VD: Unit 5 - Grammar Exercise" />
-            </Form.Group>
-            <Form.Group className="mb-16">
-              <Form.Label>Lớp học</Form.Label>
-              <Form.Select>
-                <option>Chọn lớp học</option>
-                <option>A2-Evening-01</option>
-                <option>B1-Afternoon-02</option>
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-16">
-              <Form.Label>Loại bài tập</Form.Label>
-              <Form.Select>
-                <option value="homework">Bài tập về nhà</option>
-                <option value="practice">Luyện tập</option>
-                <option value="test">Kiểm tra</option>
-              </Form.Select>
-            </Form.Group>
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-16">
-                  <Form.Label>Ngày bắt đầu</Form.Label>
-                  <Form.Control type="date" />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-16">
-                  <Form.Label>Hạn nộp</Form.Label>
-                  <Form.Control type="date" />
-                </Form.Group>
-              </Col>
-            </Row>
-            <Form.Group className="mb-16">
-              <Form.Label>Mô tả</Form.Label>
-              <Form.Control as="textarea" rows={3} placeholder="Mô tả chi tiết bài tập..." />
-            </Form.Group>
-            <Form.Group className="mb-16">
-              <Form.Label>File đính kèm</Form.Label>
-              <Form.Control type="file" multiple />
-            </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button className="btn-outline-neutral" onClick={() => setShowCreateModal(false)}>
-            Hủy
-          </Button>
-          <Button className="btn-main">
-            <i className="fas fa-save me-2"></i>
-            Tạo bài tập
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      {/* Create Homework Modal */}
+      <CreateHomeworkModal
+        show={showCreateModal}
+        onHide={() => setShowCreateModal(false)}
+        onSuccess={handleCreateSuccess}
+      />
     </Container>
   );
 };

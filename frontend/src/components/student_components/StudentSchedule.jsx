@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table, Spinner, Alert } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import RequestAbsenceModal from './RequestAbsenceModal';
 import { useAuth } from '../../contexts/AuthContext';
-import { generateScheduleMockData } from './student_mockdata';
-// import studentScheduleService from '../../services/studentScheduleService'; // TODO: Replace mock data with API
+import studentService from '../../services/studentService';
 
 /**
  * Student Schedule Component
@@ -16,8 +14,6 @@ const StudentSchedule = () => {
   const [selectedWeek, setSelectedWeek] = useState(getCurrentWeek());
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [schedules, setSchedules] = useState([]);
-  const [showAbsenceModal, setShowAbsenceModal] = useState(false);
-  const [selectedSchedule, setSelectedSchedule] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -65,6 +61,10 @@ const StudentSchedule = () => {
   function getCurrentWeek() {
     const today = new Date();
     const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 1));
+
+    console.log('First day of week:', firstDayOfWeek);
+
+    console.log('Last day of week:', new Date(today.setDate(today.getDate() - today.getDay() + 7)));
     return firstDayOfWeek;
   }
 
@@ -100,21 +100,38 @@ const StudentSchedule = () => {
       const status = calculateStatus(item.date, item.endTime);
       const attendanceStatus = item.attendance?.status || null;
 
+      // Xác định className: nếu là buổi học bù (không có class hoặc status là temporary/rescheduled) thì hiển thị "Lớp học bù"
+      let className = item.className;
+      if (!className || className === 'N/A' || className === null || className === undefined) {
+        // Kiểm tra nếu là buổi học bù
+        const isMakeupClass = 
+          item.scheduleStatus === 'rescheduled' || 
+          item.status === 'temporary' || 
+          !item.class || 
+          item.class === null;
+        
+        if (isMakeupClass) {
+          className = 'Lớp học bù';
+        } else {
+          className = 'N/A';
+        }
+      }
+
       return {
         id: item._id,
         date: scheduleDate.toISOString().split('T')[0],
         dayOfWeek: getDayOfWeek(scheduleDate),
         startTime: item.startTime,
         endTime: item.endTime,
-        lessonNumber: index + 1, // Có thể thay bằng session number nếu có
-        topic: item.topic || 'Chưa có chủ đề',
-        teacher: item.teacher?.username || item.teacher?.email || 'Chưa có thông tin',
-        room: item.room ? `${item.room.room_name}${item.room.location ? ` - ${item.room.location}` : ''}` : 'Chưa có phòng',
-        status: status,
+        lessonNumber: item.sessionOrder || index + 1,
+        topic: item.sessionTitle || 'Chưa có chủ đề',
+        teacher: item.class?.teacher?.username || 'Chưa có thông tin',
+        room: item.roomName ? `${item.roomName}${item.location ? ` - ${item.location}` : ''}` : 'Chưa có phòng',
+        status: item.scheduleStatus === 'completed' ? 'completed' : status,
         attendanceStatus: attendanceStatus,
-        className: item.className || 'N/A',
-        subject: item.subject || 'N/A',
-        rawData: item // Lưu raw data để dùng cho các chức năng khác
+        className: className,
+        subject: item.courseName || 'N/A',
+        rawData: item
       };
     });
   };
@@ -126,44 +143,59 @@ const StudentSchedule = () => {
   };
 
   const fetchSchedules = async () => {
-    // Lấy user từ AuthContext hoặc localStorage
-    const currentUser = user || JSON.parse(localStorage.getItem('user') || 'null');
-    
-    console.log('Current user:', currentUser); // Debug
-    
-    // TODO: Temporarily skip user check for mock data
-    // if (!currentUser || !currentUser._id) {
-    //   setError('Không tìm thấy thông tin học sinh. Vui lòng đăng nhập lại.');
-    //   setLoading(false);
-    //   return;
-    // }
+    if (!user) {
+      setError('Vui lòng đăng nhập để xem lịch học');
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
       setError(null);
     
-      // TODO: Replace with actual API call
-      // const response = await studentScheduleService.getStudentSchedule(currentUser._id);
+      // Get date range from current month to 6 months ahead to ensure all sessions are included
+      const today = new Date();
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      // Extend to 6 months ahead to capture all upcoming sessions
+      const endDate = new Date(today.getFullYear(), today.getMonth() + 6, 0);
       
-      // Using mock data
-      const mockSchedules = generateScheduleMockData();
-      const response = {
-        schedules: mockSchedules
+      const params = {
+        startDate: startOfMonth.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0]
       };
+
+      console.log('Fetching schedules with params:', params);
       
-      console.log('Mock schedules:', mockSchedules); // Debug
-      console.log('Response:', response); // Debug
+      const response = await studentService.getMySchedule(params);
       
-      if (response && response.schedules && Array.isArray(response.schedules)) {
-        const transformedData = transformScheduleData(response.schedules);
-        console.log('Transformed data:', transformedData); // Debug
-        setSchedules(transformedData);
+      console.log('API Response:', response);
+      
+      if (response.success && response.schedules && Array.isArray(response.schedules)) {
+        const transformed = transformScheduleData(response.schedules);
+        
+        // Filter out cancelled schedules
+        const activeSchedules = transformed.filter(schedule => {
+          const rawData = schedule.rawData;
+          if (!rawData) return true;
+          
+          // Check both scheduleStatus (from StudentSchedule) and status (from ClassSchedule)
+          const isCancelled = 
+            rawData.scheduleStatus === 'cancelled' || 
+            rawData.scheduleStatus === 'canceled' ||
+            rawData.status === 'cancelled' || 
+            rawData.status === 'canceled';
+          
+          return !isCancelled;
+        });
+        
+        console.log('Transformed schedules:', transformed.length, 'Active schedules (excluding cancelled):', activeSchedules.length);
+        setSchedules(activeSchedules);
       } else {
         setSchedules([]);
       }
     } catch (error) {
       console.error('Error fetching schedules:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Không thể tải lịch học. Vui lòng thử lại sau.';
+      const errorMessage = error.message || 'Không thể tải lịch học. Vui lòng thử lại sau.';
       setError(errorMessage);
       setSchedules([]);
     } finally {
@@ -224,11 +256,6 @@ const StudentSchedule = () => {
     );
   };
 
-  const handleRequestAbsence = (schedule) => {
-    setSelectedSchedule(schedule);
-    setShowAbsenceModal(true);
-  };
-
   const navigateWeek = (direction) => {
     const newDate = new Date(selectedWeek);
     newDate.setDate(newDate.getDate() + (direction * 7));
@@ -248,16 +275,20 @@ const StudentSchedule = () => {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     
-    const firstDayOfWeek = firstDay.getDay() || 7; // 1-7 (Mon-Sun)
+    // Điều chỉnh để bắt đầu từ Thứ 2 (1) thay vì Chủ nhật (0)
+    // getDay() trả về: 0 = Chủ nhật, 1 = Thứ 2, ..., 6 = Thứ 7
+    // Cần chuyển thành: 0 = Thứ 2, 1 = Thứ 3, ..., 6 = Chủ nhật
+    const firstDayOfWeek = firstDay.getDay(); // 0-6
+    const adjustedFirstDayOfWeek = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1; // Chủ nhật (0) -> 6, Thứ 2 (1) -> 0, ...
     const daysInMonth = lastDay.getDate();
     
     const days = [];
     
-    // Add previous month days
+    // Add previous month days - bắt đầu từ Thứ 2
     const prevMonthLastDay = new Date(year, month, 0).getDate();
-    for (let i = firstDayOfWeek - 2; i >= 0; i--) {
+    for (let i = adjustedFirstDayOfWeek; i > 0; i--) {
       days.push({
-        date: new Date(year, month - 1, prevMonthLastDay - i),
+        date: new Date(year, month - 1, prevMonthLastDay - i + 1),
         isCurrentMonth: false
       });
     }
@@ -454,7 +485,6 @@ const StudentSchedule = () => {
                                   className="btn-outline-main w-100 py-4 radius-6"
                                   style={{ fontSize: '10px' }}
                                 >
-                                  <i className="fas fa-eye me-1"></i>
                                   Chi tiết
                                 </Button>
                               </Link>
@@ -540,38 +570,42 @@ const StudentSchedule = () => {
 
                   <div className="d-flex flex-column gap-4">
                     {daySchedules.slice(0, 2).map(schedule => (
-                      <div
+                      <Link 
                         key={schedule.id}
-                        className={`rounded-6 px-6 py-4 cursor-pointer ${
-                          schedule.status === 'upcoming'
-                            ? 'bg-main-100 border-start border-main-600 border-2'
-                            : schedule.attendanceStatus === 'present'
-                            ? 'bg-success-100 border-start border-success-600 border-2'
-                            : schedule.attendanceStatus === 'absent'
-                            ? 'bg-danger-100 border-start border-danger-600 border-2'
-                            : 'bg-neutral-100 border-start border-neutral-400 border-2'
-                        }`}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => handleRequestAbsence(schedule)}
+                        to={`/student/lessons/${schedule.id}`}
+                        className="text-decoration-none"
                       >
-                        <div className="text-neutral-900 fw-medium" style={{ 
-                          fontSize: '11px',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}>
-                          {schedule.startTime} - {schedule.endTime}
+                        <div
+                          className={`rounded-6 px-6 py-4 cursor-pointer transition-2 ${
+                            schedule.status === 'upcoming'
+                              ? 'bg-main-100 border-start border-main-600 border-2'
+                              : schedule.attendanceStatus === 'present'
+                              ? 'bg-success-100 border-start border-success-600 border-2'
+                              : schedule.attendanceStatus === 'absent'
+                              ? 'bg-danger-100 border-start border-danger-600 border-2'
+                              : 'bg-neutral-100 border-start border-neutral-400 border-2'
+                          }`}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <div className="text-neutral-900 fw-medium" style={{ 
+                            fontSize: '11px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            {schedule.startTime} - {schedule.endTime}
+                          </div>
+                          <div className="text-neutral-700 fw-normal" style={{ 
+                            fontSize: '10px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            marginTop: '2px'
+                          }}>
+                            {schedule.className}
+                          </div>
                         </div>
-                        <div className="text-neutral-700 fw-normal" style={{ 
-                          fontSize: '10px',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          marginTop: '2px'
-                        }}>
-                          {schedule.className}
-                        </div>
-                      </div>
+                      </Link>
                     ))}
                     {daySchedules.length > 2 && (
                       <div className="text-main-600 text-11 fw-medium">
@@ -665,7 +699,6 @@ const StudentSchedule = () => {
                           <Button
                             className="btn-outline-main text-13 fw-medium px-12 py-6 radius-6"
                           >
-                            <i className="fas fa-eye me-1"></i>
                             Chi tiết
                           </Button>
                         </Link>
@@ -859,17 +892,6 @@ const StudentSchedule = () => {
           {viewMode === 'list' && renderListView()}
         </>
       )}
-
-      {/* Request Absence Modal */}
-      <RequestAbsenceModal
-        show={showAbsenceModal}
-        onHide={() => setShowAbsenceModal(false)}
-        schedule={selectedSchedule}
-        onSuccess={() => {
-          setShowAbsenceModal(false);
-          fetchSchedules();
-        }}
-      />
     </Container>
   );
 };

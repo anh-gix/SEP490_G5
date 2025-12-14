@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, Alert, Card, ListGroup, Badge } from 'react-bootstrap';
 import ConflictChecker from './ConflictChecker';
+import academicStaffService from '../../services/academicStaffService';
 
 const MakeupClassModal = ({ 
   originalSchedule, 
@@ -34,17 +35,29 @@ const MakeupClassModal = ({
 
   const fetchAbsenceRequests = async (scheduleId) => {
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch(`/api/schedules/${scheduleId}/absence-requests`);
-      const data = await response.json();
-      setAbsenceRequests(data);
+      // Get attendance for this class schedule
+      const response = await academicStaffService.getAttendance(scheduleId);
+      
+      const attendances = response.list || response.attendances || [];
+      
+      // Filter for absent/excused students and transform to absence requests format
+      const absenceRequests = attendances
+        .filter(att => 
+          att.attendance?.status === 'absent' || 
+          att.attendance?.status === 'excused'
+        )
+        .map(att => ({
+          id: att._id || att.student?._id,
+          studentName: att.student?.username || 'N/A',
+          reason: att.attendance?.reason || (att.attendance?.status === 'excused' ? 'Có phép' : 'Vắng'),
+          status: att.attendance?.status === 'excused' ? 'fixed' : 'pending'
+        }));
+      
+      setAbsenceRequests(absenceRequests);
     } catch (error) {
       console.error('Error fetching absence requests:', error);
-      // Mock data
-      setAbsenceRequests([
-        { id: 1, studentName: 'Nguyễn Văn A', reason: 'Ốm', status: 'approved' },
-        { id: 2, studentName: 'Trần Thị B', reason: 'Đi công tác', status: 'approved' }
-      ]);
+      // Set empty array instead of mock data
+      setAbsenceRequests([]);
     }
   };
 

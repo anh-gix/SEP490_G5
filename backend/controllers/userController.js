@@ -47,6 +47,14 @@ const createUser = async (req, res) => {
       return res.status(400).json({ message: 'Username already exists' });
     }
 
+    // Check if phone number already exists
+    if (phone) {
+      const phoneExists = await User.findOne({ phone });
+      if (phoneExists) {
+        return res.status(400).json({ message: 'Số điện thoại đã tồn tại trong hệ thống' });
+      }
+    }
+
     // Check if role exists
     const role = await Role.findById(roleId);
     if (!role) {
@@ -326,6 +334,7 @@ const saveBulkUsers = async (req, res) => {
           results.failed.push({
             email: userData.email,
             username: userData.username,
+            phone: userData.phone || '',
             reason: 'Email đã tồn tại trong hệ thống'
           });
           continue;
@@ -337,9 +346,24 @@ const saveBulkUsers = async (req, res) => {
           results.failed.push({
             email: userData.email,
             username: userData.username,
+            phone: userData.phone || '',
             reason: 'Username đã tồn tại trong hệ thống'
           });
           continue;
+        }
+
+        // Kiểm tra phone number đã tồn tại chưa
+        if (userData.phone) {
+          const existingPhone = await User.findOne({ phone: userData.phone });
+          if (existingPhone) {
+            results.failed.push({
+              email: userData.email,
+              username: userData.username,
+              phone: userData.phone,
+              reason: 'Số điện thoại đã tồn tại trong hệ thống'
+            });
+            continue;
+          }
         }
 
         // Sử dụng password từ frontend nếu có, nếu không thì generate mới
@@ -367,6 +391,7 @@ const saveBulkUsers = async (req, res) => {
         results.failed.push({
           email: userData.email,
           username: userData.username,
+          phone: userData.phone || '',
           reason: error.message || 'Lỗi không xác định'
         });
       }
@@ -388,6 +413,65 @@ const saveBulkUsers = async (req, res) => {
   }
 };
 
+// Get users by roles
+const getUsersByRoles = async (req, res) => {
+  try {
+    const { roles } = req.query; 
+    
+    if (!roles) {
+      return res.status(400).json({
+        success: false,
+        message: 'roles query parameter is required'
+      });
+    }
+
+    // Parse roles
+    const roleNames = roles.split(',').map(r => r.trim());
+    
+    // Find role IDs
+    const roleObjects = await Role.find({ name: { $in: roleNames } });
+    
+    if (roleObjects.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No matching roles found',
+        searchedRoles: roleNames
+      });
+    }
+
+    const roleIds = roleObjects.map(r => r._id);
+    
+    // Get users with these roles
+    const users = await User.find({ roleId: { $in: roleIds } })
+      .select('_id username email phone roleId')
+      .populate('roleId', 'name')
+      .sort({ username: 1 })
+      .lean();
+    
+    // Transform to include role name
+    const usersWithRole = users.map(user => ({
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      phone: user.phone,
+      role: user.roleId?.name || 'Unknown'
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: usersWithRole,
+      count: usersWithRole.length
+    });
+  } catch (error) {
+    console.error('Error getting users by roles:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching users',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUserById,
@@ -395,5 +479,6 @@ module.exports = {
   updateUser,
   deleteUser,
   uploadExcel,
-  saveBulkUsers
+  saveBulkUsers,
+  getUsersByRoles
 };

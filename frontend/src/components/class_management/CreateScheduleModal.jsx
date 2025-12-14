@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, ButtonGroup, Badge, Alert } from 'react-bootstrap';
 import ConflictChecker from './ConflictChecker';
+import classService from '../../services/classService';
+import courseService from '../../services/courseService';
 
 const CreateScheduleModal = ({ classes, teachers, rooms, onClose, onSubmit, existingSchedules }) => {
   const [mode, setMode] = useState('auto'); // auto or manual
@@ -40,21 +42,38 @@ const CreateScheduleModal = ({ classes, teachers, rooms, onClose, onSubmit, exis
 
   const fetchSyllabus = async (classId) => {
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch(`/api/classes/${classId}/syllabus`);
-      const data = await response.json();
-      setSyllabus(data);
-      setFormData(prev => ({ ...prev, totalLessons: data.length }));
+      // First, get the class to find the course
+      const classResponse = await classService.getClassById(classId);
+      const classData = classResponse.class || classResponse;
+      const courseId = classData.course?._id || classData.course;
+      
+      if (!courseId) {
+        console.warn('Class does not have a course assigned');
+        setSyllabus([]);
+        setFormData(prev => ({ ...prev, totalLessons: 0 }));
+        return;
+      }
+      
+      // Get course details with sessions
+      const courseResponse = await courseService.getCourseDetails(courseId);
+      const course = courseResponse.data || courseResponse;
+      const sessions = course.sessions || [];
+      
+      // Transform sessions to syllabus format
+      const syllabus = sessions.map((session, index) => ({
+        lessonNumber: session.order || index + 1,
+        topic: session.title || `Lesson ${index + 1}`,
+        description: session.content || session.description || ''
+      }));
+      
+      setSyllabus(syllabus);
+      setFormData(prev => ({ ...prev, totalLessons: syllabus.length }));
     } catch (error) {
       console.error('Error fetching syllabus:', error);
-      // Mock data
-      const mockSyllabus = Array.from({ length: 20 }, (_, i) => ({
-        lessonNumber: i + 1,
-        topic: `Lesson ${i + 1} Topic`,
-        description: `Description for lesson ${i + 1}`
-      }));
-      setSyllabus(mockSyllabus);
-      setFormData(prev => ({ ...prev, totalLessons: mockSyllabus.length }));
+      // Show error instead of using mock data
+      setSyllabus([]);
+      setFormData(prev => ({ ...prev, totalLessons: 0 }));
+      alert('Không thể tải giáo trình. Vui lòng thử lại sau.');
     }
   };
 

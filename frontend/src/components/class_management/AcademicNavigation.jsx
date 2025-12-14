@@ -1,11 +1,14 @@
 import React from 'react';
 import RoleNavigation from '../common/RoleNavigation';
+import { useAuth } from '../../contexts/AuthContext';
 
 /**
  * Academic Navigation Component
  * Sidebar navigation dành cho Giáo vụ - Sử dụng RoleNavigation component
  */
 const AcademicNavigation = () => {
+  const { user } = useAuth();
+
   const menuItems = [
     {
       title: 'Dashboard',
@@ -32,23 +35,30 @@ const AcademicNavigation = () => {
       color: 'warning'
     },
     {
-      title: 'Giảng viên',
+      title: 'Quản lý đơn',
+      icon: 'fa-file-alt',
+      path: '/academic/request-management',
+      color: 'info'
+    },
+    {
+      title: 'Quản lý giảng viên',
       icon: 'fa-user-tie',
       path: '/academic/teacher-management',
       color: 'main'
     },
     {
-      title: 'Báo cáo',
-      icon: 'fa-chart-bar',
-      path: '/academic/reports',
-      color: 'info'
+      title: 'Quản lý học viên',
+      icon: 'fa-user-graduate',
+      path: '/academic/student-management',
+      color: 'success'
     }
   ];
 
   const userInfo = {
-    name: 'Lê Văn C',
-    code: 'GV001',
-    avatar: null
+    name: user?.username || 'Giáo vụ',
+    code: user?.email?.split('@')[0]?.toUpperCase() || 'GV',
+    avatar: user?.avatar || null,
+    role: 'academic'
   };
 
   return (

@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const answerSchema = new mongoose.Schema({
   questionNumber: Number,
   answerText: String,
-  selectedOption: String,
+  selectedOption: [String],
   recordingUrl: String,
   score: { type: Number, default: 0 },
 });
@@ -13,6 +13,7 @@ const sectionSubmissionSchema = new mongoose.Schema({
     type: String,
     enum: ["reading", "listening", "writing", "speaking"],
   },
+  part: { type: Number, default: 1 },
   submittedAt: Date,
   answers: [answerSchema],
   sectionScore: { type: Number, default: 0 },

@@ -78,9 +78,9 @@ const SignInInner = () => {
           <div className='col-lg-6'>
             <div className='bg-main-25 border border-neutral-30 rounded-8 p-32'>
               <div className='mb-40'>
-                <h3 className='mb-16 text-neutral-500'>Welcome Back!</h3>
+                <h3 className='mb-16 text-neutral-500'>Chào mừng trở lại!</h3>
                 <p className='text-neutral-500'>
-                  Sign in to your account and join us
+                  Đăng nhập vào tài khoản của bạn
                 </p>
               </div>
               <form onSubmit={handleSubmit}>
@@ -95,7 +95,7 @@ const SignInInner = () => {
                     htmlFor='email'
                     className='fw-medium text-lg text-neutral-500 mb-16'
                   >
-                    Enter Your Email ID
+                    Nhập Email của bạn
                   </label>
                   <input
                     type='email'
@@ -104,7 +104,7 @@ const SignInInner = () => {
                     name='email'
                     value={formData.email}
                     onChange={handleChange}
-                    placeholder='Enter Your Email...'
+                    placeholder='Nhập Email của bạn...'
                   />
                   {errors.email && (
                     <div className='text-danger mt-8 small'>
@@ -118,7 +118,7 @@ const SignInInner = () => {
                     htmlFor='password'
                     className='fw-medium text-lg text-neutral-500 mb-16'
                   >
-                    Enter Your Password
+                    Nhập Mật khẩu
                   </label>
                   <div className='position-relative'>
                     <input
@@ -128,7 +128,7 @@ const SignInInner = () => {
                       name='password'
                       value={formData.password}
                       onChange={handleChange}
-                      placeholder='Enter Your Password...'
+                      placeholder='Nhập Mật khẩu của bạn...'
                     />
                     <span
                       className={`toggle-password position-absolute top-50 inset-inline-end-0 me-16 translate-middle-y ph-bold ${
@@ -148,19 +148,8 @@ const SignInInner = () => {
                     to='#'
                     className='text-warning-600 hover-text-decoration-underline'
                   >
-                    Forget password
+                    Quên mật khẩu
                   </Link>
-                </div>
-                <div className='mb-16'>
-                  <p className='text-neutral-500'>
-                    Don't have an account?{" "}
-                    <Link
-                      to='/sign-up'
-                      className='fw-semibold text-main-600 hover-text-decoration-underline'
-                    >
-                      Sign Up
-                    </Link>
-                  </p>
                 </div>
                 <div className='mt-40'>
                   <button
@@ -168,7 +157,7 @@ const SignInInner = () => {
                     disabled={isLoading}
                     className='btn btn-main rounded-pill flex-center gap-8 mt-40'
                   >
-                    {isLoading ? 'Đang đăng nhập...' : 'Sign In'}
+                    {isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}
                     <i className='ph-bold ph-arrow-up-right d-flex text-lg' />
                   </button>
                 </div>

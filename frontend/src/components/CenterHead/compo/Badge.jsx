@@ -3,11 +3,11 @@ import React from 'react';
 const Badge = ({ children, variant = 'primary', size = 'md', className = '' }) => {
   const variantClasses = {
     primary: 'bg-main-600 text-white',
-    secondary: 'bg-neutral-100 text-neutral-700',
+    secondary: 'bg-white text-neutral-700 border border-neutral-300',
     success: 'bg-main-three-600 text-white',
     warning: 'bg-main-two-600 text-white',
     danger: 'bg-danger-600 text-white',
-    info: 'bg-info-600 text-white',
+    info: 'bg-main-600 text-white',
   };
 
   const sizeClasses = {
@@ -17,8 +17,8 @@ const Badge = ({ children, variant = 'primary', size = 'md', className = '' }) =
   };
 
   return (
-    <span 
-      className={`badge radius-4 fw-medium ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+    <span
+      className={`badge radius-2 fw-medium ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
     >
       {children}
     </span>

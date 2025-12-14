@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Form, Table, ProgressBar } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, Form, Table, ProgressBar, Spinner, Alert } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { teacherClassesMock } from './teacher_mockdata';
+import teacherService from '../../services/teacherService';
 
 /**
  * Teacher Classes Component
@@ -12,21 +12,44 @@ const TeacherClasses = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchClasses();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterStatus]);
 
   const fetchClasses = async () => {
     try {
-      // TODO: Replace with actual API call
-      // const response = await teacherAPI.getClasses();
-      // setClasses(response.data);
+      setLoading(true);
+      setError(null);
       
-      // Using mock data
-      setClasses(teacherClassesMock);
+      const response = await teacherService.getMyClasses({ status: filterStatus });
+      
+      // Transform API data to component format
+      const transformedClasses = response.classes.map(cls => ({
+        id: cls._id,
+        name: cls.name,
+        level: cls.level,
+        schedule: cls.schedule,
+        room: cls.room,
+        totalStudents: cls.totalStudents,
+        activeStudents: cls.activeStudents,
+        presentStudents: cls.presentStudents,
+        completedLessons: cls.completedLessons,
+        totalLessons: cls.totalLessons,
+        ungradedSubmissions: cls.ungradedSubmissions,
+        status: cls.status,
+        nextLesson: cls.nextLesson
+      }));
+      
+      setClasses(transformedClasses);
     } catch (error) {
       console.error('Error fetching classes:', error);
+      setError(error.message || 'Không thể tải danh sách lớp học');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -55,6 +78,39 @@ const TeacherClasses = () => {
         <p className="text-neutral-600 mb-0">Quản lý các lớp học bạn đang giảng dạy</p>
       </div>
 
+      {/* Loading State */}
+      {loading && (
+        <div className="text-center py-5">
+          <Spinner animation="border" variant="primary" />
+          <p className="text-neutral-600 mt-3">Đang tải danh sách lớp học...</p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <Alert variant="danger" dismissible onClose={() => setError(null)}>
+          <i className="fas fa-exclamation-circle me-2"></i>
+          {error}
+          <Button variant="link" className="ms-3" onClick={fetchClasses}>
+            Thử lại
+          </Button>
+        </Alert>
+      )}
+
+      {/* Empty State */}
+      {!loading && !error && classes.length === 0 && (
+        <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+          <Card.Body className="text-center py-5">
+            <i className="fas fa-chalkboard-teacher text-neutral-300" style={{ fontSize: '48px' }}></i>
+            <h5 className="text-neutral-700 mt-3 mb-2">Chưa có lớp học nào</h5>
+            <p className="text-neutral-500">Hiện tại bạn chưa được phân công giảng dạy lớp học nào</p>
+          </Card.Body>
+        </Card>
+      )}
+
+      {/* Content - Only show when not loading and no error */}
+      {!loading && !error && classes.length > 0 && (
+      <>
       {/* Summary Stats */}
       <Row className="g-3 mb-24">
         <Col md={3}>
@@ -350,6 +406,8 @@ const TeacherClasses = () => {
             </Table>
           </Card.Body>
         </Card>
+      )}
+      </>
       )}
     </Container>
   );

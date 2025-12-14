@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Badge, Button } from 'react-bootstrap';
 import { Link, useParams } from 'react-router-dom';
-import { getLessonDetailMock } from './teacher_mockdata';
+import teacherService from '../../services/teacherService';
+import TeacherRequestAbsenceModal from './TeacherRequestAbsenceModal';
 
 /**
  * Lesson Detail Component
@@ -10,14 +11,55 @@ import { getLessonDetailMock } from './teacher_mockdata';
 const LessonDetail = () => {
   const { lessonId } = useParams();
   const [lessonData, setLessonData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [showAbsenceModal, setShowAbsenceModal] = useState(false);
 
   const fetchLessonData = async () => {
-    // TODO: Replace with actual API call
-    // const response = await teacherAPI.getLessonDetail(lessonId);
-    // setLessonData(response.data);
-    
-    // Using mock data
-    setLessonData(getLessonDetailMock(lessonId));
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await teacherService.getLessonDetail(lessonId);
+      
+      if (response.success) {
+        // Transform API data to component format
+        const lesson = response.lesson;
+        const transformedData = {
+          topic: lesson.sessionTitle || 'Chưa có tiêu đề',
+          date: lesson.date,
+          startTime: lesson.startTime,
+          endTime: lesson.endTime,
+          time: `${lesson.startTime} - ${lesson.endTime}`,
+          className: lesson.className,
+          level: lesson.className?.split('-')[0] || 'N/A',
+          room: lesson.roomName ? `${lesson.roomName}${lesson.roomLocation ? ` - ${lesson.roomLocation}` : ''}` : 'Chưa xác định',
+          students: lesson.totalStudents,
+          attendedStudents: 0, // TODO: Get from attendance data
+          description: lesson.sessionContent || lesson.courseDescription || 'Chưa có mô tả',
+          objectives: lesson.mocktest?.skills ? 
+            Object.keys(lesson.mocktest.skills).map(skill => `Luyện tập ${skill}`) : 
+            ['Hoàn thành các mục tiêu của buổi học'],
+          materials: lesson.material?.length > 0 ? 
+            lesson.material.map(m => m.title || m.url || 'Tài liệu') : 
+            ['Chưa có tài liệu'],
+          homework: lesson.homework?.length > 0 ? 
+            lesson.homework.map(h => h.title).join(', ') : 
+            'Chưa có bài tập',
+          homeworkDeadline: lesson.homework?.[0]?.dueDate ? 
+            new Date(lesson.homework[0].dueDate).toLocaleDateString('vi-VN') : 
+            'Chưa xác định',
+          notes: lesson.note || 'Chưa có ghi chú'
+        };
+        
+        setLessonData(transformedData);
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải chi tiết buổi học:', error);
+      setError(error.message || 'Không thể tải chi tiết buổi học');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -25,14 +67,47 @@ const LessonDetail = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId]);
 
+  if (loading) {
+    return (
+      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
+        <Card className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+          <Card.Body className="text-center py-40">
+            <div className="spinner-border text-main-600" role="status">
+              <span className="visually-hidden">Đang tải...</span>
+            </div>
+            <p className="text-neutral-600 mt-12 mb-0">Đang tải chi tiết buổi học...</p>
+          </Card.Body>
+        </Card>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
+        <Card className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+          <Card.Body className="text-center py-40">
+            <i className="fas fa-exclamation-circle text-danger-600 mb-12" style={{ fontSize: '48px' }}></i>
+            <p className="text-danger-600 mb-12">{error}</p>
+            <Button onClick={fetchLessonData} className="btn-main">
+              <i className="fas fa-redo me-2"></i>
+              Thử lại
+            </Button>
+          </Card.Body>
+        </Card>
+      </Container>
+    );
+  }
+
   if (!lessonData) {
     return (
       <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
-        <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-        </div>
+        <Card className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+          <Card.Body className="text-center py-40">
+            <i className="fas fa-calendar-times text-neutral-400 mb-12" style={{ fontSize: '48px' }}></i>
+            <p className="text-neutral-600 mb-0">Không tìm thấy buổi học</p>
+          </Card.Body>
+        </Card>
       </Container>
     );
   }
@@ -72,9 +147,12 @@ const LessonDetail = () => {
               <i className="fas fa-user-check me-2"></i>
               Điểm danh
             </Link>
-            <Button className="btn-main text-13 px-16 py-8 radius-8">
-              <i className="fas fa-chalkboard-teacher me-2"></i>
-              Vào lớp
+            <Button 
+              onClick={() => setShowAbsenceModal(true)}
+              className="btn-outline-warning text-13 px-16 py-8 radius-8"
+            >
+              <i className="fas fa-hand-paper me-2"></i>
+              Xin nghỉ
             </Button>
           </div>
         </div>
@@ -270,6 +348,28 @@ const LessonDetail = () => {
       </Card>
     </Col>
   </Row>
+
+      {/* Request Absence Modal */}
+      {lessonData && (
+        <TeacherRequestAbsenceModal
+          show={showAbsenceModal}
+          onHide={() => setShowAbsenceModal(false)}
+          schedule={{
+            classScheduleId: lessonId,
+            date: lessonData.date,
+            time: lessonData.time,
+            startTime: lessonData.startTime,
+            endTime: lessonData.endTime,
+            topic: lessonData.topic,
+            className: lessonData.className,
+            room: lessonData.room
+          }}
+          onSuccess={() => {
+            setShowAbsenceModal(false);
+            // Optionally refresh lesson data
+          }}
+        />
+      )}
     </Container>
   );
 };

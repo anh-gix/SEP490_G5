@@ -4,11 +4,9 @@ const Schema = mongoose.Schema;
 
 const classScheduleSchema = new Schema({
     
-    class: { type: Schema.Types.ObjectId, ref: 'Class', required: true },
+    class: { type: Schema.Types.ObjectId, ref: 'Class'},
     
-    session: { type: Schema.Types.ObjectId, ref: 'Session' }, 
-    
-    topic: { type: String, required: true }, // "Dạy bù Buổi 5", "Luyện tập ngoài giờ"
+    session: { type: Schema.Types.ObjectId, ref: 'Session' }, //Noi dung buoi hoc
     
     //Thời gian và địa điểm
     date:{ type: Date, required: true },
@@ -16,17 +14,67 @@ const classScheduleSchema = new Schema({
     endTime: { type: String, required: true },
     room: { type: Schema.Types.ObjectId, ref: 'Room', required: true },
     
+    // Thêm teacher (id)
+    teacher: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
+    // Thêm teacher dạy thay (id)
+    substituteTeacher: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+    },
+    
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    
-    // Lý do
-    reason: { type: String, required: true }, // "Học bù do nghỉ lễ", "Dạy bù ngoài giờ"
-    rejectionReason: { type: String }, // Lý do từ chối
-    
     
     status: {
         type: String,
-        enum: ['draft', 'pending_approval', 'approved', 'rejected'],
-        default: 'draft'
+        enum: ['temporary', 'fixed', 'completed'],//temporary: buổi tạm, fixed: buổi cố định
+        default: 'fixed'
+    },
+    
+    // Bài tập về nhà
+    homework: [{
+        _id: {
+            type: Schema.Types.ObjectId,
+            auto: true,
+            // Unique ID cho homework để HomeworkSubmission tham chiếu
+        },
+        assignment: {
+            title: { type: String, required: true },
+            files: [{ type: String }] // Changed from 'file' to 'files' array
+        },
+        deadline: { type: Date, required: true },
+        answerFiles: [{ type: String }], // Changed from 'answerFile' to 'answerFiles' array
+        // Removed: userstudy field (deprecated - use HomeworkSubmission model instead)
+    }],
+    
+    // Tài liệu học tập
+    material: [{
+        title: { type: String, required: true },
+        file: { type: String, required: true }
+    }],
+    
+    // Ghi chú
+    note: { type: String },
+    
+    // Bài thi thử
+    mocktest: {
+        title: { type: String },
+        order: { type: Number },
+        type: {
+            type: String,
+            enum: ['ielts', 'toeic', 'cam']
+        },
+        scores: [{
+            studentId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+            reading: { type: Number },
+            listening: { type: Number },
+            writing: { type: Number },
+            speaking: { type: Number }
+        }],
+        answerFile: { type: String }
     }
 }, { timestamps: true });
 

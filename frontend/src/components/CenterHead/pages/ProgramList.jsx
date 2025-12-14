@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
@@ -7,39 +7,23 @@ import Button from '../compo/Button';
 import SearchBox from '../compo/SearchBox';
 import FilterBar from '../compo/FilterBar';
 import StatusBadge from '../compo/StatusBadge';
-import ActionMenu from '../compo/ActionMenu';
-import { mockPrograms, mockProgramStats, simulateApiDelay } from '../../../helper/mockdataExtended';
 import { formatDate } from '../../../helper/helper';
+import programService from '../../../services/programService';
 
 const ProgramList = () => {
   const navigate = useNavigate();
   const [programs, setPrograms] = useState([]);
   const [filteredPrograms, setFilteredPrograms] = useState([]);
+  const [paginatedPrograms, setPaginatedPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [filterValues, setFilterValues] = useState({});
+  const [stats, setStats] = useState({ total: 0, active: 0, draft: 0, archived: 0 });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(0);
 
-  useEffect(() => {
-    fetchPrograms();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [searchKeyword, filterValues, programs]);
-
-  const fetchPrograms = async () => {
-    try {
-      setLoading(true);
-      await simulateApiDelay(500);
-      setPrograms(mockPrograms);
-    } catch (err) {
-      console.error('Error fetching programs:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     let filtered = [...programs];
 
     if (searchKeyword) {
@@ -55,7 +39,102 @@ const ProgramList = () => {
     }
 
     setFilteredPrograms(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [programs, searchKeyword, filterValues]);
+
+  const applyPagination = useCallback(() => {
+    const totalItems = filteredPrograms.length;
+    const totalPagesCount = Math.ceil(totalItems / itemsPerPage);
+    setTotalPages(totalPagesCount);
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = filteredPrograms.slice(startIndex, endIndex);
+
+    setPaginatedPrograms(paginatedData);
+  }, [filteredPrograms, currentPage, itemsPerPage]);
+
+  const fetchPrograms = async () => {
+    try {
+      setLoading(true);
+
+      const response = await programService.getAllPrograms();
+      const programsData = response.data || [];
+
+      setPrograms(programsData);
+
+      // Set stats from API response
+      if (response.stats) {
+        setStats(response.stats);
+      } else {
+        // Calculate stats if not provided by API
+        const calculatedStats = {
+          total: programsData.length,
+          active: programsData.filter(p => p.status === 'active').length,
+          draft: programsData.filter(p => p.status === 'draft').length,
+          archived: programsData.filter(p => p.status === 'archived').length
+        };
+        setStats(calculatedStats);
+      }
+
+      console.log('Programs loaded from API:', programsData);
+    } catch (err) {
+      console.error('Error fetching programs:', err);
+      alert('Không thể tải danh sách chương trình!');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (e) => {
+    const newItemsPerPage = parseInt(e.target.value);
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when items per page changes
+  };
+
+  const handleDeleteProgram = async (programId, programName) => {
+    const confirmMessage = ` CẢNH BÁO: Bạn có chắc muốn xóa chương trình "${programName}"?\n\n` +
+      `Hành động này sẽ XÓA TOÀN BỘ:\n` +
+      `• Tất cả PLO trong chương trình\n` +
+      `• Tất cả Course (học phần)\n` +
+      `• Tất cả CLO trong các course\n` +
+      `• Tất cả Session trong các course\n` +
+      `• Tất cả Materials trong các course\n\n` +
+      `Hành động này KHÔNG THỂ HOÀN TÁC!\n\n` +
+      `Nhấn OK để xác nhận xóa.`;
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      await programService.deleteProgram(programId);
+
+      // Reload programs after deletion
+      await fetchPrograms();
+
+      alert('Đã xóa chương trình và toàn bộ dữ liệu liên quan thành công!');
+    } catch (err) {
+      console.error('Error deleting program:', err);
+      alert(err.message || 'Có lỗi xảy ra khi xóa chương trình.');
+    }
+  };
+
+  useEffect(() => {
+    fetchPrograms();
+  }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [searchKeyword, filterValues, programs, applyFilters]);
+
+  useEffect(() => {
+    applyPagination();
+  }, [filteredPrograms, currentPage, itemsPerPage, applyPagination]);
 
   const breadcrumbItems = [
     { label: 'Dashboard', path: '/center-head/dashboard' },
@@ -115,25 +194,38 @@ const ProgramList = () => {
       header: 'Hành động',
       field: 'actions',
       render: (row) => (
-        <ActionMenu
-          actions={[
-            {
-              label: "Xem chi tiết",
-              icon: "ph ph-eye",
-              onClick: () => navigate(`/center-head/programs/${row._id}`)
-            },
-            {
-              label: "Chỉnh sửa",
-              icon: "ph ph-pencil-simple",
-              onClick: () => navigate(`/center-head/programs/${row._id}/edit`)
-            },
-            {
-              label: "Xem PLOs",
-              icon: "ph ph-list-bullets",
-              onClick: () => navigate(`/center-head/programs/${row._id}/plos`)
-            },
-          ]}
-        />
+        <div className="d-flex gap-2 justify-content-center">
+          <button
+            className="btn btn-sm btn-outline-primary"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/programs/${row._id}`);
+            }}
+            title="Xem chi tiết"
+          >
+            <i className="ph ph-eye"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-secondary"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/programs/${row._id}/edit`);
+            }}
+            title="Chỉnh sửa"
+          >
+            <i className="ph ph-pencil"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-danger"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteProgram(row._id, row.program_name);
+            }}
+            title="Xóa chương trình"
+          >
+            <i className="ph ph-trash"></i>
+          </button>
+        </div>
       ),
     },
   ];
@@ -155,8 +247,12 @@ const ProgramList = () => {
           <h4 className="mb-8 text-neutral-900 fw-bold">Chương trình đào tạo</h4>
           <p className="text-neutral-600 mb-0">Quản lý các chương trình và PLOs</p>
         </div>
-        <Button variant="primary" icon="ph ph-plus" onClick={() => navigate('/center-head/programs/create')}>
-          Thêm chương trình
+        <Button
+          variant="primary"
+          icon="ph ph-plus"
+          onClick={() => navigate('/center-head/programs/create')}
+        >
+          Tạo chương trình mới
         </Button>
       </div>
 
@@ -165,25 +261,25 @@ const ProgramList = () => {
         <div className="col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng Programs</h6>
-            <h4 className="text-neutral-900 fw-bold mb-0">{mockProgramStats.total}</h4>
+            <h4 className="text-neutral-900 fw-bold mb-0">{stats.total}</h4>
           </Card>
         </div>
         <div className="col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Đang hoạt động</h6>
-            <h4 className="text-success-600 fw-bold mb-0">{mockProgramStats.active}</h4>
+            <h4 className="text-success-600 fw-bold mb-0">{stats.active}</h4>
           </Card>
         </div>
         <div className="col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Bản nháp</h6>
-            <h4 className="text-warning-600 fw-bold mb-0">{mockProgramStats.draft}</h4>
+            <h4 className="text-warning-600 fw-bold mb-0">{stats.draft}</h4>
           </Card>
         </div>
         <div className="col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Đã lưu trữ</h6>
-            <h4 className="text-neutral-600 fw-bold mb-0">{mockProgramStats.archived}</h4>
+            <h4 className="text-neutral-600 fw-bold mb-0">{stats.archived}</h4>
           </Card>
         </div>
       </div>
@@ -209,10 +305,87 @@ const ProgramList = () => {
       <Card>
         <Table
           columns={columns}
-          data={filteredPrograms}
+          data={paginatedPrograms}
           onRowClick={(row) => navigate(`/center-head/programs/${row._id}`)}
         />
       </Card>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="d-flex justify-content-between align-items-center mt-4">
+          <div className="d-flex align-items-center gap-3">
+            <span className="text-sm text-neutral-600">Hiển thị</span>
+            <select
+              className="form-select form-select-sm"
+              style={{ width: 'auto' }}
+              value={itemsPerPage}
+              onChange={handleItemsPerPageChange}
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+            <span className="text-sm text-neutral-600">
+              bản ghi trên trang
+            </span>
+          </div>
+
+          <div className="d-flex align-items-center gap-2">
+            <span className="text-sm text-neutral-600">
+              Trang {currentPage} / {totalPages} ({filteredPrograms.length} bản ghi)
+            </span>
+
+            <div className="d-flex gap-1">
+              <button
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                title="Trang trước"
+              >
+                <i className="ph ph-caret-left"></i>
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(page => {
+                  const distance = Math.abs(page - currentPage);
+                  return distance === 0 || distance === 1 || page === 1 || page === totalPages;
+                })
+                .map((page, index, array) => {
+                  const prevPage = array[index - 1];
+                  const showEllipsis = prevPage && page - prevPage > 1;
+
+                  return (
+                    <div key={page} className="d-flex">
+                      {showEllipsis && (
+                        <span className="px-2 py-1 text-neutral-600">...</span>
+                      )}
+                      <button
+                        className={`btn btn-sm ${
+                          page === currentPage
+                            ? 'btn-primary'
+                            : 'btn-outline-secondary'
+                        }`}
+                        onClick={() => handlePageChange(page)}
+                      >
+                        {page}
+                      </button>
+                    </div>
+                  );
+                })}
+
+              <button
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                title="Trang sau"
+              >
+                <i className="ph ph-caret-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

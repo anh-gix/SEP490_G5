@@ -6,7 +6,6 @@ import Table from '../compo/Table';
 import Button from '../compo/Button';
 import SearchBox from '../compo/SearchBox';
 import StatusBadge from '../compo/StatusBadge';
-import ActionMenu from '../compo/ActionMenu';
 import { mockClasses, mockClassStats, simulateApiDelay } from '../../../helper/mockdataExtended';
 
 const ClassList = () => {
@@ -110,25 +109,38 @@ const ClassList = () => {
       header: 'Hành động',
       field: 'actions',
       render: (row) => (
-        <ActionMenu
-          actions={[
-            {
-              label: "Xem chi tiết",
-              icon: "ph ph-eye",
-              onClick: () => navigate(`/center-head/classes/${row._id}`)
-            },
-            {
-              label: "Quản lý học viên",
-              icon: "ph ph-users",
-              onClick: () => navigate(`/center-head/classes/${row._id}/students`)
-            },
-            {
-              label: "Xem lịch học",
-              icon: "ph ph-calendar",
-              onClick: () => navigate(`/center-head/classes/${row._id}/schedules`)
-            },
-          ]}
-        />
+        <div className="d-flex gap-2 justify-content-center">
+          <button
+            className="btn btn-sm btn-outline-primary"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/classes/${row._id}`);
+            }}
+            title="Xem chi tiết"
+          >
+            <i className="ph ph-eye"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-info"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/classes/${row._id}/students`);
+            }}
+            title="Quản lý học viên"
+          >
+            <i className="ph ph-users"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-secondary"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/classes/${row._id}/schedules`);
+            }}
+            title="Xem lịch học"
+          >
+            <i className="ph ph-calendar"></i>
+          </button>
+        </div>
       ),
     },
   ];

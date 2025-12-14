@@ -5,6 +5,7 @@ const roomController = require('../controllers/roomController');
 // Room CRUD
 router.get('/', roomController.getAllRooms);
 router.get('/stats', roomController.getRoomStats);
+router.get('/today-usage', roomController.getTodayRoomUsage);
 router.get('/:id', roomController.getRoomById);
 router.get('/:id/schedule', roomController.getRoomSchedule);
 router.post('/', roomController.createRoom);

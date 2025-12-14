@@ -1,33 +1,82 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Form, ProgressBar, ButtonGroup } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, Form, ButtonGroup, Spinner, Alert } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { classesMock } from './student_mockdata';
+import { useAuth } from '../../contexts/AuthContext';
+import studentService from '../../services/studentService';
 
 /**
  * My Classes Component
  * Hiển thị danh sách các lớp học mà học viên đã đăng ký
  */
 const MyClasses = () => {
+  const { user } = useAuth();
   const [classes, setClasses] = useState([]);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchMyClasses();
-  }, []);
+    if (user) {
+      fetchMyClasses();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const fetchMyClasses = async () => {
+    if (!user) {
+      setError('Vui lòng đăng nhập để xem danh sách lớp học');
+      setLoading(false);
+      return;
+    }
+
     try {
-      // TODO: Replace with actual API call
-      // const response = await classApi.getMyClasses();
-      // setClasses(response.data);
+      setLoading(true);
+      setError(null);
       
-      // Using mock data
-      setClasses(classesMock);
+      const response = await studentService.getMyClasses({ status: filterStatus !== 'all' ? filterStatus : undefined });
+      
+      if (response.success && response.classes) {
+        // Transform API data to component format
+        const transformedClasses = response.classes.map(cls => ({
+          id: cls._id,
+          name: cls.name,
+          level: cls.course?.name || 'N/A',
+          teacher: cls.teacher?.username || 'Chưa có giảng viên',
+          schedule: getScheduleText(),
+          startDate: cls.startDate,
+          endDate: cls.endDate,
+          status: cls.status,
+          totalLessons: cls.totalLessons || 0,
+          completedLessons: cls.completedLessons || 0,
+          attendanceRate: calculateAttendanceRate(cls.attendanceStats),
+          pendingAssignments: 0, // TODO: Add when homework API is ready
+          nextLesson: null // TODO: Get from upcoming schedules
+        }));
+        
+        setClasses(transformedClasses);
+      } else {
+        setError('Không thể tải danh sách lớp học');
+      }
     } catch (error) {
       console.error('Error fetching classes:', error);
+      setError(error.message || 'Đã có lỗi xảy ra khi tải danh sách lớp học');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const getScheduleText = () => {
+    // Format schedule text from class data
+    // This would ideally come from backend with schedule info
+    // TODO: Get actual schedule from API
+    return 'Thứ 2, 4, 6 • 19:00-21:00';
+  };
+
+  const calculateAttendanceRate = (attendanceStats) => {
+    if (!attendanceStats || attendanceStats.total === 0) return 0;
+    return Math.round((attendanceStats.present / attendanceStats.total) * 100);
   };
 
   const getStatusBadge = (status) => {
@@ -47,12 +96,19 @@ const MyClasses = () => {
     );
   };
 
+  // Re-fetch when filter changes
+  useEffect(() => {
+    if (user && filterStatus !== 'all') {
+      fetchMyClasses();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterStatus]);
+
   const filteredClasses = classes.filter(cls => {
-    const matchesStatus = filterStatus === 'all' || cls.status === filterStatus;
     const matchesSearch = cls.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          cls.level.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          cls.teacher.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesSearch;
+    return matchesSearch;
   });
 
   const renderGridView = () => {
@@ -130,16 +186,10 @@ const MyClasses = () => {
 
                   {/* Stats */}
                   <Row className="g-2 mb-16">
-                    <Col xs={6}>
+                    <Col xs={12}>
                       <div className="bg-success-25 border border-success-100 rounded-8 p-12 text-center">
                         <div className="text-success-600 fw-bold text-16">{cls.attendanceRate}%</div>
                         <div className="text-neutral-600 text-11">Chuyên cần</div>
-                      </div>
-                    </Col>
-                    <Col xs={6}>
-                      <div className="bg-warning-25 border border-warning-100 rounded-8 p-12 text-center">
-                        <div className="text-warning-600 fw-bold text-16">{cls.averageScore}</div>
-                        <div className="text-neutral-600 text-11">Điểm TB</div>
                       </div>
                     </Col>
                   </Row>
@@ -274,10 +324,6 @@ const MyClasses = () => {
                         <div className="text-success-600 fw-bold text-14">{cls.attendanceRate}%</div>
                         <div className="text-neutral-600 text-11">Chuyên cần</div>
                       </div>
-                      <div className="flex-fill bg-warning-25 border border-warning-100 rounded-8 p-8 text-center">
-                        <div className="text-warning-600 fw-bold text-14">{cls.averageScore}</div>
-                        <div className="text-neutral-600 text-11">Điểm TB</div>
-                      </div>
                       {cls.pendingAssignments > 0 && (
                         <div className="flex-fill bg-danger-25 border border-danger-100 rounded-8 p-8 text-center">
                           <div className="text-danger-600 fw-bold text-14">{cls.pendingAssignments}</div>
@@ -407,7 +453,7 @@ const MyClasses = () => {
 
       {/* Summary Stats */}
       <Row className="g-3 mb-24">
-        <Col md={3}>
+        <Col md={4}>
           <Card className="bg-main-25 border border-main-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
@@ -425,7 +471,7 @@ const MyClasses = () => {
             </Card.Body>
           </Card>
         </Col>
-        <Col md={3}>
+        <Col md={4}>
           <Card className="bg-success-25 border border-success-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
@@ -443,7 +489,7 @@ const MyClasses = () => {
             </Card.Body>
           </Card>
         </Col>
-        <Col md={3}>
+        <Col md={4}>
           <Card className="bg-warning-25 border border-warning-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
               <div className="d-flex justify-content-between align-items-center">
@@ -461,28 +507,33 @@ const MyClasses = () => {
             </Card.Body>
           </Card>
         </Col>
-        <Col md={3}>
-          <Card className="bg-info-25 border border-info-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
-            <Card.Body className="p-20">
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <div className="text-info-500 text-24 fw-bold">
-                    {Math.round(classes.reduce((sum, c) => sum + c.averageScore, 0) / classes.length * 10) / 10 || 0}
-                  </div>
-                  <div className="text-neutral-700 text-13">Điểm TB chung</div>
-                </div>
-                <div className="bg-info-500 text-white rounded-circle d-flex align-items-center justify-content-center"
-                     style={{ width: '48px', height: '48px' }}>
-                  <i className="fas fa-star"></i>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
       </Row>
 
+      {/* Loading State */}
+      {loading && (
+        <div className="text-center py-5">
+          <Spinner animation="border" variant="primary" />
+          <p className="text-neutral-500 mt-3">Đang tải danh sách lớp học...</p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && !loading && (
+        <Alert variant="danger" className="mb-24" dismissible onClose={() => setError(null)}>
+          <Alert.Heading>Lỗi!</Alert.Heading>
+          <p>{error}</p>
+          <Button variant="outline-danger" size="sm" onClick={fetchMyClasses}>
+            Thử lại
+          </Button>
+        </Alert>
+      )}
+
       {/* Classes Content */}
-      {viewMode === 'grid' ? renderGridView() : renderListView()}
+      {!loading && !error && (
+        <>
+          {viewMode === 'grid' ? renderGridView() : renderListView()}
+        </>
+      )}
     </Container>
   );
 };

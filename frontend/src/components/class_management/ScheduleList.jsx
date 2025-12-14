@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Table, Badge, Button, ButtonGroup, Dropdown } from 'react-bootstrap';
+import React, { useState, useEffect } from 'react';
+import { Table, Badge, Button, ButtonGroup, Dropdown, Pagination } from 'react-bootstrap';
 
 const ScheduleList = ({ 
   schedules, 
@@ -10,6 +10,7 @@ const ScheduleList = ({
   const [sortField, setSortField] = useState('date');
   const [sortDirection, setSortDirection] = useState('asc');
   const [selectedSchedules, setSelectedSchedules] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Sort schedules
   const sortedSchedules = [...schedules].sort((a, b) => {
@@ -31,9 +32,6 @@ const ScheduleList = ({
       case 'roomName':
         comparison = a.roomName.localeCompare(b.roomName);
         break;
-      case 'status':
-        comparison = a.status.localeCompare(b.status);
-        break;
       default:
         break;
     }
@@ -48,6 +46,7 @@ const ScheduleList = ({
       setSortField(field);
       setSortDirection('asc');
     }
+    setCurrentPage(1); // Reset to first page when sorting changes
   };
 
   const handleSelectSchedule = (scheduleId) => {
@@ -61,10 +60,20 @@ const ScheduleList = ({
   };
 
   const handleSelectAll = (e) => {
+    // Calculate paginated schedules for current page
+    const itemsPerPage = 10;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentPageSchedules = sortedSchedules.slice(startIndex, endIndex);
+    
     if (e.target.checked) {
-      setSelectedSchedules(schedules.map(s => s.id));
+      // Select all items in current page
+      const currentPageIds = currentPageSchedules.map(s => s.id);
+      setSelectedSchedules(prev => [...new Set([...prev, ...currentPageIds])]);
     } else {
-      setSelectedSchedules([]);
+      // Deselect all items in current page
+      const currentPageIds = currentPageSchedules.map(s => s.id);
+      setSelectedSchedules(prev => prev.filter(id => !currentPageIds.includes(id)));
     }
   };
 
@@ -75,16 +84,6 @@ const ScheduleList = ({
       selectedSchedules.forEach(id => onDeleteSchedule(id));
       setSelectedSchedules([]);
     }
-  };
-
-  const getStatusText = (status) => {
-    const statusMap = {
-      scheduled: 'Đã lên lịch',
-      completed: 'Đã hoàn thành',
-      cancelled: 'Đã hủy',
-      makeup: 'Học bù'
-    };
-    return statusMap[status] || status;
   };
 
   const getTypeText = (type) => {
@@ -103,6 +102,18 @@ const ScheduleList = ({
       <i className="fas fa-sort-up"></i> : 
       <i className="fas fa-sort-down"></i>;
   };
+
+  // Pagination logic
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(sortedSchedules.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedSchedules = sortedSchedules.slice(startIndex, endIndex);
+
+  // Reset to page 1 when schedules change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [schedules.length]);
 
   return (
     <div>
@@ -128,7 +139,7 @@ const ScheduleList = ({
                 <input
                   type="checkbox"
                   className="form-check-input"
-                  checked={selectedSchedules.length === schedules.length && schedules.length > 0}
+                  checked={paginatedSchedules.length > 0 && paginatedSchedules.every(s => selectedSchedules.includes(s.id))}
                   onChange={handleSelectAll}
                 />
               </th>
@@ -163,19 +174,12 @@ const ScheduleList = ({
                 Phòng học <SortIcon field="roomName" />
               </th>
               <th className="text-neutral-900 fw-semibold" style={{ padding: '16px' }}>Loại</th>
-              <th 
-                onClick={() => handleSort('status')} 
-                style={{ cursor: 'pointer', padding: '16px' }}
-                className="text-neutral-900 fw-semibold"
-              >
-                Trạng thái <SortIcon field="status" />
-              </th>
               <th style={{ width: '180px', padding: '16px' }} className="text-neutral-900 fw-semibold">Hành động</th>
             </tr>
           </thead>
           <tbody>
-            {sortedSchedules.length > 0 ? (
-              sortedSchedules.map(schedule => (
+            {paginatedSchedules.length > 0 ? (
+              paginatedSchedules.map(schedule => (
                 <tr key={schedule.id} className={selectedSchedules.includes(schedule.id) ? 'bg-main-25' : ''}>
                   <td style={{ padding: '16px' }}>
                     <input
@@ -211,17 +215,6 @@ const ScheduleList = ({
                     </Badge>
                   </td>
                   <td style={{ padding: '16px' }}>
-                    <Badge 
-                      className={
-                        schedule.status === 'scheduled' ? 'bg-success-600 text-white px-12 py-6' :
-                        schedule.status === 'completed' ? 'bg-main-600 text-white px-12 py-6' :
-                        schedule.status === 'cancelled' ? 'bg-danger-600 text-white px-12 py-6' : 'bg-warning-600 text-white px-12 py-6'
-                      }
-                    >
-                      {getStatusText(schedule.status)}
-                    </Badge>
-                  </td>
-                  <td style={{ padding: '16px' }}>
                     <ButtonGroup size="sm">
                       <Button
                         className="btn-outline-main text-13 px-10 py-6"
@@ -250,7 +243,7 @@ const ScheduleList = ({
               ))
             ) : (
               <tr>
-                <td colSpan="10" className="text-center py-40" style={{ padding: '40px' }}>
+                <td colSpan="9" className="text-center py-40" style={{ padding: '40px' }}>
                   <i className="fas fa-inbox fa-3x text-neutral-400 mb-16 d-block"></i>
                   <p className="mb-0 text-neutral-500">Không có lịch học nào</p>
                 </td>
@@ -260,33 +253,55 @@ const ScheduleList = ({
         </Table>
       </div>
 
-      {/* Summary */}
-      {schedules.length > 0 && (
-        <div className="d-flex justify-content-around p-20 bg-main-25 rounded-12 mt-24 border border-main-100">
-          <div className="text-center">
-            <div className="text-neutral-500 text-13 mb-8">Tổng số lịch</div>
-            <div className="text-neutral-900 fw-bold text-20">{schedules.length}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-neutral-500 text-13 mb-8">Đã lên lịch</div>
-            <div className="text-success-600 fw-bold text-20">
-              {schedules.filter(s => s.status === 'scheduled').length}
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-neutral-500 text-13 mb-8">Đã hoàn thành</div>
-            <div className="text-main-600 fw-bold text-20">
-              {schedules.filter(s => s.status === 'completed').length}
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-neutral-500 text-13 mb-8">Học bù</div>
-            <div className="text-warning-600 fw-bold text-20">
-              {schedules.filter(s => s.type === 'makeup').length}
-            </div>
-          </div>
+      {/* Pagination */}
+      {sortedSchedules.length > itemsPerPage && (
+        <div className="d-flex justify-content-center mt-3">
+          <Pagination>
+            <Pagination.First 
+              onClick={() => setCurrentPage(1)} 
+              disabled={currentPage === 1}
+            />
+            <Pagination.Prev 
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} 
+              disabled={currentPage === 1}
+            />
+            {[...Array(totalPages)].map((_, i) => {
+              const page = i + 1;
+              // Show first page, last page, current page, and pages around current
+              if (
+                page === 1 ||
+                page === totalPages ||
+                (page >= currentPage - 1 && page <= currentPage + 1)
+              ) {
+                return (
+                  <Pagination.Item
+                    key={page}
+                    active={page === currentPage}
+                    onClick={() => setCurrentPage(page)}
+                  >
+                    {page}
+                  </Pagination.Item>
+                );
+              } else if (
+                page === currentPage - 2 ||
+                page === currentPage + 2
+              ) {
+                return <Pagination.Ellipsis key={page} />;
+              }
+              return null;
+            })}
+            <Pagination.Next 
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} 
+              disabled={currentPage === totalPages}
+            />
+            <Pagination.Last 
+              onClick={() => setCurrentPage(totalPages)} 
+              disabled={currentPage === totalPages}
+            />
+          </Pagination>
         </div>
       )}
+
     </div>
   );
 };

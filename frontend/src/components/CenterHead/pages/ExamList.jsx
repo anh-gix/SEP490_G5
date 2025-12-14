@@ -7,8 +7,7 @@ import Button from '../compo/Button';
 import SearchBox from '../compo/SearchBox';
 import FilterBar from '../compo/FilterBar';
 import StatusBadge from '../compo/StatusBadge';
-import ActionMenu from '../compo/ActionMenu';
-import { mockExams, mockExamStats, simulateApiDelay } from '../../../helper/mockdataExtended';
+import examService from '../../../services/examService';
 import { formatDate } from '../../../helper/helper';
 
 const ExamList = () => {
@@ -30,12 +29,39 @@ const ExamList = () => {
   const fetchExams = async () => {
     try {
       setLoading(true);
-      await simulateApiDelay(500);
-      setExams(mockExams);
+      const response = await examService.getAllExamsForManagement();
+
+      if (response.success) {
+        setExams(response.data || []);
+      } else {
+        console.error('Failed to fetch exams:', response.message);
+        alert(response.message || 'Không thể tải danh sách đề thi');
+      }
     } catch (err) {
       console.error('Error:', err);
+      alert(err.message || 'Không thể tải danh sách đề thi');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteExam = async (examId, examTitle) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa đề thi "${examTitle}"? Hành động này không thể hoàn tác.`)) {
+      return;
+    }
+
+    try {
+      const response = await examService.deleteExamForManagement(examId);
+
+      if (response.success) {
+        alert('Xóa đề thi thành công!');
+        fetchExams(); // Reload the list
+      } else {
+        alert(response.message || 'Xóa đề thi thất bại');
+      }
+    } catch (err) {
+      console.error('Error deleting exam:', err);
+      alert(err.message || 'Xóa đề thi thất bại');
     }
   };
 
@@ -127,32 +153,50 @@ const ExamList = () => {
       header: 'Người tạo',
       field: 'createdBy',
       render: (row) => (
-        <span className="text-neutral-700">{row.createdBy?.fullname}</span>
+        <span className="text-neutral-700">{row.createdBy?.username || 'N/A'}</span>
       ),
     },
     {
       header: 'Hành động',
       field: 'actions',
       render: (row) => (
-        <ActionMenu
-          actions={[
-            {
-              label: "Xem chi tiết",
-              icon: "ph ph-eye",
-              onClick: () => navigate(`/center-head/exams/${row._id}`)
-            },
-            {
-              label: "Xem bài làm",
-              icon: "ph ph-notebook",
-              onClick: () => navigate(`/center-head/exams/${row._id}/submissions`)
-            },
-            {
-              label: row.isPublished ? 'Hủy xuất bản' : 'Xuất bản',
-              icon: row.isPublished ? 'ph ph-eye-slash' : 'ph ph-book-open',
-              onClick: () => console.log('Toggle publish', row._id)
-            },
-          ]}
-        />
+        <div className="d-flex gap-2 justify-content-center">
+          {/* Nút Xem */}
+          <button
+            className="btn btn-sm btn-outline-primary"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/exams/${row._id}`);
+            }}
+            title="Xem chi tiết"
+          >
+            <i className="ph ph-eye"></i>
+          </button>
+
+          {/* Nút Sửa */}
+          <button
+            className="btn btn-sm btn-outline-secondary"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/exams/${row._id}/edit`);
+            }}
+            title="Chỉnh sửa"
+          >
+            <i className="ph ph-pencil"></i>
+          </button>
+
+          {/* Nút Xóa */}
+          <button
+            className="btn btn-sm btn-outline-danger"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteExam(row._id, row.title);
+            }}
+            title="Xóa"
+          >
+            <i className="ph ph-trash"></i>
+          </button>
+        </div>
       ),
     },
   ];
@@ -174,7 +218,7 @@ const ExamList = () => {
           <h4 className="mb-8 text-neutral-900 fw-bold">Quản lý đề thi</h4>
           <p className="text-neutral-600 mb-0">Quản lý đề thi và bài làm</p>
         </div>
-        <Button variant="primary" icon="ph ph-plus" onClick={() => navigate('/center-head/exams/create')}>
+        <Button variant="primary" styles={{ "text": "white"}} icon="ph ph-plus" onClick={() => navigate('/center-head/exams/create')}>
           Tạo đề thi
         </Button>
       </div>
@@ -184,19 +228,23 @@ const ExamList = () => {
         <div className="col-md-4">
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng đề thi</h6>
-            <h4 className="text-neutral-900 fw-bold mb-0">{mockExamStats.total}</h4>
+            <h4 className="text-neutral-900 fw-bold mb-0">{exams.length}</h4>
           </Card>
         </div>
         <div className="col-md-4">
           <Card>
             <h6 className="text-neutral-600 mb-8">Đã xuất bản</h6>
-            <h4 className="text-success-600 fw-bold mb-0">{mockExamStats.published}</h4>
+            <h4 className="text-success-600 fw-bold mb-0">
+              {exams.filter(exam => exam.isPublished).length}
+            </h4>
           </Card>
         </div>
         <div className="col-md-4">
           <Card>
-            <h6 className="text-neutral-600 mb-8">Bài chờ chấm</h6>
-            <h4 className="text-warning-600 fw-bold mb-0">{mockExamStats.pendingGrading}</h4>
+            <h6 className="text-neutral-600 mb-8">Bản nháp</h6>
+            <h4 className="text-warning-600 fw-bold mb-0">
+              {exams.filter(exam => !exam.isPublished).length}
+            </h4>
           </Card>
         </div>
       </div>

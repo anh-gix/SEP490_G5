@@ -150,9 +150,14 @@ const hasAllRoles = (...roles) => {
 const isAdmin = hasRole('admin');
 
 // Common role checks
-const isStudent = hasRole('student');
-const isTeacher = hasRole('teacher');
-const isStaff = hasRole('staff');
+const isStudent = hasRole('Student');
+const isTeacher = hasRole('Teacher');
+const isAcademicStaff = hasRole('Academic Staff');
+const isSubjectLeader = hasRole('Subject Leader');
+const isCenterHead = hasRole('Center Head');
+
+// Combined role checks
+const isTeacherOrSubjectLeader = hasAnyRole('Teacher', 'Subject Leader');
 
 module.exports = {
     verifyToken,
@@ -162,5 +167,8 @@ module.exports = {
     hasAllRoles,
     isStudent,
     isTeacher,
-    isStaff
+    isAcademicStaff,
+    isSubjectLeader,
+    isCenterHead,
+    isTeacherOrSubjectLeader
 };

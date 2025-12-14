@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, Button, Badge, ProgressBar, Dropdown } from 'react-bootstrap';
 
-const ClassList = ({ classes, onEdit, onDelete, onViewDetails }) => {
+const ClassList = ({ classes, onEdit, onViewDetails }) => {
   const getStatusText = (status) => {
     const statusMap = {
       pending: 'Chờ khai giảng',
@@ -74,17 +74,8 @@ const ClassList = ({ classes, onEdit, onDelete, onViewDetails }) => {
                       label={`${classItem.completionRate.toFixed(1)}%`}
                       className="bg-neutral-50"
                       style={{ height: '8px' }}
-                    >
-                      <div 
-                        className="bg-success-600"
-                        style={{ 
-                          width: `${classItem.completionRate}%`,
-                          height: '100%',
-                          borderRadius: '4px',
-                          transition: 'width 0.3s ease'
-                        }}
-                      />
-                    </ProgressBar>
+                      variant="success"
+                    />
                   </div>
                 )}
               </Card.Body>
@@ -102,12 +93,6 @@ const ClassList = ({ classes, onEdit, onDelete, onViewDetails }) => {
                   onClick={() => onEdit(classItem)}
                 >
                   <i className="fas fa-edit"></i>
-                </Button>
-                <Button 
-                  className="btn-outline-danger text-13 fw-medium px-12 py-8 radius-8"
-                  onClick={() => onDelete(classItem.id)}
-                >
-                  <i className="fas fa-trash"></i>
                 </Button>
               </Card.Footer>
             </Card>

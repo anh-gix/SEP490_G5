@@ -9,6 +9,8 @@ import TeacherAttendancePage from "../pages/TeacherPages/TeacherAttendancePage.j
 import TeacherGradingPage from "../pages/TeacherPages/TeacherGradingPage.jsx";
 import TeacherClassDetailPage from "../pages/TeacherPages/TeacherClassDetailPage.jsx";
 import LessonDetailPage from "../pages/TeacherPages/LessonDetailPage.jsx";
+import TeacherProfilePage from "../pages/TeacherPages/TeacherProfilePage.jsx";
+import TeacherApplicationsPage from "../pages/TeacherPages/TeacherApplicationsPage.jsx";
 
 /**
  * TeacherRoutes
@@ -32,13 +34,22 @@ export const teacherRoutes = [
   
   { path: '/teacher/dashboard', element: <TeacherDashboardPage /> },
 
+  // Profile
+  { path: '/teacher/profile', element: <TeacherProfilePage /> },
+
   // I. Schedule
   { path: '/teacher/schedule', element: <TeacherSchedulePage /> },
   { path: '/teacher/lessons/:lessonId', element: <LessonDetailPage /> },
+  { path: '/teacher/applications', element: <TeacherApplicationsPage /> },
 
   // II. Classes
   { path: '/teacher/classes', element: <TeacherClassesPage /> },
   { path: '/teacher/classes/:classId', element: <TeacherClassDetailPage /> },
+  { path: '/teacher/classes/:classId/overview', element: <TeacherClassDetailPage /> },
+  { path: '/teacher/classes/:classId/students', element: <TeacherClassDetailPage /> },
+  { path: '/teacher/classes/:classId/lessons', element: <TeacherClassDetailPage /> },
+  { path: '/teacher/classes/:classId/materials', element: <TeacherClassDetailPage /> },
+  { path: '/teacher/classes/:classId/assignments', element: <TeacherClassDetailPage /> },
 
   // III. Assignments
   { path: '/teacher/assignments', element: <TeacherAssignmentsPage /> },

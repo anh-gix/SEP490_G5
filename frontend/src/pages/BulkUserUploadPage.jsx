@@ -25,7 +25,7 @@ const BulkUserUploadPage = () => {
     const fetchRoles = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get('http://localhost:9999/api/roles', {
+        const response = await axios.get('http://localhost:8080/api/roles', {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -354,7 +354,7 @@ const BulkUserUploadPage = () => {
                   </>
                 ) : (
                   <>
-                    <i className="fas fa-upload me-2"></i>
+                    
                     Generate
                   </>
                 )}
@@ -513,7 +513,6 @@ const BulkUserUploadPage = () => {
                 onClick={handleSave}
                 disabled={!selectedRoleId || saving}
               >
-                <i className="fas fa-eye me-2"></i>
                 Preview
               </Button>
             </div>

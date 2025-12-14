@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import RouteScrollToTop from "./helper/RouteScrollToTop.jsx";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import HomePageOne from "./pages/HomePageOne";
 import AboutPage from "./pages/AboutPage.jsx";
 import AboutFourPage from "./pages/AboutFourPage.jsx";
@@ -16,7 +18,6 @@ import CartPage from "./pages/CartPage.jsx";
 import CheckoutPage from "./pages/CheckoutPage.jsx";
 import ContactPage from "./pages/ContactPage.jsx";
 import CoursePage from "./pages/CoursePage.jsx";
-import CourseDetailsPage from "./pages/CourseDetailsPage.jsx";
 import CourseListViewPage from "./pages/CourseListViewPage.jsx";
 import EventDetailsPage from "./pages/EventDetailsPage.jsx";
 import EventsPage from "./pages/EventsPage.jsx";
@@ -42,19 +43,15 @@ import TutorPage from "./pages/TutorPage.jsx";
 import TutorDetailsPage from "./pages/TutorDetailsPage.jsx";
 import HomePageFive from "./pages/HomePageFive.jsx";
 import HomePageSix from "./pages/HomePageSix.jsx";
-
-import StudentExamListPage from "./pages/StudentPages/StudentExamListPage.jsx";
-import ExamDetailPage from "./pages/StudentPages/ExamDetailPage.jsx";
-import ReadingExamPage from "./pages/StudentPages/ReadingExamPage.jsx";
-import ReadingResultPage from "./pages/StudentPages/ReadingResultPage.jsx";
-
 import { Navigate } from "react-router-dom";
+import { HomePageRoutes } from "./routes/HomePageRoutes.jsx";
+import Profile from "./pages/Profile.jsx";
 import { centerHeadRoutes } from "./routes/CenterHeadRoutes.jsx";
 import { academicRoutes } from "./routes/AcademicRoutes.jsx";
-import Profile from "./pages/Profile.jsx";
 import { teacherRoutes } from "./routes/TeacherRoutes.jsx";
 import { studentRoutes } from "./routes/StudentRoutes.jsx";
 import { ministryRoutes } from "./routes/MinistryRoutes.jsx";
+import { examRoutes } from "./routes/ExamRoutes.jsx";
 function App() {
   return (
     <AuthProvider>
@@ -88,11 +85,13 @@ function App() {
 
           {/* Dashboard */}
           {/* <Route path="/" element={<Dashboard />} /> */}
+          {examRoutes.map((route, index) => (
+            <Route key={`exam-${index}`} path={route.path} element={route.element} />
+          ))}
+          {HomePageRoutes.map((route, index) => (
+            <Route key={`home-${index}`} path={route.path} element={route.element} />
+          ))}
 
-
-
-          {/* Redirect unknown routes to dashboard */}
-          <Route path="*" element={<Navigate to="/" replace />} />
 
           <Route exact path="/" element={<HomePageTwo />} />
           <Route exact path="/index-2" element={<HomePageOne />} />
@@ -122,7 +121,6 @@ function App() {
           <Route exact path="/checkout" element={<CheckoutPage />} />
           <Route exact path="/contact" element={<ContactPage />} />
           <Route exact path="/course" element={<CoursePage />} />
-          <Route exact path="/course-details" element={<CourseDetailsPage />} />
           <Route
             exact
             path="/course-list-view"
@@ -162,22 +160,39 @@ function App() {
           <Route exact path="/tutor" element={<TutorPage />} />
           <Route exact path="/tutor-details" element={<TutorDetailsPage />} />
 
-          {/* Exam Routes */}
-          <Route exact path="/exams" element={<StudentExamListPage />} />
-          <Route exact path="/exams/:id" element={<ExamDetailPage />} />
-          <Route
-            exact
-            path="/exams/:examId/submissions/:submissionId/reading"
-            element={<ReadingExamPage />}
-          />
-          <Route
-            exact
-            path="/exams/:examId/submissions/:submissionId/reading/result"
-            element={<ReadingResultPage />}
-          />
+        
+
+          {/* Redirect unknown routes to dashboard */}
+          <Route path="*" element={<Navigate to="/" replace />} />
 
         </Routes>
+        
+        {/* Toast Notifications */}
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
       </BrowserRouter>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </AuthProvider>
 
   );

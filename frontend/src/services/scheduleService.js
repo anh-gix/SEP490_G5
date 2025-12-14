@@ -1,12 +1,12 @@
 import axios from 'axios';
 
-const API_URL = `http://localhost:8080/api/schedules`;
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
 const scheduleService = {
   // Get all schedules with optional filters
   getAllSchedules: async (params = {}) => {
     try {
-      const response = await axios.get(API_URL, { params });
+      const response = await axios.get(`${API_URL}/schedules`, { params });
       return response.data;
     } catch (error) {
       console.error('Error fetching schedules:', error);
@@ -17,7 +17,7 @@ const scheduleService = {
   // Get schedule by ID
   getScheduleById: async (id) => {
     try {
-      const response = await axios.get(`${API_URL}/${id}`);
+      const response = await axios.get(`${API_URL}/schedules/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching schedule:', error);
@@ -28,7 +28,7 @@ const scheduleService = {
   // Get schedule statistics
   getScheduleStats: async () => {
     try {
-      const response = await axios.get(`${API_URL}/stats`);
+      const response = await axios.get(`${API_URL}/schedules/stats`);
       return response.data;
     } catch (error) {
       console.error('Error fetching schedule stats:', error);
@@ -39,7 +39,7 @@ const scheduleService = {
   // Get pending schedules (for approval)
   getPendingSchedules: async () => {
     try {
-      const response = await axios.get(`${API_URL}/pending`);
+      const response = await axios.get(`${API_URL}/schedules/pending`);
       return response.data;
     } catch (error) {
       console.error('Error fetching pending schedules:', error);
@@ -50,7 +50,7 @@ const scheduleService = {
   // Create new schedule
   createSchedule: async (scheduleData) => {
     try {
-      const response = await axios.post(API_URL, scheduleData);
+      const response = await axios.post(`${API_URL}/schedules`, scheduleData);
       return response.data;
     } catch (error) {
       console.error('Error creating schedule:', error);
@@ -61,7 +61,7 @@ const scheduleService = {
   // Update schedule
   updateSchedule: async (id, scheduleData) => {
     try {
-      const response = await axios.put(`${API_URL}/${id}`, scheduleData);
+      const response = await axios.put(`${API_URL}/schedules/${id}`, scheduleData);
       return response.data;
     } catch (error) {
       console.error('Error updating schedule:', error);
@@ -72,7 +72,7 @@ const scheduleService = {
   // Delete schedule
   deleteSchedule: async (id) => {
     try {
-      const response = await axios.delete(`${API_URL}/${id}`);
+      const response = await axios.delete(`${API_URL}/schedules/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error deleting schedule:', error);
@@ -83,7 +83,7 @@ const scheduleService = {
   // Approve schedule
   approveSchedule: async (id) => {
     try {
-      const response = await axios.patch(`${API_URL}/${id}/approve`);
+      const response = await axios.patch(`${API_URL}/schedules/${id}/approve`);
       return response.data;
     } catch (error) {
       console.error('Error approving schedule:', error);
@@ -94,7 +94,7 @@ const scheduleService = {
   // Reject schedule
   rejectSchedule: async (id, reason) => {
     try {
-      const response = await axios.patch(`${API_URL}/${id}/reject`, { reason });
+      const response = await axios.patch(`${API_URL}/schedules/${id}/reject`, { reason });
       return response.data;
     } catch (error) {
       console.error('Error rejecting schedule:', error);
@@ -106,7 +106,7 @@ const scheduleService = {
   checkConflict: async (scheduleData) => {
     try {
       // This will attempt to create and catch the conflict error
-      await axios.post(API_URL, { ...scheduleData, dryRun: true });
+      await axios.post(`${API_URL}/schedules`, { ...scheduleData, dryRun: true });
       return { hasConflict: false };
     } catch (error) {
       if (error.response?.data?.message?.includes('conflict')) {

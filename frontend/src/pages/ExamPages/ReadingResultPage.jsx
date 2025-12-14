@@ -46,8 +46,9 @@ const ReadingResultPage = () => {
   }, [examId, submissionId, isAuthenticated, navigate]);
 
   const getScorePercentage = () => {
-    if (!result || !result.maxScore) return 0;
-    return Math.round((result.sectionScore / result.maxScore) * 100);
+    const totalMaxScore = getTotalMaxScore();
+    if (!result || !result.sectionScore || totalMaxScore === 0) return 0;
+    return Math.round((result.sectionScore / totalMaxScore) * 100);
   };
 
   const getCorrectAnswersCount = () => {
@@ -69,6 +70,18 @@ const ReadingResultPage = () => {
     if (!examData || !examData.sections) return 0;
     const readingSections = examData.sections.filter(s => s.type === "reading");
     return readingSections.reduce((sum, s) => sum + (s.questionCount || 0), 0);
+  };
+
+  const getTotalMaxScore = () => {
+    if (!examData || !examData.sections) return result?.maxScore || 0;
+    const readingSections = examData.sections.filter(s => s.type === "reading");
+    return readingSections.reduce((sum, section) => {
+      if (!section.answerKey || !Array.isArray(section.answerKey)) return sum;
+      const sectionMaxScore = section.answerKey.reduce((sectionSum, item) => {
+        return sectionSum + (item.maxScore || 1);
+      }, 0);
+      return sum + sectionMaxScore;
+    }, 0);
   };
 
   const getScoreColor = () => {
@@ -160,9 +173,12 @@ const ReadingResultPage = () => {
   };
 
   const getBandScore = () => {
-    if (!result || !result.maxScore || result.maxScore === 0) return null;
-    const percentage = getScorePercentage();
-    const correctAnswers = Math.round((result.sectionScore / result.maxScore) * 40); // Assuming max 40 questions
+    const totalMaxScore = getTotalMaxScore();
+    const totalQuestions = getTotalQuestionsCount();
+    if (!result || !result.sectionScore || totalMaxScore === 0 || totalQuestions === 0) return null;
+    
+    // Calculate correct answers based on score ratio and total questions
+    const correctAnswers = Math.round((result.sectionScore / totalMaxScore) * totalQuestions);
     
     // Map percentage/score to band score
     if (correctAnswers >= 39) return 9;
@@ -243,13 +259,14 @@ const ReadingResultPage = () => {
 
   // Initialize selected band score when result changes
   useEffect(() => {
-    if (result && result.maxScore > 0) {
+    const totalMaxScore = getTotalMaxScore();
+    if (result && totalMaxScore > 0) {
       const bandScore = getBandScore();
       if (bandScore !== null) {
         setSelectedBandScore(bandScore);
       }
     }
-  }, [result]);
+  }, [result, examData]);
 
   if (loading) {
     return (
@@ -308,7 +325,7 @@ const ReadingResultPage = () => {
                     </div>
                     <p className='text-neutral-600 text-sm mb-8 fw-medium'>Điểm số</p>
                     <h3 className={`text-${getScoreColor()}-600 mb-0 fw-bold`}>
-                      {result.sectionScore} / {result.maxScore}
+                      {result.sectionScore} / {getTotalMaxScore()}
                     </h3>
                   </div>
                 </div>
@@ -337,7 +354,7 @@ const ReadingResultPage = () => {
               </div>
 
               {/* Band Score Section */}
-              {result.maxScore > 0 && (() => {
+              {getTotalMaxScore() > 0 && (() => {
                 const currentBandScore = getBandScore();
                 const bandScores = [9, 8.5, 8, 7.5, 7, 6.5, 6, 5.5, 5, 4.5, 4, 3.5, 3];
                 const displayBandScore = selectedBandScore !== null ? selectedBandScore : currentBandScore;
@@ -736,7 +753,7 @@ const ReadingResultPage = () => {
               {/* Actions */}
               <div className='text-center'>
                 <Link
-                  to={`/exams/${examId}`}
+                  to={`/exams/${examId}/2`}
                   className='btn btn-main px-40 py-16 rounded-pill me-16'
                 >
                   <i className='ph ph-arrow-left me-8' />

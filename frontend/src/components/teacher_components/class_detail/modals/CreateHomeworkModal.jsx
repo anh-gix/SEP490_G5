@@ -14,6 +14,7 @@ const CreateHomeworkModal = ({ show, onHide, onSuccess, classId }) => {
   const [selectedSchedule, setSelectedSchedule] = useState('');
   const [formData, setFormData] = useState({
     title: '',
+    description: '',
     deadline: ''
   });
   const [assignmentFiles, setAssignmentFiles] = useState([]);
@@ -130,7 +131,7 @@ const CreateHomeworkModal = ({ show, onHide, onSuccess, classId }) => {
 
       // Reset form
       setSelectedSchedule('');
-      setFormData({ title: '', deadline: '' });
+      setFormData({ title: '', description: '', deadline: '' });
       setAssignmentFiles([]);
       setAnswerFiles([]);
       
@@ -225,6 +226,22 @@ const CreateHomeworkModal = ({ show, onHide, onSuccess, classId }) => {
               placeholder="VD: Bài tập nghe Part 1-2"
               className="rounded-8"
               required
+            />
+          </Form.Group>
+
+          {/* Description */}
+          <Form.Group className="mb-20">
+            <Form.Label className="fw-semibold">
+              Mô tả <span className="text-muted">(Tùy chọn)</span>
+            </Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={3}
+              name="description"
+              value={formData.description}
+              onChange={handleInputChange}
+              placeholder="Nhập mô tả chi tiết về bài tập..."
+              className="rounded-8"
             />
           </Form.Group>
 

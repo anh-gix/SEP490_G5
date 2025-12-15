@@ -1014,9 +1014,10 @@ exports.getMyClassDetail = async (req, res) => {
           homeworkWithStats.push({
             _id: hw._id,
             title: hw.assignment?.title || 'Bài tập',
+            description: hw.assignment?.description || '',
             files: hw.assignment?.files || [],
             answerFiles: hw.answerFiles || [],
-            deadline: formatDateToVN(hw.deadline),
+            deadline: hw.deadline,
             submitted: submittedCount,
             late: lateCount,
             pending: totalStudents - submittedCount,
@@ -1028,7 +1029,7 @@ exports.getMyClassDetail = async (req, res) => {
       return {
         _id: lesson._id,
         lessonNumber: index + 1,
-        date: formatDateToVN(lesson.date),
+        date: lesson.date,
         time: `${lesson.startTime} - ${lesson.endTime}`,
         topic: lesson.session?.title || 'Chưa có chủ đề',
         sessionOrder: lesson.session?.order,
@@ -1053,7 +1054,7 @@ exports.getMyClassDetail = async (req, res) => {
             type: mat.file?.endsWith('.pdf') ? 'document' : 
                   mat.file?.endsWith('.mp3') ? 'audio' : 
                   mat.file?.endsWith('.mp4') ? 'video' : 'document',
-            uploadedAt: formatDateToVN(lesson.date),
+            uploadedAt: lesson.date,
             size: '2.5 MB', // Placeholder
             downloads: Math.floor(Math.random() * 50) // Placeholder
           });
@@ -1245,7 +1246,7 @@ exports.getMyClassDetail = async (req, res) => {
             lessonNumber: lesson.lessonNumber,
             sessionOrder: lesson.sessionOrder,
             title: hw.title,
-            deadline: formatDateToVN(hw.deadline),
+            deadline: hw.deadline,
             onTime: onTime,
             late: hw.late,
             pending: hw.pending,
@@ -1952,7 +1953,7 @@ exports.getClassMaterials = async (req, res) => {
             lessonNumber: schedule.session?.order || 0,
             lessonTitle: schedule.session?.title || schedule.topic || 'Chưa có tiêu đề',
             url: materialObj.file,
-            uploadDate: formatDateToVN(schedule.date),
+            uploadDate: schedule.date,
             scheduleId: schedule._id
           });
         });

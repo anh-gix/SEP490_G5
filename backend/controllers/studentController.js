@@ -577,7 +577,7 @@ exports.getClassHomework = async (req, res) => {
             _id: hw._id,
             scheduleId: schedule._id,
             title: hw.assignment?.title || 'Bài tập',
-            description: hw.description || '',
+            description: hw.assignment?.description || '',
             deadline: hw.deadline,
             lessonNumber: schedule.session?.order || 0,
             lessonTitle: schedule.session?.title || schedule.topic || 'Chưa có tiêu đề',

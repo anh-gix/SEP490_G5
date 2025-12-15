@@ -10,7 +10,7 @@ const mongoose = require('mongoose');
 exports.addHomeworkToSchedule = async (req, res) => {
   try {
     const { scheduleId } = req.params;
-    const { title, deadline } = req.body;
+    const { title, description, deadline } = req.body;
     
     // Validate required fields
     if (!title || !deadline) {
@@ -39,6 +39,7 @@ exports.addHomeworkToSchedule = async (req, res) => {
       _id: new mongoose.Types.ObjectId(),
       assignment: {
         title: title,
+        description: description || '',
         files: assignmentFiles.map(f => `/uploads/homeworks/${f.filename}`)
       },
       deadline: new Date(deadline),
@@ -90,7 +91,7 @@ exports.addHomeworkToSchedule = async (req, res) => {
 exports.updateHomework = async (req, res) => {
   try {
     const { scheduleId, homeworkId } = req.params;
-    const { title, deadline } = req.body;
+    const { title, description, deadline } = req.body;
 
     const schedule = await ClassSchedule.findById(scheduleId);
     
@@ -112,6 +113,7 @@ exports.updateHomework = async (req, res) => {
 
     // Update fields
     if (title) homework.assignment.title = title;
+    if (description !== undefined) homework.assignment.description = description;
     if (deadline) homework.deadline = new Date(deadline);
 
     // Handle file deletion
@@ -330,6 +332,7 @@ exports.getTeacherAssignments = async (req, res) => {
             _id: hw._id,
             scheduleId: schedule._id,
             title: hw.assignment.title,
+            description: hw.assignment.description || '',
             assignmentFiles: hw.assignment.files || [],
             answerFiles: hw.answerFiles || [],
             deadline: hw.deadline,

@@ -11,8 +11,8 @@ const AssignmentDetail = ({ assignmentId, onBack, onDelete }) => {
   const [loading, setLoading] = useState(true);
   const [uploadingFiles, setUploadingFiles] = useState({ assignment: false, answer: false });
   const [editingFiles, setEditingFiles] = useState({ assignment: false, answer: false });
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [editForm, setEditForm] = useState({ title: '', description: '', deadline: '' });
 
   useEffect(() => {
     fetchAssignmentDetail();
@@ -171,13 +171,20 @@ const AssignmentDetail = ({ assignmentId, onBack, onDelete }) => {
   };
 
   const handleUpdateTitle = async () => {
-    if (!newTitle.trim()) {
+    if (!editForm.title.trim()) {
       toast.warning('Tiêu đề không được để trống');
       return;
     }
 
-    if (newTitle.trim() === assignment.title) {
-      setEditingTitle(false);
+    if (!editForm.deadline) {
+      toast.warning('Deadline không được để trống');
+      return;
+    }
+
+    if (editForm.title.trim() === assignment.title && 
+        editForm.description === (assignment.description || '') && 
+        editForm.deadline === assignment.dueDate) {
+      setEditingInfo(false);
       return;
     }
 
@@ -185,18 +192,22 @@ const AssignmentDetail = ({ assignmentId, onBack, onDelete }) => {
       const response = await homeworkService.updateHomework(
         assignment.scheduleId,
         assignment._id,
-        { title: newTitle.trim() },
+        { 
+          title: editForm.title.trim(),
+          description: editForm.description,
+          deadline: editForm.deadline
+        },
         [], [], [], []
       );
 
       if (response.success) {
         await fetchAssignmentDetail();
-        setEditingTitle(false);
-        toast.success('Cập nhật tiêu đề thành công!');
+        setEditingInfo(false);
+        toast.success('Cập nhật thông tin thành công!');
       }
     } catch (err) {
-      console.error('Error updating title:', err);
-      toast.error('Không thể cập nhật tiêu đề. Vui lòng thử lại.');
+      console.error('Error updating info:', err);
+      toast.error('Không thể cập nhật thông tin. Vui lòng thử lại.');
     }
   };
 
@@ -303,7 +314,7 @@ const AssignmentDetail = ({ assignmentId, onBack, onDelete }) => {
       <div className="p-20 border-bottom">
         <Button 
           variant="link" 
-          className="text-neutral-600 p-0 mb-2 text-decoration-none" 
+          className="text-neutral-600 p-0 mb-3 text-decoration-none" 
           onClick={() => onBack && onBack()}
           style={{ fontSize: '14px' }}
         >
@@ -311,83 +322,149 @@ const AssignmentDetail = ({ assignmentId, onBack, onDelete }) => {
           Quay Lại
         </Button>
         
-        <div className="d-flex justify-content-between align-items-start mt-3">
+        <div className="d-flex justify-content-between align-items-start mt-16">
           <div className="flex-grow-1 me-3">
-            {editingTitle ? (
-              <div className="d-flex align-items-center gap-2 mb-2">
-                <input
-                  type="text"
-                  className="form-control"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="Nhập tiêu đề bài tập"
-                  autoFocus
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') handleUpdateTitle();
-                    if (e.key === 'Escape') {
-                      setEditingTitle(false);
-                      setNewTitle(assignment.title);
-                    }
-                  }}
-                  style={{ fontSize: '20px', fontWeight: 'bold' }}
-                />
-                <Button
-                  variant="success"
-                  size="sm"
-                  className="px-12 py-6"
-                  onClick={handleUpdateTitle}
-                >
-                  <i className="fas fa-check"></i>
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="px-12 py-6"
-                  onClick={() => {
-                    setEditingTitle(false);
-                    setNewTitle(assignment.title);
-                  }}
-                >
-                  <i className="fas fa-times"></i>
-                </Button>
+            {editingInfo ? (
+              <div className="mb-3">
+                {/* Lesson Info */}
+                <div className="text-neutral-600 mb-3" style={{ fontSize: '14px' }}>
+                  <div className="mt-10">
+                    <span>{assignment.sessionTitle || assignment.courseName || ''}</span>
+                  </div>
+                  <span className="mx-2">|</span>
+                  <div className='mt-10'>
+                    <span>Ngày học: {assignment.lessonDate 
+                    ? new Date(assignment.lessonDate).toLocaleDateString('vi-VN')
+                    : new Date(assignment.createdAt).toLocaleDateString('vi-VN')}</span>
+                  </div>
+                </div>
+
+                {/* Edit Form */}
+                <div className="d-flex flex-column gap-3">
+                  <div>
+                    <label className="form-label text-13 fw-semibold mb-2">Tiêu đề bài tập</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editForm.title}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
+                      placeholder="Nhập tiêu đề bài tập"
+                      style={{ fontSize: '15px' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label text-13 fw-semibold mb-2">Mô tả</label>
+                    <textarea
+                      className="form-control"
+                      rows={3}
+                      value={editForm.description}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Nhập mô tả bài tập..."
+                      style={{ fontSize: '15px' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label text-13 fw-semibold mb-2">Deadline</label>
+                    <input
+                      type="datetime-local"
+                      className="form-control"
+                      value={editForm.deadline}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, deadline: e.target.value }))}
+                      style={{ fontSize: '15px' }}
+                    />
+                  </div>
+                  <div className="d-flex gap-2">
+                    <Button
+                      variant="success"
+                      size="sm"
+                      className="px-16 py-8 text-14"
+                      onClick={handleUpdateTitle}
+                    >
+                      <i className="fas fa-check me-2"></i>
+                      Lưu thay đổi
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="px-16 py-8 text-14"
+                      onClick={() => {
+                        setEditingInfo(false);
+                        setEditForm({ 
+                          title: assignment.title, 
+                          description: assignment.description || '',
+                          deadline: assignment.dueDate 
+                        });
+                      }}
+                    >
+                      <i className="fas fa-times me-2"></i>
+                      Hủy
+                    </Button>
+                  </div>
+                </div>
               </div>
             ) : (
-              <div className="d-flex align-items-center gap-2 mb-2">
-                <h4 className="mb-0 fw-bold">{assignment.title}</h4>
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="p-0 text-primary"
-                  onClick={() => {
-                    setEditingTitle(true);
-                    setNewTitle(assignment.title);
-                  }}
-                >
-                  <i className="fas fa-edit"></i>
-                </Button>
-              </div>
-            )}
-            <div className="text-neutral-600" style={{ fontSize: '14px' }}>
-              <span>Buổi {assignment.sessionOrder || ''}: {assignment.sessionTitle || assignment.courseName || ''}</span>
-            </div>
-            <div className="text-neutral-500 mt-1" style={{ fontSize: '13px' }}>
-              {assignment.teacherName && (
-                <>
-                  <span>Giáo viên: {assignment.teacherName}</span>
+              <>
+                {/* Lesson Info */}
+                <div className="text-neutral-600 mt-10 mb-10" style={{ fontSize: '14px' }}>
+                  <span>{assignment.sessionTitle || assignment.courseName || ''}</span>
                   <span className="mx-2">|</span>
-                </>
-              )}
-              <span>Ngày học: {assignment.lessonDate 
-                ? new Date(assignment.lessonDate).toLocaleDateString('vi-VN')
-                : new Date(assignment.createdAt).toLocaleDateString('vi-VN')
-              }</span>
-            </div>
+                  <span>Ngày học: {assignment.lessonDate 
+                    ? new Date(assignment.lessonDate).toLocaleDateString('vi-VN')
+                    : new Date(assignment.createdAt).toLocaleDateString('vi-VN')
+                  }</span>
+                </div>
+
+                {/* Title */}
+                <h4 className="mb-2 fw-bold">{assignment.title}</h4>
+
+                {/* Description */}
+                {assignment.description && (
+                  <div className="mt-10 mb-2 text-neutral-600" style={{ fontSize: '14px' }}>
+                    <i className="fas fa-align-left me-2"></i>
+                    {assignment.description}
+                  </div>
+                )}
+
+                {/* Deadline */}
+                <div className="d-flex align-items-center gap-2 text-neutral-600 mt-10" style={{ fontSize: '14px' }}>
+                  <i className="fas fa-clock text-danger"></i>
+                  <span className="fw-semibold">Deadline:</span>
+                  <span>
+                    {assignment.dueDate 
+                      ? new Date(assignment.dueDate).toLocaleString('vi-VN', {
+                          day: '2-digit',
+                          month: '2-digit', 
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })
+                      : 'Chưa có deadline'
+                    }
+                  </span>
+                  {assignment.dueDate && new Date(assignment.dueDate) < new Date() && (
+                    <Badge bg="danger" className="ms-2">Đã quá hạn</Badge>
+                  )}
+                </div>
+              </>
+            )}
           </div>
           
           <div className="d-flex gap-2">
-            <Button variant="outline-secondary" size="sm" className='text-14 px-12 py-6'>
-              <i className="fas fa-download me-2"></i>
-              Xuất Báo Cáo
+            <Button 
+              variant="outline-primary" 
+              size="sm" 
+              className='text-14 px-12 py-6'
+              onClick={() => {
+                setEditingInfo(true);
+                setEditForm({ 
+                  title: assignment.title,
+                  description: assignment.description || '',
+                  deadline: assignment.dueDate ? new Date(assignment.dueDate).toISOString().slice(0, 16) : ''
+                });
+              }}
+            >
+              <i className="fas fa-edit me-2"></i>
+              Chỉnh Sửa Thông Tin
             </Button>
             <Button variant="danger" size="sm" className='text-14 px-12 py-6' onClick={handleDeleteHomework}>
               <i className="fas fa-trash me-2"></i>
@@ -612,7 +689,7 @@ const AssignmentDetail = ({ assignmentId, onBack, onDelete }) => {
                   <th className="border-0 py-3 px-4" style={{ fontSize: '13px', fontWeight: '600' }}>Học viên</th>
                   <th className="border-0 py-3 px-4" style={{ fontSize: '13px', fontWeight: '600' }}>Thời gian nộp</th>
                   <th className="border-0 py-3 px-4 text-center" style={{ fontSize: '13px', fontWeight: '600' }}>Trạng thái</th>
-                  <th className="border-0 py-3 px-4 text-center" style={{ fontSize: '13px', fontWeight: '600' }}>Thao tác</th>
+                  <th className="border-0 py-3 px-4 text-center" style={{ fontSize: '13px', fontWeight: '600' }}>Tải bài nộp</th>
                 </tr>
               </thead>
               <tbody>

@@ -293,7 +293,10 @@ const TeacherClassDetailLayout = () => {
             >
               <ClassStudents 
                 students={students}
+                classInfo={classInfo}
+                lessons={lessons}
                 onViewStudentDetail={handleViewStudentDetail}
+                onRefreshStudents={fetchStudents}
               />
             </Tab>
 
@@ -359,6 +362,7 @@ const TeacherClassDetailLayout = () => {
         show={showStudentDetail}
         onHide={() => setShowStudentDetail(false)}
         student={selectedStudent}
+        classInfo={classInfo}
         lessons={lessons}
         onUpdateMocktestScore={handleUpdateMocktestScore}
       />

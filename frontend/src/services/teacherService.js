@@ -251,6 +251,22 @@ const teacherService = {
     }
   },
 
+  // Import mocktest scores in bulk
+  importMocktestScores: async (classId, scheduleId, scores) => {
+    try {
+      const response = await axios.post(
+        `${API_URL}/teachers/me/classes/${classId}/mocktest/import-scores`,
+        { scheduleId, scores },
+        {
+          headers: getAuthHeader()
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
   // Save attendance for a schedule
   saveAttendance: async (scheduleId, attendanceData) => {
     try {

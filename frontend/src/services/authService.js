@@ -25,15 +25,8 @@ api.interceptors.request.use(
 
 // Auth service functions
 export const authService = {
-  // Đăng ký user mới
-  register: async (userData) => {
-    try {
-      const response = await api.post('/register', userData);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Đăng ký thất bại' };
-    }
-  },
+
+  
 
   // Đăng nhập
   login: async (credentials) => {

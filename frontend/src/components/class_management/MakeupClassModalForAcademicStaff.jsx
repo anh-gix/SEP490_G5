@@ -33,6 +33,7 @@ const MakeupClassModalForAcademicStaff = ({
   const [availableSchedules, setAvailableSchedules] = useState([]);
   const [loadingSchedules, setLoadingSchedules] = useState(false);
   const [selectedExistingScheduleId, setSelectedExistingScheduleId] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState('');
   const [sessionId, setSessionId] = useState(null);
   const [currentClassScheduleId, setCurrentClassScheduleId] = useState(null);
   
@@ -74,6 +75,7 @@ const MakeupClassModalForAcademicStaff = ({
     setError(null);
     setMakeupOption('existing');
     setSelectedExistingScheduleId('');
+    setSelectedClassId('');
     setSelectedSubstituteTeacherId('');
     setAvailableSchedules([]);
     setSessionId(null);
@@ -272,6 +274,40 @@ const MakeupClassModalForAcademicStaff = ({
           if (hasConflictWithSenderSchedule(schedule)) {
             return false;
           }
+          
+          // Filter out past sessions (including today's sessions that have already ended)
+          if (schedule.date) {
+            const scheduleDate = new Date(schedule.date);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const scheduleDateOnly = new Date(scheduleDate.getFullYear(), scheduleDate.getMonth(), scheduleDate.getDate());
+            
+            // If schedule is in the past (before today), exclude it
+            if (scheduleDateOnly < today) {
+              return false;
+            }
+            
+            // If schedule is today, check if it has already ended
+            if (scheduleDateOnly.getTime() === today.getTime()) {
+              if (schedule.endTime) {
+                const timeParts = schedule.endTime.split(':');
+                if (timeParts.length >= 2) {
+                  const endHours = parseInt(timeParts[0], 10);
+                  const endMinutes = parseInt(timeParts[1], 10);
+                  if (!isNaN(endHours) && !isNaN(endMinutes)) {
+                    const now = new Date();
+                    const currentTime = now.getHours() * 60 + now.getMinutes();
+                    const scheduleEndTime = endHours * 60 + endMinutes;
+                    // Exclude if the session has already ended
+                    if (scheduleEndTime < currentTime) {
+                      return false;
+                    }
+                  }
+                }
+              }
+            }
+          }
+          
           return true;
         });
         
@@ -738,6 +774,19 @@ const MakeupClassModalForAcademicStaff = ({
               {/* Existing schedule selection */}
               {makeupOption === 'existing' ? (
                 <div className="mb-3">
+                  {/* Class selection dropdown */}
+                  <Form.Group className="mb-3">
+                    <Form.Label>
+                      Chọn lớp học
+                    </Form.Label>
+                    <Form.Select
+                      value={selectedClassId}
+                      onChange={(e) => setSelectedClassId(e.target.value)}
+                    >
+                      <option value="">-- Chọn lớp học (tùy chọn) --</option>
+                    </Form.Select>
+                  </Form.Group>
+
                   <Form.Label>
                     Chọn buổi học bù <span className="text-danger">*</span>
                   </Form.Label>
@@ -758,7 +807,8 @@ const MakeupClassModalForAcademicStaff = ({
                           const scheduleId = (schedule._id || schedule.id)?.toString();
                           const dateStr = formatDateForDisplay(schedule.date);
                           const timeStr = `${schedule.startTime || ''} - ${schedule.endTime || ''}`;
-                          const className = schedule.class?.name || 'N/A';
+                          // Thay đổi: Nếu không có class, hiển thị "Lớp học bù" thay vì "N/A"
+                          const className = schedule.class?.name || (schedule.class === null || schedule.class === undefined ? 'Lớp học bù' : 'N/A');
                           const sessionTitle = schedule.session?.title || 'N/A';
                           const displayText = `${sessionTitle} - ${className}${dateStr ? ` (${dateStr})` : ''} - ${timeStr}`;
                           return (
@@ -803,7 +853,9 @@ const MakeupClassModalForAcademicStaff = ({
                                 <div className="col-md-6">
                                   <div className="text-14">
                                     <strong className="text-neutral-900">Lớp:</strong> 
-                                    <span className="text-neutral-700 ms-2">{selectedSchedule.class?.name || 'N/A'}</span>
+                                    <span className="text-neutral-700 ms-2">
+                                      {selectedSchedule.class?.name || (selectedSchedule.class === null || selectedSchedule.class === undefined ? 'Lớp học bù' : 'N/A')}
+                                    </span>
                                   </div>
                                 </div>
                                 <div className="col-md-6">

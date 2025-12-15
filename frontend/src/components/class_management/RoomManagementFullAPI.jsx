@@ -700,7 +700,7 @@ const RoomManagementFull = () => {
                         </td>
                         <td className="px-16 py-12">
                           {schedule.status === 'temporary' && !schedule.class?.name 
-                            ? 'học bù' 
+                            ? 'Lớp học bù' 
                             : (schedule.class?.name || 'N/A')}
                         </td>
                         <td className="px-16 py-12">

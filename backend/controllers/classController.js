@@ -1057,12 +1057,12 @@ exports.createClass = async (req, res) => {
   try {
     const { name, course, teacher, students, room, startDate, endDate, maxStudents, status, scheduleEntries } = req.body;
     
-    if (!name || !teacher) {
+    if (!name) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({
         success: false,
-        message: 'Vui lòng điền đầy đủ thông tin bắt buộc (tên lớp, giáo viên)'
+        message: 'Vui lòng điền đầy đủ thông tin tên lớp'
       });
     }
     

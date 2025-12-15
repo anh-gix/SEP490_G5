@@ -29,21 +29,27 @@ const AddTeacherModal = ({
           <Row className="g-3">
             <Col md={6}>
               <Form.Group>
-                <Form.Label>Tên người dùng <span className="text-danger">*</span></Form.Label>
+                <Form.Label>Số điện thoại <span className="text-danger">*</span></Form.Label>
                 <Form.Control
-                  type="text"
-                  name="username"
-                  value={formData.username}
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
                   onChange={onInputChange}
-                  placeholder="Username"
+                  placeholder="0123456789"
                   required
-                  isInvalid={!!formErrors.username}
+                  pattern="[0-9]{10,11}"
+                  minLength={10}
+                  maxLength={11}
+                  isInvalid={!!formErrors.phone}
                 />
-                {formErrors.username && (
+                {formErrors.phone && (
                   <Form.Control.Feedback type="invalid">
-                    {formErrors.username}
+                    {formErrors.phone}
                   </Form.Control.Feedback>
                 )}
+                <Form.Text className="text-muted">
+                  Số điện thoại phải có 10 hoặc 11 chữ số
+                </Form.Text>
               </Form.Group>
             </Col>
 
@@ -91,26 +97,6 @@ const AddTeacherModal = ({
                   <Form.Text className="text-muted">
                     Nếu không nhập, mật khẩu mặc định sẽ là: <strong>123456</strong>
                   </Form.Text>
-              </Form.Group>
-            </Col>
-
-            <Col md={6}>
-              <Form.Group>
-                <Form.Label>Số điện thoại <span className="text-danger">*</span></Form.Label>
-                <Form.Control
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={onInputChange}
-                  placeholder="0123456789"
-                  required
-                  isInvalid={!!formErrors.phone}
-                />
-                {formErrors.phone && (
-                  <Form.Control.Feedback type="invalid">
-                    {formErrors.phone}
-                  </Form.Control.Feedback>
-                )}
               </Form.Group>
             </Col>
 

@@ -7,14 +7,12 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess }) => {
   const [formData, setFormData] = useState({
     type: 'makeup_class',
     content: '',
-    classId: '',
     studentScheduleId: ''
   });
   const [validated, setValidated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [classes, setClasses] = useState([]);
-  const [loadingClasses, setLoadingClasses] = useState(false);
   const [studentSchedules, setStudentSchedules] = useState([]);
   const [filteredStudentSchedules, setFilteredStudentSchedules] = useState([]);
   const [loadingSchedules, setLoadingSchedules] = useState(false);
@@ -34,19 +32,12 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess }) => {
     setFormData(prev => ({
       ...prev,
       type: type,
-      classId: '',
       studentScheduleId: ''
     }));
     setSelectedClassFilter('');
     setSelectedWeekFilter('');
     setError('');
   };
-
-  useEffect(() => {
-    if (show && formData.type === 'change_class' && classes.length === 0) {
-      fetchClasses();
-    }
-  }, [show, formData.type]);
 
   useEffect(() => {
     if (show && formData.type === 'makeup_class' && studentSchedules.length === 0) {
@@ -188,62 +179,8 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess }) => {
       
       if (response && response.success) {
         if (response.schedules && Array.isArray(response.schedules)) {
-          const now = new Date();
-          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          const currentTime = now.getHours() * 60 + now.getMinutes();
-          
-          const parseDateToLocal = (dateString) => {
-            if (!dateString) return null;
-            
-            const dateMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/);
-            if (dateMatch) {
-              const year = parseInt(dateMatch[1], 10);
-              const month = parseInt(dateMatch[2], 10) - 1;
-              const day = parseInt(dateMatch[3], 10);
-              return new Date(year, month, day);
-            }
-            
-            return new Date(dateString);
-          };
-
-          const futureSchedules = response.schedules.filter(schedule => {
-            if (!schedule.date) return false;
-            
-            try {
-              const scheduleDate = parseDateToLocal(schedule.date);
-              if (!scheduleDate || isNaN(scheduleDate.getTime())) return false;
-              
-              const scheduleDateOnly = new Date(scheduleDate.getFullYear(), scheduleDate.getMonth(), scheduleDate.getDate());
-              
-              if (scheduleDateOnly > today) {
-                return true;
-              }
-              
-              if (scheduleDateOnly.getTime() === today.getTime()) {
-                if (schedule.startTime) {
-                  const timeParts = schedule.startTime.split(':');
-                  if (timeParts.length >= 2) {
-                    const hours = parseInt(timeParts[0], 10);
-                    const minutes = parseInt(timeParts[1], 10);
-                    if (!isNaN(hours) && !isNaN(minutes)) {
-                      const scheduleTime = hours * 60 + minutes;
-                      return scheduleTime >= currentTime;
-                    }
-                  }
-                }
-                // If no valid startTime, exclude it to be safe (don't show today's schedules without time)
-                return false;
-              }
-              
-              // Past schedules are excluded
-              return false;
-            } catch (error) {
-              return false; // Exclude if date parsing fails
-            }
-          });
-          
           // Filter out cancelled schedules
-          const activeSchedules = futureSchedules.filter(schedule => {
+          const activeSchedules = response.schedules.filter(schedule => {
             // Check both scheduleStatus (from StudentSchedule) and status (from ClassSchedule)
             const isCancelled = 
               schedule.scheduleStatus === 'cancelled' || 
@@ -254,8 +191,26 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess }) => {
             return !isCancelled;
           });
           
-          setStudentSchedules(activeSchedules);
-          setFilteredStudentSchedules(activeSchedules);
+          // Filter: Only allow makeup requests for absent or not-yet-attended sessions
+          // Exclude: present, late, excused (already attended)
+          const eligibleSchedules = activeSchedules.filter(schedule => {
+            const attendanceStatus = schedule.attendance?.status;
+        
+            
+            if (!attendanceStatus || attendanceStatus === null || attendanceStatus === undefined) {
+              return true; // Chưa điểm danh - cho phép xin học bù
+            }
+            
+            if (attendanceStatus === 'absent') {
+              return true; // Đã điểm danh vắng - cho phép xin học bù
+            }
+            
+            // Bỏ qua các trường hợp đã attend (present, late, excused)
+            return false;
+          });
+          
+          setStudentSchedules(eligibleSchedules);
+          setFilteredStudentSchedules(eligibleSchedules);
         } else {
           setStudentSchedules([]);
           setFilteredStudentSchedules([]);
@@ -274,37 +229,6 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess }) => {
     }
   };
 
-  const fetchClasses = async () => {
-    try {
-      setLoadingClasses(true);
-      setError(''); // Clear previous errors
-      
-      // Try to get all classes first (without status filter)
-      let response = await studentService.getMyClasses();
-      
-      // If no classes found, try with active status
-      if (response && response.success && (!response.classes || response.classes.length === 0)) {
-        response = await studentService.getMyClasses({ status: 'active' });
-      }
-      
-      if (response && response.success) {
-        if (response.classes && Array.isArray(response.classes)) {
-          setClasses(response.classes);
-        } else {
-          setClasses([]);
-        }
-      } else {
-        setError(response?.message || 'Không thể tải danh sách lớp học. Vui lòng thử lại.');
-        setClasses([]);
-      }
-    } catch (err) {
-      setError('Không thể tải danh sách lớp học. Vui lòng thử lại.');
-      setClasses([]);
-    } finally {
-      setLoadingClasses(false);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     const form = e.currentTarget;
@@ -317,12 +241,6 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess }) => {
 
     if (!formData.type) {
       setError('Vui lòng chọn loại đơn');
-      setValidated(true);
-      return;
-    }
-
-    if (formData.type === 'change_class' && !formData.classId) {
-      setError('Vui lòng chọn lớp học');
       setValidated(true);
       return;
     }
@@ -343,11 +261,6 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess }) => {
         content: formData.content
       };
 
-      // Add classId if type is change_class
-      if (formData.type === 'change_class' && formData.classId) {
-        requestData.classId = formData.classId;
-      }
-
       // Add studentScheduleId if type is makeup_class
       if (formData.type === 'makeup_class' && formData.studentScheduleId) {
         requestData.studentScheduleId = formData.studentScheduleId;
@@ -361,11 +274,9 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess }) => {
         setFormData({
           type: 'makeup_class', // Reset về mặc định "Học bù"
           content: '',
-          classId: '',
           studentScheduleId: ''
         });
         setValidated(false);
-        setClasses([]); // Reset classes list
         setStudentSchedules([]);
         setFilteredStudentSchedules([]);
         setSelectedClassFilter('');
@@ -393,12 +304,10 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess }) => {
       setFormData({
         type: 'makeup_class', // Reset về mặc định "Học bù"
         content: '',
-        classId: '',
         studentScheduleId: ''
       });
       setValidated(false);
       setError('');
-      setClasses([]); // Reset classes list
       setStudentSchedules([]);
       setFilteredStudentSchedules([]);
       setSelectedClassFilter('');
@@ -467,8 +376,7 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess }) => {
 
   const getTypeDescription = (type) => {
     const descriptions = {
-      makeup_class: 'Yêu cầu học bù buổi học đã nghỉ',
-      change_class: 'Yêu cầu chuyển sang lớp học khác'
+      makeup_class: 'Yêu cầu học bù buổi học đã nghỉ'
     };
     return descriptions[type] || '';
   };
@@ -487,7 +395,7 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess }) => {
             Tạo đơn mới
           </Modal.Title>
           <p className="mb-0 text-15" style={{ opacity: 0.95 }}>
-            Gửi đơn xin đổi buổi/lớp học
+            Gửi đơn xin học bù
           </p>
         </div>
       </Modal.Header>
@@ -507,36 +415,18 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess }) => {
             <Form.Label className="text-neutral-900 fw-semibold text-13 mb-12">
               Loại đơn <span className="text-danger-600">*</span>
             </Form.Label>
-            <Row className="g-3">
-              <Col md={6}>
-                <Button
-                  variant={formData.type === 'makeup_class' ? 'warning' : 'outline-warning'}
-                  onClick={() => handleTypeSelect('makeup_class')}
-                  className={`w-100 py-16 text-14 fw-semibold ${formData.type === 'makeup_class' ? 'active' : ''}`}
-                  style={{
-                    borderWidth: formData.type === 'makeup_class' ? '2px' : '1px',
-                    boxShadow: formData.type === 'makeup_class' ? '0 2px 8px rgba(245, 158, 11, 0.3)' : 'none'
-                  }}
-                >
-                  <i className="fas fa-calendar-check me-2"></i>
-                  Học bù
-                </Button>
-              </Col>
-              <Col md={6}>
-                <Button
-                  variant={formData.type === 'change_class' ? 'primary' : 'outline-primary'}
-                  onClick={() => handleTypeSelect('change_class')}
-                  className={`w-100 py-16 text-14 fw-semibold ${formData.type === 'change_class' ? 'active' : ''}`}
-                  style={{
-                    borderWidth: formData.type === 'change_class' ? '2px' : '1px',
-                    boxShadow: formData.type === 'change_class' ? '0 2px 8px rgba(13, 110, 253, 0.3)' : 'none'
-                  }}
-                >
-                  <i className="fas fa-exchange-alt me-2"></i>
-                  Đổi lớp
-                </Button>
-              </Col>
-            </Row>
+            <Button
+              variant="warning"
+              onClick={() => handleTypeSelect('makeup_class')}
+              className="w-100 py-16 text-14 fw-semibold active"
+              style={{
+                borderWidth: '2px',
+                boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)'
+              }}
+            >
+              <i className="fas fa-calendar-check me-2"></i>
+              Học bù
+            </Button>
             {!formData.type && validated && (
               <div className="text-danger-600 text-13 mt-8">
                 <i className="fas fa-exclamation-circle me-2"></i>
@@ -646,50 +536,6 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess }) => {
                     <Form.Text className="text-neutral-500 text-12 mt-8 d-block">
                       <i className="fas fa-info-circle me-2"></i>
                       {selectedClassFilter ? 'Không có buổi học nào trong lớp đã chọn' : 'Bạn chưa có buổi học nào'}
-                    </Form.Text>
-                  )}
-                </>
-              )}
-            </Form.Group>
-          )}
-
-          {/* Class Selection for Change Class */}
-          {formData.type === 'change_class' && (
-            <Form.Group className="mb-20">
-              <Form.Label className="text-neutral-900 fw-semibold text-13 mb-8">
-                Chọn lớp học <span className="text-danger-600">*</span>
-              </Form.Label>
-              {loadingClasses ? (
-                <div className="text-center py-16">
-                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                  <span className="text-neutral-600 text-13">Đang tải danh sách lớp...</span>
-                </div>
-              ) : (
-                <>
-                  <Form.Select
-                    name="classId"
-                    value={formData.classId}
-                    onChange={handleInputChange}
-                    required
-                    className="border-neutral-30 radius-8 px-16 py-10 text-13"
-                  >
-                    <option value="">-- Chọn lớp học --</option>
-                    {classes.map((cls) => (
-                      <option key={cls._id} value={cls._id}>
-                        {cls.name} {cls.course?.name ? `- ${cls.course.name}` : ''}
-                      </option>
-                    ))}
-                  </Form.Select>
-                  {!formData.classId && validated && (
-                    <div className="text-danger-600 text-13 mt-8">
-                      <i className="fas fa-exclamation-circle me-2"></i>
-                      Vui lòng chọn lớp học
-                    </div>
-                  )}
-                  {classes.length === 0 && !loadingClasses && (
-                    <Form.Text className="text-neutral-500 text-12 mt-8 d-block">
-                      <i className="fas fa-info-circle me-2"></i>
-                      Bạn chưa có lớp học nào đang hoạt động
                     </Form.Text>
                   )}
                 </>

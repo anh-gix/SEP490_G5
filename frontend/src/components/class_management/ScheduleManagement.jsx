@@ -9,7 +9,6 @@ import ScheduleList from './ScheduleList';
 import CreateScheduleModal from './CreateScheduleModal';
 import EditScheduleModal from './EditScheduleModal';
 import MakeupClassModal from './MakeupClassModal';
-import RoomManagement from './RoomManagement';
 import scheduleService from '../../services/scheduleService';
 import classService from '../../services/classService';
 import teacherService from '../../services/teacherService';
@@ -25,7 +24,6 @@ const ScheduleManagement = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showMakeupModal, setShowMakeupModal] = useState(false);
-  const [showRoomManagement, setShowRoomManagement] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
@@ -267,7 +265,6 @@ const ScheduleManagement = () => {
           <p>{error}</p>
         </Alert>
       )}
-
       <div className="d-flex justify-content-between align-items-center mb-24">
         <div>
           <h2 className="text-neutral-900 fw-bold mb-8">Quản lý lịch học</h2>
@@ -498,14 +495,6 @@ const ScheduleManagement = () => {
           }}
           onSubmit={handleCreateMakeupClass}
           existingSchedules={schedules}
-        />
-      )}
-
-      {showRoomManagement && (
-        <RoomManagement
-          rooms={rooms}
-          onClose={() => setShowRoomManagement(false)}
-          onUpdate={fetchRooms}
         />
       )}
     </Container>

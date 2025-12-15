@@ -3,8 +3,10 @@ import { Modal, Button, Form, Alert, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import changeRequestService from '../../services/changeRequestService';
 import teacherService from '../../services/teacherService';
+import { useAuth } from '../../contexts/AuthContext'; // Thêm import
 
 const CreateTeacherChangeRequestModal = ({ show, onHide, onSuccess }) => {
+  const { user } = useAuth(); // Lấy user hiện tại
   const [formData, setFormData] = useState({
     type: 'request_replace_teacher',
     content: '',
@@ -110,13 +112,31 @@ const CreateTeacherChangeRequestModal = ({ show, onHide, onSuccess }) => {
 
   const parseDateString = (dateString) => {
     if (!dateString) return null;
-    const dateMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (dateMatch) {
-      const year = parseInt(dateMatch[1], 10);
-      const month = parseInt(dateMatch[2], 10) - 1;
-      const day = parseInt(dateMatch[3], 10);
+    
+    // Nếu đã là Date object, trả về luôn
+    if (dateString instanceof Date) {
+      return dateString;
+    }
+    
+    // Parse format DD/MM/YYYY (từ backend formatDateToVN)
+    const vnDateMatch = dateString.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (vnDateMatch) {
+      const day = parseInt(vnDateMatch[1], 10);
+      const month = parseInt(vnDateMatch[2], 10) - 1;
+      const year = parseInt(vnDateMatch[3], 10);
       return new Date(year, month, day);
     }
+    
+    // Parse format YYYY-MM-DD
+    const isoDateMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoDateMatch) {
+      const year = parseInt(isoDateMatch[1], 10);
+      const month = parseInt(isoDateMatch[2], 10) - 1;
+      const day = parseInt(isoDateMatch[3], 10);
+      return new Date(year, month, day);
+    }
+    
+    // Fallback: thử parse với Date constructor
     return new Date(dateString);
   };
 
@@ -161,47 +181,88 @@ const CreateTeacherChangeRequestModal = ({ show, onHide, onSuccess }) => {
       });
     }
     
-    // Filter future schedules only
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Filter: Loại bỏ các buổi trong quá khứ (bao gồm cả buổi hôm nay đã kết thúc)
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const currentTime = now.getHours() * 60 + now.getMinutes(); // Thời gian hiện tại tính bằng phút
+    
     filtered = filtered.filter(schedule => {
       if (!schedule.date) return false;
+      
       const date = parseDateString(schedule.date);
       if (!date || isNaN(date.getTime())) return false;
-      const scheduleDate = new Date(date);
-      scheduleDate.setHours(0, 0, 0, 0);
-      return scheduleDate >= today;
+      
+      const scheduleDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      
+      // Nếu buổi học là trong quá khứ (trước hôm nay), loại bỏ
+      if (scheduleDate < today) {
+        return false;
+      }
+      
+      // Nếu buổi học là hôm nay, kiểm tra xem đã kết thúc chưa
+      if (scheduleDate.getTime() === today.getTime()) {
+        if (schedule.endTime) {
+          const timeParts = schedule.endTime.split(':');
+          if (timeParts.length >= 2) {
+            const endHours = parseInt(timeParts[0], 10);
+            const endMinutes = parseInt(timeParts[1], 10);
+            if (!isNaN(endHours) && !isNaN(endMinutes)) {
+              const scheduleEndTime = endHours * 60 + endMinutes;
+              // Nếu buổi học đã kết thúc, loại bỏ
+              if (scheduleEndTime < currentTime) {
+                return false;
+              }
+            }
+          }
+        }
+      }
+      
+      return true;
     });
     
+    // Filter: Loại bỏ các buổi có teacher = giáo viên hiện tại nhưng đã có người dạy thay khác
+    if (user && user._id) {
+      const currentTeacherId = user._id.toString();
+      
+      filtered = filtered.filter(schedule => {
+        // Lấy teacher ID (có thể là object hoặc string)
+        const scheduleTeacherId = schedule.teacher?._id?.toString() || schedule.teacher?.toString() || schedule.teacher;
+        const substituteTeacherId = schedule.substituteTeacher?._id?.toString() || schedule.substituteTeacher?.toString() || schedule.substituteTeacher;
+        
+        const isTeacher = scheduleTeacherId && scheduleTeacherId === currentTeacherId;
+        const isSubstituteTeacher = substituteTeacherId && substituteTeacherId === currentTeacherId;
+        
+        // Nếu giáo viên là teacher chính
+        if (isTeacher) {
+          // Nếu có substituteTeacher và substituteTeacher khác với teacher -> đã có người dạy thay -> loại bỏ
+          if (substituteTeacherId && substituteTeacherId !== scheduleTeacherId) {
+            return false;
+          }
+        }
+        
+        // Giữ lại nếu:
+        // - Giáo viên là teacher chính và không có người dạy thay
+        // - Giáo viên là substituteTeacher (có thể xin đổi)
+        return true;
+      });
+    }
+    
     setFilteredClassSchedules(filtered);
-  }, [selectedClassFilter, selectedWeekFilter, classSchedules]);
+  }, [selectedClassFilter, selectedWeekFilter, classSchedules, user]);
 
   const fetchTeacherSchedules = async () => {
     try {
       setLoadingSchedules(true);
       setError('');
       
-      const today = new Date();
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const endDate = new Date(today.getFullYear(), today.getMonth() + 6, 0);
-      
-      const params = {
-        startDate: startOfMonth.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0]
-      };
-
-      const response = await teacherService.getCurrentTeacherSchedule(params);
+      // Bỏ date range filter - lấy tất cả
+      const response = await teacherService.getCurrentTeacherSchedule();
       
       if (response && response.success) {
         if (response.schedules && Array.isArray(response.schedules)) {
-          // Filter future schedules and active status
-          const activeSchedules = response.schedules.filter(schedule => {
-            const isCancelled = schedule.status === 'cancelled' || schedule.status === 'canceled';
-            return !isCancelled;
-          });
-          
-          setClassSchedules(activeSchedules);
-          setFilteredClassSchedules(activeSchedules);
+          // Bỏ filter cancelled - hiển thị tất cả
+          setClassSchedules(response.schedules);
+          setFilteredClassSchedules(response.schedules);
         } else {
           setClassSchedules([]);
           setFilteredClassSchedules([]);
@@ -225,23 +286,32 @@ const CreateTeacherChangeRequestModal = ({ show, onHide, onSuccess }) => {
       return schedule._id ? `Buổi dạy ${schedule._id}` : 'N/A';
     }
     
+    // Parse date thành Date object, sau đó dùng toLocaleDateString()
     const date = parseDateString(schedule.date);
     if (!date || isNaN(date.getTime())) {
       return schedule._id ? `Buổi dạy ${schedule._id}` : 'N/A';
     }
     
+    // Dùng toLocaleDateString() để format
     const dateStr = date.toLocaleDateString('vi-VN', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
     });
     
-    const className = schedule.class?.name || 'N/A';
-    const topic = schedule.topic || schedule.session?.title || '';
+    const className = schedule.class?.name || (schedule.class === null || schedule.class === undefined ? 'Lớp học bù' : 'N/A');
+    const sessionTitle = schedule.sessionTitle || schedule.session?.title || '';
+    const sessionOrder = schedule.sessionOrder || schedule.session?.order;
+    const topic = schedule.topic || sessionTitle || '';
     const timeStr = schedule.startTime && schedule.endTime 
       ? `${schedule.startTime}-${schedule.endTime}` 
       : '';
-    return `${dateStr}${timeStr ? ` ${timeStr}` : ''} - ${className}${topic ? ` - ${topic}` : ''}`;
+    
+    // Format: Date Time - ClassName - Buổi X - Topic
+    const sessionInfo = sessionOrder ? `Buổi ${sessionOrder}` : '';
+    const courseName = schedule.courseName || '';
+    
+    return `${dateStr}${timeStr ? ` ${timeStr}` : ''} - ${className}${sessionInfo ? ` - ${sessionInfo}` : ''}${courseName ? ` - ${courseName}` : ''}${topic ? ` - ${topic}` : ''}`;
   };
 
   const handleSubmit = async (e) => {

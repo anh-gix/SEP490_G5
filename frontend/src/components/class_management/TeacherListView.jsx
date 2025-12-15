@@ -52,7 +52,6 @@ const TeacherListView = ({ teachers, page, totalPages, onViewDetail, onPageChang
                         size="sm"
                         onClick={() => onViewDetail(teacher)}
                       >
-                        <i className="fas fa-eye me-1"></i>
                         Chi tiết
                       </Button>
                     </div>

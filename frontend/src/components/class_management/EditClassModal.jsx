@@ -3859,16 +3859,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                                 </div>
                               )}
                             </div>
-                            <Button
-                              type="button"
-                              variant="outline-danger"
-                              size="sm"
-                              onClick={() => handleRemoveStudent(selectedStudentId)}
-                              className="text-12 fw-medium px-12 py-6 radius-8"
-                              title="Xóa học viên khỏi danh sách"
-                            >
-                              <i className="fas fa-times"></i>
-                            </Button>
                           </div>
                         );
                       })}

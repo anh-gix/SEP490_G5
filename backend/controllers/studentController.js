@@ -359,6 +359,8 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
           { path: 'teacher', select: 'username email' }
         ]
       })
+      .populate('teacher', 'username email') // Populate teacher của ClassSchedule
+      .populate('substituteTeacher', 'username email') // Populate substituteTeacher của ClassSchedule
       .populate('room', 'room_name location')
       .populate('session', 'title order content objectives')
       .lean();
@@ -367,23 +369,30 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
      
 
     if (!classSchedule) {
-      // const makeup_class = await ClassSchedule.findById(scheduleId)
-      // .populate('room', 'room_name location')
-      // .populate('session', 'title order content objectives')
-      // .populate('teacher', 'username email')
-      // .lean();
-
-
-        return res.status(404).json({
+      return res.status(404).json({
         success: false,
         message: 'Không tìm thấy buổi học'
       });
     }
 
     // Check if student is enrolled in this class
-    const isEnrolled = classSchedule.class.students.some(
-      s => s.toString() === studentId.toString()
-    );
+    // For makeup classes (no class), check via StudentSchedule instead
+    let isEnrolled = false;
+    
+    if (classSchedule.class) {
+      // Regular class: check if student is enrolled
+      isEnrolled = classSchedule.class.students.some(
+        s => s.toString() === studentId.toString()
+      );
+    } else {
+      // Makeup class (no class): check if student has StudentSchedule for this schedule
+      const studentSchedule = await StudentSchedule.findOne({
+        student: studentId,
+        classSchedule: scheduleId
+      }).lean();
+      
+      isEnrolled = !!studentSchedule;
+    }
 
     if (!isEnrolled) {
       return res.status(403).json({
@@ -406,7 +415,7 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       endTime: classSchedule.endTime,
       
       // Class info
-      className: classSchedule.class?.name,
+      className: classSchedule.class?.name || 'Lớp học bù',
       level: classSchedule.class?.course?.level,
       courseName: classSchedule.class?.course?.name,
       courseDescription: classSchedule.class?.course?.description,
@@ -418,9 +427,14 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       objectives: classSchedule.session?.objectives || [],
       
       // Teacher info
+      // Ưu tiên: substituteTeacher > teacher (ClassSchedule) > class.teacher
       teacher: {
-        name: classSchedule.class?.teacher?.username,
-        email: classSchedule.class?.teacher?.email
+        name: classSchedule.substituteTeacher?.username || 
+              classSchedule.teacher?.username || 
+              classSchedule.class?.teacher?.username,
+        email: classSchedule.substituteTeacher?.email || 
+               classSchedule.teacher?.email || 
+               classSchedule.class?.teacher?.email
       },
       
       // Room info
@@ -1449,9 +1463,6 @@ exports.getStudentById = async (req, res) => {
   }
 };
 
-// =========================
-// ➕ TẠO HỌC VIÊN MỚI
-// =========================
 exports.createStudent = async (req, res) => {
   try {
     const { email, password, username, phone, address } = req.body;
@@ -1474,13 +1485,15 @@ exports.createStudent = async (req, res) => {
       });
     }
     
-    // Check if username already exists
-    const usernameExists = await User.findOne({ username });
-    if (usernameExists) {
-      return res.status(400).json({
-        success: false,
-        message: 'Username đã tồn tại trong hệ thống'
-      });
+    // Validate phone number length (10-11 digits)
+    if (phone) {
+      const phoneDigits = phone.replace(/\D/g, '');
+      if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+        return res.status(400).json({
+          success: false,
+          message: 'Số điện thoại phải có 10 hoặc 11 chữ số'
+        });
+      }
     }
     
     // Check if phone number already exists
@@ -1649,7 +1662,6 @@ const enrollStudentInCourses = async (studentId, levelsToStudyStr, type) => {
 
     return { enrolled: enrolledCount, courses: enrolledCourseIds };
   } catch (error) {
-    // Return empty result but don't throw - enrollment failure shouldn't fail the import
     return { enrolled: 0, courses: [], error: error.message };
   }
 };
@@ -1728,16 +1740,18 @@ exports.importStudents = async (req, res) => {
           continue;
         }
         
-        // Check if username exists (different from email/phone)
-        const usernameExists = await User.findOne({ username: studentData.username });
-        if (usernameExists) {
-          results.failed.push({
-            email: studentData.email,
-            username: studentData.username,
-            phone: studentData.phone || '',
-            reason: 'Username đã tồn tại trong hệ thống'
-          });
-          continue;
+        // Validate phone number length (10-11 digits)
+        if (studentData.phone) {
+          const phoneDigits = studentData.phone.replace(/\D/g, '');
+          if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+            results.failed.push({
+              email: studentData.email,
+              username: studentData.username,
+              phone: studentData.phone || '',
+              reason: 'Số điện thoại phải có 10 hoặc 11 chữ số'
+            });
+            continue;
+          }
         }
         
         // Create new student

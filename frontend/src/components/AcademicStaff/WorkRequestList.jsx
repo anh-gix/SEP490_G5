@@ -236,7 +236,6 @@ const WorkRequestList = ({ onViewDetail }) => {
                             }}
                             className="d-inline-flex align-items-center gap-2"
                           >
-                            <i className="fas fa-eye"></i>
                             Xem chi tiết
                           </Button>
                         </td>

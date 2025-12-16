@@ -773,9 +773,9 @@ const StudentDetail = () => {
                         <th className="px-16 py-12 text-13">Trình độ</th>
                         <th className="px-16 py-12 text-13">Học viên</th>
                         <th className="px-16 py-12 text-13">Trạng thái</th>
-                        {isEditMode && (
+                        {/* {isEditMode && (
                           <th className="px-16 py-12 text-13">Thao tác</th>
-                        )}
+                        )} */}
                       </tr>
                     </thead>
                     <tbody>
@@ -792,7 +792,7 @@ const StudentDetail = () => {
                               {getClassStatusText(cls.status)}
                             </Badge>
                           </td>
-                          {isEditMode && (
+                          {/* {isEditMode && (
                             <td className="px-16 py-12">
                               <Button
                                 variant="outline-primary"
@@ -804,7 +804,7 @@ const StudentDetail = () => {
                                 Đổi lớp
                               </Button>
                             </td>
-                          )}
+                          )} */}
                         </tr>
                       ))}
                     </tbody>

@@ -538,7 +538,6 @@ const StudentManagementAPI = () => {
                       onClick={() => handleViewDetail(student)}
                       className="flex-grow-1"
                     >
-                      <i className="fas fa-eye me-1"></i>
                       Chi tiết
                     </Button>
                   </div>
@@ -597,7 +596,6 @@ const StudentManagementAPI = () => {
                           size="sm"
                           onClick={() => handleViewDetail(student)}
                         >
-                          <i className="fas fa-eye me-1"></i>
                           Chi tiết
                         </Button>
                       </div>

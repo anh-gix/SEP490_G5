@@ -10,8 +10,18 @@ import {
   Title,
   Tooltip,
   Legend,
+  Filler
 } from 'chart.js';
 import Breadcrumb from '../compo/Breadcrumb';
+import Card from '../compo/Card';
+import Table from '../compo/Table';
+import Button from '../compo/Button';
+import SearchBox from '../compo/SearchBox';
+import FilterBar from '../compo/FilterBar';
+import StatusBadge from '../compo/StatusBadge';
+import UserDetailModal from '../compo/UserDetailModal';
+import EditUserModal from '../compo/EditUserModal';
+import { mockUsers, mockRoles, mockRoleStats, simulateApiDelay } from '../../../helper/mockdataExtended';
 
 // Register Chart.js components
 ChartJS.register(
@@ -21,250 +31,72 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 );
 
-// Mock data for student growth chart
-const mockStudentChartData = {
-  monthly: [
-    { period: 'Tháng 8/2024', total: 2850, new: 120, active: 2650, inactive: 200 },
-    { period: 'Tháng 9/2024', total: 2980, new: 130, active: 2780, inactive: 200 },
-    { period: 'Tháng 10/2024', total: 3120, new: 140, active: 2920, inactive: 200 },
-    { period: 'Tháng 11/2024', total: 3270, new: 150, active: 3070, inactive: 200 },
-    { period: 'Tháng 12/2024', total: 3340, new: 70, active: 3140, inactive: 200 },
-    { period: 'Tháng 1/2025', total: 3456, new: 116, active: 3234, inactive: 222 },
-  ],
-  yearly: [
-    { period: '2022', total: 1200, new: 1200, active: 1100, inactive: 100 },
-    { period: '2023', total: 2400, new: 1200, active: 2200, inactive: 200 },
-    { period: '2024', total: 3340, new: 940, active: 3140, inactive: 200 },
-    { period: '2025', total: 3456, new: 116, active: 3234, inactive: 222 },
-  ],
-  weekly: [
-    { period: 'Tuần 1', total: 3410, new: 15, active: 3190, inactive: 220 },
-    { period: 'Tuần 2', total: 3425, new: 20, active: 3205, inactive: 220 },
-    { period: 'Tuần 3', total: 3440, new: 18, active: 3220, inactive: 220 },
-    { period: 'Tuần 4', total: 3456, new: 16, active: 3234, inactive: 222 },
+// Mock data cho biểu đồ học viên mới theo tháng
+const monthlyStudentData = {
+  labels: ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'],
+  datasets: [
+    {
+      label: 'Học viên mới',
+      data: [245, 312, 289, 356, 423, 398, 267, 445, 512, 489, 534, 456],
+      borderColor: 'rgba(93, 135, 255, 1)',
+      backgroundColor: 'rgba(93, 135, 255, 0.1)',
+      borderWidth: 2,
+      tension: 0.4,
+      fill: false,
+      pointRadius: 5,
+      pointHoverRadius: 7,
+      pointBackgroundColor: 'rgba(93, 135, 255, 1)',
+      pointBorderColor: '#fff',
+      pointBorderWidth: 2,
+    }
   ]
 };
 
-// Time Period Selector Component
-const TimePeriodSelector = ({ selectedPeriod, onPeriodChange }) => {
-  const periods = [
-    { key: 'monthly', label: 'Theo tháng', icon: 'ph ph-calendar' },
-    { key: 'yearly', label: 'Theo năm', icon: 'ph ph-trend-up' },
-    { key: 'weekly', label: 'Trong tháng', icon: 'ph ph-clock' }
-  ];
-
-  return (
-    <div className="d-flex gap-2 mb-3">
-      {periods.map(period => (
-        <button
-          key={period.key}
-          className={`btn btn-sm ${selectedPeriod === period.key ? 'btn-primary' : 'btn-outline-primary'}`}
-          onClick={() => onPeriodChange(period.key)}
-        >
-          <i className={period.icon + ' me-1'}></i>
-          {period.label}
-        </button>
-      ))}
-    </div>
-  );
-};
-
-// Student Growth Chart Component
-const StudentGrowthChart = ({ data, periodType }) => {
-  const chartData = {
-    labels: data.map(item => item.period),
-    datasets: [
-      {
-        label: 'Tổng học viên',
-        data: data.map(item => item.total),
-        borderColor: 'rgb(13, 110, 253)',
-        backgroundColor: 'rgba(13, 110, 253, 0.1)',
-        tension: 0.4,
-        fill: true,
-        pointBackgroundColor: 'rgb(13, 110, 253)',
-        pointBorderColor: '#fff',
-        pointBorderWidth: 2,
-        pointRadius: 6,
-        pointHoverRadius: 8,
-      },
-      {
-        label: 'Học viên mới',
-        data: data.map(item => item.new),
-        borderColor: 'rgb(25, 135, 84)',
-        backgroundColor: 'rgba(25, 135, 84, 0.1)',
-        tension: 0.4,
-        fill: true,
-        pointBackgroundColor: 'rgb(25, 135, 84)',
-        pointBorderColor: '#fff',
-        pointBorderWidth: 2,
-        pointRadius: 6,
-        pointHoverRadius: 8,
-      },
-      {
-        label: 'Đang hoạt động',
-        data: data.map(item => item.active),
-        borderColor: 'rgb(255, 193, 7)',
-        backgroundColor: 'rgba(255, 193, 7, 0.1)',
-        tension: 0.4,
-        fill: true,
-        pointBackgroundColor: 'rgb(255, 193, 7)',
-        pointBorderColor: '#fff',
-        pointBorderWidth: 2,
-        pointRadius: 6,
-        pointHoverRadius: 8,
-      }
-    ],
-  };
-
-  const getTitle = () => {
-    switch(periodType) {
-      case 'monthly': return 'Xu hướng tăng trưởng học viên theo tháng';
-      case 'yearly': return 'Xu hướng tăng trưởng học viên theo năm';
-      case 'weekly': return 'Xu hướng tăng trưởng học viên trong tháng';
-      default: return 'Xu hướng tăng trưởng học viên';
-    }
-  };
-
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top',
-        labels: {
-          usePointStyle: true,
-          padding: 20,
-        }
-      },
-      title: {
-        display: true,
-        text: getTitle(),
-        font: {
-          size: 16,
-          weight: 'bold'
-        },
-        padding: {
-          bottom: 20
-        }
-      },
-      tooltip: {
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        titleColor: '#fff',
-        bodyColor: '#fff',
-        callbacks: {
-          label: function(context) {
-            return `${context.dataset.label}: ${context.parsed.y.toLocaleString()} học viên`;
-          }
-        }
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        ticks: {
-          callback: function(value) {
-            return value.toLocaleString();
-          }
-        },
-        grid: {
-          color: 'rgba(0, 0, 0, 0.1)'
-        }
-      },
-      x: {
-        grid: {
-          color: 'rgba(0, 0, 0, 0.1)'
-        }
-      }
-    },
-    interaction: {
-      mode: 'index',
-      intersect: false,
-    },
-    elements: {
-      point: {
-        hoverBorderWidth: 3
-      }
-    }
-  };
-
-  return (
-    <div style={{ height: '450px', width: '100%', position: 'relative' }}>
-      <Line data={chartData} options={options} />
-    </div>
-  );
-};
-
-import Card from '../compo/Card';
-import Table from '../compo/Table';
-import Button from '../compo/Button';
-import SearchBox from '../compo/SearchBox';
-import FilterBar from '../compo/FilterBar';
-import StatusBadge from '../compo/StatusBadge';
-import ImportExportButtons from '../compo/ImportExportButtons';
-import { mockUsers, mockRoles, mockRoleStats, simulateApiDelay } from '../../../helper/mockdataExtended';
-import { formatDate } from '../../../helper/helper';
-
-// Enhanced Student Statistics Component
-const StudentStatsChart = ({ studentStats }) => {
-  const { total, active, inactive, pending } = studentStats;
+// Component thống kê tóm tắt học viên - Thiết kế tối giản
+const StudentSummaryStats = ({ studentStats }) => {
+  const { total } = studentStats;
+  const newStudentsThisMonth = 116;
 
   const stats = [
     {
-      label: 'Tổng học viên',
+      title: 'Tổng số học viên',
       value: total,
-      icon: 'ph ph-graduation-cap',
-      color: 'primary',
-      bgColor: 'primary-50',
-      textColor: 'primary-600'
+      subtitle: 'Tổng số học viên đã đăng ký trong hệ thống',
+      icon: 'ph ph-users'
     },
     {
-      label: 'Đang hoạt động',
-      value: active,
-      icon: 'ph ph-check-circle',
-      color: 'success',
-      bgColor: 'success-50',
-      textColor: 'success-600'
-    },
-    {
-      label: 'Không hoạt động',
-      value: inactive,
-      icon: 'ph ph-x-circle',
-      color: 'warning',
-      bgColor: 'warning-50',
-      textColor: 'warning-600'
-    },
-    {
-      label: 'Chờ duyệt',
-      value: pending,
-      icon: 'ph ph-clock',
-      color: 'info',
-      bgColor: 'info-50',
-      textColor: 'info-600'
+      title: 'Thay đổi trong tháng',
+      value: newStudentsThisMonth,
+      subtitle: 'Học viên mới tham gia trong tháng này',
+      icon: 'ph ph-trend-up',
+      showArrow: true
     }
   ];
 
   return (
-    <div className="row g-4">
-      {stats.map((stat) => (
-        <div key={stat.label} className="col-md-6 col-xl-3">
-          <Card className="bg-white border-0 shadow-sm h-100">
-            <div className="card-body d-flex align-items-center p-4">
-              <div className={`w-48 h-48 bg-${stat.bgColor} d-flex align-items-center justify-content-center rounded-3 me-3`}>
-                <i className={`${stat.icon} text-${stat.textColor} fs-4`}></i>
+    <div className="row g-3">
+      {stats.map((stat, index) => (
+        <div key={index} className="col-md-6">
+          <Card className="h-100">
+            <div className="p-4">
+              <div className="d-flex justify-content-between align-items-start mb-3">
+                <div className="text-neutral-600 fs-6">{stat.title}</div>
+                <i className={`${stat.icon} fs-4 text-neutral-400`}></i>
               </div>
-              <div className="flex-grow-1">
-                <div className={`display-5 fw-bold text-${stat.textColor} mb-1`}>
+              <div className="d-flex align-items-end gap-2 mb-2">
+                <div className="display-5 fw-bold text-neutral-900">
                   {stat.value.toLocaleString()}
                 </div>
-                <div className="text-sm text-neutral-600 fw-medium">{stat.label}</div>
-                {stat.label === 'Tổng học viên' && (
-                  <div className="text-xs text-neutral-500 mt-1">
-                    +{Math.round((active / total) * 100)}% active rate
-                  </div>
+                {stat.showArrow && (
+                  <i className="ph ph-arrow-up text-success fs-5 mb-2"></i>
                 )}
+              </div>
+              <div className="text-neutral-500 small">
+                {stat.subtitle}
               </div>
             </div>
           </Card>
@@ -274,114 +106,146 @@ const StudentStatsChart = ({ studentStats }) => {
   );
 };
 
-// Management Roles Statistics Component
-const ManagementStatsChart = () => {
-  const roleConfigs = {
-    centerHead: {
-      label: 'Trưởng trung tâm',
-      icon: 'ph ph-crown',
-      color: 'danger',
-      description: 'Quản lý toàn bộ hệ thống'
+// Component biểu đồ xu hướng tăng trưởng học viên
+const StudentGrowthChart = () => {
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: true,
+        position: 'bottom',
+        labels: {
+          usePointStyle: true,
+          padding: 20,
+          color: '#5D87FF'
+        }
+      },
+      title: {
+        display: true,
+        text: 'Số lượng học viên mới theo tháng',
+        align: 'start',
+        font: {
+          size: 18,
+          weight: '600'
+        },
+        color: '#1a1a1a',
+        padding: {
+          bottom: 20
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        padding: 12,
+        titleColor: '#fff',
+        bodyColor: '#fff',
+        callbacks: {
+          label: function(context) {
+            return `${context.dataset.label}: ${context.parsed.y.toLocaleString()}`;
+          }
+        }
+      }
     },
-    subjectLeader: {
-      label: 'Trưởng môn',
-      icon: 'ph ph-medal',
-      color: 'warning',
-      description: 'Quản lý chương trình đào tạo'
+    scales: {
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)',
+          drawBorder: false
+        },
+        ticks: {
+          callback: function(value) {
+            return value.toLocaleString();
+          },
+          color: '#9e9e9e',
+          padding: 10
+        }
+      },
+      x: {
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)',
+          drawBorder: false
+        },
+        ticks: {
+          color: '#9e9e9e',
+          padding: 10
+        }
+      }
     },
-    giaovu: {
-      label: 'Giáo vụ',
-      icon: 'ph ph-clipboard-text',
-      color: 'info',
-      description: 'Quản lý lớp học và lịch trình'
-    },
-    teacher: {
-      label: 'Giảng viên',
-      icon: 'ph ph-chalkboard-teacher',
-      color: 'success',
-      description: 'Giảng dạy và hướng dẫn'
-    },
-    cashier: {
-      label: 'Thu ngân',
-      icon: 'ph ph-money',
-      color: 'secondary',
-      description: 'Quản lý tài chính'
-    },
-    receptionist: {
-      label: 'Lễ tân',
-      icon: 'ph ph-phone',
-      color: 'primary',
-      description: 'Tiếp đón và hỗ trợ'
+    interaction: {
+      mode: 'index',
+      intersect: false,
     }
   };
 
   return (
-    <div className="row g-4">
-      {Object.entries(mockRoleStats).filter(([key]) => key !== 'student').map(([key, stats]) => {
-        const config = roleConfigs[key] || {
-          label: key.replace(/([A-Z])/g, ' $1').trim(),
-          icon: 'ph ph-users',
-          color: 'secondary',
-          description: 'Vai trò quản lý'
-        };
+    <div style={{ height: '400px', width: '100%', padding: '20px' }}>
+      <Line data={monthlyStudentData} options={options} />
+    </div>
+  );
+};
 
-        const activeRate = stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0;
+// Component thống kê tóm tắt nhân sự - Thiết kế đơn giản
+const StaffSummaryStats = () => {
+  const roleConfigs = {
+    centerHead: {
+      label: 'Trưởng trung tâm',
+      icon: 'ph ph-crown',
+    },
+    teacher: {
+      label: 'Giáo viên',
+      icon: 'ph ph-chalkboard-teacher',
+    },
+    subjectLeader: {
+      label: 'Trưởng môn',
+      icon: 'ph ph-medal',
+    },
+    giaovu: {
+      label: 'Giáo vụ',
+      icon: 'ph ph-clipboard-text',
+    }
+  };
+
+  const filteredRoleStats = Object.entries(mockRoleStats)
+    .filter(([key]) => ['centerHead', 'teacher', 'subjectLeader', 'giaovu'].includes(key));
+
+  return (
+    <div className="row g-3">
+      {filteredRoleStats.map(([key, stats]) => {
+        const config = roleConfigs[key];
+        if (!config) return null;
 
         return (
-          <div key={key} className="col-md-6 col-lg-4">
-            <Card
-              className="bg-white border-0 shadow-sm h-100"
-              style={{ transition: 'all 0.3s ease', cursor: 'pointer' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-5px)';
-                e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.15)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '';
-              }}
-            >
-              <div className="card-body p-4">
-                <div className="d-flex align-items-start justify-content-between mb-3">
-                  <div className={`w-48 h-48 bg-${config.color}-50 d-flex align-items-center justify-content-center rounded-3`}>
-                    <i className={`${config.icon} text-${config.color}-600 fs-4`}></i>
+          <div key={key} className="col-md-6 col-lg-3">
+            <Card className="h-100">
+              <div className="p-3">
+                <div className="d-flex align-items-center gap-3 mb-3">
+                  <div
+                    className="d-flex align-items-center justify-content-center rounded-circle"
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      backgroundColor: 'rgba(93, 135, 255, 0.1)'
+                    }}
+                  >
+                    <i className={`${config.icon} fs-4 text-primary`}></i>
                   </div>
-                  <div className="text-end">
-                    <div className="text-lg fw-bold text-neutral-900">{stats.total}</div>
-                    <div className="text-xs text-neutral-500">tổng số</div>
+                  <div>
+                    <div className="fs-4 fw-bold text-neutral-900">{stats.total}</div>
+                    <div className="text-neutral-500 small">tài khoản</div>
                   </div>
                 </div>
-
-                <div className="mb-3">
-                  <h6 className="mb-1 text-neutral-900 fw-semibold">{config.label}</h6>
-                  <p className="text-xs text-neutral-600 mb-0">{config.description}</p>
+                <div className="mb-2">
+                  <div className="text-neutral-700 fw-semibold small">{config.label}</div>
                 </div>
-
-                <div className="d-flex justify-content-between align-items-center">
-                  <div className="d-flex align-items-center gap-3">
-                    <div className="d-flex align-items-center gap-1">
-                      <div className="w-8 h-8 bg-success rounded-circle"></div>
-                      <span className="text-xs text-neutral-600">{stats.active}</span>
-                    </div>
-                    <div className="d-flex align-items-center gap-1">
-                      <div className="w-8 h-8 bg-warning rounded-circle"></div>
-                      <span className="text-xs text-neutral-600">{stats.inactive}</span>
-                    </div>
+                <div className="d-flex gap-3 text-xs">
+                  <div className="text-success">
+                    <i className="ph ph-check-circle me-1"></i>
+                    {stats.active} hoạt động
                   </div>
-                  <div className="text-end">
-                    <div className="text-sm fw-semibold text-success">{activeRate}%</div>
-                    <div className="text-xs text-neutral-500">tỷ lệ active</div>
-                  </div>
-                </div>
-
-                {/* Progress bar */}
-                <div className="mt-3">
-                  <div className="progress" style={{ height: '6px' }}>
-                    <div
-                      className="progress-bar bg-success"
-                      style={{ width: `${activeRate}%` }}
-                      role="progressbar"
-                    ></div>
+                  <div className="text-neutral-400">
+                    <i className="ph ph-x-circle me-1"></i>
+                    {stats.inactive} không hoạt động
                   </div>
                 </div>
               </div>
@@ -401,8 +265,16 @@ const UserList = () => {
   const [error, setError] = useState(null);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [filterValues, setFilterValues] = useState({});
-  const [activeTab, setActiveTab] = useState('students'); // 'students' or 'management'
-  const [chartPeriod, setChartPeriod] = useState('monthly'); // 'monthly', 'yearly', 'weekly'
+  const [activeTab, setActiveTab] = useState('students'); // 'students' or 'staff'
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+
+  // Modal states
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -425,13 +297,13 @@ const UserList = () => {
   const applyFilters = useCallback(() => {
     let filtered = [...users];
 
-    // Filter by tab first
+    // Filter by tab
     if (activeTab === 'students') {
-      // Only show students (role005)
       filtered = filtered.filter(user => user.roleId === 'role005');
     } else {
-      // Show management roles (all except students)
-      filtered = filtered.filter(user => user.roleId !== 'role005');
+      filtered = filtered.filter(user =>
+        ['role001', 'role002', 'role003', 'role004'].includes(user.roleId)
+      );
     }
 
     // Search filter
@@ -440,7 +312,8 @@ const UserList = () => {
       filtered = filtered.filter(user =>
         user.fullname?.toLowerCase().includes(keyword) ||
         user.email?.toLowerCase().includes(keyword) ||
-        user.username?.toLowerCase().includes(keyword)
+        user.username?.toLowerCase().includes(keyword) ||
+        user.phone?.toLowerCase().includes(keyword)
       );
     }
 
@@ -455,6 +328,7 @@ const UserList = () => {
     }
 
     setFilteredUsers(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
   }, [users, activeTab, searchKeyword, filterValues]);
 
   useEffect(() => {
@@ -479,28 +353,41 @@ const UserList = () => {
   };
 
   const handleViewUser = (user) => {
-    navigate(`/center-head/users/${user._id}`);
+    setSelectedUser(user);
+    setIsViewModalOpen(true);
   };
 
   const handleEditUser = (user) => {
-    navigate(`/center-head/users/${user._id}/edit`);
+    setSelectedUser(user);
+    setIsEditModalOpen(true);
   };
 
-  const handleDeleteUser = (user) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa người dùng "${user.fullname}"?`)) {
-      console.log('Delete user:', user._id);
-      // Implement delete logic
+  const handleCloseViewModal = () => {
+    setIsViewModalOpen(false);
+    setSelectedUser(null);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setSelectedUser(null);
+  };
+
+  const handleSaveUser = (updatedData) => {
+    console.log('Saving user data:', updatedData);
+    // Implement save logic here
+    // Update users list and refresh
+    alert('Cập nhật tài khoản thành công!');
+    setIsEditModalOpen(false);
+    setSelectedUser(null);
+    fetchUsers();
+  };
+
+  const handleBlockUser = (user) => {
+    if (window.confirm(`Bạn có chắc chắn muốn ${user.status === 'active' ? 'khóa' : 'mở khóa'} tài khoản "${user.fullname}"?`)) {
+      console.log('Block/Unblock user:', user._id);
+      // Implement block/unblock logic
+      // Update user status and refresh data
     }
-  };
-
-  const handleImport = () => {
-    console.log('Import users from Excel');
-    // Implement import logic
-  };
-
-  const handleExport = () => {
-    console.log('Export users to Excel');
-    // Implement export logic
   };
 
   const breadcrumbItems = [
@@ -509,44 +396,51 @@ const UserList = () => {
   ];
 
   const getCurrentFilters = () => {
-    let availableRoles = mockRoles;
-
     if (activeTab === 'students') {
-      // Only student role for students tab
-      availableRoles = mockRoles.filter(role => role._id === 'role005');
+      return [
+        {
+          key: "status",
+          label: "Trạng thái",
+          options: [
+            { value: "active", label: "Đang hoạt động" },
+            { value: "inactive", label: "Không hoạt động" },
+          ]
+        }
+      ];
     } else {
-      // All roles except students for management tab
-      availableRoles = mockRoles.filter(role => role._id !== 'role005');
-    }
+      const staffRoles = mockRoles.filter(role =>
+        ['role001', 'role002', 'role003', 'role004'].includes(role._id)
+      );
 
-    return [
-      {
-        key: "role",
-        label: "Vai trò",
-        options: availableRoles.map(role => ({
-          value: role._id,
-          label: role.name
-        }))
-      },
-      {
-        key: "status",
-        label: "Trạng thái",
-        options: [
-          { value: "active", label: "Đang hoạt động" },
-          { value: "inactive", label: "Không hoạt động" },
-        ]
-      }
-    ];
+      return [
+        {
+          key: "role",
+          label: "Vai trò",
+          options: staffRoles.map(role => ({
+            value: role._id,
+            label: role.name
+          }))
+        },
+        {
+          key: "status",
+          label: "Trạng thái",
+          options: [
+            { value: "active", label: "Đang hoạt động" },
+            { value: "inactive", label: "Không hoạt động" },
+          ]
+        }
+      ];
+    }
   };
 
-  const columns = [
+  // Student columns (simplified - no actions)
+  const studentColumns = [
     {
-      header: 'Người dùng',
+      header: 'Tên người dùng',
       field: 'fullname',
       render: (row) => (
         <div>
-          <div className="fw-semibold text-neutral-900 mb-4">{row.fullname}</div>
-          <div className="text-sm text-neutral-600">{row.email}</div>
+          <div className="fw-semibold text-neutral-900">{row.fullname}</div>
           <div className="text-sm text-neutral-500">@{row.username}</div>
         </div>
       ),
@@ -555,14 +449,64 @@ const UserList = () => {
       header: 'Vai trò',
       field: 'role',
       render: (row) => (
-        <span className="badge bg-main-50 text-main-600 fw-medium">
+        <span className="badge bg-primary-50 text-primary-600 fw-medium">
           {row.role?.name || 'N/A'}
         </span>
       ),
     },
     {
       header: 'Liên hệ',
-      field: 'phone',
+      field: 'contact',
+      render: (row) => (
+        <div>
+          <div className="text-neutral-900">{row.phone}</div>
+          <div className="text-sm text-neutral-600">{row.address}</div>
+        </div>
+      ),
+    },
+    {
+      header: 'Trạng thái',
+      field: 'status',
+      render: (row) => (
+        <StatusBadge status={row.status} size="sm" />
+      ),
+    },
+  ];
+
+  // Staff columns (with actions menu)
+  const staffColumns = [
+    {
+      header: 'Người dùng',
+      field: 'fullname',
+      render: (row) => (
+        <div>
+          <div className="fw-semibold text-neutral-900">{row.fullname}</div>
+          <div className="text-sm text-neutral-500">{row.email}</div>
+          <div className="text-sm text-neutral-500">@{row.username}</div>
+        </div>
+      ),
+    },
+    {
+      header: 'Vai trò',
+      field: 'role',
+      render: (row) => {
+        const roleColors = {
+          'role001': 'danger',
+          'role002': 'success',
+          'role003': 'warning',
+          'role004': 'info'
+        };
+        const color = roleColors[row.roleId] || 'secondary';
+        return (
+          <span className={`badge bg-${color}-50 text-${color}-600 fw-medium`}>
+            {row.role?.name || 'N/A'}
+          </span>
+        );
+      },
+    },
+    {
+      header: 'Liên hệ',
+      field: 'contact',
       render: (row) => (
         <div>
           <div className="text-neutral-900">{row.phone}</div>
@@ -578,66 +522,135 @@ const UserList = () => {
       ),
     },
     {
-      header: 'Đăng nhập cuối',
-      field: 'lastLogin',
-      render: (row) => (
-        <span className="text-neutral-700">{formatDate(row.lastLogin)}</span>
-      ),
-    },
-    {
-      header: 'Hành động',
+      header: '',
       field: 'actions',
       render: (row) => (
-        <div className="d-flex gap-2 justify-content-center">
-          <button
-            className="btn btn-sm btn-outline-primary"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleViewUser(row);
-            }}
-            title="Xem chi tiết"
-          >
-            <i className="ph ph-eye"></i>
-          </button>
+        <div className="dropdown">
           <button
             className="btn btn-sm btn-outline-secondary"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleEditUser(row);
-            }}
-            title="Chỉnh sửa"
+            type="button"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+            onClick={(e) => e.stopPropagation()}
           >
-            <i className="ph ph-pencil"></i>
+            <i className="ph ph-dots-three-outline-vertical"></i>
           </button>
-          <button
-            className="btn btn-sm btn-outline-warning"
-            onClick={(e) => {
-              e.stopPropagation();
-              console.log('Reset password', row._id);
-            }}
-            title="Đổi mật khẩu"
-          >
-            <i className="ph ph-key"></i>
-          </button>
-          <button
-            className="btn btn-sm btn-outline-danger"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDeleteUser(row);
-            }}
-            title="Xóa"
-          >
-            <i className="ph ph-trash"></i>
-          </button>
+          <ul className="dropdown-menu dropdown-menu-end">
+            <li>
+              <button
+                className="dropdown-item"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditUser(row);
+                }}
+              >
+                <i className="ph ph-pencil me-2"></i>
+                Chỉnh sửa
+              </button>
+            </li>
+            <li><hr className="dropdown-divider" /></li>
+            <li>
+              <button
+                className={`dropdown-item ${row.status === 'active' ? 'text-warning' : 'text-success'}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleBlockUser(row);
+                }}
+              >
+                <i className={`ph ${row.status === 'active' ? 'ph-lock' : 'ph-lock-open'} me-2`}></i>
+                {row.status === 'active' ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
+              </button>
+            </li>
+          </ul>
         </div>
       ),
     },
   ];
 
+  // Pagination logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  // Pagination component
+  const Pagination = () => {
+    const pageNumbers = [];
+    const maxPagesToShow = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+    if (endPage - startPage < maxPagesToShow - 1) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(i);
+    }
+
+    if (totalPages <= 1) return null;
+
+    return (
+      <nav className="mt-4">
+        <ul className="pagination justify-content-center">
+          <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+            <button
+              className="page-link"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              <i className="ph ph-caret-left"></i>
+            </button>
+          </li>
+
+          {startPage > 1 && (
+            <>
+              <li className="page-item">
+                <button className="page-link" onClick={() => handlePageChange(1)}>1</button>
+              </li>
+              {startPage > 2 && <li className="page-item disabled"><span className="page-link">...</span></li>}
+            </>
+          )}
+
+          {pageNumbers.map(number => (
+            <li key={number} className={`page-item ${currentPage === number ? 'active' : ''}`}>
+              <button className="page-link" onClick={() => handlePageChange(number)}>
+                {number}
+              </button>
+            </li>
+          ))}
+
+          {endPage < totalPages && (
+            <>
+              {endPage < totalPages - 1 && <li className="page-item disabled"><span className="page-link">...</span></li>}
+              <li className="page-item">
+                <button className="page-link" onClick={() => handlePageChange(totalPages)}>{totalPages}</button>
+              </li>
+            </>
+          )}
+
+          <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+            <button
+              className="page-link"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              <i className="ph ph-caret-right"></i>
+            </button>
+          </li>
+        </ul>
+      </nav>
+    );
+  };
+
   if (loading) {
     return (
       <div className="d-flex justify-content-center align-items-center min-vh-100">
-        <div className="spinner-border text-main-600" role="status">
+        <div className="spinner-border text-primary" role="status">
           <span className="visually-hidden">Đang tải...</span>
         </div>
       </div>
@@ -657,16 +670,12 @@ const UserList = () => {
           </p>
         </div>
         <div className="d-flex align-items-center gap-3">
-          <ImportExportButtons
-            onImport={handleImport}
-            onExport={handleExport}
-          />
           <Button
             variant="primary"
             icon="ph ph-plus"
             onClick={handleCreateUser}
           >
-            Thêm người dùng
+            Thêm tài khoản
           </Button>
         </div>
       </div>
@@ -680,134 +689,176 @@ const UserList = () => {
       )}
 
       {/* Tabs */}
-      <div className="mb-24">
-        <ul className="nav nav-tabs" role="tablist">
-          <li className="nav-item" role="presentation">
-            <button
-              className={`nav-link ${activeTab === 'students' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('students');
-                setFilterValues({});
-                setSearchKeyword("");
-              }}
-              type="button"
-              role="tab"
-            >
-              <i className="ph ph-graduation-cap me-2"></i>
-              Học viên ({mockRoleStats.student.total})
-            </button>
-          </li>
-          <li className="nav-item" role="presentation">
-            <button
-              className={`nav-link ${activeTab === 'management' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('management');
-                setFilterValues({});
-                setSearchKeyword("");
-              }}
-              type="button"
-              role="tab"
-            >
-              <i className="ph ph-users-three me-2"></i>
-              Quản lý hệ thống ({mockUsers.filter(u => u.roleId !== 'role005').length})
-            </button>
-          </li>
-        </ul>
-      </div>
-
-      {/* Student Statistics Chart - Only show for students tab */}
-      {activeTab === 'students' && (
-        <div className="mb-24">
-          <div className="d-flex justify-content-between align-items-center mb-16">
-            <h5 className="mb-0 text-neutral-900 fw-semibold">Thống kê học viên</h5>
-            <div className="d-flex align-items-center gap-2">
-              <span className="text-sm text-neutral-600 fw-medium">Theo dõi theo:</span>
-              <TimePeriodSelector
-                selectedPeriod={chartPeriod}
-                onPeriodChange={setChartPeriod}
-              />
-            </div>
-          </div>
-
-          <Card className="mb-24">
-            <StudentStatsChart studentStats={mockRoleStats.student} />
-          </Card>
-
-          <Card>
-            <div className="p-4">
-              <StudentGrowthChart
-                data={mockStudentChartData[chartPeriod]}
-                periodType={chartPeriod}
-              />
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* Management Roles Stats - Only show for management tab */}
-      {activeTab === 'management' && (
-        <div className="mb-24">
-          <div className="d-flex justify-content-between align-items-center mb-16">
-            <div>
-              <h5 className="mb-2 text-neutral-900 fw-semibold">Thống kê vai trò quản lý</h5>
-              <p className="text-sm text-neutral-600 mb-0">Tổng quan về các vị trí quản lý trong hệ thống</p>
-            </div>
-            <div className="d-flex align-items-center gap-2">
-              <div className="d-flex align-items-center gap-1">
-                <div className="w-8 h-8 bg-success rounded-circle"></div>
-                <span className="text-xs text-neutral-600">Active</span>
-              </div>
-              <div className="d-flex align-items-center gap-1">
-                <div className="w-8 h-8 bg-warning rounded-circle"></div>
-                <span className="text-xs text-neutral-600">Inactive</span>
-              </div>
-            </div>
-          </div>
-          <ManagementStatsChart />
-        </div>
-      )}
-
-      {/* Search & Filter */}
       <Card className="mb-24">
-        <div className="d-flex flex-column flex-md-row gap-3 align-items-start align-items-md-center justify-content-between">
-          <div className="flex-grow-1" style={{ maxWidth: '400px' }}>
-            <SearchBox
-              placeholder="Tìm kiếm theo tên, email, username..."
-              onSearch={handleSearch}
-              value={searchKeyword}
-              onChange={setSearchKeyword}
-            />
-          </div>
-          <FilterBar
-            filters={getCurrentFilters()}
-            values={filterValues}
-            onChange={handleFilterChange}
-            onReset={handleResetFilters}
-          />
+        <div className="d-flex gap-2 p-2">
+          <button
+            className={`flex-fill btn ${activeTab === 'students' ? 'btn-primary' : 'btn-outline-secondary'} py-3 px-4 rounded-3`}
+            onClick={() => {
+              setActiveTab('students');
+              setFilterValues({});
+              setSearchKeyword("");
+            }}
+            type="button"
+            style={{
+              fontWeight: '600',
+              fontSize: '15px',
+              border: activeTab === 'students' ? 'none' : '1px solid #dee2e6',
+              boxShadow: activeTab === 'students' ? '0 4px 12px rgba(93, 135, 255, 0.2)' : 'none',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            <i className="ph ph-graduation-cap me-2 fs-5"></i>
+            Quản lý học viên
+          </button>
+          <button
+            className={`flex-fill btn ${activeTab === 'staff' ? 'btn-primary' : 'btn-outline-secondary'} py-3 px-4 rounded-3`}
+            onClick={() => {
+              setActiveTab('staff');
+              setFilterValues({});
+              setSearchKeyword("");
+            }}
+            type="button"
+            style={{
+              fontWeight: '600',
+              fontSize: '15px',
+              border: activeTab === 'staff' ? 'none' : '1px solid #dee2e6',
+              boxShadow: activeTab === 'staff' ? '0 4px 12px rgba(93, 135, 255, 0.2)' : 'none',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            <i className="ph ph-users-three me-2 fs-5"></i>
+            Quản lý nhân sự
+          </button>
         </div>
       </Card>
 
-      {/* Table */}
-      <Card>
-        <div className="d-flex justify-content-between align-items-center mb-16">
-          <h6 className="mb-0 text-neutral-900 fw-semibold">
-            {activeTab === 'students' ? 'Danh sách học viên' : 'Danh sách nhân viên quản lý'} ({filteredUsers.length})
-          </h6>
-          <Button
-            variant="outline"
-            icon="ph ph-arrows-clockwise"
-            size="sm"
-            onClick={fetchUsers}
-          >
-            Làm mới
-          </Button>
-        </div>
-        <Table
-          columns={columns}
-          data={filteredUsers}
-          onRowClick={handleViewUser}
-        />
-      </Card>
+      {/* Student Tab Content */}
+      {activeTab === 'students' && (
+        <>
+          {/* Summary Stats */}
+          <div className="mb-24">
+            <h5 className="mb-3 text-neutral-900 fw-semibold">Tóm tắt học viên</h5>
+            <StudentSummaryStats studentStats={mockRoleStats.student} />
+          </div>
+
+          {/* Student Growth Trend Chart */}
+          <Card className="mb-24">
+            <StudentGrowthChart />
+          </Card>
+
+          {/* Search & Filter */}
+          <Card className="mb-24">
+            <div className="d-flex flex-column flex-md-row gap-3 align-items-start align-items-md-center justify-content-between">
+              <div className="flex-grow-1" style={{ maxWidth: '400px' }}>
+                <SearchBox
+                  placeholder="Tìm kiếm theo tên, email, số điện thoại..."
+                  onSearch={handleSearch}
+                  value={searchKeyword}
+                  onChange={setSearchKeyword}
+                />
+              </div>
+              <FilterBar
+                filters={getCurrentFilters()}
+                values={filterValues}
+                onChange={handleFilterChange}
+                onReset={handleResetFilters}
+              />
+            </div>
+          </Card>
+
+          {/* Student Table */}
+          <Card>
+            <div className="d-flex justify-content-between align-items-center mb-16">
+              <h6 className="mb-0 text-neutral-900 fw-semibold">
+                Danh sách học viên ({filteredUsers.length})
+              </h6>
+              <Button
+                variant="outline"
+                icon="ph ph-arrows-clockwise"
+                size="sm"
+                onClick={fetchUsers}
+              >
+                Làm mới
+              </Button>
+            </div>
+            <Table
+              columns={studentColumns}
+              data={currentItems}
+              onRowClick={handleViewUser}
+            />
+            <Pagination />
+          </Card>
+        </>
+      )}
+
+      {/* Staff Tab Content */}
+      {activeTab === 'staff' && (
+        <>
+          {/* Staff Summary Statistics */}
+          <div className="mb-24">
+            <h5 className="mb-3 text-neutral-900 fw-semibold">Tóm tắt nhân sự</h5>
+            <StaffSummaryStats />
+          </div>
+
+          {/* Search & Filter */}
+          <Card className="mb-24">
+            <div className="d-flex flex-column flex-md-row gap-3 align-items-start align-items-md-center justify-content-between">
+              <div className="flex-grow-1" style={{ maxWidth: '400px' }}>
+                <SearchBox
+                  placeholder="Tìm kiếm theo tên, email, số điện thoại..."
+                  onSearch={handleSearch}
+                  value={searchKeyword}
+                  onChange={setSearchKeyword}
+                />
+              </div>
+              <FilterBar
+                filters={getCurrentFilters()}
+                values={filterValues}
+                onChange={handleFilterChange}
+                onReset={handleResetFilters}
+              />
+            </div>
+          </Card>
+
+          {/* Staff Table */}
+          <Card>
+            <div className="d-flex justify-content-between align-items-center mb-16">
+              <h6 className="mb-0 text-neutral-900 fw-semibold">
+                Danh sách nhân sự ({filteredUsers.length})
+              </h6>
+              <Button
+                variant="outline"
+                icon="ph ph-arrows-clockwise"
+                size="sm"
+                onClick={fetchUsers}
+              >
+                Làm mới
+              </Button>
+            </div>
+            <Table
+              columns={staffColumns}
+              data={currentItems}
+              onRowClick={handleViewUser}
+            />
+            <Pagination />
+          </Card>
+        </>
+      )}
+
+      {/* View User Detail Modal - Read Only */}
+      <UserDetailModal
+        user={selectedUser}
+        isOpen={isViewModalOpen}
+        onClose={handleCloseViewModal}
+      />
+
+      {/* Edit User Modal */}
+      <EditUserModal
+        user={selectedUser}
+        isOpen={isEditModalOpen}
+        onClose={handleCloseEditModal}
+        onSave={handleSaveUser}
+      />
     </div>
   );
 };

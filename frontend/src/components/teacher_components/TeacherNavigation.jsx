@@ -83,7 +83,14 @@ const TeacherNavigation = () => {
       icon: 'fa-user-check',
       path: '/teacher/exams',
       color: 'main'
+    },
+    {
+      title: 'Đề Quản lý tips',
+      icon: 'fa-user-check',
+      path: '/teacher/tips',
+      color: 'main'
     }
+    
   ];
 
   const userInfo = {

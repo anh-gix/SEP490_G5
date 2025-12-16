@@ -37,7 +37,7 @@ const RequestStats = ({ stats, filterType, onFilterTypeChange }) => {
               <div>
                 <div className="text-neutral-500 text-13 mb-4">Tổng số đơn</div>
                 <div className="text-neutral-900 fw-bold text-32">
-                  {stats.changeClass + stats.makeupClass + stats.requestReplaceTeacher + (stats.assignStudents || 0)}
+                  {(stats.makeupClass || 0) + (stats.requestReplaceTeacher || 0) + (stats.assignStudents || 0)}
                 </div>
               </div>
             </div>

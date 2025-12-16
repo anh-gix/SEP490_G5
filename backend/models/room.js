@@ -28,7 +28,7 @@ const roomSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true, // tự động thêm createdAt, updatedAt
+    timestamps: true,
   }
 );
 

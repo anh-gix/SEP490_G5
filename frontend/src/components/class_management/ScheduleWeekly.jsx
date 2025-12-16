@@ -1,10 +1,13 @@
-import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card, Button, Badge } from 'react-bootstrap';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
 
-const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
+const ScheduleWeekly = ({ schedules, onScheduleClick, selectedWeek, onWeekChange, onLessonClick }) => {
+  // Sử dụng selectedWeek từ props, nếu không có thì dùng current date
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
+    if (selectedWeek) {
+      return selectedWeek;
+    }
     const today = new Date();
     const dayOfWeek = today.getDay();
     const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Start from Monday
@@ -13,6 +16,13 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
     monday.setHours(0, 0, 0, 0);
     return monday;
   });
+
+  // Sync currentWeekStart với selectedWeek prop
+  useEffect(() => {
+    if (selectedWeek) {
+      setCurrentWeekStart(selectedWeek);
+    }
+  }, [selectedWeek]);
 
   // Time slots configuration - each slot is 2 hours from 8:00 to 20:00
   const timeSlots = useMemo(() => {
@@ -80,12 +90,18 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
     const newDate = new Date(currentWeekStart);
     newDate.setDate(currentWeekStart.getDate() - 7);
     setCurrentWeekStart(newDate);
+    if (onWeekChange) {
+      onWeekChange(newDate);
+    }
   };
 
   const goToNextWeek = () => {
     const newDate = new Date(currentWeekStart);
     newDate.setDate(currentWeekStart.getDate() + 7);
     setCurrentWeekStart(newDate);
+    if (onWeekChange) {
+      onWeekChange(newDate);
+    }
   };
 
   const goToCurrentWeek = () => {
@@ -96,6 +112,9 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
     monday.setDate(today.getDate() + diff);
     monday.setHours(0, 0, 0, 0);
     setCurrentWeekStart(monday);
+    if (onWeekChange) {
+      onWeekChange(monday);
+    }
   };
 
   const formatWeekRange = () => {
@@ -307,7 +326,21 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
                           </Card>
                         );
 
-                        // If onScheduleClick is provided, use div wrapper, otherwise use Link
+                        // If onLessonClick is provided, use onClick handler, otherwise use onScheduleClick or Link fallback
+                        if (onLessonClick) {
+                          return (
+                            <div 
+                              key={schedule.id} 
+                              className="text-decoration-none"
+                              onClick={() => onLessonClick(schedule.id)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              {ScheduleCard}
+                            </div>
+                          );
+                        }
+
+                        // If onScheduleClick is provided, use div wrapper
                         if (onScheduleClick) {
                           return (
                             <div key={schedule.id} className="text-decoration-none">
@@ -316,14 +349,11 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
                           );
                         }
 
+                        // Fallback: no handler provided, just render card
                         return (
-                          <Link
-                            key={schedule.id}
-                            to={`/academic/lessons/${schedule.id}`}
-                            className="text-decoration-none"
-                          >
+                          <div key={schedule.id} className="text-decoration-none">
                             {ScheduleCard}
-                          </Link>
+                          </div>
                         );
                       })
                     ) : null}

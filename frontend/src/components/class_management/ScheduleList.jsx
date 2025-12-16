@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Badge, Button, ButtonGroup, Dropdown, Pagination } from 'react-bootstrap';
+import { Table, Badge, Button, ButtonGroup, Pagination } from 'react-bootstrap';
 
 const ScheduleList = ({ 
-  schedules, 
-  onEditSchedule, 
-  onDeleteSchedule, 
-  onCreateMakeup 
+  schedules
+  // Bỏ onCreateMakeup prop
 }) => {
   const [sortField, setSortField] = useState('date');
   const [sortDirection, setSortDirection] = useState('asc');
-  const [selectedSchedules, setSelectedSchedules] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Sort schedules
@@ -49,43 +46,6 @@ const ScheduleList = ({
     setCurrentPage(1); // Reset to first page when sorting changes
   };
 
-  const handleSelectSchedule = (scheduleId) => {
-    setSelectedSchedules(prev => {
-      if (prev.includes(scheduleId)) {
-        return prev.filter(id => id !== scheduleId);
-      } else {
-        return [...prev, scheduleId];
-      }
-    });
-  };
-
-  const handleSelectAll = (e) => {
-    // Calculate paginated schedules for current page
-    const itemsPerPage = 10;
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const currentPageSchedules = sortedSchedules.slice(startIndex, endIndex);
-    
-    if (e.target.checked) {
-      // Select all items in current page
-      const currentPageIds = currentPageSchedules.map(s => s.id);
-      setSelectedSchedules(prev => [...new Set([...prev, ...currentPageIds])]);
-    } else {
-      // Deselect all items in current page
-      const currentPageIds = currentPageSchedules.map(s => s.id);
-      setSelectedSchedules(prev => prev.filter(id => !currentPageIds.includes(id)));
-    }
-  };
-
-  const handleBulkDelete = () => {
-    if (selectedSchedules.length === 0) return;
-    
-    if (window.confirm(`Bạn có chắc chắn muốn xóa ${selectedSchedules.length} lịch học đã chọn?`)) {
-      selectedSchedules.forEach(id => onDeleteSchedule(id));
-      setSelectedSchedules([]);
-    }
-  };
-
   const getTypeText = (type) => {
     const typeMap = {
       regular: 'Học chính',
@@ -117,32 +77,12 @@ const ScheduleList = ({
 
   return (
     <div>
-      {/* Bulk actions */}
-      {selectedSchedules.length > 0 && (
-        <div className="d-flex justify-content-between align-items-center mb-16 p-16 bg-main-25 rounded-12 border border-main-100">
-          <span className="text-neutral-900 fw-semibold">{selectedSchedules.length} lịch học đã chọn</span>
-          <Button 
-            className="btn-danger text-13 fw-medium px-16 py-8 radius-8"
-            onClick={handleBulkDelete}
-          >
-            <i className="fas fa-trash me-2"></i> Xóa đã chọn
-          </Button>
-        </div>
-      )}
 
       {/* Table */}
       <div className="bg-white border border-neutral-30 rounded-12 overflow-hidden">
         <Table className="mb-0" hover responsive>
           <thead style={{ backgroundColor: 'var(--main-25)' }}>
             <tr>
-              <th style={{ width: '50px', padding: '16px' }}>
-                <input
-                  type="checkbox"
-                  className="form-check-input"
-                  checked={paginatedSchedules.length > 0 && paginatedSchedules.every(s => selectedSchedules.includes(s.id))}
-                  onChange={handleSelectAll}
-                />
-              </th>
               <th 
                 onClick={() => handleSort('date')} 
                 style={{ cursor: 'pointer', padding: '16px' }}
@@ -174,21 +114,12 @@ const ScheduleList = ({
                 Phòng học <SortIcon field="roomName" />
               </th>
               <th className="text-neutral-900 fw-semibold" style={{ padding: '16px' }}>Loại</th>
-              <th style={{ width: '180px', padding: '16px' }} className="text-neutral-900 fw-semibold">Hành động</th>
             </tr>
           </thead>
           <tbody>
             {paginatedSchedules.length > 0 ? (
               paginatedSchedules.map(schedule => (
-                <tr key={schedule.id} className={selectedSchedules.includes(schedule.id) ? 'bg-main-25' : ''}>
-                  <td style={{ padding: '16px' }}>
-                    <input
-                      type="checkbox"
-                      className="form-check-input"
-                      checked={selectedSchedules.includes(schedule.id)}
-                      onChange={() => handleSelectSchedule(schedule.id)}
-                    />
-                  </td>
+                <tr key={schedule.id}>
                   <td className="text-neutral-700" style={{ padding: '16px' }}>
                     {new Date(schedule.date).toLocaleDateString('vi-VN', {
                       weekday: 'short',
@@ -214,36 +145,12 @@ const ScheduleList = ({
                       {getTypeText(schedule.type)}
                     </Badge>
                   </td>
-                  <td style={{ padding: '16px' }}>
-                    <ButtonGroup size="sm">
-                      <Button
-                        className="btn-outline-main text-13 px-10 py-6"
-                        onClick={() => onEditSchedule(schedule)}
-                        title="Sửa"
-                      >
-                        <i className="fas fa-edit"></i>
-                      </Button>
-                      <Button
-                        className="btn-outline-warning text-13 px-10 py-6"
-                        onClick={() => onCreateMakeup(schedule)}
-                        title="Học bù"
-                      >
-                        <i className="fas fa-calendar-plus"></i>
-                      </Button>
-                      <Button
-                        className="btn-outline-danger text-13 px-10 py-6"
-                        onClick={() => onDeleteSchedule(schedule.id)}
-                        title="Xóa"
-                      >
-                        <i className="fas fa-trash"></i>
-                      </Button>
-                    </ButtonGroup>
-                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="9" className="text-center py-40" style={{ padding: '40px' }}>
+                <td colSpan="7" className="text-center py-40" style={{ padding: '40px' }}>
+                  {/* Đổi colSpan từ 8 thành 7 vì đã bỏ 1 cột */}
                   <i className="fas fa-inbox fa-3x text-neutral-400 mb-16 d-block"></i>
                   <p className="mb-0 text-neutral-500">Không có lịch học nào</p>
                 </td>

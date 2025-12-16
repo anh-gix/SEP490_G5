@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Modal, Button, Form, Alert } from 'react-bootstrap';
+import { Container, Button, Form, Alert, Modal } from 'react-bootstrap';
 import * as XLSX from 'xlsx';
 import scheduleService from '../../services/scheduleService';
 import roomService from '../../services/roomService';
@@ -1641,16 +1641,42 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   }, [filteredTeachers, formData.teacherId]);
 
   return (
-    <Modal show={true} onHide={onClose} size="xl" centered backdrop="static">
-      <Modal.Header closeButton className="bg-main-600 text-white border-0 p-24">
-        <Modal.Title className="fw-bold">
-          <i className="fas fa-plus-circle me-2"></i>
-          Tạo lớp học mới
-        </Modal.Title>
-      </Modal.Header>
+    <Container fluid className="p-0" style={{ 
+      minHeight: '100vh', 
+      height: '100vh',
+      display: 'flex', 
+      flexDirection: 'column',
+      backgroundColor: '#fff'
+    }}>
+      {/* Header */}
+      <div className="bg-main-600 text-white border-0 p-24" style={{ flexShrink: 0 }}>
+        <div className="d-flex flex-column">
+          <Button
+            variant="link"
+            onClick={onClose}
+            className="text-white p-0 mb-16 align-self-start"
+            style={{ 
+              textDecoration: 'none', 
+              fontSize: '16px',
+              fontWeight: '500',
+              transition: 'opacity 0.2s'
+            }}
+            onMouseEnter={(e) => e.target.style.opacity = '0.8'}
+            onMouseLeave={(e) => e.target.style.opacity = '1'}
+          >
+            <i className="fas fa-arrow-left me-2"></i>
+            Quay lại
+          </Button>
+          <h4 className="fw-bold mb-0">
+            <i className="fas fa-plus-circle me-2"></i>
+            Tạo lớp học mới
+          </h4>
+        </div>
+      </div>
 
-      <Form onSubmit={handleSubmit}>
-        <Modal.Body className="p-24" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+      <Form onSubmit={handleSubmit} style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {/* Body - Scrollable */}
+        <div className="p-24" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           <div className="mb-24">
             <h5 className="text-neutral-900 fw-semibold mb-16 pb-12 border-bottom border-neutral-100">
               Thông tin cơ bản
@@ -1717,19 +1743,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               </div>
 
               <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">Band</Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="band"
-                    value={formData.band}
-                    onChange={handleInputChange}
-                    placeholder="VD: Band 1"
-                    className="border-neutral-30 radius-8 px-16 py-10"
-                    readOnly
-                  />
-                </Form.Group>
-              </div>
+  <Form.Group>
+    <Form.Label className="text-neutral-700 fw-medium mb-8">Band</Form.Label>
+    <div className="border border-neutral-30 rounded-8 px-16 py-10 bg-neutral-25 text-neutral-700" style={{ minHeight: '38px', display: 'flex', alignItems: 'center' }}>
+      {formData.band || <span className="text-neutral-400">Chưa có band</span>}
+    </div>
+  </Form.Group>
+</div>
             </div>
 
             <div className="row g-3 mb-16">
@@ -1819,17 +1839,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                   key={entry.id}
                   className={`border rounded-12 p-16 ${isDuplicate ? 'border-danger border-2' : 'border-neutral-100'}`}
                 >
-                  <div className="d-flex justify-content-between align-items-center mb-12">
-                    <div className="fw-semibold text-neutral-900">
-                      Buổi {index + 1}
-                    </div>
+                  <div className="d-flex justify-content-end align-items-center mb-12">
                     {formData.scheduleEntries.length > 1 && (
                       <Button
                         type="button"
                         className="btn-outline-danger text-13 fw-medium px-14 py-6 radius-8"
                         onClick={() => removeScheduleEntry(entry.id)}
                       >
-                        <i className="fas fa-trash-alt me-2"></i>
                         Xóa
                       </Button>
                     )}
@@ -2301,32 +2317,32 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               )}
             </div>
           </div>
+        </div>
 
-
-
-        </Modal.Body>
-
-        <Modal.Footer className="bg-neutral-25 border-0 p-20">
-          <Button 
-            className="btn-outline-neutral text-15 fw-medium px-20 py-10 radius-8"
-            onClick={onClose}
-          >
-            <i className="fas fa-times me-2"></i> Hủy
-          </Button>
-          <Button 
-            type="submit" 
-            className="btn-main text-15 fw-semibold px-24 py-10 radius-8"
-            disabled={conflicts.hasConflict || checkingConflicts}
-            title={conflicts.hasConflict ? 'Vui lòng giải quyết các xung đột lịch học trước khi tạo lớp' : ''}
-          >
-            <i className="fas fa-check me-2"></i> Tạo lớp học
-            {conflicts.hasConflict && (
-              <span className="ms-2">
-                <i className="fas fa-exclamation-triangle"></i>
-              </span>
-            )}
-          </Button>
-        </Modal.Footer>
+        {/* Footer */}
+        <div className="bg-neutral-25 border-top border-neutral-200 p-20" style={{ flexShrink: 0 }}>
+          <div className="d-flex justify-content-end gap-12">
+            <Button 
+              className="btn-outline-neutral text-15 fw-medium px-20 py-10 radius-8"
+              onClick={onClose}
+            >
+              <i className="fas fa-times me-2"></i> Hủy
+            </Button>
+            <Button 
+              type="submit" 
+              className="btn-main text-15 fw-semibold px-24 py-10 radius-8"
+              disabled={conflicts.hasConflict || checkingConflicts}
+              title={conflicts.hasConflict ? 'Vui lòng giải quyết các xung đột lịch học trước khi tạo lớp' : ''}
+            >
+              <i className="fas fa-check me-2"></i> Tạo lớp học
+              {conflicts.hasConflict && (
+                <span className="ms-2">
+                  <i className="fas fa-exclamation-triangle"></i>
+                </span>
+              )}
+            </Button>
+          </div>
+        </div>
       </Form>
 
       {/* Select Student Modal */}
@@ -2446,7 +2462,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           </Button>
         </Modal.Footer>
       </Modal>
-    </Modal>
+    </Container>
   );
 };
 

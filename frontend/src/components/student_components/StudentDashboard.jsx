@@ -71,19 +71,6 @@ const StudentDashboard = () => {
     });
   };
 
-  if (loading) {
-    return (
-      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
-        <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Đang tải...</span>
-          </div>
-          <p className="mt-3 text-neutral-600">Đang tải dữ liệu dashboard...</p>
-        </div>
-      </Container>
-    );
-  }
-
   if (error) {
     return (
       <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>

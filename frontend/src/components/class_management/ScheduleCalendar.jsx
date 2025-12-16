@@ -1,11 +1,31 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card, Button, Badge, Dropdown } from 'react-bootstrap';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
 import { classScheduleService } from '../../services/classScheduleService';
 
-const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateMakeup, onAssignSubstitute, classService, studentSchedule = [], readOnly = false, showLegend = true }) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
+const ScheduleCalendar = ({ 
+  schedules, 
+  onDeleteSchedule, 
+  onCreateMakeup, 
+  onAssignSubstitute, 
+  classService, 
+  studentSchedule = [], 
+  readOnly = false, 
+  showLegend = true,
+  selectedMonth,  // Thêm prop này
+  onMonthChange,    // Thêm prop này
+  onLessonClick     // Thêm prop này để handle click vào schedule card
+}) => {
+  // Sử dụng selectedMonth từ props, nếu không có thì dùng current date
+  const [currentDate, setCurrentDate] = useState(selectedMonth || new Date());
   const [selectedDate, setSelectedDate] = useState(null);
+
+  // Sync currentDate với selectedMonth prop
+  useEffect(() => {
+    if (selectedMonth) {
+      setCurrentDate(selectedMonth);
+    }
+  }, [selectedMonth]);
 
   // Get calendar data
   const calendarData = useMemo(() => {
@@ -19,10 +39,6 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
     const firstDayIndex = firstDay.getDay(); // 0 = Chủ nhật, 1 = Thứ 2, ..., 6 = Thứ 7
     const lastDayIndex = lastDay.getDay();
     
-    // Điều chỉnh để bắt đầu từ Thứ 2 (1) thay vì Chủ nhật (0)
-    // Nếu firstDay là Chủ nhật (0), cần thêm 1 ngày để thành Thứ 2
-    // Nếu firstDay là Thứ 2 (1), không cần thêm
-    // Nếu firstDay là Thứ 3-7 (2-6), cần lùi về Thứ 2
     const adjustedFirstDayIndex = firstDayIndex === 0 ? 6 : firstDayIndex - 1; // Chủ nhật (0) -> 6, Thứ 2 (1) -> 0, Thứ 3 (2) -> 1, ...
     const adjustedLastDayIndex = lastDayIndex === 0 ? 6 : lastDayIndex - 1;
     const nextDays = 7 - adjustedLastDayIndex - 1;
@@ -63,17 +79,30 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
     return schedules.filter(s => s.date === dateStr);
   };
 
-  // Navigation
+  // Navigation - cập nhật để gọi onMonthChange
   const goToPreviousMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+    setCurrentDate(newDate);
+    if (onMonthChange) {
+      onMonthChange(newDate);
+    }
   };
 
   const goToNextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+    setCurrentDate(newDate);
+    if (onMonthChange) {
+      onMonthChange(newDate);
+    }
   };
 
   const goToToday = () => {
-    setCurrentDate(new Date());
+    const today = new Date();
+    const todayMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    setCurrentDate(todayMonth);
+    if (onMonthChange) {
+      onMonthChange(todayMonth);
+    }
   };
 
   // Format month/year
@@ -300,20 +329,8 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                         const timeStatus = schedule.timeStatus;
                         const hasAttendance = !!attendanceStatus;
                         const programColor = getProgramTypeColor(schedule.programType);
-                        // Border color: ưu tiên program type, fallback về status color
                         const borderColor = programColor || getStatusColor(schedule);
                         const statusColor = getStatusColor(schedule); // Giữ để dùng cho icon
-                        
-                        // Debug log for calendar rendering
-                        if (schedule.programType) {
-                          console.log('🎨 Calendar rendering schedule:', {
-                            scheduleId: schedule._id,
-                            className: schedule.className,
-                            programType: schedule.programType,
-                            programColor: programColor,
-                            statusColor: statusColor
-                          });
-                        }
                         
                         // Màu nền khác nhau theo trạng thái
                         let backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt mặc định
@@ -446,8 +463,9 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                             title={tooltipText}
                             onClick={(e) => {
                               e.stopPropagation(); // Prevent triggering parent div's onClick
-                              if (onEditSchedule) {
-                                onEditSchedule(schedule);
+                              // Nếu có onLessonClick, gọi nó với schedule.id
+                              if (onLessonClick) {
+                                onLessonClick(schedule.id);
                               }
                             }}
                           >

@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Table, Spinner, Alert } from 'react-bootstrap';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import academicStaffService from '../../services/academicStaffService';
 
 const AcademicDashboard = () => {
-  const navigate = useNavigate();
 
   const [todayOverview, setTodayOverview] = useState({
     todaySchedules: 0,
@@ -21,8 +20,6 @@ const AcademicDashboard = () => {
   const [roomSchedule, setRoomSchedule] = useState([]);
   const [timeSlots, setTimeSlots] = useState([]); // Time slots from database
   const [recentActivities, setRecentActivities] = useState([]);
-  const [todaySchedule, setTodaySchedule] = useState([]);
-  const [classProgress, setClassProgress] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -53,11 +50,9 @@ const AcademicDashboard = () => {
           pendingChangeClassRequests: 0
         });
         
-        setTodaySchedule(data.todaySchedule || []);
         setAbsentStudentsList(data.absentStudentsList || []);
         setRoomSchedule(data.roomSchedule || []);
         setTimeSlots(data.timeSlots || []); // Set time slots from API
-        setClassProgress(data.classProgress || []);
         setRecentActivities(data.recentActivities || []);
       } else {
         throw new Error(response.message || 'Không thể tải dữ liệu dashboard');
@@ -70,17 +65,6 @@ const AcademicDashboard = () => {
       setLoading(false);
     }
   };
-
-  if (loading) {
-    return (
-      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
-        <div className="text-center py-5">
-          <Spinner animation="border" variant="primary" />
-          <p className="mt-3 text-neutral-500">Đang tải dữ liệu...</p>
-        </div>
-      </Container>
-    );
-  }
 
   // Filter only absent students (not late) for the sidebar
   const absentOnlyStudents = absentStudentsList.filter(student => student.status === 'absent');
@@ -120,7 +104,7 @@ const AcademicDashboard = () => {
           <Row className="g-2">
 
             {/* Tổng số đơn trong 1 tuần qua */}
-            <Col md={4} lg>
+            <Col md={3} lg={3}>
                 <Card className="bg-purple-50 border border-purple-200 rounded-8 h-100 transition-2 item-hover">
                   <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
                     <div className="d-flex justify-content-between align-items-start">
@@ -145,14 +129,14 @@ const AcademicDashboard = () => {
             </Col>
 
             {/* đơn lâu nhất chưa xử lý (bao nhiêu ngày chưa giải quyết) */}
-            <Col md={4} lg>
+            <Col md={9} lg={9}>
               <Card 
                 className="bg-purple-50 border border-purple-200 rounded-8 h-100 transition-2 item-hover"
                 style={{ cursor: recentActivities && recentActivities.length > 0 && recentActivities[recentActivities.length - 1]?.id ? 'pointer' : 'default' }}
                 onClick={() => {
                   const longestPendingRequest = recentActivities && recentActivities.length > 0 ? recentActivities[recentActivities.length - 1] : null;
                   if (longestPendingRequest?.id) {
-                    navigate(`/academic/request-management/${longestPendingRequest.id}`);
+                    window.location.href = `/academic/request-management?requestId=${longestPendingRequest.id}`;
                   }
                 }}
               >
@@ -183,7 +167,7 @@ const AcademicDashboard = () => {
                   <div className="text-end">
                     {recentActivities && recentActivities.length > 0 && recentActivities[recentActivities.length - 1]?.id ? (
                       <Link 
-                        to={`/academic/request-management/${recentActivities[recentActivities.length - 1].id}`} 
+                        to={`/academic/request-management?requestId=${recentActivities[recentActivities.length - 1].id}`} 
                         className="text-decoration-none"
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -227,25 +211,60 @@ const AcademicDashboard = () => {
               </div>
             </Card.Header>
             <Card.Body className="p-0">
-              <Table className="mb-0" hover size="sm">
+              <Table className="mb-0" hover size="sm" style={{ tableLayout: 'fixed' }}>
                 <thead style={{ backgroundColor: 'var(--neutral-50)' }}>
                   <tr>
-                    <th className="text-neutral-700 fw-medium text-12 px-16 py-10">Phòng</th>
+                    <th 
+                      className="text-neutral-700 fw-medium text-12 px-16 py-10"
+                      style={{ wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal' }}
+                    >
+                      Phòng
+                    </th>
                     {timeSlots.length > 0 ? (
-                      timeSlots.map((timeSlot, idx) => (
-                        <th key={idx} className="text-neutral-700 fw-medium text-12 px-16 py-10">
-                          {timeSlot}
-                        </th>
-                      ))
-                    ) : (
-                      // Fallback to default time slots if not loaded yet
-                      <>
-                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">08:00-10:00</th>
-                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">10:30-12:30</th>
-                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">14:00-16:00</th>
-                        <th className="text-neutral-700 fw-medium text-12 px-16 py-10">18:00-20:00</th>
-                      </>
-                    )}
+                    timeSlots.map((timeSlot, idx) => (
+                      <th 
+                        key={idx} 
+                        className="text-neutral-700 fw-medium text-12 px-16 py-10"
+                        style={{ wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal' }}
+                      >
+                        {timeSlot}
+                      </th>
+                    ))
+                  ) : (
+                    // Fallback to default time slots if not loaded yet
+                    <>
+                      <th 
+                        className="text-neutral-700 fw-medium text-12 px-16 py-10"
+                        style={{ wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal' }}
+                      >
+                        08:00-10:00
+                      </th>
+                      <th 
+                        className="text-neutral-700 fw-medium text-12 px-16 py-10"
+                        style={{ wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal' }}
+                      >
+                        10:00-12:00
+                      </th>
+                      <th 
+                        className="text-neutral-700 fw-medium text-12 px-16 py-10"
+                        style={{ wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal' }}
+                      >
+                        14:00-16:00
+                      </th>
+                      <th 
+                        className="text-neutral-700 fw-medium text-12 px-16 py-10"
+                        style={{ wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal' }}
+                      >
+                        16:00-18:00
+                      </th>
+                      <th 
+                        className="text-neutral-700 fw-medium text-12 px-16 py-10"
+                        style={{ wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal' }}
+                      >
+                        18:00-20:00
+                      </th>
+                    </>
+                  )}
                   </tr>
                 </thead>
                 <tbody>
@@ -256,9 +275,16 @@ const AcademicDashboard = () => {
                         <div className="text-neutral-500 text-11">{room.location}</div>
                       </td>
                       {room.schedules.map((schedule, sIdx) => (
-                        <td key={sIdx} className="px-16 py-12">
+                        <td 
+                          key={sIdx} 
+                          className="px-16 py-12"
+                          style={{ wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal' }}
+                        >
                           {schedule.status === 'occupied' ? (
-                            <Badge className="bg-success-100 text-success-700 px-8 py-4 text-11 fw-medium">
+                            <Badge 
+                              className="bg-success-100 text-success-700 px-8 py-4 text-11 fw-medium"
+                              style={{ wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'normal', display: 'inline-block', maxWidth: '100%' }}
+                            >
                               <i className="fas fa-users me-1"></i>
                               {schedule.class}
                             </Badge>

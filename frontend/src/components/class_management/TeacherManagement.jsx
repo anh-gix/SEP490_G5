@@ -12,6 +12,7 @@ import TeacherGridView from './TeacherGridView';
 import TeacherListView from './TeacherListView';
 import AddTeacherModal from './AddTeacherModal';
 import ImportTeacherModal from './ImportTeacherModal';
+import TeacherDetail from './TeacherDetail';
 
 const TeacherManagement = () => {
   const navigate = useNavigate();
@@ -46,6 +47,10 @@ const TeacherManagement = () => {
   const [previewTeachers, setPreviewTeachers] = useState([]);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Teacher Detail states
+  const [showTeacherDetail, setShowTeacherDetail] = useState(false);
+  const [selectedTeacherId, setSelectedTeacherId] = useState(null);
 
   // Fetch program types and levels on mount
   useEffect(() => {
@@ -489,8 +494,22 @@ const TeacherManagement = () => {
   };
 
   const handleViewDetail = (teacher) => {
-    navigate(`/academic/teacher-management/${teacher._id}`);
+    setSelectedTeacherId(teacher._id);
+    setShowTeacherDetail(true);
   };
+
+  // If showing teacher detail, render TeacherDetail component
+  if (showTeacherDetail && selectedTeacherId) {
+    return (
+      <TeacherDetail
+        teacherId={selectedTeacherId}
+        onBack={() => {
+          setShowTeacherDetail(false);
+          setSelectedTeacherId(null);
+        }}
+      />
+    );
+  }
 
   return (
     <Container fluid className="p-24">

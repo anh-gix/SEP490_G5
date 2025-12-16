@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Nav, Tabs, Tab, Pagination, ButtonGroup, Alert } from 'react-bootstrap';
+import React, { useState, useEffect } from 'react';
+import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Pagination, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import Swal from 'sweetalert2';
 import studentService from '../../services/studentService';
 import { courseService } from '../../services/courseService';
-import ScheduleCalendar from './ScheduleCalendar';
 
 /**
  * Student Management Component with API Integration
@@ -17,12 +18,7 @@ const StudentManagementAPI = () => {
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('list');
   const [showModal, setShowModal] = useState(false);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [editingStudent, setEditingStudent] = useState(null);
-  const [selectedStudent, setSelectedStudent] = useState(null);
-  const [studentSchedule, setStudentSchedule] = useState([]);
-  const [schedulePage, setSchedulePage] = useState(1);
-  const [scheduleViewMode, setScheduleViewMode] = useState('calendar'); // 'table' or 'calendar'
+  const [editingStudent, setEditingStudent] = useState(null); // Always null - editing disabled
   const [searchTerm, setSearchTerm] = useState('');
   const [programType, setProgramType] = useState('');
   const [level, setLevel] = useState('');
@@ -39,6 +35,7 @@ const StudentManagementAPI = () => {
     address: ''
   });
   const [formErrors, setFormErrors] = useState({});
+  const [filterNoClass, setFilterNoClass] = useState(null); // null = all, true = no class only
 
   // Fetch program types and levels on mount
   useEffect(() => {
@@ -103,30 +100,42 @@ const StudentManagementAPI = () => {
   useEffect(() => {
     setPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, programType, level]);
+  }, [searchTerm, programType, level, filterNoClass]);
 
   useEffect(() => {
     fetchStudents();
     fetchStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, programType, level, page]);
+  }, [searchTerm, programType, level, page, filterNoClass]);
 
   const fetchStudents = async () => {
     try {
       setLoading(true);
       setError(null);
-      const params = {
-        page,
-        limit: 10
-      };
+      const params = {};
+      
+      // When filtering by noClass, fetch all students to filter on frontend
+      if (filterNoClass === true) {
+        params.limit = 10000; // Fetch all students
+        params.page = 1; // Start from page 1
+      } else {
+        params.page = page;
+        params.limit = 10;
+      }
+      
       if (searchTerm) params.search = searchTerm;
       if (programType) params.programType = programType;
       if (level) params.level = level;
       
       const data = await studentService.getAllStudents(params);
       setStudents(data.students || []);
-      setTotal(data.total || 0);
-      setTotalPages(data.totalPages || 1);
+      
+      // Only set total/totalPages from API when not filtering by noClass
+      // When filtering by noClass, we'll calculate these after filtering
+      if (filterNoClass !== true) {
+        setTotal(data.total || 0);
+        setTotalPages(data.totalPages || 1);
+      }
     } catch (err) {
       console.error('Error fetching students:', err);
       // Handle 404 errors more gracefully
@@ -204,17 +213,12 @@ const StudentManagementAPI = () => {
     // Clear previous errors
     setFormErrors({});
     
-    // Validate password
-    if (!formData.password) {
-      setFormErrors({ password: 'Vui lòng nhập mật khẩu!' });
-      return;
-    }
-    
     try {
       setLoading(true);
       await studentService.createStudent(formData);
       
       // Success - close modal and refresh
+      toast.success('Thêm học viên thành công!');
       handleCloseModal();
       fetchStudents();
       fetchStats();
@@ -223,6 +227,7 @@ const StudentManagementAPI = () => {
       const errorMessage = err?.message || err?.response?.data?.message || 'Không thể lưu thông tin Học viên';
       const parsedErrors = parseErrorToField(errorMessage);
       setFormErrors(parsedErrors);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -259,24 +264,8 @@ const StudentManagementAPI = () => {
   //   }
   // };
 
-  const handleViewDetail = async (student) => {
-    try {
-      setLoading(true);
-      const data = await studentService.getStudentById(student._id);
-      setSelectedStudent(data.student);
-      
-      // Fetch Student's schedule
-      const scheduleData = await studentService.getStudentSchedule(student._id);
-      setStudentSchedule(scheduleData.schedules || []);
-      setSchedulePage(1); // Reset to first page when opening modal
-      
-      setShowDetailModal(true);
-    } catch (err) {
-      console.error('Error fetching Student details:', err);
-      alert('Không thể tải thông tin chi tiết');
-    } finally {
-      setLoading(false);
-    }
+  const handleViewDetail = (student) => {
+    navigate(`/academic/student-management/${student._id}`);
   };
 
   const handleCloseModal = () => {
@@ -292,45 +281,35 @@ const StudentManagementAPI = () => {
     setFormErrors({});
   };
 
-  const filteredStudents = students;
+  // Handle click on stats cards to filter students
+  const handleStatsCardClick = (filterType) => {
+    if (filterType === 'all') {
+      setFilterNoClass(null);
+    } else if (filterType === 'noClass') {
+      setFilterNoClass(true);
+    }
+    setPage(1); // Reset to first page when filter changes
+  };
 
-  // Transform schedule data for calendar view
-  const calendarSchedules = useMemo(() => {
-    return studentSchedule.map((schedule, index) => {
-      const scheduleDate = new Date(schedule.date);
-      const dateStr = scheduleDate.toISOString().split('T')[0];
-      
-      // Get attendance status
-      const attendanceStatus = schedule.attendance?.status || null;
-      
-      // Get schedule status from StudentSchedule
-      const scheduleStatus = schedule.scheduleStatus || 'scheduled';
-      const isMakeupSchedule = scheduleStatus === 'rescheduled';
-      const isCancelled = scheduleStatus === 'cancelled';
-      const reason = schedule.reason || null;
-      
-      return {
-        id: schedule._id || index,
-        date: dateStr,
-        startTime: schedule.startTime || '',
-        endTime: schedule.endTime || '',
-        className: schedule.className || 'N/A',
-        roomName: schedule.room?.room_name || 'N/A',
-        topic: schedule.topic || '',
-        status: schedule.status === 'fixed' ? 'scheduled' : schedule.status === 'temporary' ? 'makeup' : 'scheduled',
-        attendanceStatus: attendanceStatus, // 'present', 'absent', 'late', 'excused', or null
-        hasAttendance: !!attendanceStatus,
-        teacherName: schedule.teacher?.username || 'N/A',
-        lessonNumber: schedule.session?.order || '',
-        lessonTopic: schedule.topic || '',
-        scheduleStatus: scheduleStatus,
-        reason: reason,
-        isMakeupSchedule: isMakeupSchedule,
-        isCancelled: isCancelled,
-        cancellationReason: isCancelled ? reason : null
-      };
-    });
-  }, [studentSchedule]);
+  // Filter students based on filterNoClass
+  const allFilteredStudents = filterNoClass === true
+    ? students.filter(student => !student.stats?.classNames || student.stats.classNames.length === 0)
+    : students;
+
+  // Calculate total and totalPages for filtered results
+  useEffect(() => {
+    if (filterNoClass === true) {
+      const filteredCount = students.filter(student => !student.stats?.classNames || student.stats.classNames.length === 0).length;
+      setTotal(filteredCount);
+      setTotalPages(Math.ceil(filteredCount / 10));
+    }
+  }, [filterNoClass, students]);
+
+  // Paginate filtered students
+  const filteredStudents = filterNoClass === true
+    ? allFilteredStudents.slice((page - 1) * 10, page * 10)
+    : allFilteredStudents;
+
 
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#f8f9fa' }}>
@@ -363,8 +342,17 @@ const StudentManagementAPI = () => {
 
       {/* Stats Cards */}
       <Row className="g-3 mb-24">
-        <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+        <Col md={6}>
+          <Card 
+            className="bg-white rounded-12 box-shadow-sm"
+            style={{ 
+              cursor: 'pointer',
+              border: filterNoClass === null ? '3px solid #0D74FF' : '2px solid #E5E7EB',
+              boxShadow: filterNoClass === null ? '0 4px 16px rgba(13, 116, 255, 0.4)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+              transition: 'all 0.2s ease'
+            }}
+            onClick={() => handleStatsCardClick('all')}
+          >
             <Card.Body className="p-20">
               <div className="d-flex align-items-center gap-16">
                 <div 
@@ -375,7 +363,7 @@ const StudentManagementAPI = () => {
                     background: 'linear-gradient(135deg, #0D74FF 0%, #0A5FD9 100%)'
                   }}
                 >
-                  <i className="fas fa-chalkboard-Student text-white" style={{ fontSize: '24px' }}></i>
+                  <i className="fas fa-user-graduate text-white" style={{ fontSize: '24px' }}></i>
                 </div>
                 <div>
                   <div className="text-neutral-500 text-13 mb-4">Tổng Học viên</div>
@@ -386,54 +374,17 @@ const StudentManagementAPI = () => {
           </Card>
         </Col>
 
-        <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
-                <div 
-                  className="rounded-12 d-flex align-items-center justify-content-center"
-                  style={{ 
-                    width: '56px',
-                    height: '56px',
-                    background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
-                  }}
-                >
-                  <i className="fas fa-user-check text-white" style={{ fontSize: '24px' }}></i>
-                </div>
-                <div>
-                  <div className="text-neutral-500 text-13 mb-4">Đang hoạt động</div>
-                  <div className="text-neutral-900 fw-bold text-32">{stats.active || 0}</div>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-            <Card.Body className="p-20">
-              <div className="d-flex align-items-center gap-16">
-                <div 
-                  className="rounded-12 d-flex align-items-center justify-content-center"
-                  style={{ 
-                    width: '56px',
-                    height: '56px',
-                    background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
-                  }}
-                >
-                  <i className="fas fa-door-open text-white" style={{ fontSize: '24px' }}></i>
-                </div>
-                <div>
-                  <div className="text-neutral-500 text-13 mb-4">Tổng lớp</div>
-                  <div className="text-neutral-900 fw-bold text-32">{stats.totalClasses || 0}</div>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col md={3}>
-          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+        <Col md={6}>
+          <Card 
+            className="bg-white rounded-12 box-shadow-sm"
+            style={{ 
+              cursor: 'pointer',
+              border: filterNoClass === true ? '3px solid #EF4444' : '2px solid #E5E7EB',
+              boxShadow: filterNoClass === true ? '0 4px 16px rgba(239, 68, 68, 0.4)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+              transition: 'all 0.2s ease'
+            }}
+            onClick={() => handleStatsCardClick('noClass')}
+          >
             <Card.Body className="p-20">
               <div className="d-flex align-items-center gap-16">
                 <div 
@@ -447,7 +398,7 @@ const StudentManagementAPI = () => {
                   <i className="fas fa-user-slash text-white" style={{ fontSize: '24px' }}></i>
                 </div>
                 <div>
-                  <div className="text-neutral-500 text-13 mb-4">Tạm nghỉ</div>
+                  <div className="text-neutral-500 text-13 mb-4">Chưa có lớp</div>
                   <div className="text-neutral-900 fw-bold text-32">{stats.inactive || 0}</div>
                 </div>
               </div>
@@ -766,21 +717,30 @@ const StudentManagementAPI = () => {
               <Col md={6}>
                 <Form.Group>
                   <Form.Label>
-                    Mật khẩu {!editingStudent && <span className="text-danger">*</span>}
+                    Mật khẩu
+                    {!editingStudent && (
+                      <span className="text-muted" style={{ fontSize: '12px', fontWeight: 'normal' }}>
+                        {' '}(Mặc định: 123456)
+                      </span>
+                    )}
                   </Form.Label>
                   <Form.Control
                     type="password"
                     name="password"
                     value={formData.password}
                     onChange={handleInputChange}
-                    placeholder={editingStudent ? "Để trống nếu không đổi" : "Nhập mật khẩu"}
-                    required={!editingStudent}
+                    placeholder={editingStudent ? "Để trống nếu không đổi" : "Để trống sẽ dùng mật khẩu mặc định: 123456"}
                     isInvalid={!!formErrors.password}
                   />
                   {formErrors.password && (
                     <Form.Control.Feedback type="invalid">
                       {formErrors.password}
                     </Form.Control.Feedback>
+                  )}
+                  {!editingStudent && (
+                    <Form.Text className="text-muted">
+                      Nếu không nhập, mật khẩu mặc định sẽ là: <strong>123456</strong>
+                    </Form.Text>
                   )}
                 </Form.Group>
               </Col>
@@ -830,248 +790,6 @@ const StudentManagementAPI = () => {
             </Button>
           </Modal.Footer>
         </Form>
-      </Modal>
-
-      {/* Student Detail Modal */}
-      <Modal show={showDetailModal} onHide={() => { setShowDetailModal(false); setSchedulePage(1); }} size="xl">
-        <Modal.Header closeButton className="py-12">
-          <Modal.Title className="text-16">
-            Chi tiết Học viên - {selectedStudent?.username}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body style={{ padding: '16px' }}>
-          {selectedStudent && (
-            <Tabs defaultActiveKey="info" className="mb-3">
-              {/* Info Tab */}
-              <Tab eventKey="info" title={<><i className="fas fa-user me-2"></i>Thông tin</>}>
-                <Row className="g-3">
-                  <Col md={6}>
-                    <Card className="border-0 bg-neutral-25">
-                      <Card.Body className="p-16">
-                        <h6 className="text-13 text-neutral-500 mb-8">Email</h6>
-                        <p className="text-14 text-neutral-900 mb-0">{selectedStudent.email}</p>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                  <Col md={6}>
-                    <Card className="border-0 bg-neutral-25">
-                      <Card.Body className="p-16">
-                        <h6 className="text-13 text-neutral-500 mb-8">Số điện thoại</h6>
-                        <p className="text-14 text-neutral-900 mb-0">{selectedStudent.phone || 'N/A'}</p>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                  <Col md={12}>
-                    <Card className="border-0 bg-neutral-25">
-                      <Card.Body className="p-16">
-                        <h6 className="text-13 text-neutral-500 mb-8">Địa chỉ</h6>
-                        <p className="text-14 text-neutral-900 mb-0">{selectedStudent.address || 'N/A'}</p>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                </Row>
-              </Tab>
-
-              {/* Classes Tab */}
-              <Tab eventKey="classes" title={<><i className="fas fa-door-open me-2"></i>Lớp học ({selectedStudent.classes?.length || 0})</>}>
-                {selectedStudent.classes && selectedStudent.classes.length > 0 ? (
-                  <Table hover>
-                    <thead className="bg-neutral-25">
-                      <tr>
-                        <th className="px-16 py-12 text-13">Lớp</th>
-                        <th className="px-16 py-12 text-13">Khóa học</th>
-                        <th className="px-16 py-12 text-13">Trình độ</th>
-                        <th className="px-16 py-12 text-13">Học viên</th>
-                        <th className="px-16 py-12 text-13">Trạng thái</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedStudent.classes.map((cls, index) => (
-                        <tr key={index}>
-                          <td className="px-16 py-12 fw-semibold">{cls.name}</td>
-                          <td className="px-16 py-12">{cls.course?.name || 'N/A'}</td>
-                          <td className="px-16 py-12">
-                            <Badge bg="info">{cls.level}</Badge>
-                          </td>
-                          <td className="px-16 py-12">{cls.students?.length || 0}</td>
-                          <td className="px-16 py-12">
-                            <Badge bg={cls.status === 'active' ? 'success' : 'secondary'}>
-                              {cls.status}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                ) : (
-                  <div className="text-center py-4 text-muted">
-                    Chưa có lớp học nào
-                  </div>
-                )}
-              </Tab>
-
-              {/* Schedule Tab */}
-              <Tab eventKey="schedule" title={<><i className="fas fa-calendar me-2"></i>lịch học</>}>
-                {studentSchedule.length > 0 ? (
-                  <>
-                    {/* View Toggle */}
-                    <div className="d-flex justify-content-end mb-2">
-                      <ButtonGroup size="sm">
-                        <Button
-                          variant={scheduleViewMode === 'table' ? 'primary' : 'outline-secondary'}
-                          size="sm"
-                          onClick={() => setScheduleViewMode('table')}
-                          className="px-12 py-6"
-                        >
-                          <i className="fas fa-table me-1"></i>
-                          Bảng
-                        </Button>
-                        <Button
-                          variant={scheduleViewMode === 'calendar' ? 'primary' : 'outline-secondary'}
-                          size="sm"
-                          onClick={() => setScheduleViewMode('calendar')}
-                          className="px-12 py-6"
-                        >
-                          <i className="fas fa-calendar-alt me-1"></i>
-                          Lịch
-                        </Button>
-                      </ButtonGroup>
-                    </div>
-
-                    {/* Table View */}
-                    {scheduleViewMode === 'table' && (
-                      <>
-                        <Table hover size="sm">
-                            <thead className="bg-neutral-25 sticky-top">
-                              <tr>
-                                <th className="px-12 py-8 text-12">Thời gian</th>
-                                <th className="px-12 py-8 text-12">Lớp học</th>
-                                <th className="px-12 py-8 text-12">Phòng</th>
-                                <th className="px-12 py-8 text-12">Trạng thái</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {studentSchedule
-                                .slice((schedulePage - 1) * 10, schedulePage * 10)
-                                .map((schedule, index) => (
-                                <tr key={index}>
-                                  <td className="px-12 py-8">
-                                    <div className="text-13">
-                                      {new Date(schedule.date).toLocaleDateString('vi-VN')}
-                                    </div>
-                                    <div className="text-12 text-muted">
-                                      {schedule.startTime} - {schedule.endTime}
-                                    </div>
-                                  </td>
-                                  <td className="px-12 py-8 text-13">{schedule.className || 'N/A'}</td>
-                                  <td className="px-12 py-8 text-13">{schedule.room?.room_name || 'N/A'}</td>
-                                  <td className="px-12 py-8">
-                                    {!schedule.attendance || !schedule.attendance.status ? (
-                                      <Badge bg="secondary" className="text-12">Chưa học</Badge>
-                                    ) : (
-                                      <Badge 
-                                        bg={
-                                          schedule.attendance.status === 'present' ? 'success' :
-                                          schedule.attendance.status === 'absent' ? 'danger' :
-                                          schedule.attendance.status === 'late' ? 'warning' :
-                                          'info'
-                                        }
-                                        className="text-12"
-                                      >
-                                        {schedule.attendance.status === 'present' ? 'Có mặt' :
-                                         schedule.attendance.status === 'absent' ? 'Vắng mặt' :
-                                         schedule.attendance.status === 'late' ? 'Đi muộn' :
-                                         'Có phép'}
-                                      </Badge>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </Table>
-                        {studentSchedule.length > 10 && (
-                          <div className="d-flex justify-content-center mt-2">
-                            <Pagination size="sm">
-                              <Pagination.First 
-                                onClick={() => setSchedulePage(1)} 
-                                disabled={schedulePage === 1}
-                              />
-                              <Pagination.Prev 
-                                onClick={() => setSchedulePage(prev => Math.max(1, prev - 1))} 
-                                disabled={schedulePage === 1}
-                              />
-                              {[...Array(Math.ceil(studentSchedule.length / 10))].map((_, i) => {
-                                const page = i + 1;
-                                // Show first page, last page, current page, and pages around current
-                                if (
-                                  page === 1 ||
-                                  page === Math.ceil(studentSchedule.length / 10) ||
-                                  (page >= schedulePage - 1 && page <= schedulePage + 1)
-                                ) {
-                                  return (
-                                    <Pagination.Item
-                                      key={page}
-                                      active={page === schedulePage}
-                                      onClick={() => setSchedulePage(page)}
-                                    >
-                                      {page}
-                                    </Pagination.Item>
-                                  );
-                                } else if (
-                                  page === schedulePage - 2 ||
-                                  page === schedulePage + 2
-                                ) {
-                                  return <Pagination.Ellipsis key={page} />;
-                                }
-                                return null;
-                              })}
-                              <Pagination.Next 
-                                onClick={() => setSchedulePage(prev => Math.min(Math.ceil(studentSchedule.length / 10), prev + 1))} 
-                                disabled={schedulePage === Math.ceil(studentSchedule.length / 10)}
-                              />
-                              <Pagination.Last 
-                                onClick={() => setSchedulePage(Math.ceil(studentSchedule.length / 10))} 
-                                disabled={schedulePage === Math.ceil(studentSchedule.length / 10)}
-                              />
-                            </Pagination>
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    {/* Calendar View */}
-                    {scheduleViewMode === 'calendar' && (
-                      <ScheduleCalendar
-                        schedules={calendarSchedules}
-                        onEditSchedule={(schedule) => {
-                          // Optional: Handle edit if needed
-                          console.log('Edit schedule:', schedule);
-                        }}
-                        onDeleteSchedule={(scheduleId) => {
-                          // Optional: Handle delete if needed
-                          console.log('Delete schedule:', scheduleId);
-                        }}
-                        onCreateMakeup={(schedule) => {
-                          // Optional: Handle create makeup if needed
-                          console.log('Create makeup:', schedule);
-                        }}
-                      />
-                    )}
-                  </>
-                ) : (
-                  <div className="text-center py-4 text-muted">
-                    Chưa có lịch học
-                  </div>
-                )}
-              </Tab>
-            </Tabs>
-          )}
-        </Modal.Body>
-        <Modal.Footer className="py-10 border-top">
-          <Button variant="secondary" size="sm" onClick={() => { setShowDetailModal(false); setSchedulePage(1); }}>
-            Đóng
-          </Button>
-        </Modal.Footer>
       </Modal>
     </Container>
   );

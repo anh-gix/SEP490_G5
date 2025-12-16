@@ -251,6 +251,22 @@ const teacherService = {
     }
   },
 
+  // Import mocktest scores in bulk
+  importMocktestScores: async (classId, scheduleId, scores) => {
+    try {
+      const response = await axios.post(
+        `${API_URL}/teachers/me/classes/${classId}/mocktest/import-scores`,
+        { scheduleId, scores },
+        {
+          headers: getAuthHeader()
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
   // Save attendance for a schedule
   saveAttendance: async (scheduleId, attendanceData) => {
     try {
@@ -259,6 +275,79 @@ const teacherService = {
         { attendanceData },
         {
           headers: getAuthHeader()
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // ===========================
+  // MATERIAL MANAGEMENT
+  // ===========================
+
+  // Get course materials (read-only)
+  getCourseMaterials: async (courseId) => {
+    try {
+      const response = await axios.get(`${API_URL}/courses/${courseId}/materials`, {
+        headers: getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Get class materials (editable by teacher)
+  getClassMaterials: async (classId) => {
+    try {
+      const response = await axios.get(`${API_URL}/teachers/me/classes/${classId}/materials`, {
+        headers: getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Add material to class schedule
+  addMaterialToSchedule: async (scheduleId, files, titles) => {
+    try {
+      const formData = new FormData();
+      files.forEach((file) => {
+        formData.append('materials', file);
+      });
+      
+      // Add titles as separate field (JSON array)
+      if (titles && titles.length > 0) {
+        formData.append('titles', JSON.stringify(titles));
+      }
+
+      const response = await axios.post(
+        `${API_URL}/teachers/me/schedules/${scheduleId}/materials`,
+        formData,
+        {
+          headers: {
+            ...getAuthHeader(),
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Delete material from class schedule
+  deleteMaterialFromSchedule: async (scheduleId, materialUrl) => {
+    try {
+      const response = await axios.delete(
+        `${API_URL}/teachers/me/schedules/${scheduleId}/materials`,
+        {
+          headers: getAuthHeader(),
+          data: { materialUrl }
         }
       );
       return response.data;

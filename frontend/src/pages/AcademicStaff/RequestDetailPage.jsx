@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Container, Card, Button, Spinner, Alert, Modal, Form } from 'react-bootstrap';
-import AcademicNavigation from '../../components/class_management/AcademicNavigation.jsx';
 import ScheduleCalendar from '../../components/class_management/ScheduleCalendar';
+import ChangeClassModal from '../../components/class_management/ChangeClassModal';
 import { formatDateToYYYYMMDD, parseDateString } from '../../helper/helper';
 import classService from '../../services/classService';
 import { studentScheduleService } from '../../services/studentScheduleService';
@@ -22,6 +22,7 @@ const RequestDetailPage = ({
   onApprove,
   onReject,
   onChangeClass,
+  onChangeClassConfirm,
   onAddMakeupClass,
   onRemoveMakeupClass,
   onRemoveClassChange,
@@ -33,8 +34,10 @@ const RequestDetailPage = ({
   const [rejectReason, setRejectReason] = useState('');
   const [loadingStudentScheduleIds, setLoadingStudentScheduleIds] = useState({}); // Map session index -> loading state
   const [resolvedStudentScheduleIds, setResolvedStudentScheduleIds] = useState({}); // Map session index -> studentScheduleId
-  const [replaceTeacherStudentScheduleId, setReplaceTeacherStudentScheduleId] = useState(null); // studentScheduleId cho đơn replace_teacher
-  const [loadingReplaceTeacherScheduleId, setLoadingReplaceTeacherScheduleId] = useState(false); // Loading state cho replace_teacher
+  const [replaceTeacherStudentScheduleId, setReplaceTeacherStudentScheduleId] = useState(null); // studentScheduleId cho đơn request_replace_teacher
+  const [loadingReplaceTeacherScheduleId, setLoadingReplaceTeacherScheduleId] = useState(false); // Loading state cho request_replace_teacher
+  const [showChangeClassModal, setShowChangeClassModal] = useState(false);
+  const [selectedClassToChange, setSelectedClassToChange] = useState(null);
   // Xác định role của người gửi đơn
   const isStudent = senderRole === 'Student';
   const isTeacher = senderRole === 'Teacher';
@@ -81,16 +84,24 @@ const RequestDetailPage = ({
         return (a.sessionOrder || 0) - (b.sessionOrder || 0);
       });
 
-      // Tìm session gần nhất (đã học hoặc sắp học)
+      // Tìm session sắp học tiếp theo (chưa học)
       let currentSession = null;
       
-      // Tìm session đã học gần nhất
-      const pastSessions = sortedSchedules.filter(s => s.date <= now);
-      if (pastSessions.length > 0) {
-        currentSession = pastSessions[pastSessions.length - 1];
+      // Tìm session sắp học tiếp theo (chưa học)
+      const upcomingSessions = sortedSchedules.filter(s => {
+        const scheduleDate = new Date(s.date);
+        scheduleDate.setHours(0, 0, 0, 0);
+        const nowDate = new Date(now);
+        nowDate.setHours(0, 0, 0, 0);
+        return scheduleDate >= nowDate;  // Lọc buổi SẮP TỚI
+      });
+      
+      if (upcomingSessions.length > 0) {
+        // Nếu có buổi sắp tới → lấy buổi sắp tới ĐẦU TIÊN (session đang học)
+        currentSession = upcomingSessions[0];
       } else if (sortedSchedules.length > 0) {
-        // Nếu chưa có session nào đã học, lấy session đầu tiên (sắp học)
-        currentSession = sortedSchedules[0];
+        // Nếu không có buổi sắp tới → lấy buổi CUỐI CÙNG (đã học hết)
+        currentSession = sortedSchedules[sortedSchedules.length - 1];
       }
 
       return {
@@ -253,13 +264,13 @@ const RequestDetailPage = ({
               ...prev,
               [idx]: foundStudentScheduleId
             }));
-            console.log(`✅ Tìm thấy studentScheduleId từ API cho buổi ${session.sessionOrder}:`, foundStudentScheduleId);
+            console.log(` Tìm thấy studentScheduleId từ API cho buổi ${session.sessionOrder}:`, foundStudentScheduleId);
           } else {
-            console.log(`⚠️ Không tìm thấy studentSchedule cho học sinh ${studentId} trong kết quả API`);
+            console.log(` Không tìm thấy studentSchedule cho học sinh ${studentId} trong kết quả API`);
           }
         }
       } catch (error) {
-        console.error(`❌ Lỗi khi gọi API lấy studentSchedule cho buổi ${session.sessionOrder}:`, error);
+        console.error(` Lỗi khi gọi API lấy studentSchedule cho buổi ${session.sessionOrder}:`, error);
       } finally {
         setLoadingStudentScheduleIds(prev => {
           const newState = { ...prev };
@@ -270,10 +281,10 @@ const RequestDetailPage = ({
     });
   }, [filteredPendingMakeupSessions, selectedRequest, pendingClassChange, senderSchedule, resolvedStudentScheduleIds, loadingStudentScheduleIds]);
 
-  // useEffect để gọi API lấy studentScheduleId cho đơn replace_teacher
+  // useEffect để gọi API lấy studentScheduleId cho đơn request_replace_teacher
   useEffect(() => {
-    // Chỉ chạy cho đơn replace_teacher
-    if (selectedRequest?.type !== 'replace_teacher' || !selectedRequest?.classScheduleId) {
+    // Chỉ chạy cho đơn request_replace_teacher
+    if (selectedRequest?.type !== 'request_replace_teacher' || !selectedRequest?.classScheduleId) {
       return;
     }
 
@@ -318,12 +329,12 @@ const RequestDetailPage = ({
           const firstStudentSchedule = response.studentSchedules[0];
           const foundStudentScheduleId = firstStudentSchedule._id || firstStudentSchedule.id;
           setReplaceTeacherStudentScheduleId(foundStudentScheduleId);
-          console.log('✅ Tìm thấy studentScheduleId từ API cho đơn replace_teacher:', foundStudentScheduleId);
+          console.log(' Tìm thấy studentScheduleId từ API cho đơn request_replace_teacher:', foundStudentScheduleId);
         } else {
-          console.log('⚠️ Không tìm thấy studentSchedule cho classScheduleId:', classScheduleId);
+          console.log(' Không tìm thấy studentSchedule cho classScheduleId:', classScheduleId);
         }
       } catch (error) {
-        console.error('❌ Lỗi khi gọi API lấy studentSchedule cho đơn replace_teacher:', error);
+        console.error(' Lỗi khi gọi API lấy studentSchedule cho đơn request_replace_teacher:', error);
       } finally {
         setLoadingReplaceTeacherScheduleId(false);
       }
@@ -337,6 +348,25 @@ const RequestDetailPage = ({
     // Kiểm tra xem có đổi lớp không
     const isClassChangeRequest = selectedRequest?.type === 'change_class' && pendingClassChange;
     const oldClassId = pendingClassChange?.oldClassId?.toString();
+    
+    // Debug: Kiểm tra dữ liệu programType từ backend
+    if (senderSchedule && senderSchedule.length > 0) {
+      const firstSchedule = senderSchedule[0];
+      if (firstSchedule.class?.course?.program) {
+        console.log(' Program type data received:', {
+          programType: firstSchedule.class?.course?.program?.type,
+          className: firstSchedule.class?.name,
+          courseName: firstSchedule.class?.course?.name
+        });
+      } else {
+        console.warn(' Program type not found in schedule:', {
+          hasClass: !!firstSchedule.class,
+          hasCourse: !!firstSchedule.class?.course,
+          hasProgram: !!firstSchedule.class?.course?.program,
+          schedule: firstSchedule
+        });
+      }
+    }
     
     const schedules = senderSchedule.map((schedule, index) => {
       const dateStr = formatDateToYYYYMMDD(schedule.date);
@@ -437,12 +467,20 @@ const RequestDetailPage = ({
       // Kiểm tra xem có phải buổi học bù không (từ database với scheduleStatus: 'rescheduled')
       const isMakeupFromDB = scheduleStatus === 'rescheduled';
       
+      // Xác định className: nếu không có class và là makeup/temporary thì hiển thị "Lớp học bù"
+      let className = schedule.class?.name;
+      if (!className && (isMakeupFromDB || schedule.status === 'temporary' || displayStatus === 'makeup')) {
+        className = 'Lớp học bù';
+      } else if (!className) {
+        className = 'N/A';
+      }
+      
       return {
         id: scheduleId,
         date: dateStr,
         startTime: schedule.startTime || '',
         endTime: schedule.endTime || '',
-        className: schedule.class?.name || 'N/A',
+        className: className,
         roomName: schedule.room?.room_name || 'N/A',
         topic: schedule.topic || '',
         status: displayStatus,
@@ -461,7 +499,8 @@ const RequestDetailPage = ({
         cancellationReason: schedule.studentScheduleReason || null,
         makeupReason: isMakeupFromDB ? schedule.studentScheduleReason : null, // Lý do học bù
         isOldClassSchedule: isOldClassSchedule, // Đánh dấu buổi của lớp cũ (khi đổi lớp)
-        isNewClassSchedule: false // Đánh dấu buổi của lớp mới (sẽ được thêm ở dưới)
+        isNewClassSchedule: false, // Đánh dấu buổi của lớp mới (sẽ được thêm ở dưới)
+        programType: schedule.class?.course?.program?.type || schedule.programType || schedule.sessionCourse?.program?.type || null // Thêm program type để hiển thị màu (ưu tiên từ class, sau đó từ session)
       };
     });
     
@@ -496,7 +535,7 @@ const RequestDetailPage = ({
           date: dateStr,
           startTime: makeup.makeupSchedule.startTime || '',
           endTime: makeup.makeupSchedule.endTime || '',
-          className: makeup.makeupClassInfo?.className || 'N/A',
+          className: makeup.makeupClassInfo?.className || 'Lớp học bù',
           roomName: makeup.makeupSchedule.roomName || 'N/A',
           topic: makeup.makeupSchedule.title || '',
           status: 'makeup',
@@ -506,7 +545,8 @@ const RequestDetailPage = ({
           teacherName: 'N/A',
           lessonNumber: makeup.makeupSchedule.order || '',
           lessonTopic: makeup.makeupSchedule.title || '',
-          isMakeupSchedule: true
+          isMakeupSchedule: true,
+          programType: makeup.makeupClassInfo?.programType || makeup.makeupSchedule?.class?.course?.program?.type || makeup.makeupSchedule?.programType || makeup.makeupSchedule?.sessionCourse?.program?.type || null
         };
       })
       .filter(Boolean);
@@ -542,7 +582,8 @@ const RequestDetailPage = ({
           isMakeupSchedule: false,
           isSubstituteClass: false,
           isOldClassSchedule: false, // Đánh dấu buổi của lớp cũ
-          isNewClassSchedule: true // Đánh dấu buổi của lớp mới
+          isNewClassSchedule: true, // Đánh dấu buổi của lớp mới
+          programType: newClassInfo?.programType || newSchedule?.class?.course?.program?.type || newSchedule?.programType || newSchedule?.sessionCourse?.program?.type || null
         });
       });
     }
@@ -555,11 +596,9 @@ const RequestDetailPage = ({
   }
 
   return (
-    <div className="d-flex" style={{ minHeight: '100vh' }}>
-      <AcademicNavigation />
-      <div className="flex-grow-1" style={{ backgroundColor: '#f8f9fa' }}>
-        <Container fluid className="p-24">
-          {/* Header với nút quay lại */}
+    <>
+      <Container fluid className="p-24">
+        {/* Header với nút quay lại */}
           <div className="mb-24">
             <div className="d-flex align-items-center gap-12 mb-16">
               <Button
@@ -575,9 +614,7 @@ const RequestDetailPage = ({
             <h4 className="text-neutral-900 fw-bold mb-8">
               {(() => {
                 const requestType = selectedRequest?.type;
-                if (requestType === 'create_class') {
-                  return 'Chi tiết đơn - Yêu cầu tạo lớp';
-                } else if (requestType === 'replace_teacher') {
+                if (requestType === 'request_replace_teacher') {
                   return 'Chi tiết đơn - Lịch dạy';
                 } else if (requestType === 'makeup_class' || requestType === 'change_class') {
                   return isStudent ? 'Chi tiết đơn - Lịch học' : isTeacher ? 'Chi tiết đơn - Lịch dạy' : 'Chi tiết đơn - Lịch học/dạy';
@@ -606,9 +643,9 @@ const RequestDetailPage = ({
                   {/* Hiển thị thông tin request dựa trên type */}
                   {(() => {
                     const requestType = selectedRequest?.type;
-                    // Chỉ hiển thị phần này cho 3 loại đơn: makeup_class, replace_teacher, change_class
+                    // Chỉ hiển thị phần này cho 3 loại đơn: makeup_class, request_replace_teacher, change_class
                     const shouldShowSection = requestType === 'makeup_class' || 
-                                            requestType === 'replace_teacher' || 
+                                            requestType === 'request_replace_teacher' || 
                                             requestType === 'change_class';
                     
                     if (!shouldShowSection) return null;
@@ -763,21 +800,7 @@ const RequestDetailPage = ({
                                 )}
                               </div>
                               <div className="d-flex flex-column gap-2 align-items-end">
-                                {!correspondingMakeup ? (
-                                  <Button
-                                    variant="outline-primary"
-                                    size="sm"
-                                    onClick={() => {
-                                      // Truyền studentScheduleId để tự động chọn buổi học bù từ đơn
-                                      const studentScheduleId = studentSchedule?._id || studentSchedule?.id;
-                                      onAddMakeupClass(studentScheduleId);
-                                    }}
-                                    className="d-flex align-items-center gap-2"
-                                  >
-                                    <i className="fas fa-plus"></i>
-                                    {isStudent ? 'Xếp buổi học bù' : isTeacher ? 'Xếp lịch dạy thay' : 'Xếp buổi học bù'}
-                                  </Button>
-                                ) : (
+                                {correspondingMakeup ? (
                                   <Button
                                     variant="outline-danger"
                                     size="sm"
@@ -792,7 +815,21 @@ const RequestDetailPage = ({
                                     <i className="fas fa-trash"></i>
                                     Xóa
                                   </Button>
-                                )}
+                                ) : selectedRequest?.status === 'pending' ? (
+                                  <Button
+                                    variant="outline-primary"
+                                    size="sm"
+                                    onClick={() => {
+                                      // Truyền studentScheduleId để tự động chọn buổi học bù từ đơn
+                                      const studentScheduleId = studentSchedule?._id || studentSchedule?.id;
+                                      onAddMakeupClass(studentScheduleId);
+                                    }}
+                                    className="d-flex align-items-center gap-2"
+                                  >
+                                    <i className="fas fa-plus"></i>
+                                    {isStudent ? 'Xếp buổi học bù' : isTeacher ? 'Xếp lịch dạy thay' : 'Xếp buổi học bù'}
+                                  </Button>
+                                ) : null}
                               </div>
                             </div>
                           </div>
@@ -803,7 +840,7 @@ const RequestDetailPage = ({
                     // ============================================
                     // 2. REPLACE_TEACHER: Hiển thị từ classScheduleId
                     // ============================================
-                    if (requestType === 'replace_teacher' && selectedRequest?.classScheduleId) {
+                    if (requestType === 'request_replace_teacher' && selectedRequest?.classScheduleId) {
                       const classSchedule = selectedRequest.classScheduleId;
                       const session = classSchedule?.session;
                       const classInfo = classSchedule?.class;
@@ -891,7 +928,22 @@ const RequestDetailPage = ({
                                 )}
                               </div>
                               <div className="d-flex flex-column gap-2 align-items-end">
-                                {!correspondingSubstitute ? (
+                                {correspondingSubstitute ? (
+                                  <Button
+                                    variant="outline-danger"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (onRemoveMakeupClass && substituteIndex >= 0) {
+                                        onRemoveMakeupClass(substituteIndex);
+                                      }
+                                    }}
+                                    className="d-flex align-items-center gap-2"
+                                    title="Xóa giáo viên dạy thay này"
+                                  >
+                                    <i className="fas fa-trash"></i>
+                                    Xóa
+                                  </Button>
+                                ) : selectedRequest?.status === 'pending' ? (
                                   <Button
                                     variant="outline-primary"
                                     size="sm"
@@ -916,22 +968,7 @@ const RequestDetailPage = ({
                                       </>
                                     )}
                                   </Button>
-                                ) : (
-                                  <Button
-                                    variant="outline-danger"
-                                    size="sm"
-                                    onClick={() => {
-                                      if (onRemoveMakeupClass && substituteIndex >= 0) {
-                                        onRemoveMakeupClass(substituteIndex);
-                                      }
-                                    }}
-                                    className="d-flex align-items-center gap-2"
-                                    title="Xóa giáo viên dạy thay này"
-                                  >
-                                    <i className="fas fa-trash"></i>
-                                    Xóa
-                                  </Button>
-                                )}
+                                ) : null}
                               </div>
                             </div>
                           </div>
@@ -979,12 +1016,24 @@ const RequestDetailPage = ({
                         ).join(', ');
                       };
                       
+                      // Extract courseId - xử lý cả object và ObjectId string
+                      let extractedCourseId = null;
+                      if (courseInfo) {
+                        if (typeof courseInfo === 'object' && courseInfo._id) {
+                          extractedCourseId = courseInfo._id.toString();
+                        } else if (typeof courseInfo === 'string') {
+                          extractedCourseId = courseInfo;
+                        } else if (courseInfo && typeof courseInfo === 'object' && courseInfo.toString) {
+                          extractedCourseId = courseInfo.toString();
+                        }
+                      }
+                      
                       // Tạo classItem để truyền vào onChangeClass
                       const classItemForChange = {
                         classId: String(classInfo?._id || classInfo),
                         className: classInfo?.name || 'N/A',
                         courseName: courseInfo?.name || 'N/A',
-                        courseId: courseInfo?._id || courseInfo || null,
+                        courseId: extractedCourseId,
                         currentSessionTitle: currentSession?.title || 'Chưa có thông tin session',
                         currentSessionOrder: currentSession?.order || null,
                         fixedSchedules: fixedSchedules
@@ -993,6 +1042,9 @@ const RequestDetailPage = ({
                       // Kiểm tra xem có pendingClassChange không
                       const isPendingChange = pendingClassChange && 
                         String(pendingClassChange.oldClassId) === String(classItemForChange.classId);
+                      
+                      // Kiểm tra xem có thể đổi lớp không (cần có courseId và onChangeClass)
+                      const canChangeClass = !!onChangeClass && !!extractedCourseId;
                       
                       return (
                         <div className="mb-12">
@@ -1067,17 +1119,7 @@ const RequestDetailPage = ({
                                 )}
                               </div>
                               <div className="d-flex flex-column gap-2 align-items-end">
-                                {!isPendingChange ? (
-                                  <Button
-                                    variant="outline-primary"
-                                    size="sm"
-                                    onClick={() => onChangeClass(classItemForChange)}
-                                    className="d-flex align-items-center gap-2"
-                                  >
-                                    <i className="fas fa-exchange-alt"></i>
-                                    Đổi lớp
-                                  </Button>
-                                ) : (
+                                {isPendingChange ? (
                                   <Button
                                     variant="outline-danger"
                                     size="sm"
@@ -1088,7 +1130,36 @@ const RequestDetailPage = ({
                                     <i className="fas fa-trash"></i>
                                     Xóa
                                   </Button>
-                                )}
+                                ) : selectedRequest?.status === 'pending' ? (
+                                  <Button
+                                    variant="outline-primary"
+                                    size="sm"
+                                    onClick={() => {
+                                      console.log('🔵 Đổi lớp button clicked', { classItemForChange, onChangeClass: !!onChangeClass, courseId: extractedCourseId });
+                                      if (!onChangeClass) {
+                                        console.error(' onChangeClass is undefined');
+                                        return;
+                                      }
+                                      if (!extractedCourseId) {
+                                        console.error(' courseId is null or undefined', { courseInfo });
+                                        return;
+                                      }
+                                      try {
+                                        // Mở modal local trong RequestDetailPage
+                                        setSelectedClassToChange(classItemForChange);
+                                        setShowChangeClassModal(true);
+                                      } catch (error) {
+                                        console.error(' Error opening change class modal:', error);
+                                      }
+                                    }}
+                                    className="d-flex align-items-center gap-2"
+                                    disabled={!canChangeClass}
+                                    title={!canChangeClass ? (!extractedCourseId ? 'Không thể đổi lớp: Thiếu thông tin khóa học' : 'Không thể đổi lớp') : 'Đổi lớp học'}
+                                  >
+                                    <i className="fas fa-exchange-alt"></i>
+                                    Đổi lớp
+                                  </Button>
+                                ) : null}
                               </div>
                             </div>
                           </div>
@@ -1102,7 +1173,7 @@ const RequestDetailPage = ({
                         <h6 className="text-neutral-900 fw-bold mb-8 text-14">
                           {requestType === 'makeup_class' 
                             ? 'Buổi xin học bù:' 
-                            : requestType === 'replace_teacher' 
+                            : requestType === 'request_replace_teacher' 
                             ? 'Buổi xin xếp buổi dạy thay:' 
                             : requestType === 'change_class' 
                             ? 'Lớp yêu cầu đổi:' 
@@ -1152,13 +1223,28 @@ const RequestDetailPage = ({
                                         </span>
                                       </div>
                                     </div>
-                                    {isStudent && (
+                                    {isStudent && selectedRequest?.status === 'pending' && (
                                       <div className="d-flex align-items-center">
                                         <Button
                                           variant="outline-primary"
                                           size="sm"
-                                          onClick={() => onChangeClass(classItem)}
+                                          onClick={() => {
+                                            console.log('🔵 Đổi lớp button clicked (fallback)', { classItem, onChangeClass: !!onChangeClass });
+                                            if (!onChangeClass) {
+                                              console.error(' onChangeClass is undefined');
+                                              return;
+                                            }
+                                            try {
+                                              // Mở modal local trong RequestDetailPage
+                                              setSelectedClassToChange(classItem);
+                                              setShowChangeClassModal(true);
+                                            } catch (error) {
+                                              console.error(' Error opening change class modal:', error);
+                                            }
+                                          }}
                                           className="d-flex align-items-center gap-2"
+                                          disabled={!onChangeClass}
+                                          title={!onChangeClass ? 'Không thể đổi lớp' : 'Đổi lớp học'}
                                         >
                                           <i className="fas fa-exchange-alt"></i>
                                           Đổi lớp
@@ -1327,7 +1413,7 @@ const RequestDetailPage = ({
                                               Xóa
                                             </Button>
                                           </>
-                                        ) : shouldShowButton ? (
+                                        ) : shouldShowButton && selectedRequest?.status === 'pending' ? (
                                           <Button
                                             variant="outline-primary"
                                             size="sm"
@@ -1366,8 +1452,8 @@ const RequestDetailPage = ({
                 </div>
               )}
               
-              {/* Hiển thị file đính kèm cho đơn create_class, hoặc lịch học/dạy cho các đơn khác */}
-              {selectedRequest?.type === 'create_class' ? (
+              {/* Hiển thị lịch học/dạy cho các đơn */}
+              {false ? (
                 <>
                   <div className="d-flex align-items-center justify-content-between mb-12">
                     <h6 className="text-neutral-900 fw-bold mb-0">
@@ -1429,6 +1515,7 @@ const RequestDetailPage = ({
                         onEditSchedule={() => {}} // Read-only
                         onDeleteSchedule={() => {}} // Read-only
                         onCreateMakeup={() => {}} // Read-only
+                        readOnly={true} // Read-only mode
                         classService={classService}
                         studentSchedule={senderSchedule.map(sch => {
                           const scheduleDate = new Date(sch.date);
@@ -1456,29 +1543,33 @@ const RequestDetailPage = ({
             >
               Đóng
             </Button>
-            <Button 
-              variant="danger" 
-              onClick={() => {
-                setShowRejectModal(true);
-                setRejectReason('');
-              }}
-              disabled={processing}
-            >
-              {processing ? 'Đang xử lý...' : 'Từ chối'}
-            </Button>
-            <Button 
-              variant="success" 
-              onClick={onApprove} 
-              disabled={processing || unscheduledMakeupSessionsCount > 0}
-              title={unscheduledMakeupSessionsCount > 0 
-                ? `Vui lòng xếp học bù cho ${unscheduledMakeupSessionsCount} buổi còn thiếu trước khi chấp nhận` 
-                : ''}
-            >
-              {processing ? 'Đang xử lý...' : 'Chấp nhận'}
-            </Button>
+            {/* Chỉ hiển thị nút Từ chối và Chấp nhận khi status là pending */}
+            {selectedRequest?.status === 'pending' && (
+              <>
+                <Button 
+                  variant="danger" 
+                  onClick={() => {
+                    setShowRejectModal(true);
+                    setRejectReason('');
+                  }}
+                  disabled={processing}
+                >
+                  {processing ? 'Đang xử lý...' : 'Từ chối'}
+                </Button>
+                <Button 
+                  variant="success" 
+                  onClick={onApprove} 
+                  disabled={processing || unscheduledMakeupSessionsCount > 0}
+                  title={unscheduledMakeupSessionsCount > 0 
+                    ? `Vui lòng xếp học bù cho ${unscheduledMakeupSessionsCount} buổi còn thiếu trước khi chấp nhận` 
+                    : ''}
+                >
+                  {processing ? 'Đang xử lý...' : 'Chấp nhận'}
+                </Button>
+              </>
+            )}
           </div>
-        </Container>
-      </div>
+      </Container>
 
       {/* Modal từ chối */}
       <Modal show={showRejectModal} onHide={() => {
@@ -1539,7 +1630,31 @@ const RequestDetailPage = ({
           </Button>
         </Modal.Footer>
       </Modal>
-    </div>
+
+      {/* Change Class Modal */}
+      <ChangeClassModal
+        show={showChangeClassModal}
+        onHide={() => {
+          setShowChangeClassModal(false);
+          setSelectedClassToChange(null);
+        }}
+        selectedClassToChange={selectedClassToChange}
+        senderSchedule={senderSchedule}
+        onConfirm={(data) => {
+          console.log(' ChangeClassModal confirmed', { data });
+          // Gọi onChangeClassConfirm từ parent để cập nhật pendingClassChange
+          if (onChangeClassConfirm) {
+            onChangeClassConfirm(data);
+          } else {
+            console.error(' onChangeClassConfirm is undefined');
+          }
+          // Đóng modal
+          setShowChangeClassModal(false);
+          setSelectedClassToChange(null);
+        }}
+        processing={processing}
+      />
+    </>
   );
 };
 

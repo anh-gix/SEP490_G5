@@ -26,6 +26,19 @@ api.interceptors.request.use(
 
 // Course service functions
 export const courseService = {
+   /**
+   * Get courses with filters
+   * @param {object} params - { status, program, search }
+   */
+  getCourses: async (params = {}) => {
+    try {
+      const response = await api.get('/courses', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+      throw error.response?.data || { message: 'Không thể lấy danh sách khóa học' };
+    }
+  },
   // Lấy tất cả courses
   getAllCourses: async (params = {}) => {
     try {
@@ -230,12 +243,10 @@ export const courseService = {
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy danh sách courses theo program và level' };
-      }
+      console.error('Error fetching courses by program:', error);
+      throw error.response?.data || { message: 'Không thể lấy danh sách khóa học' };
+    }
   },
-  // =========================
-  // PLO MAPPING FUNCTIONS
-  // =========================
 
   // Get PLOs of a Course's Program
   getProgramPLOs: async (courseId) => {

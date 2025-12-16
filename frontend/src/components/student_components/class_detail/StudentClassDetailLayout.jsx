@@ -36,18 +36,14 @@ const StudentClassDetailLayout = () => {
       setLoading(true);
       setError(null);
       
-      const response = await studentService.getMyClasses();
+      // Use getMyClassDetail to get full class info with mocktest scores
+      const response = await studentService.getMyClassDetail(classId);
       
-      if (response.success && response.classes) {
-        const currentClass = response.classes.find(c => c._id === classId);
-        if (currentClass) {
-          console.log('✅ Class Info:', currentClass); // Debug log
-          setClassInfo(currentClass);
-        } else {
-          setError('Không tìm thấy lớp học');
-        }
+      if (response.success) {
+        console.log('📚 Class Detail:', response.data); // Debug log
+        setClassInfo(response.data);
       } else {
-        setError('Không thể tải danh sách lớp học');
+        setError('Không thể tải thông tin lớp học');
       }
     } catch (error) {
       console.error('Error fetching class info:', error);

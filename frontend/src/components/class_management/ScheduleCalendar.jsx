@@ -3,7 +3,7 @@ import { Card, Button, Badge, Dropdown } from 'react-bootstrap';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
 import { classScheduleService } from '../../services/classScheduleService';
 
-const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateMakeup, classService, studentSchedule = [] }) => {
+const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreateMakeup, onAssignSubstitute, classService, studentSchedule = [], readOnly = false, showLegend = true }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
 
@@ -160,6 +160,19 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
     }
   };
 
+  // Get color based on program type
+  const getProgramTypeColor = (programType) => {
+    if (!programType) return null;
+    
+    const colorMap = {
+      'ielts': '#2196F3', // Xanh dương
+      'toeic': '#FF9800', // Cam
+      'cam': '#757575'    // Xám
+    };
+    
+    return colorMap[programType.toLowerCase()] || null;
+  };
+
   const getStatusColor = (schedule) => {
     // Kiểm tra buổi của lớp cũ (khi đổi lớp)
     if (schedule.isOldClassSchedule) {
@@ -191,8 +204,6 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
     
     if (timeStatus === 'completed') {
       return '#4CAF50'; // Màu xanh lá cho buổi đã kết thúc
-    } else if (timeStatus === 'upcoming') {
-      return '#757575'; // Màu xám cho buổi chưa bắt đầu
     }
     
     // Nếu không có timeStatus, kiểm tra attendance status (cho Student/Teacher management)
@@ -209,7 +220,18 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
       }
     }
     
-    // Chưa điểm danh (chưa học) - màu xám
+    // Ưu tiên sử dụng màu program type nếu có (cho Teacher Detail)
+    const programColor = getProgramTypeColor(schedule.programType);
+    if (programColor) {
+      return programColor;
+    }
+    
+    // Nếu có timeStatus === 'upcoming' nhưng không có programType
+    if (timeStatus === 'upcoming') {
+      return '#757575'; // Màu xám cho buổi chưa bắt đầu
+    }
+    
+    // Màu xám mặc định
     return '#757575';
   };
 
@@ -276,8 +298,22 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                       {daySchedules.slice(0, 3).map(schedule => {
                         const attendanceStatus = schedule.attendanceStatus;
                         const timeStatus = schedule.timeStatus;
-                        const statusColor = getStatusColor(schedule);
                         const hasAttendance = !!attendanceStatus;
+                        const programColor = getProgramTypeColor(schedule.programType);
+                        // Border color: ưu tiên program type, fallback về status color
+                        const borderColor = programColor || getStatusColor(schedule);
+                        const statusColor = getStatusColor(schedule); // Giữ để dùng cho icon
+                        
+                        // Debug log for calendar rendering
+                        if (schedule.programType) {
+                          console.log('🎨 Calendar rendering schedule:', {
+                            scheduleId: schedule._id,
+                            className: schedule.className,
+                            programType: schedule.programType,
+                            programColor: programColor,
+                            statusColor: statusColor
+                          });
+                        }
                         
                         // Màu nền khác nhau theo trạng thái
                         let backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt mặc định
@@ -296,7 +332,16 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                         } else if (timeStatus === 'completed') {
                           backgroundColor = 'rgba(76, 175, 80, 0.1)'; // Xanh lá nhạt cho buổi đã kết thúc
                         } else if (timeStatus === 'upcoming') {
-                          backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt cho buổi chưa bắt đầu
+                          // Sử dụng màu program type nếu có, nếu không thì xám nhạt
+                          if (programColor) {
+                            // Convert hex to rgba với opacity 0.2 để dễ nhìn hơn
+                            const r = parseInt(programColor.slice(1, 3), 16);
+                            const g = parseInt(programColor.slice(3, 5), 16);
+                            const b = parseInt(programColor.slice(5, 7), 16);
+                            backgroundColor = `rgba(${r}, ${g}, ${b}, 0.2)`;
+                          } else {
+                            backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt cho buổi chưa bắt đầu
+                          }
                         } else if (timeStatus === 'ongoing') {
                           // Buổi đang diễn ra, kiểm tra attendance
                           if (attendanceStatus === 'present' || attendanceStatus === 'late') {
@@ -305,6 +350,12 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                             backgroundColor = 'rgba(244, 67, 54, 0.1)'; // Đỏ nhạt cho vắng mặt
                           } else if (attendanceStatus === 'excused') {
                             backgroundColor = 'rgba(255, 152, 0, 0.1)'; // Cam nhạt cho có phép
+                          } else if (programColor) {
+                            // Nếu không có attendance status, sử dụng màu program type
+                            const r = parseInt(programColor.slice(1, 3), 16);
+                            const g = parseInt(programColor.slice(3, 5), 16);
+                            const b = parseInt(programColor.slice(5, 7), 16);
+                            backgroundColor = `rgba(${r}, ${g}, ${b}, 0.1)`;
                           }
                         } else {
                           // Không có timeStatus, kiểm tra attendance (cho Student/Teacher management)
@@ -314,7 +365,37 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                             backgroundColor = 'rgba(244, 67, 54, 0.1)'; // Đỏ nhạt cho vắng mặt
                           } else if (attendanceStatus === 'excused') {
                             backgroundColor = 'rgba(255, 152, 0, 0.1)'; // Cam nhạt cho có phép
+                          } else if (programColor) {
+                            // Nếu không có attendance status, sử dụng màu program type
+                            const r = parseInt(programColor.slice(1, 3), 16);
+                            const g = parseInt(programColor.slice(3, 5), 16);
+                            const b = parseInt(programColor.slice(5, 7), 16);
+                            backgroundColor = `rgba(${r}, ${g}, ${b}, 0.2)`;
                           }
+                        }
+                        
+                        // Ưu tiên màu programType nếu không có trạng thái đặc biệt nào (cho Teacher Detail)
+                        // Đây là trường hợp phổ biến nhất cho Teacher Detail page
+                        if (!schedule.isOldClassSchedule && 
+                            !schedule.isNewClassSchedule && 
+                            !schedule.isCancelled && 
+                            schedule.scheduleStatus !== 'cancelled' &&
+                            !schedule.isAbsentSchedule && 
+                            schedule.status !== 'absent' &&
+                            !schedule.isMakeupSchedule && 
+                            schedule.status !== 'makeup' && 
+                            schedule.scheduleStatus !== 'rescheduled' &&
+                            timeStatus !== 'completed' &&
+                            timeStatus !== 'ongoing' &&
+                            timeStatus !== 'upcoming' &&
+                            !attendanceStatus && 
+                            programColor &&
+                            (backgroundColor === 'rgba(0,0,0,0.02)' || !backgroundColor)) {
+                          // Áp dụng màu program type với độ đậm hơn
+                          const r = parseInt(programColor.slice(1, 3), 16);
+                          const g = parseInt(programColor.slice(3, 5), 16);
+                          const b = parseInt(programColor.slice(5, 7), 16);
+                          backgroundColor = `rgba(${r}, ${g}, ${b}, 0.25)`;
                         }
                         
                         // Tooltip text
@@ -356,8 +437,8 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                             key={schedule.id}
                             className="p-1 rounded"
                             style={{ 
-                              borderLeft: `3px solid ${statusColor}`,
-                              background: backgroundColor,
+                              borderLeft: `3px solid ${borderColor}`, // Sử dụng program type color cho border
+                              background: backgroundColor, // Background theo attendance/schedule status
                               fontSize: '10px',
                               cursor: 'pointer',
                               position: 'relative'
@@ -411,6 +492,73 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
                                 <Badge bg="warning" text="dark" style={{ fontSize: '8px', padding: '2px 4px' }}>Học bù</Badge>
                               )}
                             </div>
+                            <div className="mt-1 d-flex justify-content-end gap-1">
+                              {onAssignSubstitute && !readOnly && (() => {
+                                // Kiểm tra xem buổi học có phải là quá khứ không
+                                const scheduleDate = new Date(schedule.date);
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                scheduleDate.setHours(0, 0, 0, 0);
+                                const isPastSchedule = scheduleDate < today;
+                                
+                                if (isPastSchedule) {
+                                  return null; // Không hiển thị nút cho buổi học quá khứ
+                                }
+                                
+                                return (
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="p-0"
+                                    style={{ fontSize: '8px', color: '#2196F3', textDecoration: 'none' }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onAssignSubstitute(schedule);
+                                    }}
+                                    title="Xếp người dạy thay"
+                                  >
+                                    <i className="fas fa-user-plus me-1"></i>
+                                    Dạy thay
+                                  </Button>
+                                );
+                              })()}
+                              {onCreateMakeup && !readOnly && (() => {
+                                // Kiểm tra xem buổi học có phải là quá khứ không
+                                const scheduleDate = new Date(schedule.date);
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                scheduleDate.setHours(0, 0, 0, 0);
+                                const isPastSchedule = scheduleDate < today;
+                                
+                                // Không hiển thị nút nếu:
+                                // - Buổi học đã qua
+                                // - Buổi học đã bị hủy
+                                // - Buổi học đã là học bù
+                                const isCancelled = schedule.isCancelled || schedule.scheduleStatus === 'cancelled';
+                                const isMakeup = schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled';
+                                
+                                if (isPastSchedule || isCancelled || isMakeup) {
+                                  return null;
+                                }
+                                
+                                return (
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="p-0"
+                                    style={{ fontSize: '8px', color: '#FF9800', textDecoration: 'none' }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onCreateMakeup(schedule);
+                                    }}
+                                    title="Xếp buổi học bù"
+                                  >
+                                    <i className="fas fa-calendar-plus me-1"></i>
+                                    Học bù
+                                  </Button>
+                                );
+                              })()}
+                            </div>
                           </div>
                         );
                       })}
@@ -427,6 +575,48 @@ const ScheduleCalendar = ({ schedules, onEditSchedule, onDeleteSchedule, onCreat
           </div>
         </Card.Body>
       </Card>
+
+      {/* Program Type Color Legend */}
+      {showLegend && (
+        <div className="d-flex justify-content-center gap-4 mt-3 mb-2">
+          <div className="d-flex align-items-center gap-2">
+            <div 
+              style={{ 
+                width: '20px', 
+                height: '20px', 
+                backgroundColor: '#2196F3', 
+                borderRadius: '4px',
+                border: '1px solid #e0e0e0'
+              }}
+            ></div>
+            <span className="text-13 text-neutral-700">IELTS</span>
+          </div>
+          <div className="d-flex align-items-center gap-2">
+            <div 
+              style={{ 
+                width: '20px', 
+                height: '20px', 
+                backgroundColor: '#FF9800', 
+                borderRadius: '4px',
+                border: '1px solid #e0e0e0'
+              }}
+            ></div>
+            <span className="text-13 text-neutral-700">TOEIC</span>
+          </div>
+          <div className="d-flex align-items-center gap-2">
+            <div 
+              style={{ 
+                width: '20px', 
+                height: '20px', 
+                backgroundColor: '#757575', 
+                borderRadius: '4px',
+                border: '1px solid #e0e0e0'
+              }}
+            ></div>
+            <span className="text-13 text-neutral-700">Cambridge</span>
+          </div>
+        </div>
+      )}
 
     </div>
   );

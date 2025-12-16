@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8080/api/work-requests';
+import api from './api';
 
 /**
  * Work Request Service - Handles all work request operations
@@ -34,7 +32,7 @@ export const workRequestService = {
         formData.append('requestedBy', user._id);
       }
 
-      const response = await axios.post(`${API_BASE_URL}/create`, formData, {
+      const response = await api.post('/work-requests/create', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
@@ -61,7 +59,7 @@ export const workRequestService = {
         data.userId = user._id;
       }
 
-      const response = await axios.post(`${API_BASE_URL}/submit/program/${programId}`, data);
+      const response = await api.post(`/work-requests/submit/program/${programId}`, data);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể nộp chương trình' };
@@ -80,7 +78,7 @@ export const workRequestService = {
         data.userId = user._id;
       }
 
-      const response = await axios.post(`${API_BASE_URL}/submit/exam/${examId}`, data);
+      const response = await api.post(`/work-requests/submit/exam/${examId}`, data);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể nộp đề thi' };
@@ -105,7 +103,7 @@ export const workRequestService = {
    */
   getAllRequests: async (params = {}) => {
     try {
-      const response = await axios.get(API_BASE_URL, { params });
+      const response = await api.get('/work-requests', { params });
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy danh sách yêu cầu' };
@@ -123,7 +121,7 @@ export const workRequestService = {
         params.userId = user._id;
       }
 
-      const response = await axios.get(`${API_BASE_URL}/my-requests`, { params });
+      const response = await api.get('/work-requests/my-requests', { params });
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy danh sách yêu cầu của bạn' };
@@ -141,7 +139,7 @@ export const workRequestService = {
         params.userId = user._id;
       }
 
-      const response = await axios.get(`${API_BASE_URL}/assigned-to-me`, { params });
+      const response = await api.get('/work-requests/assigned-to-me', { params });
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy danh sách công việc được giao' };
@@ -154,7 +152,7 @@ export const workRequestService = {
    */
   getRequestById: async (id) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/${id}`);
+      const response = await api.get(`/work-requests/${id}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy thông tin yêu cầu' };
@@ -167,7 +165,7 @@ export const workRequestService = {
    */
   getStats: async (params = {}) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/stats`, { params });
+      const response = await api.get('/work-requests/stats', { params });
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy thống kê' };
@@ -190,7 +188,7 @@ export const workRequestService = {
         data.userId = user._id;
       }
 
-      const response = await axios.post(`${API_BASE_URL}/${id}/approve`, data);
+      const response = await api.post(`/work-requests/${id}/approve`, data);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể duyệt yêu cầu' };
@@ -209,7 +207,7 @@ export const workRequestService = {
         data.userId = user._id;
       }
 
-      const response = await axios.post(`${API_BASE_URL}/${id}/reject`, data);
+      const response = await api.post(`/work-requests/${id}/reject`, data);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể từ chối yêu cầu' };
@@ -228,7 +226,7 @@ export const workRequestService = {
         data.userId = user._id;
       }
 
-      const response = await axios.post(`${API_BASE_URL}/${id}/revoke`, data);
+      const response = await api.post(`/work-requests/${id}/revoke`, data);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể thu hồi phê duyệt' };
@@ -251,7 +249,7 @@ export const workRequestService = {
         data.userId = user._id;
       }
 
-      const response = await axios.delete(`${API_BASE_URL}/${id}/cancel`, { data });
+      const response = await api.delete(`/work-requests/${id}/cancel`, { data });
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể hủy yêu cầu' };

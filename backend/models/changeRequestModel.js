@@ -1,15 +1,6 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-/**
- * ChangeRequest Model - Quản lý các đơn yêu cầu từ HỌC VIÊN gửi cho GIÁO VỤ
- *
- * Các loại đơn:
- * - change_class: Đơn xin đổi lớp học
- * - makeup_class: Đơn xin học bù
- * - request_replace_teacher: Đơn yêu cầu đổi giáo viên (khiếu nại giáo viên)
- */
-
 const changeRequestSchema = new Schema({
   // Người gửi đơn (Student)
   sender: {

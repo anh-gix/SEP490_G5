@@ -14,10 +14,9 @@ const SignUpInner = () => {
           <div className='col-lg-6'>
             <div className='bg-main-25 border border-neutral-30 rounded-8 p-32'>
               <div className='mb-40'>
-                <h3 className='mb-16 text-neutral-500'>Let's Get Started!</h3>
+                <h3 className='mb-16 text-neutral-500'>Bắt đầu nào!</h3>
                 <p className='text-neutral-500'>
-                  Please Enter your Email Address to Start your Online
-                  Application
+                  Vui lòng nhập thông tin để bắt đầu đăng ký trực tuyến
                 </p>
               </div>
               <form action='#'>
@@ -27,13 +26,13 @@ const SignUpInner = () => {
                       htmlFor='fname'
                       className='fw-medium text-lg text-neutral-500 mb-16'
                     >
-                      First Name
+                      Tên
                     </label>
                     <input
                       type='text'
                       className='common-input rounded-pill'
                       id='fname'
-                      placeholder='Enter Your First Name'
+                      placeholder='Nhập tên của bạn'
                     />
                   </div>
                   <div className='col-sm-6'>
@@ -41,13 +40,13 @@ const SignUpInner = () => {
                       htmlFor='lname'
                       className='fw-medium text-lg text-neutral-500 mb-16'
                     >
-                      Last Name
+                      Họ
                     </label>
                     <input
                       type='text'
                       className='common-input rounded-pill'
                       id='lname'
-                      placeholder='Enter Your Last Name'
+                      placeholder='Nhập họ của bạn'
                     />
                   </div>
                   <div className='col-sm-12'>
@@ -55,13 +54,13 @@ const SignUpInner = () => {
                       htmlFor='email'
                       className='fw-medium text-lg text-neutral-500 mb-16'
                     >
-                      Enter Your Email ID
+                      Nhập Email của bạn
                     </label>
                     <input
                       type='email'
                       className='common-input rounded-pill'
                       id='email'
-                      placeholder='Enter Your Email...'
+                      placeholder='Nhập Email của bạn...'
                     />
                   </div>
                   <div className='col-sm-12'>
@@ -69,14 +68,14 @@ const SignUpInner = () => {
                       htmlFor='password'
                       className='fw-medium text-lg text-neutral-500 mb-16'
                     >
-                      Password
+                      Mật khẩu
                     </label>
                     <div className='position-relative'>
                       <input
                         type={passwordVisible ? "text" : "password"}
                         className='common-input rounded-pill pe-44'
                         id='password'
-                        placeholder='Enter Your Password...'
+                        placeholder='Nhập Mật khẩu của bạn...'
                       />
                       <span
                         className={`toggle-password position-absolute top-50 inset-inline-end-0 me-16 translate-middle-y ph-bold ${
@@ -88,12 +87,12 @@ const SignUpInner = () => {
                   </div>
                   <div className='col-sm-12'>
                     <p className='text-neutral-500 mt-8'>
-                      Have an accounts?{" "}
+                      Đã có tài khoản?{" "}
                       <Link
                         to='/sign-in'
                         className='fw-semibold text-main-600 hover-text-decoration-underline'
                       >
-                        Sign In
+                        Đăng nhập
                       </Link>
                     </p>
                   </div>
@@ -103,7 +102,7 @@ const SignUpInner = () => {
                         type='submit'
                         className='btn btn-main rounded-pill flex-center gap-8'
                       >
-                        Sign UP
+                        Đăng ký
                         <i className='ph-bold ph-arrow-up-right d-flex text-lg' />
                       </button>
                     </div>

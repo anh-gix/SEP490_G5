@@ -10,7 +10,7 @@ const getAuthHeader = () => {
 
 const homeworkService = {
   // ========================
-  // 📝 TEACHER - HOMEWORK ASSIGNMENT
+  //  TEACHER - HOMEWORK ASSIGNMENT
   // ========================
 
   /**
@@ -57,6 +57,7 @@ const homeworkService = {
       
       // Add text fields
       formData.append('title', homeworkData.title);
+      if (homeworkData.description) formData.append('description', homeworkData.description);
       formData.append('deadline', homeworkData.deadline);
       
       // Add assignment files (max 5)
@@ -114,6 +115,7 @@ const homeworkService = {
       
       // Add text fields
       if (homeworkData.title) formData.append('title', homeworkData.title);
+      if (homeworkData.description !== undefined) formData.append('description', homeworkData.description);
       if (homeworkData.deadline) formData.append('deadline', homeworkData.deadline);
       
       // Add new files
@@ -197,7 +199,7 @@ const homeworkService = {
   },
 
   // ========================
-  // 📚 STUDENT - HOMEWORK SUBMISSION
+  //  STUDENT - HOMEWORK SUBMISSION
   // ========================
 
   /**

@@ -1,21 +1,19 @@
 const Room = require("../models/room");
 const ClassSchedule = require("../models/classScheduleModel");
+const Class = require("../models/classModel");
+const Course = require("../models/courseModel");
+const mongoose = require("mongoose");
 
-// =========================
-// 📋 LẤY DANH SÁCH PHÒNG HỌC
-// =========================
 exports.getAllRooms = async (req, res) => {
   try {
     const { status, search } = req.query;
     
     let query = {};
     
-    // Filter by status
     if (status && status !== 'all') {
       query.status = status;
     }
     
-    // Search by room name or location
     if (search) {
       query.$or = [
         { room_name: { $regex: search, $options: 'i' } },
@@ -31,7 +29,7 @@ exports.getAllRooms = async (req, res) => {
       rooms
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy danh sách phòng:", error);
+    console.error(" Lỗi khi lấy danh sách phòng:", error);
     res.status(500).json({ 
       message: "Lỗi server khi lấy danh sách phòng",
       error: error.message 
@@ -39,9 +37,6 @@ exports.getAllRooms = async (req, res) => {
   }
 };
 
-// =========================
-// 🔍 LẤY THÔNG TIN 1 PHÒNG
-// =========================
 exports.getRoomById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -57,7 +52,7 @@ exports.getRoomById = async (req, res) => {
       room
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy thông tin phòng:", error);
+    console.error(" Lỗi khi lấy thông tin phòng:", error);
     res.status(500).json({ 
       message: "Lỗi server khi lấy thông tin phòng",
       error: error.message 
@@ -65,21 +60,16 @@ exports.getRoomById = async (req, res) => {
   }
 };
 
-// =========================
-// ➕ TẠO PHÒNG MỚI
-// =========================
 exports.createRoom = async (req, res) => {
   try {
     const { room_name, capacity, location, description, status } = req.body;
     
-    // Validate required fields
     if (!room_name || !capacity || !location) {
       return res.status(400).json({ 
         message: "Thiếu thông tin bắt buộc (room_name, capacity, location)" 
       });
     }
     
-    // Check if room name already exists
     const existingRoom = await Room.findOne({ room_name });
     if (existingRoom) {
       return res.status(400).json({ 
@@ -100,7 +90,7 @@ exports.createRoom = async (req, res) => {
       room: newRoom
     });
   } catch (error) {
-    console.error("❌ Lỗi khi tạo phòng:", error);
+    console.error(" Lỗi khi tạo phòng:", error);
     res.status(500).json({ 
       message: "Lỗi server khi tạo phòng",
       error: error.message 
@@ -108,9 +98,6 @@ exports.createRoom = async (req, res) => {
   }
 };
 
-// =========================
-// ✏️ CẬP NHẬT PHÒNG
-// =========================
 exports.updateRoom = async (req, res) => {
   try {
     const { id } = req.params;
@@ -122,7 +109,6 @@ exports.updateRoom = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy phòng học" });
     }
     
-    // Check if new room name already exists (excluding current room)
     if (room_name && room_name !== room.room_name) {
       const existingRoom = await Room.findOne({ 
         room_name, 
@@ -135,7 +121,32 @@ exports.updateRoom = async (req, res) => {
       }
     }
     
-    // Update fields
+    // Validate capacity reduction - check if existing classes would be affected
+    if (capacity && capacity < room.capacity) {
+      // Find all active classes using this room
+      const classesUsingRoom = await Class.find({ 
+        room: id,
+        status: { $in: ['pending', 'active'] }
+      }).select('name students').lean();
+      
+      // Check if any class has more students than the new capacity
+      const problematicClasses = classesUsingRoom.filter(
+        cls => cls.students.length > capacity
+      );
+      
+      if (problematicClasses.length > 0) {
+        const classNames = problematicClasses.map(cls => cls.name).join(', ');
+        const maxStudents = Math.max(...problematicClasses.map(cls => cls.students.length));
+        
+        return res.status(400).json({ 
+          message: `Không thể giảm sức chứa phòng xuống ${capacity}. Có ${problematicClasses.length} lớp học đang sử dụng phòng này với số học viên nhiều hơn (tối đa ${maxStudents} học viên).`,
+          affectedClasses: problematicClasses.length,
+          classNames: classNames,
+          maxStudentsInClasses: maxStudents
+        });
+      }
+    }
+    
     if (room_name) room.room_name = room_name;
     if (capacity) room.capacity = capacity;
     if (location) room.location = location;
@@ -149,7 +160,7 @@ exports.updateRoom = async (req, res) => {
       room
     });
   } catch (error) {
-    console.error("❌ Lỗi khi cập nhật phòng:", error);
+    console.error(" Lỗi khi cập nhật phòng:", error);
     res.status(500).json({ 
       message: "Lỗi server khi cập nhật phòng",
       error: error.message 
@@ -157,14 +168,10 @@ exports.updateRoom = async (req, res) => {
   }
 };
 
-// =========================
-// 🗑️ XÓA PHÒNG
-// =========================
 exports.deleteRoom = async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Check if room is being used in any schedules
     const schedulesUsingRoom = await ClassSchedule.countDocuments({ room: id });
     
     if (schedulesUsingRoom > 0) {
@@ -185,7 +192,7 @@ exports.deleteRoom = async (req, res) => {
       room
     });
   } catch (error) {
-    console.error("❌ Lỗi khi xóa phòng:", error);
+    console.error(" Lỗi khi xóa phòng:", error);
     res.status(500).json({ 
       message: "Lỗi server khi xóa phòng",
       error: error.message 
@@ -193,13 +200,10 @@ exports.deleteRoom = async (req, res) => {
   }
 };
 
-// =========================
-// 📅 LẤY LỊCH SỬ DỤNG PHÒNG
-// =========================
 exports.getRoomSchedule = async (req, res) => {
   try {
     const { id } = req.params;
-    const { date, startDate, endDate } = req.query; // Optional: filter by specific date or date range
+    const { date, startDate, endDate } = req.query;
     
     const room = await Room.findById(id);
     if (!room) {
@@ -208,14 +212,12 @@ exports.getRoomSchedule = async (req, res) => {
     
     let query = { room: id, status: { $in: ['temporary', 'fixed'] } };
     
-    // Filter by date range if provided (priority over single date)
     if (startDate && endDate) {
       query.date = {
         $gte: new Date(startDate),
         $lte: new Date(endDate)
       };
     } else if (date) {
-      // Filter by single date if provided
       const startDate = new Date(date);
       startDate.setHours(0, 0, 0, 0);
       const endDate = new Date(date);
@@ -228,14 +230,92 @@ exports.getRoomSchedule = async (req, res) => {
       .populate({
         path: 'class',
         select: 'name subject teacherId',
-        populate: {
-          path: 'teacherId',
-          select: 'username email'
-        }
+        populate: [
+          {
+            path: 'teacherId',
+            select: 'username email'
+          },
+          {
+            path: 'course',
+            select: 'name',
+            populate: {
+              path: 'program',
+              select: 'type program_name'
+            }
+          }
+        ]
       })
-      .populate('session', 'title order') // Populate session để lấy title
+      .populate('session', 'title order')
       .sort({ date: 1, startTime: 1 })
       .lean();
+    
+    // Xử lý các schedule không có class nhưng có session (buổi học bù)
+    // Tìm course chứa session để lấy program type
+    for (let schedule of schedules) {
+      if (!schedule.class && schedule.session) {
+        // Lấy sessionId: có thể là object (đã populate) hoặc ObjectId
+        let sessionId = schedule.session._id || schedule.session;
+        
+        // Convert sang ObjectId nếu cần
+        let sessionObjectId;
+        try {
+          if (sessionId instanceof mongoose.Types.ObjectId) {
+            sessionObjectId = sessionId;
+          } else if (typeof sessionId === 'string') {
+            sessionObjectId = new mongoose.Types.ObjectId(sessionId);
+          } else {
+            sessionObjectId = sessionId;
+          }
+        } catch (error) {
+          continue;
+        }
+        
+        // Tìm course chứa session này - thử với cả ObjectId và string
+        let course = await Course.findOne({ sessions: sessionObjectId })
+          .populate({
+            path: 'program',
+            select: 'type'
+          })
+          .select('name program sessions')
+          .lean();
+        
+        // Nếu không tìm thấy với ObjectId, thử với string
+        if (!course) {
+          course = await Course.findOne({ sessions: sessionObjectId.toString() })
+            .populate({
+              path: 'program',
+              select: 'type'
+            })
+            .select('name program sessions')
+            .lean();
+        }
+        
+        // Nếu vẫn không tìm thấy, thử với $in operator
+        if (!course) {
+          course = await Course.findOne({ 
+            sessions: { $in: [sessionObjectId, sessionObjectId.toString()] }
+          })
+            .populate({
+              path: 'program',
+              select: 'type'
+            })
+            .select('name program sessions')
+            .lean();
+        }
+        
+        // Gán program type vào schedule
+        if (course && course.program) {
+          schedule.programType = course.program.type;
+          // Có thể thêm thông tin course vào schedule để frontend dùng
+          schedule._course = {
+            name: course.name,
+            program: {
+              type: course.program.type
+            }
+          };
+        }
+      }
+    }
     
     res.status(200).json({
       message: "Lấy lịch sử dụng phòng thành công",
@@ -250,7 +330,7 @@ exports.getRoomSchedule = async (req, res) => {
       schedules
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy lịch phòng:", error);
+    console.error(" Lỗi khi lấy lịch phòng:", error);
     res.status(500).json({ 
       message: "Lỗi server khi lấy lịch phòng",
       error: error.message 
@@ -258,9 +338,6 @@ exports.getRoomSchedule = async (req, res) => {
   }
 };
 
-// =========================
-// 📊 THỐNG KÊ PHÒNG HỌC
-// =========================
 exports.getRoomStats = async (req, res) => {
   try {
     const totalRooms = await Room.countDocuments();
@@ -268,7 +345,6 @@ exports.getRoomStats = async (req, res) => {
     const inUseRooms = await Room.countDocuments({ status: 'in_use' });
     const maintenanceRooms = await Room.countDocuments({ status: 'maintenance' });
     
-    // Get today's schedules
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
@@ -289,9 +365,111 @@ exports.getRoomStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy thống kê phòng:", error);
+    console.error(" Lỗi khi lấy thống kê phòng:", error);
     res.status(500).json({ 
       message: "Lỗi server khi lấy thống kê phòng",
+      error: error.message 
+    });
+  }
+};
+
+exports.getTodayRoomUsage = async (req, res) => {
+  try {
+    const now = new Date();
+    const todayString = now.toISOString().split('T')[0];
+    
+    const todayStart = new Date(todayString);
+    const todayEnd = new Date(todayString);
+    todayEnd.setUTCHours(23, 59, 59, 999);
+
+    const todaySchedules = await ClassSchedule.find({
+      date: { $gte: todayStart, $lte: todayEnd },
+      status: { $in: ['temporary', 'fixed'] }
+    })
+      .populate('class', 'name level course')
+      .populate('room', 'room_name location')
+      .sort({ startTime: 1 })
+      .lean();
+
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    
+    const allSchedulesForTimeSlots = await ClassSchedule.find({
+      date: { $gte: currentMonthStart, $lte: currentMonthEnd },
+      status: { $in: ['temporary', 'fixed'] }
+    })
+      .select('startTime endTime')
+      .lean();
+    
+    const normalizeTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : '';
+    const timeSlotSet = new Set();
+    
+    allSchedulesForTimeSlots.forEach(schedule => {
+      if (schedule.startTime && schedule.endTime) {
+        const start = normalizeTime(schedule.startTime);
+        const end = normalizeTime(schedule.endTime);
+        if (start && end) {
+          timeSlotSet.add(`${start}-${end}`);
+        }
+      }
+    });
+    
+    let timeSlots = Array.from(timeSlotSet).sort((a, b) => {
+      const [startA] = a.split('-');
+      const [startB] = b.split('-');
+      return startA.localeCompare(startB);
+    });
+    
+    if (timeSlots.length === 0) {
+      timeSlots = ['08:00-10:00', '10:30-12:30', '14:00-16:00', '18:00-20:00'];
+    }
+
+    const rooms = await Room.find()
+      .select('room_name location')
+      .sort({ room_name: 1 })
+      .lean();
+
+    const roomScheduleData = rooms.map(room => {
+      const schedules = timeSlots.map(timeSlot => {
+        const [startTime, endTime] = timeSlot.split('-');
+        const normalizeTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : '';
+        const matchingSchedule = todaySchedules.find(s => 
+          s.room?._id?.toString() === room._id?.toString() &&
+          normalizeTime(s.startTime) === startTime &&
+          normalizeTime(s.endTime) === endTime
+        );
+        
+        if (matchingSchedule) {
+          return {
+            time: timeSlot,
+            class: matchingSchedule.class?.name || 'N/A',
+            status: 'occupied'
+          };
+        }
+        return {
+          time: timeSlot,
+          class: 'Free',
+          status: 'available'
+        };
+      });
+
+      return {
+        room: room.room_name || 'N/A',
+        location: room.location || 'N/A',
+        schedules
+      };
+    });
+
+    res.status(200).json({
+      message: "Lấy lịch sử dụng phòng hôm nay thành công",
+      success: true,
+      roomSchedule: roomScheduleData,
+      timeSlots: timeSlots
+    });
+  } catch (error) {
+    console.error(" Lỗi khi lấy lịch sử dụng phòng hôm nay:", error);
+    res.status(500).json({ 
+      message: "Lỗi server khi lấy lịch sử dụng phòng hôm nay",
       error: error.message 
     });
   }

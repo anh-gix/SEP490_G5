@@ -7,7 +7,22 @@ const Program = require("../models/programModel");
 const Course = require("../models/courseModel");
 
 // =========================
-// 📋 LẤY DANH SÁCH GIẢNG VIÊN
+// HELPER FUNCTIONS
+// =========================
+
+// Helper function to format date to Vietnamese locale (DD/MM/YYYY)
+// Uses UTC methods to avoid timezone conversion issues
+const formatDateToVN = (date) => {
+  if (!date) return null;
+  const d = new Date(date);
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const year = d.getUTCFullYear();
+  return `${day}/${month}/${year}`;
+};
+
+// =========================
+//  LẤY DANH SÁCH GIẢNG VIÊN
 // =========================
 exports.getAllTeachers = async (req, res) => {
   try {
@@ -19,7 +34,7 @@ exports.getAllTeachers = async (req, res) => {
     if (!teacherRole) {
       // Log all available roles for debugging
       const allRoles = await Role.find({}).select('name');
-      console.error('❌ Không tìm thấy role Teacher. Các roles hiện có:', allRoles);
+      console.error(' Không tìm thấy role Teacher. Các roles hiện có:', allRoles);
       return res.status(404).json({ 
         success: false,
         message: "Không tìm thấy role giảng viên",
@@ -27,8 +42,6 @@ exports.getAllTeachers = async (req, res) => {
         availableRoles: allRoles.map(r => r.name)
       });
     }
-    
-    console.log('✅ Found teacher role:', teacherRole.name, teacherRole._id);
     
     let query = { roleId: teacherRole._id };
     
@@ -107,8 +120,6 @@ exports.getAllTeachers = async (req, res) => {
       .limit(limitNum)
       .lean();
     
-    console.log(`📋 Found ${teachers.length} users with roleId: ${teacherRole._id} (${teacherRole.name})`);
-    
     // Get additional info for each teacher
     const teachersWithStats = await Promise.all(
       teachers.map(async (teacher) => {
@@ -127,8 +138,6 @@ exports.getAllTeachers = async (req, res) => {
       })
     );
     
-    console.log(`✅ Returning ${teachersWithStats.length} teachers to frontend`);
-    
     res.status(200).json({
       success: true,
       message: "Lấy danh sách giảng viên thành công",
@@ -139,7 +148,7 @@ exports.getAllTeachers = async (req, res) => {
       totalPages: Math.ceil(total / limitNum)
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy danh sách giảng viên:", error);
+    console.error(" Lỗi khi lấy danh sách giảng viên:", error);
     res.status(500).json({ 
       success: false,
       message: "Lỗi server khi lấy danh sách giảng viên",
@@ -181,6 +190,13 @@ exports.getCurrentTeacher = async (req, res) => {
       .populate('course', 'name')
       .lean();
     
+    // Format dates for classes
+    const formattedClasses = classes.map(cls => ({
+      ...cls,
+      startDate: formatDateToVN(cls.startDate),
+      endDate: formatDateToVN(cls.endDate)
+    }));
+    
     const totalStudents = classes.reduce((sum, cls) => sum + (cls.students?.length || 0), 0);
     
     res.status(200).json({
@@ -188,6 +204,7 @@ exports.getCurrentTeacher = async (req, res) => {
       message: 'Lấy thông tin giảng viên thành công',
       teacher: {
         ...teacher.toObject(),
+        classes: formattedClasses,
         stats: {
           classCount: classes.length,
           totalStudents
@@ -195,7 +212,7 @@ exports.getCurrentTeacher = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy thông tin giảng viên hiện tại:', error);
+    console.error(' Lỗi khi lấy thông tin giảng viên hiện tại:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy thông tin giảng viên',
@@ -205,15 +222,15 @@ exports.getCurrentTeacher = async (req, res) => {
 };
 
 // =========================
-// 🔍 LẤY THÔNG TIN 1 GIẢNG VIÊN
+//  LẤY THÔNG TIN 1 GIẢNG VIÊN
 // =========================
 exports.getTeacherById = async (req, res) => {
   try {
     const { id } = req.params;
     
-    console.log(`\n🔍 [DEBUG] ============================================`);
-    console.log(`🔍 [DEBUG] getTeacherById - Teacher ID: ${id}`);
-    console.log(`🔍 [DEBUG] ============================================\n`);
+    console.log(`\n [DEBUG] ============================================`);
+    console.log(` [DEBUG] getTeacherById - Teacher ID: ${id}`);
+    console.log(` [DEBUG] ============================================\n`);
     
     const teacher = await User.findById(id)
       .select('-password -token')
@@ -223,7 +240,7 @@ exports.getTeacherById = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy giảng viên" });
     }
     
-    console.log(`✅ [DEBUG] Tìm thấy giảng viên: ${teacher.username} (${teacher.email})`);
+    console.log(` [DEBUG] Tìm thấy giảng viên: ${teacher.username} (${teacher.email})`);
     
     // Get classes taught by this teacher - check both teacher and teacherId fields
     const classes = await Class.find({ 
@@ -241,7 +258,7 @@ exports.getTeacherById = async (req, res) => {
       })
       .lean();
     
-    console.log(`\n📋 [DEBUG] Tìm thấy ${classes.length} lớp học:`);
+    console.log(`\n [DEBUG] Tìm thấy ${classes.length} lớp học:`);
     classes.forEach((cls, idx) => {
       const teacherId = cls.teacher?.toString() || cls.teacherId?.toString() || 'N/A';
       console.log(`  [${idx + 1}] ${cls.name}`);
@@ -252,7 +269,7 @@ exports.getTeacherById = async (req, res) => {
     
     // Format classes with level information and teaching stats
     const formattedClasses = await Promise.all(classes.map(async (cls) => {
-      console.log(`\n📚 [DEBUG] Xử lý lớp: ${cls.name} (ID: ${cls._id})`);
+      console.log(`\n [DEBUG] Xử lý lớp: ${cls.name} (ID: ${cls._id})`);
       
       // Lấy tất cả ClassSchedule của lớp này để log
       const allSchedules = await ClassSchedule.find({
@@ -274,9 +291,9 @@ exports.getTeacherById = async (req, res) => {
         const isThisTeacher = teacherId === id.toString();
         
         console.log(`    [${idx + 1}] ${schedule.date} ${schedule.startTime}-${schedule.endTime}`);
-        console.log(`        Teacher: ${teacherName} (ID: ${teacherId}) ${isThisTeacher ? '✅' : '❌'}`);
+        console.log(`        Teacher: ${teacherName} (ID: ${teacherId}) ${isThisTeacher ? '' : ''}`);
         console.log(`        SubstituteTeacher: ${subTeacherName || 'Không có'} (ID: ${subTeacherId || 'N/A'})`);
-        console.log(`        → Giảng viên này dạy: ${isThisTeacher && !hasSubstitute ? '✅ CÓ' : '❌ KHÔNG'}`);
+        console.log(`        → Giảng viên này dạy: ${isThisTeacher && !hasSubstitute ? ' CÓ' : ' KHÔNG'}`);
       });
       
       // Lấy tất cả schedule IDs để kiểm tra điểm danh
@@ -316,7 +333,7 @@ exports.getTeacherById = async (req, res) => {
       console.log(`  - Số buổi nghỉ: ${totalSessions - actualTeachingSessions}`);
       
       // Log chi tiết từng buổi
-      console.log(`\n  📝 Chi tiết từng buổi học:`);
+      console.log(`\n   Chi tiết từng buổi học:`);
       allSchedules.forEach((schedule, idx) => {
         const scheduleId = schedule._id.toString();
         const hasAttendance = scheduleIdsWithAttendance.has(scheduleId);
@@ -327,18 +344,18 @@ exports.getTeacherById = async (req, res) => {
         
         const dateStr = new Date(schedule.date).toLocaleDateString('vi-VN');
         console.log(`    [${idx + 1}] ${dateStr} ${schedule.startTime}-${schedule.endTime}`);
-        console.log(`        Đã có điểm danh: ${hasAttendance ? '✅ CÓ' : '❌ CHƯA'}`);
-        console.log(`        Teacher: ${schedule.teacher?.username || 'N/A'} (ID: ${teacherId}) ${isThisTeacher ? '✅ ĐÚNG' : '❌ KHÔNG PHẢI'}`);
+        console.log(`        Đã có điểm danh: ${hasAttendance ? ' CÓ' : ' CHƯA'}`);
+        console.log(`        Teacher: ${schedule.teacher?.username || 'N/A'} (ID: ${teacherId}) ${isThisTeacher ? ' ĐÚNG' : ' KHÔNG PHẢI'}`);
         if (hasSubstitute) {
-          console.log(`        ⚠️  SubstituteTeacher: ${schedule.substituteTeacher?.username || 'N/A'} → Giáo viên chính NGHỈ`);
+          console.log(`          SubstituteTeacher: ${schedule.substituteTeacher?.username || 'N/A'} → Giáo viên chính NGHỈ`);
         } else {
           console.log(`        SubstituteTeacher: Không có → Giáo viên chính dạy`);
         }
-        console.log(`        → Được tính vào "Số buổi dạy": ${isCounted ? '✅ CÓ' : '❌ KHÔNG'}`);
+        console.log(`        → Được tính vào "Số buổi dạy": ${isCounted ? ' CÓ' : ' KHÔNG'}`);
         console.log(``);
       });
       
-      console.log(`  📊 TÓM TẮT:`);
+      console.log(`   TÓM TẮT:`);
       console.log(`     - Tổng số buổi đã có điểm danh: ${totalSessions}`);
       console.log(`     - Số buổi do ${teacher.username} dạy (không có người dạy thay): ${actualTeachingSessions}`);
       console.log(`     - Số buổi nghỉ (có người dạy thay): ${totalSessions - actualTeachingSessions}`);
@@ -354,8 +371,8 @@ exports.getTeacherById = async (req, res) => {
         level: cls.course?.program?.level || 'N/A',
         students: cls.students || [],
         status: cls.status,
-        startDate: cls.startDate,
-        endDate: cls.endDate,
+        startDate: formatDateToVN(cls.startDate),
+        endDate: formatDateToVN(cls.endDate),
         stats: {
           totalSessions,
           actualTeachingSessions,
@@ -371,21 +388,21 @@ exports.getTeacherById = async (req, res) => {
     const totalSessions = formattedClasses.reduce((sum, cls) => sum + (cls.stats?.totalSessions || 0), 0);
     const actualTeachingSessions = formattedClasses.reduce((sum, cls) => sum + (cls.stats?.actualTeachingSessions || 0), 0);
     
-    console.log(`\n📊 [DEBUG] ============================================`);
-    console.log(`📊 [DEBUG] TỔNG HỢP KẾT QUẢ:`);
-    console.log(`📊 [DEBUG] - Số lớp: ${formattedClasses.length}`);
-    console.log(`📊 [DEBUG] - Tổng số học viên: ${totalStudents}`);
-    console.log(`📊 [DEBUG] - Tổng số buổi: ${totalSessions}`);
-    console.log(`📊 [DEBUG] - Số buổi dạy thực tế: ${actualTeachingSessions}`);
-    console.log(`📊 [DEBUG] - Số buổi nghỉ: ${totalSessions - actualTeachingSessions}`);
-    console.log(`📊 [DEBUG] ============================================\n`);
+    console.log(`\n [DEBUG] ============================================`);
+    console.log(` [DEBUG] TỔNG HỢP KẾT QUẢ:`);
+    console.log(` [DEBUG] - Số lớp: ${formattedClasses.length}`);
+    console.log(` [DEBUG] - Tổng số học viên: ${totalStudents}`);
+    console.log(` [DEBUG] - Tổng số buổi: ${totalSessions}`);
+    console.log(` [DEBUG] - Số buổi dạy thực tế: ${actualTeachingSessions}`);
+    console.log(` [DEBUG] - Số buổi nghỉ: ${totalSessions - actualTeachingSessions}`);
+    console.log(` [DEBUG] ============================================\n`);
     
     // Log chi tiết stats của từng lớp
     formattedClasses.forEach((cls, idx) => {
-      console.log(`📊 [DEBUG] Lớp ${idx + 1}: ${cls.name}`);
-      console.log(`📊 [DEBUG]   - Tổng số buổi: ${cls.stats.totalSessions}`);
-      console.log(`📊 [DEBUG]   - Số buổi dạy: ${cls.stats.actualTeachingSessions}`);
-      console.log(`📊 [DEBUG]   - Số buổi nghỉ: ${cls.stats.absentSessions}`);
+      console.log(` [DEBUG] Lớp ${idx + 1}: ${cls.name}`);
+      console.log(` [DEBUG]   - Tổng số buổi: ${cls.stats.totalSessions}`);
+      console.log(` [DEBUG]   - Số buổi dạy: ${cls.stats.actualTeachingSessions}`);
+      console.log(` [DEBUG]   - Số buổi nghỉ: ${cls.stats.absentSessions}`);
     });
     console.log(`\n`);
     
@@ -405,7 +422,7 @@ exports.getTeacherById = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy thông tin giảng viên:", error);
+    console.error(" Lỗi khi lấy thông tin giảng viên:", error);
     res.status(500).json({ 
       message: "Lỗi server khi lấy thông tin giảng viên",
       error: error.message 
@@ -420,8 +437,8 @@ exports.createTeacher = async (req, res) => {
   try {
     const { username, email, password, phone, address } = req.body;
     
-    // Validate required fields
-    if (!username || !email || !password || !phone || !address) {
+    // Validate required fields (password không bắt buộc, sẽ dùng mặc định nếu không có)
+    if (!username || !email || !phone || !address) {
       return res.status(400).json({ 
         message: "Thiếu thông tin bắt buộc" 
       });
@@ -460,7 +477,7 @@ exports.createTeacher = async (req, res) => {
     const newTeacher = await User.create({
       username,
       email,
-      password,
+      password: password || '123456', // Default password nếu không có
       phone,
       address,
       roleId: teacherRole._id
@@ -476,7 +493,7 @@ exports.createTeacher = async (req, res) => {
       teacher: teacherResponse
     });
   } catch (error) {
-    console.error("❌ Lỗi khi tạo giảng viên:", error);
+    console.error(" Lỗi khi tạo giảng viên:", error);
     res.status(500).json({ 
       message: "Lỗi server khi tạo giảng viên",
       error: error.message 
@@ -542,7 +559,7 @@ exports.updateTeacher = async (req, res) => {
       teacher: teacherResponse
     });
   } catch (error) {
-    console.error("❌ Lỗi khi cập nhật giảng viên:", error);
+    console.error(" Lỗi khi cập nhật giảng viên:", error);
     res.status(500).json({ 
       message: "Lỗi server khi cập nhật giảng viên",
       error: error.message 
@@ -577,7 +594,7 @@ exports.deleteTeacher = async (req, res) => {
       message: "Xóa giảng viên thành công"
     });
   } catch (error) {
-    console.error("❌ Lỗi khi xóa giảng viên:", error);
+    console.error(" Lỗi khi xóa giảng viên:", error);
     res.status(500).json({ 
       message: "Lỗi server khi xóa giảng viên",
       error: error.message 
@@ -586,7 +603,7 @@ exports.deleteTeacher = async (req, res) => {
 };
 
 // =========================
-// 📅 LẤY LỊCH DẠY CỦA GIẢNG VIÊN HIỆN TẠI (từ token)
+//  LẤY LỊCH DẠY CỦA GIẢNG VIÊN HIỆN TẠI (từ token)
 // =========================
 exports.getCurrentTeacherSchedule = async (req, res) => {
   try {
@@ -594,54 +611,29 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
     const teacherId = req.user._id;
     const { startDate, endDate } = req.query;
     
-    // Find all classes taught by this teacher
-    const teacherClasses = await Class.find({ teacher: teacherId })
-      .select('_id name course startDate endDate')
-      .populate('course', 'name')
-      .lean();
-    
-    if (!teacherClasses || teacherClasses.length === 0) {
-      return res.status(200).json({
-        success: true,
-        message: 'Chưa có lớp học nào',
-        total: 0,
-        schedules: []
-      });
-    }
-    
-    
-    const classIds = teacherClasses.map(cls => cls._id);
-    
-    console.log('🔍 Get Current Teacher Schedule:', {
-      teacherId,
-      startDate,
-      endDate,
-      classIds: classIds.length
-    });
-    
-    let query = { class: { $in: classIds } };
+    // Simple query: get all ClassSchedules where teacher is this teacher
+    let query = { teacher: teacherId };
     
     // Filter by date range if provided
     if (startDate && endDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
+      // Parse dates carefully to avoid timezone issues
+      // Expecting YYYY-MM-DD format from frontend
+      const parseDate = (dateStr) => {
+        const [year, month, day] = dateStr.split('-').map(Number);
+        return new Date(Date.UTC(year, month - 1, day));
+      };
       
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
+      const start = parseDate(startDate);
+      start.setUTCHours(0, 0, 0, 0);
+      
+      const end = parseDate(endDate);
+      end.setUTCHours(23, 59, 59, 999);
       
       query.date = {
         $gte: start,
         $lte: end
       };
-      console.log('📅 Date filter:', {
-        startDate,
-        endDate,
-        startObj: start,
-        endObj: end
-      });
     }
-    
-    console.log('🔍 Query:', JSON.stringify(query));
     
     const schedules = await ClassSchedule.find(query)
       .populate('class', 'name course startDate endDate')
@@ -657,27 +649,21 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
       .sort({ date: 1, startTime: 1 })
       .lean();
     
-    console.log('📋 Schedules found:', {
-      total: schedules.length,
-      sample: schedules[0] ? {
-        date: schedules[0].date,
-        status: schedules[0].status,
-        className: schedules[0].class?.name
-      } : 'No schedules'
-    });
-    
     // Format schedules with additional info
-    const formattedSchedules = schedules.map(schedule => ({
-      ...schedule,
-      className: schedule.class?.name,
-      courseName: schedule.class?.course?.name,
-      sessionTitle: schedule.session?.title,
-      sessionOrder: schedule.session?.order,
-      roomName: schedule.room?.room_name,
-      location: schedule.room?.location,
-      classStartDate: schedule.class?.startDate,
-      classEndDate: schedule.class?.endDate
-    }));
+    const formattedSchedules = schedules.map(schedule => {
+      return {
+        ...schedule,
+        date: formatDateToVN(schedule.date),
+        className: schedule.class?.name,
+        courseName: schedule.class?.course?.name,
+        sessionTitle: schedule.session?.title,
+        sessionOrder: schedule.session?.order,
+        roomName: schedule.room?.room_name,
+        location: schedule.room?.location,
+        classStartDate: formatDateToVN(schedule.class?.startDate),
+        classEndDate: formatDateToVN(schedule.class?.endDate)
+      };
+    });
     
     res.status(200).json({
       success: true,
@@ -686,7 +672,7 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
       schedules: formattedSchedules
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy lịch dạy:', error);
+    console.error(' Lỗi khi lấy lịch dạy:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy lịch dạy',
@@ -696,7 +682,7 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
 };
 
 // =========================
-// 📅 LẤY LỊCH DẠY CỦA GIẢNG VIÊN (Admin use)
+//  LẤY LỊCH DẠY CỦA GIẢNG VIÊN (Admin use)
 // =========================
 exports.getTeacherSchedule = async (req, res) => {
   try {
@@ -719,18 +705,58 @@ exports.getTeacherSchedule = async (req, res) => {
     
     const classIds = teacherClasses.map(cls => cls._id);
     
-    let query = { class: { $in: classIds }, status: 'fixed' };
+    // Lấy cả temporary và fixed để hiển thị đầy đủ lịch dạy
+    let query = { class: { $in: classIds }, status: { $in: ['temporary', 'fixed'] } };
     
     // Filter by date range if provided
     if (startDate && endDate) {
-      query.date = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      };
+      // Parse date string (YYYY-MM-DD) và tạo Date range để tránh vấn đề timezone
+      const startDateParts = startDate.split('-');
+      const endDateParts = endDate.split('-');
+      
+      if (startDateParts.length === 3 && endDateParts.length === 3) {
+        const start = new Date(
+          Date.UTC(
+            parseInt(startDateParts[0]),
+            parseInt(startDateParts[1]) - 1,
+            parseInt(startDateParts[2])
+          )
+        );
+        const end = new Date(
+          Date.UTC(
+            parseInt(endDateParts[0]),
+            parseInt(endDateParts[1]) - 1,
+            parseInt(endDateParts[2])
+          )
+        );
+        end.setUTCDate(end.getUTCDate() + 1); // Ngày tiếp theo để bao gồm cả ngày cuối
+        
+        query.date = {
+          $gte: start,
+          $lt: end
+        };
+      } else {
+        // Fallback to old method if date format is different
+        query.date = {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate)
+        };
+      }
     }
     
     const schedules = await ClassSchedule.find(query)
-      .populate('class', 'name startDate endDate')
+      .populate({
+        path: 'class',
+        select: 'name startDate endDate course',
+        populate: {
+          path: 'course',
+          select: 'name program',
+          populate: {
+            path: 'program',
+            select: 'type program_name'
+          }
+        }
+      })
       .populate('room', 'room_name location')
       .populate('session', 'title order')
       .sort({ date: 1, startTime: 1 })
@@ -741,8 +767,10 @@ exports.getTeacherSchedule = async (req, res) => {
       const classInfo = teacherClasses.find(c => c._id.toString() === schedule.class._id.toString());
       return {
         ...schedule,
-        classStartDate: classInfo?.startDate,
-        classEndDate: classInfo?.endDate
+        date: formatDateToVN(schedule.date),
+        classStartDate: formatDateToVN(classInfo?.startDate),
+        classEndDate: formatDateToVN(classInfo?.endDate),
+        programType: schedule.class?.course?.program?.type || null
       };
     });
     
@@ -753,7 +781,7 @@ exports.getTeacherSchedule = async (req, res) => {
       schedules: schedulesWithClassInfo
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy lịch dạy:", error);
+    console.error(" Lỗi khi lấy lịch dạy:", error);
     res.status(500).json({ 
       success: false,
       message: "Lỗi server khi lấy lịch dạy",
@@ -763,7 +791,7 @@ exports.getTeacherSchedule = async (req, res) => {
 };
 
 // =========================
-// 📚 LẤY DANH SÁCH LỚP HỌC CỦA GIẢNG VIÊN HIỆN TẠI
+//  LẤY DANH SÁCH LỚP HỌC CỦA GIẢNG VIÊN HIỆN TẠI
 // =========================
 exports.getMyClasses = async (req, res) => {
   try {
@@ -859,12 +887,12 @@ exports.getMyClasses = async (req, res) => {
           completedLessons,
           totalLessons: allSchedules.length,
           ungradedSubmissions,
-          startDate: cls.startDate,
-          endDate: cls.endDate,
+          startDate: formatDateToVN(cls.startDate),
+          endDate: formatDateToVN(cls.endDate),
           status: classStatus,
           nextLesson: nextLesson ? {
             topic: nextLesson.session?.title || 'Chưa có chủ đề',
-            date: nextLesson.date,
+            date: formatDateToVN(nextLesson.date),
             time: `${nextLesson.startTime} - ${nextLesson.endTime}`
           } : null
         };
@@ -878,7 +906,7 @@ exports.getMyClasses = async (req, res) => {
       classes: classesWithStats
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy danh sách lớp học:', error);
+    console.error(' Lỗi khi lấy danh sách lớp học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy danh sách lớp học',
@@ -888,7 +916,7 @@ exports.getMyClasses = async (req, res) => {
 };
 
 // =========================
-// 📖 LẤY CHI TIẾT LỚP HỌC CỦA GIẢNG VIÊN HIỆN TẠI
+//  LẤY CHI TIẾT LỚP HỌC CỦA GIẢNG VIÊN HIỆN TẠI
 // =========================
 exports.getMyClassDetail = async (req, res) => {
   try {
@@ -920,8 +948,8 @@ exports.getMyClassDetail = async (req, res) => {
 
     // Get all schedules/lessons for this class
     const lessons = await ClassSchedule.find({ 
-      class: classId,
-      status: 'fixed' 
+      class: classId
+      // Không filter theo status, lấy tất cả (scheduled, completed, cancelled, etc.)
     })
       .populate('session', 'title order content')
       .populate('room', 'room_name location')
@@ -932,19 +960,71 @@ exports.getMyClassDetail = async (req, res) => {
     const today = now.toISOString().split('T')[0];
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
-    // Format lessons with status
-    const formattedLessons = lessons.map((lesson, index) => {
+    // Get StudentSchedule and HomeworkSubmission for counting
+    const StudentSchedule = require('../models/studentScheduleModel');
+    const HomeworkSubmission = require('../models/homeworkSubmissionModel');
+    
+    console.log(` [DEBUG] Total lessons found: ${lessons.length}`);
+    console.log(` [DEBUG] Today: ${today}, Current time: ${currentTime}`);
+    
+    // Format lessons with status and real attendance data
+    const formattedLessons = await Promise.all(lessons.map(async (lesson, index) => {
+      // Convert lesson.date to YYYY-MM-DD string for comparison
+      const lessonDateStr = new Date(lesson.date).toISOString().split('T')[0];
+      
       let status = 'scheduled';
-      if (lesson.date < today || (lesson.date === today && lesson.endTime < currentTime)) {
+      if (lessonDateStr < today || (lessonDateStr === today && lesson.endTime < currentTime)) {
         status = 'completed';
-      } else if (lesson.date === today || (lesson.date > today && new Date(lesson.date) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))) {
+      } else if (lessonDateStr === today || (lessonDateStr > today && new Date(lesson.date) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))) {
         status = 'upcoming';
       }
+      
+      console.log(` Lesson ${index + 1}: date=${lessonDateStr}, today=${today}, status=${status}`);
 
-      // Count attendance (placeholder - would need StudentSchedule)
+      // Get real attendance count from StudentSchedule
       const totalStudents = classInfo.students.length;
-      const hasAttendance = status === 'completed';
-      const attendanceCount = hasAttendance ? Math.round(totalStudents * (0.8 + Math.random() * 0.15)) : 0;
+      const studentSchedules = await StudentSchedule.find({
+        classSchedule: lesson._id
+      });
+      
+      const hasAttendance = studentSchedules.some(ss => ss.attendance?.status);
+      console.log(` Lesson ${index + 1} (${lesson.date}): hasAttendance = ${hasAttendance}, totalStudents = ${totalStudents}, recorded = ${studentSchedules.length}`) ;
+      const attendanceCount = studentSchedules.filter(
+        ss => ss.attendance?.status === 'present' || ss.attendance?.status === 'late'
+      ).length;
+
+      // Get homework for this lesson
+      const homeworkWithStats = [];
+      
+      if (lesson.homework && lesson.homework.length > 0) {
+        for (const hw of lesson.homework) {
+          const submissions = await HomeworkSubmission.find({
+            classSchedule: lesson._id,
+            homeworkId: hw._id
+          });
+          
+          const submittedCount = submissions.filter(
+            s => s.status === 'submitted' || s.status === 'late'
+          ).length;
+          
+          const lateCount = submissions.filter(
+            s => s.status === 'late'
+          ).length;
+
+          homeworkWithStats.push({
+            _id: hw._id,
+            title: hw.assignment?.title || 'Bài tập',
+            description: hw.assignment?.description || '',
+            files: hw.assignment?.files || [],
+            answerFiles: hw.answerFiles || [],
+            deadline: hw.deadline,
+            submitted: submittedCount,
+            late: lateCount,
+            pending: totalStudents - submittedCount,
+            total: totalStudents
+          });
+        }
+      }
 
       return {
         _id: lesson._id,
@@ -957,9 +1037,10 @@ exports.getMyClassDetail = async (req, res) => {
         status,
         hasAttendance,
         attendanceCount,
-        totalStudents
+        totalStudents,
+        homework: homeworkWithStats
       };
-    });
+    }));
 
     // Get materials from schedules
     const materials = [];
@@ -981,57 +1062,10 @@ exports.getMyClassDetail = async (req, res) => {
       }
     });
 
-    // Get assignments/homework from schedules
-    const HomeworkSubmission = require('../models/homeworkSubmissionModel');
-    const assignments = [];
-    
-    for (const lesson of lessons) {
-      if (lesson.homework && lesson.homework.length > 0) {
-        for (const hw of lesson.homework) {
-          const totalStudents = classInfo.students.length;
-          
-          // Get real submission statistics
-          const submissions = await HomeworkSubmission.find({
-            classSchedule: lesson._id,
-            homeworkId: hw._id
-          });
-          
-          const submittedCount = submissions.filter(
-            s => s.status === 'submitted' || s.status === 'late'
-          ).length;
-          
-          const lateCount = submissions.filter(
-            s => s.status === 'late'
-          ).length;
-
-          assignments.push({
-            _id: hw._id,
-            classScheduleId: lesson._id,
-            lessonDate: lesson.date,
-            sessionOrder: lesson.session?.order,
-            sessionTitle: lesson.session?.title,
-            title: hw.assignment.title,
-            files: hw.assignment.files || [], // Support multiple files
-            answerFiles: hw.answerFiles || [], // Support multiple answer files
-            type: 'homework',
-            dueDate: hw.deadline,
-            total: totalStudents,
-            submitted: submittedCount,
-            late: lateCount,
-            notSubmitted: totalStudents - submittedCount,
-            submissionRate: totalStudents > 0 ? Math.round((submittedCount / totalStudents) * 100) : 0
-          });
-        }
-      }
-    }
-
     // Get course info to check mocktest sessions
     const Course = require('../models/courseModel');
     const course = await Course.findById(classInfo.course._id);
     const mocktestSessionOrders = course?.mocktestSessionOrders || [];
-
-    // Get StudentSchedule for attendance
-    const StudentSchedule = require('../models/studentScheduleModel');
 
     // Format students with real stats
     const formattedStudents = await Promise.all(classInfo.students.map(async (student) => {
@@ -1054,6 +1088,8 @@ exports.getMyClassDetail = async (req, res) => {
         .flatMap(l => l.homework || [])
         .map(hw => hw._id);
       
+      const totalAssignments = homeworkIds.length;
+      
       const submissions = await HomeworkSubmission.find({
         student: student._id,
         homeworkId: { $in: homeworkIds }
@@ -1062,8 +1098,8 @@ exports.getMyClassDetail = async (req, res) => {
       const submittedCount = submissions.filter(
         s => s.status === 'submitted' || s.status === 'late'
       ).length;
-      const homeworkCompletionRate = assignments.length > 0
-        ? Math.round((submittedCount / assignments.length) * 100)
+      const homeworkCompletionRate = totalAssignments > 0
+        ? Math.round((submittedCount / totalAssignments) * 100)
         : 0;
 
       // Get mocktest scores
@@ -1149,7 +1185,7 @@ exports.getMyClassDetail = async (req, res) => {
         totalLessons: totalLessons,
         attendanceRate: attendanceRate,
         submittedAssignments: submittedCount,
-        totalAssignments: assignments.length,
+        totalAssignments: totalAssignments,
         homeworkCompletionRate: homeworkCompletionRate,
         mocktestScores: mocktestScores,
         mocktestSessionOrders: mocktestSessionOrders
@@ -1162,6 +1198,68 @@ exports.getMyClassDetail = async (req, res) => {
     const averageAttendance = Math.round(
       formattedStudents.reduce((sum, s) => sum + s.attendanceRate, 0) / formattedStudents.length
     );
+
+    // === THÊM DỮ LIỆU CHO CLASS OVERVIEW ===
+
+    // 1. Mocktest Milestones
+    const mocktestMilestones = [];
+    for (const sessionOrder of mocktestSessionOrders) {
+      const lessonIndex = lessons.findIndex(l => l.session?.order === sessionOrder);
+      if (lessonIndex !== -1) {
+        const mocktestLesson = lessons[lessonIndex];
+        mocktestMilestones.push({
+          sessionOrder: sessionOrder,
+          lessonNumber: lessonIndex + 1,
+          lessonId: mocktestLesson._id,
+          date: formatDateToVN(mocktestLesson.date),
+          status: formattedLessons[lessonIndex]?.status || 'scheduled',
+          title: `Mocktest ${sessionOrder}`
+        });
+      }
+    }
+
+    // 2. Attendance by Lesson (chỉ completed lessons)
+    console.log(` [DEBUG] formattedLessons count: ${formattedLessons.length}`);
+    console.log(` [DEBUG] Completed lessons: ${formattedLessons.filter(l => l.status === 'completed').length}`);
+    console.log(` [DEBUG] Completed with attendance: ${formattedLessons.filter(l => l.status === 'completed' && l.hasAttendance).length}`);
+    
+    const attendanceByLesson = formattedLessons
+      .filter(l => l.status === 'completed' && l.hasAttendance)
+      .map(l => ({
+        lessonNumber: l.lessonNumber,
+        date: l.date,
+        attendanceCount: l.attendanceCount,
+        totalStudents: l.totalStudents,
+        attendanceRate: Math.round((l.attendanceCount / l.totalStudents) * 100)
+      }));
+    
+    console.log(` [DEBUG] attendanceByLesson result:`, attendanceByLesson);
+
+    // 3. Homework Stats - Extract from formattedLessons
+    const homeworkStats = [];
+    formattedLessons.forEach(lesson => {
+      if (lesson.homework && lesson.homework.length > 0) {
+        lesson.homework.forEach(hw => {
+          const onTime = hw.submitted - hw.late;
+          homeworkStats.push({
+            assignmentId: hw._id,
+            lessonNumber: lesson.lessonNumber,
+            sessionOrder: lesson.sessionOrder,
+            title: hw.title,
+            deadline: hw.deadline,
+            onTime: onTime,
+            late: hw.late,
+            pending: hw.pending,
+            total: hw.total,
+            onTimeRate: hw.total > 0 ? Math.round((onTime / hw.total) * 100) : 0,
+            lateRate: hw.total > 0 ? Math.round((hw.late / hw.total) * 100) : 0,
+            pendingRate: hw.total > 0 ? Math.round((hw.pending / hw.total) * 100) : 0
+          });
+        });
+      }
+    });
+    
+    console.log(` [DEBUG] homeworkStats result:`, homeworkStats);
 
     // Determine class status
     let classStatus = classInfo.status;
@@ -1201,19 +1299,21 @@ exports.getMyClassDetail = async (req, res) => {
         completedLessons,
         totalLessons: lessons.length,
         averageAttendance,
-        startDate: classInfo.startDate,
-        endDate: classInfo.endDate,
+        startDate: formatDateToVN(classInfo.startDate),
+        endDate: formatDateToVN(classInfo.endDate),
         status: classStatus,
         nextLesson: nextLesson ? {
           topic: nextLesson.topic,
           date: nextLesson.date,
           time: nextLesson.time
-        } : null
+        } : null,
+        mocktestMilestones: mocktestMilestones
       },
       students: formattedStudents,
       lessons: formattedLessons,
       materials,
-      assignments
+      attendanceByLesson: attendanceByLesson,
+      homeworkStats: homeworkStats
     };
 
     res.status(200).json({
@@ -1222,7 +1322,7 @@ exports.getMyClassDetail = async (req, res) => {
       data: detailData
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy chi tiết lớp học:', error);
+    console.error(' Lỗi khi lấy chi tiết lớp học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy chi tiết lớp học',
@@ -1232,7 +1332,7 @@ exports.getMyClassDetail = async (req, res) => {
 };
 
 // =========================
-// 📖 LẤY CHI TIẾT BUỔI HỌC (ClassSchedule)
+//  LẤY CHI TIẾT BUỔI HỌC (ClassSchedule)
 // =========================
 exports.getLessonDetail = async (req, res) => {
   try {
@@ -1255,7 +1355,7 @@ exports.getLessonDetail = async (req, res) => {
           },
           {
             path: 'students',
-            select: 'username email'
+            select: 'username email fullName'
           }
         ]
       })
@@ -1278,10 +1378,30 @@ exports.getLessonDetail = async (req, res) => {
       });
     }
 
+    // Get attendance data for all students in this class
+    const studentSchedules = await StudentSchedule.find({
+      classSchedule: scheduleId
+    }).populate('student', 'username email fullName').lean();
+
+    // Map students with their attendance status
+    const studentsWithAttendance = (schedule.class?.students || []).map(student => {
+      const studentSchedule = studentSchedules.find(
+        ss => ss.student._id.toString() === student._id.toString()
+      );
+
+      return {
+        _id: student._id,
+        username: student.username,
+        email: student.email,
+        fullName: student.fullName || student.username,
+        attendance: studentSchedule?.attendance || null // null if not marked yet
+      };
+    });
+
     // Format response
     const lessonDetail = {
       _id: schedule._id,
-      date: schedule.date,
+      date: formatDateToVN(schedule.date),
       startTime: schedule.startTime,
       endTime: schedule.endTime,
       status: schedule.status,
@@ -1290,8 +1410,8 @@ exports.getLessonDetail = async (req, res) => {
       className: schedule.class?.name,
       courseName: schedule.class?.course?.name,
       courseDescription: schedule.class?.course?.description,
-      classStartDate: schedule.class?.startDate,
-      classEndDate: schedule.class?.endDate,
+      classStartDate: formatDateToVN(schedule.class?.startDate),
+      classEndDate: formatDateToVN(schedule.class?.endDate),
       
       // Session info
       sessionTitle: schedule.session?.title,
@@ -1308,9 +1428,9 @@ exports.getLessonDetail = async (req, res) => {
       teacherName: schedule.class?.teacher?.username,
       teacherEmail: schedule.class?.teacher?.email,
       
-      // Student info
-      totalStudents: schedule.class?.students?.length || 0,
-      students: schedule.class?.students || [],
+      // Student info with attendance
+      totalStudents: studentsWithAttendance.length,
+      students: studentsWithAttendance,
       
       // Homework
       homework: schedule.homework || [],
@@ -1331,7 +1451,7 @@ exports.getLessonDetail = async (req, res) => {
       lesson: lessonDetail
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy chi tiết buổi học:', error);
+    console.error(' Lỗi khi lấy chi tiết buổi học:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy chi tiết buổi học',
@@ -1341,7 +1461,7 @@ exports.getLessonDetail = async (req, res) => {
 };
 
 // =========================
-// 📝 CẬP NHẬT ĐIỂM MOCKTEST
+//  CẬP NHẬT ĐIỂM MOCKTEST
 // =========================
 exports.updateMocktestScore = async (req, res) => {
   try {
@@ -1362,7 +1482,7 @@ exports.updateMocktestScore = async (req, res) => {
       .populate('class', 'teacher students course')
       .populate('session', 'order title');
 
-    console.log('🔍 Update Mocktest - Schedule Info:', {
+    console.log(' Update Mocktest - Schedule Info:', {
       scheduleId,
       studentId,
       hasSchedule: !!schedule,
@@ -1403,10 +1523,11 @@ exports.updateMocktestScore = async (req, res) => {
     const Course = require('../models/courseModel');
     const Session = require('../models/sessionModel');
     
-    const course = await Course.findById(schedule.class.course);
+    const course = await Course.findById(schedule.class.course)
+      .populate('program', 'name type');
     const session = schedule.session; // Already populated above
     
-    console.log('🔍 Update Mocktest - Course & Session Info:', {
+    console.log(' Update Mocktest - Course & Session Info:', {
       courseId: schedule.class.course,
       hasCourse: !!course,
       mocktestSessionOrders: course?.mocktestSessionOrders,
@@ -1425,7 +1546,7 @@ exports.updateMocktestScore = async (req, res) => {
     const isMocktestSession = mocktestSessionOrders.includes(session.order);
 
     if (!isMocktestSession) {
-      console.log('❌ Not a mocktest session:', {
+      console.log(' Not a mocktest session:', {
         sessionOrder: session.order,
         mocktestSessionOrders,
         courseName: course?.name
@@ -1456,24 +1577,67 @@ exports.updateMocktestScore = async (req, res) => {
       s => s.studentId.toString() === studentId.toString()
     );
 
+    const skillScores = {
+      reading: reading || 0,
+      listening: listening || 0,
+      writing: writing || 0,
+      speaking: speaking || 0
+    };
+
+    // Get program type
+    const programType = course?.program?.type?.toLowerCase() || 'ielts';
+
+    // Calculate total score based on program type
+    let totalScore = 0;
+    if (programType === 'ielts') {
+      const validScores = Object.values(skillScores).filter(s => s > 0);
+      totalScore = validScores.length > 0 
+        ? Math.round((validScores.reduce((a, b) => a + b, 0) / validScores.length) * 2) / 2 
+        : 0;
+    } else if (programType === 'toeic') {
+      totalScore = (skillScores.reading || 0) + (skillScores.listening || 0);
+    } else if (programType === 'cam' || programType === 'cambridge') {
+      const validScores = Object.values(skillScores).filter(s => s > 0);
+      totalScore = validScores.length > 0 
+        ? Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length) 
+        : 0;
+    }
+
     if (studentScore) {
-      // Update existing score
+      // Update existing score in ClassSchedule
       if (reading !== undefined) studentScore.reading = reading;
       if (listening !== undefined) studentScore.listening = listening;
       if (writing !== undefined) studentScore.writing = writing;
       if (speaking !== undefined) studentScore.speaking = speaking;
     } else {
-      // Add new score
+      // Add new score to ClassSchedule
       schedule.mocktest.scores.push({
         studentId,
-        reading: reading || 0,
-        listening: listening || 0,
-        writing: writing || 0,
-        speaking: speaking || 0
+        reading: skillScores.reading,
+        listening: skillScores.listening,
+        writing: skillScores.writing,
+        speaking: skillScores.speaking
       });
     }
 
     await schedule.save();
+
+    // Also save to User.mocktestScores for easy student access
+    const mocktestKey = `mocktest${session.order}`;
+    await User.findByIdAndUpdate(
+      studentId,
+      {
+        $set: {
+          [`mocktestScores.${mocktestKey}`]: {
+            scheduleId: scheduleId,
+            sessionOrder: session.order,
+            totalScore: totalScore,
+            skillScores: skillScores
+          }
+        }
+      },
+      { new: true }
+    );
 
     res.status(200).json({
       success: true,
@@ -1485,7 +1649,7 @@ exports.updateMocktestScore = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Lỗi khi cập nhật điểm mocktest:', error);
+    console.error(' Lỗi khi cập nhật điểm mocktest:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi cập nhật điểm mocktest',
@@ -1494,8 +1658,264 @@ exports.updateMocktestScore = async (req, res) => {
   }
 };
 
+// ====================================
+//  IMPORT ĐIỂM MOCKTEST HÀNG LOẠT
+// ====================================
+exports.importMocktestScores = async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const { scheduleId, scores } = req.body; // scores: [{ studentId, email, reading, listening, writing, speaking }]
+    const teacherId = req.user._id;
+
+    console.log('📥 Import Mocktest Scores Request:', {
+      classId,
+      scheduleId,
+      teacherId,
+      totalScores: scores?.length
+    });
+
+    // Validate input
+    if (!scheduleId || !scores || !Array.isArray(scores) || scores.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu thông tin scheduleId hoặc scores'
+      });
+    }
+
+    // Find the schedule and verify ownership
+    const schedule = await ClassSchedule.findById(scheduleId)
+      .populate({
+        path: 'class',
+        select: 'teacher students course name',
+        populate: {
+          path: 'course',
+          select: 'name program mocktestSessionOrders',
+          populate: {
+            path: 'program',
+            select: 'type name'
+          }
+        }
+      })
+      .populate('session', 'order title');
+
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy buổi học'
+      });
+    }
+
+    // Verify teacher ownership
+    if (schedule.class.teacher.toString() !== teacherId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền cập nhật điểm cho lớp này'
+      });
+    }
+
+    // Verify this is a mocktest session
+    const course = schedule.class.course;
+    const session = schedule.session;
+    const mocktestSessionOrders = course?.mocktestSessionOrders || [];
+    const isMocktestSession = mocktestSessionOrders.includes(session?.order);
+
+    if (!isMocktestSession) {
+      return res.status(400).json({
+        success: false,
+        message: 'Buổi học này không phải là buổi mocktest'
+      });
+    }
+
+    // Get program type for validation
+    const programType = course?.program?.type?.toLowerCase() || 'ielts';
+
+    // Validate scores based on program type
+    const validateScore = (score, skill, type) => {
+      if (score === null || score === undefined || score === 0) return true; // Allow 0 or empty
+
+      const num = parseFloat(score);
+      if (isNaN(num)) return false;
+
+      switch (type) {
+        case 'ielts':
+          if (num < 1 || num > 9) return false;
+          const decimal = (num % 1).toFixed(1);
+          return decimal === '0.0' || decimal === '0.5';
+        
+        case 'toeic':
+          if (skill === 'reading' || skill === 'listening') {
+            return Number.isInteger(num) && num >= 10 && num <= 495 && num % 5 === 0;
+          }
+          return true; // writing/speaking not used in TOEIC
+        
+        case 'cam':
+        case 'cambridge':
+          return Number.isInteger(num) && num >= 1 && num <= 15;
+        
+        default:
+          return true;
+      }
+    };
+
+    // Initialize mocktest if not exists
+    if (!schedule.mocktest) {
+      schedule.mocktest = {
+        title: `Mocktest ${session.order}`,
+        order: session.order,
+        type: programType,
+        scores: []
+      };
+    }
+
+    if (!schedule.mocktest.scores) {
+      schedule.mocktest.scores = [];
+    }
+
+    // Process each score
+    let successCount = 0;
+    let failedCount = 0;
+    const failedRecords = [];
+
+    for (const scoreData of scores) {
+      try {
+        const { studentId, reading, listening, writing, speaking } = scoreData;
+
+        // Verify student is in class
+        const isStudentInClass = schedule.class.students.some(
+          s => s._id.toString() === studentId.toString()
+        );
+
+        if (!isStudentInClass) {
+          failedCount++;
+          failedRecords.push({
+            studentId,
+            reason: 'Học viên không thuộc lớp học này'
+          });
+          continue;
+        }
+
+        // Validate scores
+        const skills = { reading, listening, writing, speaking };
+        let hasInvalidScore = false;
+
+        for (const [skill, value] of Object.entries(skills)) {
+          if (!validateScore(value, skill, programType)) {
+            hasInvalidScore = true;
+            failedCount++;
+            failedRecords.push({
+              studentId,
+              reason: `Điểm ${skill} không hợp lệ cho ${programType.toUpperCase()}`
+            });
+            break;
+          }
+        }
+
+        if (hasInvalidScore) continue;
+
+        // Find or create score entry in ClassSchedule
+        let studentScore = schedule.mocktest.scores.find(
+          s => s.studentId.toString() === studentId.toString()
+        );
+
+        const skillScores = {
+          reading: reading || 0,
+          listening: listening || 0,
+          writing: writing || 0,
+          speaking: speaking || 0
+        };
+
+        // Calculate total score based on program type
+        let totalScore = 0;
+        if (programType === 'ielts') {
+          // IELTS: average of 4 skills
+          const validScores = Object.values(skillScores).filter(s => s > 0);
+          totalScore = validScores.length > 0 
+            ? Math.round((validScores.reduce((a, b) => a + b, 0) / validScores.length) * 2) / 2 
+            : 0;
+        } else if (programType === 'toeic') {
+          // TOEIC: sum of reading + listening
+          totalScore = (skillScores.reading || 0) + (skillScores.listening || 0);
+        } else if (programType === 'cam' || programType === 'cambridge') {
+          // Cambridge: average of 4 skills
+          const validScores = Object.values(skillScores).filter(s => s > 0);
+          totalScore = validScores.length > 0 
+            ? Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length) 
+            : 0;
+        }
+
+        if (studentScore) {
+          // Update existing score in ClassSchedule
+          if (reading !== undefined && reading !== null) studentScore.reading = reading;
+          if (listening !== undefined && listening !== null) studentScore.listening = listening;
+          if (writing !== undefined && writing !== null) studentScore.writing = writing;
+          if (speaking !== undefined && speaking !== null) studentScore.speaking = speaking;
+        } else {
+          // Add new score to ClassSchedule
+          schedule.mocktest.scores.push({
+            studentId,
+            reading: skillScores.reading,
+            listening: skillScores.listening,
+            writing: skillScores.writing,
+            speaking: skillScores.speaking
+          });
+        }
+
+        // Also save to User.mocktestScores for easy student access
+        const mocktestKey = `mocktest${session.order}`;
+        await User.findByIdAndUpdate(
+          studentId,
+          {
+            $set: {
+              [`mocktestScores.${mocktestKey}`]: {
+                scheduleId: scheduleId,
+                sessionOrder: session.order,
+                totalScore: totalScore,
+                skillScores: skillScores
+              }
+            }
+          },
+          { new: true }
+        );
+
+        successCount++;
+      } catch (error) {
+        console.error(`Error processing score for student ${scoreData.studentId}:`, error);
+        failedCount++;
+        failedRecords.push({
+          studentId: scoreData.studentId,
+          reason: error.message
+        });
+      }
+    }
+
+    // Save schedule
+    await schedule.save();
+
+    console.log('✅ Import Mocktest Scores Result:', {
+      successCount,
+      failedCount,
+      total: scores.length
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Import thành công ${successCount}/${scores.length} điểm`,
+      successCount,
+      failedCount,
+      failedRecords: failedCount > 0 ? failedRecords : undefined
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi import điểm mocktest:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi import điểm mocktest',
+      error: error.message
+    });
+  }
+};
+
 // =========================
-// 📝 LƯU ĐIỂM DANH HÀNG LOẠT
+//  LƯU ĐIỂM DANH HÀNG LOẠT
 // =========================
 exports.saveAttendance = async (req, res) => {
   try {
@@ -1503,8 +1923,16 @@ exports.saveAttendance = async (req, res) => {
     const { scheduleId } = req.params;
     const { attendanceData } = req.body; // Array of { studentId, status, checkInTime }
 
+    console.log(' Save Attendance Request:', {
+      scheduleId,
+      teacherId,
+      totalStudents: attendanceData?.length
+    });
+
     // Verify schedule exists and teacher owns it
-    const schedule = await ClassSchedule.findById(scheduleId).populate('class');
+    const schedule = await ClassSchedule.findById(scheduleId)
+      .populate('class', 'teacher name');
+    
     if (!schedule) {
       return res.status(404).json({
         success: false,
@@ -1513,65 +1941,95 @@ exports.saveAttendance = async (req, res) => {
     }
 
     // Verify teacher owns this class
-    if (schedule.teacher.toString() !== teacherId.toString()) {
+    if (schedule.class.teacher.toString() !== teacherId.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Bạn không có quyền điểm danh lớp này'
       });
     }
 
-    // TODO: Tạm thời bỏ kiểm tra ngày để test
-    // Verify class date
-    // const today = new Date();
-    // today.setHours(0, 0, 0, 0);
-    // const scheduleDate = new Date(schedule.date);
-    // scheduleDate.setHours(0, 0, 0, 0);
+    // Get schedule start time for late detection
+    const scheduleStart = new Date(schedule.date);
+    const [hours, minutes] = (schedule.startTime || '08:00').split(':');
+    scheduleStart.setHours(parseInt(hours), parseInt(minutes), 0);
 
-    // if (scheduleDate.getTime() !== today.getTime()) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: 'Chỉ được điểm danh vào ngày học'
-    //   });
-    // }
+    console.log('⏰ Schedule start time:', scheduleStart);
 
-    const StudentSchedule = require('../models/studentScheduleModel');
+    // Prepare bulk operations for efficiency
+    const bulkOps = [];
     
-    // Update attendance for each student
-    const updatePromises = attendanceData.map(async ({ studentId, status, checkInTime }) => {
+    for (const record of attendanceData) {
+      let finalStatus = record.status;
+      
+      // Auto-detect late if checked in after start time
+      if (record.status === 'present' && record.checkInTime) {
+        const checkIn = new Date(record.checkInTime);
+        if (checkIn > scheduleStart) {
+          finalStatus = 'late';
+          console.log(`⏰ Student ${record.studentId} marked as LATE (checked in at ${checkIn.toLocaleTimeString()})`);
+        }
+      }
+
       // Find or create StudentSchedule
-      let studentSchedule = await StudentSchedule.findOne({
-        student: studentId,
+      const existingSchedule = await StudentSchedule.findOne({
+        student: record.studentId,
         classSchedule: scheduleId
       });
 
-      if (!studentSchedule) {
-        // Create new StudentSchedule if doesn't exist
-        studentSchedule = new StudentSchedule({
-          student: studentId,
-          classSchedule: scheduleId,
-          scheduleStatus: 'scheduled'
+      if (existingSchedule) {
+        // Update existing
+        bulkOps.push({
+          updateOne: {
+            filter: {
+              student: record.studentId,
+              classSchedule: scheduleId
+            },
+            update: {
+              $set: {
+                'attendance.status': finalStatus,
+                'attendance.checkInTime': record.checkInTime || null,
+                'attendance.markedBy': teacherId,
+                scheduleStatus: 'completed'
+              }
+            }
+          }
         });
+      } else {
+        // Create new
+        const newSchedule = new StudentSchedule({
+          student: record.studentId,
+          classSchedule: scheduleId,
+          attendance: {
+            status: finalStatus,
+            checkInTime: record.checkInTime || null,
+            markedBy: teacherId
+          },
+          scheduleStatus: 'completed'
+        });
+        await newSchedule.save();
       }
+    }
 
-      // Update attendance
-      studentSchedule.attendance = {
-        status,
-        checkInTime: checkInTime ? new Date(checkInTime) : (status === 'present' || status === 'late' ? new Date() : null),
-        markedBy: teacherId
-      };
+    // Execute bulk operations if any
+    if (bulkOps.length > 0) {
+      await StudentSchedule.bulkWrite(bulkOps);
+    }
 
-      return studentSchedule.save();
+    // Update ClassSchedule status
+    await ClassSchedule.findByIdAndUpdate(scheduleId, {
+      status: 'completed',
+      hasAttendance: true
     });
 
-    await Promise.all(updatePromises);
+    console.log(' Attendance saved successfully');
 
     res.status(200).json({
       success: true,
-      message: 'Lưu điểm danh thành công',
-      totalUpdated: attendanceData.length
+      message: 'Đã lưu điểm danh thành công',
+      attendanceCount: attendanceData.length
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lưu điểm danh:', error);
+    console.error(' Lỗi khi lưu điểm danh:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lưu điểm danh',
@@ -1580,9 +2038,6 @@ exports.saveAttendance = async (req, res) => {
   }
 };
 
-// =========================
-// 📥 IMPORT GIẢNG VIÊN HÀNG LOẠT
-// =========================
 exports.importTeachers = async (req, res) => {
   try {
     const { teachers } = req.body;
@@ -1683,7 +2138,7 @@ exports.importTeachers = async (req, res) => {
       results
     });
   } catch (error) {
-    console.error('❌ Lỗi khi import giảng viên:', error);
+    console.error(' Lỗi khi import giảng viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi import giảng viên',
@@ -1693,7 +2148,7 @@ exports.importTeachers = async (req, res) => {
 };
 
 // =========================
-// 📊 THỐNG KÊ GIẢNG VIÊN
+//  THỐNG KÊ GIẢNG VIÊN
 // =========================
 exports.getTeacherStats = async (req, res) => {
   try {
@@ -1709,13 +2164,29 @@ exports.getTeacherStats = async (req, res) => {
     const teachers = await User.find({ roleId: teacherRole._id }).select('_id');
     const teacherIds = teachers.map(t => t._id);
     
+    // Count total classes - check both teacher and teacherId fields
     const totalClasses = await Class.countDocuments({ 
-      teacherId: { $in: teacherIds } 
+      $or: [
+        { teacher: { $in: teacherIds } },
+        { teacherId: { $in: teacherIds } }
+      ]
     });
     
     // Count teachers who have classes (active teachers)
-    const activeTeacherIds = await Class.distinct('teacherId');
-    const activeTeachers = activeTeacherIds.length;
+    // Query both teacher and teacherId fields to get all teachers with classes
+    const teacherIdsFromTeacherField = await Class.distinct('teacher');
+    const teacherIdsFromTeacherIdField = await Class.distinct('teacherId');
+    
+    // Merge and get unique teacher IDs
+    const allActiveTeacherIds = new Set();
+    teacherIdsFromTeacherField.forEach(id => {
+      if (id) allActiveTeacherIds.add(id.toString());
+    });
+    teacherIdsFromTeacherIdField.forEach(id => {
+      if (id) allActiveTeacherIds.add(id.toString());
+    });
+    
+    const activeTeachers = allActiveTeacherIds.size;
     
     res.status(200).json({
       message: "Lấy thống kê giảng viên thành công",
@@ -1727,10 +2198,229 @@ exports.getTeacherStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy thống kê giảng viên:", error);
+    console.error(" Lỗi khi lấy thống kê giảng viên:", error);
     res.status(500).json({ 
       message: "Lỗi server khi lấy thống kê giảng viên",
       error: error.message 
     });
   }
 };
+
+// =========================
+// 📁 QUẢN LÝ TÀI LIỆU LỚP HỌC
+// =========================
+
+/**
+ * GET /api/teachers/me/classes/:classId/materials
+ * Lấy tài liệu riêng của lớp học (từ ClassSchedule)
+ */
+exports.getClassMaterials = async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const teacherId = req.user._id;
+
+    // Verify teacher owns this class
+    const classInfo = await Class.findOne({ 
+      _id: classId, 
+      teacher: teacherId 
+    });
+
+    if (!classInfo) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền truy cập lớp học này'
+      });
+    }
+
+    // Get all schedules with materials
+    const schedules = await ClassSchedule.find({ 
+      class: classId,
+      material: { $exists: true, $ne: [] }
+    })
+      .populate('session', 'title order')
+      .select('date material session topic')
+      .sort({ date: 1 })
+      .lean();
+
+    // Format materials
+    const materials = [];
+    schedules.forEach(schedule => {
+      if (schedule.material && schedule.material.length > 0) {
+        schedule.material.forEach((materialObj, index) => {
+          materials.push({
+            id: materialObj._id || `${schedule._id}-${index}`,
+            title: materialObj.title || `Tài liệu buổi ${schedule.session?.order || 'N/A'}`,
+            lessonNumber: schedule.session?.order || 0,
+            lessonTitle: schedule.session?.title || schedule.topic || 'Chưa có tiêu đề',
+            url: materialObj.file,
+            uploadDate: schedule.date,
+            scheduleId: schedule._id
+          });
+        });
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Lấy danh sách tài liệu thành công',
+      total: materials.length,
+      materials
+    });
+  } catch (error) {
+    console.error(' Lỗi khi lấy tài liệu lớp học:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Lỗi server khi lấy tài liệu',
+      error: error.message 
+    });
+  }
+};
+
+/**
+ * POST /api/teachers/me/schedules/:scheduleId/materials
+ * Thêm tài liệu cho buổi học
+ */
+exports.addMaterialToSchedule = async (req, res) => {
+  try {
+    const { scheduleId } = req.params;
+    const teacherId = req.user._id;
+
+    // Get schedule and verify teacher ownership
+    const schedule = await ClassSchedule.findById(scheduleId).populate('class');
+    
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy buổi học'
+      });
+    }
+
+    // Verify teacher owns this class
+    if (schedule.class.teacher.toString() !== teacherId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền thêm tài liệu cho buổi học này'
+      });
+    }
+
+    // Check if files were uploaded
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng chọn ít nhất 1 file'
+      });
+    }
+
+    // Parse titles from request body (sent as JSON string)
+    let titles = [];
+    if (req.body.titles) {
+      try {
+        titles = JSON.parse(req.body.titles);
+      } catch (e) {
+        console.warn(' Failed to parse titles, using filenames as fallback');
+      }
+    }
+
+    // Get file paths and create material objects (multer saves files and provides paths)
+    const materialObjects = req.files.map((file, index) => ({
+      title: titles[index] || file.originalname, // Use custom title or fallback to filename
+      file: `/uploads/materials/${file.filename}`
+    }));
+
+    // Add materials to schedule
+    if (!schedule.material) {
+      schedule.material = [];
+    }
+    schedule.material.push(...materialObjects);
+
+    await schedule.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Thêm ${materialObjects.length} tài liệu thành công`,
+      materials: materialObjects.map(m => m.file),
+      total: schedule.material.length
+    });
+  } catch (error) {
+    console.error(' Lỗi khi thêm tài liệu:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Lỗi server khi thêm tài liệu',
+      error: error.message 
+    });
+  }
+};
+
+/**
+ * DELETE /api/teachers/me/schedules/:scheduleId/materials
+ * Xóa tài liệu khỏi buổi học
+ */
+exports.deleteMaterialFromSchedule = async (req, res) => {
+  try {
+    const { scheduleId } = req.params;
+    const { materialUrl } = req.body;
+    const teacherId = req.user._id;
+
+    if (!materialUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp URL tài liệu cần xóa'
+      });
+    }
+
+    // Get schedule and verify teacher ownership
+    const schedule = await ClassSchedule.findById(scheduleId).populate('class');
+    
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy buổi học'
+      });
+    }
+
+    // Verify teacher owns this class
+    if (schedule.class.teacher.toString() !== teacherId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền xóa tài liệu của buổi học này'
+      });
+    }
+
+    // Check if material exists
+    const materialExists = schedule.material && schedule.material.some(m => m.file === materialUrl);
+    if (!materialExists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy tài liệu này trong buổi học'
+      });
+    }
+
+    // Remove material from array
+    schedule.material = schedule.material.filter(m => m.file !== materialUrl);
+    await schedule.save();
+
+    // Optional: Delete physical file
+    const fs = require('fs');
+    const path = require('path');
+    const filePath = path.join(__dirname, '..', materialUrl);
+    
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log(`🗑️ Đã xóa file vật lý: ${filePath}`);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Xóa tài liệu thành công',
+      remainingMaterials: schedule.material.length
+    });
+  } catch (error) {
+    console.error(' Lỗi khi xóa tài liệu:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Lỗi server khi xóa tài liệu',
+      error: error.message 
+    });
+  }
+};
+

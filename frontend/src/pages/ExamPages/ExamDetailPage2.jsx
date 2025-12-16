@@ -534,7 +534,7 @@ const ExamDetailPage2 = () => {
                           }}
                           onClick={() => {
                             if (submission && submission._id) {
-                              navigate(`/exams/${id}/submissions/${submission._id}/${sectionType}/result`);
+                              navigate(`/student/exams/${id}/submissions/${submission._id}/${sectionType}/result`);
                             }
                           }}
                           onMouseEnter={(e) => {

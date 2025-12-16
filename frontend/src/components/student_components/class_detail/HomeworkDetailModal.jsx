@@ -492,11 +492,7 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
                                 </>
                               ) : (
                                 <>
-<<<<<<< HEAD
                                   <i className="fas fa-upload me-2"></i>
-=======
-                                  
->>>>>>> origin/Namvv-teacher-class-management
                                   Nộp lại ({selectedFiles.filter(f => !f.isExisting).length} file mới)
                                 </>
                               )}
@@ -663,11 +659,7 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
                       </>
                     ) : (
                       <>
-<<<<<<< HEAD
                         <i className="fas fa-upload me-2"></i>
-=======
-                        
->>>>>>> origin/Namvv-teacher-class-management
                         Nộp bài
                       </>
                     )}

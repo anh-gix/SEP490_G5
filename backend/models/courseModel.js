@@ -146,12 +146,8 @@ const courseSchema = new Schema({
     status: {
         type: String,
         enum: [
-            'draft',              // Đang tạo, chưa hoàn thiện (thiếu CLO, session, materials...)
-            'completed',          // Đã tạo xong (đủ thông tin để submit program)
-            'pending_revision',   // Center Head yêu cầu chỉnh sửa (có work request edit_course)
-            'in_revision',        // Subject Leader đang chỉnh sửa theo yêu cầu
-            'active',             // Course đang được sử dụng (sau khi program approved)
-            'archived'            // Course đã được lưu trữ
+            'draft',       // Đang tạo, chưa hoàn thiện (thiếu CLO, session, materials...)
+            'completed'    // Đã tạo xong (đủ thông tin để submit program)
         ],
         default: 'draft',
         index: true

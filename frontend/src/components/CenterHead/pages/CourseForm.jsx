@@ -11,33 +11,17 @@ import courseService from "../../../services/courseService";
 import sessionService from "../../../services/sessionService";
 import camSessionService from "../../../services/camSessionService";
 
-<<<<<<< HEAD
 const CourseFormNew = () => {
   const navigate = useNavigate();
   const { programId, courseId } = useParams();
 
-=======
-const CourseFormNew = ({ viewMode = 'center-head' }) => {
-  const navigate = useNavigate();
-  const { programId, courseId } = useParams();
-
-  // Determine base path
-  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
-
->>>>>>> origin/Namvv-teacher-class-management
   // Only allow edit mode - redirect if no courseId
   useEffect(() => {
     if (!courseId) {
       alert('Vui lòng sử dụng Wizard để tạo học phần mới!');
-<<<<<<< HEAD
       navigate(`/center-head/programs/${programId || ''}`);
     }
   }, [courseId, programId, navigate]);
-=======
-      navigate(`${basePath}/programs/${programId || ''}`);
-    }
-  }, [courseId, programId, navigate, basePath]);
->>>>>>> origin/Namvv-teacher-class-management
 
   const isEdit = Boolean(courseId);
   const [activeTab, setActiveTab] = useState("info");
@@ -76,11 +60,6 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
     publishedDate: "",
     url: "",
     note: "",
-<<<<<<< HEAD
-=======
-    uploadType: "link", // "link" hoặc "file"
-    file: null,
->>>>>>> origin/Namvv-teacher-class-management
   });
 
   // CLO Form
@@ -114,19 +93,11 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
 
   // Breadcrumb
   const breadcrumbItems = [
-<<<<<<< HEAD
     { label: "Dashboard", path: "/center-head/dashboard" },
     { label: "Quản lý chương trình", path: "/center-head/programs" },
     {
       label: "Chi tiết chương trình",
       path: `/center-head/programs/${programId}`,
-=======
-    { label: "Dashboard", path: `${basePath}/dashboard` },
-    { label: "Quản lý chương trình", path: `${basePath}/programs` },
-    {
-      label: "Chi tiết chương trình",
-      path: `${basePath}/programs/${programId}`,
->>>>>>> origin/Namvv-teacher-class-management
     },
     { label: "Chỉnh sửa học phần" },
   ];
@@ -163,11 +134,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
           // Redirect draft courses to wizard
           if (courseData.status === 'draft') {
             alert('Học phần chưa hoàn thành! Vui lòng tiếp tục tạo theo wizard.');
-<<<<<<< HEAD
             navigate(`/center-head/programs/${programId}/courses/${courseId}/edit`);
-=======
-            navigate(`${basePath}/programs/${programId}/courses/${courseId}/edit`);
->>>>>>> origin/Namvv-teacher-class-management
             return;
           }
 
@@ -206,11 +173,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
         } catch (error) {
           console.error("Error loading course:", error);
           alert("Không thể tải thông tin học phần!");
-<<<<<<< HEAD
           navigate(`/center-head/programs/${programId}/edit`);
-=======
-          navigate(`${basePath}/programs/${programId}/edit`);
->>>>>>> origin/Namvv-teacher-class-management
         } finally {
           setLoading(false);
         }
@@ -238,52 +201,22 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
       publishedDate: "",
       url: "",
       note: "",
-<<<<<<< HEAD
-=======
-      uploadType: "link",
-      file: null,
->>>>>>> origin/Namvv-teacher-class-management
     });
     setShowMaterialModal(true);
   };
 
   const handleEditMaterial = (index) => {
     setEditingMaterialIndex(index);
-<<<<<<< HEAD
     setMaterialForm({ ...formData.materials[index] });
-=======
-    const material = formData.materials[index];
-    setMaterialForm({
-      ...material,
-      uploadType: material.url && material.url.startsWith('http') ? 'link' : 'file',
-      file: null,
-    });
->>>>>>> origin/Namvv-teacher-class-management
     setShowMaterialModal(true);
   };
 
   const handleMaterialFormChange = (e) => {
-<<<<<<< HEAD
     const { name, value } = e.target;
     setMaterialForm((prev) => ({
       ...prev,
       [name]: value,
     }));
-=======
-    const { name, value, type, files } = e.target;
-
-    if (type === 'file') {
-      setMaterialForm((prev) => ({
-        ...prev,
-        file: files[0],
-      }));
-    } else {
-      setMaterialForm((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
-    }
->>>>>>> origin/Namvv-teacher-class-management
   };
 
   const handleSaveMaterial = () => {
@@ -292,63 +225,11 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
       return;
     }
 
-<<<<<<< HEAD
     const materials = [...formData.materials];
     if (editingMaterialIndex !== null) {
       materials[editingMaterialIndex] = materialForm;
     } else {
       materials.push(materialForm);
-=======
-    // Kiểm tra nếu chọn link thì phải có URL
-    if (materialForm.uploadType === 'link' && !materialForm.url) {
-      alert("Vui lòng nhập URL tài liệu!");
-      return;
-    }
-
-    // Kiểm tra nếu chọn file thì phải có file (khi thêm mới)
-    if (materialForm.uploadType === 'file' && editingMaterialIndex === null && !materialForm.file) {
-      alert("Vui lòng chọn file để upload!");
-      return;
-    }
-
-    // Tạo object material để lưu
-    const materialData = {
-      description: materialForm.description,
-      author: materialForm.author,
-      publisher: materialForm.publisher,
-      publishedDate: materialForm.publishedDate,
-      note: materialForm.note,
-    };
-
-    // Nếu là link thì lưu URL
-    if (materialForm.uploadType === 'link') {
-      materialData.url = materialForm.url;
-    } else if (materialForm.file) {
-      // Nếu là file, tạo URL tạm thời (trong thực tế sẽ upload lên server)
-      // TODO: Implement file upload to server
-      materialData.url = `file://${materialForm.file.name}`;
-      materialData.fileName = materialForm.file.name;
-      materialData.fileSize = materialForm.file.size;
-      materialData.fileType = materialForm.file.type;
-
-      // Lưu file object để upload sau
-      materialData.fileObject = materialForm.file;
-    }
-
-    const materials = [...formData.materials];
-    if (editingMaterialIndex !== null) {
-      // Khi edit, giữ lại fileObject cũ nếu không upload file mới
-      if (materialForm.uploadType === 'file' && !materialForm.file) {
-        materialData.url = materials[editingMaterialIndex].url;
-        materialData.fileName = materials[editingMaterialIndex].fileName;
-        materialData.fileSize = materials[editingMaterialIndex].fileSize;
-        materialData.fileType = materials[editingMaterialIndex].fileType;
-        materialData.fileObject = materials[editingMaterialIndex].fileObject;
-      }
-      materials[editingMaterialIndex] = materialData;
-    } else {
-      materials.push(materialData);
->>>>>>> origin/Namvv-teacher-class-management
     }
 
     setFormData((prev) => ({ ...prev, materials }));
@@ -468,30 +349,10 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
       return;
     }
 
-<<<<<<< HEAD
     setEditingSessionIndex(null);
     setSessionForm({
       title: "",
       order: formData.sessions.length + 1,
-=======
-    // Kiểm tra không vượt quá số lượng buổi học
-    const numberOfSessions = parseInt(formData.numberOfSessions) || 0;
-    if (numberOfSessions > 0 && formData.sessions.length >= numberOfSessions) {
-      alert(`Không thể thêm session! Đã đạt giới hạn ${numberOfSessions} buổi học.`);
-      return;
-    }
-
-    // Tính toán order tiếp theo (tìm order lớn nhất + 1)
-    const maxOrder = formData.sessions.length > 0
-      ? Math.max(...formData.sessions.map(s => s.order || 0))
-      : 0;
-    const nextOrder = maxOrder + 1;
-
-    setEditingSessionIndex(null);
-    setSessionForm({
-      title: "",
-      order: nextOrder,
->>>>>>> origin/Namvv-teacher-class-management
       content: "",
       learningType: "theory",
       clos: [],
@@ -533,22 +394,6 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
       return;
     }
 
-<<<<<<< HEAD
-=======
-    // Kiểm tra số lượng buổi học khi thêm mới
-    const numberOfSessions = parseInt(formData.numberOfSessions) || 0;
-    if (editingSessionIndex === null && numberOfSessions > 0 && formData.sessions.length >= numberOfSessions) {
-      alert(`Không thể thêm session! Đã đạt giới hạn ${numberOfSessions} buổi học.`);
-      return;
-    }
-
-    // Kiểm tra order không được vượt quá numberOfSessions
-    if (numberOfSessions > 0 && sessionForm.order > numberOfSessions) {
-      alert(`Order không được vượt quá số lượng buổi học (${numberOfSessions})!`);
-      return;
-    }
-
->>>>>>> origin/Namvv-teacher-class-management
     const sessions = [...formData.sessions];
     if (editingSessionIndex !== null) {
       sessions[editingSessionIndex] = sessionForm;
@@ -562,22 +407,9 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
 
   const handleDeleteSession = (index) => {
     if (window.confirm("Bạn có chắc muốn xóa Session này?")) {
-<<<<<<< HEAD
       setFormData((prev) => ({
         ...prev,
         sessions: prev.sessions.filter((_, i) => i !== index),
-=======
-      const updatedSessions = formData.sessions
-        .filter((_, i) => i !== index)
-        .map((session, idx) => ({
-          ...session,
-          order: idx + 1  // Reorder lại từ 1, 2, 3...
-        }));
-
-      setFormData((prev) => ({
-        ...prev,
-        sessions: updatedSessions,
->>>>>>> origin/Namvv-teacher-class-management
       }));
     }
   };
@@ -826,11 +658,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
         alert("Tạo học phần thành công!");
       }
 
-<<<<<<< HEAD
       navigate(`/center-head/programs/${programId}/edit`);
-=======
-      navigate(`${basePath}/programs/${programId}/edit`);
->>>>>>> origin/Namvv-teacher-class-management
     } catch (error) {
       console.error("Error submitting course:", error);
       alert(error.message || "Lỗi khi lưu học phần!");
@@ -937,11 +765,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
           <Button
             variant="outline"
             icon="ph ph-x-circle"
-<<<<<<< HEAD
             onClick={() => navigate(`/center-head/programs/${programId}`)}
-=======
-            onClick={() => navigate(`${basePath}/programs/${programId}`)}
->>>>>>> origin/Namvv-teacher-class-management
           >
             Hủy
           </Button>
@@ -1212,7 +1036,6 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
                             {material.description}
                           </div>
                           {material.url && (
-<<<<<<< HEAD
                             <a
                               href={material.url}
                               target="_blank"
@@ -1222,32 +1045,6 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
                               <i className="ph ph-link me-1"></i>
                               Link
                             </a>
-=======
-                            <div className="mt-1">
-                              {material.fileName ? (
-                                <div className="text-sm">
-                                  <i className="ph ph-file me-1 text-info"></i>
-                                  <span className="text-muted">File: </span>
-                                  <strong>{material.fileName}</strong>
-                                  {material.fileSize && (
-                                    <span className="text-muted ms-2">
-                                      ({(material.fileSize / 1024 / 1024).toFixed(2)} MB)
-                                    </span>
-                                  )}
-                                </div>
-                              ) : (
-                                <a
-                                  href={material.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-sm text-primary"
-                                >
-                                  <i className="ph ph-link me-1"></i>
-                                  {material.url.length > 40 ? material.url.substring(0, 40) + '...' : material.url}
-                                </a>
-                              )}
-                            </div>
->>>>>>> origin/Namvv-teacher-class-management
                           )}
                         </td>
                         <td>{material.author || "-"}</td>
@@ -1462,11 +1259,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
                                        icon="ph ph-pencil"
                                        onClick={() =>
                                          camSession._id &&
-<<<<<<< HEAD
                                          navigate(`/center-head/cam-sessions/${camSession._id}/edit`)
-=======
-                                         navigate(`${basePath}/cam-sessions/${camSession._id}/edit`)
->>>>>>> origin/Namvv-teacher-class-management
                                        }
                                        disabled={loading}
                                      />
@@ -1705,7 +1498,6 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
               />
             </div>
 
-<<<<<<< HEAD
             <div className="col-md-6">
               <label className="form-label fw-semibold">URL (nếu có)</label>
               <input
@@ -1716,88 +1508,6 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
                 value={materialForm.url}
                 onChange={handleMaterialFormChange}
               />
-=======
-            {/* Lựa chọn Link hoặc Upload File */}
-            <div className="col-12">
-              <hr className="my-2" />
-            </div>
-
-            <div className="col-12">
-              <label className="form-label fw-semibold">
-                Tài liệu <span className="text-danger">*</span>
-              </label>
-              <div className="d-flex gap-4 mb-3">
-                <div className="form-check">
-                  <input
-                    className="form-check-input"
-                    type="radio"
-                    name="uploadType"
-                    id="uploadTypeLink"
-                    value="link"
-                    checked={materialForm.uploadType === 'link'}
-                    onChange={handleMaterialFormChange}
-                  />
-                  <label className="form-check-label" htmlFor="uploadTypeLink">
-                    <i className="ph ph-link me-1"></i>
-                    Gán link
-                  </label>
-                </div>
-                <div className="form-check">
-                  <input
-                    className="form-check-input"
-                    type="radio"
-                    name="uploadType"
-                    id="uploadTypeFile"
-                    value="file"
-                    checked={materialForm.uploadType === 'file'}
-                    onChange={handleMaterialFormChange}
-                  />
-                  <label className="form-check-label" htmlFor="uploadTypeFile">
-                    <i className="ph ph-upload me-1"></i>
-                    Upload file
-                  </label>
-                </div>
-              </div>
-
-              {/* Hiển thị input tương ứng */}
-              {materialForm.uploadType === 'link' ? (
-                <div>
-                  <input
-                    type="url"
-                    name="url"
-                    className="form-control"
-                    placeholder="https://example.com/document.pdf"
-                    value={materialForm.url}
-                    onChange={handleMaterialFormChange}
-                  />
-                  <small className="text-muted">
-                    Nhập đường dẫn URL đến tài liệu
-                  </small>
-                </div>
-              ) : (
-                <div>
-                  <input
-                    type="file"
-                    name="file"
-                    className="form-control"
-                    onChange={handleMaterialFormChange}
-                    accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip"
-                  />
-                  <small className="text-muted">
-                    Chọn file tài liệu (PDF, Word, Excel, PowerPoint, ZIP...)
-                  </small>
-                  {materialForm.file && (
-                    <div className="mt-2 p-2 bg-light rounded border">
-                      <i className="ph ph-file me-2"></i>
-                      <strong>{materialForm.file.name}</strong>
-                      <span className="text-muted ms-2">
-                        ({(materialForm.file.size / 1024 / 1024).toFixed(2)} MB)
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
->>>>>>> origin/Namvv-teacher-class-management
             </div>
 
             <div className="col-12">
@@ -1932,11 +1642,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
         <div className="modal-body">
           <div className="row g-3">
             <div className="col-md-3">
-<<<<<<< HEAD
               <label className="form-label fw-semibold">Order</label>
-=======
-              <label className="form-label fw-semibold">Order (Tự động)</label>
->>>>>>> origin/Namvv-teacher-class-management
               <input
                 type="number"
                 name="order"
@@ -1944,15 +1650,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
                 min="1"
                 value={sessionForm.order}
                 onChange={handleSessionFormChange}
-<<<<<<< HEAD
               />
-=======
-                readOnly
-                disabled
-                style={{ backgroundColor: '#e9ecef' }}
-              />
-              <small className="text-muted">Tự động tăng dần</small>
->>>>>>> origin/Namvv-teacher-class-management
             </div>
 
             <div className="col-md-9">
@@ -1980,14 +1678,10 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
                 onChange={handleSessionFormChange}
               >
                 <option value="theory">Theory (Lý thuyết)</option>
-<<<<<<< HEAD
                 <option value="practice">Practice (Thực hành)</option>
                 <option value="lab">Lab (Thí nghiệm)</option>
                 <option value="project">Project (Dự án)</option>
                 <option value="exam">Exam (Kiểm tra)</option>
-=======
-                <option value="mocktest">Mock Test (Kiểm tra)</option>
->>>>>>> origin/Namvv-teacher-class-management
               </select>
             </div>
 

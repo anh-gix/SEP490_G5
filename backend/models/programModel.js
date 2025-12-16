@@ -65,7 +65,7 @@ const programSchema = new Schema({
     },
 
     // ===== STATUS ĐỂ XEM PROGRAM ĐÃ ĐƯỢC DUYỆT CHƯA =====
-    // Tất cả thông tin chi tiết về submission, approval, rejection được lưu trong WorkRequest model
+    // Tất cả thông tin chi tiết về submission, approval, rejection được lưu trong ApprovalRequest model
     status: {
         type: String,
         enum: [

@@ -1,25 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
 import studentService from '../../services/studentService';
-<<<<<<< HEAD
 
 const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents = [], generatedSessions = [] }) => {
-=======
-import courseService from '../../services/courseService';
-
-const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents = [], generatedSessions = [], courseId }) => {
->>>>>>> origin/Namvv-teacher-class-management
   const [students, setStudents] = useState([]);
   const [studentSearchTerm, setStudentSearchTerm] = useState('');
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [studentsError, setStudentsError] = useState(null);
   const [selectedStudents, setSelectedStudents] = useState(initialSelectedStudents);
   const [studentSchedules, setStudentSchedules] = useState({}); // Map studentId -> schedules
-<<<<<<< HEAD
-=======
-  const [enrolledStudentIds, setEnrolledStudentIds] = useState([]);
-  const [courseEnrollmentsLoading, setCourseEnrollmentsLoading] = useState(false);
->>>>>>> origin/Namvv-teacher-class-management
 
   // Update selected students when initialSelectedStudents changes
   useEffect(() => {
@@ -29,40 +18,6 @@ const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents 
     }
   }, [show, initialSelectedStudents]);
 
-<<<<<<< HEAD
-=======
-  // Fetch studentEnrollments when modal opens and courseId is available
-  useEffect(() => {
-    const fetchCourseEnrollments = async () => {
-      if (!show || !courseId) {
-        setEnrolledStudentIds([]);
-        return;
-      }
-
-      try {
-        setCourseEnrollmentsLoading(true);
-        const response = await courseService.getCourseDetails(courseId);
-        
-        if (response && response.success && response.data) {
-          const course = response.data;
-          const studentEnrollments = course.studentEnrollments || [];
-          // Convert to string array for comparison
-          setEnrolledStudentIds(studentEnrollments.map(id => String(id)));
-        } else {
-          setEnrolledStudentIds([]);
-        }
-      } catch (error) {
-        console.error('Lỗi khi fetch course enrollments:', error);
-        setEnrolledStudentIds([]);
-      } finally {
-        setCourseEnrollmentsLoading(false);
-      }
-    };
-
-    fetchCourseEnrollments();
-  }, [show, courseId]);
-
->>>>>>> origin/Namvv-teacher-class-management
   useEffect(() => {
     const fetchStudents = async () => {
       if (!show) return;
@@ -70,7 +25,6 @@ const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents 
       try {
         setStudentsLoading(true);
         setStudentsError(null);
-<<<<<<< HEAD
         console.log('🔍 Fetching students in SelectStudentModal...');
         const response = await studentService.getAllStudents();
         console.log('📋 Students API Response:', response);
@@ -81,35 +35,15 @@ const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents 
           setStudents(fetchedStudents);
         } else {
           console.warn('⚠️ API response không có students hoặc data field:', response);
-=======
-        console.log(' Fetching students in SelectStudentModal...');
-        const response = await studentService.getAllStudents();
-        console.log(' Students API Response:', response);
-        
-        if (response && (response.students || response.data)) {
-          const fetchedStudents = response.students || response.data || [];
-          console.log(' Fetched students count:', fetchedStudents.length);
-          setStudents(fetchedStudents);
-        } else {
-          console.warn(' API response không có students hoặc data field:', response);
->>>>>>> origin/Namvv-teacher-class-management
           setStudents([]);
           setStudentsError('Không tìm thấy dữ liệu học viên');
         }
       } catch (error) {
-<<<<<<< HEAD
         console.error('❌ Lỗi khi fetch students:', error);
         setStudents([]);
         const errorMessage = error.message || 'Không thể tải danh sách học viên';
         setStudentsError(errorMessage);
         console.error('❌ Error details:', error);
-=======
-        console.error(' Lỗi khi fetch students:', error);
-        setStudents([]);
-        const errorMessage = error.message || 'Không thể tải danh sách học viên';
-        setStudentsError(errorMessage);
-        console.error(' Error details:', error);
->>>>>>> origin/Namvv-teacher-class-management
       } finally {
         setStudentsLoading(false);
       }
@@ -285,28 +219,12 @@ const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents 
   }, [generatedSessions, studentSchedules]);
 
   const filteredStudentList = useMemo(() => {
-<<<<<<< HEAD
     if (!studentSearchTerm) {
       return students;
     }
 
     const searchLower = studentSearchTerm.toLowerCase();
     return students.filter(student => {
-=======
-    // First filter by enrollment
-    let enrolledStudents = students.filter(student => {
-      const studentId = String(student._id || student.id);
-      return enrolledStudentIds.includes(studentId);
-    });
-
-    // Then filter by search term
-    if (!studentSearchTerm) {
-      return enrolledStudents;
-    }
-
-    const searchLower = studentSearchTerm.toLowerCase();
-    return enrolledStudents.filter(student => {
->>>>>>> origin/Namvv-teacher-class-management
       const fullName = (student.fullName || '').toLowerCase();
       const email = (student.email || '').toLowerCase();
       const username = (student.username || '').toLowerCase();
@@ -315,11 +233,7 @@ const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents 
              email.includes(searchLower) || 
              username.includes(searchLower);
     });
-<<<<<<< HEAD
   }, [students, studentSearchTerm]);
-=======
-  }, [students, studentSearchTerm, enrolledStudentIds]);
->>>>>>> origin/Namvv-teacher-class-management
 
   const handleStudentToggle = (studentId) => {
     setSelectedStudents(prev => {
@@ -410,11 +324,7 @@ const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents 
             className="border border-neutral-100 rounded-12 p-16"
             style={{ maxHeight: '400px', overflowY: 'auto' }}
           >
-<<<<<<< HEAD
             {studentsLoading ? (
-=======
-            {studentsLoading || courseEnrollmentsLoading ? (
->>>>>>> origin/Namvv-teacher-class-management
               <div className="text-center text-neutral-500 py-20">
                 <i className="fas fa-spinner fa-spin me-2"></i>
                 Đang tải danh sách học viên...
@@ -426,23 +336,9 @@ const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents 
                   {studentsError}
                 </Alert>
               </div>
-<<<<<<< HEAD
             ) : filteredStudentList.length === 0 ? (
               <div className="text-center text-neutral-500 py-20">
                 {studentSearchTerm ? 'Không tìm thấy học viên nào phù hợp với từ khóa tìm kiếm' : 'Không có học viên nào trong hệ thống'}
-=======
-            ) : !courseId ? (
-              <div className="text-center text-neutral-500 py-20">
-                Vui lòng chọn course trước khi thêm học viên
-              </div>
-            ) : enrolledStudentIds.length === 0 ? (
-              <div className="text-center text-neutral-500 py-20">
-                Course này chưa có học sinh đăng ký
-              </div>
-            ) : filteredStudentList.length === 0 ? (
-              <div className="text-center text-neutral-500 py-20">
-                {studentSearchTerm ? 'Không tìm thấy học viên nào phù hợp với từ khóa tìm kiếm' : 'Không có học viên nào trong danh sách đăng ký'}
->>>>>>> origin/Namvv-teacher-class-management
               </div>
             ) : (
               <div className="d-flex flex-column gap-8">

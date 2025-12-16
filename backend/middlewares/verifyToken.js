@@ -156,9 +156,6 @@ const isAcademicStaff = hasRole('Academic Staff');
 const isSubjectLeader = hasRole('Subject Leader');
 const isCenterHead = hasRole('Center Head');
 
-// Combined role checks
-const isTeacherOrSubjectLeader = hasAnyRole('Teacher', 'Subject Leader');
-
 module.exports = {
     verifyToken,
     isAdmin,
@@ -169,6 +166,5 @@ module.exports = {
     isTeacher,
     isAcademicStaff,
     isSubjectLeader,
-    isCenterHead,
-    isTeacherOrSubjectLeader
+    isCenterHead
 };

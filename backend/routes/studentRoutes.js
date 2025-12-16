@@ -57,7 +57,6 @@ const upload = multer({
 router.get('/me', verifyToken, isStudent, studentController.getCurrentStudent);
 router.get('/me/dashboard', verifyToken, isStudent, studentController.getDashboardData);
 router.get('/me/classes', verifyToken, isStudent, studentController.getMyClasses);
-router.get('/me/classes/:classId', verifyToken, isStudent, studentController.getMyClassDetail);
 router.get('/me/schedule', verifyToken, isStudent, studentController.getMySchedule);
 router.get('/me/lessons/:scheduleId', verifyToken, isStudent, studentController.getLessonDetail);
 
@@ -101,12 +100,6 @@ router.get('/stats', studentController.getStudentStats);
 
 // Get student by ID
 router.get('/:id', studentController.getStudentById);
-
-// Update student course enrollments (must be before /:id routes to avoid conflict)
-router.patch('/:id/courses', studentController.updateStudentCourseEnrollments);
-
-// Change student class (must be before /:id routes to avoid conflict)
-router.patch('/:id/change-class', studentController.changeStudentClass);
 
 // Create student
 router.post('/', studentController.createStudent);

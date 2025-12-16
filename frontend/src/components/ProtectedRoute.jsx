@@ -20,13 +20,6 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/sign-in" state={{ from: location }} replace />;
   }
 
-  if (allowedRoles.length > 0) {
-    const userRole = user?.roleId?.name || user?.role;
-    if (!allowedRoles.includes(userRole)) {
-      return <Navigate to="/sign-in" state={{ from: location, error: 'no-permission' }} replace />;
-    }
-  }
-
   return children;
 };
 

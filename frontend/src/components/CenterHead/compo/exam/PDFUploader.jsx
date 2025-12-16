@@ -113,11 +113,7 @@ const PDFUploader = ({ currentFileUrl, onUpload, sectionType }) => {
                 className="w-36 h-36 d-flex align-items-center justify-content-center border border-main-600 text-main-600 rounded-8 hover-bg-main-50"
                 title="Xem PDF"
               >
-<<<<<<< HEAD
                 <i className="fas fa-eye text-xs"></i>
-=======
-                
->>>>>>> origin/Namvv-teacher-class-management
               </a>
               <button
                 className="w-36 h-36 d-flex align-items-center justify-content-center border border-danger-600 text-danger-600 rounded-8 hover-bg-danger-50 bg-transparent"

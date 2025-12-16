@@ -3,12 +3,7 @@ import ExamBasicInfo from '../compo/exam/ExamBasicInfo';
 import SectionForm from '../compo/exam/SectionForm';
 import ExamSummary from '../compo/exam/ExamSummary';
 
-<<<<<<< HEAD
 const ExamCreate = () => {
-=======
-const ExamCreate = ({ viewMode = 'center-head' }) => {
-  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
->>>>>>> origin/Namvv-teacher-class-management
   const [activeTab, setActiveTab] = useState('info');
   const [examData, setExamData] = useState({
     title: '',

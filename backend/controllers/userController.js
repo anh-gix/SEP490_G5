@@ -41,14 +41,10 @@ const createUser = async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Validate phone number length (10-11 digits)
-    if (phone) {
-      const phoneDigits = phone.replace(/\D/g, '');
-      if (phoneDigits.length < 10 || phoneDigits.length > 11) {
-        return res.status(400).json({ 
-          message: 'Số điện thoại phải có 10 hoặc 11 chữ số' 
-        });
-      }
+    // Check if username already exists
+    const usernameExists = await User.findOne({ username });
+    if (usernameExists) {
+      return res.status(400).json({ message: 'Username already exists' });
     }
 
     // Check if phone number already exists
@@ -122,6 +118,9 @@ const deleteUser = async (req, res) => {
   }
 };
 
+// =========================
+// 📤 UPLOAD EXCEL VÀ PARSE DỮ LIỆU
+// =========================
 const uploadExcel = async (req, res) => {
   let filePath = null;
   try {
@@ -341,18 +340,16 @@ const saveBulkUsers = async (req, res) => {
           continue;
         }
 
-        // Validate phone number length (10-11 digits)
-        if (userData.phone) {
-          const phoneDigits = userData.phone.replace(/\D/g, '');
-          if (phoneDigits.length < 10 || phoneDigits.length > 11) {
-            results.failed.push({
-              email: userData.email,
-              username: userData.username,
-              phone: userData.phone || '',
-              reason: 'Số điện thoại phải có 10 hoặc 11 chữ số'
-            });
-            continue;
-          }
+        // Kiểm tra username đã tồn tại chưa
+        const existingUsername = await User.findOne({ username: userData.username });
+        if (existingUsername) {
+          results.failed.push({
+            email: userData.email,
+            username: userData.username,
+            phone: userData.phone || '',
+            reason: 'Username đã tồn tại trong hệ thống'
+          });
+          continue;
         }
 
         // Kiểm tra phone number đã tồn tại chưa
@@ -416,65 +413,6 @@ const saveBulkUsers = async (req, res) => {
   }
 };
 
-// Get users by roles
-const getUsersByRoles = async (req, res) => {
-  try {
-    const { roles } = req.query; 
-    
-    if (!roles) {
-      return res.status(400).json({
-        success: false,
-        message: 'roles query parameter is required'
-      });
-    }
-
-    // Parse roles
-    const roleNames = roles.split(',').map(r => r.trim());
-    
-    // Find role IDs
-    const roleObjects = await Role.find({ name: { $in: roleNames } });
-    
-    if (roleObjects.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'No matching roles found',
-        searchedRoles: roleNames
-      });
-    }
-
-    const roleIds = roleObjects.map(r => r._id);
-    
-    // Get users with these roles
-    const users = await User.find({ roleId: { $in: roleIds } })
-      .select('_id username email phone roleId')
-      .populate('roleId', 'name')
-      .sort({ username: 1 })
-      .lean();
-    
-    // Transform to include role name
-    const usersWithRole = users.map(user => ({
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      phone: user.phone,
-      role: user.roleId?.name || 'Unknown'
-    }));
-
-    res.status(200).json({
-      success: true,
-      data: usersWithRole,
-      count: usersWithRole.length
-    });
-  } catch (error) {
-    console.error('Error getting users by roles:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching users',
-      error: error.message
-    });
-  }
-};
-
 module.exports = {
   getAllUsers,
   getUserById,
@@ -482,6 +420,5 @@ module.exports = {
   updateUser,
   deleteUser,
   uploadExcel,
-  saveBulkUsers,
-  getUsersByRoles
+  saveBulkUsers
 };

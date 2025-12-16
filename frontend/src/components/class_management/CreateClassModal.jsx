@@ -212,29 +212,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
-<<<<<<< HEAD
-=======
-    // Auto-update maxStudents when room is selected/deselected
-    if (name === 'roomId') {
-      if (value) {
-        // Find selected room and set maxStudents to room capacity
-        const selectedRoom = rooms.find(r => {
-          const roomId = r._id || r.id;
-          return String(roomId) === String(value);
-        });
-        if (selectedRoom) {
-          const capacity = selectedRoom.capacity || selectedRoom.maxCapacity || selectedRoom.maxStudents;
-          setFormData(prev => ({ ...prev, roomId: value, maxStudents: capacity }));
-          return; // Don't process further
-        }
-      } else {
-        // Room deselected, clear maxStudents
-        setFormData(prev => ({ ...prev, roomId: '', maxStudents: null }));
-        return; // Don't process further
-      }
-    }
-    
->>>>>>> origin/Namvv-teacher-class-management
     // Validate start date when it changes
     if (name === 'startDate') {
       const today = getTodayDate();
@@ -301,22 +278,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-<<<<<<< HEAD
-=======
-    // Validate course selection first
-    if (!formData.course) {
-      setImportResult({
-        success: 0,
-        notFound: [],
-        total: 0,
-        error: 'Vui lòng chọn course trước khi import học viên từ Excel'
-      });
-      setShowImportResultModal(true);
-      e.target.value = '';
-      return;
-    }
-
->>>>>>> origin/Namvv-teacher-class-management
     // Validate file type
     const validTypes = [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -415,27 +376,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         return;
       }
 
-<<<<<<< HEAD
-=======
-      // Get studentEnrollments from selectedCourse
-      let enrolledStudentIds = [];
-      if (selectedCourse && selectedCourse.studentEnrollments) {
-        enrolledStudentIds = selectedCourse.studentEnrollments.map(id => String(id));
-      } else {
-        // Fetch course details if not available
-        try {
-          const response = await courseService.getCourseDetails(formData.course);
-          if (response && response.success && response.data) {
-            const course = response.data;
-            enrolledStudentIds = (course.studentEnrollments || []).map(id => String(id));
-          }
-        } catch (error) {
-          console.error('Error fetching course details:', error);
-          // Continue with empty array - will check enrollment later
-        }
-      }
-
->>>>>>> origin/Namvv-teacher-class-management
       // Match students by email or phone
       const matchedStudentIds = [];
       const notFound = [];
@@ -454,27 +394,10 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
         if (foundStudent) {
           const studentId = foundStudent._id || foundStudent.id;
-<<<<<<< HEAD
           if (studentId && !matchedStudentIds.includes(String(studentId))) {
             matchedStudentIds.push(String(studentId));
           }
         } else {
-=======
-          const studentIdStr = String(studentId);
-          
-          // Check if student is enrolled in the selected course
-          if (studentId && enrolledStudentIds.includes(studentIdStr)) {
-            // Student found and enrolled in course
-            if (!matchedStudentIds.includes(studentIdStr)) {
-              matchedStudentIds.push(studentIdStr);
-            }
-          } else {
-            // Student found but not enrolled in course
-            notFound.push(`${value} (chưa enroll vào course này)`);
-          }
-        } else {
-          // Student not found in database
->>>>>>> origin/Namvv-teacher-class-management
           notFound.push(value);
         }
       });
@@ -500,10 +423,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       setShowImportResultModal(true);
 
     } catch (error) {
-<<<<<<< HEAD
       console.error('Error reading Excel file:', error);
-=======
->>>>>>> origin/Namvv-teacher-class-management
       setImportResult({
         success: 0,
         notFound: [],
@@ -517,7 +437,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     }
   };
 
-<<<<<<< HEAD
   // Auto-fetch band when program and level are selected
   useEffect(() => {
     const fetchBand = async () => {
@@ -526,57 +445,19 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       if (!formData.program || !formData.level) {
         // Clear band if program or level is empty
         console.log('⚠️ Program or level is empty, clearing band');
-=======
-  // Handle download Excel template
-  const handleDownloadTemplate = () => {
-    // Create sample data - only first column with Email or Phone
-    const sampleData = [
-      ['Email hoặc Số điện thoại'], // Header row
-      ['student1@email.com'], // Example email
-      ['0123456789'], // Example phone
-      ['student2@email.com'] // Another example email
-    ];
-
-    // Create worksheet from array
-    const ws = XLSX.utils.aoa_to_sheet(sampleData);
-    
-    // Create workbook
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Danh sách học viên');
-
-    // Generate file name
-    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const fileName = `Mau_Import_Hoc_Vien_Lop_Hoc_${timestamp}.xlsx`;
-
-    // Write and download
-    XLSX.writeFile(wb, fileName);
-  };
-
-  // Auto-fetch band when program and level are selected
-  useEffect(() => {
-    const fetchBand = async () => {
-      if (!formData.program || !formData.level) {
-        // Clear band if program or level is empty
->>>>>>> origin/Namvv-teacher-class-management
         setFormData(prev => ({ ...prev, band: '' }));
         return;
       }
 
       const type = getTypeFromProgram(formData.program);
-<<<<<<< HEAD
       console.log('📋 Mapped program to type:', formData.program, '→', type);
       
       if (!type) {
         console.warn('⚠️ Không tìm thấy type cho program:', formData.program);
-=======
-      
-      if (!type) {
->>>>>>> origin/Namvv-teacher-class-management
         return;
       }
 
       try {
-<<<<<<< HEAD
         console.log('🌐 Fetching band from API with params:', { type, level: formData.level });
         const response = await courseService.getBandByTypeAndLevel(type, formData.level);
 
@@ -597,20 +478,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       } catch (error) {
         console.error('❌ Error fetching band:', error);
         console.error('❌ Error details:', error.response?.data || error.message);
-=======
-        const response = await courseService.getBandByTypeAndLevel(type, formData.level);
-
-        if (response && response.success) {
-          if (response.band && response.band.trim() !== '') {
-            setFormData(prev => ({ ...prev, band: response.band }));
-          } else {
-            setFormData(prev => ({ ...prev, band: '' }));
-          }
-        } else {
-          setFormData(prev => ({ ...prev, band: '' }));
-        }
-      } catch (error) {
->>>>>>> origin/Namvv-teacher-class-management
         // Clear band on error to avoid showing stale data
         setFormData(prev => ({ ...prev, band: '' }));
       }
@@ -629,17 +496,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         return;
       }
 
-<<<<<<< HEAD
-=======
-      // Don't fetch if level is not selected (backend requires both programName and level)
-      if (!formData.level) {
-        setCourses([]);
-        setSelectedCourse(null);
-        setFormData(prev => ({ ...prev, course: '' }));
-        return;
-      }
-
->>>>>>> origin/Namvv-teacher-class-management
       try {
         setCoursesLoading(true);
         const response = await courseService.getCoursesByProgram(formData.program, formData.level);
@@ -660,10 +516,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           setCourses([]);
         }
       } catch (error) {
-<<<<<<< HEAD
         console.error('❌ Error fetching courses:', error);
-=======
->>>>>>> origin/Namvv-teacher-class-management
         setCourses([]);
       } finally {
         setCoursesLoading(false);
@@ -701,10 +554,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           }
         }
       } catch (error) {
-<<<<<<< HEAD
         console.error('❌ Error fetching course details:', error);
-=======
->>>>>>> origin/Namvv-teacher-class-management
         // Fallback to course from list if available
         if (courseFromList) {
           setSelectedCourse(courseFromList);
@@ -728,11 +578,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         if (roomCapacity && studentCount > roomCapacity) {
           setCapacityWarning({
             type: 'danger',
-<<<<<<< HEAD
             message: `⚠️ Cảnh báo: Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`
-=======
-            message: ` Cảnh báo: Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`
->>>>>>> origin/Namvv-teacher-class-management
           });
         } else {
           setCapacityWarning(null);
@@ -829,10 +675,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           });
         }
       } catch (error) {
-<<<<<<< HEAD
         console.error('Error checking conflicts:', error);
-=======
->>>>>>> origin/Namvv-teacher-class-management
         // Don't show error to user, just silently fail
         setConflicts({
           hasConflict: false,
@@ -881,23 +724,14 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       return;
     }
 
-<<<<<<< HEAD
     // Validate teacher is selected
     if (!formData.teacherId) {
       setErrorMessage('Vui lòng chọn giáo viên!');
-=======
-    if (
-      formData.scheduleEntries.length === 0 ||
-      formData.scheduleEntries.some(entry => !entry.day)
-    ) {
-      setErrorMessage('Vui lòng chọn ít nhất 1 ngày học và điền đủ thời gian!');
->>>>>>> origin/Namvv-teacher-class-management
       setShowErrorModal(true);
       return;
     }
 
     if (
-<<<<<<< HEAD
       formData.scheduleEntries.length === 0 ||
       formData.scheduleEntries.some(entry => !entry.day)
     ) {
@@ -907,8 +741,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     }
 
     if (
-=======
->>>>>>> origin/Namvv-teacher-class-management
       formData.scheduleEntries.some(
         entry => entry.startTime >= entry.endTime
       )
@@ -987,7 +819,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         
         if (typesResponse?.success && typesResponse.types) {
           const allTypes = typesResponse.types;
-<<<<<<< HEAD
           console.log('📋 Types from API:', allTypes);
           const allPrograms = allTypes.map(type => getProgramFromType(type)).filter(Boolean);
           setAvailablePrograms(allPrograms);
@@ -995,19 +826,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           console.log('✅ Available programs:', allPrograms);
         } else {
           console.warn('⚠️ Types response:', typesResponse);
-=======
-          const allPrograms = allTypes.map(type => getProgramFromType(type)).filter(Boolean);
-          setAvailablePrograms(allPrograms);
->>>>>>> origin/Namvv-teacher-class-management
         }
         
         if (levelsResponse?.success && levelsResponse.levels) {
           const allLevels = levelsResponse.levels;
           setAvailableLevels(allLevels);
-<<<<<<< HEAD
           console.log('✅ Loaded levels from program table:', allLevels.length);
-=======
->>>>>>> origin/Namvv-teacher-class-management
         }
         
         // Also fetch mappings for band lookup (still needed for band display)
@@ -1015,7 +839,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           const mappingsResponse = await courseService.getCourseMappings();
           if (mappingsResponse && mappingsResponse.success && mappingsResponse.mappings) {
             setMappings(mappingsResponse.mappings);
-<<<<<<< HEAD
             console.log('✅ Loaded mappings from program table:', mappingsResponse.mappings.length);
           }
         } catch (mappingsError) {
@@ -1023,14 +846,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         }
       } catch (error) {
         console.error('❌ Error fetching course data:', error);
-=======
-          }
-        } catch (mappingsError) {
-          // Error fetching mappings
-        }
-      } catch (error) {
-        // Error fetching course data
->>>>>>> origin/Namvv-teacher-class-management
       }
     };
     fetchCourseData();
@@ -1047,11 +862,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             setAvailableLevels(response.levels);
           }
         } catch (error) {
-<<<<<<< HEAD
           console.error('❌ Error fetching all levels:', error);
-=======
-          // Error fetching all levels
->>>>>>> origin/Namvv-teacher-class-management
         }
         return;
       }
@@ -1074,11 +885,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           }
         }
       } catch (error) {
-<<<<<<< HEAD
         console.error('❌ Error fetching levels by type:', error);
-=======
-        // Error fetching levels by type
->>>>>>> origin/Namvv-teacher-class-management
       }
     };
     
@@ -1098,11 +905,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             setAvailablePrograms(allPrograms);
           }
         } catch (error) {
-<<<<<<< HEAD
           console.error('❌ Error fetching all types:', error);
-=======
-          // Error fetching all types
->>>>>>> origin/Namvv-teacher-class-management
         }
         return;
       }
@@ -1122,11 +925,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           }
         }
       } catch (error) {
-<<<<<<< HEAD
         console.error('❌ Error fetching types by level:', error);
-=======
-        // Error fetching types by level
->>>>>>> origin/Namvv-teacher-class-management
       }
     };
     
@@ -1159,10 +958,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           }
         }
       } catch (error) {
-<<<<<<< HEAD
         // Sử dụng mock data nếu API lỗi
-=======
->>>>>>> origin/Namvv-teacher-class-management
       } finally {
         setRoomLoading(false);
       }
@@ -1181,10 +977,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           setRooms(fetchedRooms);
         }
       } catch (error) {
-<<<<<<< HEAD
         // Sử dụng mock data nếu API lỗi
-=======
->>>>>>> origin/Namvv-teacher-class-management
       }
     };
 
@@ -1194,7 +987,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   useEffect(() => {
     const fetchTeachers = async () => {
       try {
-<<<<<<< HEAD
         console.log('🔍 Fetching teachers...');
         const response = await teacherService.getAllTeachers();
         console.log('📋 API Response:', response);
@@ -1215,17 +1007,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         }
       } catch (error) {
         console.error('❌ Lỗi khi fetch teachers:', error);
-=======
-        const response = await teacherService.getAllTeachers();
-        
-        if (response && (response.teachers || response.data)) {
-          const fetchedTeachers = response.teachers || response.data || [];
-          setTeachers(fetchedTeachers);
-        } else {
-          setTeachers([]);
-        }
-      } catch (error) {
->>>>>>> origin/Namvv-teacher-class-management
         setTeachers([]);
       }
     };
@@ -1238,7 +1019,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       try {
         setStudentsLoading(true);
         setStudentsError(null);
-<<<<<<< HEAD
         console.log('🔍 Fetching students...');
         // Không filter theo status vì User model không có field status
         const response = await studentService.getAllStudents();
@@ -1250,29 +1030,15 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           setStudents(fetchedStudents);
         } else {
           console.warn('⚠️ API response không có students hoặc data field:', response);
-=======
-        const response = await studentService.getAllStudents();
-        
-        if (response && (response.students || response.data)) {
-          const fetchedStudents = response.students || response.data || [];
-          setStudents(fetchedStudents);
-        } else {
->>>>>>> origin/Namvv-teacher-class-management
           setStudents([]);
           setStudentsError('Không tìm thấy dữ liệu học viên');
         }
       } catch (error) {
-<<<<<<< HEAD
         console.error('❌ Lỗi khi fetch students:', error);
         setStudents([]);
         const errorMessage = error.message || 'Không thể tải danh sách học viên';
         setStudentsError(errorMessage);
         console.error('❌ Error details:', error);
-=======
-        setStudents([]);
-        const errorMessage = error.message || 'Không thể tải danh sách học viên';
-        setStudentsError(errorMessage);
->>>>>>> origin/Namvv-teacher-class-management
       } finally {
         setStudentsLoading(false);
       }
@@ -1281,15 +1047,10 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     fetchStudents();
   }, []);
 
-<<<<<<< HEAD
   // Cập nhật mock data với _id từ DB sau khi fetch teachers
   useEffect(() => {
     if (USE_MOCK_DATA && teachers.length > 0) {
       // Tạo map teacherName -> _id từ teachers
-=======
-  useEffect(() => {
-    if (USE_MOCK_DATA && teachers.length > 0) {
->>>>>>> origin/Namvv-teacher-class-management
       const teacherNameToIdMap = {};
       teachers.forEach(teacher => {
         const teacherName = teacher.name || teacher.teacherName || teacher.fullName;
@@ -1299,20 +1060,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         }
       });
 
-<<<<<<< HEAD
       // Cập nhật existingSchedules với _id từ DB
-=======
->>>>>>> origin/Namvv-teacher-class-management
       setExistingSchedules(prevSchedules => {
         const updatedSchedules = prevSchedules.map(schedule => {
           if (schedule.teacherName && teacherNameToIdMap[schedule.teacherName]) {
             return {
               ...schedule,
-<<<<<<< HEAD
               teacherId: teacherNameToIdMap[schedule.teacherName] // Cập nhật với _id từ DB
-=======
-              teacherId: teacherNameToIdMap[schedule.teacherName]
->>>>>>> origin/Namvv-teacher-class-management
             };
           }
           return schedule;
@@ -1340,10 +1094,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   const normalizeDayValue = (value) => {
     if (!value) return null;
     
-<<<<<<< HEAD
     // If it's a date string, parse it first
-=======
->>>>>>> origin/Namvv-teacher-class-management
     if (typeof value === 'string' && (value.includes('-') || value.includes('/'))) {
       const dayFromDate = parseDateToDayOfWeek(value);
       if (dayFromDate) {
@@ -1375,10 +1126,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   const hasTimeOverlap = (startA, endA, startB, endB) => {
     if (!startA || !endA || !startB || !endB) return false;
     
-<<<<<<< HEAD
     // Chuyển đổi thời gian từ string "HH:MM" sang phút để so sánh chính xác
-=======
->>>>>>> origin/Namvv-teacher-class-management
     const timeToMinutes = (timeStr) => {
       if (!timeStr) return 0;
       const parts = timeStr.split(':');
@@ -1393,38 +1141,25 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     const startBMin = timeToMinutes(startB);
     const endBMin = timeToMinutes(endB);
     
-<<<<<<< HEAD
     // Hai khoảng thời gian overlap nếu: startA < endB VÀ endA > startB
     // Lưu ý: Nếu một lớp kết thúc đúng lúc lớp kia bắt đầu (ví dụ: 08:00-10:00 và 10:00-12:00)
     // thì KHÔNG có overlap vì sử dụng > và < (không có =)
-=======
->>>>>>> origin/Namvv-teacher-class-management
     return startAMin < endBMin && endAMin > startBMin;
   };
 
   const hasDateRangeOverlap = (startDateA, endDateA, startDateB, endDateB) => {
-<<<<<<< HEAD
     if (!startDateA || !endDateA || !startDateB || !endDateB) return true; // Nếu thiếu thông tin, coi như có overlap để an toàn
-=======
-    if (!startDateA || !endDateA || !startDateB || !endDateB) return true;
->>>>>>> origin/Namvv-teacher-class-management
     
     const startA = new Date(startDateA);
     const endA = new Date(endDateA);
     const startB = new Date(startDateB);
     const endB = new Date(endDateB);
     
-<<<<<<< HEAD
     // Kiểm tra overlap: startA < endB && startB < endA
     return startA <= endB && startB <= endA;
   };
 
   // Convert day string to day of week number (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
-=======
-    return startA <= endB && startB <= endA;
-  };
-
->>>>>>> origin/Namvv-teacher-class-management
   const getDayOfWeekNumber = (dayStr) => {
     const dayMap = {
       'CN': 0,
@@ -1438,30 +1173,20 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     return dayMap[dayStr] !== undefined ? dayMap[dayStr] : null;
   };
 
-<<<<<<< HEAD
   // Find the next occurrence of a day of week from a start date
-=======
->>>>>>> origin/Namvv-teacher-class-management
   const findNextDayOfWeek = (startDate, targetDayOfWeek) => {
     const start = new Date(startDate);
     const currentDay = start.getDay();
     let daysToAdd = (targetDayOfWeek - currentDay + 7) % 7;
     if (daysToAdd === 0 && start.getTime() < new Date().getTime()) {
-<<<<<<< HEAD
       daysToAdd = 7; // If today is the target day but in the past, go to next week
-=======
-      daysToAdd = 7;
->>>>>>> origin/Namvv-teacher-class-management
     }
     const result = new Date(start);
     result.setDate(start.getDate() + daysToAdd);
     return result;
   };
 
-<<<<<<< HEAD
   // Generate all sessions that will be created
-=======
->>>>>>> origin/Namvv-teacher-class-management
   const generateSessions = (startDate, scheduleEntries, numberOfSessions) => {
     if (!startDate || !scheduleEntries.length || !numberOfSessions) {
       return [];
@@ -1470,10 +1195,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     const sessions = [];
     const start = new Date(startDate);
     
-<<<<<<< HEAD
     // Find first occurrence of each day of week from start date
-=======
->>>>>>> origin/Namvv-teacher-class-management
     const firstOccurrences = {};
     scheduleEntries.forEach(entry => {
       const dayOfWeek = getDayOfWeekNumber(entry.day);
@@ -1482,10 +1204,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       }
     });
 
-<<<<<<< HEAD
     // Generate sessions in round-robin fashion
-=======
->>>>>>> origin/Namvv-teacher-class-management
     let entryIndex = 0;
     let weekOffset = 0;
 
@@ -1498,36 +1217,23 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         continue;
       }
 
-<<<<<<< HEAD
       // Get the first occurrence of this day
       const firstOccurrence = firstOccurrences[dayOfWeek];
       
       // Calculate the date for this session
-=======
-      const firstOccurrence = firstOccurrences[dayOfWeek];
-      
->>>>>>> origin/Namvv-teacher-class-management
       const sessionDate = new Date(firstOccurrence);
       sessionDate.setDate(firstOccurrence.getDate() + (weekOffset * 7));
 
       sessions.push({
-<<<<<<< HEAD
         date: sessionDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
-=======
-        date: sessionDate.toISOString().split('T')[0],
->>>>>>> origin/Namvv-teacher-class-management
         dayOfWeek: dayOfWeek,
         startTime: entry.startTime,
         endTime: entry.endTime
       });
 
-<<<<<<< HEAD
       // Move to next entry (round-robin)
       entryIndex++;
       // If we've gone through all entries, move to next week
-=======
-      entryIndex++;
->>>>>>> origin/Namvv-teacher-class-management
       if (entryIndex % scheduleEntries.length === 0) {
         weekOffset++;
       }
@@ -1544,10 +1250,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     [formData.scheduleEntries]
   );
 
-<<<<<<< HEAD
   // Generate sessions that will be created
-=======
->>>>>>> origin/Namvv-teacher-class-management
   const generatedSessions = useMemo(() => {
     if (!formData.startDate || !filledScheduleEntries.length || !selectedCourse?.numberOfSessions) {
       return [];
@@ -1562,34 +1265,22 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
     const conflicts = new Set();
 
-<<<<<<< HEAD
     // Check each generated session against existing schedules
-=======
->>>>>>> origin/Namvv-teacher-class-management
     generatedSessions.forEach((session) => {
       const sessionDate = session.date;
       const sessionStart = parseTime(session.startTime);
       const sessionEnd = parseTime(session.endTime);
 
       existingSchedules.forEach((schedule) => {
-<<<<<<< HEAD
         // API populate room với _id và room_name
         const scheduleRoomId =
           schedule.room?._id?.toString() || // Nếu room được populate
-=======
-        const scheduleRoomId =
-          schedule.room?._id?.toString() ||
->>>>>>> origin/Namvv-teacher-class-management
           schedule.roomId ||
           schedule.roomID ||
           schedule.room?.id ||
           schedule.room?.id?.toString();
         const scheduleRoomName = 
-<<<<<<< HEAD
           schedule.room?.room_name || // API trả về room_name, không phải name
-=======
-          schedule.room?.room_name ||
->>>>>>> origin/Namvv-teacher-class-management
           schedule.roomName || 
           schedule.room?.name;
 
@@ -1597,30 +1288,16 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           return;
         }
 
-<<<<<<< HEAD
         // Get schedule date
-=======
->>>>>>> origin/Namvv-teacher-class-management
         const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
         if (!scheduleDate) {
           return;
         }
 
-<<<<<<< HEAD
         // Format schedule date to YYYY-MM-DD for comparison
         const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
 
         // Check if dates match
-=======
-        // Validate date before creating Date object
-        const dateObj = new Date(scheduleDate);
-        if (isNaN(dateObj.getTime())) {
-          return; // Invalid date, skip this schedule
-        }
-
-        const scheduleDateStr = dateObj.toISOString().split('T')[0];
-
->>>>>>> origin/Namvv-teacher-class-management
         if (scheduleDateStr !== sessionDate) {
           return;
         }
@@ -1639,7 +1316,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             schedule.endHour
         );
 
-<<<<<<< HEAD
         // Check if times overlap
         const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
 
@@ -1652,11 +1328,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             scheduleDate: scheduleDateStr,
             scheduleTime: `${scheduleStart} - ${scheduleEnd}`
           });
-=======
-        const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
-
-        if (hasTimeConflict) {
->>>>>>> origin/Namvv-teacher-class-management
           if (scheduleRoomId) {
             conflicts.add(String(scheduleRoomId));
           }
@@ -1670,10 +1341,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     return conflicts;
   }, [generatedSessions, existingSchedules]);
 
-<<<<<<< HEAD
   // Fetch teacher schedules - need to get all schedules for conflict checking
-=======
->>>>>>> origin/Namvv-teacher-class-management
   useEffect(() => {
     const fetchTeacherSchedules = async () => {
       if (!teachers.length || !generatedSessions.length) {
@@ -1682,20 +1350,14 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
       const schedulesMap = {};
       
-<<<<<<< HEAD
       // Get date range from generated sessions
-=======
->>>>>>> origin/Namvv-teacher-class-management
       if (generatedSessions.length === 0) return;
       
       const sessionDates = generatedSessions.map(s => s.date).sort();
       const minDate = sessionDates[0];
       const maxDate = sessionDates[sessionDates.length - 1];
       
-<<<<<<< HEAD
       // Fetch schedules for each teacher
-=======
->>>>>>> origin/Namvv-teacher-class-management
       await Promise.all(
         teachers.map(async (teacher) => {
           const teacherId = teacher._id || teacher.id;
@@ -1711,10 +1373,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               schedulesMap[String(teacherId)] = response.schedules;
             }
           } catch (error) {
-<<<<<<< HEAD
             console.error(`Error fetching schedule for teacher ${teacherId}:`, error);
-=======
->>>>>>> origin/Namvv-teacher-class-management
             schedulesMap[String(teacherId)] = [];
           }
         })
@@ -1726,10 +1385,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     fetchTeacherSchedules();
   }, [teachers, generatedSessions]);
 
-<<<<<<< HEAD
   // Fetch student schedules - need to get all schedules for conflict checking
-=======
->>>>>>> origin/Namvv-teacher-class-management
   useEffect(() => {
     const fetchStudentSchedules = async () => {
       if (!formData.selectedStudents.length || !generatedSessions.length) {
@@ -1739,18 +1395,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
       const schedulesMap = {};
       
-<<<<<<< HEAD
       // Get date range from generated sessions
-=======
->>>>>>> origin/Namvv-teacher-class-management
       const sessionDates = generatedSessions.map(s => s.date).sort();
       const minDate = sessionDates[0];
       const maxDate = sessionDates[sessionDates.length - 1];
       
-<<<<<<< HEAD
       // Fetch schedules for each selected student
-=======
->>>>>>> origin/Namvv-teacher-class-management
       await Promise.all(
         formData.selectedStudents.map(async (studentId) => {
           if (!studentId) return;
@@ -1769,10 +1419,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               schedulesMap[String(studentId)] = [];
             }
           } catch (error) {
-<<<<<<< HEAD
             console.error(`Error fetching schedule for student ${studentId}:`, error);
-=======
->>>>>>> origin/Namvv-teacher-class-management
             schedulesMap[String(studentId)] = [];
           }
         })
@@ -1791,24 +1438,17 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
     const conflicts = new Set();
 
-<<<<<<< HEAD
     // Check each teacher's schedules
     Object.entries(teacherSchedules).forEach(([teacherId, schedules]) => {
       if (!schedules || schedules.length === 0) return;
 
       // Check each generated session against teacher's schedules
-=======
-    Object.entries(teacherSchedules).forEach(([teacherId, schedules]) => {
-      if (!schedules || schedules.length === 0) return;
-
->>>>>>> origin/Namvv-teacher-class-management
       generatedSessions.forEach((session) => {
         const sessionDate = session.date;
         const sessionStart = parseTime(session.startTime);
         const sessionEnd = parseTime(session.endTime);
 
         schedules.forEach((schedule) => {
-<<<<<<< HEAD
           // Get schedule date
           const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
           if (!scheduleDate) return;
@@ -1817,33 +1457,16 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
 
           // Check if dates match
-=======
-          const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
-          if (!scheduleDate) return;
-
-          // Validate date before creating Date object
-          const dateObj = new Date(scheduleDate);
-          if (isNaN(dateObj.getTime())) {
-            return; // Invalid date, skip this schedule
-          }
-
-          const scheduleDateStr = dateObj.toISOString().split('T')[0];
-
->>>>>>> origin/Namvv-teacher-class-management
           if (scheduleDateStr !== sessionDate) {
             return;
           }
 
-<<<<<<< HEAD
           // Check time overlap
-=======
->>>>>>> origin/Namvv-teacher-class-management
           const scheduleStart = parseTime(schedule.startTime);
           const scheduleEnd = parseTime(schedule.endTime);
           const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
 
           if (hasTimeConflict) {
-<<<<<<< HEAD
             console.log('🔴 CONFLICT Teacher:', {
               teacherId,
               scheduleId: schedule._id || schedule.id,
@@ -1852,18 +1475,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               scheduleDate: scheduleDateStr,
               scheduleTime: `${scheduleStart} - ${scheduleEnd}`
             });
-=======
->>>>>>> origin/Namvv-teacher-class-management
             conflicts.add(teacherId);
           }
         });
       });
     });
 
-<<<<<<< HEAD
     console.log('📋 Conflicting Teacher IDs:', Array.from(conflicts));
-=======
->>>>>>> origin/Namvv-teacher-class-management
     return conflicts;
   }, [generatedSessions, teacherSchedules]);
 
@@ -1872,30 +1490,21 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       return new Map();
     }
 
-<<<<<<< HEAD
     const conflicts = new Map(); // Map<studentId, Array<conflictDetails>>
 
     // Check each student's schedules
-=======
-    const conflicts = new Map();
-
->>>>>>> origin/Namvv-teacher-class-management
     Object.entries(studentSchedules).forEach(([studentId, schedules]) => {
       if (!schedules || schedules.length === 0) return;
 
       const studentConflicts = [];
 
-<<<<<<< HEAD
       // Check each generated session against student's schedules
-=======
->>>>>>> origin/Namvv-teacher-class-management
       generatedSessions.forEach((session) => {
         const sessionDate = session.date;
         const sessionStart = parseTime(session.startTime);
         const sessionEnd = parseTime(session.endTime);
 
         schedules.forEach((schedule) => {
-<<<<<<< HEAD
           // Get schedule date - handle different response formats
           const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate || schedule.classSchedule?.date;
           if (!scheduleDate) return;
@@ -1904,27 +1513,11 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           const scheduleDateStr = new Date(scheduleDate).toISOString().split('T')[0];
 
           // Check if dates match
-=======
-          const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate || schedule.classSchedule?.date;
-          if (!scheduleDate) return;
-
-          // Validate date before creating Date object
-          const dateObj = new Date(scheduleDate);
-          if (isNaN(dateObj.getTime())) {
-            return; // Invalid date, skip this schedule
-          }
-
-          const scheduleDateStr = dateObj.toISOString().split('T')[0];
-
->>>>>>> origin/Namvv-teacher-class-management
           if (scheduleDateStr !== sessionDate) {
             return;
           }
 
-<<<<<<< HEAD
           // Check time overlap - handle different response formats
-=======
->>>>>>> origin/Namvv-teacher-class-management
           const scheduleStart = parseTime(
             schedule.startTime ||
             schedule.start_time ||
@@ -1945,20 +1538,14 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
 
           if (hasTimeConflict) {
-<<<<<<< HEAD
             // Get class name - handle different response formats
-=======
->>>>>>> origin/Namvv-teacher-class-management
             const className = 
               schedule.className || 
               schedule.class?.name || 
               schedule.classSchedule?.class?.name ||
               'N/A';
             
-<<<<<<< HEAD
             // Format date for display
-=======
->>>>>>> origin/Namvv-teacher-class-management
             const displayDate = new Date(scheduleDateStr).toLocaleDateString('vi-VN', {
               weekday: 'long',
               year: 'numeric',
@@ -1975,7 +1562,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             };
 
             studentConflicts.push(conflictDetail);
-<<<<<<< HEAD
 
             console.log('🔴 CONFLICT Student:', {
               studentId,
@@ -1986,8 +1572,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               scheduleDate: scheduleDateStr,
               scheduleTime: `${scheduleStart} - ${scheduleEnd}`
             });
-=======
->>>>>>> origin/Namvv-teacher-class-management
           }
         });
       });
@@ -1997,10 +1581,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       }
     });
 
-<<<<<<< HEAD
     console.log('📋 Conflicting Student IDs:', Array.from(conflicts.keys()));
-=======
->>>>>>> origin/Namvv-teacher-class-management
     return conflicts;
   }, [generatedSessions, studentSchedules]);
 
@@ -2011,7 +1592,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
     const filtered = rooms.filter(
       (room) => {
-<<<<<<< HEAD
         // API có thể trả về _id (MongoDB) hoặc id
         const roomId = room._id || room.id;
         const roomIdStr = String(roomId);
@@ -2020,20 +1600,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         const roomName = room.name || room.roomName || room.room_name || room.title || `Phòng ${roomId}`;
         
         // So sánh bằng cả id và name
-=======
-        const roomId = room._id || room.id;
-        const roomIdStr = String(roomId);
-        
-        const roomName = room.name || room.roomName || room.room_name || room.title || `Phòng ${roomId}`;
-        
->>>>>>> origin/Namvv-teacher-class-management
         const hasIdConflict = conflictingRoomIds.has(roomIdStr) || conflictingRoomIds.has(String(room.id));
         const hasNameConflict = conflictingRoomIds.has(roomName) || 
                                 conflictingRoomIds.has(room.name) || 
                                 conflictingRoomIds.has(room.roomName) || 
                                 conflictingRoomIds.has(room.room_name);
         
-<<<<<<< HEAD
         if (hasIdConflict || hasNameConflict) {
           console.log('🚫 Room filtered out:', {
             roomId,
@@ -2045,13 +1617,10 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           });
         }
         
-=======
->>>>>>> origin/Namvv-teacher-class-management
         return !hasIdConflict && !hasNameConflict;
       }
     );
     
-<<<<<<< HEAD
     console.log('📋 Filtered rooms:', {
       total: rooms.length,
       filtered: filtered.length,
@@ -2059,13 +1628,10 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       conflictingIds: Array.from(conflictingRoomIds)
     });
     
-=======
->>>>>>> origin/Namvv-teacher-class-management
     return filtered;
   }, [generatedSessions, existingSchedules, rooms, conflictingRoomIds]);
 
   const filteredTeachers = useMemo(() => {
-<<<<<<< HEAD
     // Nếu chưa có đủ thông tin để filter, hiển thị tất cả teachers
     if (!generatedSessions.length || Object.keys(teacherSchedules).length === 0) {
       console.log('📋 Showing all teachers (no filter conditions):', teachers.length);
@@ -2080,32 +1646,18 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         const teacherIdStr = String(teacherId);
         
         // Chỉ so sánh bằng ID (không so sánh bằng name vì name có thể trùng và không đáng tin cậy)
-=======
-    if (!generatedSessions.length || Object.keys(teacherSchedules).length === 0) {
-      return teachers;
-    }
-
-    const filtered = teachers.filter(
-      (teacher) => {
-        const teacherId = teacher._id || teacher.id;
-        const teacherIdStr = String(teacherId);
-        
->>>>>>> origin/Namvv-teacher-class-management
         const hasIdConflict = conflictingTeacherIds.has(teacherIdStr) || conflictingTeacherIds.has(String(teacher.id));
         
         return !hasIdConflict;
       }
     );
     
-<<<<<<< HEAD
     console.log('📋 Filtered teachers:', {
       total: teachers.length,
       filtered: filtered.length,
       conflicting: conflictingTeacherIds.size
     });
     
-=======
->>>>>>> origin/Namvv-teacher-class-management
     return filtered;
   }, [generatedSessions, teacherSchedules, teachers, conflictingTeacherIds]);
 
@@ -2145,10 +1697,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
       <Form onSubmit={handleSubmit}>
         <Modal.Body className="p-24" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-<<<<<<< HEAD
           {/* Basic Information - Moved to top */}
-=======
->>>>>>> origin/Namvv-teacher-class-management
           <div className="mb-24">
             <h5 className="text-neutral-900 fw-semibold mb-16 pb-12 border-bottom border-neutral-100">
               Thông tin cơ bản
@@ -2269,7 +1818,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               </div>
             </div>
           </div>
-                  
+
+          {/* Schedule */}
           <div className="mb-24">
             <h5 className="text-neutral-900 fw-semibold mb-16 pb-12 border-bottom border-neutral-100">
               Lịch học & Thời gian
@@ -2299,7 +1849,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                 </Form.Group>
               </div>
             </div>
-<<<<<<< HEAD
 
             <Form.Group className="mb-12">
               <Form.Label className="text-neutral-700 fw-medium mb-8">
@@ -2412,118 +1961,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           </div>
 
                     {/* Resources */}
-=======
-
-            <Form.Group className="mb-12">
-              <Form.Label className="text-neutral-700 fw-medium mb-8">
-                Thời khóa biểu <span className="text-danger-600">*</span>
-              </Form.Label>
-              <p className="text-neutral-500 text-13 mb-0">
-                Thêm nhiều buổi học với ngày và giờ khác nhau (ví dụ: Thứ 2: 08:00-10:00, Thứ 4: 18:00-20:00).
-              </p>
-            </Form.Group>
-
-            <div className="d-flex flex-column gap-12">
-              {formData.scheduleEntries.map((entry, index) => {
-                const isDuplicate = duplicateEntryIndices.includes(index);
-                return (
-                <div
-                  key={entry.id}
-                  className={`border rounded-12 p-16 ${isDuplicate ? 'border-danger border-2' : 'border-neutral-100'}`}
-                >
-                  <div className="d-flex justify-content-between align-items-center mb-12">
-                    <div className="fw-semibold text-neutral-900">
-                      Buổi {index + 1}
-                    </div>
-                    {formData.scheduleEntries.length > 1 && (
-                      <Button
-                        type="button"
-                        className="btn-outline-danger text-13 fw-medium px-14 py-6 radius-8"
-                        onClick={() => removeScheduleEntry(entry.id)}
-                      >
-                        <i className="fas fa-trash-alt me-2"></i>
-                        Xóa
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="row g-3">
-                    <div className="col-md-4">
-                      <Form.Group>
-                        <Form.Label className="text-neutral-700 fw-medium mb-8">
-                          Ngày học
-                        </Form.Label>
-                        <Form.Select
-                          value={entry.day}
-                          onChange={(e) =>
-                            handleScheduleEntryChange(entry.id, 'day', e.target.value)
-                          }
-                          className="border-neutral-30 radius-8 px-16 py-10"
-                          required
-                        >
-                          <option value="">-- Chọn ngày --</option>
-                          {daysOfWeek.map(day => (
-                            <option key={day.value} value={day.value}>
-                              {day.label}
-                            </option>
-                          ))}
-                        </Form.Select>
-                      </Form.Group>
-                    </div>
-                    <div className="col-md-4">
-                      <Form.Group>
-                        <Form.Label className="text-neutral-700 fw-medium mb-8">
-                          Giờ bắt đầu
-                        </Form.Label>
-                        <Form.Control
-                          type="time"
-                          value={entry.startTime}
-                          onChange={(e) =>
-                            handleScheduleEntryChange(entry.id, 'startTime', e.target.value)
-                          }
-                          className="border-neutral-30 radius-8 px-16 py-10"
-                          required
-                        />
-                      </Form.Group>
-                    </div>
-                    <div className="col-md-4">
-                      <Form.Group>
-                        <Form.Label className="text-neutral-700 fw-medium mb-8">
-                          Giờ kết thúc
-                        </Form.Label>
-                        <Form.Control
-                          type="time"
-                          value={entry.endTime}
-                          onChange={(e) =>
-                            handleScheduleEntryChange(entry.id, 'endTime', e.target.value)
-                          }
-                          className="border-neutral-30 radius-8 px-16 py-10"
-                          required
-                        />
-                      </Form.Group>
-                    </div>
-                  </div>
-                </div>
-                );
-              })}
-            </div>
-
-            <Button
-              type="button"
-              onClick={addScheduleEntry}
-              className="btn-outline-main text-14 fw-medium px-16 py-8 radius-8 mt-16"
-            >
-              <i className="fas fa-plus me-2"></i>
-              Thêm buổi học
-            </Button>
-
-            {scheduleEntriesError && (
-              <Alert variant="danger" className="mt-12 mb-0">
-                {scheduleEntriesError}
-              </Alert>
-            )}
-          </div>  
->>>>>>> origin/Namvv-teacher-class-management
                     <div className="mb-24">
             <h5 className="text-neutral-900 fw-semibold mb-16 pb-12 border-bottom border-neutral-100">
               Tài nguyên
@@ -2533,11 +1970,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               <div className="col-md-6">
                 <Form.Group>
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
-<<<<<<< HEAD
                     Giáo viên <span className="text-danger-600">*</span>
-=======
-                    Giáo viên
->>>>>>> origin/Namvv-teacher-class-management
                   </Form.Label>
                   <Form.Select
                     name="teacherId"
@@ -2545,10 +1978,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     onChange={handleInputChange}
                     className="border-neutral-30 radius-8 px-16 py-10"
                     disabled={teachers.length === 0}
-<<<<<<< HEAD
                     required
-=======
->>>>>>> origin/Namvv-teacher-class-management
                   >
                     <option value="">-- Chọn giáo viên --</option>
                     {teachers.length === 0 ? (
@@ -2562,10 +1992,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     ) : null}
                     {filteredTeachers.map(t => {
                       const teacherId = t._id || t.id;
-<<<<<<< HEAD
                       // Hỗ trợ nhiều format tên từ API
-=======
->>>>>>> origin/Namvv-teacher-class-management
                       const teacherName = 
                         t.name || 
                         t.teacherName || 
@@ -2604,11 +2031,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                       <div className="d-flex align-items-start">
                         <i className="fas fa-exclamation-triangle me-2 mt-1 text-warning"></i>
                         <div className="flex-grow-1">
-<<<<<<< HEAD
                           <strong className="text-danger">⚠️ Xung đột lịch giáo viên:</strong>
-=======
-                          <strong className="text-danger"> Xung đột lịch giáo viên:</strong>
->>>>>>> origin/Namvv-teacher-class-management
                           <ul className="mb-0 mt-2" style={{ fontSize: '13px' }}>
                             {conflicts.teacher.map((c, idx) => (
                               <li key={idx}>
@@ -2669,11 +2092,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                       <div className="d-flex align-items-start">
                         <i className="fas fa-exclamation-triangle me-2 mt-1 text-warning"></i>
                         <div className="flex-grow-1">
-<<<<<<< HEAD
                           <strong className="text-danger">⚠️ Xung đột phòng học:</strong>
-=======
-                          <strong className="text-danger"> Xung đột phòng học:</strong>
->>>>>>> origin/Namvv-teacher-class-management
                           <ul className="mb-0 mt-2" style={{ fontSize: '13px' }}>
                             {conflicts.room.map((c, idx) => (
                               <li key={idx}>
@@ -2696,10 +2115,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             </div>
           </div>
 
-<<<<<<< HEAD
           {/* Students Selection */}
-=======
->>>>>>> origin/Namvv-teacher-class-management
           <div className="mb-24">
             <div className="d-flex justify-content-between align-items-center mb-16 pb-12 border-bottom border-neutral-100">
               <h5 className="text-neutral-900 fw-semibold mb-0">
@@ -2755,13 +2171,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     variant="outline-primary"
                     size="sm"
                     onClick={() => setShowSelectStudentModal(true)}
-<<<<<<< HEAD
                     className="text-13 fw-medium px-16 py-8 radius-8"
-=======
-                    disabled={!formData.course}
-                    className="text-13 fw-medium px-16 py-8 radius-8"
-                    title={!formData.course ? 'Vui lòng chọn course trước khi thêm học viên' : ''}
->>>>>>> origin/Namvv-teacher-class-management
                   >
                     <i className="fas fa-plus me-2"></i>
                     Thêm học viên
@@ -2769,10 +2179,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                 </div>
               </div>
 
-<<<<<<< HEAD
               {/* Hidden file input */}
-=======
->>>>>>> origin/Namvv-teacher-class-management
               <input
                 ref={fileInputRef}
                 type="file"
@@ -2794,20 +2201,14 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                 ) : (
                   <div className="d-flex flex-column gap-8">
                     {formData.selectedStudents.map(selectedStudentId => {
-<<<<<<< HEAD
                       // Find student details from the students list
-=======
->>>>>>> origin/Namvv-teacher-class-management
                       const student = students.find(s => {
                         const studentId = s._id || s.id;
                         return String(studentId) === String(selectedStudentId);
                       });
                       
                       if (!student) {
-<<<<<<< HEAD
                         // If student not found in list, show placeholder
-=======
->>>>>>> origin/Namvv-teacher-class-management
                         return (
                           <div
                             key={selectedStudentId}
@@ -2895,30 +2296,10 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                 )}
               </div>
 
-<<<<<<< HEAD
               <Form.Text className="text-neutral-500 text-12 mt-8">
                 <i className="fas fa-info-circle me-1"></i>
                 Có thể thêm học viên sau khi tạo lớp. File Excel cần có cột đầu tiên chứa Email hoặc Số điện thoại của học viên.
               </Form.Text>
-=======
-              <div className="d-flex align-items-center gap-8 mt-8">
-                <Form.Text className="text-neutral-500 text-12 mb-0">
-                  <i className="fas fa-info-circle me-1"></i>
-                  Có thể thêm học viên sau khi tạo lớp.
-                </Form.Text>
-                <Button
-                  type="button"
-                  variant="link"
-                  size="sm"
-                  onClick={handleDownloadTemplate}
-                  className="text-12 p-0 text-decoration-none"
-                  style={{ padding: 0, lineHeight: 'inherit' }}
-                >
-                  <i className="fas fa-download me-1"></i>
-                  Tải file mẫu Excel
-                </Button>
-              </div>
->>>>>>> origin/Namvv-teacher-class-management
               {checkingConflicts && formData.selectedStudents && formData.selectedStudents.length > 0 && (
                 <div className="mt-12">
                   <Form.Text className="text-info text-12">
@@ -2932,11 +2313,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                   <div className="d-flex align-items-start">
                     <i className="fas fa-exclamation-triangle me-2 mt-1 text-warning"></i>
                     <div className="flex-grow-1">
-<<<<<<< HEAD
                       <strong className="text-danger">⚠️ Xung đột lịch học viên:</strong>
-=======
-                      <strong className="text-danger"> Xung đột lịch học viên:</strong>
->>>>>>> origin/Namvv-teacher-class-management
                       <div className="mt-2" style={{ fontSize: '13px' }}>
                         {conflicts.students.map((studentConflict, idx) => (
                           <div key={idx} className="mb-2">
@@ -3000,10 +2377,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         onConfirm={handleStudentsConfirmed}
         initialSelectedStudents={formData.selectedStudents}
         generatedSessions={generatedSessions}
-<<<<<<< HEAD
-=======
-        courseId={formData.course}
->>>>>>> origin/Namvv-teacher-class-management
       />
 
       {/* Import Result Modal */}
@@ -3045,11 +2418,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                 <div className="mb-0">
                   <div className="text-neutral-700 fw-medium mb-8">
                     <i className="fas fa-info-circle me-2"></i>
-<<<<<<< HEAD
                     Không tìm thấy {importResult.notFound.length} học viên:
-=======
-                    Không tìm thấy hoặc chưa enroll vào course: {importResult.notFound.length} học viên
->>>>>>> origin/Namvv-teacher-class-management
                   </div>
                   <div 
                     className="border border-neutral-100 rounded-8 p-12 bg-neutral-25"

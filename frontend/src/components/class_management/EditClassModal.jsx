@@ -21,11 +21,7 @@ const createEmptyScheduleEntry = () => ({
   endTime: '10:00'
 });
 
-<<<<<<< HEAD
 const EditClassForm = ({ classData, onSubmit }) => {
-=======
-const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
->>>>>>> origin/Namvv-teacher-class-management
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     id: '',
@@ -146,15 +142,9 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
         
         // Debug log to check if schedules are present
         if (classDataWithSchedules && classDataWithSchedules.schedules) {
-<<<<<<< HEAD
           console.log('✅ Full class data loaded with schedules:', classDataWithSchedules.schedules.length);
         } else {
           console.log('⚠️ Full class data loaded but no schedules found');
-=======
-          console.log(' Full class data loaded with schedules:', classDataWithSchedules.schedules.length);
-        } else {
-          console.log(' Full class data loaded but no schedules found');
->>>>>>> origin/Namvv-teacher-class-management
         }
       } catch (error) {
         console.error('Error fetching full class data:', error);
@@ -394,11 +384,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
       const day = String(scheduleDate.getDate()).padStart(2, '0');
       const dateString = `${year}-${month}-${day}`;
 
-<<<<<<< HEAD
       console.log('🔍 [VALIDATE] Convert thứ sang date:');
-=======
-      console.log(' [VALIDATE] Convert thứ sang date:');
->>>>>>> origin/Namvv-teacher-class-management
       console.log('  - Thứ được chọn:', newScheduleData.day);
       console.log('  - targetDay (0=CN, 1=T2, ..., 6=T7):', targetDay);
       console.log('  - Hôm nay là thứ:', today.getDay(), `(${['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][today.getDay()]})`);
@@ -507,15 +493,9 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           excludeScheduleId: excludeScheduleId
         };
         
-<<<<<<< HEAD
         console.log('\n🔍 ========== FRONTEND: VALIDATE SCHEDULE EDIT ==========');
         console.log('📋 Request data:', JSON.stringify(validationData, null, 2));
         console.log('📅 Thông tin buổi học:');
-=======
-        console.log('\n ========== FRONTEND: VALIDATE SCHEDULE EDIT ==========');
-        console.log(' Request data:', JSON.stringify(validationData, null, 2));
-        console.log(' Thông tin buổi học:');
->>>>>>> origin/Namvv-teacher-class-management
         console.log('  - ClassId:', classId);
         console.log('  - Date:', editedSchedule.date);
         console.log('  - Time:', `${editedSchedule.startTime} - ${editedSchedule.endTime}`);
@@ -527,11 +507,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
         
         const response = await classScheduleService.validateAddClassSchedule(validationData);
         
-<<<<<<< HEAD
         console.log('✅ Response từ server:');
-=======
-        console.log(' Response từ server:');
->>>>>>> origin/Namvv-teacher-class-management
         console.log('  - Success:', response.success);
         console.log('  - HasConflict:', response.conflicts?.hasConflict);
         console.log('  - Room conflicts:', response.conflicts?.room?.length || 0);
@@ -566,11 +542,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
         
         setScheduleValidationResult(response);
       } catch (error) {
-<<<<<<< HEAD
         console.error('❌ Error validating schedule edit:', error);
-=======
-        console.error(' Error validating schedule edit:', error);
->>>>>>> origin/Namvv-teacher-class-management
         console.error('  - Error message:', error.message);
         console.error('  - Error response:', error.response?.data);
         setScheduleValidationResult({
@@ -997,11 +969,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
             };
           }).filter(s => s.date);
 
-<<<<<<< HEAD
           console.log('📅 Lịch dạy hiện tại của giáo viên được chọn:', {
-=======
-          console.log(' Lịch dạy hiện tại của giáo viên được chọn:', {
->>>>>>> origin/Namvv-teacher-class-management
             teacherId: teacherId,
             totalSchedules: teacherSchedules.length,
             schedules: teacherSchedules.map(s => ({
@@ -1016,11 +984,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           });
 
           // Log current class schedule with detailed info
-<<<<<<< HEAD
           console.log('📚 Lịch học của lớp hiện tại:', {
-=======
-          console.log(' Lịch học của lớp hiện tại:', {
->>>>>>> origin/Namvv-teacher-class-management
             classId: classId,
             className: fullClassData?.name || 'N/A',
             totalSchedules: currentClassSchedules.length,
@@ -1036,11 +1000,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           
           // Log which dates have schedules
           const classScheduleDates = currentClassSchedules.map(s => s.date);
-<<<<<<< HEAD
           console.log('📅 Các ngày có lịch học của lớp hiện tại:', classScheduleDates);
-=======
-          console.log(' Các ngày có lịch học của lớp hiện tại:', classScheduleDates);
->>>>>>> origin/Namvv-teacher-class-management
 
           // Check which teacher schedules have attendance (already taught)
           // Get schedule IDs from teacher schedules
@@ -1163,11 +1123,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
 
                 // Check time overlap
                 if (hasTimeOverlap(classStart, classEnd, teacherStart, teacherEnd)) {
-<<<<<<< HEAD
                   console.log('🔍 [DEBUG] Phát hiện xung đột:', {
-=======
-                  console.log(' [DEBUG] Phát hiện xung đột:', {
->>>>>>> origin/Namvv-teacher-class-management
                     date: classSchedule.date,
                     currentClass: {
                       startTime: classSchedule.startTime,
@@ -1204,11 +1160,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           // Log comparison results and update state for filtering
           try {
             if (conflicts.length > 0) {
-<<<<<<< HEAD
               console.warn('⚠️ PHÁT HIỆN XUNG ĐỘT LỊCH:', {
-=======
-              console.warn(' PHÁT HIỆN XUNG ĐỘT LỊCH:', {
->>>>>>> origin/Namvv-teacher-class-management
                 totalConflicts: conflicts.length,
                 conflicts: conflicts.map(c => {
                   try {
@@ -1265,11 +1217,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                 conflictingRoomIds: prev.conflictingRoomIds || []
               }));
             } else {
-<<<<<<< HEAD
               console.log('✅ KHÔNG CÓ XUNG ĐỘT: Lịch giáo viên và lịch lớp hiện tại không trùng nhau (đã loại trừ các buổi của chính lớp hiện tại)');
-=======
-              console.log(' KHÔNG CÓ XUNG ĐỘT: Lịch giáo viên và lịch lớp hiện tại không trùng nhau (đã loại trừ các buổi của chính lớp hiện tại)');
->>>>>>> origin/Namvv-teacher-class-management
               
               // Clear teacher conflicts for this teacher if no conflicts found
               setTeacherRoomConflicts(prev => {
@@ -1288,7 +1236,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
               });
             }
           } catch (error) {
-<<<<<<< HEAD
             console.error('❌ Lỗi khi xử lý conflicts:', error);
             // Don't update state on error to prevent breaking the UI
           }
@@ -1296,15 +1243,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           console.log('📅 Giáo viên được chọn chưa có lịch dạy nào:', teacherId);
           if (currentClassSchedules.length > 0) {
             console.log('📚 Lịch học của lớp hiện tại:', {
-=======
-            console.error(' Lỗi khi xử lý conflicts:', error);
-            // Don't update state on error to prevent breaking the UI
-          }
-        } else {
-          console.log(' Giáo viên được chọn chưa có lịch dạy nào:', teacherId);
-          if (currentClassSchedules.length > 0) {
-            console.log(' Lịch học của lớp hiện tại:', {
->>>>>>> origin/Namvv-teacher-class-management
               classId: classId,
               className: fullClassData?.name || 'N/A',
               totalSchedules: currentClassSchedules.length,
@@ -1313,11 +1251,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           }
         }
       } catch (error) {
-<<<<<<< HEAD
         console.error('❌ Lỗi khi lấy và so sánh lịch:', error);
-=======
-        console.error(' Lỗi khi lấy và so sánh lịch:', error);
->>>>>>> origin/Namvv-teacher-class-management
       }
     };
 
@@ -1396,46 +1330,25 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           
           // Get class IDs from room schedules to filter out current class
           const roomSchedules = roomResponse.schedules.map(schedule => {
-<<<<<<< HEAD
             // Try to get classId from various possible fields
             const scheduleClassId = schedule.class?._id?.toString() || 
                                    schedule.classId?.toString() || 
                                    schedule.class?.id?.toString() ||
                                    schedule._id?.toString(); // Fallback to schedule ID if class info not available
-=======
-            // Get class ID from various possible paths in API response
-            // Primary path from API: class._id
-            const scheduleClassId = 
-              schedule.class?._id?.toString() ||  // Primary path from API
-              schedule.class?._id ||              // In case it's already a string
-              schedule.classId?.toString() ||
-              schedule.classId ||
-              schedule.class?.id?.toString() ||
-              schedule.class?.id ||
-              null; // Don't use schedule._id as fallback - that's wrong
->>>>>>> origin/Namvv-teacher-class-management
             
             return {
               date: formatDateLocal(schedule.date),
               startTime: schedule.startTime,
               endTime: schedule.endTime,
               className: schedule.className || schedule.class?.name || 'N/A',
-<<<<<<< HEAD
               classId: scheduleClassId,
-=======
-              classId: scheduleClassId, // Can be null if no class info
->>>>>>> origin/Namvv-teacher-class-management
               room: roomName, // Use room name from response
               status: schedule.status,
               _id: schedule._id
             };
           }).filter(s => s.date);
 
-<<<<<<< HEAD
           console.log('📅 Lịch sử dụng hiện tại của phòng được chọn:', {
-=======
-          console.log(' Lịch sử dụng hiện tại của phòng được chọn:', {
->>>>>>> origin/Namvv-teacher-class-management
             roomId: roomId,
             totalSchedules: roomSchedules.length,
             schedules: roomSchedules.map(s => ({
@@ -1450,11 +1363,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           });
 
           // Log current class schedule with detailed info
-<<<<<<< HEAD
           console.log('📚 Lịch học của lớp hiện tại:', {
-=======
-          console.log(' Lịch học của lớp hiện tại:', {
->>>>>>> origin/Namvv-teacher-class-management
             classId: classId,
             className: fullClassData?.name || 'N/A',
             totalSchedules: currentClassSchedules.length,
@@ -1470,11 +1379,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           
           // Log which dates have schedules
           const classScheduleDates = currentClassSchedules.map(s => s.date);
-<<<<<<< HEAD
           console.log('📅 Các ngày có lịch học của lớp hiện tại:', classScheduleDates);
-=======
-          console.log(' Các ngày có lịch học của lớp hiện tại:', classScheduleDates);
->>>>>>> origin/Namvv-teacher-class-management
 
           // Check which room schedules have attendance (already taught)
           // Get schedule IDs from room schedules
@@ -1573,19 +1478,9 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
               // Skip if it's from the same class (compare by classId)
               const roomClassIdStr = roomSchedule.classId ? String(roomSchedule.classId) : null;
               
-<<<<<<< HEAD
               // Also check by className as fallback
               const isSameClass = roomClassIdStr && roomClassIdStr === currentClassIdStr;
               const isSameClassByName = roomSchedule.className === (fullClassData?.name || 'Lớp hiện tại');
-=======
-              // Exclude if same class ID
-              const isSameClass = currentClassIdStr && roomClassIdStr && roomClassIdStr === currentClassIdStr;
-              
-              // Also check by class name as fallback
-              const scheduleClassName = roomSchedule.className || 'N/A';
-              const currentClassName = fullClassData?.name || formData.name || 'Lớp hiện tại';
-              const isSameClassByName = currentClassName && scheduleClassName && scheduleClassName === currentClassName;
->>>>>>> origin/Namvv-teacher-class-management
               
               if (isSameClass || isSameClassByName) {
                 return; // Skip schedules from the same class
@@ -1625,11 +1520,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           // Log comparison results and update state for filtering
           try {
             if (conflicts.length > 0) {
-<<<<<<< HEAD
               console.warn('⚠️ PHÁT HIỆN XUNG ĐỘT PHÒNG HỌC:', {
-=======
-              console.warn(' PHÁT HIỆN XUNG ĐỘT PHÒNG HỌC:', {
->>>>>>> origin/Namvv-teacher-class-management
                 totalConflicts: conflicts.length,
                 conflicts: conflicts.map(c => {
                   try {
@@ -1680,11 +1571,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                 conflictingTeacherIds: prev.conflictingTeacherIds || []
               }));
             } else {
-<<<<<<< HEAD
               console.log('✅ KHÔNG CÓ XUNG ĐỘT PHÒNG: Lịch phòng và lịch lớp hiện tại không trùng nhau (đã loại trừ các buổi của chính lớp hiện tại)');
-=======
-              console.log(' KHÔNG CÓ XUNG ĐỘT PHÒNG: Lịch phòng và lịch lớp hiện tại không trùng nhau (đã loại trừ các buổi của chính lớp hiện tại)');
->>>>>>> origin/Namvv-teacher-class-management
               
               // Clear room conflicts for this room if no conflicts found
               setTeacherRoomConflicts(prev => {
@@ -1703,7 +1590,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
               });
             }
           } catch (error) {
-<<<<<<< HEAD
             console.error('❌ Lỗi khi xử lý conflicts phòng học:', error);
             // Don't update state on error to prevent breaking the UI
           }
@@ -1711,15 +1597,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           console.log('📅 Phòng được chọn chưa có lịch sử dụng nào:', roomId);
           if (currentClassSchedules.length > 0) {
             console.log('📚 Lịch học của lớp hiện tại:', {
-=======
-            console.error(' Lỗi khi xử lý conflicts phòng học:', error);
-            // Don't update state on error to prevent breaking the UI
-          }
-        } else {
-          console.log(' Phòng được chọn chưa có lịch sử dụng nào:', roomId);
-          if (currentClassSchedules.length > 0) {
-            console.log(' Lịch học của lớp hiện tại:', {
->>>>>>> origin/Namvv-teacher-class-management
               classId: classId,
               className: fullClassData?.name || 'N/A',
               totalSchedules: currentClassSchedules.length,
@@ -1728,11 +1605,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           }
         }
       } catch (error) {
-<<<<<<< HEAD
         console.error('❌ Lỗi khi lấy và so sánh lịch phòng:', error);
-=======
-        console.error(' Lỗi khi lấy và so sánh lịch phòng:', error);
->>>>>>> origin/Namvv-teacher-class-management
       }
     };
 
@@ -1957,7 +1830,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
       // Loại trừ các schedules của lớp hiện tại khỏi lịch học của học sinh
       // để tránh báo conflict với chính lớp đang chỉnh sửa
       const studentScheduleList = allStudentSchedules.filter(studentSchedule => {
-<<<<<<< HEAD
         // Kiểm tra xem schedule này có thuộc về lớp hiện tại không
         const scheduleClassId = 
           studentSchedule.classId ||
@@ -1974,36 +1846,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
         }
         
         return true; // Giữ lại schedule của lớp khác
-=======
-        // Get class ID from various possible paths in API response
-        // Primary path from API: classSchedule.class._id
-        const scheduleClassId = 
-          studentSchedule.classSchedule?.class?._id ||  // Primary path from API
-          studentSchedule.classSchedule?.class?.id ||
-          studentSchedule.classId ||
-          studentSchedule.class?._id ||
-          studentSchedule.class?.id;
-        
-        const scheduleClassIdStr = scheduleClassId ? String(scheduleClassId) : null;
-        
-        // Exclude if same class ID
-        if (currentClassIdStr && scheduleClassIdStr && scheduleClassIdStr === currentClassIdStr) {
-          return false; // Exclude schedule of current class
-        }
-        
-        // Also check by class name as fallback
-        const scheduleClassName = 
-          studentSchedule.classSchedule?.class?.name ||
-          studentSchedule.className ||
-          studentSchedule.class?.name;
-        const currentClassName = fullClassData?.name || formData.name;
-        
-        if (currentClassName && scheduleClassName && scheduleClassName === currentClassName) {
-          return false; // Exclude schedule of current class by name
-        }
-        
-        return true; // Keep schedule from other classes
->>>>>>> origin/Namvv-teacher-class-management
       });
       
       const studentConflictsList = [];
@@ -2358,10 +2200,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
       // Match students by email or phone
       const matchedStudentIds = [];
       const notFound = [];
-<<<<<<< HEAD
-=======
-      const matchedStudentMap = new Map(); // Map<studentId, studentObject> for later use
->>>>>>> origin/Namvv-teacher-class-management
 
       emailsOrPhones.forEach((value) => {
         const normalizedValue = value.toLowerCase().trim();
@@ -2379,85 +2217,25 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
           const studentId = foundStudent._id || foundStudent.id;
           if (studentId && !matchedStudentIds.includes(String(studentId))) {
             matchedStudentIds.push(String(studentId));
-<<<<<<< HEAD
-=======
-            matchedStudentMap.set(String(studentId), foundStudent);
->>>>>>> origin/Namvv-teacher-class-management
           }
         } else {
           notFound.push(value);
         }
       });
 
-<<<<<<< HEAD
       // Add matched students to selectedStudents (avoid duplicates)
       if (matchedStudentIds.length > 0) {
         setSelectedStudents(prev => {
           const newSelected = [...new Set([...prev, ...matchedStudentIds])];
-=======
-      // Validate student enrollment in course if course is selected
-      let validStudentIds = matchedStudentIds;
-      let invalidStudents = [];
-      
-      if (formData.course && matchedStudentIds.length > 0) {
-        try {
-          // Fetch course details to get studentEnrollments
-          const courseResponse = await courseService.getCourseDetails(formData.course);
-          
-          if (courseResponse && courseResponse.success && courseResponse.data) {
-            const course = courseResponse.data;
-            const enrolledStudentIds = (course.studentEnrollments || []).map(id => String(id));
-            
-            // Separate valid and invalid students
-            validStudentIds = matchedStudentIds.filter(studentId => 
-              enrolledStudentIds.includes(studentId)
-            );
-            
-            const invalidStudentIds = matchedStudentIds.filter(studentId => 
-              !enrolledStudentIds.includes(studentId)
-            );
-            
-            // Get student info for invalid students
-            invalidStudents = invalidStudentIds.map(studentId => {
-              const student = matchedStudentMap.get(studentId);
-              const studentName = student?.fullName || student?.name || student?.username || 
-                                 student?.email?.split('@')[0] || `Học viên ${studentId}`;
-              return {
-                studentId: studentId,
-                studentName: studentName,
-                reason: 'Học viên chưa có trong danh sách đăng ký khóa học'
-              };
-            });
-          }
-        } catch (error) {
-          console.error('Error fetching course details for validation:', error);
-          // If error fetching course, proceed with all matched students but log warning
-          console.warn('Could not validate student enrollment, proceeding with all matched students');
-        }
-      }
-
-      // Add only valid students to selectedStudents (avoid duplicates)
-      if (validStudentIds.length > 0) {
-        setSelectedStudents(prev => {
-          const newSelected = [...new Set([...prev, ...validStudentIds])];
->>>>>>> origin/Namvv-teacher-class-management
           return newSelected;
         });
       }
 
       // Show results in modal
       setImportResult({
-<<<<<<< HEAD
         success: matchedStudentIds.length,
         notFound: notFound,
         total: emailsOrPhones.length
-=======
-        success: validStudentIds.length,
-        notFound: notFound,
-        total: emailsOrPhones.length,
-        invalidStudents: invalidStudents.length > 0 ? invalidStudents : undefined,
-        courseName: formData.course && selectedCourse ? (selectedCourse.name || 'N/A') : undefined
->>>>>>> origin/Namvv-teacher-class-management
       });
       setShowImportResultModal(true);
 
@@ -2488,29 +2266,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
-<<<<<<< HEAD
-=======
-    // Auto-update maxStudents when room is selected/deselected
-    if (name === 'roomId') {
-      if (value) {
-        // Find selected room and set maxStudents to room capacity
-        const selectedRoom = rooms.find(r => {
-          const roomId = r._id || r.id;
-          return String(roomId) === String(value);
-        });
-        if (selectedRoom) {
-          const capacity = selectedRoom.capacity || selectedRoom.maxCapacity || selectedRoom.maxStudents;
-          setFormData(prev => ({ ...prev, roomId: value, maxStudents: capacity }));
-          return; // Don't process further
-        }
-      } else {
-        // Room deselected, clear maxStudents
-        setFormData(prev => ({ ...prev, roomId: '', maxStudents: null }));
-        return; // Don't process further
-      }
-    }
-    
->>>>>>> origin/Namvv-teacher-class-management
     // If program or level changes, clear course if it doesn't belong to the new program/level
     if (name === 'program' || name === 'level') {
       const newProgram = name === 'program' ? value : formData.program;
@@ -2666,11 +2421,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
         if (roomCapacity && studentCount > roomCapacity) {
           setCapacityWarning({
             type: 'danger',
-<<<<<<< HEAD
             message: `⚠️ Cảnh báo: Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`
-=======
-            message: ` Cảnh báo: Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`
->>>>>>> origin/Namvv-teacher-class-management
           });
         } else {
           setCapacityWarning(null);
@@ -3308,21 +3059,15 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Tên lớp <span className="text-danger-600">*</span>
                   </Form.Label>
-                  {formData.status === 'active' ? (
-                    <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
-                      {formData.name}
-                    </div>
-                  ) : (
-                    <Form.Control
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      placeholder="VD: A1-Morning-01"
-                      required
-                      className="border-neutral-30 radius-8 px-16 py-10"
-                    />
-                  )}
+                  <Form.Control
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="VD: A1-Morning-01"
+                    required
+                    className="border-neutral-30 radius-8 px-16 py-10"
+                  />
                 </Form.Group>
               </div>
 
@@ -3513,7 +3258,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
               </h5>
               
               <div className="d-flex align-items-center gap-2">
-<<<<<<< HEAD
                 <Button
                   className="btn-main text-14 fw-medium px-16 py-8"
                   onClick={() => {
@@ -3530,8 +3274,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                   <i className="fas fa-plus me-2"></i>
                   Thêm buổi học
                 </Button>
-=======
->>>>>>> origin/Namvv-teacher-class-management
                 
                 {calendarSchedules.length > 0 && (
                   <ButtonGroup>
@@ -3568,11 +3310,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                       setShowScheduleDetailModal(true);
                     }}
                     onDeleteSchedule={() => {}} // Read-only in this context
-<<<<<<< HEAD
                     onCreateMakeup={() => {}} // Read-only in this context
-=======
-                    showLegend={false}
->>>>>>> origin/Namvv-teacher-class-management
                   />
                 ) : (
                   <ScheduleWeekly
@@ -3651,11 +3389,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                    teacherRoomConflicts.teacherConflicts.some(c => c.teacherId === (formData.teacherId?.toString() || String(formData.teacherId))) && (
                     <Alert variant="warning" className="mt-12 mb-0">
                       <i className="fas fa-exclamation-triangle me-2"></i>
-<<<<<<< HEAD
                       <strong>⚠️ CẢNH BÁO XUNG ĐỘT LỊCH HỌC:</strong> Giáo viên đã chọn có <strong>{teacherRoomConflicts.teacherConflicts.filter(c => c.teacherId === (formData.teacherId?.toString() || String(formData.teacherId))).length} xung đột</strong> với các lớp khác.
-=======
-                      <strong> CẢNH BÁO XUNG ĐỘT LỊCH HỌC:</strong> Giáo viên đã chọn có <strong>{teacherRoomConflicts.teacherConflicts.filter(c => c.teacherId === (formData.teacherId?.toString() || String(formData.teacherId))).length} xung đột</strong> với các lớp khác.
->>>>>>> origin/Namvv-teacher-class-management
                       <div className="mt-8">
                         <details>
                           <summary className="cursor-pointer fw-medium text-13 mb-8">
@@ -3707,11 +3441,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                                     
                                     // Nếu vẫn không có, log warning và dùng fallback
                                     if (!currentClassTime || currentClassTime === 'N/A') {
-<<<<<<< HEAD
                                       console.warn('⚠️ [DEBUG] Không tìm thấy thời gian lớp hiện tại cho conflict:', {
-=======
-                                      console.warn(' [DEBUG] Không tìm thấy thời gian lớp hiện tại cho conflict:', {
->>>>>>> origin/Namvv-teacher-class-management
                                         conflict,
                                         currentSchedule,
                                         currentClassSchedulesForRender: currentClassSchedulesForRender?.filter(s => s?.date === conflict?.date)
@@ -3723,11 +3453,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                                     
                                     // Log để debug
                                     if (conflict.date === '2025-12-01') {
-<<<<<<< HEAD
                                       console.log('🔍 [DEBUG] Hiển thị conflict cho ngày 2025-12-01:', {
-=======
-                                      console.log(' [DEBUG] Hiển thị conflict cho ngày 2025-12-01:', {
->>>>>>> origin/Namvv-teacher-class-management
                                         conflict,
                                         currentSchedule,
                                         currentClassTime,
@@ -3807,11 +3533,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                    teacherRoomConflicts.roomConflicts.some(c => c.roomId === (formData.roomId?.toString() || String(formData.roomId))) && (
                     <Alert variant="warning" className="mt-12 mb-0">
                       <i className="fas fa-exclamation-triangle me-2"></i>
-<<<<<<< HEAD
                       <strong>⚠️ CẢNH BÁO XUNG ĐỘT LỊCH HỌC:</strong> Phòng học đã chọn có <strong>{teacherRoomConflicts.roomConflicts.filter(c => c.roomId === (formData.roomId?.toString() || String(formData.roomId))).length} xung đột</strong> với các lớp khác.
-=======
-                      <strong> CẢNH BÁO XUNG ĐỘT LỊCH HỌC:</strong> Phòng học đã chọn có <strong>{teacherRoomConflicts.roomConflicts.filter(c => c.roomId === (formData.roomId?.toString() || String(formData.roomId))).length} xung đột</strong> với các lớp khác.
->>>>>>> origin/Namvv-teacher-class-management
                       <div className="mt-8">
                         <details>
                           <summary className="cursor-pointer fw-medium text-13 mb-8">
@@ -4061,7 +3783,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                                 </div>
                               )}
                             </div>
-<<<<<<< HEAD
                             <Button
                               type="button"
                               variant="outline-danger"
@@ -4072,8 +3793,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                             >
                               <i className="fas fa-times"></i>
                             </Button>
-=======
->>>>>>> origin/Namvv-teacher-class-management
                           </div>
                         );
                       })}
@@ -4085,7 +3804,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                 <i className="fas fa-info-circle me-1"></i>
                 Có thể thêm học viên sau khi chỉnh sửa lớp. File Excel cần có cột đầu tiên chứa Email hoặc Số điện thoại của học viên.
               </Form.Text>
-<<<<<<< HEAD
             </div>
           </div>
           </Card.Body>
@@ -4097,650 +3815,18 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
             variant="outline-secondary"
             className="text-15 fw-medium px-24 py-12 radius-8"
             onClick={handleBack}
-=======
-            </div>
-          </div>
-          </Card.Body>
-        </Card>
-
-        {/* Action Buttons */}
-        <div className="d-flex justify-content-between align-items-center gap-12 mt-24">
-          <div>
-            {formData.status === 'pending' && onDelete && (
-              <Button 
-                variant="outline-danger"
-                className="text-15 fw-medium px-24 py-12 radius-8"
-                onClick={() => onDelete(classId || formData.id)}
-              >
-                <i className="fas fa-trash me-2"></i>
-                Xóa lớp học
-              </Button>
-            )}
-          </div>
-          <div className="d-flex gap-12">
-            <Button 
-              variant="outline-secondary"
-              className="text-15 fw-medium px-24 py-12 radius-8"
-              onClick={handleBack}
-            >
-              <i className="fas fa-times me-2"></i>
-              Hủy
-            </Button>
-            <Button 
-              variant="warning"
-              className="text-white text-15 fw-semibold px-24 py-12 radius-8"
-              type="submit"
-            >
-              <i className="fas fa-save me-2"></i>
-              Lưu thay đổi
-            </Button>
-          </div>
-        </div>
-      </Form>
-
-      {/* Select Student Modal */}
-      <SelectStudentModal
-        show={showSelectStudentModal}
-        onClose={() => setShowSelectStudentModal(false)}
-        onConfirm={handleStudentsConfirmed}
-        initialSelectedStudents={selectedStudents}
-        generatedSessions={generatedSessions}
-        courseId={formData.course || fullClassData?.course?._id || fullClassData?.course?.id || fullClassData?.course || null}
-      />
-
-      {/* Import Result Modal */}
-      <Modal 
-        show={showImportResultModal} 
-        onHide={() => setShowImportResultModal(false)} 
-        centered
-        size="md"
-      >
-        <Modal.Header closeButton className="bg-main-600 text-white border-0 p-24">
-          <Modal.Title className="fw-bold">
-            <i className="fas fa-file-excel me-2"></i>
-            Kết quả Import Excel
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="p-24">
-          {importResult?.error ? (
-            <Alert variant="danger" className="mb-0">
-              <i className="fas fa-exclamation-circle me-2"></i>
-              {importResult.error}
-            </Alert>
-          ) : (
-            <>
-              {importResult?.success > 0 && (
-                <Alert variant="success" className="mb-16">
-                  <i className="fas fa-check-circle me-2"></i>
-                  <strong>Đã import thành công {importResult.success} học viên</strong>
-                </Alert>
-              )}
-              
-              {importResult?.success === 0 && importResult?.total > 0 && (
-                <Alert variant="warning" className="mb-16">
-                  <i className="fas fa-exclamation-triangle me-2"></i>
-                  <strong>Không tìm thấy học viên nào phù hợp trong hệ thống</strong>
-                </Alert>
-              )}
-
-              {importResult?.notFound && importResult.notFound.length > 0 && (
-                <div className="mb-16">
-                  <div className="text-neutral-700 fw-medium mb-8">
-                    <i className="fas fa-info-circle me-2"></i>
-                    Không tìm thấy {importResult.notFound.length} học viên:
-                  </div>
-                  <div 
-                    className="border border-neutral-100 rounded-8 p-12 bg-neutral-25"
-                    style={{ maxHeight: '200px', overflowY: 'auto' }}
-                  >
-                    <div className="d-flex flex-column gap-4">
-                      {importResult.notFound.slice(0, 20).map((item, index) => (
-                        <div key={index} className="text-neutral-600 text-13">
-                          • {item}
-                        </div>
-                      ))}
-                      {importResult.notFound.length > 20 && (
-                        <div className="text-neutral-500 text-12 mt-4">
-                          ... và {importResult.notFound.length - 20} học viên khác
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {importResult?.invalidStudents && importResult.invalidStudents.length > 0 && (
-                <div className="mb-0">
-                  <Alert variant="warning" className="mb-8">
-                    <i className="fas fa-exclamation-triangle me-2"></i>
-                    <strong>
-                      {importResult.invalidStudents.length} học viên chưa đăng ký khóa học
-                      {importResult.courseName && ` "${importResult.courseName}"`}
-                    </strong>
-                  </Alert>
-                  <div className="text-neutral-700 fw-medium mb-8">
-                    <i className="fas fa-user-times me-2"></i>
-                    Danh sách học viên chưa đăng ký:
-                  </div>
-                  <div 
-                    className="border border-warning rounded-8 p-12 bg-warning-25"
-                    style={{ maxHeight: '200px', overflowY: 'auto' }}
-                  >
-                    <div className="d-flex flex-column gap-4">
-                      {importResult.invalidStudents.slice(0, 20).map((student, index) => (
-                        <div key={student.studentId || index} className="text-neutral-700 text-13">
-                          • <strong>{student.studentName}</strong>
-                          <span className="text-neutral-500 text-12 ms-2">
-                            ({student.reason || 'Chưa đăng ký khóa học'})
-                          </span>
-                        </div>
-                      ))}
-                      {importResult.invalidStudents.length > 20 && (
-                        <div className="text-neutral-500 text-12 mt-4">
-                          ... và {importResult.invalidStudents.length - 20} học viên khác
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-neutral-600 text-12 mt-8">
-                    <i className="fas fa-info-circle me-2"></i>
-                    Các học viên này sẽ không được thêm vào lớp. Vui lòng đăng ký khóa học cho họ trước.
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </Modal.Body>
-        <Modal.Footer className="bg-neutral-25 border-0 p-20">
-          <Button 
-            className="btn-main text-15 fw-semibold px-24 py-10 radius-8"
-            onClick={() => setShowImportResultModal(false)}
           >
-            <i className="fas fa-check me-2"></i> OK
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Schedule Detail Modal */}
-      <Modal 
-        show={showScheduleDetailModal} 
-        onHide={() => {
-          setShowScheduleDetailModal(false);
-          setSelectedScheduleDetail(null);
-          setEditedSchedule(null);
-          setHasAttendance(false);
-          setCheckingAttendance(false);
-          setScheduleValidationResult(null);
-        }} 
-        centered
-        size="md"
-        onShow={async () => {
-          // Reset validation result when modal opens
-          setScheduleValidationResult(null);
-          
-          // Initialize editedSchedule when modal opens
-          if (selectedScheduleDetail) {
-            setEditedSchedule({
-              date: selectedScheduleDetail.date,
-              startTime: selectedScheduleDetail.startTime,
-              endTime: selectedScheduleDetail.endTime
-            });
-            
-            // Check if schedule has attendance (buổi đã học)
-            const scheduleId = selectedScheduleDetail.id || selectedScheduleDetail._id;
-            if (scheduleId && !scheduleId.startsWith('generated-') && !scheduleId.startsWith('schedule-')) {
-              try {
-                setCheckingAttendance(true);
-                const response = await classScheduleService.getAttendanceByClassSchedule(scheduleId);
-                const attendances = response.list || response.attendances || response || [];
-                
-                // Check if any student has attendance (status is not null/undefined)
-                const hasAnyAttendance = attendances.some(att => att.attendance?.status != null);
-                setHasAttendance(hasAnyAttendance);
-              } catch (error) {
-                console.error('Error checking attendance:', error);
-                // If error, assume no attendance (allow editing)
-                setHasAttendance(false);
-              } finally {
-                setCheckingAttendance(false);
-              }
-            } else {
-              // Generated schedule, no attendance yet
-              setHasAttendance(false);
-            }
-          }
-        }}
-      >
-        <Modal.Header closeButton className="bg-main-600 text-white border-0 p-24">
-          <Modal.Title className="fw-bold">
-            <i className="fas fa-calendar-day me-2"></i>
-            Thông tin buổi học
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="p-24">
-          {checkingAttendance && (
-            <div className="text-center py-20">
-              <div className="spinner-border text-main-600" role="status">
-                <span className="visually-hidden">Đang kiểm tra...</span>
-              </div>
-              <p className="text-neutral-600 mt-3">Đang kiểm tra trạng thái buổi học...</p>
-            </div>
-          )}
-          {!checkingAttendance && selectedScheduleDetail && editedSchedule && (
-            <div className="d-flex flex-column gap-16">
-              {hasAttendance && (
-                <Alert variant="warning" className="mb-0">
-                  <i className="fas fa-exclamation-triangle me-2"></i>
-  Buổi học đã diễn ra, không thể chỉnh sửa thông tin.
-                </Alert>
-              )}
-              
-              {validatingScheduleEdit && (
-                <Alert variant="info" className="mb-0">
-                  <i className="fas fa-spinner fa-spin me-2"></i>
-                  Đang kiểm tra xung đột lịch học...
-                </Alert>
-              )}
-              
-              {!validatingScheduleEdit && scheduleValidationResult && scheduleValidationResult.conflicts?.hasConflict && (
-                <Alert variant="danger" className="mb-0">
-                  <div className="fw-semibold mb-8">
-                    <i className="fas fa-exclamation-circle me-2"></i>
-                    Phát hiện xung đột lịch học:
-                  </div>
-                  
-                  {scheduleValidationResult.conflicts.teacher && scheduleValidationResult.conflicts.teacher.length > 0 && (
-                    <div className="mb-8">
-                      <div className="fw-medium mb-4">Xung đột với giáo viên:</div>
-                      <ul className="mb-0 ps-16">
-                        {scheduleValidationResult.conflicts.teacher.map((conflict, idx) => (
-                          <li key={idx} className="text-13">
-                            Giáo viên đã có lớp <strong>{conflict.className}</strong> vào {conflict.date} lúc {conflict.time}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  
-                  {scheduleValidationResult.conflicts.room && scheduleValidationResult.conflicts.room.length > 0 && (
-                    <div className="mb-8">
-                      <div className="fw-medium mb-4">Xung đột với phòng học:</div>
-                      <ul className="mb-0 ps-16">
-                        {scheduleValidationResult.conflicts.room.map((conflict, idx) => (
-                          <li key={idx} className="text-13">
-                            Phòng đã được sử dụng bởi lớp <strong>{conflict.className}</strong> vào {conflict.date} lúc {conflict.time}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  
-                  {scheduleValidationResult.conflicts.students && scheduleValidationResult.conflicts.students.length > 0 && (
-                    <div className="mb-0">
-                      <div className="fw-medium mb-4">Xung đột với học viên:</div>
-                      <ul className="mb-0 ps-16">
-                        {scheduleValidationResult.conflicts.students.map((studentConflict, idx) => (
-                          <li key={idx} className="text-13 mb-4">
-                            <strong>{studentConflict.studentName}</strong> đã có lớp:
-                            <ul className="ps-16 mt-2 mb-0">
-                              {studentConflict.conflicts.map((conflict, cIdx) => (
-                                <li key={cIdx} className="text-12">
-                                  <strong>{conflict.className}</strong> vào {conflict.date} lúc {conflict.time}
-                                </li>
-                              ))}
-                            </ul>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </Alert>
-              )}
-              
-              {!validatingScheduleEdit && scheduleValidationResult && !scheduleValidationResult.conflicts?.hasConflict && editedSchedule.date && editedSchedule.startTime && editedSchedule.endTime && (
-                <Alert variant="success" className="mb-0">
-                  <i className="fas fa-check-circle me-2"></i>
-                  Không có xung đột lịch học.
-                </Alert>
-              )}
-              <div className="row g-3">
-                <div className="col-md-6">
-                  <Form.Group>
-                    <Form.Label className="text-neutral-700 fw-medium mb-8">
-                      Ngày học
-                    </Form.Label>
-                    <Form.Control
-                      type="date"
-                      value={editedSchedule.date}
-                      onChange={(e) => setEditedSchedule({
-                        ...editedSchedule,
-                        date: e.target.value
-                      })}
-                      className="border-neutral-30 radius-8 px-16 py-10"
-                      disabled={hasAttendance || checkingAttendance}
-                    />
-                  </Form.Group>
-                </div>
-                <div className="col-md-6">
-                  <div className="text-neutral-600 text-13 fw-medium mb-8">
-                    Thứ
-                  </div>
-                  <div className="text-neutral-900 fw-semibold text-15">
-                    {(() => {
-                      const date = new Date(editedSchedule.date);
-                      const dayOfWeek = date.getDay();
-                      const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-                      return dayNames[dayOfWeek];
-                    })()}
-                  </div>
-                </div>
-              </div>
-
-              <div className="row g-3">
-                <div className="col-md-6">
-                  <Form.Group>
-                    <Form.Label className="text-neutral-700 fw-medium mb-8">
-                      Giờ bắt đầu
-                    </Form.Label>
-                    <Form.Control
-                      type="time"
-                      value={editedSchedule.startTime}
-                      onChange={(e) => setEditedSchedule({
-                        ...editedSchedule,
-                        startTime: e.target.value
-                      })}
-                      className="border-neutral-30 radius-8 px-16 py-10"
-                      disabled={hasAttendance || checkingAttendance}
-                    />
-                  </Form.Group>
-                </div>
-                <div className="col-md-6">
-                  <Form.Group>
-                    <Form.Label className="text-neutral-700 fw-medium mb-8">
-                      Giờ kết thúc
-                    </Form.Label>
-                    <Form.Control
-                      type="time"
-                      value={editedSchedule.endTime}
-                      onChange={(e) => setEditedSchedule({
-                        ...editedSchedule,
-                        endTime: e.target.value
-                      })}
-                      className="border-neutral-30 radius-8 px-16 py-10"
-                      disabled={hasAttendance || checkingAttendance}
-                    />
-                  </Form.Group>
-                </div>
-              </div>
-
-              {selectedScheduleDetail.className && (
-                <div>
-                  <div className="text-neutral-600 text-13 fw-medium mb-8">
-                    Lớp học
-                  </div>
-                  <div className="text-neutral-900 fw-semibold text-15">
-                    {selectedScheduleDetail.className}
-                  </div>
-                </div>
-              )}
-
-              {selectedScheduleDetail.teacherName && selectedScheduleDetail.teacherName !== 'Chưa có' && (
-                <div>
-                  <div className="text-neutral-600 text-13 fw-medium mb-8">
-                    Giáo viên
-                  </div>
-                  <div className="text-neutral-900 text-15">
-                    {selectedScheduleDetail.teacherName}
-                  </div>
-                </div>
-              )}
-
-              {selectedScheduleDetail.roomName && selectedScheduleDetail.roomName !== 'Chưa có' && (
-                <div>
-                  <div className="text-neutral-600 text-13 fw-medium mb-8">
-                    Phòng học
-                  </div>
-                  <div className="text-neutral-900 text-15">
-                    {selectedScheduleDetail.roomName}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </Modal.Body>
-        <Modal.Footer className="bg-neutral-25 border-0 p-20">
-          <Button 
-            className="btn-outline-neutral text-15 fw-medium px-20 py-10 radius-8"
-            onClick={() => {
-              setShowScheduleDetailModal(false);
-              setSelectedScheduleDetail(null);
-              setEditedSchedule(null);
-            }}
-            disabled={savingSchedule}
-          >
-            <i className="fas fa-times me-2"></i> Hủy
+            <i className="fas fa-times me-2"></i>
+            Hủy
           </Button>
           <Button 
-            className="btn-main text-15 fw-semibold px-24 py-10 radius-8"
-            disabled={hasAttendance || checkingAttendance || savingSchedule || validatingScheduleEdit || (scheduleValidationResult?.conflicts?.hasConflict === true)}
-            onClick={() => {
-              if (!editedSchedule || !selectedScheduleDetail) return;
-              
-              // Prevent saving if has attendance
-              if (hasAttendance) {
-                alert('Buổi học đã diễn ra, không thể chỉnh sửa!');
-                return;
-              }
-              
-              // Validate
-              if (!editedSchedule.date || !editedSchedule.startTime || !editedSchedule.endTime) {
-                alert('Vui lòng điền đầy đủ thông tin!');
-                return;
-              }
-              
-              if (editedSchedule.startTime >= editedSchedule.endTime) {
-                alert('Giờ bắt đầu phải nhỏ hơn giờ kết thúc!');
-                return;
-              }
-              
-              // Check for conflicts
-              if (scheduleValidationResult?.conflicts?.hasConflict) {
-                alert('Không thể lưu do có xung đột lịch học. Vui lòng kiểm tra lại!');
-                return;
-              }
-
-              // Check if schedule has real ID (from database)
-              const scheduleId = selectedScheduleDetail.id;
-              if (!scheduleId || scheduleId.startsWith('generated-') || scheduleId.startsWith('schedule-')) {
-                alert('Buổi học này chưa được lưu vào hệ thống. Vui lòng lưu lớp học trước khi chỉnh sửa buổi học.');
-                return;
-              }
-
-              // Show confirmation modal
-              setShowConfirmUpdateModal(true);
-            }}
-          >
-            {savingSchedule ? (
-              <>
-                <i className="fas fa-spinner fa-spin me-2"></i>
-                Đang lưu...
-              </>
-            ) : (
-              <>
-                <i className="fas fa-save me-2"></i>
-                Lưu thay đổi
-              </>
-            )}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Confirm Update Scope Modal */}
-      <Modal 
-        show={showConfirmUpdateModal} 
-        onHide={() => {
-          setShowConfirmUpdateModal(false);
-          setUpdateScope('single');
-        }} 
-        centered
-        size="md"
-      >
-        <Modal.Header closeButton className="bg-warning-50 border-0 p-24">
-          <Modal.Title className="fw-bold text-neutral-900">
-            <i className="fas fa-exclamation-triangle text-warning-600 me-2"></i>
-            Xác nhận chỉnh sửa
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="p-24">
-          <div className="mb-20">
-            <h5 className="text-neutral-900 fw-semibold mb-12">Bạn muốn chỉnh sửa buổi học này</h5>
-            <p className="text-neutral-600 text-14 mb-0">
-              Vui lòng chọn phạm vi áp dụng thay đổi:
-            </p>
-          </div>
-
-          <div className="d-flex flex-column gap-12">
-            <div 
-              className={`border rounded-12 p-16 cursor-pointer transition-all ${
-                updateScope === 'single' 
-                  ? 'border-main-500 bg-main-50' 
-                  : 'border-neutral-200 bg-white hover-border-neutral-300'
-              }`}
-              onClick={() => setUpdateScope('single')}
-              style={{ cursor: 'pointer' }}
-            >
-              <div className="d-flex align-items-center gap-12">
-                <div 
-                  className={`rounded-circle d-flex align-items-center justify-content-center ${
-                    updateScope === 'single' ? 'bg-main-600' : 'border border-neutral-300 bg-white'
-                  }`}
-                  style={{ width: '20px', height: '20px', flexShrink: 0 }}
-                >
-                  {updateScope === 'single' && (
-                    <i className="fas fa-check text-white" style={{ fontSize: '10px' }}></i>
-                  )}
-                </div>
-                <div className="flex-grow-1">
-                  <div className="text-neutral-900 fw-semibold text-15 mb-4">Chỉ buổi học này</div>
-                </div>
-              </div>
-            </div>
-
-            <div 
-              className={`border rounded-12 p-16 cursor-pointer transition-all ${
-                updateScope === 'future' 
-                  ? 'border-main-500 bg-main-50' 
-                  : 'border-neutral-200 bg-white hover-border-neutral-300'
-              }`}
-              onClick={() => setUpdateScope('future')}
-              style={{ cursor: 'pointer' }}
-            >
-              <div className="d-flex align-items-center gap-12">
-                <div 
-                  className={`rounded-circle d-flex align-items-center justify-content-center ${
-                    updateScope === 'future' ? 'bg-main-600' : 'border border-neutral-300 bg-white'
-                  }`}
-                  style={{ width: '20px', height: '20px', flexShrink: 0 }}
-                >
-                  {updateScope === 'future' && (
-                    <i className="fas fa-check text-white" style={{ fontSize: '10px' }}></i>
-                  )}
-                </div>
-                <div className="flex-grow-1">
-                  <div className="text-neutral-900 fw-semibold text-15 mb-4">Buổi học này và các buổi học sau</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Modal.Body>
-        <Modal.Footer className="bg-neutral-25 border-0 p-20">
-          <Button 
-            className="btn-outline-neutral text-15 fw-medium px-20 py-10 radius-8"
-            onClick={() => {
-              setShowConfirmUpdateModal(false);
-              setUpdateScope('single');
-            }}
-            disabled={savingSchedule}
->>>>>>> origin/Namvv-teacher-class-management
-          >
-            <i className="fas fa-times me-2"></i> Hủy
-          </Button>
-          <Button 
-<<<<<<< HEAD
             variant="warning"
             className="text-white text-15 fw-semibold px-24 py-12 radius-8"
             type="submit"
-=======
-            className="btn-main text-15 fw-semibold px-24 py-10 radius-8"
-            disabled={savingSchedule}
-            onClick={async () => {
-              if (!editedSchedule || !selectedScheduleDetail) return;
-
-              try {
-                setSavingSchedule(true);
-                
-                // Prepare update data
-                const updateData = {
-                  date: editedSchedule.date,
-                  startTime: editedSchedule.startTime,
-                  endTime: editedSchedule.endTime,
-                  updateScope: updateScope // 'single' or 'future'
-                };
-
-                // Check if schedule has real ID (from database)
-                const scheduleId = selectedScheduleDetail.id;
-
-                console.log(' Cập nhật buổi học:');
-                console.log('  - ScheduleId:', scheduleId);
-                console.log('  - UpdateScope:', updateScope);
-                console.log('  - Date:', updateData.date);
-                console.log('  - StartTime:', updateData.startTime);
-                console.log('  - EndTime:', updateData.endTime);
-
-                // Call API to update schedule
-                await scheduleService.updateSchedule(scheduleId, updateData);
-                
-                // Refresh class data to get updated schedules
-                if (formData.id || formData._id) {
-                  const classId = formData.id || formData._id;
-                  try {
-                    const response = await classService.getClassById(classId);
-                    if (response && response.data) {
-                      setFullClassData(response.data);
-                    }
-                  } catch (error) {
-                    console.error('Error refreshing class data:', error);
-                  }
-                }
-
-                alert('Cập nhật buổi học thành công!');
-                setShowConfirmUpdateModal(false);
-                setShowScheduleDetailModal(false);
-                setSelectedScheduleDetail(null);
-                setEditedSchedule(null);
-                setUpdateScope('single');
-              } catch (error) {
-                console.error('Error updating schedule:', error);
-                alert(error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật buổi học. Vui lòng thử lại.');
-              } finally {
-                setSavingSchedule(false);
-              }
-            }}
->>>>>>> origin/Namvv-teacher-class-management
           >
-            {savingSchedule ? (
-              <>
-                <i className="fas fa-spinner fa-spin me-2"></i>
-                Đang lưu...
-              </>
-            ) : (
-              <>
-                <i className="fas fa-check me-2"></i>
-                Xác nhận
-              </>
-            )}
+            <i className="fas fa-save me-2"></i>
+            Lưu thay đổi
           </Button>
-<<<<<<< HEAD
         </div>
       </Form>
 
@@ -5298,8 +4384,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
               </>
             )}
           </Button>
-=======
->>>>>>> origin/Namvv-teacher-class-management
         </Modal.Footer>
       </Modal>
 
@@ -5527,11 +4611,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                 const calculatedDay = scheduleDate.getDay();
                 const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
                 console.log('   - Ngày được tính:', scheduleDate.toLocaleDateString('vi-VN'), `(${dayNames[calculatedDay]})`);
-<<<<<<< HEAD
                 console.log('   - Kiểm tra: Ngày tính có đúng thứ được chọn không?', calculatedDay === targetDay ? '✅ ĐÚNG' : '❌ SAI');
-=======
-                console.log('   - Kiểm tra: Ngày tính có đúng thứ được chọn không?', calculatedDay === targetDay ? ' ĐÚNG' : ' SAI');
->>>>>>> origin/Namvv-teacher-class-management
                 
                 // Format date để tránh timezone issues (dùng local time, không dùng UTC)
                 const year = scheduleDate.getFullYear();
@@ -5553,13 +4633,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                 };
 
                 // ========== LOGGING: Trước khi tạo ==========
-<<<<<<< HEAD
                 console.log('📋 ========== TẠO BUỔI HỌC ==========');
                 console.log('📅 Thông tin buổi học sẽ được thêm:');
-=======
-                console.log(' ========== TẠO BUỔI HỌC ==========');
-                console.log(' Thông tin buổi học sẽ được thêm:');
->>>>>>> origin/Namvv-teacher-class-management
                 console.log('   - Lớp học ID:', classId);
                 console.log('   - Lặp lại vào các tuần:', newScheduleData.repeatWeekly ? 'Có' : 'Không');
                 console.log('   - Ngày đầu tiên:', scheduleData.date);
@@ -5576,13 +4651,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                 const response = await classScheduleService.createClassSchedule(scheduleData);
 
                 // ========== LOGGING: Kết quả từ API ==========
-<<<<<<< HEAD
                 console.log('✅ ========== KẾT QUẢ TẠO BUỔI HỌC ==========');
                 console.log('📊 Response:', response);
-=======
-                console.log(' ========== KẾT QUẢ TẠO BUỔI HỌC ==========');
-                console.log(' Response:', response);
->>>>>>> origin/Namvv-teacher-class-management
                 console.log('');
                 
                 if (response.cleanupInfo) {
@@ -5627,11 +4697,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                     
                     if (updatedClassData) {
                       setFullClassData(updatedClassData);
-<<<<<<< HEAD
                       console.log('✅ Đã refresh lại class data với schedules mới');
-=======
-                      console.log(' Đã refresh lại class data với schedules mới');
->>>>>>> origin/Namvv-teacher-class-management
                     }
                   } catch (refreshError) {
                     console.error('Error refreshing class data:', refreshError);

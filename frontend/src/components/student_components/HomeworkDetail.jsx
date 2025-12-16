@@ -318,11 +318,7 @@ const HomeworkDetail = () => {
                           type="submit"
                           className="btn-main text-13 fw-medium px-20 py-10 radius-8 w-100"
                         >
-<<<<<<< HEAD
                           <i className="fas fa-upload me-2"></i>
-=======
-                          
->>>>>>> origin/Namvv-teacher-class-management
                           Nộp bài
                         </Button>
                       </Form>

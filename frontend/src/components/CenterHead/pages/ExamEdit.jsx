@@ -9,18 +9,9 @@ import Step2AddSections from '../compo/exam/Step2AddSections';
 import Step3AnswerKeys from '../compo/exam/Step3AnswerKeys';
 import examService from '../../../services/examService';
 
-<<<<<<< HEAD
 const ExamEdit = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-=======
-const ExamEdit = ({ viewMode = 'center-head' }) => {
-  const { id } = useParams();
-  const navigate = useNavigate();
-
-  // Determine base path
-  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
->>>>>>> origin/Namvv-teacher-class-management
   const [currentStep, setCurrentStep] = useState(1);
   const [examData, setExamData] = useState({
     title: '',
@@ -115,11 +106,7 @@ const ExamEdit = ({ viewMode = 'center-head' }) => {
   const handleSaveAndExit = async () => {
     const saved = await handleSaveExam();
     if (saved) {
-<<<<<<< HEAD
       navigate(`/center-head/exams/${id}`);
-=======
-      navigate(`${basePath}/exams/${id}`);
->>>>>>> origin/Namvv-teacher-class-management
     }
   };
 
@@ -137,11 +124,7 @@ const ExamEdit = ({ viewMode = 'center-head' }) => {
 
   const handleCancel = () => {
     if (window.confirm('Bạn có chắc muốn hủy? Các thay đổi chưa lưu sẽ bị mất.')) {
-<<<<<<< HEAD
       navigate(`/center-head/exams/${id}`);
-=======
-      navigate(`${basePath}/exams/${id}`);
->>>>>>> origin/Namvv-teacher-class-management
     }
   };
 

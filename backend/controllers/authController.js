@@ -20,6 +20,12 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
+    // Check if username already exists
+    const usernameExists = await User.findOne({ username });
+    if (usernameExists) {
+      return res.status(400).json({ message: 'Username already exists' });
+    }
+
     // Check if role exists
     const role = await Role.findById(roleId);
     if (!role) {

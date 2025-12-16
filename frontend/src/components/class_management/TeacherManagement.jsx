@@ -1,109 +1,52 @@
-<<<<<<< HEAD
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, Tabs, Tab, ProgressBar, Spinner, Alert } from 'react-bootstrap';
 import teacherService from '../../services/teacherService';
 import classService from '../../services/classService';
-=======
-import React, { useState, useEffect, useRef } from 'react';
-import { Container, Button, Spinner, Alert } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import teacherService from '../../services/teacherService';
-import studentService from '../../services/studentService';
-import { courseService } from '../../services/courseService';
-import * as XLSX from 'xlsx';
-import TeacherStats from './TeacherStats';
-import TeacherFilters from './TeacherFilters';
-import TeacherGridView from './TeacherGridView';
-import TeacherListView from './TeacherListView';
-import AddTeacherModal from './AddTeacherModal';
-import ImportTeacherModal from './ImportTeacherModal';
->>>>>>> origin/Namvv-teacher-class-management
 
+/**
+ * Teacher Management Component
+ * Quản lý giảng viên - profile, phân công lớp, lịch dạy
+ */
 const TeacherManagement = () => {
-  const navigate = useNavigate();
   const [teachers, setTeachers] = useState([]);
-  const [stats, setStats] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState('list');
+  const [viewMode, setViewMode] = useState('grid');
   const [showModal, setShowModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [editingTeacher, setEditingTeacher] = useState(null);
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-<<<<<<< HEAD
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-=======
-  const [programType, setProgramType] = useState('');
-  const [level, setLevel] = useState('');
-  const [availableTypes, setAvailableTypes] = useState([]);
-  const [availableLevels, setAvailableLevels] = useState([]);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [selectedStatCard, setSelectedStatCard] = useState('total'); // 'total' or 'inactive'
->>>>>>> origin/Namvv-teacher-class-management
   const [formData, setFormData] = useState({
-    username: '',
+    name: '',
     email: '',
-    password: '',
     phone: '',
-    address: ''
+    specialization: [],
+    qualifications: '',
+    experience: '',
+    status: 'active'
   });
-  const [formErrors, setFormErrors] = useState({});
-  
-  // Import Excel states
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [importFile, setImportFile] = useState(null);
-  const [previewTeachers, setPreviewTeachers] = useState([]);
-  const [importing, setImporting] = useState(false);
-  const fileInputRef = useRef(null);
 
-  // Fetch program types and levels on mount
-  useEffect(() => {
-    const fetchFilterOptions = async () => {
-      try {
-        const [typesResponse, levelsResponse] = await Promise.all([
-          courseService.getAllTypes(),
-          courseService.getAllLevels()
-        ]);
-        
-        if (typesResponse?.success && typesResponse.types) {
-          setAvailableTypes(typesResponse.types);
-        }
-        
-        if (levelsResponse?.success && levelsResponse.levels) {
-          setAvailableLevels(levelsResponse.levels);
-        }
-      } catch (err) {
-        console.error('Error fetching filter options:', err);
-      }
-    };
-    
-    fetchFilterOptions();
-  }, []);
-
-  // Reset page when filters change (but not when page itself changes)
-  useEffect(() => {
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, filterStatus, programType, level, selectedStatCard]);
+  const specializationOptions = [
+    'Speaking',
+    'Listening',
+    'Reading',
+    'Writing',
+    'Grammar',
+    'IELTS',
+    'TOEIC',
+    'Business English'
+  ];
 
   useEffect(() => {
     fetchTeachers();
-<<<<<<< HEAD
   }, [searchTerm, filterStatus]);
-=======
-    fetchStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, filterStatus, programType, level, page]);
->>>>>>> origin/Namvv-teacher-class-management
 
   const fetchTeachers = async () => {
     try {
       setLoading(true);
       setError(null);
-<<<<<<< HEAD
       
       const params = {};
       if (searchTerm) params.search = searchTerm;
@@ -164,440 +107,132 @@ const TeacherManagement = () => {
     } finally {
       setLoading(false);
     }
-=======
-      const params = {
-        page,
-        limit: 10
-      };
-      if (searchTerm) params.search = searchTerm;
-      if (filterStatus && filterStatus !== 'all') params.status = filterStatus;
-      if (programType) params.programType = programType;
-      if (level) params.level = level;
-      
-      const data = await teacherService.getAllTeachers(params);
-      setTeachers(data.teachers || []);
-      setTotal(data.total || 0);
-      setTotalPages(data.totalPages || 1);
-    } catch (err) {
-      console.error('Error fetching teachers:', err);
-      setError(err.message || 'Không thể tải danh sách giảng viên');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchStats = async () => {
-    try {
-      const data = await teacherService.getTeacherStats();
-      setStats(data.stats || {});
-    } catch (err) {
-      console.error('Error fetching stats:', err);
-    }
->>>>>>> origin/Namvv-teacher-class-management
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    // Clear error when user starts typing
-    if (formErrors[name]) {
-      setFormErrors(prev => ({ ...prev, [name]: '' }));
-    }
   };
 
-  const parseErrorToField = (errorMessage) => {
-    const errors = {};
-    if (!errorMessage) return errors;
-    
-    const message = typeof errorMessage === 'string' ? errorMessage : errorMessage.message || '';
-    
-    // Map error messages to form fields (check most specific first)
-    if (message.includes('Số điện thoại đã tồn tại')) {
-      errors.phone = message;
-    } else if (message.includes('Email đã tồn tại')) {
-      errors.email = message;
-    } else if (message.includes('Username đã tồn tại')) {
-      errors.username = message;
-    } else if (message.toLowerCase().includes('số điện thoại') || message.toLowerCase().includes('phone')) {
-      errors.phone = message;
-    } else if (message.toLowerCase().includes('email')) {
-      errors.email = message;
-    } else if (message.toLowerCase().includes('username')) {
-      errors.username = message;
-    } else {
-      // General error - show on submit
-      errors.submit = message;
-    }
-    
-    return errors;
+  const handleSpecializationToggle = (spec) => {
+    setFormData(prev => {
+      const newSpec = prev.specialization.includes(spec)
+        ? prev.specialization.filter(s => s !== spec)
+        : [...prev.specialization, spec];
+      return { ...prev, specialization: newSpec };
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Clear previous errors
-    setFormErrors({});
-    
-    try {
-      setLoading(true);
-      await teacherService.createTeacher(formData);
-      
-      // Success - close modal and refresh
-      toast.success('Thêm giảng viên thành công!');
-      handleCloseModal();
-      fetchTeachers();
-      fetchStats();
-    } catch (err) {
-      console.error('Error saving teacher:', err);
-      const errorMessage = err?.message || err?.response?.data?.message || 'Không thể lưu thông tin Giảng viên';
-      const parsedErrors = parseErrorToField(errorMessage);
-      setFormErrors(parsedErrors);
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
+    if (editingTeacher) {
+      setTeachers(teachers.map(t => 
+        t.id === editingTeacher.id 
+          ? { ...t, ...formData }
+          : t
+      ));
+      alert('Cập nhật giảng viên thành công!');
+    } else {
+      const newTeacher = {
+        ...formData,
+        id: teachers.length + 1,
+        currentClasses: 0,
+        totalStudents: 0,
+        rating: 0,
+        totalLessons: 0,
+        completedLessons: 0
+      };
+      setTeachers([...teachers, newTeacher]);
+      alert('Thêm giảng viên thành công!');
     }
+    
+    handleCloseModal();
+  };
+
+  const handleEdit = (teacher) => {
+    setEditingTeacher(teacher);
+    setFormData({
+      name: teacher.name,
+      email: teacher.email,
+      phone: teacher.phone,
+      specialization: teacher.specialization,
+      qualifications: teacher.qualifications,
+      experience: teacher.experience,
+      status: teacher.status
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (teacherId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa giảng viên này?')) return;
+    
+    setTeachers(teachers.filter(t => t.id !== teacherId));
+    alert('Xóa giảng viên thành công!');
+  };
+
+  const handleViewDetail = (teacher) => {
+    setSelectedTeacher(teacher);
+    setShowDetailModal(true);
   };
 
   const handleCloseModal = () => {
     setShowModal(false);
+    setEditingTeacher(null);
     setFormData({
-      username: '',
+      name: '',
       email: '',
-      password: '',
       phone: '',
-      address: ''
+      specialization: [],
+      qualifications: '',
+      experience: '',
+      status: 'active'
     });
-    setFormErrors({});
   };
 
-  // Import Excel handlers
-  const handleOpenImportModal = () => {
-    setShowImportModal(true);
-    setImportFile(null);
-    setPreviewTeachers([]);
-    setImporting(false);
+  const getStatusBadge = (status) => {
+    return status === 'active' 
+      ? <Badge className="bg-success-600 text-white px-12 py-6">Đang hoạt động</Badge>
+      : <Badge className="bg-neutral-500 text-white px-12 py-6">Tạm nghỉ</Badge>;
   };
 
-  const handleCloseImportModal = () => {
-    setShowImportModal(false);
-    setImportFile(null);
-    setPreviewTeachers([]);
-    setImporting(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+  const getRatingStars = (rating) => {
+    return [...Array(5)].map((_, i) => (
+      <i 
+        key={i} 
+        className={`fas fa-star ${i < Math.floor(rating) ? 'text-warning-600' : 'text-neutral-300'}`}
+        style={{ fontSize: '14px' }}
+      ></i>
+    ));
   };
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const filteredTeachers = teachers.filter(teacher => {
+    const matchesSearch = teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         teacher.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === 'all' || teacher.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
 
-    const validTypes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-    ];
-    const isValidType = validTypes.includes(file.type) || 
-                       file.name.endsWith('.xlsx') || 
-                       file.name.endsWith('.xls');
-
-    if (!isValidType) {
-      toast.error('Vui lòng chọn file Excel (.xlsx hoặc .xls)');
-      e.target.value = '';
-      return;
-    }
-
-    setImportFile(file);
-    setPreviewTeachers([]);
-  };
-
-  const handlePreviewExcel = async () => {
-    if (!importFile) {
-      toast.error('Vui lòng chọn file Excel');
-      return;
-    }
-
-    setImporting(true);
-    try {
-      // Read file as array buffer
-      const data = await importFile.arrayBuffer();
-      const workbook = XLSX.read(data, { type: 'array' });
-
-      // Get first sheet
-      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-        toast.error('File Excel không có sheet nào');
-        setImporting(false);
-        return;
-      }
-
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-
-      if (!worksheet) {
-        toast.error('Sheet đầu tiên không có dữ liệu');
-        setImporting(false);
-        return;
-      }
-
-      // Convert to JSON (array of objects) - use raw: true to get raw values
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-        raw: true, 
-        defval: ''
-      });
-
-      if (!jsonData || jsonData.length === 0) {
-        toast.error('File Excel không có dữ liệu');
-        setImporting(false);
-        return;
-      }
-
-      // Parse and validate each row
-      const previewData = [];
-      jsonData.forEach((row, index) => {
-        const rowNumber = index + 1; // +2 vì có header và index bắt đầu từ 0
-        const errors = [];
-
-        // Get data from Excel (support both Vietnamese and English)
-        const username = row.username || row.Username || row['Tên đăng nhập'] || row['username'] || '';
-        const email = row.email || row.Email || row['Email'] || '';
-        let phone = row.phone || row.Phone || row['Số điện thoại'] || row['Điện thoại'] || '';
-        
-        // Convert phone to string first
-        phone = phone ? String(phone) : '';
-        phone = phone.trim();
-        
-        // Remove any non-digit characters (spaces, dashes, etc.)
-        phone = phone.replace(/\D/g, '');
-        
-        // Always add leading zero if phone doesn't start with 0
-        // This handles the case where Excel removes leading zeros from phone numbers
-        if (phone && phone.length > 0 && phone[0] !== '0') {
-          phone = '0' + phone;
-        }
-        
-        const address = row.address || row.Address || row['Địa chỉ'] || '';
-
-        // Validate
-        if (!username || !username.toString().trim()) {
-          errors.push('Username không được để trống');
-        }
-
-        if (!email || !email.toString().trim()) {
-          errors.push('Email không được để trống');
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.toString())) {
-          errors.push('Email không hợp lệ');
-        }
-
-        if (!phone || !phone.toString().trim()) {
-          errors.push('Số điện thoại không được để trống');
-        }else {
-          // Validate phone length (10-11 digits after normalization)
-          const phoneDigits = phone.replace(/\D/g, '');
-          if (phoneDigits.length < 10 || phoneDigits.length > 11) {
-            errors.push('Số điện thoại phải có 10 hoặc 11 chữ số');
-          }
-        }
-
-        if (!address || !address.toString().trim()) {
-          errors.push('Địa chỉ không được để trống');
-        }
-
-        previewData.push({
-          rowNumber,
-          username: username.toString().trim(),
-          email: email.toString().trim(),
-          phone: phone.toString().trim(),
-          address: address.toString().trim(),
-          hasError: errors.length > 0,
-          errors
-        });
-      });
-
-      // Normalize phone numbers - ensure they all have leading zero for comparison
-      const normalizePhone = (phone) => {
-        if (!phone) return '';
-        const phoneStr = String(phone).replace(/\D/g, ''); // Remove all non-digits
-        if (phoneStr && phoneStr.length > 0 && phoneStr[0] !== '0') {
-          return '0' + phoneStr;
-        }
-        return phoneStr;
-      };
-
-      // Check for duplicates within the Excel file
-      const emailMap = new Map();
-      const phoneMap = new Map();
-      
-      previewData.forEach((item, index) => {
-        const email = item.email.toLowerCase();
-        // Normalize phone before checking duplicates
-        const phone = normalizePhone(item.phone);
-        
-        // Check duplicate email in file
-        if (email && emailMap.has(email)) {
-          const firstIndex = emailMap.get(email);
-          if (!previewData[firstIndex].errors.includes('Email trùng lặp trong file Excel')) {
-            previewData[firstIndex].errors.push('Email trùng lặp trong file Excel');
-            previewData[firstIndex].hasError = true;
-          }
-          if (!item.errors.includes('Email trùng lặp trong file Excel')) {
-            item.errors.push('Email trùng lặp trong file Excel');
-            item.hasError = true;
-          }
-        } else if (email) {
-          emailMap.set(email, index);
-        }
-        
-        // Check duplicate phone in file
-        if (phone && phoneMap.has(phone)) {
-          const firstIndex = phoneMap.get(phone);
-          if (!previewData[firstIndex].errors.includes('Số điện thoại trùng lặp trong file Excel')) {
-            previewData[firstIndex].errors.push('Số điện thoại trùng lặp trong file Excel');
-            previewData[firstIndex].hasError = true;
-          }
-          if (!item.errors.includes('Số điện thoại trùng lặp trong file Excel')) {
-            item.errors.push('Số điện thoại trùng lặp trong file Excel');
-            item.hasError = true;
-          }
-        } else if (phone) {
-          phoneMap.set(phone, index);
-        }
-      });
-
-      // Check for duplicates with existing data in database
-      try {
-        // Get all students and teachers from database
-        const [studentsResponse, teachersResponse] = await Promise.all([
-          studentService.getAllStudents().catch(() => ({ students: [] })),
-          teacherService.getAllTeachers().catch(() => ({ teachers: [] }))
-        ]);
-        
-        const allStudents = studentsResponse.students || [];
-        const allTeachers = teachersResponse.teachers || [];
-        const allUsers = [...allStudents, ...allTeachers];
-        
-        const existingEmails = new Set(allUsers.map(u => u.email?.toLowerCase()).filter(Boolean));
-        
-        const existingPhones = new Set(
-          allUsers
-            .map(u => normalizePhone(u.phone))
-            .filter(Boolean)
-        );
-        
-        previewData.forEach((item) => {
-          const email = item.email.toLowerCase();
-          const phone = normalizePhone(item.phone);
-          
-          if (email && existingEmails.has(email)) {
-            item.errors.push('Email đã tồn tại trong hệ thống');
-            item.hasError = true;
-          }
-          
-          if (phone && existingPhones.has(phone)) {
-            item.errors.push('Số điện thoại đã tồn tại trong hệ thống');
-            item.hasError = true;
-          }
-        });
-      } catch (err) {
-        console.error('Error checking existing users:', err);
-      }
-
-      setPreviewTeachers(previewData);
-    } catch (error) {
-      console.error('Error reading Excel file:', error);
-      toast.error('Lỗi khi đọc file Excel: ' + (error.message || 'Vui lòng thử lại'));
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  const handleConfirmImport = async () => {
-    const validTeachers = previewTeachers.filter(t => !t.hasError);
-    
-    if (validTeachers.length === 0) {
-      toast.error('Không có giảng viên hợp lệ để import');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const result = await teacherService.importTeachers(validTeachers);
-      
-      toast.success(`Import thành công: ${result.successCount} giảng viên. Thất bại: ${result.failedCount} giảng viên`);
-      
-      handleCloseImportModal();
-      fetchTeachers();
-      fetchStats();
-    } catch (err) {
-      console.error('Error importing teachers:', err);
-      const errorMessage = err.message || (typeof err === 'string' ? err : 'Không thể import giảng viên');
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDownloadTemplate = () => {
-    // Create sample data
-    const sampleData = [
-      {
-        username: 'teacher1',
-        email: 'teacher1@email.com',
-        phone: '0123456789',
-        address: '123 Đường ABC, Quận 1, TP.HCM'
-      },
-      {
-        username: 'teacher2',
-        email: 'teacher2@email.com',
-        phone: '0987654321',
-        address: '456 Đường XYZ, Quận 2, TP.HCM'
-      }
-    ];
-
-    // Create worksheet
-    const ws = XLSX.utils.json_to_sheet(sampleData);
-    
-    // Create workbook
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Danh sách giảng viên');
-
-    // Generate file name with timestamp
-    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const fileName = `Mau_Import_Giang_Vien_${timestamp}.xlsx`;
-
-    // Write and download
-    XLSX.writeFile(wb, fileName);
-  };
-
-  const handleViewDetail = (teacher) => {
-    navigate(`/academic/teacher-management/${teacher._id}`);
+  const stats = {
+    total: teachers.length,
+    active: teachers.filter(t => t.status === 'active').length,
+    totalClasses: teachers.reduce((sum, t) => sum + t.currentClasses, 0),
+    totalStudents: teachers.reduce((sum, t) => sum + t.totalStudents, 0),
+    avgRating: (teachers.reduce((sum, t) => sum + t.rating, 0) / teachers.length).toFixed(1)
   };
 
   return (
-    <Container fluid className="p-24">
+    <Container fluid className="py-24 px-24" style={{ backgroundColor: '#f8f9fa' }}>
       {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-24">
         <div>
           <h4 className="text-neutral-900 fw-bold mb-8">Quản lý Giảng viên</h4>
-          <p className="text-neutral-600 mb-0">Quản lý thông tin và lịch giảng dạy</p>
+          <p className="text-neutral-600 mb-0">Quản lý thông tin và phân công giảng viên</p>
         </div>
-        <div className="d-flex gap-2">
-          <Button 
-            className="btn-main px-20 py-10 radius-8"
-            onClick={() => setShowModal(true)}
-            disabled={loading}
-          >
-            <i className="fas fa-plus me-2"></i>
-            Thêm Giảng viên
-          </Button>
-          <Button 
-            variant="success"
-            className="px-20 py-10 radius-8"
-            onClick={handleOpenImportModal}
-            disabled={loading}
-          >
-            <i className="fas fa-file-excel me-2"></i>
-            Import từ Excel
-          </Button>
-        </div>
+        <Button className="btn-main px-20 py-12 radius-8" onClick={() => setShowModal(true)}>
+          <i className="fas fa-plus me-2"></i>
+          Thêm giảng viên
+        </Button>
       </div>
 
       {loading && (
@@ -618,103 +253,573 @@ const TeacherManagement = () => {
         <>
 
       {/* Stats Cards */}
-      <TeacherStats 
-        stats={stats} 
-        selectedCard={selectedStatCard}
-        onCardClick={setSelectedStatCard}
-      />
+      <Row className="g-3 mb-24">
+        <Col md={3}>
+          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+            <Card.Body className="p-20">
+              <div className="d-flex align-items-center gap-16">
+                <div 
+                  className="rounded-12 d-flex align-items-center justify-content-center"
+                  style={{ 
+                    width: '56px',
+                    height: '56px',
+                    background: 'linear-gradient(135deg, #0D74FF 0%, #0A5FD9 100%)'
+                  }}
+                >
+                  <i className="fas fa-user-tie text-white" style={{ fontSize: '24px' }}></i>
+                </div>
+                <div>
+                  <div className="text-neutral-500 text-13 mb-4">Tổng giảng viên</div>
+                  <div className="text-neutral-900 fw-bold text-32">{stats.total}</div>
+                </div>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
 
-      {/* Filters */}
-      <TeacherFilters
-        searchTerm={searchTerm}
-        filterStatus={filterStatus}
-        programType={programType}
-        level={level}
-        viewMode={viewMode}
-        availableTypes={availableTypes}
-        availableLevels={availableLevels}
-        onSearchChange={(value) => {
-          setSearchTerm(value);
-          setPage(1);
-        }}
-        onFilterStatusChange={(value) => {
-          setFilterStatus(value);
-          setPage(1);
-        }}
-        onProgramTypeChange={(value) => {
-          setProgramType(value);
-          setPage(1);
-        }}
-        onLevelChange={(value) => {
-          setLevel(value);
-          setPage(1);
-        }}
-        onViewModeChange={setViewMode}
-      />
+        <Col md={3}>
+          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+            <Card.Body className="p-20">
+              <div className="d-flex align-items-center gap-16">
+                <div 
+                  className="rounded-12 d-flex align-items-center justify-content-center"
+                  style={{ 
+                    width: '56px',
+                    height: '56px',
+                    background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
+                  }}
+                >
+                  <i className="fas fa-check-circle text-white" style={{ fontSize: '24px' }}></i>
+                </div>
+                <div>
+                  <div className="text-neutral-500 text-13 mb-4">Đang hoạt động</div>
+                  <div className="text-neutral-900 fw-bold text-32">{stats.active}</div>
+                </div>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
 
-      {/* Loading State */}
-      {loading && (
-        <div className="text-center py-5">
-          <Spinner animation="border" variant="primary" />
-          <p className="text-neutral-600 mt-16">Đang tải danh sách giảng viên...</p>
-        </div>
+        <Col md={3}>
+          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+            <Card.Body className="p-20">
+              <div className="d-flex align-items-center gap-16">
+                <div 
+                  className="rounded-12 d-flex align-items-center justify-content-center"
+                  style={{ 
+                    width: '56px',
+                    height: '56px',
+                    background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                  }}
+                >
+                  <i className="fas fa-chalkboard-teacher text-white" style={{ fontSize: '24px' }}></i>
+                </div>
+                <div>
+                  <div className="text-neutral-500 text-13 mb-4">Lớp đang dạy</div>
+                  <div className="text-neutral-900 fw-bold text-32">{stats.totalClasses}</div>
+                </div>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+
+        <Col md={3}>
+          <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+            <Card.Body className="p-20">
+              <div className="d-flex align-items-center gap-16">
+                <div 
+                  className="rounded-12 d-flex align-items-center justify-content-center"
+                  style={{ 
+                    width: '56px',
+                    height: '56px',
+                    background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)'
+                  }}
+                >
+                  <i className="fas fa-star text-white" style={{ fontSize: '24px' }}></i>
+                </div>
+                <div>
+                  <div className="text-neutral-500 text-13 mb-4">Đánh giá TB</div>
+                  <div className="text-neutral-900 fw-bold text-32">{stats.avgRating}</div>
+                </div>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Filters & View Toggle */}
+      <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
+        <Card.Body className="p-20">
+          <Row className="align-items-center g-3">
+            <Col md={4}>
+              <Form.Control
+                type="text"
+                placeholder="Tìm kiếm giảng viên..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="radius-8"
+              />
+            </Col>
+            <Col md={3}>
+              <Form.Select 
+                value={filterStatus} 
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="radius-8"
+              >
+                <option value="all">Tất cả trạng thái</option>
+                <option value="active">Đang hoạt động</option>
+                <option value="inactive">Tạm nghỉ</option>
+              </Form.Select>
+            </Col>
+            <Col md={5} className="text-end">
+              <Button
+                className={viewMode === 'grid' ? 'btn-main' : 'btn-outline-main'}
+                onClick={() => setViewMode('grid')}
+                style={{ marginRight: '8px' }}
+              >
+                <i className="fas fa-th"></i>
+              </Button>
+              <Button
+                className={viewMode === 'list' ? 'btn-main' : 'btn-outline-main'}
+                onClick={() => setViewMode('list')}
+              >
+                <i className="fas fa-list"></i>
+              </Button>
+            </Col>
+          </Row>
+        </Card.Body>
+      </Card>
+
+      {/* Teachers Display */}
+      {viewMode === 'grid' ? (
+        <Row className="g-3">
+          {filteredTeachers.map(teacher => (
+            <Col md={6} lg={4} key={teacher.id}>
+              <Card className="bg-white border border-neutral-100 rounded-12 box-shadow-sm h-100 hover-shadow transition-2">
+                <Card.Body className="p-20">
+                  {/* Header */}
+                  <div className="d-flex align-items-start gap-16 mb-16">
+                    <div 
+                      className="rounded-circle bg-main-100 d-flex align-items-center justify-content-center text-main-600 fw-bold"
+                      style={{ width: '56px', height: '56px', fontSize: '20px', minWidth: '56px' }}
+                    >
+                      {teacher.name.charAt(0)}
+                    </div>
+                    <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                      <h6 className="text-neutral-900 fw-bold mb-4">{teacher.name}</h6>
+                      <div className="text-neutral-600 text-12 mb-4">{teacher.email}</div>
+                      <div className="d-flex gap-4">
+                        {getRatingStars(teacher.rating)}
+                        <span className="text-neutral-600 text-12 ms-2">{teacher.rating}</span>
+                      </div>
+                    </div>
+                    {getStatusBadge(teacher.status)}
+                  </div>
+
+                  {/* Specialization */}
+                  <div className="mb-16">
+                    <div className="text-neutral-600 text-12 mb-8">Chuyên môn</div>
+                    <div className="d-flex flex-wrap gap-4">
+                      {teacher.specialization.slice(0, 3).map(spec => (
+                        <Badge key={spec} className="bg-main-100 text-main-600 px-8 py-4 text-11">
+                          {spec}
+                        </Badge>
+                      ))}
+                      {teacher.specialization.length > 3 && (
+                        <Badge className="bg-neutral-100 text-neutral-600 px-8 py-4 text-11">
+                          +{teacher.specialization.length - 3}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="border-top border-neutral-100 pt-16 mb-16">
+                    <Row className="g-2 text-center">
+                      <Col xs={4}>
+                        <div className="text-neutral-500 text-11 mb-4">Lớp dạy</div>
+                        <div className="text-neutral-900 fw-bold text-14">{teacher.currentClasses}</div>
+                      </Col>
+                      <Col xs={4}>
+                        <div className="text-neutral-500 text-11 mb-4">Học viên</div>
+                        <div className="text-main-600 fw-bold text-14">{teacher.totalStudents}</div>
+                      </Col>
+                      <Col xs={4}>
+                        <div className="text-neutral-500 text-11 mb-4">Kinh nghiệm</div>
+                        <div className="text-neutral-900 fw-bold text-14">{teacher.experience} năm</div>
+                      </Col>
+                    </Row>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="d-flex gap-8">
+                    <Button 
+                      className="btn-outline-main flex-grow-1 text-13 px-12 py-8 radius-6"
+                      onClick={() => handleViewDetail(teacher)}
+                    >
+                      <i className="fas fa-eye me-1"></i>
+                      Chi tiết
+                    </Button>
+                    <Button 
+                      className="btn-outline-info text-13 px-12 py-8 radius-6"
+                      onClick={() => handleEdit(teacher)}
+                    >
+                      <i className="fas fa-edit"></i>
+                    </Button>
+                    <Button 
+                      className="btn-outline-danger text-13 px-12 py-8 radius-6"
+                      onClick={() => handleDelete(teacher.id)}
+                    >
+                      <i className="fas fa-trash"></i>
+                    </Button>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      ) : (
+        <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
+          <Card.Body className="p-0">
+            <Table hover className="mb-0">
+              <thead>
+                <tr className="bg-neutral-25">
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Giảng viên</th>
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Liên hệ</th>
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Chuyên môn</th>
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Lớp dạy</th>
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Đánh giá</th>
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Trạng thái</th>
+                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTeachers.map(teacher => (
+                  <tr key={teacher.id}>
+                    <td className="px-20 py-16">
+                      <div className="d-flex align-items-center gap-12">
+                        <div 
+                          className="rounded-circle bg-main-100 d-flex align-items-center justify-content-center text-main-600 fw-bold"
+                          style={{ width: '40px', height: '40px', fontSize: '16px', minWidth: '40px' }}
+                        >
+                          {teacher.name.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="text-neutral-900 fw-semibold text-14">{teacher.name}</div>
+                          <div className="text-neutral-500 text-12">{teacher.experience} năm kinh nghiệm</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-20 py-16">
+                      <div className="text-neutral-700 text-13 mb-2">{teacher.email}</div>
+                      <div className="text-neutral-600 text-12">{teacher.phone}</div>
+                    </td>
+                    <td className="px-20 py-16">
+                      <div className="d-flex flex-wrap gap-4">
+                        {teacher.specialization.slice(0, 2).map(spec => (
+                          <Badge key={spec} className="bg-main-100 text-main-600 px-8 py-4 text-11">
+                            {spec}
+                          </Badge>
+                        ))}
+                        {teacher.specialization.length > 2 && (
+                          <Badge className="bg-neutral-100 text-neutral-600 px-8 py-4 text-11">
+                            +{teacher.specialization.length - 2}
+                          </Badge>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-20 py-16 text-center">
+                      <span className="text-neutral-900 fw-bold text-14">{teacher.currentClasses}</span>
+                      <div className="text-neutral-500 text-11">{teacher.totalStudents} HV</div>
+                    </td>
+                    <td className="px-20 py-16 text-center">
+                      <div className="d-flex gap-2 justify-content-center mb-2">
+                        {getRatingStars(teacher.rating)}
+                      </div>
+                      <div className="text-neutral-600 text-12">{teacher.rating}/5.0</div>
+                    </td>
+                    <td className="px-20 py-16">{getStatusBadge(teacher.status)}</td>
+                    <td className="px-20 py-16">
+                      <div className="d-flex gap-8 justify-content-center">
+                        <Button 
+                          className="btn-outline-main text-12 px-12 py-6 radius-6"
+                          onClick={() => handleViewDetail(teacher)}
+                        >
+                          <i className="fas fa-eye"></i>
+                        </Button>
+                        <Button 
+                          className="btn-outline-info text-12 px-12 py-6 radius-6"
+                          onClick={() => handleEdit(teacher)}
+                        >
+                          <i className="fas fa-edit"></i>
+                        </Button>
+                        <Button 
+                          className="btn-outline-danger text-12 px-12 py-6 radius-6"
+                          onClick={() => handleDelete(teacher.id)}
+                        >
+                          <i className="fas fa-trash"></i>
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </Card.Body>
+        </Card>
       )}
 
-      {/* Error State */}
-      {error && (
-        <Alert variant="danger" className="mb-24">
-          <Alert.Heading>Lỗi</Alert.Heading>
-          <p>{error}</p>
-        </Alert>
-      )}
+      {/* Add/Edit Modal */}
+      <Modal show={showModal} onHide={handleCloseModal} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>{editingTeacher ? 'Chỉnh sửa giảng viên' : 'Thêm giảng viên'}</Modal.Title>
+        </Modal.Header>
+        <Form onSubmit={handleSubmit}>
+          <Modal.Body>
+            <Row className="g-3">
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>Họ và tên <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="VD: Nguyễn Văn A"
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Email <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="email@example.com"
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Số điện thoại <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    placeholder="0901234567"
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Bằng cấp</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="qualifications"
+                    value={formData.qualifications}
+                    onChange={handleInputChange}
+                    placeholder="VD: CELTA, Master in English"
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Kinh nghiệm (năm)</Form.Label>
+                  <Form.Control
+                    type="number"
+                    name="experience"
+                    value={formData.experience}
+                    onChange={handleInputChange}
+                    placeholder="VD: 5"
+                    min="0"
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>Chuyên môn</Form.Label>
+                  <div className="border border-neutral-200 rounded-8 p-16">
+                    <Row className="g-2">
+                      {specializationOptions.map(spec => (
+                        <Col md={6} key={spec}>
+                          <Form.Check
+                            type="checkbox"
+                            id={`spec-${spec}`}
+                            label={spec}
+                            checked={formData.specialization.includes(spec)}
+                            onChange={() => handleSpecializationToggle(spec)}
+                          />
+                        </Col>
+                      ))}
+                    </Row>
+                  </div>
+                </Form.Group>
+              </Col>
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>Trạng thái</Form.Label>
+                  <Form.Select
+                    name="status"
+                    value={formData.status}
+                    onChange={handleInputChange}
+                  >
+                    <option value="active">Đang hoạt động</option>
+                    <option value="inactive">Tạm nghỉ</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+            </Row>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button className="btn-outline-neutral" onClick={handleCloseModal}>
+              Hủy
+            </Button>
+            <Button type="submit" className="btn-main">
+              <i className="fas fa-save me-2"></i>
+              {editingTeacher ? 'Cập nhật' : 'Thêm giảng viên'}
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
 
-      {/* Filter teachers based on selected stat card */}
-      {(() => {
-        let filteredTeachers = teachers;
-        if (selectedStatCard === 'inactive') {
-          // Only show teachers with no classes
-          filteredTeachers = teachers.filter(teacher => 
-            !teacher.stats || teacher.stats.classCount === 0
-          );
-        }
-        // If selectedStatCard === 'total', show all teachers (no filter)
+      {/* Teacher Detail Modal */}
+      <Modal show={showDetailModal} onHide={() => setShowDetailModal(false)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Thông tin giảng viên</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedTeacher && (
+            <Tabs defaultActiveKey="profile">
+              <Tab eventKey="profile" title="Thông tin">
+                <div className="pt-20">
+                  <div className="d-flex align-items-center gap-20 mb-24">
+                    <div 
+                      className="rounded-circle bg-main-100 d-flex align-items-center justify-content-center text-main-600 fw-bold"
+                      style={{ width: '80px', height: '80px', fontSize: '32px' }}
+                    >
+                      {selectedTeacher.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h5 className="text-neutral-900 fw-bold mb-8">{selectedTeacher.name}</h5>
+                      <div className="d-flex gap-4 mb-8">
+                        {getRatingStars(selectedTeacher.rating)}
+                        <span className="text-neutral-600 text-14 ms-2">{selectedTeacher.rating}/5.0</span>
+                      </div>
+                      {getStatusBadge(selectedTeacher.status)}
+                    </div>
+                  </div>
 
-        return (
-          <>
-            {/* Grid View */}
-            {!loading && !error && viewMode === 'grid' && (
-              <TeacherGridView
-                teachers={filteredTeachers}
-                onViewDetail={handleViewDetail}
-              />
-            )}
+                  <Row className="g-3">
+                    <Col md={6}>
+                      <div className="bg-neutral-50 rounded-8 p-16">
+                        <div className="text-neutral-600 text-12 mb-4">Email</div>
+                        <div className="text-neutral-900 text-14">{selectedTeacher.email}</div>
+                      </div>
+                    </Col>
+                    <Col md={6}>
+                      <div className="bg-neutral-50 rounded-8 p-16">
+                        <div className="text-neutral-600 text-12 mb-4">Số điện thoại</div>
+                        <div className="text-neutral-900 text-14">{selectedTeacher.phone}</div>
+                      </div>
+                    </Col>
+                    <Col md={6}>
+                      <div className="bg-neutral-50 rounded-8 p-16">
+                        <div className="text-neutral-600 text-12 mb-4">Bằng cấp</div>
+                        <div className="text-neutral-900 text-14">{selectedTeacher.qualifications}</div>
+                      </div>
+                    </Col>
+                    <Col md={6}>
+                      <div className="bg-neutral-50 rounded-8 p-16">
+                        <div className="text-neutral-600 text-12 mb-4">Kinh nghiệm</div>
+                        <div className="text-neutral-900 text-14">{selectedTeacher.experience} năm</div>
+                      </div>
+                    </Col>
+                    <Col md={12}>
+                      <div className="bg-neutral-50 rounded-8 p-16">
+                        <div className="text-neutral-600 text-12 mb-8">Chuyên môn</div>
+                        <div className="d-flex flex-wrap gap-8">
+                          {selectedTeacher.specialization.map(spec => (
+                            <Badge key={spec} className="bg-main-600 text-white px-12 py-6">
+                              {spec}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </Col>
+                  </Row>
 
-            {/* List View */}
-            {!loading && !error && viewMode === 'list' && (
-              <TeacherListView
-                teachers={filteredTeachers}
-                page={page}
-                totalPages={totalPages}
-                onViewDetail={handleViewDetail}
-                onPageChange={setPage}
-              />
-            )}
-          </>
-        );
-      })()}
+                  <div className="mt-24">
+                    <h6 className="text-neutral-900 fw-semibold mb-16">Thống kê</h6>
+                    <Row className="g-3">
+                      <Col md={4}>
+                        <Card className="bg-main-25 border-0">
+                          <Card.Body className="p-16 text-center">
+                            <div className="text-main-600 fw-bold text-24 mb-4">{selectedTeacher.currentClasses}</div>
+                            <div className="text-neutral-600 text-13">Lớp đang dạy</div>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                      <Col md={4}>
+                        <Card className="bg-success-25 border-0">
+                          <Card.Body className="p-16 text-center">
+                            <div className="text-success-600 fw-bold text-24 mb-4">{selectedTeacher.totalStudents}</div>
+                            <div className="text-neutral-600 text-13">Học viên</div>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                      <Col md={4}>
+                        <Card className="bg-warning-25 border-0">
+                          <Card.Body className="p-16 text-center">
+                            <div className="text-warning-600 fw-bold text-24 mb-4">{selectedTeacher.completedLessons}</div>
+                            <div className="text-neutral-600 text-13">Buổi đã dạy</div>
+                          </Card.Body>
+                        </Card>
+                      </Col>
+                    </Row>
+                  </div>
+                </div>
+              </Tab>
 
-      {/* Add Teacher Modal */}
-      <AddTeacherModal
-        show={showModal}
-        onHide={handleCloseModal}
-        formData={formData}
-        formErrors={formErrors}
-        loading={loading}
-        onSubmit={handleSubmit}
-        onInputChange={handleInputChange}
-      />
+              <Tab eventKey="classes" title="Lớp đang dạy">
+                <div className="pt-20">
+                  <Table hover>
+                    <thead className="bg-neutral-25">
+                      <tr>
+                        <th className="px-16 py-12 text-13">Lớp học</th>
+                        <th className="px-16 py-12 text-13">Level</th>
+                        <th className="px-16 py-12 text-13">Học viên</th>
+                        <th className="px-16 py-12 text-13">Tiến độ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="px-16 py-12">A2-Evening-01</td>
+                        <td className="px-16 py-12">
+                          <Badge className="bg-main-100 text-main-600">A2</Badge>
+                        </td>
+                        <td className="px-16 py-12">25 HV</td>
+                        <td className="px-16 py-12">
+                          <div className="d-flex align-items-center gap-12">
+                            <ProgressBar 
+                              now={65} 
+                              style={{ height: '6px', width: '100px' }}
+                              className="flex-grow-1"
+                            />
+                            <span className="text-13">65%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </Table>
+                </div>
+              </Tab>
 
-<<<<<<< HEAD
               <Tab eventKey="schedule" title="Lịch dạy">
                 <div className="pt-20">
                   <Table hover>
@@ -750,21 +855,6 @@ const TeacherManagement = () => {
       </Modal>
         </>
       )}
-=======
-      {/* Import Teacher Modal */}
-      <ImportTeacherModal
-        show={showImportModal}
-        onHide={handleCloseImportModal}
-        importFile={importFile}
-        previewTeachers={previewTeachers}
-        importing={importing}
-        loading={loading}
-        onFileSelect={handleFileSelect}
-        onPreviewExcel={handlePreviewExcel}
-        onConfirmImport={handleConfirmImport}
-        onDownloadTemplate={handleDownloadTemplate}
-      />
->>>>>>> origin/Namvv-teacher-class-management
     </Container>
   );
 };

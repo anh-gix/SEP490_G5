@@ -25,14 +25,8 @@ const TeacherClassDetailLayout = () => {
   
   const [classInfo, setClassInfo] = useState(null);
   const [students, setStudents] = useState([]);
-<<<<<<< HEAD
   const [materials, setMaterials] = useState([]);
   const [lessons, setLessons] = useState([]);
-=======
-  const [lessons, setLessons] = useState([]);
-  const [attendanceByLesson, setAttendanceByLesson] = useState([]);
-  const [homeworkStats, setHomeworkStats] = useState([]);
->>>>>>> origin/Namvv-teacher-class-management
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -67,15 +61,8 @@ const TeacherClassDetailLayout = () => {
       if (response.success) {
         setClassInfo(response.data.classInfo);
         setStudents(response.data.students || []);
-<<<<<<< HEAD
         setMaterials(response.data.materials || []);
         setLessons(response.data.lessons || []);
-=======
-        setLessons(response.data.lessons || []);
-        setAttendanceByLesson(response.data.attendanceByLesson || []);
-        console.log('Attendance Data:', response.data.attendanceByLesson);
-        setHomeworkStats(response.data.homeworkStats || []);
->>>>>>> origin/Namvv-teacher-class-management
       }
     } catch (error) {
       console.error('Error fetching class details:', error);
@@ -97,7 +84,6 @@ const TeacherClassDetailLayout = () => {
     }
   };
 
-<<<<<<< HEAD
   const getFileIcon = (type) => {
     const icons = {
       document: 'fa-file-pdf',
@@ -118,8 +104,6 @@ const TeacherClassDetailLayout = () => {
     return colors[type] || 'text-neutral-600';
   };
 
-=======
->>>>>>> origin/Namvv-teacher-class-management
   const getLessonStatusBadge = (status) => {
     const statusConfig = {
       completed: { bg: 'bg-success-600', text: 'Đã học' },
@@ -158,11 +142,7 @@ const TeacherClassDetailLayout = () => {
         scores
       );
       
-<<<<<<< HEAD
       console.log('📥 API Response:', response);
-=======
-      console.log('API Response:', response);
->>>>>>> origin/Namvv-teacher-class-management
 
       alert('Cập nhật điểm thành công!');
       // Refresh students list to update table and modal
@@ -249,7 +229,6 @@ const TeacherClassDetailLayout = () => {
 
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
-<<<<<<< HEAD
       {/* Breadcrumb */}
       <div className="mb-16">
         <Link to="/teacher/classes" className="text-neutral-600 text-13 text-decoration-none">
@@ -257,8 +236,6 @@ const TeacherClassDetailLayout = () => {
           Quay lại danh sách lớp
         </Link>
       </div>
-=======
->>>>>>> origin/Namvv-teacher-class-management
 
       {/* Class Header */}
       <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24"
@@ -266,27 +243,14 @@ const TeacherClassDetailLayout = () => {
         <Card.Body className="p-24">
           <Row className="align-items-center">
             <Col lg={8}>
-<<<<<<< HEAD
-=======
-            {/* Breadcrumb back to class list*/}
-            <div className="mb-16">
-              <Link to="/teacher/classes" className="text-white text-13 text-decoration-none">
-                <i className="fas fa-arrow-left me-2"></i>
-                Quay lại danh sách lớp
-              </Link>
-            </div>
->>>>>>> origin/Namvv-teacher-class-management
               <div className="d-flex align-items-center gap-12 mb-12">
                 <h4 className="text-white fw-bold mb-0">{classInfo.name}</h4>
                 <Badge className="bg-white text-main-600 px-12 py-6">{classInfo.level}</Badge>
               </div>
-<<<<<<< HEAD
               <div className="text-white mb-12" style={{ opacity: 0.95 }}>
                 <i className="fas fa-book me-2"></i>
                 {classInfo.subject}
               </div>
-=======
->>>>>>> origin/Namvv-teacher-class-management
               <div className="text-white d-flex gap-20" style={{ opacity: 0.9 }}>
                 <span><i className="fas fa-calendar me-2"></i>{classInfo.schedule}</span>
                 <span><i className="fas fa-door-open me-2"></i>{classInfo.room}</span>
@@ -334,13 +298,8 @@ const TeacherClassDetailLayout = () => {
             >
               <ClassOverview 
                 classInfo={classInfo}
-<<<<<<< HEAD
                 materials={materials}
                 setShowMaterialModal={setShowMaterialModal}
-=======
-                attendanceByLesson={attendanceByLesson}
-                homeworkStats={homeworkStats}
->>>>>>> origin/Namvv-teacher-class-management
               />
             </Tab>
 
@@ -355,14 +314,7 @@ const TeacherClassDetailLayout = () => {
             >
               <ClassStudents 
                 students={students}
-<<<<<<< HEAD
                 onViewStudentDetail={handleViewStudentDetail}
-=======
-                classInfo={classInfo}
-                lessons={lessons}
-                onViewStudentDetail={handleViewStudentDetail}
-                onRefreshStudents={fetchStudents}
->>>>>>> origin/Namvv-teacher-class-management
               />
             </Tab>
 
@@ -386,25 +338,15 @@ const TeacherClassDetailLayout = () => {
               title={
                 <span className="px-8">
                   <i className="fas fa-folder-open me-2"></i>
-<<<<<<< HEAD
                   Tài liệu ({materials.length})
-=======
-                  Tài liệu
->>>>>>> origin/Namvv-teacher-class-management
                 </span>
               }
             >
               <ClassMaterials 
-<<<<<<< HEAD
                 materials={materials}
                 setShowMaterialModal={setShowMaterialModal}
                 getFileIcon={getFileIcon}
                 getFileIconColor={getFileIconColor}
-=======
-                classId={classId}
-                courseId={classInfo?.course?._id}
-                setShowMaterialModal={setShowMaterialModal}
->>>>>>> origin/Namvv-teacher-class-management
               />
             </Tab>
 
@@ -419,10 +361,6 @@ const TeacherClassDetailLayout = () => {
             >
               <ClassAssignments 
                 classId={classId}
-<<<<<<< HEAD
-=======
-                lessons={lessons}
->>>>>>> origin/Namvv-teacher-class-management
                 onAssignmentUpdate={fetchClassDetails}
               />
             </Tab>
@@ -431,29 +369,15 @@ const TeacherClassDetailLayout = () => {
       </Card>
 
       {/* Modals */}
-<<<<<<< HEAD
       <MaterialModal 
         show={showMaterialModal}
         onHide={() => setShowMaterialModal(false)}
       />
 
-=======
-      {/* Modals */}
-      <MaterialModal 
-        show={showMaterialModal}
-        onHide={() => setShowMaterialModal(false)}
-        onSuccess={fetchClassDetails}
-        classId={classId}
-      />
->>>>>>> origin/Namvv-teacher-class-management
       <StudentDetailModal 
         show={showStudentDetail}
         onHide={() => setShowStudentDetail(false)}
         student={selectedStudent}
-<<<<<<< HEAD
-=======
-        classInfo={classInfo}
->>>>>>> origin/Namvv-teacher-class-management
         lessons={lessons}
         onUpdateMocktestScore={handleUpdateMocktestScore}
       />

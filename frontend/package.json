@@ -30,11 +30,9 @@
     "react-select": "^5.10.1",
     "react-slick": "^0.30.3",
     "react-slider": "^2.0.6",
-    "react-toastify": "^11.0.5",
     "react-visibility-sensor": "^5.1.1",
     "recharts": "^3.4.1",
     "slick-carousel": "^1.8.1",
-    "sweetalert2": "^11.26.3",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

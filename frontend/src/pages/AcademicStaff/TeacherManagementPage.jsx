@@ -1,22 +1,18 @@
 import React from 'react';
-<<<<<<< HEAD
 import AcademicNavigation from '../../components/class_management/AcademicNavigation.jsx';
 import TeacherManagement from '../../components/class_management/TeacherManagementAPI';
-=======
-import AcademicLayout from '../../components/class_management/AcademicLayout';
-import TeacherManagement from '../../components/class_management/TeacherManagement';
->>>>>>> origin/Namvv-teacher-class-management
 
 /**
- * Teacher Management Page for Academic Staff
- * Quản lý Giảng viên
- * Wrapper page - chỉ chứa layout với AcademicLayout
+ * Teacher Management Page for Academic Staff - API Integrated
  */
 const TeacherManagementPage = () => {
   return (
-    <AcademicLayout>
-      <TeacherManagement />
-    </AcademicLayout>
+    <div className="d-flex" style={{ minHeight: '100vh' }}>
+      <AcademicNavigation />
+      <div className="flex-grow-1" style={{ backgroundColor: '#f8f9fa' }}>
+        <TeacherManagement />
+      </div>
+    </div>
   );
 };
 

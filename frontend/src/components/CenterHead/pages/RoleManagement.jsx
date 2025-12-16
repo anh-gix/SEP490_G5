@@ -1,34 +1,27 @@
 import { useEffect, useState } from 'react';
 import Breadcrumb from '../compo/Breadcrumb';
-import RoleList from '../compo/RoleList';
-import PermissionList from '../compo/PermissionList';
-import CreateRoleModal from '../compo/CreateRoleModal';
-import EditRoleModal from '../compo/EditRoleModal';
-import { mockRoles, mockPermissions, simulateApiDelay } from '../../../helper/mockdataExtended';
+import Card from '../compo/Card';
+import Table from '../compo/Table';
+import Button from '../compo/Button';
+import Tabs from '../compo/Tabs';
+import { mockRoles, mockPermissionMatrix, simulateApiDelay } from '../../../helper/mockdataExtended';
 
 const RoleManagement = () => {
   const [roles, setRoles] = useState([]);
-  const [permissions, setPermissions] = useState([]);
-  const [selectedRole, setSelectedRole] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingRole, setEditingRole] = useState(null);
+  const [activeTab, setActiveTab] = useState('roles');
 
   useEffect(() => {
-    fetchData();
+    fetchRoles();
   }, []);
 
-  const fetchData = async () => {
+  const fetchRoles = async () => {
     try {
       setLoading(true);
       await simulateApiDelay(400);
       setRoles(mockRoles);
-      setPermissions(mockPermissions);
-
-      // Don't auto-select any role, user must choose
     } catch (err) {
-      console.error('Error fetching data:', err);
+      console.error('Error fetching roles:', err);
     } finally {
       setLoading(false);
     }
@@ -36,97 +29,96 @@ const RoleManagement = () => {
 
   const breadcrumbItems = [
     { label: 'Dashboard', path: '/center-head/dashboard' },
-    { label: 'Quản lý vai trò', path: '/center-head/roles' },
+    { label: 'Quản lý tài khoản', path: '/center-head/users' },
+    { label: 'Vai trò & Phân quyền', path: '/center-head/roles' },
   ];
 
-  const handleSelectRole = (role) => {
-    setSelectedRole(role);
-  };
+  const tabs = [
+    { key: 'roles', label: 'Danh sách vai trò' },
+    { key: 'permissions', label: 'Ma trận phân quyền' },
+  ];
 
-  const handleCreateRole = () => {
-    setShowCreateModal(true);
-  };
+  const roleColumns = [
+    {
+      header: 'Vai trò',
+      field: 'name',
+      render: (row) => (
+        <div>
+          <div className="fw-semibold text-neutral-900 mb-4">{row.name}</div>
+          <div className="text-sm text-neutral-600">{row.description}</div>
+        </div>
+      ),
+    },
+    {
+      header: 'Số người dùng',
+      field: 'userCount',
+      render: (row) => (
+        <span className="badge bg-main-50 text-main-600 fw-medium px-12 py-4">
+          {row.userCount} người
+        </span>
+      ),
+    },
+    {
+      header: 'Hành động',
+      field: 'actions',
+      render: (row) => (
+        <div className="d-flex gap-2">
+          <Button variant="outline" size="sm" icon="ph ph-pencil-simple">
+            Chỉnh sửa
+          </Button>
+          <Button variant="outline" size="sm" icon="ph ph-eye">
+            Xem quyền
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
-  const handleEditRole = (role) => {
-    setEditingRole(role);
-    setShowEditModal(true);
-  };
+  const renderPermissionMatrix = () => {
+    const categories = Object.keys(mockPermissionMatrix);
+    const roleNames = mockRoles.map(r => r.name);
 
-  const handleSaveNewRole = async (newRole) => {
-    await simulateApiDelay(300);
-
-    // Create a new empty permission for the new role
-    const newPermission = {
-      _id: `perm${Date.now()}`,
-      name: `${newRole.name} Permission`,
-      description: `Quyền cho vai trò ${newRole.name}`,
-      permissions: {}
-    };
-
-    const role = {
-      _id: `role${Date.now()}`,
-      name: newRole.name,
-      description: newRole.description,
-      permissionId: newPermission._id,
-      permission: newPermission,
-      userCount: 0,
-      createdAt: new Date().toISOString(),
-    };
-
-    setPermissions([...permissions, newPermission]);
-    const newRoles = [...roles, role];
-    setRoles(newRoles);
-    setSelectedRole(role);
-    setShowCreateModal(false);
-  };
-
-  const handleUpdateRole = async (updatedRole) => {
-    await simulateApiDelay(300);
-
-    const updatedRoles = roles.map(r =>
-      r._id === updatedRole._id ? updatedRole : r
+    return (
+      <div className="permission-matrix">
+        {categories.map(category => (
+          <Card key={category} className="mb-24">
+            <h6 className="mb-16 text-neutral-900 fw-bold text-uppercase">
+              {category.replace(/([A-Z])/g, ' $1').trim()}
+            </h6>
+            <div className="table-responsive">
+              <table className="table table-bordered">
+                <thead>
+                  <tr>
+                    <th className="bg-neutral-50">Chức năng</th>
+                    {roleNames.map(role => (
+                      <th key={role} className="bg-neutral-50 text-center">{role}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(mockPermissionMatrix[category]).map(([key, allowedRoles]) => (
+                    <tr key={key}>
+                      <td className="text-neutral-700">
+                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                      </td>
+                      {roleNames.map(role => (
+                        <td key={role} className="text-center">
+                          {allowedRoles.includes(role) ? (
+                            <i className="ph ph-check-circle text-success-600 text-xl"></i>
+                          ) : (
+                            <i className="ph ph-x-circle text-neutral-300 text-xl"></i>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        ))}
+      </div>
     );
-
-    setRoles(updatedRoles);
-    setSelectedRole(updatedRole);
-  };
-
-  const handleDeleteRole = async (roleId) => {
-    await simulateApiDelay(300);
-
-    const newRoles = roles.filter(r => r._id !== roleId);
-    setRoles(newRoles);
-
-    // Select first role if deleted role was selected
-    if (selectedRole?._id === roleId) {
-      setSelectedRole(newRoles.length > 0 ? newRoles[0] : null);
-    }
-  };
-
-  const handleTogglePermission = async (role, newPermissions) => {
-    // If newPermissions is a string (module name), it's the old single-toggle format
-    // We'll handle the new bulk update format where newPermissions is the entire permissions object
-
-    // Create updated permission object
-    const updatedPermission = {
-      ...role.permission,
-      permissions: newPermissions
-    };
-
-    // Update role
-    const updatedRole = {
-      ...role,
-      permission: updatedPermission
-    };
-
-    await simulateApiDelay(300);
-
-    const updatedRoles = roles.map(r =>
-      r._id === updatedRole._id ? updatedRole : r
-    );
-
-    setRoles(updatedRoles);
-    setSelectedRole(updatedRole);
   };
 
   if (loading) {
@@ -140,59 +132,34 @@ const RoleManagement = () => {
   }
 
   return (
-    <div className="role-management-page">
+    <div className="role-management-container">
       <Breadcrumb items={breadcrumbItems} />
 
-      <div className="page-header mb-24">
+      <div className="d-flex justify-content-between align-items-center mb-24">
         <div>
-          <h4 className="mb-8 text-neutral-900 fw-bold">Quản lý vai trò</h4>
+          <h4 className="mb-8 text-neutral-900 fw-bold">Quản lý vai trò & Phân quyền</h4>
           <p className="text-neutral-600 mb-0">
-            Quản lý vai trò và quyền hạn của người dùng trong hệ thống
+            Xem và quản lý vai trò, phân quyền trong hệ thống
           </p>
         </div>
+        {activeTab === 'roles' && (
+          <Button variant="primary" icon="ph ph-plus">
+            Thêm vai trò
+          </Button>
+        )}
       </div>
 
-      <div className="role-management-layout">
-        <div className="role-management-sidebar">
-          <RoleList
-            roles={roles}
-            selectedRole={selectedRole}
-            onSelectRole={handleSelectRole}
-            onCreateRole={handleCreateRole}
-            onUpdateRole={handleUpdateRole}
-            onDeleteRole={handleDeleteRole}
-            onEditRole={handleEditRole}
-          />
-        </div>
+      <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
-        <div className="role-management-main">
-          <PermissionList
-            role={selectedRole}
-            permissions={permissions}
-            onTogglePermission={handleTogglePermission}
-          />
-        </div>
+      <div className="mt-24">
+        {activeTab === 'roles' && (
+          <Card>
+            <Table columns={roleColumns} data={roles} />
+          </Card>
+        )}
+
+        {activeTab === 'permissions' && renderPermissionMatrix()}
       </div>
-
-      {/* Create Role Modal */}
-      {showCreateModal && (
-        <CreateRoleModal
-          onClose={() => setShowCreateModal(false)}
-          onSave={handleSaveNewRole}
-        />
-      )}
-
-      {/* Edit Role Modal */}
-      {showEditModal && editingRole && (
-        <EditRoleModal
-          role={editingRole}
-          onClose={() => {
-            setShowEditModal(false);
-            setEditingRole(null);
-          }}
-          onSave={handleUpdateRole}
-        />
-      )}
     </div>
   );
 };

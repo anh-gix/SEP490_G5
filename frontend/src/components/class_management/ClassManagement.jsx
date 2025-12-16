@@ -1,11 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Container, Card, Button, Form, Row, Col, Spinner, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
-<<<<<<< HEAD
-=======
-import { toast } from 'react-toastify';
-import Swal from 'sweetalert2';
->>>>>>> origin/Namvv-teacher-class-management
 import ClassList from './ClassList';
 import CreateClassModal from './CreateClassModal';
 import classService from '../../services/classService';
@@ -77,11 +72,11 @@ const ClassManagement = () => {
       setLoading(true);
       await classService.createClass(classData);
       setShowCreateModal(false);
-      toast.success('Tạo lớp học thành công!');
+      alert('Tạo lớp học thành công!');
       await fetchClasses();
     } catch (err) {
       console.error('Error creating class:', err);
-      toast.error(err.message || 'Có lỗi xảy ra khi tạo lớp học!');
+      alert(err.message || 'Có lỗi xảy ra khi tạo lớp học!');
     } finally {
       setLoading(false);
     }
@@ -89,7 +84,6 @@ const ClassManagement = () => {
 
   const handleEditClass = (classItem) => {
     navigate(`/academic/class-management/${classItem.id}/edit`);
-<<<<<<< HEAD
   };
 
   const handleDeleteClass = async (classId) => {
@@ -106,8 +100,6 @@ const ClassManagement = () => {
     } finally {
       setLoading(false);
     }
-=======
->>>>>>> origin/Namvv-teacher-class-management
   };
 
   const handleViewDetails = (classItem) => {
@@ -162,74 +154,6 @@ const ClassManagement = () => {
           </Row>
         </Card.Body>
       </Card>
-      
-      <Row className="g-3 mb-24">
-        <Col md={6} lg={3}>
-          <Card className="bg-white border border-main-200 rounded-12 box-shadow-sm transition-2 item-hover">
-            <Card.Body className="d-flex align-items-center p-20">
-              <div className="bg-main-600 text-white rounded-8 d-flex align-items-center justify-content-center me-16"
-                   style={{ width: '56px', height: '56px', minWidth: '56px' }}>
-                <i className="fas fa-chalkboard-teacher fa-lg"></i>
-              </div>
-              <div>
-                <h4 className="text-neutral-900 fw-bold mb-4">{classes.length}</h4>
-                <p className="text-neutral-500 mb-0 text-13">Tổng số lớp</p>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col md={6} lg={3}>
-          <Card className="bg-white border border-success-200 rounded-12 box-shadow-sm transition-2 item-hover">
-            <Card.Body className="d-flex align-items-center p-20">
-              <div className="bg-success-600 text-white rounded-8 d-flex align-items-center justify-content-center me-16"
-                   style={{ width: '56px', height: '56px', minWidth: '56px' }}>
-                <i className="fas fa-play-circle fa-lg"></i>
-              </div>
-              <div>
-                <h4 className="text-neutral-900 fw-bold mb-4">
-                  {classes.filter(c => c.status === 'active').length}
-                </h4>
-                <p className="text-neutral-500 mb-0 text-13">Đang học</p>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col md={6} lg={3}>
-          <Card className="bg-white border border-warning-200 rounded-12 box-shadow-sm transition-2 item-hover">
-            <Card.Body className="d-flex align-items-center p-20">
-              <div className="bg-warning-600 text-white rounded-8 d-flex align-items-center justify-content-center me-16"
-                   style={{ width: '56px', height: '56px', minWidth: '56px' }}>
-                <i className="fas fa-clock fa-lg"></i>
-              </div>
-              <div>
-                <h4 className="text-neutral-900 fw-bold mb-4">
-                  {classes.filter(c => c.status === 'pending').length}
-                </h4>
-                <p className="text-neutral-500 mb-0 text-13">Chờ khai giảng</p>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col md={6} lg={3}>
-          <Card className="bg-white border border-info-200 rounded-12 box-shadow-sm transition-2 item-hover">
-            <Card.Body className="d-flex align-items-center p-20">
-              <div className="bg-info-500 text-white rounded-8 d-flex align-items-center justify-content-center me-16"
-                   style={{ width: '56px', height: '56px', minWidth: '56px' }}>
-                <i className="fas fa-check-circle fa-lg"></i>
-              </div>
-              <div>
-                <h4 className="text-neutral-900 fw-bold mb-4">
-                  {classes.filter(c => c.status === 'completed').length}
-                </h4>
-                <p className="text-neutral-500 mb-0 text-13">Đã hoàn thành</p>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
 
       <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
         <Card.Body className="p-24">
@@ -299,15 +223,78 @@ const ClassManagement = () => {
         </Card.Body>
       </Card>
 
+      <Row className="g-3 mb-24">
+        <Col md={6} lg={3}>
+          <Card className="bg-white border border-main-200 rounded-12 box-shadow-sm transition-2 item-hover">
+            <Card.Body className="d-flex align-items-center p-20">
+              <div className="bg-main-600 text-white rounded-8 d-flex align-items-center justify-content-center me-16"
+                   style={{ width: '56px', height: '56px', minWidth: '56px' }}>
+                <i className="fas fa-chalkboard-teacher fa-lg"></i>
+              </div>
+              <div>
+                <h4 className="text-neutral-900 fw-bold mb-4">{classes.length}</h4>
+                <p className="text-neutral-500 mb-0 text-13">Tổng số lớp</p>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
 
+        <Col md={6} lg={3}>
+          <Card className="bg-white border border-success-200 rounded-12 box-shadow-sm transition-2 item-hover">
+            <Card.Body className="d-flex align-items-center p-20">
+              <div className="bg-success-600 text-white rounded-8 d-flex align-items-center justify-content-center me-16"
+                   style={{ width: '56px', height: '56px', minWidth: '56px' }}>
+                <i className="fas fa-play-circle fa-lg"></i>
+              </div>
+              <div>
+                <h4 className="text-neutral-900 fw-bold mb-4">
+                  {classes.filter(c => c.status === 'active').length}
+                </h4>
+                <p className="text-neutral-500 mb-0 text-13">Đang học</p>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+
+        <Col md={6} lg={3}>
+          <Card className="bg-white border border-warning-200 rounded-12 box-shadow-sm transition-2 item-hover">
+            <Card.Body className="d-flex align-items-center p-20">
+              <div className="bg-warning-600 text-white rounded-8 d-flex align-items-center justify-content-center me-16"
+                   style={{ width: '56px', height: '56px', minWidth: '56px' }}>
+                <i className="fas fa-clock fa-lg"></i>
+              </div>
+              <div>
+                <h4 className="text-neutral-900 fw-bold mb-4">
+                  {classes.filter(c => c.status === 'pending').length}
+                </h4>
+                <p className="text-neutral-500 mb-0 text-13">Chờ khai giảng</p>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+
+        <Col md={6} lg={3}>
+          <Card className="bg-white border border-info-200 rounded-12 box-shadow-sm transition-2 item-hover">
+            <Card.Body className="d-flex align-items-center p-20">
+              <div className="bg-info-500 text-white rounded-8 d-flex align-items-center justify-content-center me-16"
+                   style={{ width: '56px', height: '56px', minWidth: '56px' }}>
+                <i className="fas fa-check-circle fa-lg"></i>
+              </div>
+              <div>
+                <h4 className="text-neutral-900 fw-bold mb-4">
+                  {classes.filter(c => c.status === 'completed').length}
+                </h4>
+                <p className="text-neutral-500 mb-0 text-13">Đã hoàn thành</p>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
 
       <ClassList
         classes={classes}
         onEdit={handleEditClass}
-<<<<<<< HEAD
         onDelete={handleDeleteClass}
-=======
->>>>>>> origin/Namvv-teacher-class-management
         onViewDetails={handleViewDetails}
       />
 

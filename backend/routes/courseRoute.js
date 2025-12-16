@@ -35,9 +35,6 @@ router.get('/types-by-level', courseController.getTypesByLevel);
 router.get('/:id/program-plos', courseController.getProgramPLOs);
 router.put('/:id/map-plos', courseController.updateCoursePLOMapping);
 
-// MATERIALS ROUTES - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
-router.get('/:courseId/materials', courseController.getCourseMaterials);
-
 //lấy chi tiết giáo trình
 router.get('/:id/details', courseController.getCourseById);
 

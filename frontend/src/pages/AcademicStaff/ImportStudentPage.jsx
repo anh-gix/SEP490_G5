@@ -20,25 +20,3 @@ export default ImportStudentPage;
 
 
 
-<<<<<<< HEAD
-=======
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
->>>>>>> origin/Namvv-teacher-class-management

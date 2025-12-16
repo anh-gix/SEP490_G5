@@ -1,9 +1,5 @@
 import axios from 'axios';
-<<<<<<< HEAD
 
-=======
-import api from './api.js';
->>>>>>> origin/Namvv-teacher-class-management
 const API_BASE_URL = 'http://localhost:8080/api/users';
 
 // Helper to get auth token
@@ -14,21 +10,6 @@ const getAuthHeader = () => {
 
 // User service functions
 export const userService = {
-<<<<<<< HEAD
-=======
-  getUsersByRoles: async (roles) => {
-    try {
-      const rolesString = roles.join(',');
-      const response = await api.get('/users/by-roles', {
-        params: { roles: rolesString }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching users by roles:', error);
-      throw error.response?.data || { message: 'Không thể lấy danh sách nhân viên' };
-    }
-  },
->>>>>>> origin/Namvv-teacher-class-management
   // Lấy tất cả users
   getAllUsers: async () => {
     try {

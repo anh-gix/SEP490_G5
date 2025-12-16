@@ -2,8 +2,7 @@ const Program = require('../models/programModel');
 const Course = require('../models/courseModel');
 const Session = require('../models/sessionModel');
 const CamSession = require('../models/camSession');
-const WorkRequest = require('../models/workRequestModel');
-const { getBandByTypeAndLevel, getBandOptionsByType } = require('../utils/programBandMapper');
+const ApprovalRequest = require('../models/approvalRequestModel');
 
 // =========================
 // PROGRAM CRUD OPERATIONS
@@ -16,7 +15,6 @@ const { getBandByTypeAndLevel, getBandOptionsByType } = require('../utils/progra
 const getAllPrograms = async (req, res) => {
   try {
     const programs = await Program.find()
-      .populate('createdBy', 'username email phone address')
       .sort({ createdAt: -1 });
 
     // Get course count for each program
@@ -48,58 +46,6 @@ const getAllPrograms = async (req, res) => {
 };
 
 /**
- * Get programs created by current teacher
- * GET /api/programs/my-programs
- */
-const getMyPrograms = async (req, res) => {
-  try {
-    // Get teacherId from authenticated user (assuming req.user is set by auth middleware)
-    const teacherId = req.user?._id || req.query.teacherId || req.body.teacherId;
-
-    if (!teacherId) {
-      // Return empty array if no teacherId provided instead of error
-      console.warn('No teacherId provided for getMyPrograms, returning empty array');
-      return res.status(200).json({
-        success: true,
-        data: [],
-        count: 0,
-        message: 'Chưa có thông tin teacher để lọc'
-      });
-    }
-
-    const programs = await Program.find({ createdBy: teacherId })
-      .populate('createdBy', 'username email phone address')
-      .sort({ createdAt: -1 });
-
-    // Get course count for each program
-    const programsWithStats = await Promise.all(
-      programs.map(async (program) => {
-        const courseCount = await Course.countDocuments({
-          program: program._id
-        });
-        return {
-          ...program.toObject(),
-          courseCount
-        };
-      })
-    );
-
-    res.status(200).json({
-      success: true,
-      data: programsWithStats,
-      count: programs.length
-    });
-  } catch (error) {
-    console.error('Error getting my programs:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi lấy danh sách chương trình của tôi',
-      error: error.message
-    });
-  }
-};
-
-/**
  * Get program by ID with details
  * GET /api/programs/:id
  */
@@ -123,22 +69,21 @@ const getProgramById = async (req, res) => {
       .populate('sessions', 'title order')
       .select('_id courseCode name description status createdAt updatedAt clos sessions mappedPLOs');
 
-    // Get work request info if exists (use WorkRequest model)
-    const workRequest = await WorkRequest.findOne({
+    // Get approval request info if exists
+    const approvalRequest = await ApprovalRequest.findOne({
       entityId: id,
-      entityType: 'Program',
-      direction: 'bottom_up'
+      entityType: 'Program'
     })
-      .populate('requestedBy', 'username email')
-      .populate('processedBy', 'username email')
-      .sort({ requestedAt: -1 });
+      .populate('submittedBy', 'username email')
+      .populate('reviewedBy', 'username email')
+      .sort({ submittedAt: -1 });
 
     res.status(200).json({
       success: true,
       data: {
         ...program.toObject(),
         courses,
-        workRequestInfo: workRequest // Changed from approvalInfo
+        approvalInfo: approvalRequest
       }
     });
   } catch (error) {
@@ -207,16 +152,13 @@ const createProgram = async (req, res) => {
       }
     }
 
-    // Auto-calculate band if not provided
-    const finalBand = band || getBandByTypeAndLevel(type, level);
-
     const program = await Program.create({
       code,
       program_name,
       description,
       type,
       level,
-      band: finalBand,
+      band,
       plos: plos || [],
       createdBy,
       status: 'draft'  // Always create as draft
@@ -294,16 +236,8 @@ const updateProgram = async (req, res) => {
     if (description !== undefined) program.description = description;
     if (type) program.type = type;
     if (level) program.level = level;
+    if (band !== undefined) program.band = band;
     if (plos !== undefined) program.plos = plos;
-
-    // Auto-calculate band if type or level changed and band not explicitly provided
-    if ((type || level) && band === undefined) {
-      const updatedType = type || program.type;
-      const updatedLevel = level || program.level;
-      program.band = getBandByTypeAndLevel(updatedType, updatedLevel);
-    } else if (band !== undefined) {
-      program.band = band;
-    }
 
     await program.save();
 
@@ -582,50 +516,16 @@ const archiveProgram = async (req, res) => {
   }
 };
 
-/**
- * Get band options for a specific program type
- * GET /api/programs/band-options/:type
- */
-const getBandOptions = async (req, res) => {
-  try {
-    const { type } = req.params;
-
-    if (!['ielts', 'toeic', 'cam'].includes(type)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Type không hợp lệ. Chỉ chấp nhận: ielts, toeic, cam'
-      });
-    }
-
-    const bandOptions = getBandOptionsByType(type);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        type,
-        bandOptions
-      }
-    });
-  } catch (error) {
-    console.error('Error getting band options:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi lấy danh sách band options',
-      error: error.message
-    });
-  }
-};
-
 module.exports = {
   getAllPrograms,
-  getMyPrograms,
   getProgramById,
   createProgram,
   updateProgram,
   deleteProgram,
   getProgramPLOs,
+  // Helper functions
   getProgramSubmissionStatus,
+  // Program management
   activateProgram,
-  archiveProgram,
-  getBandOptions
+  archiveProgram
 };

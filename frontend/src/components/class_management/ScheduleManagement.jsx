@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Container, Card, Button, ButtonGroup, Form, Row, Col, Badge, Spinner, Alert } from 'react-bootstrap';
-import { toast } from 'react-toastify';
-import Swal from 'sweetalert2';
 import ScheduleCalendar from './ScheduleCalendar';
 import ScheduleWeekly from './ScheduleWeekly';
 import ScheduleList from './ScheduleList';
 import CreateScheduleModal from './CreateScheduleModal';
 import EditScheduleModal from './EditScheduleModal';
 import MakeupClassModal from './MakeupClassModal';
+import RoomManagement from './RoomManagement';
 import scheduleService from '../../services/scheduleService';
 import classService from '../../services/classService';
 import teacherService from '../../services/teacherService';
@@ -24,6 +23,7 @@ const ScheduleManagement = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showMakeupModal, setShowMakeupModal] = useState(false);
+  const [showRoomManagement, setShowRoomManagement] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
@@ -62,26 +62,10 @@ const ScheduleManagement = () => {
           }
         }
         
-<<<<<<< HEAD
         return {
           id: sch._id || sch.id,
           classId: sch.class?._id || sch.classId,
           className: sch.class?.name || 'N/A',
-=======
-        let className = sch.class?.name;
-        if (!className && sch.status === 'temporary') {
-          className = 'Lớp học bù';
-        } else if (!className) {
-          className = 'N/A';
-        }
-        
-        const programType = sch.class?.course?.program?.type || sch.programType || sch.sessionCourse?.program?.type || null;
-        
-        return {
-          id: sch._id || sch.id,
-          classId: sch.class?._id || sch.classId,
-          className: className,
->>>>>>> origin/Namvv-teacher-class-management
           teacherId: sch.teacher?._id || sch.class?.teacher?._id || sch.teacherId,
           teacherName: sch.teacher?.username || sch.class?.teacher?.username || 'N/A',
           roomId: sch.room?._id || sch.roomId,
@@ -92,12 +76,7 @@ const ScheduleManagement = () => {
           lessonNumber: sch.session?.order || sch.session?.sessionNumber || 0,
           lessonTopic: sch.session?.title || sch.topic || 'N/A',
           status: sch.status || 'fixed',
-<<<<<<< HEAD
           type: sch.type || 'regular'
-=======
-          type: sch.type || 'regular',
-          programType: programType
->>>>>>> origin/Namvv-teacher-class-management
         };
       });
       
@@ -154,6 +133,7 @@ const ScheduleManagement = () => {
     }
   };
 
+  // Fetch data from API
   useEffect(() => {
     const fetchData = async () => {
       await fetchSchedules();
@@ -162,6 +142,7 @@ const ScheduleManagement = () => {
       await fetchRooms();
     };
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   const handleCreateSchedule = async (scheduleData) => {
@@ -169,14 +150,14 @@ const ScheduleManagement = () => {
       setLoading(true);
       await scheduleService.createSchedule(scheduleData);
       setShowCreateModal(false);
-      toast.success('Tạo lịch học thành công!');
+      alert('Tạo lịch học thành công!');
       await fetchSchedules();
     } catch (err) {
       console.error('Error creating schedule:', err);
       if (err.message && err.message.includes('conflict')) {
-        toast.error(`Xung đột lịch học: ${err.message}`);
+        alert(`Xung đột lịch học: ${err.message}`);
       } else {
-        toast.error(err.message || 'Có lỗi xảy ra khi tạo lịch học!');
+        alert(err.message || 'Có lỗi xảy ra khi tạo lịch học!');
       }
     } finally {
       setLoading(false);
@@ -189,38 +170,27 @@ const ScheduleManagement = () => {
       await scheduleService.updateSchedule(scheduleData.id, scheduleData);
       setShowEditModal(false);
       setSelectedSchedule(null);
-      toast.success('Cập nhật lịch học thành công!');
+      alert('Cập nhật lịch học thành công!');
       await fetchSchedules();
     } catch (err) {
       console.error('Error updating schedule:', err);
-      toast.error(err.message || 'Có lỗi xảy ra khi cập nhật lịch học!');
+      alert(err.message || 'Có lỗi xảy ra khi cập nhật lịch học!');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteSchedule = async (scheduleId) => {
-    const result = await Swal.fire({
-      title: 'Xác nhận xóa',
-      text: 'Bạn có chắc chắn muốn xóa lịch học này?',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Xóa',
-      cancelButtonText: 'Hủy',
-      confirmButtonColor: '#dc3545',
-      cancelButtonColor: '#6c757d'
-    });
-    
-    if (!result.isConfirmed) return;
+    if (!window.confirm('Bạn có chắc chắn muốn xóa lịch học này?')) return;
     
     try {
       setLoading(true);
       await scheduleService.deleteSchedule(scheduleId);
-      toast.success('Xóa lịch học thành công!');
+      alert('Xóa lịch học thành công!');
       await fetchSchedules();
     } catch (err) {
       console.error('Error deleting schedule:', err);
-      toast.error(err.message || 'Có lỗi xảy ra khi xóa lịch học!');
+      alert(err.message || 'Có lỗi xảy ra khi xóa lịch học!');
     } finally {
       setLoading(false);
     }
@@ -231,11 +201,11 @@ const ScheduleManagement = () => {
       setLoading(true);
       await scheduleService.createSchedule({ ...makeupData, type: 'makeup' });
       setShowMakeupModal(false);
-      toast.success('Tạo lịch học bù thành công!');
+      alert('Tạo lịch học bù thành công!');
       await fetchSchedules();
     } catch (err) {
       console.error('Error creating makeup class:', err);
-      toast.error(err.message || 'Có lỗi xảy ra khi tạo lịch học bù!');
+      alert(err.message || 'Có lỗi xảy ra khi tạo lịch học bù!');
     } finally {
       setLoading(false);
     }
@@ -258,11 +228,13 @@ const ScheduleManagement = () => {
   };
 
   const handleExportSchedule = () => {
-    toast.info('Chức năng xuất lịch học sẽ được triển khai sau!');
+    // TODO: Implement export functionality (Excel/PDF)
+    alert('Chức năng xuất lịch học sẽ được triển khai sau!');
   };
 
   return (
     <Container fluid className="p-24">
+      {/* Loading Spinner */}
       {loading && (
         <div className="text-center py-5">
           <Spinner animation="border" variant="primary" />
@@ -270,18 +242,20 @@ const ScheduleManagement = () => {
         </div>
       )}
 
+      {/* Error Alert */}
       {error && (
         <Alert variant="danger" dismissible onClose={() => setError(null)} className="mb-24">
           <Alert.Heading>Lỗi!</Alert.Heading>
           <p>{error}</p>
         </Alert>
       )}
+
+      {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-24">
         <div>
           <h2 className="text-neutral-900 fw-bold mb-8">Quản lý lịch học</h2>
           <p className="text-neutral-500 mb-0">Sắp xếp và quản lý lịch học cho các lớp</p>
         </div>
-<<<<<<< HEAD
         <div className="d-flex gap-12">
           <Button 
             className="btn-outline-main text-15 fw-medium px-20 py-10 radius-8"
@@ -290,10 +264,9 @@ const ScheduleManagement = () => {
             <i className="fas fa-download me-2"></i> Xuất lịch học
           </Button>
         </div>
-=======
->>>>>>> origin/Namvv-teacher-class-management
       </div>
 
+      {/* Filters */}
       <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
         <Card.Body className="p-24">
           <Row className="g-3">
@@ -411,6 +384,7 @@ const ScheduleManagement = () => {
         </Card.Body>
       </Card>
 
+      {/* View Toggle */}
       <div className="d-flex justify-content-center mb-24">
         <ButtonGroup>
           <Button 
@@ -440,6 +414,7 @@ const ScheduleManagement = () => {
         </ButtonGroup>
       </div>
 
+      {/* Content */}
       <div>
         {viewMode === 'calendar' ? (
           <ScheduleCalendar 
@@ -449,6 +424,10 @@ const ScheduleManagement = () => {
               setShowEditModal(true);
             }}
             onDeleteSchedule={handleDeleteSchedule}
+            onCreateMakeup={(schedule) => {
+              setSelectedSchedule(schedule);
+              setShowMakeupModal(true);
+            }}
           />
         ) : viewMode === 'weekly' ? (
           <ScheduleWeekly 
@@ -479,6 +458,7 @@ const ScheduleManagement = () => {
         )}
       </div>
 
+      {/* Modals */}
       {showCreateModal && (
         <CreateScheduleModal
           classes={classes}
@@ -517,6 +497,14 @@ const ScheduleManagement = () => {
           }}
           onSubmit={handleCreateMakeupClass}
           existingSchedules={schedules}
+        />
+      )}
+
+      {showRoomManagement && (
+        <RoomManagement
+          rooms={rooms}
+          onClose={() => setShowRoomManagement(false)}
+          onUpdate={fetchRooms}
         />
       )}
     </Container>

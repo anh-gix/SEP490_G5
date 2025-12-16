@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import React, { useState, useEffect, useMemo } from 'react';
 import { Container, Card, Table, Badge, Spinner, Alert, Pagination, Button, Modal, Form, Row, Col, InputGroup, Accordion } from 'react-bootstrap';
 import AcademicNavigation from '../../components/class_management/AcademicNavigation.jsx';
@@ -13,16 +12,10 @@ import { studentScheduleService } from '../../services/studentScheduleService';
 import scheduleService from '../../services/scheduleService';
 import { formatDateToYYYYMMDD, parseDateString } from '../../helper/helper';
 import RequestDetailPage from './RequestDetailPage';
-=======
-import React from 'react';
-import AcademicNavigation from '../../components/class_management/AcademicNavigation.jsx';
-import RequestManagement from '../../components/class_management/RequestManagement';
->>>>>>> origin/Namvv-teacher-class-management
 
 /**
  * Request Management Page for Academic Staff
  * Quản lý đơn xin đổi buổi/lớp học
-<<<<<<< HEAD
  */
 const RequestManagementPage = () => {
   const [changeRequests, setChangeRequests] = useState([]);
@@ -4798,16 +4791,10 @@ const RequestManagementPage = () => {
     );
   }
 
-=======
- * Wrapper page - chỉ chứa layout với AcademicNavigation
- */
-const RequestManagementPage = () => {
->>>>>>> origin/Namvv-teacher-class-management
   return (
     <div className="d-flex" style={{ minHeight: '100vh' }}>
       <AcademicNavigation />
       <div className="flex-grow-1" style={{ backgroundColor: '#f8f9fa' }}>
-<<<<<<< HEAD
         <Container fluid className="p-24">
           {/* Header */}
           <div className="mb-24">
@@ -5606,16 +5593,8 @@ const RequestManagementPage = () => {
         </Container>
       </div>
     </div>
-=======
-        <RequestManagement />
-          </div>
-                    </div>
->>>>>>> origin/Namvv-teacher-class-management
   );
 };
 
 export default RequestManagementPage;
-<<<<<<< HEAD
 
-=======
->>>>>>> origin/Namvv-teacher-class-management

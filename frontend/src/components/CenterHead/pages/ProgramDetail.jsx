@@ -10,11 +10,7 @@ import { courseService } from '../../../services/courseService';
 import approvalRequestService from '../../../services/approvalRequestService';
 import { formatDate } from '../../../helper/helper';
 
-<<<<<<< HEAD
 const ProgramDetail = () => {
-=======
-const ProgramDetail = ({ viewMode = 'center-head' }) => {
->>>>>>> origin/Namvv-teacher-class-management
   const { id } = useParams();
   const navigate = useNavigate();
   const [program, setProgram] = useState(null);
@@ -31,15 +27,6 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const userRole = user.roleId?.name || user.role;
 
-<<<<<<< HEAD
-=======
-  // Determine base path based on viewMode
-  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
-
-  // Center Head should not see edit/delete buttons
-  const isViewOnly = viewMode === 'center-head' || userRole === 'Center Head';
-
->>>>>>> origin/Namvv-teacher-class-management
   useEffect(() => {
     fetchProgramDetail();
   }, [id]);
@@ -198,15 +185,9 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
   }
 
   const breadcrumbItems = [
-<<<<<<< HEAD
     { label: 'Dashboard', path: '/center-head/dashboard' },
     { label: 'Chương trình đào tạo', path: '/center-head/programs' },
     { label: program.program_name, path: `/center-head/programs/${id}` },
-=======
-    { label: 'Dashboard', path: `${basePath}/dashboard` },
-    { label: 'Chương trình đào tạo', path: `${basePath}/programs` },
-    { label: program.program_name, path: `${basePath}/programs/${id}` },
->>>>>>> origin/Namvv-teacher-class-management
   ];
 
   const courseColumns = [
@@ -262,11 +243,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
               icon="ph ph-play-circle"
               onClick={(e) => {
                 e.stopPropagation();
-<<<<<<< HEAD
                 navigate(`/center-head/programs/${id}/courses/${row._id}/edit`);
-=======
-                navigate(`${basePath}/programs/${id}/courses/${row._id}/edit`);
->>>>>>> origin/Namvv-teacher-class-management
               }}
             >
               <span className="d-none d-md-inline">Tiếp tục</span>
@@ -274,24 +251,15 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
             </Button>
           )}
 
-<<<<<<< HEAD
           {/* Completed: Show "Edit" button to edit via form - only for non-Center Head */}
           {row.status === 'completed' && userRole !== 'Center Head' && (
-=======
-          {/* Completed: Show "Edit" button to edit via form - only for non-view-only */}
-          {row.status === 'completed' && !isViewOnly && (
->>>>>>> origin/Namvv-teacher-class-management
             <Button
               variant="outline"
               size="sm"
               icon="ph ph-pencil"
               onClick={(e) => {
                 e.stopPropagation();
-<<<<<<< HEAD
                 navigate(`/center-head/programs/${id}/courses/${row._id}/edit-form`);
-=======
-                navigate(`${basePath}/programs/${id}/courses/${row._id}/edit-form`);
->>>>>>> origin/Namvv-teacher-class-management
               }}
             >
               <span className="d-none d-md-inline">Sửa</span>
@@ -306,24 +274,15 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
             icon="ph ph-eye"
             onClick={(e) => {
               e.stopPropagation();
-<<<<<<< HEAD
               navigate(`/center-head/courses/${row._id}/details`);
-=======
-              navigate(`${basePath}/courses/${row._id}/details`);
->>>>>>> origin/Namvv-teacher-class-management
             }}
           >
             <span className="d-none d-md-inline">Xem</span>
             <span className="d-inline d-md-none">👁</span>
           </Button>
 
-<<<<<<< HEAD
           {/* Delete button - only for non-Center Head */}
           {userRole !== 'Center Head' && (
-=======
-          {/* Delete button - only for non-view-only */}
-          {!isViewOnly && (
->>>>>>> origin/Namvv-teacher-class-management
             <Button
               variant="danger"
               size="sm"
@@ -475,21 +434,12 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
             </>
           )}
 
-<<<<<<< HEAD
           {/* Edit button - only for non-Center Head */}
           {userRole !== 'Center Head' && (
             <Button
               variant="outline"
               icon="ph ph-pencil-simple"
               onClick={() => navigate(`/center-head/programs/${id}/edit`)}
-=======
-          {/* Edit button - only for non-view-only */}
-          {!isViewOnly && (
-            <Button
-              variant="outline"
-              icon="ph ph-pencil-simple"
-              onClick={() => navigate(`${basePath}/programs/${id}/edit`)}
->>>>>>> origin/Namvv-teacher-class-management
             >
               Chỉnh sửa
             </Button>
@@ -518,37 +468,19 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
 
       {/* Stats Cards */}
       <div className="row g-3 g-md-4 mb-24">
-<<<<<<< HEAD
         <div className="col-6 col-md-4">
-=======
-        <div className="col-6 col-md-3">
->>>>>>> origin/Namvv-teacher-class-management
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng PLOs</h6>
             <h4 className="text-main-600 fw-bold mb-0">{program.plos?.length || 0}</h4>
           </Card>
         </div>
-<<<<<<< HEAD
         <div className="col-6 col-md-4">
-=======
-        <div className="col-6 col-md-3">
->>>>>>> origin/Namvv-teacher-class-management
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng Courses</h6>
             <h4 className="text-success-600 fw-bold mb-0">{courses.length}</h4>
           </Card>
         </div>
-<<<<<<< HEAD
         <div className="col-6 col-md-4">
-=======
-        <div className="col-6 col-md-3">
-          <Card>
-            <h6 className="text-neutral-600 mb-8">Người tạo</h6>
-            <h6 className="text-neutral-900 fw-bold mb-0">{program.createdBy?.username || 'N/A'}</h6>
-          </Card>
-        </div>
-        <div className="col-6 col-md-3">
->>>>>>> origin/Namvv-teacher-class-management
           <Card>
             <h6 className="text-neutral-600 mb-8">Cập nhật lần cuối</h6>
             <h6 className="text-neutral-600 fw-bold mb-0">{formatDate(program.updatedAt)}</h6>
@@ -607,30 +539,13 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
               Các môn học thuộc chương trình này
             </p>
           </div>
-<<<<<<< HEAD
-=======
-          {/* Show Create Course button only when program is draft or needs_revision and not view-only */}
-          {!isViewOnly && (program?.status === 'draft' || program?.status === 'needs_revision') && (
-            <Button
-              variant="primary"
-              onClick={() => navigate(`${basePath}/programs/${id}/courses/create`)}
-            >
-              <i className="ph ph-plus me-2"></i>
-              Tạo học phần mới
-            </Button>
-          )}
->>>>>>> origin/Namvv-teacher-class-management
         </div>
 
         {courses.length > 0 ? (
           <Table
             columns={courseColumns}
             data={courses}
-<<<<<<< HEAD
             onRowClick={(row) => navigate(`/center-head/courses/${row._id}/details`)}
-=======
-            onRowClick={(row) => navigate(`${basePath}/courses/${row._id}/details`)}
->>>>>>> origin/Namvv-teacher-class-management
           />
         ) : (
           <div className="text-center py-5 text-neutral-600">

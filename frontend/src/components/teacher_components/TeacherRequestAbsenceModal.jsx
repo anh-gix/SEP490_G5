@@ -1,9 +1,5 @@
 import React, { useState } from 'react';
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
-<<<<<<< HEAD
-=======
-import { useNavigate } from 'react-router-dom';
->>>>>>> origin/Namvv-teacher-class-management
 import changeRequestService from '../../services/changeRequestService';
 
 /**
@@ -11,10 +7,6 @@ import changeRequestService from '../../services/changeRequestService';
  * Modal cho phép giảng viên xin nghỉ dạy
  */
 const TeacherRequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
-<<<<<<< HEAD
-=======
-  const navigate = useNavigate();
->>>>>>> origin/Namvv-teacher-class-management
   const [formData, setFormData] = useState({
     description: ''
   });
@@ -54,11 +46,7 @@ const TeacherRequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
 
       // Prepare request data
       const requestData = {
-<<<<<<< HEAD
         type: 'replace_teacher',
-=======
-        type: 'request_replace_teacher',
->>>>>>> origin/Namvv-teacher-class-management
         classScheduleId: schedule.classScheduleId,
         content: formData.description
       };
@@ -79,12 +67,6 @@ const TeacherRequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
         }
 
         onHide();
-<<<<<<< HEAD
-=======
-        
-        // Redirect to applications page with success state
-        navigate('/teacher/applications', { state: { showSuccessToast: true } });
->>>>>>> origin/Namvv-teacher-class-management
       } else {
         setError(response.message || 'Có lỗi xảy ra khi gửi đơn xin nghỉ. Vui lòng thử lại.');
       }
@@ -220,7 +202,6 @@ const TeacherRequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
               Cung cấp thông tin chi tiết giúp giáo vụ xử lý đơn nhanh hơn
             </Form.Text>
           </Form.Group>
-<<<<<<< HEAD
 
           {/* Important Notice */}
           <Alert variant="info" className="bg-info-50 border-info-200 rounded-8 mb-0">
@@ -247,8 +228,6 @@ const TeacherRequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
               </div>
             </div>
           </Alert>
-=======
->>>>>>> origin/Namvv-teacher-class-management
         </Form>
       </Modal.Body>
 
@@ -287,11 +266,3 @@ const TeacherRequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
 
 export default TeacherRequestAbsenceModal;
 
-<<<<<<< HEAD
-=======
-
-
-
-
-
->>>>>>> origin/Namvv-teacher-class-management

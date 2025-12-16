@@ -2,21 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
-<<<<<<< HEAD
 import approvalRequestService from '../../../services/approvalRequestService';
 import { formatDate } from '../../../helper/helper';
 
 const ApprovalRequests = () => {
   const navigate = useNavigate();
-=======
-import { workRequestService } from '../../../services/workRequestService';
-import { formatDate } from '../../../helper/helper';
-import CreateWorkRequestModal from './CreateWorkRequestModal';
-
-const ApprovalRequests = () => {
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('bottom_up'); // 'bottom_up' or 'top_down'
->>>>>>> origin/Namvv-teacher-class-management
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -39,46 +29,21 @@ const ApprovalRequests = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
-<<<<<<< HEAD
   const [approveNote, setApproveNote] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [reviewNote, setReviewNote] = useState('');
-=======
-  const [showRevokeModal, setShowRevokeModal] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [approveNote, setApproveNote] = useState('');
-  const [rejectReason, setRejectReason] = useState('');
-  const [reviewNote, setReviewNote] = useState('');
-  const [revokeReason, setRevokeReason] = useState('');
->>>>>>> origin/Namvv-teacher-class-management
   const [actionLoading, setActionLoading] = useState(false);
 
   // Statistics
   const [stats, setStats] = useState({
-<<<<<<< HEAD
     pending: 0,
     approved: 0,
     rejected: 0
-=======
-    // Bottom-up stats
-    pendingApprovals: 0,
-    approved: 0,
-    rejected: 0,
-    // Top-down stats
-    pendingTasks: 0,
-    inProgressTasks: 0,
-    pendingApprovalTasks: 0,
-    completedTasks: 0
->>>>>>> origin/Namvv-teacher-class-management
   });
 
   useEffect(() => {
     fetchRequests();
-<<<<<<< HEAD
   }, [statusFilter, typeFilter, fromDate, toDate, currentPage, itemsPerPage]);
-=======
-  }, [activeTab, statusFilter, typeFilter, fromDate, toDate, currentPage, itemsPerPage]);
->>>>>>> origin/Namvv-teacher-class-management
 
   useEffect(() => {
     fetchStats();
@@ -89,10 +54,6 @@ const ApprovalRequests = () => {
       setLoading(true);
 
       const params = {
-<<<<<<< HEAD
-=======
-        direction: activeTab,
->>>>>>> origin/Namvv-teacher-class-management
         page: currentPage,
         limit: itemsPerPage
       };
@@ -102,11 +63,7 @@ const ApprovalRequests = () => {
         params.status = statusFilter;
       }
       if (typeFilter && typeFilter !== 'all') {
-<<<<<<< HEAD
         params.type = typeFilter;
-=======
-        params.requestType = typeFilter;
->>>>>>> origin/Namvv-teacher-class-management
       }
       if (fromDate) {
         params.fromDate = fromDate;
@@ -115,11 +72,7 @@ const ApprovalRequests = () => {
         params.toDate = toDate;
       }
 
-<<<<<<< HEAD
       const response = await approvalRequestService.getPendingRequests(params);
-=======
-      const response = await workRequestService.getAllRequests(params);
->>>>>>> origin/Namvv-teacher-class-management
 
       if (response.success) {
         setRequests(response.data);
@@ -137,34 +90,12 @@ const ApprovalRequests = () => {
 
   const fetchStats = async () => {
     try {
-<<<<<<< HEAD
       const response = await approvalRequestService.getStats();
       if (response.success) {
         setStats({
           pending: response.data.pending || 0,
           approved: response.data.approved || 0,
           rejected: response.data.rejected || 0
-=======
-      const response = await workRequestService.getStats();
-      if (response.success) {
-        const data = response.data;
-
-        // Bottom-up stats
-        const bottomUpStats = data.byDirection?.bottom_up || {};
-        // Top-down stats
-        const topDownStats = data.byDirection?.top_down || {};
-
-        setStats({
-          // Bottom-up
-          pendingApprovals: bottomUpStats.pending || 0,
-          approved: bottomUpStats.approved || 0,
-          rejected: bottomUpStats.rejected || 0,
-          // Top-down
-          pendingTasks: topDownStats.pending || 0,
-          inProgressTasks: topDownStats.in_progress || 0,
-          pendingApprovalTasks: topDownStats.pending_approval || 0,
-          completedTasks: topDownStats.completed || 0
->>>>>>> origin/Namvv-teacher-class-management
         });
       }
     } catch (error) {
@@ -182,13 +113,8 @@ const ApprovalRequests = () => {
 
     try {
       setActionLoading(true);
-<<<<<<< HEAD
       const response = await approvalRequestService.approveRequest(selectedRequest._id, {
         note: approveNote.trim() || undefined
-=======
-      const response = await workRequestService.approveRequest(selectedRequest._id, {
-        responseNote: approveNote.trim() || undefined
->>>>>>> origin/Namvv-teacher-class-management
       });
 
       if (response.success) {
@@ -216,15 +142,9 @@ const ApprovalRequests = () => {
 
     try {
       setActionLoading(true);
-<<<<<<< HEAD
       const response = await approvalRequestService.rejectRequest(selectedRequest._id, {
         reason: rejectReason.trim(),
         note: reviewNote.trim() || undefined
-=======
-      const response = await workRequestService.rejectRequest(selectedRequest._id, {
-        rejectionReason: rejectReason.trim(),
-        responseNote: reviewNote.trim() || undefined
->>>>>>> origin/Namvv-teacher-class-management
       });
 
       if (response.success) {
@@ -245,51 +165,9 @@ const ApprovalRequests = () => {
     }
   };
 
-<<<<<<< HEAD
   const handleViewProgramDetail = () => {
     if (selectedRequest?.entityId?._id) {
       navigate(`/center-head/programs/${selectedRequest.entityId._id}`);
-=======
-  const handleRevoke = async () => {
-    if (!selectedRequest || !revokeReason.trim()) {
-      alert('Vui lòng nhập lý do thu hồi phê duyệt');
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      const response = await workRequestService.revokeApproval(selectedRequest._id, {
-        reason: revokeReason.trim()
-      });
-
-      if (response.success) {
-        alert('Đã thu hồi phê duyệt thành công! Yêu cầu đã chuyển về trạng thái chờ duyệt.');
-        setShowRevokeModal(false);
-        setShowDetailModal(false);
-        setRevokeReason('');
-        setSelectedRequest(null);
-        fetchRequests();
-        fetchStats();
-      }
-    } catch (error) {
-      console.error('Error revoking approval:', error);
-      alert(error.message || 'Có lỗi xảy ra khi thu hồi phê duyệt');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleViewEntityDetail = () => {
-    if (!selectedRequest) return;
-
-    const { entityType, entityId } = selectedRequest;
-
-    if (entityType === 'Program' && entityId?._id) {
-      navigate(`/center-head/programs/${entityId._id}`);
-    } else if (entityType === 'Exam' && entityId?._id) {
-      // Navigate to exam detail if route exists
-      navigate(`/center-head/exams/${entityId._id}`);
->>>>>>> origin/Namvv-teacher-class-management
     }
   };
 
@@ -316,19 +194,9 @@ const ApprovalRequests = () => {
 
   const getStatusBadge = (status) => {
     const badges = {
-<<<<<<< HEAD
       pending: { class: 'bg-warning-subtle text-warning', text: 'Chờ duyệt' },
       approved: { class: 'bg-success-subtle text-success', text: 'Đã duyệt' },
       rejected: { class: 'bg-danger-subtle text-danger', text: 'Từ chối' }
-=======
-      pending: { class: 'bg-warning-subtle text-warning', text: 'Chờ xử lý' },
-      in_progress: { class: 'bg-info-subtle text-info', text: 'Đang làm' },
-      pending_approval: { class: 'bg-primary-subtle text-primary', text: 'Chờ duyệt' },
-      approved: { class: 'bg-success-subtle text-success', text: 'Đã duyệt' },
-      rejected: { class: 'bg-danger-subtle text-danger', text: 'Từ chối' },
-      completed: { class: 'bg-success-subtle text-success', text: 'Hoàn thành' },
-      need_revision: { class: 'bg-secondary-subtle text-secondary', text: 'Cần sửa' }
->>>>>>> origin/Namvv-teacher-class-management
     };
     const badge = badges[status] || badges.pending;
     return (
@@ -338,27 +206,11 @@ const ApprovalRequests = () => {
     );
   };
 
-<<<<<<< HEAD
-=======
-  const getRequestTypeName = (type) => {
-    const names = {
-      program: 'Chương trình',
-      exam: 'Đề thi',
-      create_program: 'Tạo chương trình',
-      edit_course: 'Chỉnh sửa khóa học',
-      create_exam: 'Tạo đề thi',
-      assign_students: 'Sắp xếp học viên'
-    };
-    return names[type] || type;
-  };
-
->>>>>>> origin/Namvv-teacher-class-management
   // Filter requests by search query (client-side)
   const filteredRequests = requests.filter(req => {
     if (!searchQuery.trim()) return true;
 
     const query = searchQuery.toLowerCase();
-<<<<<<< HEAD
     const entityName = req.entityId?.program_name || req.entityId?.name || '';
     const submitterName = req.submittedBy?.name || '';
     const submitterEmail = req.submittedBy?.email || '';
@@ -367,18 +219,6 @@ const ApprovalRequests = () => {
       entityName.toLowerCase().includes(query) ||
       submitterName.toLowerCase().includes(query) ||
       submitterEmail.toLowerCase().includes(query)
-=======
-    const entityName = req.entityId?.program_name || req.entityId?.name || req.entityId?.title || '';
-    const requesterName = req.requestedBy?.username || req.requestedBy?.name || '';
-    const requesterEmail = req.requestedBy?.email || '';
-    const assigneeName = req.assignedTo?.username || req.assignedTo?.name || '';
-
-    return (
-      entityName.toLowerCase().includes(query) ||
-      requesterName.toLowerCase().includes(query) ||
-      requesterEmail.toLowerCase().includes(query) ||
-      assigneeName.toLowerCase().includes(query)
->>>>>>> origin/Namvv-teacher-class-management
     );
   });
 
@@ -398,7 +238,6 @@ const ApprovalRequests = () => {
   return (
     <div className="approval-requests-container">
       {/* Header Section */}
-<<<<<<< HEAD
       <div className="mb-4 pb-3 border-bottom">
         <h2 className="fw-bold mb-2">Yêu cầu phê duyệt</h2>
         <p className="text-muted mb-0">Quản lý yêu cầu phê duyệt chương trình và đề thi</p>
@@ -452,179 +291,6 @@ const ApprovalRequests = () => {
           </Card>
         </div>
       </div>
-=======
-      <div className="mb-4 pb-3 border-bottom d-flex justify-content-between align-items-center">
-        <div>
-          <h2 className="fw-bold mb-2">Quản lý yêu cầu</h2>
-          <p className="text-muted mb-0">Phê duyệt và theo dõi tiến độ công việc</p>
-        </div>
-        {activeTab === 'top_down' && (
-          <Button
-            variant="primary"
-            onClick={() => setShowCreateModal(true)}
-          >
-            <i className="ph ph-plus me-2"></i>
-            Tạo yêu cầu mới
-          </Button>
-        )}
-      </div>
-
-      {/* Tabs Navigation */}
-      <div className="mb-4">
-        <ul className="nav nav-tabs nav-tabs-custom">
-          <li className="nav-item">
-            <button
-              className={`nav-link ${activeTab === 'bottom_up' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('bottom_up');
-                setCurrentPage(1);
-                setStatusFilter('all');
-              }}
-            >
-              <i className="ph ph-arrow-circle-up me-2"></i>
-              Yêu cầu phê duyệt
-              {stats.pendingApprovals > 0 && (
-                <span className="badge bg-warning text-dark ms-2 rounded-pill">
-                  {stats.pendingApprovals}
-                </span>
-              )}
-            </button>
-          </li>
-          <li className="nav-item">
-            <button
-              className={`nav-link ${activeTab === 'top_down' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('top_down');
-                setCurrentPage(1);
-                setStatusFilter('all');
-              }}
-            >
-              <i className="ph ph-arrow-circle-down me-2"></i>
-              Công việc đã giao
-              {(stats.pendingTasks + stats.inProgressTasks + stats.pendingApprovalTasks) > 0 && (
-                <span className="badge bg-info text-dark ms-2 rounded-pill">
-                  {stats.pendingTasks + stats.inProgressTasks + stats.pendingApprovalTasks}
-                </span>
-              )}
-            </button>
-          </li>
-        </ul>
-      </div>
-
-      {/* Stats Cards Section */}
-      {activeTab === 'bottom_up' ? (
-        <div className="row g-4 mb-5">
-          <div className="col-md-4">
-            <Card>
-              <div className="p-4">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div>
-                    <div className="text-muted small mb-1">Chờ duyệt</div>
-                    <div className="h3 fw-bold text-warning mb-0">{stats.pendingApprovals}</div>
-                  </div>
-                  <div className="text-warning" style={{ fontSize: '2.5rem', opacity: 0.2 }}>
-                    <i className="ph ph-clock"></i>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-          <div className="col-md-4">
-            <Card>
-              <div className="p-4">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div>
-                    <div className="text-muted small mb-1">Đã duyệt</div>
-                    <div className="h3 fw-bold text-success mb-0">{stats.approved}</div>
-                  </div>
-                  <div className="text-success" style={{ fontSize: '2.5rem', opacity: 0.2 }}>
-                    <i className="ph ph-check-circle"></i>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-          <div className="col-md-4">
-            <Card>
-              <div className="p-4">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div>
-                    <div className="text-muted small mb-1">Từ chối</div>
-                    <div className="h3 fw-bold text-danger mb-0">{stats.rejected}</div>
-                  </div>
-                  <div className="text-danger" style={{ fontSize: '2.5rem', opacity: 0.2 }}>
-                    <i className="ph ph-x-circle"></i>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </div>
-      ) : (
-        <div className="row g-4 mb-5">
-          <div className="col-md-3">
-            <Card>
-              <div className="p-4">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div>
-                    <div className="text-muted small mb-1">Chưa nhận</div>
-                    <div className="h3 fw-bold text-warning mb-0">{stats.pendingTasks}</div>
-                  </div>
-                  <div className="text-warning" style={{ fontSize: '2.5rem', opacity: 0.2 }}>
-                    <i className="ph ph-hourglass"></i>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-          <div className="col-md-3">
-            <Card>
-              <div className="p-4">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div>
-                    <div className="text-muted small mb-1">Đang làm</div>
-                    <div className="h3 fw-bold text-info mb-0">{stats.inProgressTasks}</div>
-                  </div>
-                  <div className="text-info" style={{ fontSize: '2.5rem', opacity: 0.2 }}>
-                    <i className="ph ph-spinner"></i>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-          <div className="col-md-3">
-            <Card>
-              <div className="p-4">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div>
-                    <div className="text-muted small mb-1">Chờ duyệt lại</div>
-                    <div className="h3 fw-bold text-primary mb-0">{stats.pendingApprovalTasks}</div>
-                  </div>
-                  <div className="text-primary" style={{ fontSize: '2.5rem', opacity: 0.2 }}>
-                    <i className="ph ph-eye"></i>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-          <div className="col-md-3">
-            <Card>
-              <div className="p-4">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div>
-                    <div className="text-muted small mb-1">Hoàn thành</div>
-                    <div className="h3 fw-bold text-success mb-0">{stats.completedTasks}</div>
-                  </div>
-                  <div className="text-success" style={{ fontSize: '2.5rem', opacity: 0.2 }}>
-                    <i className="ph ph-check-circle"></i>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </div>
-      )}
->>>>>>> origin/Namvv-teacher-class-management
 
       {/* Filters Section */}
       <Card className="mb-4">
@@ -637,11 +303,7 @@ const ApprovalRequests = () => {
               <input
                 type="text"
                 className="form-control"
-<<<<<<< HEAD
                 placeholder="Tìm theo tên, người nộp..."
-=======
-                placeholder={activeTab === 'bottom_up' ? "Tìm theo tên, người nộp..." : "Tìm theo tên, người được giao..."}
->>>>>>> origin/Namvv-teacher-class-management
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -659,27 +321,9 @@ const ApprovalRequests = () => {
                 }}
               >
                 <option value="all">Tất cả</option>
-<<<<<<< HEAD
                 <option value="pending">Chờ duyệt</option>
                 <option value="approved">Đã duyệt</option>
                 <option value="rejected">Từ chối</option>
-=======
-                {activeTab === 'bottom_up' ? (
-                  <>
-                    <option value="pending">Chờ duyệt</option>
-                    <option value="approved">Đã duyệt</option>
-                    <option value="rejected">Từ chối</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="pending">Chưa nhận</option>
-                    <option value="in_progress">Đang làm</option>
-                    <option value="pending_approval">Chờ duyệt lại</option>
-                    <option value="approved">Đã duyệt</option>
-                    <option value="completed">Hoàn thành</option>
-                  </>
-                )}
->>>>>>> origin/Namvv-teacher-class-management
               </select>
             </div>
           </div>
@@ -711,24 +355,8 @@ const ApprovalRequests = () => {
                     }}
                   >
                     <option value="all">Tất cả</option>
-<<<<<<< HEAD
                     <option value="program">Chương trình</option>
                     <option value="exam">Đề thi</option>
-=======
-                    {activeTab === 'bottom_up' ? (
-                      <>
-                        <option value="program">Chương trình</option>
-                        <option value="exam">Đề thi</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="create_program">Tạo chương trình</option>
-                        <option value="edit_course">Chỉnh sửa khóa học</option>
-                        <option value="create_exam">Tạo đề thi</option>
-                        <option value="assign_students">Sắp xếp học viên</option>
-                      </>
-                    )}
->>>>>>> origin/Namvv-teacher-class-management
                   </select>
                 </div>
 
@@ -782,10 +410,7 @@ const ApprovalRequests = () => {
           <div className="d-flex justify-content-between align-items-center">
             <div>
               <strong>{totalItems}</strong> yêu cầu
-<<<<<<< HEAD
               {(statusFilter && statusFilter !== 'all') && ` - ${getStatusBadge(statusFilter).props.children}`}
-=======
->>>>>>> origin/Namvv-teacher-class-management
             </div>
             <div className="d-flex align-items-center gap-2">
               <label className="mb-0 small text-muted">Hiển thị:</label>
@@ -817,15 +442,9 @@ const ApprovalRequests = () => {
                 <tr>
                   <th className="fw-semibold">Loại</th>
                   <th className="fw-semibold">Tên</th>
-<<<<<<< HEAD
                   <th className="fw-semibold">Người nộp</th>
                   <th className="fw-semibold">Trạng thái</th>
                   <th className="fw-semibold">Ngày nộp</th>
-=======
-                  <th className="fw-semibold">{activeTab === 'bottom_up' ? 'Người nộp' : 'Người được giao'}</th>
-                  <th className="fw-semibold">Trạng thái</th>
-                  <th className="fw-semibold">Ngày tạo</th>
->>>>>>> origin/Namvv-teacher-class-management
                   <th className="fw-semibold"></th>
                 </tr>
               </thead>
@@ -838,7 +457,6 @@ const ApprovalRequests = () => {
                   >
                     <td>
                       <span className="badge bg-primary-subtle text-primary px-3 py-2 rounded-pill">
-<<<<<<< HEAD
                         {request.requestType === 'program' ? 'Chương trình' : 'Đề thi'}
                       </span>
                     </td>
@@ -852,32 +470,6 @@ const ApprovalRequests = () => {
                     </td>
                     <td>{getStatusBadge(request.status)}</td>
                     <td className="text-muted">{formatDate(request.submittedAt)}</td>
-=======
-                        {getRequestTypeName(request.requestType)}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="fw-medium">
-                        {request.entityId?.program_name || request.entityId?.name || request.entityId?.title || 'N/A'}
-                      </div>
-                      <small className="text-muted">{request.entityType || 'N/A'}</small>
-                    </td>
-                    <td>
-                      {activeTab === 'bottom_up' ? (
-                        <>
-                          <div className="fw-medium">{request.requestedBy?.username || request.requestedBy?.name || 'N/A'}</div>
-                          <small className="text-muted">{request.requestedBy?.email || ''}</small>
-                        </>
-                      ) : (
-                        <>
-                          <div className="fw-medium">{request.assignedTo?.username || request.assignedTo?.name || 'Chưa giao'}</div>
-                          <small className="text-muted">{request.assignedTo?.email || ''}</small>
-                        </>
-                      )}
-                    </td>
-                    <td>{getStatusBadge(request.status)}</td>
-                    <td className="text-muted">{formatDate(request.requestedAt)}</td>
->>>>>>> origin/Namvv-teacher-class-management
                     <td>
                       <i className="ph ph-caret-right text-muted"></i>
                     </td>
@@ -981,11 +573,7 @@ const ApprovalRequests = () => {
                 <div>
                   <h5 className="modal-title fw-bold mb-1">Chi tiết yêu cầu</h5>
                   <p className="text-muted small mb-0">
-<<<<<<< HEAD
                     {selectedRequest.entityId?.program_name || selectedRequest.entityId?.name}
-=======
-                    {selectedRequest.entityId?.program_name || selectedRequest.entityId?.name || selectedRequest.entityId?.title || 'N/A'}
->>>>>>> origin/Namvv-teacher-class-management
                   </p>
                 </div>
                 <button
@@ -1000,17 +588,6 @@ const ApprovalRequests = () => {
 
               {/* Modal Body */}
               <div className="modal-body">
-<<<<<<< HEAD
-=======
-                {/* Direction Badge */}
-                <div className="mb-3">
-                  <span className={`badge ${selectedRequest.direction === 'bottom_up' ? 'bg-info' : 'bg-purple'} text-white px-3 py-2`}>
-                    <i className={`ph ${selectedRequest.direction === 'bottom_up' ? 'ph-arrow-circle-up' : 'ph-arrow-circle-down'} me-2`}></i>
-                    {selectedRequest.direction === 'bottom_up' ? 'Yêu cầu phê duyệt' : 'Công việc được giao'}
-                  </span>
-                </div>
-
->>>>>>> origin/Namvv-teacher-class-management
                 {/* Status and Type */}
                 <div className="row g-3 mb-4 pb-4 border-bottom">
                   <div className="col-6">
@@ -1019,18 +596,13 @@ const ApprovalRequests = () => {
                   </div>
                   <div className="col-6">
                     <label className="form-label text-muted small text-uppercase fw-semibold">Loại</label>
-<<<<<<< HEAD
                     <p className="mb-0 fw-medium">
                       {selectedRequest.requestType === 'program' ? 'Chương trình' : 'Đề thi'}
                     </p>
-=======
-                    <p className="mb-0 fw-medium">{getRequestTypeName(selectedRequest.requestType)}</p>
->>>>>>> origin/Namvv-teacher-class-management
                   </div>
                 </div>
 
                 {/* Entity Info */}
-<<<<<<< HEAD
                 <div className="mb-4 pb-4 border-bottom">
                   <h6 className="fw-semibold mb-3">
                     <i className="ph ph-info me-2"></i>
@@ -1109,93 +681,6 @@ const ApprovalRequests = () => {
                         <label className="form-label text-muted small text-uppercase">Ghi chú phê duyệt</label>
                         <div className="p-3 bg-light rounded border">
                           {selectedRequest.reviewNote}
-=======
-                {selectedRequest.entityId && (
-                  <div className="mb-4 pb-4 border-bottom">
-                    <h6 className="fw-semibold mb-3">
-                      <i className="ph ph-info me-2"></i>
-                      Thông tin {selectedRequest.entityType}
-                    </h6>
-                    <div className="row g-3">
-                      <div className="col-6">
-                        <label className="form-label text-muted small text-uppercase">Tên</label>
-                        <p className="mb-0">{selectedRequest.entityId?.program_name || selectedRequest.entityId?.name || selectedRequest.entityId?.title}</p>
-                      </div>
-                      <div className="col-6">
-                        <label className="form-label text-muted small text-uppercase">Mã</label>
-                        <p className="mb-0">{selectedRequest.entityId?.code || 'N/A'}</p>
-                      </div>
-                    </div>
-                    <div className="mt-3">
-                      <button
-                        className="btn btn-link p-0 text-decoration-none"
-                        onClick={handleViewEntityDetail}
-                      >
-                        <i className="ph ph-arrow-square-out me-2"></i>
-                        Xem chi tiết
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Request Info */}
-                <div className="mb-4 pb-4 border-bottom">
-                  <h6 className="fw-semibold mb-3">
-                    <i className="ph ph-user me-2"></i>
-                    Thông tin yêu cầu
-                  </h6>
-                  <div className="row g-3">
-                    <div className="col-6">
-                      <label className="form-label text-muted small text-uppercase">Người tạo</label>
-                      <p className="mb-0 fw-medium">{selectedRequest.requestedBy?.username || selectedRequest.requestedBy?.name}</p>
-                      <small className="text-muted">{selectedRequest.requestedBy?.email}</small>
-                    </div>
-                    {selectedRequest.direction === 'top_down' && selectedRequest.assignedTo && (
-                      <div className="col-6">
-                        <label className="form-label text-muted small text-uppercase">Người được giao</label>
-                        <p className="mb-0 fw-medium">{selectedRequest.assignedTo?.username || selectedRequest.assignedTo?.name}</p>
-                        <small className="text-muted">{selectedRequest.assignedTo?.email}</small>
-                      </div>
-                    )}
-                    <div className="col-6">
-                      <label className="form-label text-muted small text-uppercase">Ngày tạo</label>
-                      <p className="mb-0">{formatDate(selectedRequest.requestedAt)}</p>
-                    </div>
-                  </div>
-                  {selectedRequest.requestNote && (
-                    <div className="mt-3">
-                      <label className="form-label text-muted small text-uppercase">Ghi chú</label>
-                      <div className="p-3 bg-light rounded border">
-                        {selectedRequest.requestNote}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Response Info (if processed) */}
-                {selectedRequest.processedBy && (
-                  <div className="mb-4 pb-4 border-bottom">
-                    <h6 className="fw-semibold mb-3">
-                      <i className="ph ph-check-square me-2"></i>
-                      Thông tin xử lý
-                    </h6>
-                    <div className="row g-3">
-                      <div className="col-6">
-                        <label className="form-label text-muted small text-uppercase">Người xử lý</label>
-                        <p className="mb-0 fw-medium">{selectedRequest.processedBy?.username || selectedRequest.processedBy?.name}</p>
-                        <small className="text-muted">{selectedRequest.processedBy?.email}</small>
-                      </div>
-                      <div className="col-6">
-                        <label className="form-label text-muted small text-uppercase">Ngày xử lý</label>
-                        <p className="mb-0">{formatDate(selectedRequest.processedAt)}</p>
-                      </div>
-                    </div>
-                    {selectedRequest.responseNote && (
-                      <div className="mt-3">
-                        <label className="form-label text-muted small text-uppercase">Phản hồi</label>
-                        <div className="p-3 bg-light rounded border">
-                          {selectedRequest.responseNote}
->>>>>>> origin/Namvv-teacher-class-management
                         </div>
                       </div>
                     )}
@@ -1210,39 +695,6 @@ const ApprovalRequests = () => {
                   </div>
                 )}
 
-<<<<<<< HEAD
-=======
-                {/* Revocation Info (if revoked) */}
-                {selectedRequest.revocation?.revokedBy && (
-                  <div className="mb-4 pb-4 border-bottom">
-                    <h6 className="fw-semibold mb-3 text-warning">
-                      <i className="ph ph-arrow-counter-clockwise me-2"></i>
-                      Thông tin thu hồi phê duyệt
-                    </h6>
-                    <div className="alert alert-warning border-warning">
-                      <div className="row g-3">
-                        <div className="col-6">
-                          <label className="form-label text-muted small text-uppercase">Người thu hồi</label>
-                          <p className="mb-0 fw-medium">{selectedRequest.revocation.revokedBy?.username || selectedRequest.revocation.revokedBy?.name || 'N/A'}</p>
-                        </div>
-                        <div className="col-6">
-                          <label className="form-label text-muted small text-uppercase">Ngày thu hồi</label>
-                          <p className="mb-0">{formatDate(selectedRequest.revocation.revokedAt)}</p>
-                        </div>
-                      </div>
-                      {selectedRequest.revocation.revocationReason && (
-                        <div className="mt-3">
-                          <label className="form-label text-warning-emphasis small text-uppercase fw-semibold">Lý do thu hồi</label>
-                          <div className="p-3 bg-white rounded border border-warning">
-                            {selectedRequest.revocation.revocationReason}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
->>>>>>> origin/Namvv-teacher-class-management
                 {/* History */}
                 {selectedRequest.history && selectedRequest.history.length > 0 && (
                   <div>
@@ -1256,11 +708,7 @@ const ApprovalRequests = () => {
                           <div className="d-flex justify-content-between align-items-start">
                             <div>
                               <p className="mb-1 fw-medium text-capitalize">
-<<<<<<< HEAD
                                 {entry.action} bởi {entry.performedBy?.name}
-=======
-                                {entry.action} bởi {entry.performedBy?.username || entry.performedBy?.name}
->>>>>>> origin/Namvv-teacher-class-management
                               </p>
                               <small className="text-muted">
                                 {formatDate(entry.performedAt)}
@@ -1282,15 +730,8 @@ const ApprovalRequests = () => {
                 )}
               </div>
 
-<<<<<<< HEAD
               {/* Modal Footer - Actions for Pending */}
               {selectedRequest.status === 'pending' && (
-=======
-              {/* Modal Footer - Actions */}
-              {/* Actions for pending requests */}
-              {((activeTab === 'bottom_up' && selectedRequest.status === 'pending') ||
-                (activeTab === 'top_down' && selectedRequest.status === 'pending_approval')) && (
->>>>>>> origin/Namvv-teacher-class-management
                 <div className="modal-footer border-top">
                   <Button
                     variant="success"
@@ -1314,39 +755,11 @@ const ApprovalRequests = () => {
                   </Button>
                 </div>
               )}
-<<<<<<< HEAD
-=======
-
-              {/* Actions for approved requests - Revoke option */}
-              {activeTab === 'bottom_up' && selectedRequest.status === 'approved' && (
-                <div className="modal-footer border-top bg-light">
-                  <div className="w-100">
-                    <div className="alert alert-info mb-3">
-                      <i className="ph ph-info me-2"></i>
-                      Yêu cầu này đã được duyệt. Bạn có thể thu hồi phê duyệt nếu phát hiện sai sót.
-                    </div>
-                    <div className="d-flex justify-content-end">
-                      <Button
-                        variant="warning"
-                        onClick={() => {
-                          setShowDetailModal(false);
-                          setShowRevokeModal(true);
-                        }}
-                      >
-                        <i className="ph ph-arrow-counter-clockwise me-2"></i>
-                        Thu hồi phê duyệt
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
->>>>>>> origin/Namvv-teacher-class-management
             </div>
           </div>
         </div>
       )}
 
-<<<<<<< HEAD
       {/* Approve Modal */}
       {showApproveModal && selectedRequest && (
         <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
@@ -1354,23 +767,6 @@ const ApprovalRequests = () => {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Duyệt yêu cầu</h5>
-=======
-      {/* Approve Modal - Enhanced with detailed confirmation */}
-      {showApproveModal && selectedRequest && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content">
-              <div className="modal-header bg-success-subtle">
-                <div>
-                  <h5 className="modal-title fw-bold text-success">
-                    <i className="ph ph-check-circle me-2"></i>
-                    Xác nhận duyệt yêu cầu
-                  </h5>
-                  <p className="text-muted small mb-0 mt-1">
-                    Vui lòng kiểm tra kỹ thông tin trước khi phê duyệt
-                  </p>
-                </div>
->>>>>>> origin/Namvv-teacher-class-management
                 <button
                   type="button"
                   className="btn-close"
@@ -1383,7 +779,6 @@ const ApprovalRequests = () => {
                 ></button>
               </div>
               <div className="modal-body">
-<<<<<<< HEAD
                 <p className="text-muted mb-3">
                   Bạn có chắc chắn muốn duyệt yêu cầu này không?
                 </p>
@@ -1398,68 +793,6 @@ const ApprovalRequests = () => {
                 />
               </div>
               <div className="modal-footer">
-=======
-                {/* Request Summary */}
-                <div className="alert alert-info border-info mb-4">
-                  <div className="d-flex align-items-start">
-                    <i className="ph ph-info fs-4 me-3 mt-1"></i>
-                    <div className="flex-grow-1">
-                      <h6 className="fw-bold mb-2">Thông tin yêu cầu</h6>
-                      <div className="row g-2">
-                        <div className="col-6">
-                          <small className="text-muted d-block">Loại:</small>
-                          <strong>{getRequestTypeName(selectedRequest.requestType)}</strong>
-                        </div>
-                        <div className="col-6">
-                          <small className="text-muted d-block">Tên:</small>
-                          <strong>{selectedRequest.entityId?.program_name || selectedRequest.entityId?.name || selectedRequest.entityId?.title || 'N/A'}</strong>
-                        </div>
-                        <div className="col-6">
-                          <small className="text-muted d-block">Người nộp:</small>
-                          <strong>{selectedRequest.requestedBy?.username || selectedRequest.requestedBy?.name}</strong>
-                        </div>
-                        <div className="col-6">
-                          <small className="text-muted d-block">Ngày nộp:</small>
-                          <strong>{formatDate(selectedRequest.requestedAt)}</strong>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Warning message */}
-                <div className="alert alert-warning border-warning mb-4">
-                  <div className="d-flex align-items-start">
-                    <i className="ph ph-warning fs-4 me-3 mt-1"></i>
-                    <div>
-                      <h6 className="fw-bold mb-2">Lưu ý quan trọng</h6>
-                      <ul className="mb-0 ps-3">
-                        <li>Sau khi duyệt, {selectedRequest.requestType === 'program' ? 'chương trình' : 'đề thi'} sẽ chuyển sang trạng thái "Đã duyệt"</li>
-                        <li>Bạn có thể <strong>thu hồi phê duyệt</strong> nếu phát hiện sai sót (trước khi {selectedRequest.requestType === 'program' ? 'chương trình' : 'đề thi'} được kích hoạt)</li>
-                        <li>Vui lòng kiểm tra kỹ nội dung trước khi phê duyệt</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Note input */}
-                <div>
-                  <label className="form-label fw-semibold">Ghi chú phê duyệt (Tùy chọn)</label>
-                  <textarea
-                    className="form-control"
-                    rows="3"
-                    placeholder="Thêm ghi chú hoặc nhận xét về việc phê duyệt..."
-                    value={approveNote}
-                    onChange={(e) => setApproveNote(e.target.value)}
-                    disabled={actionLoading}
-                  />
-                  <small className="text-muted">
-                    Ghi chú này sẽ được gửi cho người nộp yêu cầu
-                  </small>
-                </div>
-              </div>
-              <div className="modal-footer border-top">
->>>>>>> origin/Namvv-teacher-class-management
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -1469,10 +802,6 @@ const ApprovalRequests = () => {
                   }}
                   disabled={actionLoading}
                 >
-<<<<<<< HEAD
-=======
-                  <i className="ph ph-x me-2"></i>
->>>>>>> origin/Namvv-teacher-class-management
                   Hủy
                 </Button>
                 <Button
@@ -1480,10 +809,6 @@ const ApprovalRequests = () => {
                   onClick={handleApprove}
                   disabled={actionLoading}
                 >
-<<<<<<< HEAD
-=======
-                  <i className="ph ph-check me-2"></i>
->>>>>>> origin/Namvv-teacher-class-management
                   {actionLoading ? 'Đang xử lý...' : 'Xác nhận duyệt'}
                 </Button>
               </div>
@@ -1560,163 +885,6 @@ const ApprovalRequests = () => {
           </div>
         </div>
       )}
-<<<<<<< HEAD
-=======
-
-      {/* Revoke Approval Modal */}
-      {showRevokeModal && selectedRequest && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content">
-              <div className="modal-header bg-warning-subtle">
-                <div>
-                  <h5 className="modal-title fw-bold text-warning-emphasis">
-                    <i className="ph ph-arrow-counter-clockwise me-2"></i>
-                    Thu hồi phê duyệt
-                  </h5>
-                  <p className="text-muted small mb-0 mt-1">
-                    Yêu cầu sẽ được chuyển về trạng thái chờ duyệt
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => {
-                    setShowRevokeModal(false);
-                    setShowDetailModal(true);
-                    setRevokeReason('');
-                  }}
-                  disabled={actionLoading}
-                ></button>
-              </div>
-              <div className="modal-body">
-                {/* Request Info */}
-                <div className="alert alert-warning border-warning mb-4">
-                  <div className="d-flex align-items-start">
-                    <i className="ph ph-warning-circle fs-4 me-3 mt-1"></i>
-                    <div className="flex-grow-1">
-                      <h6 className="fw-bold mb-2">Thông tin yêu cầu</h6>
-                      <div className="row g-2">
-                        <div className="col-6">
-                          <small className="text-muted d-block">Loại:</small>
-                          <strong>{getRequestTypeName(selectedRequest.requestType)}</strong>
-                        </div>
-                        <div className="col-6">
-                          <small className="text-muted d-block">Tên:</small>
-                          <strong>{selectedRequest.entityId?.program_name || selectedRequest.entityId?.name || selectedRequest.entityId?.title || 'N/A'}</strong>
-                        </div>
-                        <div className="col-6">
-                          <small className="text-muted d-block">Người nộp:</small>
-                          <strong>{selectedRequest.requestedBy?.username || selectedRequest.requestedBy?.name}</strong>
-                        </div>
-                        <div className="col-6">
-                          <small className="text-muted d-block">Đã duyệt lúc:</small>
-                          <strong>{formatDate(selectedRequest.processedAt)}</strong>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Warning about revocation */}
-                <div className="alert alert-danger border-danger mb-4">
-                  <div className="d-flex align-items-start">
-                    <i className="ph ph-warning fs-4 me-3 mt-1"></i>
-                    <div>
-                      <h6 className="fw-bold mb-2 text-danger">Lưu ý khi thu hồi phê duyệt</h6>
-                      <ul className="mb-0 ps-3">
-                        <li>Yêu cầu sẽ chuyển về trạng thái <strong>"Chờ duyệt"</strong></li>
-                        <li>{selectedRequest.requestType === 'program' ? 'Chương trình' : 'Đề thi'} sẽ chuyển về trạng thái <strong>"Chờ phê duyệt"</strong></li>
-                        <li>Bạn có thể duyệt lại hoặc từ chối yêu cầu này sau khi thu hồi</li>
-                        <li>Hành động này sẽ được ghi lại trong lịch sử</li>
-                        <li className="text-danger fw-bold">Chỉ thu hồi được nếu {selectedRequest.requestType === 'program' ? 'chương trình' : 'đề thi'} chưa được kích hoạt</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Revocation reason */}
-                <div>
-                  <label className="form-label text-danger fw-semibold">
-                    Lý do thu hồi phê duyệt *
-                  </label>
-                  <textarea
-                    className="form-control"
-                    rows="4"
-                    placeholder="Nhập lý do thu hồi phê duyệt (ví dụ: Phát hiện sai sót trong nội dung, cần kiểm tra lại...)"
-                    value={revokeReason}
-                    onChange={(e) => setRevokeReason(e.target.value)}
-                    disabled={actionLoading}
-                    required
-                  />
-                  <small className="text-muted">
-                    Lý do này sẽ được gửi cho người nộp yêu cầu và lưu trong lịch sử
-                  </small>
-                </div>
-              </div>
-              <div className="modal-footer border-top">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowRevokeModal(false);
-                    setShowDetailModal(true);
-                    setRevokeReason('');
-                  }}
-                  disabled={actionLoading}
-                >
-                  <i className="ph ph-x me-2"></i>
-                  Hủy
-                </Button>
-                <Button
-                  variant="warning"
-                  onClick={handleRevoke}
-                  disabled={actionLoading || !revokeReason.trim()}
-                >
-                  <i className="ph ph-arrow-counter-clockwise me-2"></i>
-                  {actionLoading ? 'Đang xử lý...' : 'Xác nhận thu hồi'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create Work Request Modal */}
-      <CreateWorkRequestModal
-        show={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={() => {
-          fetchRequests();
-          fetchStats();
-        }}
-      />
-
-      <style jsx>{`
-        .nav-tabs-custom {
-          border-bottom: 2px solid #dee2e6;
-        }
-        .nav-tabs-custom .nav-link {
-          border: none;
-          color: #6c757d;
-          padding: 1rem 1.5rem;
-          font-weight: 500;
-          border-bottom: 3px solid transparent;
-          transition: all 0.2s;
-        }
-        .nav-tabs-custom .nav-link:hover {
-          color: #0d6efd;
-          background-color: #f8f9fa;
-        }
-        .nav-tabs-custom .nav-link.active {
-          color: #0d6efd;
-          border-bottom-color: #0d6efd;
-          background-color: transparent;
-        }
-        .bg-purple {
-          background-color: #6f42c1;
-        }
-      `}</style>
->>>>>>> origin/Namvv-teacher-class-management
     </div>
   );
 };

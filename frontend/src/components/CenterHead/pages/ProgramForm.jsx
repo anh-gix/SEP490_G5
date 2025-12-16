@@ -8,21 +8,11 @@ import Badge from '../compo/Badge';
 import Tabs from '../compo/Tabs';
 import programService from '../../../services/programService';
 
-<<<<<<< HEAD
 const ProgramFormNew = () => {
-=======
-const ProgramFormNew = ({ viewMode = 'center-head' }) => {
->>>>>>> origin/Namvv-teacher-class-management
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = Boolean(id);
 
-<<<<<<< HEAD
-=======
-  // Determine base path
-  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
-
->>>>>>> origin/Namvv-teacher-class-management
   // Form state
   const [formData, setFormData] = useState({
     code: '',
@@ -49,13 +39,8 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
 
   // Breadcrumb
   const breadcrumbItems = [
-<<<<<<< HEAD
     { label: 'Dashboard', path: '/center-head/dashboard' },
     { label: 'Quản lý chương trình', path: '/center-head/programs' },
-=======
-    { label: 'Dashboard', path: `${basePath}/dashboard` },
-    { label: 'Quản lý chương trình', path: `${basePath}/programs` },
->>>>>>> origin/Namvv-teacher-class-management
     { label: isEdit ? 'Chỉnh sửa chương trình' : 'Tạo chương trình mới' }
   ];
 
@@ -83,11 +68,7 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
         } catch (error) {
           console.error('Error loading program:', error);
           alert('Không thể tải thông tin chương trình!');
-<<<<<<< HEAD
           navigate('/center-head/programs');
-=======
-          navigate(`${basePath}/programs`);
->>>>>>> origin/Namvv-teacher-class-management
         } finally {
           setLoading(false);
         }
@@ -164,11 +145,7 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
       return;
     }
 
-<<<<<<< HEAD
     navigate(`/center-head/programs/${id}/courses/create`);
-=======
-    navigate(`${basePath}/programs/${id}/courses/create`);
->>>>>>> origin/Namvv-teacher-class-management
   };
 
   // ==================== Form Submission ====================
@@ -227,17 +204,10 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
 
         if (addCourse) {
           // Navigate to course wizard
-<<<<<<< HEAD
           navigate(`/center-head/programs/${newProgramId}/courses/create`);
         } else {
           // Go back to program list
           navigate('/center-head/programs');
-=======
-          navigate(`${basePath}/programs/${newProgramId}/courses/create`);
-        } else {
-          // Go back to program list
-          navigate(`${basePath}/programs`);
->>>>>>> origin/Namvv-teacher-class-management
         }
         return;
       }
@@ -523,11 +493,7 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
                   </thead>
                   <tbody>
                     {formData.courses.map(course => (
-<<<<<<< HEAD
                       <tr key={course._id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/center-head/courses/${course._id}/details`)}>
-=======
-                      <tr key={course._id} style={{ cursor: 'pointer' }} onClick={() => navigate(`${basePath}/courses/${course._id}/details`)}>
->>>>>>> origin/Namvv-teacher-class-management
                         <td className="px-16 py-12">
                           <Badge variant="primary">{course.courseCode}</Badge>
                         </td>

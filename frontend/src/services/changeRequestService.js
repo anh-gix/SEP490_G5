@@ -25,20 +25,6 @@ api.interceptors.request.use(
 );
 
 const changeRequestService = {
-<<<<<<< HEAD
-=======
-  // Get stats (counts) for change requests
-  getStats: async (params = {}) => {
-    try {
-      const response = await api.get('/change-requests/stats', { params });
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching change request stats:', error);
-      throw error.response?.data || error.message;
-    }
-  },
-
->>>>>>> origin/Namvv-teacher-class-management
   // Get all change requests with optional filters
   getAllChangeRequests: async (params = {}) => {
     try {
@@ -82,20 +68,6 @@ const changeRequestService = {
       throw error.response?.data || error.message;
     }
   },
-<<<<<<< HEAD
-=======
-
-  // Get my change requests (for students - filtered by current user)
-  getMyChangeRequests: async (params = {}) => {
-    try {
-      const response = await api.get('/change-requests', { params });
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching my change requests:', error);
-      throw error.response?.data || error.message;
-    }
-  },
->>>>>>> origin/Namvv-teacher-class-management
 };
 
 export default changeRequestService;

@@ -1,19 +1,9 @@
-<<<<<<< HEAD
 import React, { useState, useEffect, useMemo } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Nav, Tabs, Tab, Pagination, ButtonGroup, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import studentService from '../../services/studentService';
 import { courseService } from '../../services/courseService';
 import ScheduleCalendar from './ScheduleCalendar';
-=======
-import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Pagination, Alert } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import Swal from 'sweetalert2';
-import studentService from '../../services/studentService';
-import { courseService } from '../../services/courseService';
->>>>>>> origin/Namvv-teacher-class-management
 
 /**
  * Student Management Component with API Integration
@@ -27,16 +17,12 @@ const StudentManagementAPI = () => {
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('list');
   const [showModal, setShowModal] = useState(false);
-<<<<<<< HEAD
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentSchedule, setStudentSchedule] = useState([]);
   const [schedulePage, setSchedulePage] = useState(1);
   const [scheduleViewMode, setScheduleViewMode] = useState('calendar'); // 'table' or 'calendar'
-=======
-  const [editingStudent, setEditingStudent] = useState(null); // Always null - editing disabled
->>>>>>> origin/Namvv-teacher-class-management
   const [searchTerm, setSearchTerm] = useState('');
   const [programType, setProgramType] = useState('');
   const [level, setLevel] = useState('');
@@ -53,10 +39,6 @@ const StudentManagementAPI = () => {
     address: ''
   });
   const [formErrors, setFormErrors] = useState({});
-<<<<<<< HEAD
-=======
-  const [filterNoClass, setFilterNoClass] = useState(null); // null = all, true = no class only
->>>>>>> origin/Namvv-teacher-class-management
 
   // Fetch program types and levels on mount
   useEffect(() => {
@@ -121,62 +103,30 @@ const StudentManagementAPI = () => {
   useEffect(() => {
     setPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-<<<<<<< HEAD
   }, [searchTerm, programType, level]);
-=======
-  }, [searchTerm, programType, level, filterNoClass]);
->>>>>>> origin/Namvv-teacher-class-management
 
   useEffect(() => {
     fetchStudents();
     fetchStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-<<<<<<< HEAD
   }, [searchTerm, programType, level, page]);
-=======
-  }, [searchTerm, programType, level, page, filterNoClass]);
->>>>>>> origin/Namvv-teacher-class-management
 
   const fetchStudents = async () => {
     try {
       setLoading(true);
       setError(null);
-<<<<<<< HEAD
       const params = {
         page,
         limit: 10
       };
-=======
-      const params = {};
-      
-      // When filtering by noClass, fetch all students to filter on frontend
-      if (filterNoClass === true) {
-        params.limit = 10000; // Fetch all students
-        params.page = 1; // Start from page 1
-      } else {
-        params.page = page;
-        params.limit = 10;
-      }
-      
->>>>>>> origin/Namvv-teacher-class-management
       if (searchTerm) params.search = searchTerm;
       if (programType) params.programType = programType;
       if (level) params.level = level;
       
       const data = await studentService.getAllStudents(params);
       setStudents(data.students || []);
-<<<<<<< HEAD
       setTotal(data.total || 0);
       setTotalPages(data.totalPages || 1);
-=======
-      
-      // Only set total/totalPages from API when not filtering by noClass
-      // When filtering by noClass, we'll calculate these after filtering
-      if (filterNoClass !== true) {
-        setTotal(data.total || 0);
-        setTotalPages(data.totalPages || 1);
-      }
->>>>>>> origin/Namvv-teacher-class-management
     } catch (err) {
       console.error('Error fetching students:', err);
       // Handle 404 errors more gracefully
@@ -254,24 +204,17 @@ const StudentManagementAPI = () => {
     // Clear previous errors
     setFormErrors({});
     
-<<<<<<< HEAD
     // Validate password
     if (!formData.password) {
       setFormErrors({ password: 'Vui lòng nhập mật khẩu!' });
       return;
     }
     
-=======
->>>>>>> origin/Namvv-teacher-class-management
     try {
       setLoading(true);
       await studentService.createStudent(formData);
       
       // Success - close modal and refresh
-<<<<<<< HEAD
-=======
-      toast.success('Thêm học viên thành công!');
->>>>>>> origin/Namvv-teacher-class-management
       handleCloseModal();
       fetchStudents();
       fetchStats();
@@ -280,10 +223,6 @@ const StudentManagementAPI = () => {
       const errorMessage = err?.message || err?.response?.data?.message || 'Không thể lưu thông tin Học viên';
       const parsedErrors = parseErrorToField(errorMessage);
       setFormErrors(parsedErrors);
-<<<<<<< HEAD
-=======
-      toast.error(errorMessage);
->>>>>>> origin/Namvv-teacher-class-management
     } finally {
       setLoading(false);
     }
@@ -320,7 +259,6 @@ const StudentManagementAPI = () => {
   //   }
   // };
 
-<<<<<<< HEAD
   const handleViewDetail = async (student) => {
     try {
       setLoading(true);
@@ -339,10 +277,6 @@ const StudentManagementAPI = () => {
     } finally {
       setLoading(false);
     }
-=======
-  const handleViewDetail = (student) => {
-    navigate(`/academic/student-management/${student._id}`);
->>>>>>> origin/Namvv-teacher-class-management
   };
 
   const handleCloseModal = () => {
@@ -358,7 +292,6 @@ const StudentManagementAPI = () => {
     setFormErrors({});
   };
 
-<<<<<<< HEAD
   const filteredStudents = students;
 
   // Transform schedule data for calendar view
@@ -398,37 +331,6 @@ const StudentManagementAPI = () => {
       };
     });
   }, [studentSchedule]);
-=======
-  // Handle click on stats cards to filter students
-  const handleStatsCardClick = (filterType) => {
-    if (filterType === 'all') {
-      setFilterNoClass(null);
-    } else if (filterType === 'noClass') {
-      setFilterNoClass(true);
-    }
-    setPage(1); // Reset to first page when filter changes
-  };
-
-  // Filter students based on filterNoClass
-  const allFilteredStudents = filterNoClass === true
-    ? students.filter(student => !student.stats?.classNames || student.stats.classNames.length === 0)
-    : students;
-
-  // Calculate total and totalPages for filtered results
-  useEffect(() => {
-    if (filterNoClass === true) {
-      const filteredCount = students.filter(student => !student.stats?.classNames || student.stats.classNames.length === 0).length;
-      setTotal(filteredCount);
-      setTotalPages(Math.ceil(filteredCount / 10));
-    }
-  }, [filterNoClass, students]);
-
-  // Paginate filtered students
-  const filteredStudents = filterNoClass === true
-    ? allFilteredStudents.slice((page - 1) * 10, page * 10)
-    : allFilteredStudents;
-
->>>>>>> origin/Namvv-teacher-class-management
 
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#f8f9fa' }}>
@@ -461,22 +363,8 @@ const StudentManagementAPI = () => {
 
       {/* Stats Cards */}
       <Row className="g-3 mb-24">
-<<<<<<< HEAD
         <Col md={3}>
           <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-=======
-        <Col md={6}>
-          <Card 
-            className="bg-white rounded-12 box-shadow-sm"
-            style={{ 
-              cursor: 'pointer',
-              border: filterNoClass === null ? '3px solid #0D74FF' : '2px solid #E5E7EB',
-              boxShadow: filterNoClass === null ? '0 4px 16px rgba(13, 116, 255, 0.4)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-              transition: 'all 0.2s ease'
-            }}
-            onClick={() => handleStatsCardClick('all')}
-          >
->>>>>>> origin/Namvv-teacher-class-management
             <Card.Body className="p-20">
               <div className="d-flex align-items-center gap-16">
                 <div 
@@ -487,11 +375,7 @@ const StudentManagementAPI = () => {
                     background: 'linear-gradient(135deg, #0D74FF 0%, #0A5FD9 100%)'
                   }}
                 >
-<<<<<<< HEAD
                   <i className="fas fa-chalkboard-Student text-white" style={{ fontSize: '24px' }}></i>
-=======
-                  <i className="fas fa-user-graduate text-white" style={{ fontSize: '24px' }}></i>
->>>>>>> origin/Namvv-teacher-class-management
                 </div>
                 <div>
                   <div className="text-neutral-500 text-13 mb-4">Tổng Học viên</div>
@@ -502,7 +386,6 @@ const StudentManagementAPI = () => {
           </Card>
         </Col>
 
-<<<<<<< HEAD
         <Col md={3}>
           <Card className="bg-white border-0 rounded-12 box-shadow-sm">
             <Card.Body className="p-20">
@@ -551,19 +434,6 @@ const StudentManagementAPI = () => {
 
         <Col md={3}>
           <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-=======
-        <Col md={6}>
-          <Card 
-            className="bg-white rounded-12 box-shadow-sm"
-            style={{ 
-              cursor: 'pointer',
-              border: filterNoClass === true ? '3px solid #EF4444' : '2px solid #E5E7EB',
-              boxShadow: filterNoClass === true ? '0 4px 16px rgba(239, 68, 68, 0.4)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-              transition: 'all 0.2s ease'
-            }}
-            onClick={() => handleStatsCardClick('noClass')}
-          >
->>>>>>> origin/Namvv-teacher-class-management
             <Card.Body className="p-20">
               <div className="d-flex align-items-center gap-16">
                 <div 
@@ -577,11 +447,7 @@ const StudentManagementAPI = () => {
                   <i className="fas fa-user-slash text-white" style={{ fontSize: '24px' }}></i>
                 </div>
                 <div>
-<<<<<<< HEAD
                   <div className="text-neutral-500 text-13 mb-4">Tạm nghỉ</div>
-=======
-                  <div className="text-neutral-500 text-13 mb-4">Chưa có lớp</div>
->>>>>>> origin/Namvv-teacher-class-management
                   <div className="text-neutral-900 fw-bold text-32">{stats.inactive || 0}</div>
                 </div>
               </div>
@@ -721,10 +587,7 @@ const StudentManagementAPI = () => {
                       onClick={() => handleViewDetail(student)}
                       className="flex-grow-1"
                     >
-<<<<<<< HEAD
                       <i className="fas fa-eye me-1"></i>
-=======
->>>>>>> origin/Namvv-teacher-class-management
                       Chi tiết
                     </Button>
                   </div>
@@ -783,10 +646,7 @@ const StudentManagementAPI = () => {
                           size="sm"
                           onClick={() => handleViewDetail(student)}
                         >
-<<<<<<< HEAD
                           <i className="fas fa-eye me-1"></i>
-=======
->>>>>>> origin/Namvv-teacher-class-management
                           Chi tiết
                         </Button>
                       </div>
@@ -906,28 +766,15 @@ const StudentManagementAPI = () => {
               <Col md={6}>
                 <Form.Group>
                   <Form.Label>
-<<<<<<< HEAD
                     Mật khẩu {!editingStudent && <span className="text-danger">*</span>}
-=======
-                    Mật khẩu
-                    {!editingStudent && (
-                      <span className="text-muted" style={{ fontSize: '12px', fontWeight: 'normal' }}>
-                        {' '}(Mặc định: 123456)
-                      </span>
-                    )}
->>>>>>> origin/Namvv-teacher-class-management
                   </Form.Label>
                   <Form.Control
                     type="password"
                     name="password"
                     value={formData.password}
                     onChange={handleInputChange}
-<<<<<<< HEAD
                     placeholder={editingStudent ? "Để trống nếu không đổi" : "Nhập mật khẩu"}
                     required={!editingStudent}
-=======
-                    placeholder={editingStudent ? "Để trống nếu không đổi" : "Để trống sẽ dùng mật khẩu mặc định: 123456"}
->>>>>>> origin/Namvv-teacher-class-management
                     isInvalid={!!formErrors.password}
                   />
                   {formErrors.password && (
@@ -935,14 +782,6 @@ const StudentManagementAPI = () => {
                       {formErrors.password}
                     </Form.Control.Feedback>
                   )}
-<<<<<<< HEAD
-=======
-                  {!editingStudent && (
-                    <Form.Text className="text-muted">
-                      Nếu không nhập, mật khẩu mặc định sẽ là: <strong>123456</strong>
-                    </Form.Text>
-                  )}
->>>>>>> origin/Namvv-teacher-class-management
                 </Form.Group>
               </Col>
 
@@ -992,7 +831,6 @@ const StudentManagementAPI = () => {
           </Modal.Footer>
         </Form>
       </Modal>
-<<<<<<< HEAD
 
       {/* Student Detail Modal */}
       <Modal show={showDetailModal} onHide={() => { setShowDetailModal(false); setSchedulePage(1); }} size="xl">
@@ -1235,8 +1073,6 @@ const StudentManagementAPI = () => {
           </Button>
         </Modal.Footer>
       </Modal>
-=======
->>>>>>> origin/Namvv-teacher-class-management
     </Container>
   );
 };

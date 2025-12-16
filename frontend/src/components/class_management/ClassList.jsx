@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, Button, Badge, ProgressBar, Dropdown } from 'react-bootstrap';
 
-const ClassList = ({ classes, onEdit, onViewDetails }) => {
+const ClassList = ({ classes, onEdit, onDelete, onViewDetails }) => {
   const getStatusText = (status) => {
     const statusMap = {
       pending: 'Chờ khai giảng',
@@ -74,8 +74,17 @@ const ClassList = ({ classes, onEdit, onViewDetails }) => {
                       label={`${classItem.completionRate.toFixed(1)}%`}
                       className="bg-neutral-50"
                       style={{ height: '8px' }}
-                      variant="success"
-                    />
+                    >
+                      <div 
+                        className="bg-success-600"
+                        style={{ 
+                          width: `${classItem.completionRate}%`,
+                          height: '100%',
+                          borderRadius: '4px',
+                          transition: 'width 0.3s ease'
+                        }}
+                      />
+                    </ProgressBar>
                   </div>
                 )}
               </Card.Body>
@@ -85,6 +94,7 @@ const ClassList = ({ classes, onEdit, onViewDetails }) => {
                   className="btn-outline-main flex-fill text-13 fw-medium px-16 py-8 radius-8"
                   onClick={() => onViewDetails(classItem)}
                 >
+                  <i className="fas fa-eye me-1"></i>
                   Chi tiết
                 </Button>
                 <Button 
@@ -93,7 +103,6 @@ const ClassList = ({ classes, onEdit, onViewDetails }) => {
                 >
                   <i className="fas fa-edit"></i>
                 </Button>
-<<<<<<< HEAD
                 {classItem.status === 'pending' && (
                   <Button 
                     className="btn-outline-danger text-13 fw-medium px-12 py-8 radius-8"
@@ -102,8 +111,6 @@ const ClassList = ({ classes, onEdit, onViewDetails }) => {
                     <i className="fas fa-trash"></i>
                   </Button>
                 )}
-=======
->>>>>>> origin/Namvv-teacher-class-management
               </Card.Footer>
             </Card>
           </div>

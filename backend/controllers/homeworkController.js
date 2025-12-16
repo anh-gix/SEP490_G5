@@ -10,7 +10,7 @@ const mongoose = require('mongoose');
 exports.addHomeworkToSchedule = async (req, res) => {
   try {
     const { scheduleId } = req.params;
-    const { title, description, deadline } = req.body;
+    const { title, deadline } = req.body;
     
     // Validate required fields
     if (!title || !deadline) {
@@ -39,7 +39,6 @@ exports.addHomeworkToSchedule = async (req, res) => {
       _id: new mongoose.Types.ObjectId(),
       assignment: {
         title: title,
-        description: description || '',
         files: assignmentFiles.map(f => `/uploads/homeworks/${f.filename}`)
       },
       deadline: new Date(deadline),
@@ -75,7 +74,7 @@ exports.addHomeworkToSchedule = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(' Lỗi khi thêm homework:', error);
+    console.error('❌ Lỗi khi thêm homework:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi thêm bài tập',
@@ -91,7 +90,7 @@ exports.addHomeworkToSchedule = async (req, res) => {
 exports.updateHomework = async (req, res) => {
   try {
     const { scheduleId, homeworkId } = req.params;
-    const { title, description, deadline } = req.body;
+    const { title, deadline } = req.body;
 
     const schedule = await ClassSchedule.findById(scheduleId);
     
@@ -113,7 +112,6 @@ exports.updateHomework = async (req, res) => {
 
     // Update fields
     if (title) homework.assignment.title = title;
-    if (description !== undefined) homework.assignment.description = description;
     if (deadline) homework.deadline = new Date(deadline);
 
     // Handle file deletion
@@ -162,7 +160,7 @@ exports.updateHomework = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(' Lỗi khi cập nhật homework:', error);
+    console.error('❌ Lỗi khi cập nhật homework:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi cập nhật bài tập',
@@ -207,10 +205,10 @@ exports.deleteHomework = async (req, res) => {
         classSchedule: scheduleId,
         homeworkId: homeworkId
       });
-      console.log(` Đã xóa ${deleteResult.deletedCount} bài nộp liên quan`);
+      console.log(`✅ Đã xóa ${deleteResult.deletedCount} bài nộp liên quan`);
     } catch (submissionError) {
       // Log error but don't fail the homework deletion
-      console.log(' Lỗi khi xóa submissions (không ảnh hưởng):', submissionError.message);
+      console.log('⚠️ Lỗi khi xóa submissions (không ảnh hưởng):', submissionError.message);
     }
 
     res.status(200).json({
@@ -219,7 +217,7 @@ exports.deleteHomework = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(' Lỗi khi xóa homework:', error);
+    console.error('❌ Lỗi khi xóa homework:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi xóa bài tập',
@@ -251,7 +249,7 @@ exports.getHomeworkSubmissions = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(' Lỗi khi lấy danh sách submissions:', error);
+    console.error('❌ Lỗi khi lấy danh sách submissions:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy danh sách bài nộp',
@@ -289,7 +287,6 @@ exports.getTeacherAssignments = async (req, res) => {
       'homework.0': { $exists: true }
     })
       .populate('class', 'name')
-      .populate('session', 'title order')
       .populate({
         path: 'class',
         populate: {
@@ -332,15 +329,12 @@ exports.getTeacherAssignments = async (req, res) => {
             _id: hw._id,
             scheduleId: schedule._id,
             title: hw.assignment.title,
-            description: hw.assignment.description || '',
             assignmentFiles: hw.assignment.files || [],
             answerFiles: hw.answerFiles || [],
             deadline: hw.deadline,
             className: schedule.class?.name,
             courseName: schedule.class?.course?.name,
             courseCode: schedule.class?.course?.courseCode,
-            lessonNumber: schedule.session?.order,
-            lessonTitle: schedule.session?.title,
             totalStudents,
             submitted,
             pending: totalStudents - submitted,
@@ -360,7 +354,7 @@ exports.getTeacherAssignments = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(' Lỗi khi lấy danh sách assignments:', error);
+    console.error('❌ Lỗi khi lấy danh sách assignments:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy danh sách bài tập',
@@ -407,7 +401,7 @@ exports.getClassSchedules = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(' Lỗi khi lấy danh sách schedules:', error);
+    console.error('❌ Lỗi khi lấy danh sách schedules:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy danh sách buổi học',

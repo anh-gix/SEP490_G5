@@ -1,76 +1,13 @@
-<<<<<<< HEAD
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8080/api/approval-requests';
 
 // Approval Request service functions
-=======
-/**
- * Approval Request Service (UPDATED - Now uses WorkRequest API)
- *
- * This file has been updated to use the new WorkRequest API while maintaining
- * backward compatibility with existing components.
- *
- * MIGRATION NOTE:
- * - Old API: /api/approval-requests (still works for backward compatibility)
- * - New API: /api/work-requests (recommended)
- * - This service now uses workRequestService under the hood
- * - Field mapping is handled automatically (submittedBy → requestedBy, etc.)
- *
- * FOR NEW COMPONENTS:
- * - Import workRequestService directly: import { workRequestService } from './workRequestService'
- * - Use new field names: requestedBy, processedBy, requestedAt, processedAt, etc.
- */
-
-import { workRequestService } from './workRequestService';
-
-/**
- * Maps WorkRequest response to old ApprovalRequest format for backward compatibility
- */
-function mapWorkRequestToApproval(workRequest) {
-  if (!workRequest) return null;
-
-  return {
-    _id: workRequest._id,
-    requestType: workRequest.requestType,
-    entityType: workRequest.entityType,
-    entityId: workRequest.entityId,
-
-    // Map field names: new → old
-    submittedBy: workRequest.requestedBy,
-    submittedAt: workRequest.requestedAt,
-    submissionNote: workRequest.requestNote,
-
-    reviewedBy: workRequest.processedBy,
-    reviewedAt: workRequest.processedAt,
-    reviewNote: workRequest.responseNote,
-
-    status: workRequest.status,
-    rejectionReason: workRequest.rejectionReason,
-    history: workRequest.history,
-
-    createdAt: workRequest.createdAt,
-    updatedAt: workRequest.updatedAt,
-
-    // Include new fields for gradual migration
-    __isWorkRequest: true,
-    __originalData: workRequest
-  };
-}
-
-function mapWorkRequestsToApprovals(workRequests) {
-  if (!Array.isArray(workRequests)) return [];
-  return workRequests.map(mapWorkRequestToApproval);
-}
-
-// Approval Request service functions (backward compatible)
->>>>>>> origin/Namvv-teacher-class-management
 export const approvalRequestService = {
   // =========================
   // SUBMIT FOR APPROVAL
   // =========================
 
-<<<<<<< HEAD
   /**
    * Submit program for approval
    * @param {string} programId - Program ID
@@ -109,29 +46,12 @@ export const approvalRequestService = {
     } catch (error) {
       throw error.response?.data || { message: 'Không thể nộp đề thi' };
     }
-=======
-  submitProgram: async (programId, data = {}) => {
-    const response = await workRequestService.submitProgram(programId, data);
-    return {
-      ...response,
-      data: mapWorkRequestToApproval(response.data)
-    };
-  },
-
-  submitExam: async (examId, data = {}) => {
-    const response = await workRequestService.submitExam(examId, data);
-    return {
-      ...response,
-      data: mapWorkRequestToApproval(response.data)
-    };
->>>>>>> origin/Namvv-teacher-class-management
   },
 
   // =========================
   // GET REQUESTS
   // =========================
 
-<<<<<<< HEAD
   /**
    * Get all pending approval requests (Center Head)
    * @param {object} params - { type: 'program' | 'exam', status: 'pending' | 'approved' | 'rejected', fromDate: string, toDate: string, page: number, limit: number }
@@ -206,49 +126,12 @@ export const approvalRequestService = {
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy thống kê' };
     }
-=======
-  getPendingRequests: async (params = {}) => {
-    const response = await workRequestService.getPendingRequests(params);
-    return {
-      ...response,
-      data: mapWorkRequestsToApprovals(response.data)
-    };
-  },
-
-  getMyRequests: async (params = {}) => {
-    const response = await workRequestService.getMyRequests(params);
-    return {
-      ...response,
-      data: mapWorkRequestsToApprovals(response.data)
-    };
-  },
-
-  getRequestById: async (id) => {
-    const response = await workRequestService.getRequestById(id);
-    return {
-      ...response,
-      data: mapWorkRequestToApproval(response.data)
-    };
-  },
-
-  getApprovalHistory: async (params = {}) => {
-    const response = await workRequestService.getApprovalHistory(params);
-    return {
-      ...response,
-      data: mapWorkRequestsToApprovals(response.data)
-    };
-  },
-
-  getStats: async () => {
-    return await workRequestService.getStats({ direction: 'bottom_up' });
->>>>>>> origin/Namvv-teacher-class-management
   },
 
   // =========================
   // APPROVE/REJECT
   // =========================
 
-<<<<<<< HEAD
   /**
    * Approve request (Center Head)
    * @param {string} id - Request ID
@@ -287,21 +170,12 @@ export const approvalRequestService = {
     } catch (error) {
       throw error.response?.data || { message: 'Không thể từ chối yêu cầu' };
     }
-=======
-  approveRequest: async (id, data = {}) => {
-    return await workRequestService.approveRequest(id, data);
-  },
-
-  rejectRequest: async (id, data) => {
-    return await workRequestService.rejectRequest(id, data);
->>>>>>> origin/Namvv-teacher-class-management
   },
 
   // =========================
   // CANCEL REQUEST
   // =========================
 
-<<<<<<< HEAD
   /**
    * Cancel pending request (Subject Leader)
    * @param {string} id - Request ID
@@ -321,11 +195,6 @@ export const approvalRequestService = {
       throw error.response?.data || { message: 'Không thể hủy yêu cầu' };
     }
   },
-=======
-  cancelRequest: async (id, data = {}) => {
-    return await workRequestService.cancelRequest(id, data);
-  }
->>>>>>> origin/Namvv-teacher-class-management
 };
 
 export default approvalRequestService;

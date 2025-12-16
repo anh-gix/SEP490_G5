@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
-<<<<<<< HEAD
-=======
-import { useNavigate } from 'react-router-dom';
->>>>>>> origin/Namvv-teacher-class-management
 import { useAuth } from '../../contexts/AuthContext';
 import changeRequestService from '../../services/changeRequestService';
 
@@ -13,10 +9,6 @@ import changeRequestService from '../../services/changeRequestService';
  */
 const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
   const { user } = useAuth();
-<<<<<<< HEAD
-=======
-  const navigate = useNavigate();
->>>>>>> origin/Namvv-teacher-class-management
   const [formData, setFormData] = useState({
     description: ''
   });
@@ -89,12 +81,6 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
         }
 
         onHide();
-<<<<<<< HEAD
-=======
-        
-        // Redirect to applications page with success state
-        navigate('/student/applications', { state: { showSuccessToast: true } });
->>>>>>> origin/Namvv-teacher-class-management
       } else {
         setError(response.message || 'Có lỗi xảy ra khi gửi đơn xin nghỉ. Vui lòng thử lại.');
       }
@@ -230,7 +216,6 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
               Cung cấp thông tin chi tiết giúp giáo vụ xử lý đơn nhanh hơn
             </Form.Text>
           </Form.Group>
-<<<<<<< HEAD
 
           {/* Important Notice */}
           <Alert variant="info" className="bg-info-50 border-info-200 rounded-8 mb-0">
@@ -257,8 +242,6 @@ const RequestAbsenceModal = ({ show, onHide, schedule, onSuccess }) => {
               </div>
             </div>
           </Alert>
-=======
->>>>>>> origin/Namvv-teacher-class-management
         </Form>
       </Modal.Body>
 

@@ -2,17 +2,17 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const changeRequestSchema = new Schema({
-  // Người gửi đơn (Student)
+  // Người gửi đơn
   sender: {
     type: Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-
+  
   // Loại đơn
   type: {
     type: String,
-    enum: ['change_class', 'makeup_class', 'request_replace_teacher'],
+    enum: ['create_class', 'change_class', 'makeup_class', 'replace_teacher'],
     required: true
   },
   
@@ -28,10 +28,16 @@ const changeRequestSchema = new Schema({
     ref: 'StudentSchedule'
   },
   
-  // ID lịch dạy của lớp (dùng cho request_replace_teacher)
+  // ID lịch dạy của lớp (dùng cho thay giáo viên cho buổi dạy)
   classScheduleId: {
     type: Schema.Types.ObjectId,
     ref: 'ClassSchedule'
+  },
+  
+  // File Excel đính kèm (chỉ dùng cho đơn tạo lớp - type: 'create_class')
+  excelFile: {
+    type: String,
+    trim: true
   },
   
   // Nội dung yêu cầu (có thể là đổi lớp hoặc đổi buổi học)

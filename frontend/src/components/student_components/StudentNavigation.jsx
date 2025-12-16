@@ -53,6 +53,12 @@ const StudentNavigation = () => {
       path: '/student/courses',
       color: 'success'
     },
+    {
+      title: 'Luyện Thi',
+      icon: 'fa-headphones',
+      path: '/student/practice-exams',
+      color: 'main'
+    },
     // {
     //   title: 'Bài tập',
     //   icon: 'fa-tasks',

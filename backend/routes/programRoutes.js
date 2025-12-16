@@ -4,7 +4,6 @@ const programController = require('../controllers/programController');
 
 // PROGRAM CRUD ROUTES
 router.get('/', programController.getAllPrograms);
-router.get('/my-programs', programController.getMyPrograms);
 router.get('/:id', programController.getProgramById);
 router.post('/', programController.createProgram);
 router.put('/:id', programController.updateProgram);
@@ -14,7 +13,6 @@ router.delete('/:id', programController.deleteProgram);
 router.get('/:id/plos', programController.getProgramPLOs);
 
 // PROGRAM HELPER ROUTES
-router.get('/band-options/:type', programController.getBandOptions);  // Must be before /:id routes
 router.get('/:id/submission-status', programController.getProgramSubmissionStatus);
 
 // PROGRAM MANAGEMENT ROUTES

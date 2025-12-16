@@ -11,20 +11,17 @@ import courseService from "../../../services/courseService";
 import sessionService from "../../../services/sessionService";
 import camSessionService from "../../../services/camSessionService";
 
-const CourseFormNew = ({ viewMode = 'center-head' }) => {
+const CourseFormNew = () => {
   const navigate = useNavigate();
   const { programId, courseId } = useParams();
-
-  // Determine base path
-  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
 
   // Only allow edit mode - redirect if no courseId
   useEffect(() => {
     if (!courseId) {
       alert('Vui lòng sử dụng Wizard để tạo học phần mới!');
-      navigate(`${basePath}/programs/${programId || ''}`);
+      navigate(`/center-head/programs/${programId || ''}`);
     }
-  }, [courseId, programId, navigate, basePath]);
+  }, [courseId, programId, navigate]);
 
   const isEdit = Boolean(courseId);
   const [activeTab, setActiveTab] = useState("info");
@@ -98,11 +95,11 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
 
   // Breadcrumb
   const breadcrumbItems = [
-    { label: "Dashboard", path: `${basePath}/dashboard` },
-    { label: "Quản lý chương trình", path: `${basePath}/programs` },
+    { label: "Dashboard", path: "/center-head/dashboard" },
+    { label: "Quản lý chương trình", path: "/center-head/programs" },
     {
       label: "Chi tiết chương trình",
-      path: `${basePath}/programs/${programId}`,
+      path: `/center-head/programs/${programId}`,
     },
     { label: "Chỉnh sửa học phần" },
   ];
@@ -139,7 +136,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
           // Redirect draft courses to wizard
           if (courseData.status === 'draft') {
             alert('Học phần chưa hoàn thành! Vui lòng tiếp tục tạo theo wizard.');
-            navigate(`${basePath}/programs/${programId}/courses/${courseId}/edit`);
+            navigate(`/center-head/programs/${programId}/courses/${courseId}/edit`);
             return;
           }
 
@@ -178,7 +175,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
         } catch (error) {
           console.error("Error loading course:", error);
           alert("Không thể tải thông tin học phần!");
-          navigate(`${basePath}/programs/${programId}/edit`);
+          navigate(`/center-head/programs/${programId}/edit`);
         } finally {
           setLoading(false);
         }
@@ -755,7 +752,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
         alert("Tạo học phần thành công!");
       }
 
-      navigate(`${basePath}/programs/${programId}/edit`);
+      navigate(`/center-head/programs/${programId}/edit`);
     } catch (error) {
       console.error("Error submitting course:", error);
       alert(error.message || "Lỗi khi lưu học phần!");
@@ -862,7 +859,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
           <Button
             variant="outline"
             icon="ph ph-x-circle"
-            onClick={() => navigate(`${basePath}/programs/${programId}`)}
+            onClick={() => navigate(`/center-head/programs/${programId}`)}
           >
             Hủy
           </Button>
@@ -1371,7 +1368,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
                                        icon="ph ph-pencil"
                                        onClick={() =>
                                          camSession._id &&
-                                         navigate(`${basePath}/cam-sessions/${camSession._id}/edit`)
+                                         navigate(`/center-head/cam-sessions/${camSession._id}/edit`)
                                        }
                                        disabled={loading}
                                      />

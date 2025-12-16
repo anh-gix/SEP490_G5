@@ -9,13 +9,9 @@ import { formatDate } from '../../../helper/helper';
 
 const API_BASE_URL = 'http://localhost:8080';
 
-const ExamView = ({ viewMode = 'center-head' }) => {
+const ExamView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-
-  // Determine base path
-  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
-  const isViewOnly = viewMode === 'center-head';
   const [exam, setExam] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -198,15 +194,13 @@ const ExamView = ({ viewMode = 'center-head' }) => {
             </Button>
           )}
 
-          {!isViewOnly && (
-            <Button
-              variant="primary"
-              icon="ph ph-pencil"
-              onClick={() => navigate(`${basePath}/exams/${exam._id}/edit`)}
-            >
-              Chỉnh sửa
-            </Button>
-          )}
+          <Button
+            variant="primary"
+            icon="ph ph-pencil"
+            onClick={() => navigate(`/center-head/exams/${exam._id}/edit`)}
+          >
+            Chỉnh sửa
+          </Button>
         </div>
       </div>
 
@@ -353,16 +347,14 @@ const ExamView = ({ viewMode = 'center-head' }) => {
                         {section.answerKey?.length || 0} câu
                       </div>
                     </div>
-                    {!isViewOnly && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        icon="ph ph-pencil"
-                        onClick={() => navigate(`${basePath}/exams/${exam._id}/edit`)}
-                      >
-                        Sửa
-                      </Button>
-                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon="ph ph-pencil"
+                      onClick={() => navigate(`/center-head/exams/${exam._id}/edit`)}
+                    >
+                      Sửa
+                    </Button>
                   </div>
                 </div>
 

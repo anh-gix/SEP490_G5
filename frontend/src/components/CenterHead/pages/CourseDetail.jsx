@@ -9,7 +9,7 @@ import Modal from '../compo/Modal';
 import { courseService } from '../../../services/courseService';
 import { formatDate } from '../../../helper/helper';
 
-const CourseDetails = ({ viewMode = 'center-head' }) => {
+const CourseDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [course, setCourse] = useState(null);
@@ -19,15 +19,10 @@ const CourseDetails = ({ viewMode = 'center-head' }) => {
   const [selectedCamSession, setSelectedCamSession] = useState(null);
   const [showCamSessionModal, setShowCamSessionModal] = useState(false);
 
-  // Determine base path
-  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
 
   // Get user role from localStorage
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const userRole = user.roleId?.name || user.role;
-
-  // Center Head should not see edit/delete buttons
-  const isViewOnly = viewMode === 'center-head' || userRole === 'Center Head';
 
   useEffect(() => {
     fetchCourseDetails();
@@ -79,9 +74,9 @@ console.log(response.data);
   };
 
   const breadcrumbItems = [
-    { label: 'Dashboard', path: `${basePath}/dashboard` },
-    { label: 'Danh sách môn học', path: `${basePath}/courses` },
-    { label: 'Chi tiết môn học', path: `${basePath}/courses/${id}/details` },
+    { label: 'Dashboard', path: '/center-head/dashboard' },
+    { label: 'Danh sách môn học', path: '/center-head/courses' },
+    { label: 'Chi tiết môn học', path: `/center-head/courses/${id}/details` },
   ];
 
   if (loading) {
@@ -534,12 +529,12 @@ console.log(response.data);
             Quay lại
           </Button>
           {/* Edit and Delete buttons - only for non-Center Head */}
-          {!isViewOnly && (
+          {userRole !== 'Center Head' && (
             <>
               <Button
                 variant="primary"
                 icon="ph ph-pencil"
-                onClick={() => navigate(`${basePath}/programs/${course.program?._id || course.program}/courses/${id}/edit-form`)}
+                onClick={() => navigate(`/center-head/programs/${course.program?._id || course.program}/courses/${id}/edit-form`)}
               >
                 Sửa
               </Button>

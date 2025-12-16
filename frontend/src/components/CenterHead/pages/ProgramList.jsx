@@ -96,6 +96,34 @@ const ProgramList = () => {
     setCurrentPage(1); // Reset to first page when items per page changes
   };
 
+  const handleDeleteProgram = async (programId, programName) => {
+    const confirmMessage = ` CẢNH BÁO: Bạn có chắc muốn xóa chương trình "${programName}"?\n\n` +
+      `Hành động này sẽ XÓA TOÀN BỘ:\n` +
+      `• Tất cả PLO trong chương trình\n` +
+      `• Tất cả Course (học phần)\n` +
+      `• Tất cả CLO trong các course\n` +
+      `• Tất cả Session trong các course\n` +
+      `• Tất cả Materials trong các course\n\n` +
+      `Hành động này KHÔNG THỂ HOÀN TÁC!\n\n` +
+      `Nhấn OK để xác nhận xóa.`;
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      await programService.deleteProgram(programId);
+
+      // Reload programs after deletion
+      await fetchPrograms();
+
+      alert('Đã xóa chương trình và toàn bộ dữ liệu liên quan thành công!');
+    } catch (err) {
+      console.error('Error deleting program:', err);
+      alert(err.message || 'Có lỗi xảy ra khi xóa chương trình.');
+    }
+  };
+
   useEffect(() => {
     fetchPrograms();
   }, []);
@@ -156,13 +184,6 @@ const ProgramList = () => {
       render: (row) => <StatusBadge status={row.status} size="sm" />,
     },
     {
-      header: 'Người tạo',
-      field: 'createdBy',
-      render: (row) => (
-        <span className="text-neutral-700">{row.createdBy?.username || 'N/A'}</span>
-      ),
-    },
-    {
       header: 'Cập nhật',
       field: 'updatedAt',
       render: (row) => (
@@ -184,6 +205,26 @@ const ProgramList = () => {
           >
             <i className="ph ph-eye"></i>
           </button>
+          <button
+            className="btn btn-sm btn-outline-secondary"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/center-head/programs/${row._id}/edit`);
+            }}
+            title="Chỉnh sửa"
+          >
+            <i className="ph ph-pencil"></i>
+          </button>
+          <button
+            className="btn btn-sm btn-outline-danger"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteProgram(row._id, row.program_name);
+            }}
+            title="Xóa chương trình"
+          >
+            <i className="ph ph-trash"></i>
+          </button>
         </div>
       ),
     },
@@ -204,8 +245,15 @@ const ProgramList = () => {
       <div className="d-flex justify-content-between align-items-center mb-24">
         <div>
           <h4 className="mb-8 text-neutral-900 fw-bold">Chương trình đào tạo</h4>
-          <p className="text-neutral-600 mb-0">Xem tất cả các chương trình trong hệ thống</p>
+          <p className="text-neutral-600 mb-0">Quản lý các chương trình và PLOs</p>
         </div>
+        <Button
+          variant="primary"
+          icon="ph ph-plus"
+          onClick={() => navigate('/center-head/programs/create')}
+        >
+          Tạo chương trình mới
+        </Button>
       </div>
 
       {/* Stats */}

@@ -9,12 +9,9 @@ import Step2AddSections from '../compo/exam/Step2AddSections';
 import Step3AnswerKeys from '../compo/exam/Step3AnswerKeys';
 import examService from '../../../services/examService';
 
-const ExamEdit = ({ viewMode = 'center-head' }) => {
+const ExamEdit = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-
-  // Determine base path
-  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
   const [currentStep, setCurrentStep] = useState(1);
   const [examData, setExamData] = useState({
     title: '',
@@ -109,7 +106,7 @@ const ExamEdit = ({ viewMode = 'center-head' }) => {
   const handleSaveAndExit = async () => {
     const saved = await handleSaveExam();
     if (saved) {
-      navigate(`${basePath}/exams/${id}`);
+      navigate(`/center-head/exams/${id}`);
     }
   };
 
@@ -127,7 +124,7 @@ const ExamEdit = ({ viewMode = 'center-head' }) => {
 
   const handleCancel = () => {
     if (window.confirm('Bạn có chắc muốn hủy? Các thay đổi chưa lưu sẽ bị mất.')) {
-      navigate(`${basePath}/exams/${id}`);
+      navigate(`/center-head/exams/${id}`);
     }
   };
 

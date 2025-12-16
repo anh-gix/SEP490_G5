@@ -14,13 +14,10 @@ import CourseStep4CLOMapping from './course-wizard-steps/CourseStep3CLOMapping';
 import CourseStep5Sessions from './course-wizard-steps/CourseStep4Sessions';
 import CamSession from './CamSession';
 
-const CourseWizard = ({ viewMode = 'center-head' }) => {
+const CourseWizard = () => {
   const navigate = useNavigate();
   const { programId, courseId } = useParams();
   const isEdit = Boolean(courseId);
-
-  // Determine base path
-  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
 
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -103,9 +100,9 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
 
   // Breadcrumb
   const breadcrumbItems = [
-    { label: 'Dashboard', path: `${basePath}/dashboard` },
-    { label: 'Quản lý chương trình', path: `${basePath}/programs` },
-    { label: 'Chi tiết chương trình', path: `${basePath}/programs/${programId}` },
+    { label: 'Dashboard', path: '/center-head/dashboard' },
+    { label: 'Quản lý chương trình', path: '/center-head/programs' },
+    { label: 'Chi tiết chương trình', path: `/center-head/programs/${programId}` },
     { label: isEdit ? 'Chỉnh sửa học phần' : 'Tạo học phần mới' }
   ];
 
@@ -202,7 +199,7 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
       );
       if (!confirm) return;
     }
-    navigate(`${basePath}/programs/${programId}`);
+    navigate(`/center-head/programs/${programId}`);
   };
 
   // Calculate completion percentage
@@ -250,7 +247,6 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
                 isWizardMode={true}
                 courseData={courseData}
                 setCourseData={setCourseData}
-                viewMode={viewMode}
               />
               {/* Custom navigation for wizard mode */}
               <div className="d-flex justify-content-between gap-3 mt-4 pt-4 border-top">
@@ -272,7 +268,7 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
                       const programId = typeof courseData.program === 'object'
                         ? (courseData.program._id || courseData.program.id)
                         : courseData.program;
-                      navigate(`${basePath}/programs/${programId}`);
+                      navigate(`/center-head/programs/${programId}`);
                     } catch (error) {
                       console.error('Error updating course status:', error);
                       alert('Có lỗi khi cập nhật trạng thái học phần!');
@@ -410,7 +406,7 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
         <div className="col-lg-12">
           <Card className="shadow-sm">
             <div className="row g-3">
-              {steps.map((step) => {
+              {steps.map((step, index) => {
                 const status = getStepStatus(step.number);
                 const isClickable = status === 'completed' || status === 'active' || status === 'available';
 
@@ -476,6 +472,17 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
                             </span>
                           )}
                         </div>
+
+                        {/* Connector line */}
+                        {index < steps.length - 1 && (
+                          <div className="step-connector d-none d-lg-block">
+                            <div className={`connector-line ${
+                              step.number < courseData.lastCompletedStep + 1
+                                ? 'bg-success-600'
+                                : 'bg-neutral-200'
+                            }`}></div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -581,6 +588,20 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
         @keyframes pulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
           50% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+        }
+
+        .step-connector {
+          position: absolute;
+          top: 28px;
+          left: calc(100% + 8px);
+          width: calc(100% - 80px);
+          pointer-events: none;
+        }
+
+        .connector-line {
+          height: 3px;
+          width: 100%;
+          transition: all 0.3s ease;
         }
 
         .wizard-header {

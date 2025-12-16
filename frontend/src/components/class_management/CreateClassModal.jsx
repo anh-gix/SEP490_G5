@@ -1819,17 +1819,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                   key={entry.id}
                   className={`border rounded-12 p-16 ${isDuplicate ? 'border-danger border-2' : 'border-neutral-100'}`}
                 >
-                  <div className="d-flex justify-content-between align-items-center mb-12">
-                    <div className="fw-semibold text-neutral-900">
-                      Buổi {index + 1}
-                    </div>
+                  <div className="d-flex justify-content-end align-items-center mb-12">
                     {formData.scheduleEntries.length > 1 && (
                       <Button
                         type="button"
                         className="btn-outline-danger text-13 fw-medium px-14 py-6 radius-8"
                         onClick={() => removeScheduleEntry(entry.id)}
                       >
-                        <i className="fas fa-trash-alt me-2"></i>
                         Xóa
                       </Button>
                     )}

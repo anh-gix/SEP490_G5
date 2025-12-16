@@ -62,9 +62,6 @@ const StudentSchedule = () => {
     const today = new Date();
     const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 1));
 
-    console.log('First day of week:', firstDayOfWeek);
-
-    console.log('Last day of week:', new Date(today.setDate(today.getDate() - today.getDay() + 7)));
     return firstDayOfWeek;
   }
 
@@ -163,12 +160,8 @@ const StudentSchedule = () => {
         startDate: startOfMonth.toISOString().split('T')[0],
         endDate: endDate.toISOString().split('T')[0]
       };
-
-      console.log('Fetching schedules with params:', params);
       
       const response = await studentService.getMySchedule(params);
-      
-      console.log('API Response:', response);
       
       if (response.success && response.schedules && Array.isArray(response.schedules)) {
         const transformed = transformScheduleData(response.schedules);
@@ -188,7 +181,6 @@ const StudentSchedule = () => {
           return !isCancelled;
         });
         
-        console.log('Transformed schedules:', transformed.length, 'Active schedules (excluding cancelled):', activeSchedules.length);
         setSchedules(activeSchedules);
       } else {
         setSchedules([]);

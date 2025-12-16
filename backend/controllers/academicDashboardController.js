@@ -182,41 +182,6 @@ exports.getDashboardData = async (req, res) => {
       };
     });
 
-    const classes = await Class.find({ status: 'active' })
-      .populate('course', 'name level')
-      .select('name course startDate endDate students')
-      .limit(3)
-      .lean();
-
-    const classIds = classes.map(c => c._id);
-    const classSchedulesCount = await ClassSchedule.aggregate([
-      { $match: { class: { $in: classIds } } },
-      { $group: { _id: '$class', total: { $sum: 1 }, completed: { $sum: { $cond: [{ $lt: ['$date', new Date()] }, 1, 0] } } } }
-    ]);
-
-    const scheduleCountMap = {};
-    classSchedulesCount.forEach(item => {
-      scheduleCountMap[item._id.toString()] = {
-        total: item.total,
-        completed: item.completed
-      };
-    });
-
-    const classProgressData = classes.map(cls => {
-      const counts = scheduleCountMap[cls._id.toString()] || { total: 0, completed: 0 };
-      const progress = counts.total > 0 ? Math.round((counts.completed / counts.total) * 100) : 0;
-
-      return {
-        id: cls._id,
-        name: cls.name || 'N/A',
-        level: cls.course?.level || cls.name?.split('-')[0] || 'N/A',
-        progress,
-        students: cls.students?.length || 0,
-        completedLessons: counts.completed,
-        totalLessons: counts.total
-      };
-    });
-
     const recentRequests = await ChangeRequest.find({ status: 'pending' })
       .populate('sender', 'username email')
       .select('_id type sender createdAt')
@@ -323,11 +288,9 @@ exports.getDashboardData = async (req, res) => {
         totalRequestsLastWeek,
         pendingChangeClassRequests
       },
-      todaySchedule: processedSchedules.slice(0, 10),
       absentStudentsList,
       roomSchedule: roomScheduleData,
       timeSlots: timeSlots,
-      classProgress: classProgressData,
       recentActivities
     };
 

@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Table, Spinner, Alert } from 'react-bootstrap';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import academicStaffService from '../../services/academicStaffService';
 
 const AcademicDashboard = () => {
-  const navigate = useNavigate();
 
   const [todayOverview, setTodayOverview] = useState({
     todaySchedules: 0,
@@ -21,8 +20,6 @@ const AcademicDashboard = () => {
   const [roomSchedule, setRoomSchedule] = useState([]);
   const [timeSlots, setTimeSlots] = useState([]); // Time slots from database
   const [recentActivities, setRecentActivities] = useState([]);
-  const [todaySchedule, setTodaySchedule] = useState([]);
-  const [classProgress, setClassProgress] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -53,11 +50,9 @@ const AcademicDashboard = () => {
           pendingChangeClassRequests: 0
         });
         
-        setTodaySchedule(data.todaySchedule || []);
         setAbsentStudentsList(data.absentStudentsList || []);
         setRoomSchedule(data.roomSchedule || []);
         setTimeSlots(data.timeSlots || []); // Set time slots from API
-        setClassProgress(data.classProgress || []);
         setRecentActivities(data.recentActivities || []);
       } else {
         throw new Error(response.message || 'Không thể tải dữ liệu dashboard');
@@ -141,7 +136,7 @@ const AcademicDashboard = () => {
                 onClick={() => {
                   const longestPendingRequest = recentActivities && recentActivities.length > 0 ? recentActivities[recentActivities.length - 1] : null;
                   if (longestPendingRequest?.id) {
-                    navigate(`/academic/request-management/${longestPendingRequest.id}`);
+                    window.location.href = `/academic/request-management?requestId=${longestPendingRequest.id}`;
                   }
                 }}
               >
@@ -172,7 +167,7 @@ const AcademicDashboard = () => {
                   <div className="text-end">
                     {recentActivities && recentActivities.length > 0 && recentActivities[recentActivities.length - 1]?.id ? (
                       <Link 
-                        to={`/academic/request-management/${recentActivities[recentActivities.length - 1].id}`} 
+                        to={`/academic/request-management?requestId=${recentActivities[recentActivities.length - 1].id}`} 
                         className="text-decoration-none"
                         onClick={(e) => e.stopPropagation()}
                       >

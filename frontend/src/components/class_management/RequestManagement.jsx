@@ -129,15 +129,15 @@ const RequestManagement = () => {
     }
   }, [user, filterStatus]);
 
-  // Handle requestId from URL query parameter - wait for initial load to complete
+  // Handle requestId from URL query parameter - call immediately on mount
   useEffect(() => {
     const requestId = searchParams.get('requestId');
-    if (requestId && user?._id && !loading && !loadingRequestById) {
-      // Execute immediately without delay for better performance
+    if (requestId && user?._id && !loadingRequestById) {
+      // Call immediately, don't wait for list to load
       handleOpenRequestById(requestId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, user, loading]);
+  }, [searchParams, user]); // Remove loading from dependencies
 
 
   const fetchStats = async () => {
@@ -979,6 +979,45 @@ const RequestManagement = () => {
           setSelectedRequest(null);
         }}
       />
+    );
+  }
+
+  // Early return: Show loading overlay immediately if requestId exists and we're fetching
+  const requestId = searchParams.get('requestId');
+  if (requestId && (loadingRequestById || (loading && user?._id))) {
+    return (
+      <Container fluid className="p-24" style={{ position: 'relative' }}>
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999
+          }}
+        >
+          <div 
+            style={{
+              backgroundColor: 'white',
+              padding: '24px',
+              borderRadius: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+            }}
+          >
+            <Spinner animation="border" variant="primary" />
+            <p className="text-neutral-700 mb-0 fw-medium">Đang tải chi tiết đơn...</p>
+          </div>
+        </div>
+      </Container>
     );
   }
 

@@ -475,19 +475,6 @@ const TeacherAttendance = () => {
                 Các lớp hôm nay ({todaySchedules.length})
               </h6>
 
-              {/* Filter by status */}
-              <Form.Select 
-                size="sm"
-                value={selectedStatus} 
-                onChange={(e) => setSelectedStatus(e.target.value)} 
-                className="rounded-8 mb-3"
-              >
-                <option value="all">Tất cả trạng thái</option>
-                <option value="present">Có mặt</option>
-                <option value="absent">Vắng</option>
-                <option value="not-marked">Chưa điểm danh</option>
-              </Form.Select>
-
               {/* Classes List */}
               <div className="d-flex flex-column gap-2" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                 {todaySchedules.map((schedule) => (
@@ -504,7 +491,7 @@ const TeacherAttendance = () => {
                     <Card.Body className="p-12">
                       <div className="d-flex justify-content-between align-items-start mb-2">
                         <div className="text-neutral-900 fw-semibold text-13">
-                          {schedule.className}
+                          {schedule.className || 'Lớp học bù'}
                         </div>
                         <Badge bg="primary" className="px-2 py-1 text-10">
                           Buổi {schedule.sessionOrder}

@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import ClassList from './ClassList';
 import CreateClassModal from './CreateClassModal';
-import AcademicClassDetailLayout from './AcademicClassDetailLayout';
+import ClassDetail from './ClassDetail';
 import EditClassForm from './EditClassModal';
 import classService from '../../services/classService';
 
@@ -268,10 +268,10 @@ const ClassManagement = () => {
     }
   }
 
-  // If showing class detail, render AcademicClassDetailLayout component
+  // If showing class detail, render ClassDetail component
   if (showClassDetail && selectedClassId) {
     return (
-      <AcademicClassDetailLayout
+      <ClassDetail
         classId={selectedClassId}
         onBack={() => {
           setShowClassDetail(false);

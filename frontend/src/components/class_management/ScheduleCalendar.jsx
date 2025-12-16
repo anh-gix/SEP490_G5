@@ -555,7 +555,7 @@ const ScheduleCalendar = ({
                                 const isCancelled = schedule.isCancelled || schedule.scheduleStatus === 'cancelled';
                                 const isMakeup = schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled';
                                 
-                                if (isPastSchedule || isCancelled || isMakeup) {
+                                if (isPastSchedule || isCancelled) {
                                   return null;
                                 }
                                 

@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Container, Card, Row, Col, Badge, Button, Spinner, Alert } from 'react-bootstrap';
-import MakeupClassModal from './MakeupClassModal';
 import scheduleService from '../../services/scheduleService';
-import classService from '../../services/classService';
-import teacherService from '../../services/teacherService';
-import roomService from '../../services/roomService';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
 
 /**
@@ -18,11 +14,6 @@ const AcademicLessonDetail = ({ lessonId, onBack }) => {
   const [lessonData, setLessonData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showMakeupModal, setShowMakeupModal] = useState(false);
-  const [classes, setClasses] = useState([]);
-  const [teachers, setTeachers] = useState([]);
-  const [rooms, setRooms] = useState([]);
-  const [schedules, setSchedules] = useState([]);
 
   const fetchLessonData = async () => {
     try {
@@ -84,39 +75,6 @@ const AcademicLessonDetail = ({ lessonId, onBack }) => {
       };
 
       setLessonData(transformedLesson);
-
-      // Fetch data for modals
-      try {
-        const [classesRes, teachersRes, roomsRes, schedulesRes] = await Promise.all([
-          classService.getAllClasses(),
-          teacherService.getAllTeachers(),
-          roomService.getAllRooms(),
-          scheduleService.getAllSchedules()
-        ]);
-
-        setClasses((classesRes.classes || classesRes.data || []).map(cls => ({
-          id: cls._id || cls.id,
-          name: cls.name,
-          level: cls.level,
-          students: cls.totalStudents || cls.students?.length || 0
-        })));
-
-        setTeachers((teachersRes.teachers || teachersRes.data || []).map(teacher => ({
-          id: teacher._id || teacher.id,
-          name: teacher.username || teacher.name,
-          email: teacher.email
-        })));
-
-        setRooms((roomsRes.rooms || roomsRes.data || []).map(room => ({
-          id: room._id || room.id,
-          name: room.room_name || room.name,
-          capacity: room.capacity
-        })));
-
-        setSchedules(schedulesRes.schedules || schedulesRes.data || []);
-      } catch (err) {
-        console.error('Error fetching modal data:', err);
-      }
     } catch (err) {
       console.error('Error fetching lesson data:', err);
       setError(err.message || 'Không thể tải thông tin buổi học');
@@ -129,18 +87,6 @@ const AcademicLessonDetail = ({ lessonId, onBack }) => {
     fetchLessonData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId]);
-
-  const handleCreateMakeup = async (makeupData) => {
-    try {
-      // TODO: Call API to create makeup class
-      console.log('Create makeup class:', makeupData);
-      setShowMakeupModal(false);
-      alert('Tạo lịch học bù thành công!');
-    } catch (err) {
-      console.error('Error creating makeup class:', err);
-      alert('Có lỗi xảy ra khi tạo lịch học bù!');
-    }
-  };
 
   if (loading) {
     return (
@@ -193,15 +139,6 @@ const AcademicLessonDetail = ({ lessonId, onBack }) => {
                 day: 'numeric' 
               })} • {lessonData.time}
             </p>
-          </div>
-          <div className="d-flex gap-12">
-            <Button 
-              className="btn-outline-info text-13 px-16 py-8 radius-8"
-              onClick={() => setShowMakeupModal(true)}
-            >
-              <i className="fas fa-calendar-plus me-2"></i>
-              Tạo lịch học bù
-            </Button>
           </div>
         </div>
       </div>
@@ -435,31 +372,6 @@ const AcademicLessonDetail = ({ lessonId, onBack }) => {
           </Card>
         </Col>
       </Row>
-
-      {showMakeupModal && lessonData && (
-        <MakeupClassModal
-          originalSchedule={{
-            id: lessonData.id,
-            classId: lessonData.classId,
-            className: lessonData.className,
-            teacherId: lessonData.teacherId,
-            teacherName: lessonData.teacherName,
-            roomId: lessonData.roomId,
-            roomName: lessonData.room,
-            date: lessonData.date,
-            startTime: lessonData.startTime,
-            endTime: lessonData.endTime,
-            lessonNumber: lessonData.lessonNumber,
-            lessonTopic: lessonData.lessonTopic
-          }}
-          classes={classes}
-          teachers={teachers}
-          rooms={rooms}
-          onClose={() => setShowMakeupModal(false)}
-          onSubmit={handleCreateMakeup}
-          existingSchedules={schedules}
-        />
-      )}
     </Container>
   );
 };

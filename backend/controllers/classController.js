@@ -830,13 +830,6 @@ exports.checkTeacherRoomConflicts = async (req, res) => {
     const { id: classId } = req.params;
     const { teacherId, roomId, scheduleEntries, startDate } = req.body;
     
-    console.log('\n ========== KIỂM TRA CONFLICT TEACHER/ROOM (checkTeacherRoomConflicts) ==========');
-    console.log('  - ClassId:', classId);
-    console.log('  - TeacherId:', teacherId || 'Không có');
-    console.log('  - RoomId:', roomId || 'Không có');
-    console.log('  - StartDate:', startDate || 'Không có');
-    console.log('  - ScheduleEntries:', scheduleEntries?.length || 0);
-    
     // Get class data to get course info
     const classData = await Class.findById(classId)
       .populate('course', 'numberOfSessions')

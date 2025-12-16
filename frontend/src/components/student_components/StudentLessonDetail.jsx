@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Badge, Button, Alert, Spinner } from 'react-bootstrap';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import RequestAbsenceModal from './RequestAbsenceModal';
 import studentService from '../../services/studentService';
 
 /**
@@ -12,8 +11,8 @@ import studentService from '../../services/studentService';
 const StudentLessonDetail = () => {
   const { lessonId } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [lessonData, setLessonData] = useState(null);
-  const [showAbsenceModal, setShowAbsenceModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -49,7 +48,12 @@ const StudentLessonDetail = () => {
   }, [lessonId, user]);
 
   const handleRequestAbsence = () => {
-    setShowAbsenceModal(true);
+    navigate('/student/applications', {
+      state: {
+        openCreateModal: true,
+        preselectedScheduleId: lessonData.studentScheduleId
+      }
+    });
   };
 
   const getAttendanceBadge = (attendance) => {
@@ -366,28 +370,6 @@ const StudentLessonDetail = () => {
           </Card>
         </Col>
       </Row>
-
-      {/* Request Absence Modal */}
-      <RequestAbsenceModal
-        show={showAbsenceModal}
-        onHide={() => setShowAbsenceModal(false)}
-        schedule={{
-          id: lessonData._id,
-          studentScheduleId: lessonData.studentScheduleId,
-          date: lessonData.date,
-          startTime: lessonData.startTime,
-          endTime: lessonData.endTime,
-          topic: lessonData.topic,
-          className: lessonData.className,
-          teacher: lessonData.teacher?.name,
-          room: lessonData.room?.fullName,
-          lessonNumber: lessonData.lessonNumber
-        }}
-        onSuccess={() => {
-          setShowAbsenceModal(false);
-          fetchLessonData();
-        }}
-      />
     </Container>
   );
 };

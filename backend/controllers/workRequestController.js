@@ -454,8 +454,6 @@ exports.getAssignedToMe = async (req, res) => {
   try {
     const { userId, status } = req.query;
 
-    console.log('🔍 Get Assigned To Me - Query params:', { userId, status });
-
     if (!userId) {
       return res.status(400).json({
         success: false,
@@ -469,16 +467,12 @@ exports.getAssignedToMe = async (req, res) => {
     };
     if (status) query.status = status;
 
-    console.log('🔎 Searching with query:', query);
-
     const requests = await WorkRequest.find(query)
       .populate('requestedBy', 'name email username')
       .populate('assignedTo', 'name email username')
       .populate('processedBy', 'name email username')
       .populate('entityId')
       .sort({ requestedAt: -1 });
-
-    console.log('📦 Found', requests.length, 'work requests for user', userId);
 
     res.status(200).json({
       success: true,
@@ -1506,8 +1500,6 @@ exports.getWorkRequestStats = async (req, res) => {
       create_exam: await WorkRequest.countDocuments({ ...query, requestType: 'create_exam' }),
       total: await WorkRequest.countDocuments(query)
     };
-
-    console.log('📊 WorkRequest stats for user', userId, ':', stats);
 
     res.status(200).json({
       success: true,

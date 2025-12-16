@@ -8,7 +8,7 @@ import ClassStudents from '../teacher_components/class_detail/ClassStudents';
 import AcademicClassLessons from './AcademicClassLessons';
 
 /**
- * Academic Class Detail Layout Component
+ * Class Detail Component
  * Layout cho chi tiết lớp học của Academic Staff với 3 tabs:
  * - Tổng quan (từ student)
  * - Học viên (từ teacher)
@@ -16,7 +16,7 @@ import AcademicClassLessons from './AcademicClassLessons';
  * @param {string} classId - ID của lớp học (từ props thay vì route params)
  * @param {function} onBack - Callback để quay lại danh sách
  */
-const AcademicClassDetailLayout = ({ classId, onBack }) => {
+const ClassDetail = ({ classId, onBack }) => {
   const [classInfo, setClassInfo] = useState(null);
   const [students, setStudents] = useState([]);
   const [lessons, setLessons] = useState([]);
@@ -103,7 +103,7 @@ const AcademicClassDetailLayout = ({ classId, onBack }) => {
           
           // Determine status
           let status = 'scheduled';
-          if (schedule.status === 'completed' || (isPast && schedule.hasAttendance)) {
+          if (schedule.status === 'completed' || isPast) {
             status = 'completed';
           } else if (isToday || (scheduleDateOnly > today && scheduleDateOnly <= new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000))) {
             status = 'upcoming';
@@ -349,5 +349,5 @@ const AcademicClassDetailLayout = ({ classId, onBack }) => {
   );
 };
 
-export default AcademicClassDetailLayout;
+export default ClassDetail;
 

@@ -308,11 +308,6 @@ const RequestDetailPage = ({
     if (senderSchedule && senderSchedule.length > 0) {
       const firstSchedule = senderSchedule[0];
       if (firstSchedule.class?.course?.program) {
-        console.log(' Program type data received:', {
-          programType: firstSchedule.class?.course?.program?.type,
-          className: firstSchedule.class?.name,
-          courseName: firstSchedule.class?.course?.name
-        });
       } else {
         console.warn(' Program type not found in schedule:', {
           hasClass: !!firstSchedule.class,

@@ -184,8 +184,8 @@ exports.getDashboardData = async (req, res) => {
     const recentRequests = await ChangeRequest.find({ status: 'pending' })
       .populate('sender', 'username email')
       .select('_id type sender createdAt')
-      .sort({ createdAt: -1 })
-      .limit(5)
+      .sort({ createdAt: 1 })
+      .limit(3)
       .lean();
 
     const currentTime = new Date();
@@ -243,6 +243,9 @@ exports.getDashboardData = async (req, res) => {
 
       return {
         id: request._id,
+        senderName: senderName,
+        requestType: requestType,
+        createdAt: request.createdAt,
         message,
         time: timeText,
         icon,

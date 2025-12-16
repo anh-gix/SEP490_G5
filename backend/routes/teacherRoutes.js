@@ -41,6 +41,7 @@ router.get('/me/classes', verifyToken, isTeacherOrSubjectLeader, teacherControll
 router.get('/me/classes/:classId', verifyToken, isTeacherOrSubjectLeader, teacherController.getMyClassDetail);
 router.get('/me/lessons/:scheduleId', verifyToken, isTeacherOrSubjectLeader, teacherController.getLessonDetail);
 router.put('/me/mocktest/:scheduleId/student/:studentId', verifyToken, isTeacherOrSubjectLeader, teacherController.updateMocktestScore);
+router.post('/me/classes/:classId/mocktest/import-scores', verifyToken, isTeacherOrSubjectLeader, teacherController.importMocktestScores);
 router.post('/me/attendance/:scheduleId', verifyToken, isTeacherOrSubjectLeader, teacherController.saveAttendance);
 
 // Material management routes

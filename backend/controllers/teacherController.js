@@ -976,9 +976,10 @@ exports.getMyClassDetail = async (req, res) => {
           homeworkWithStats.push({
             _id: hw._id,
             title: hw.assignment?.title || 'Bài tập',
+            description: hw.assignment?.description || '',
             files: hw.assignment?.files || [],
             answerFiles: hw.answerFiles || [],
-            deadline: formatDateToVN(hw.deadline),
+            deadline: hw.deadline,
             submitted: submittedCount,
             late: lateCount,
             pending: totalStudents - submittedCount,
@@ -990,7 +991,7 @@ exports.getMyClassDetail = async (req, res) => {
       return {
         _id: lesson._id,
         lessonNumber: index + 1,
-        date: formatDateToVN(lesson.date),
+        date: lesson.date,
         time: `${lesson.startTime} - ${lesson.endTime}`,
         topic: lesson.session?.title || 'Chưa có chủ đề',
         sessionOrder: lesson.session?.order,
@@ -1015,7 +1016,7 @@ exports.getMyClassDetail = async (req, res) => {
             type: mat.file?.endsWith('.pdf') ? 'document' : 
                   mat.file?.endsWith('.mp3') ? 'audio' : 
                   mat.file?.endsWith('.mp4') ? 'video' : 'document',
-            uploadedAt: formatDateToVN(lesson.date),
+            uploadedAt: lesson.date,
             size: '2.5 MB', // Placeholder
             downloads: Math.floor(Math.random() * 50) // Placeholder
           });
@@ -1207,7 +1208,7 @@ exports.getMyClassDetail = async (req, res) => {
             lessonNumber: lesson.lessonNumber,
             sessionOrder: lesson.sessionOrder,
             title: hw.title,
-            deadline: formatDateToVN(hw.deadline),
+            deadline: hw.deadline,
             onTime: onTime,
             late: hw.late,
             pending: hw.pending,
@@ -1540,7 +1541,8 @@ exports.updateMocktestScore = async (req, res) => {
     const Course = require('../models/courseModel');
     const Session = require('../models/sessionModel');
     
-    const course = await Course.findById(schedule.class.course);
+    const course = await Course.findById(schedule.class.course)
+      .populate('program', 'name type');
     const session = schedule.session; // Already populated above
     
     console.log(' Update Mocktest - Course & Session Info:', {
@@ -1593,24 +1595,67 @@ exports.updateMocktestScore = async (req, res) => {
       s => s.studentId.toString() === studentId.toString()
     );
 
+    const skillScores = {
+      reading: reading || 0,
+      listening: listening || 0,
+      writing: writing || 0,
+      speaking: speaking || 0
+    };
+
+    // Get program type
+    const programType = course?.program?.type?.toLowerCase() || 'ielts';
+
+    // Calculate total score based on program type
+    let totalScore = 0;
+    if (programType === 'ielts') {
+      const validScores = Object.values(skillScores).filter(s => s > 0);
+      totalScore = validScores.length > 0 
+        ? Math.round((validScores.reduce((a, b) => a + b, 0) / validScores.length) * 2) / 2 
+        : 0;
+    } else if (programType === 'toeic') {
+      totalScore = (skillScores.reading || 0) + (skillScores.listening || 0);
+    } else if (programType === 'cam' || programType === 'cambridge') {
+      const validScores = Object.values(skillScores).filter(s => s > 0);
+      totalScore = validScores.length > 0 
+        ? Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length) 
+        : 0;
+    }
+
     if (studentScore) {
-      // Update existing score
+      // Update existing score in ClassSchedule
       if (reading !== undefined) studentScore.reading = reading;
       if (listening !== undefined) studentScore.listening = listening;
       if (writing !== undefined) studentScore.writing = writing;
       if (speaking !== undefined) studentScore.speaking = speaking;
     } else {
-      // Add new score
+      // Add new score to ClassSchedule
       schedule.mocktest.scores.push({
         studentId,
-        reading: reading || 0,
-        listening: listening || 0,
-        writing: writing || 0,
-        speaking: speaking || 0
+        reading: skillScores.reading,
+        listening: skillScores.listening,
+        writing: skillScores.writing,
+        speaking: skillScores.speaking
       });
     }
 
     await schedule.save();
+
+    // Also save to User.mocktestScores for easy student access
+    const mocktestKey = `mocktest${session.order}`;
+    await User.findByIdAndUpdate(
+      studentId,
+      {
+        $set: {
+          [`mocktestScores.${mocktestKey}`]: {
+            scheduleId: scheduleId,
+            sessionOrder: session.order,
+            totalScore: totalScore,
+            skillScores: skillScores
+          }
+        }
+      },
+      { new: true }
+    );
 
     res.status(200).json({
       success: true,
@@ -1626,6 +1671,262 @@ exports.updateMocktestScore = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi cập nhật điểm mocktest',
+      error: error.message
+    });
+  }
+};
+
+// ====================================
+//  IMPORT ĐIỂM MOCKTEST HÀNG LOẠT
+// ====================================
+exports.importMocktestScores = async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const { scheduleId, scores } = req.body; // scores: [{ studentId, email, reading, listening, writing, speaking }]
+    const teacherId = req.user._id;
+
+    console.log('📥 Import Mocktest Scores Request:', {
+      classId,
+      scheduleId,
+      teacherId,
+      totalScores: scores?.length
+    });
+
+    // Validate input
+    if (!scheduleId || !scores || !Array.isArray(scores) || scores.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu thông tin scheduleId hoặc scores'
+      });
+    }
+
+    // Find the schedule and verify ownership
+    const schedule = await ClassSchedule.findById(scheduleId)
+      .populate({
+        path: 'class',
+        select: 'teacher students course name',
+        populate: {
+          path: 'course',
+          select: 'name program mocktestSessionOrders',
+          populate: {
+            path: 'program',
+            select: 'type name'
+          }
+        }
+      })
+      .populate('session', 'order title');
+
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy buổi học'
+      });
+    }
+
+    // Verify teacher ownership
+    if (schedule.class.teacher.toString() !== teacherId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền cập nhật điểm cho lớp này'
+      });
+    }
+
+    // Verify this is a mocktest session
+    const course = schedule.class.course;
+    const session = schedule.session;
+    const mocktestSessionOrders = course?.mocktestSessionOrders || [];
+    const isMocktestSession = mocktestSessionOrders.includes(session?.order);
+
+    if (!isMocktestSession) {
+      return res.status(400).json({
+        success: false,
+        message: 'Buổi học này không phải là buổi mocktest'
+      });
+    }
+
+    // Get program type for validation
+    const programType = course?.program?.type?.toLowerCase() || 'ielts';
+
+    // Validate scores based on program type
+    const validateScore = (score, skill, type) => {
+      if (score === null || score === undefined || score === 0) return true; // Allow 0 or empty
+
+      const num = parseFloat(score);
+      if (isNaN(num)) return false;
+
+      switch (type) {
+        case 'ielts':
+          if (num < 1 || num > 9) return false;
+          const decimal = (num % 1).toFixed(1);
+          return decimal === '0.0' || decimal === '0.5';
+        
+        case 'toeic':
+          if (skill === 'reading' || skill === 'listening') {
+            return Number.isInteger(num) && num >= 10 && num <= 495 && num % 5 === 0;
+          }
+          return true; // writing/speaking not used in TOEIC
+        
+        case 'cam':
+        case 'cambridge':
+          return Number.isInteger(num) && num >= 1 && num <= 15;
+        
+        default:
+          return true;
+      }
+    };
+
+    // Initialize mocktest if not exists
+    if (!schedule.mocktest) {
+      schedule.mocktest = {
+        title: `Mocktest ${session.order}`,
+        order: session.order,
+        type: programType,
+        scores: []
+      };
+    }
+
+    if (!schedule.mocktest.scores) {
+      schedule.mocktest.scores = [];
+    }
+
+    // Process each score
+    let successCount = 0;
+    let failedCount = 0;
+    const failedRecords = [];
+
+    for (const scoreData of scores) {
+      try {
+        const { studentId, reading, listening, writing, speaking } = scoreData;
+
+        // Verify student is in class
+        const isStudentInClass = schedule.class.students.some(
+          s => s._id.toString() === studentId.toString()
+        );
+
+        if (!isStudentInClass) {
+          failedCount++;
+          failedRecords.push({
+            studentId,
+            reason: 'Học viên không thuộc lớp học này'
+          });
+          continue;
+        }
+
+        // Validate scores
+        const skills = { reading, listening, writing, speaking };
+        let hasInvalidScore = false;
+
+        for (const [skill, value] of Object.entries(skills)) {
+          if (!validateScore(value, skill, programType)) {
+            hasInvalidScore = true;
+            failedCount++;
+            failedRecords.push({
+              studentId,
+              reason: `Điểm ${skill} không hợp lệ cho ${programType.toUpperCase()}`
+            });
+            break;
+          }
+        }
+
+        if (hasInvalidScore) continue;
+
+        // Find or create score entry in ClassSchedule
+        let studentScore = schedule.mocktest.scores.find(
+          s => s.studentId.toString() === studentId.toString()
+        );
+
+        const skillScores = {
+          reading: reading || 0,
+          listening: listening || 0,
+          writing: writing || 0,
+          speaking: speaking || 0
+        };
+
+        // Calculate total score based on program type
+        let totalScore = 0;
+        if (programType === 'ielts') {
+          // IELTS: average of 4 skills
+          const validScores = Object.values(skillScores).filter(s => s > 0);
+          totalScore = validScores.length > 0 
+            ? Math.round((validScores.reduce((a, b) => a + b, 0) / validScores.length) * 2) / 2 
+            : 0;
+        } else if (programType === 'toeic') {
+          // TOEIC: sum of reading + listening
+          totalScore = (skillScores.reading || 0) + (skillScores.listening || 0);
+        } else if (programType === 'cam' || programType === 'cambridge') {
+          // Cambridge: average of 4 skills
+          const validScores = Object.values(skillScores).filter(s => s > 0);
+          totalScore = validScores.length > 0 
+            ? Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length) 
+            : 0;
+        }
+
+        if (studentScore) {
+          // Update existing score in ClassSchedule
+          if (reading !== undefined && reading !== null) studentScore.reading = reading;
+          if (listening !== undefined && listening !== null) studentScore.listening = listening;
+          if (writing !== undefined && writing !== null) studentScore.writing = writing;
+          if (speaking !== undefined && speaking !== null) studentScore.speaking = speaking;
+        } else {
+          // Add new score to ClassSchedule
+          schedule.mocktest.scores.push({
+            studentId,
+            reading: skillScores.reading,
+            listening: skillScores.listening,
+            writing: skillScores.writing,
+            speaking: skillScores.speaking
+          });
+        }
+
+        // Also save to User.mocktestScores for easy student access
+        const mocktestKey = `mocktest${session.order}`;
+        await User.findByIdAndUpdate(
+          studentId,
+          {
+            $set: {
+              [`mocktestScores.${mocktestKey}`]: {
+                scheduleId: scheduleId,
+                sessionOrder: session.order,
+                totalScore: totalScore,
+                skillScores: skillScores
+              }
+            }
+          },
+          { new: true }
+        );
+
+        successCount++;
+      } catch (error) {
+        console.error(`Error processing score for student ${scoreData.studentId}:`, error);
+        failedCount++;
+        failedRecords.push({
+          studentId: scoreData.studentId,
+          reason: error.message
+        });
+      }
+    }
+
+    // Save schedule
+    await schedule.save();
+
+    console.log('✅ Import Mocktest Scores Result:', {
+      successCount,
+      failedCount,
+      total: scores.length
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Import thành công ${successCount}/${scores.length} điểm`,
+      successCount,
+      failedCount,
+      failedRecords: failedCount > 0 ? failedRecords : undefined
+    });
+  } catch (error) {
+    console.error('❌ Lỗi khi import điểm mocktest:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi import điểm mocktest',
       error: error.message
     });
   }
@@ -1989,7 +2290,7 @@ exports.getClassMaterials = async (req, res) => {
             lessonNumber: schedule.session?.order || 0,
             lessonTitle: schedule.session?.title || schedule.topic || 'Chưa có tiêu đề',
             url: materialObj.file,
-            uploadDate: formatDateToVN(schedule.date),
+            uploadDate: schedule.date,
             scheduleId: schedule._id
           });
         });

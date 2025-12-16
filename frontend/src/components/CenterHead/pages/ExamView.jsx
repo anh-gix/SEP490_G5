@@ -9,9 +9,13 @@ import { formatDate } from '../../../helper/helper';
 
 const API_BASE_URL = 'http://localhost:8080';
 
-const ExamView = () => {
+const ExamView = ({ viewMode = 'center-head' }) => {
   const { id } = useParams();
   const navigate = useNavigate();
+
+  // Determine base path
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
+  const isViewOnly = viewMode === 'center-head';
   const [exam, setExam] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -194,13 +198,15 @@ const ExamView = () => {
             </Button>
           )}
 
-          <Button
-            variant="primary"
-            icon="ph ph-pencil"
-            onClick={() => navigate(`/center-head/exams/${exam._id}/edit`)}
-          >
-            Chỉnh sửa
-          </Button>
+          {!isViewOnly && (
+            <Button
+              variant="primary"
+              icon="ph ph-pencil"
+              onClick={() => navigate(`${basePath}/exams/${exam._id}/edit`)}
+            >
+              Chỉnh sửa
+            </Button>
+          )}
         </div>
       </div>
 
@@ -347,14 +353,16 @@ const ExamView = () => {
                         {section.answerKey?.length || 0} câu
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      icon="ph ph-pencil"
-                      onClick={() => navigate(`/center-head/exams/${exam._id}/edit`)}
-                    >
-                      Sửa
-                    </Button>
+                    {!isViewOnly && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon="ph ph-pencil"
+                        onClick={() => navigate(`${basePath}/exams/${exam._id}/edit`)}
+                      >
+                        Sửa
+                      </Button>
+                    )}
                   </div>
                 </div>
 

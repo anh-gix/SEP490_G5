@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { Modal, Button, Form, Badge, Row, Col, Card, Table } from 'react-bootstrap';
+import Swal from 'sweetalert2';
+import { toast } from 'react-toastify';
 
+/* eslint-disable no-unused-vars */
 const StudentDetailModal = ({ 
   show, 
   onHide, 
   student,
+  classInfo,
   onUpdateMocktestScore 
 }) => {
   const [editingMocktest, setEditingMocktest] = useState(null);
@@ -41,20 +45,48 @@ const StudentDetailModal = ({
     }
   };
 
-  const handleSaveMocktestScore = () => {
-    console.log('💾 Save Mocktest Score:', {
-      studentId: student.id || student._id,
-      scheduleId: editingScheduleId,
-      scores: mocktestScores,
-      sessionOrder: editingMocktest
+  const handleSaveMocktestScore = async () => {
+    // Validate scores
+    const programType = classInfo?.course?.program?.type?.toLowerCase() || 'ielts';
+    let hasValidScore = false;
+    
+    Object.values(mocktestScores).forEach(score => {
+      if (score !== '' && score !== null && score !== undefined && score > 0) {
+        hasValidScore = true;
+      }
     });
     
-    if (onUpdateMocktestScore && editingScheduleId) {
-      onUpdateMocktestScore(student.id || student._id, editingScheduleId, mocktestScores);
+    if (!hasValidScore) {
+      toast.warning('Vui lòng nhập ít nhất một điểm kỹ năng');
+      return;
     }
-    setEditingMocktest(null);
-    setEditingScheduleId(null);
-    setMocktestScores({ reading: '', listening: '', writing: '', speaking: '' });
+    
+    // Show confirmation
+    const result = await Swal.fire({
+      title: 'Xác nhận cập nhật điểm',
+      html: `Bạn có chắc chắn muốn cập nhật điểm Mocktest ${editingMocktest} cho học viên <strong>${student.name}</strong>?`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#487FFF',
+      cancelButtonColor: '#6c757d',
+      confirmButtonText: 'Xác nhận',
+      cancelButtonText: 'Hủy'
+    });
+    
+    if (result.isConfirmed) {
+      try {
+        if (onUpdateMocktestScore && editingScheduleId) {
+          await onUpdateMocktestScore(student.id || student._id, editingScheduleId, mocktestScores);
+          toast.success('Cập nhật điểm thành công!');
+          setEditingMocktest(null);
+          setEditingScheduleId(null);
+          setMocktestScores({ reading: '', listening: '', writing: '', speaking: '' });
+        }
+      } catch (error) {
+        toast.error('Không thể cập nhật điểm. Vui lòng thử lại.');
+        console.error('Error updating mocktest score:', error);
+      }
+    }
   };
 
   const handleCancelEdit = () => {
@@ -63,14 +95,31 @@ const StudentDetailModal = ({
     setMocktestScores({ reading: '', listening: '', writing: '', speaking: '' });
   };
 
-  // Calculate total score
+  // Calculate total score based on program type
   const calculateTotal = (skillScores) => {
     if (!skillScores) return null;
-    let total = (skillScores.reading || 0) + 
-                (skillScores.listening || 0) + 
-                (skillScores.writing || 0) + 
-                (skillScores.speaking || 0);
-    return Math.round(total * 10) / 10;
+    
+    const programType = classInfo?.course?.program?.type?.toLowerCase() || 'ielts';
+    let totalScore = null;
+    
+    if (programType === 'ielts') {
+      // IELTS: Average of 4 skills
+      const sum = (skillScores.reading || 0) + 
+                  (skillScores.listening || 0) + 
+                  (skillScores.writing || 0) + 
+                  (skillScores.speaking || 0);
+      totalScore = sum > 0 ? (sum / 4).toFixed(1) : null;
+    } else if (programType === 'toeic') {
+      // TOEIC: Sum of 2 skills (max 990)
+      const sum = (skillScores.listening || 0) + (skillScores.reading || 0);
+      totalScore = sum > 0 ? sum : null;
+    } else if (programType === 'cam' || programType === 'cambridge') {
+      // Cambridge: Sum of 2 parts (max 30)
+      const sum = (skillScores.reading || 0) + (skillScores.listening || 0);
+      totalScore = sum > 0 ? sum : null;
+    }
+    
+    return totalScore;
   };
 
   return (
@@ -270,31 +319,40 @@ const StudentDetailModal = ({
                         ) : (
                           <>
                             <td className="px-16 py-12 text-center">
-                              <Badge className={`${skillScores?.reading ? 'bg-info-100 text-info-700' : 'bg-neutral-100 text-neutral-500'} px-8 py-4 text-13`}>
+                              <Badge className={`${skillScores?.reading ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-500'} px-8 py-4 text-13`}>
                                 {skillScores?.reading || '-'}
                               </Badge>
                             </td>
                             <td className="px-16 py-12 text-center">
-                              <Badge className={`${skillScores?.listening ? 'bg-purple-100 text-purple-700' : 'bg-neutral-100 text-neutral-500'} px-8 py-4 text-13`}>
+                              <Badge className={`${skillScores?.listening ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-500'} px-8 py-4 text-13`}>
                                 {skillScores?.listening || '-'}
                               </Badge>
                             </td>
                             <td className="px-16 py-12 text-center">
-                              <Badge className={`${skillScores?.writing ? 'bg-warning-100 text-warning-700' : 'bg-neutral-100 text-neutral-500'} px-8 py-4 text-13`}>
+                              <Badge className={`${skillScores?.writing ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-500'} px-8 py-4 text-13`}>
                                 {skillScores?.writing || '-'}
                               </Badge>
                             </td>
                             <td className="px-16 py-12 text-center">
-                              <Badge className={`${skillScores?.speaking ? 'bg-success-100 text-success-700' : 'bg-neutral-100 text-neutral-500'} px-8 py-4 text-13`}>
+                              <Badge className={`${skillScores?.speaking ? 'bg-primary-100 text-primary-700' : 'bg-neutral-100 text-neutral-500'} px-8 py-4 text-13`}>
                                 {skillScores?.speaking || '-'}
                               </Badge>
                             </td>
                             <td className="px-16 py-12 text-center">
                               <Badge className={`${
-                                totalScore >= 700 ? 'bg-success-600' : 
-                                totalScore >= 500 ? 'bg-warning-600' : 
-                                totalScore ? 'bg-danger-600' : 
-                                'bg-neutral-300'
+                                (() => {
+                                  const programType = classInfo?.course?.program?.type?.toLowerCase() || 'ielts';
+                                  if (!totalScore) return 'bg-neutral-300';
+                                  
+                                  if (programType === 'ielts') {
+                                    return totalScore >= 6.5 ? 'bg-success-600' : totalScore >= 5.0 ? 'bg-warning-600' : 'bg-danger-600';
+                                  } else if (programType === 'toeic') {
+                                    return totalScore >= 700 ? 'bg-success-600' : totalScore >= 500 ? 'bg-warning-600' : 'bg-danger-600';
+                                  } else if (programType === 'cam' || programType === 'cambridge') {
+                                    return totalScore >= 20 ? 'bg-success-600' : totalScore >= 15 ? 'bg-warning-600' : 'bg-danger-600';
+                                  }
+                                  return 'bg-neutral-300';
+                                })()
                               } text-white px-10 py-6 text-14 fw-semibold`}>
                                 {totalScore || '-'}
                               </Badge>

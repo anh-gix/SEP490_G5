@@ -63,7 +63,22 @@ const TeacherSchedule = () => {
         params.endDate = formatDateForAPI(endDate);
       }
 
+      console.log('[TeacherSchedule] Fetching schedules:', {
+        viewMode,
+        params,
+        hasDateRange: !!(startDate && endDate),
+        startDate: startDate ,
+        endDate: endDate
+      });
+
       const response = await teacherService.getCurrentTeacherSchedule(params);
+      
+      console.log('[TeacherSchedule] Response received:', {
+        success: response.success,
+        total: response.total,
+        schedulesCount: response.schedules?.length || 0
+      });
+
       
       if (response.success) {
         // Transform schedules to match frontend format
@@ -90,11 +105,8 @@ const TeacherSchedule = () => {
             material: schedule.material || [],
             mocktest: schedule.mocktest,
             status: schedule.status,
-            // Thêm teacher và substituteTeacher để filter
-            teacher: schedule.teacher,
-            substituteTeacher: schedule.substituteTeacher,
-            // Determine schedule status for filtering - truyền schedule vào để kiểm tra substituteTeacher
-            scheduleStatus: getScheduleStatus(schedule.date, schedule.startTime, schedule)
+            // Determine schedule status for filtering
+            scheduleStatus: getScheduleStatus(schedule.date, schedule.startTime)
           };
         });
 
@@ -111,44 +123,22 @@ const TeacherSchedule = () => {
 
 
 
-  const getScheduleStatus = (date, startTime, schedule) => {
-    // Kiểm tra nếu giáo viên hiện tại là teacher chính và có người dạy thay
-    if (user && user._id && schedule) {
-      const currentTeacherId = user._id.toString();
-      const scheduleTeacherId = schedule.teacher?._id?.toString() || schedule.teacher?.toString() || schedule.teacher;
-      const substituteTeacherId = schedule.substituteTeacher?._id?.toString() || schedule.substituteTeacher?.toString() || schedule.substituteTeacher;
-      
-      // Nếu giáo viên hiện tại là teacher chính và có substituteTeacher khác với teacher
-      if (scheduleTeacherId === currentTeacherId && substituteTeacherId && substituteTeacherId !== scheduleTeacherId) {
-        return 'absent'; // Trạng thái nghỉ dạy
-      }
-    }
-    
+  const getScheduleStatus = (date, startTime) => {
     // Parse date string safely to avoid timezone issues
     let scheduleDate;
     if (date instanceof Date) {
       scheduleDate = new Date(date);
     } else {
-      // If date is a string, parse it as local date (YYYY-MM-DD hoặc DD/MM/YYYY)
-      // Thử parse format DD/MM/YYYY trước (từ backend formatDateToVN)
-      const vnDateMatch = date.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-      if (vnDateMatch) {
-        const day = parseInt(vnDateMatch[1], 10);
-        const month = parseInt(vnDateMatch[2], 10) - 1;
-        const year = parseInt(vnDateMatch[3], 10);
-        scheduleDate = new Date(year, month, day);
+      // If date is a string, parse it as local date (YYYY-MM-DD)
+      const dateParts = date.split('T')[0].split('-');
+      if (dateParts.length === 3) {
+        scheduleDate = new Date(
+          parseInt(dateParts[0]), 
+          parseInt(dateParts[1]) - 1, 
+          parseInt(dateParts[2])
+        );
       } else {
-        // Thử parse format YYYY-MM-DD
-        const dateParts = date.split('T')[0].split('-');
-        if (dateParts.length === 3) {
-          scheduleDate = new Date(
-            parseInt(dateParts[0]), 
-            parseInt(dateParts[1]) - 1, 
-            parseInt(dateParts[2])
-          );
-        } else {
-          scheduleDate = new Date(date);
-        }
+        scheduleDate = new Date(date);
       }
     }
     

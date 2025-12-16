@@ -57,6 +57,7 @@ const upload = multer({
 router.get('/me', verifyToken, isStudent, studentController.getCurrentStudent);
 router.get('/me/dashboard', verifyToken, isStudent, studentController.getDashboardData);
 router.get('/me/classes', verifyToken, isStudent, studentController.getMyClasses);
+router.get('/me/classes/:classId', verifyToken, isStudent, studentController.getMyClassDetail);
 router.get('/me/schedule', verifyToken, isStudent, studentController.getMySchedule);
 router.get('/me/lessons/:scheduleId', verifyToken, isStudent, studentController.getLessonDetail);
 

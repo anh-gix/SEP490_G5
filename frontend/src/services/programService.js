@@ -2,6 +2,28 @@ import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8080/api/programs';
 
+// Create axios instance with interceptor for authentication
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Interceptor to add token to headers
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Program service functions
 export const programService = {
   // Lấy tất cả programs
@@ -11,6 +33,16 @@ export const programService = {
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy danh sách chương trình' };
+    }
+  },
+
+  // Lấy programs của teacher hiện tại
+  getMyPrograms: async (params = {}) => {
+    try {
+      const response = await api.get('/my-programs', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy danh sách chương trình của tôi' };
     }
   },
 

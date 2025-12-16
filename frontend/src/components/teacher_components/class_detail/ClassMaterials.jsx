@@ -227,10 +227,9 @@ const ClassMaterials = ({ classId, courseId, setShowMaterialModal, onMaterialsLo
         </div>
 
         {courseMaterials.length === 0 ? (
-          <div className="bg-white border-0 rounded-12 text-center py-40" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+          <div className="bg-white border-0 rounded-12 text-center py-10" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
             <i className="fas fa-book-open text-neutral-300 mb-3" style={{ fontSize: '48px' }}></i>
             <p className="text-neutral-500 mb-0">Chưa có tài liệu khóa học</p>
-            <p className="text-neutral-400 text-13 mt-2 mb-0">Tài liệu sẽ được cung cấp bởi khóa học</p>
           </div>
         ) : (
           <Row className="g-3">
@@ -351,9 +350,9 @@ const ClassMaterials = ({ classId, courseId, setShowMaterialModal, onMaterialsLo
                 </h6>
                 <Row className="g-3">
                   {group.materials.map((material, matIndex) => (
-                    <Col md={4} key={`material-${matIndex}`}>
+                    <Col md={2} key={`material-${matIndex}`}>
                       <Card className="border border-neutral-100 rounded-12 hover-shadow transition-2 h-100">
-                        <Card.Body className="p-20">
+                        <Card.Body className="p-20 pb-0">
                           <div className="d-flex align-items-start gap-12 mb-12">
                             <div className={`rounded-8 d-flex align-items-center justify-content-center ${getFileIconColor(material.url)}`}
                                  style={{ width: '40px', height: '40px', backgroundColor: '#F1F3F5' }}>
@@ -376,7 +375,10 @@ const ClassMaterials = ({ classId, courseId, setShowMaterialModal, onMaterialsLo
                             </div>
                           </div>
 
-                          <div className="d-flex gap-8">
+                          
+                        </Card.Body>
+                        <Card.Body className="p-20">
+                        <div className="d-flex gap-8">
                             <Button 
                               className="btn-outline-main flex-grow-1 text-12 px-12 py-6 radius-6"
                               onClick={() => handleDownloadMaterial(material.url, material.title || getFileName(material.url))}
@@ -412,7 +414,7 @@ const ClassMaterials = ({ classId, courseId, setShowMaterialModal, onMaterialsLo
                               </Button>
                             )}
                           </div>
-                        </Card.Body>
+                          </Card.Body>
                       </Card>
                     </Col>
                   ))}

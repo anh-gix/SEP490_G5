@@ -161,30 +161,6 @@ const ExamDetailPage2 = () => {
     }
   };
 
-  const handleFullTestClick = async () => {
-    try {
-      setStartingExam(true);
-      
-      // If no submission exists, create one by starting the exam
-      if (!submission) {
-        const result = await examService.startExam(id);
-        if (result.submission) {
-          setSubmission(result.submission);
-          navigate(`/exams/${id}/full-test`);
-        } else {
-          throw new Error('Không thể tạo bài làm');
-        }
-      } else {
-        // If submission exists, navigate directly
-        navigate(`/exams/${id}/full-test`);
-      }
-    } catch (err) {
-      console.error('Error starting exam:', err);
-      alert(err.message || 'Không thể bắt đầu làm bài. Vui lòng thử lại.');
-    } finally {
-      setStartingExam(false);
-    }
-  };
 
   // Show loading state
   if (loading) {
@@ -409,26 +385,17 @@ const ExamDetailPage2 = () => {
                       {/* Key and Document Icons - Only show when section is completed */}
                       {isCompleted && (
                         <div className="flex-center gap-8 justify-content-center">
-                          <i 
-                            className="ph ph-key text-neutral-400 text-xl transition-2"
-                            style={{
-                              cursor: "pointer",
-                              transition: "all 0.2s ease",
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color = "#3b82f6";
-                              e.currentTarget.style.transform = "scale(1.2)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.color = "";
-                              e.currentTarget.style.transform = "scale(1)";
-                            }}
-                          />
+                        
                           <i 
                             className="ph ph-file-text text-neutral-400 text-xl transition-2"
                             style={{
                               cursor: "pointer",
                               transition: "all 0.2s ease",
+                            }}
+                            onClick={() => {
+                              if (submission && submission._id) {
+                                navigate(`/exams/${id}/submissions/${submission._id}/${sectionType}/result`);
+                              }
                             }}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.color = "#3b82f6";
@@ -452,8 +419,8 @@ const ExamDetailPage2 = () => {
             <div
               className="bg-main-25 rounded-12 p-24 border border-neutral-30 position-relative"
             >
-              <div className="d-flex flex-wrap flex-between gap-16">
-                {/* Left: Icon and Label */}
+              <div className="d-flex flex-wrap flex-center gap-16" style={{ justifyContent: "center", alignItems: "center" }}>
+                {/* Icon and Label */}
                 <div className="flex-align gap-12">
                   <div className="w-48 h-48 bg-main-600 rounded-12 flex-center text-white text-2xl">
                     <i className="ph ph-squares-four" />
@@ -463,8 +430,8 @@ const ExamDetailPage2 = () => {
                   </div>
                 </div>
 
-                {/* Center: Progress Bar */}
-                <div style={{ flex: "1 1 auto", maxWidth: "400px" }}>
+                {/* Progress Bar */}
+                <div style={{ width: "100%", maxWidth: "400px" }}>
                   <div
                     className="position-relative rounded-pill"
                     style={{
@@ -499,24 +466,6 @@ const ExamDetailPage2 = () => {
                   </div>
                 </div>
 
-                {/* Right: Start Button */}
-                <button
-                  className="btn btn-main px-24 py-12 rounded-pill fw-semibold transition-2"
-                  onClick={handleFullTestClick}
-                  disabled={startingExam}
-                >
-                  {startingExam ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-8" />
-                      Đang tải...
-                    </>
-                  ) : (
-                    <>
-                      Làm Bài
-                      <i className="ph ph-lightning ms-8" />
-                    </>
-                  )}
-                </button>
               </div>
             </div>
           </div>

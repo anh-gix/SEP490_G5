@@ -10,7 +10,7 @@ import { courseService } from '../../../services/courseService';
 import approvalRequestService from '../../../services/approvalRequestService';
 import { formatDate } from '../../../helper/helper';
 
-const ProgramDetail = () => {
+const ProgramDetail = ({ viewMode = 'center-head' }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [program, setProgram] = useState(null);
@@ -26,6 +26,12 @@ const ProgramDetail = () => {
   // Get user role from localStorage
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const userRole = user.roleId?.name || user.role;
+
+  // Determine base path based on viewMode
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
+
+  // Center Head should not see edit/delete buttons
+  const isViewOnly = viewMode === 'center-head' || userRole === 'Center Head';
 
   useEffect(() => {
     fetchProgramDetail();
@@ -185,9 +191,9 @@ const ProgramDetail = () => {
   }
 
   const breadcrumbItems = [
-    { label: 'Dashboard', path: '/center-head/dashboard' },
-    { label: 'Chương trình đào tạo', path: '/center-head/programs' },
-    { label: program.program_name, path: `/center-head/programs/${id}` },
+    { label: 'Dashboard', path: `${basePath}/dashboard` },
+    { label: 'Chương trình đào tạo', path: `${basePath}/programs` },
+    { label: program.program_name, path: `${basePath}/programs/${id}` },
   ];
 
   const courseColumns = [
@@ -243,7 +249,7 @@ const ProgramDetail = () => {
               icon="ph ph-play-circle"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/center-head/programs/${id}/courses/${row._id}/edit`);
+                navigate(`${basePath}/programs/${id}/courses/${row._id}/edit`);
               }}
             >
               <span className="d-none d-md-inline">Tiếp tục</span>
@@ -251,15 +257,15 @@ const ProgramDetail = () => {
             </Button>
           )}
 
-          {/* Completed: Show "Edit" button to edit via form - only for non-Center Head */}
-          {row.status === 'completed' && userRole !== 'Center Head' && (
+          {/* Completed: Show "Edit" button to edit via form - only for non-view-only */}
+          {row.status === 'completed' && !isViewOnly && (
             <Button
               variant="outline"
               size="sm"
               icon="ph ph-pencil"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/center-head/programs/${id}/courses/${row._id}/edit-form`);
+                navigate(`${basePath}/programs/${id}/courses/${row._id}/edit-form`);
               }}
             >
               <span className="d-none d-md-inline">Sửa</span>
@@ -274,15 +280,15 @@ const ProgramDetail = () => {
             icon="ph ph-eye"
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/center-head/courses/${row._id}/details`);
+              navigate(`${basePath}/courses/${row._id}/details`);
             }}
           >
             <span className="d-none d-md-inline">Xem</span>
             <span className="d-inline d-md-none">👁</span>
           </Button>
 
-          {/* Delete button - only for non-Center Head */}
-          {userRole !== 'Center Head' && (
+          {/* Delete button - only for non-view-only */}
+          {!isViewOnly && (
             <Button
               variant="danger"
               size="sm"
@@ -434,12 +440,12 @@ const ProgramDetail = () => {
             </>
           )}
 
-          {/* Edit button - only for non-Center Head */}
-          {userRole !== 'Center Head' && (
+          {/* Edit button - only for non-view-only */}
+          {!isViewOnly && (
             <Button
               variant="outline"
               icon="ph ph-pencil-simple"
-              onClick={() => navigate(`/center-head/programs/${id}/edit`)}
+              onClick={() => navigate(`${basePath}/programs/${id}/edit`)}
             >
               Chỉnh sửa
             </Button>
@@ -468,19 +474,25 @@ const ProgramDetail = () => {
 
       {/* Stats Cards */}
       <div className="row g-3 g-md-4 mb-24">
-        <div className="col-6 col-md-4">
+        <div className="col-6 col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng PLOs</h6>
             <h4 className="text-main-600 fw-bold mb-0">{program.plos?.length || 0}</h4>
           </Card>
         </div>
-        <div className="col-6 col-md-4">
+        <div className="col-6 col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng Courses</h6>
             <h4 className="text-success-600 fw-bold mb-0">{courses.length}</h4>
           </Card>
         </div>
-        <div className="col-6 col-md-4">
+        <div className="col-6 col-md-3">
+          <Card>
+            <h6 className="text-neutral-600 mb-8">Người tạo</h6>
+            <h6 className="text-neutral-900 fw-bold mb-0">{program.createdBy?.username || 'N/A'}</h6>
+          </Card>
+        </div>
+        <div className="col-6 col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Cập nhật lần cuối</h6>
             <h6 className="text-neutral-600 fw-bold mb-0">{formatDate(program.updatedAt)}</h6>
@@ -539,11 +551,11 @@ const ProgramDetail = () => {
               Các môn học thuộc chương trình này
             </p>
           </div>
-          {/* Show Create Course button only when program is draft or needs_revision */}
-          {(program?.status === 'draft' || program?.status === 'needs_revision') && (
+          {/* Show Create Course button only when program is draft or needs_revision and not view-only */}
+          {!isViewOnly && (program?.status === 'draft' || program?.status === 'needs_revision') && (
             <Button
               variant="primary"
-              onClick={() => navigate(`/center-head/programs/${id}/courses/create`)}
+              onClick={() => navigate(`${basePath}/programs/${id}/courses/create`)}
             >
               <i className="ph ph-plus me-2"></i>
               Tạo học phần mới
@@ -555,7 +567,7 @@ const ProgramDetail = () => {
           <Table
             columns={courseColumns}
             data={courses}
-            onRowClick={(row) => navigate(`/center-head/courses/${row._id}/details`)}
+            onRowClick={(row) => navigate(`${basePath}/courses/${row._id}/details`)}
           />
         ) : (
           <div className="text-center py-5 text-neutral-600">

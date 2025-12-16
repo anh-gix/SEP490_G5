@@ -71,17 +71,6 @@ const AcademicDashboard = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
-        <div className="text-center py-5">
-          <Spinner animation="border" variant="primary" />
-          <p className="mt-3 text-neutral-500">Đang tải dữ liệu...</p>
-        </div>
-      </Container>
-    );
-  }
-
   // Filter only absent students (not late) for the sidebar
   const absentOnlyStudents = absentStudentsList.filter(student => student.status === 'absent');
 

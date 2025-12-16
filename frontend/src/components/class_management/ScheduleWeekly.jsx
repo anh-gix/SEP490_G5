@@ -1,10 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, Button, Badge } from 'react-bootstrap';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
 
-const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
+const ScheduleWeekly = ({ schedules, onScheduleClick, selectedWeek, onWeekChange }) => {
+  // Sử dụng selectedWeek từ props, nếu không có thì dùng current date
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
+    if (selectedWeek) {
+      return selectedWeek;
+    }
     const today = new Date();
     const dayOfWeek = today.getDay();
     const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Start from Monday
@@ -13,6 +17,13 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
     monday.setHours(0, 0, 0, 0);
     return monday;
   });
+
+  // Sync currentWeekStart với selectedWeek prop
+  useEffect(() => {
+    if (selectedWeek) {
+      setCurrentWeekStart(selectedWeek);
+    }
+  }, [selectedWeek]);
 
   // Time slots configuration - each slot is 2 hours from 8:00 to 20:00
   const timeSlots = useMemo(() => {
@@ -80,12 +91,18 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
     const newDate = new Date(currentWeekStart);
     newDate.setDate(currentWeekStart.getDate() - 7);
     setCurrentWeekStart(newDate);
+    if (onWeekChange) {
+      onWeekChange(newDate);
+    }
   };
 
   const goToNextWeek = () => {
     const newDate = new Date(currentWeekStart);
     newDate.setDate(currentWeekStart.getDate() + 7);
     setCurrentWeekStart(newDate);
+    if (onWeekChange) {
+      onWeekChange(newDate);
+    }
   };
 
   const goToCurrentWeek = () => {
@@ -96,6 +113,9 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
     monday.setDate(today.getDate() + diff);
     monday.setHours(0, 0, 0, 0);
     setCurrentWeekStart(monday);
+    if (onWeekChange) {
+      onWeekChange(monday);
+    }
   };
 
   const formatWeekRange = () => {

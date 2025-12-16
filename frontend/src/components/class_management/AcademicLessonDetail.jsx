@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Container, Card, Row, Col, Badge, Button, Spinner, Alert } from 'react-bootstrap';
-import EditScheduleModal from './EditScheduleModal';
 import MakeupClassModal from './MakeupClassModal';
 import scheduleService from '../../services/scheduleService';
 import classService from '../../services/classService';
@@ -18,7 +17,6 @@ const AcademicLessonDetail = () => {
   const [lessonData, setLessonData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showMakeupModal, setShowMakeupModal] = useState(false);
   const [classes, setClasses] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -131,19 +129,6 @@ const AcademicLessonDetail = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId]);
 
-  const handleEditSchedule = async (scheduleData) => {
-    try {
-      // TODO: Call API to update schedule
-      console.log('Update schedule:', scheduleData);
-      setShowEditModal(false);
-      alert('Cập nhật lịch học thành công!');
-      await fetchLessonData();
-    } catch (err) {
-      console.error('Error updating schedule:', err);
-      alert('Có lỗi xảy ra khi cập nhật lịch học!');
-    }
-  };
-
   const handleCreateMakeup = async (makeupData) => {
     try {
       // TODO: Call API to create makeup class
@@ -209,13 +194,6 @@ const AcademicLessonDetail = () => {
             </p>
           </div>
           <div className="d-flex gap-12">
-            <Button 
-              className="btn-outline-warning text-13 px-16 py-8 radius-8"
-              onClick={() => setShowEditModal(true)}
-            >
-              <i className="fas fa-edit me-2"></i>
-              Chỉnh sửa lịch
-            </Button>
             <Button 
               className="btn-outline-info text-13 px-16 py-8 radius-8"
               onClick={() => setShowMakeupModal(true)}
@@ -459,31 +437,6 @@ const AcademicLessonDetail = () => {
           </Card>
         </Col>
       </Row>
-
-      {/* Modals */}
-      {showEditModal && lessonData && (
-        <EditScheduleModal
-          schedule={{
-            id: lessonData.id,
-            classId: lessonData.classId,
-            teacherId: lessonData.teacherId,
-            roomId: lessonData.roomId,
-            date: lessonData.date,
-            startTime: lessonData.startTime,
-            endTime: lessonData.endTime,
-            lessonNumber: lessonData.lessonNumber,
-            lessonTopic: lessonData.lessonTopic,
-            status: lessonData.status,
-            type: lessonData.type
-          }}
-          classes={classes}
-          teachers={teachers}
-          rooms={rooms}
-          onClose={() => setShowEditModal(false)}
-          onSubmit={handleEditSchedule}
-          existingSchedules={schedules}
-        />
-      )}
 
       {showMakeupModal && lessonData && (
         <MakeupClassModal

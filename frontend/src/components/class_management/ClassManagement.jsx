@@ -107,12 +107,6 @@ const ClassManagement = () => {
 
   return (
     <Container fluid className="py-24 px-24">
-      {loading && (
-        <div className="text-center py-5">
-          <Spinner animation="border" variant="primary" />
-          <p className="mt-3 text-neutral-500">Đang tải dữ liệu...</p>
-        </div>
-      )}
 
       {error && (
         <Alert variant="danger" dismissible onClose={() => setError(null)} className="mb-24">

@@ -95,17 +95,6 @@ const EditClassPage = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <AcademicLayout>
-        <div className="text-center py-5">
-          <Spinner animation="border" variant="primary" />
-          <p className="mt-3 text-neutral-500">Đang tải dữ liệu...</p>
-        </div>
-      </AcademicLayout>
-    );
-  }
-
   if (error) {
     return (
       <AcademicLayout>

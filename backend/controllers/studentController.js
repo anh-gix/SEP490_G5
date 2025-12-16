@@ -1547,17 +1547,6 @@ exports.importStudents = async (req, res) => {
           continue;
         }
         
-        // Check if username exists
-        const usernameExists = await User.findOne({ username: studentData.username });
-        if (usernameExists) {
-          results.failed.push({
-            email: studentData.email,
-            username: studentData.username,
-            phone: studentData.phone || '',
-            reason: 'Username đã tồn tại trong hệ thống'
-          });
-          continue;
-        }
         
         // Check if phone number exists
         if (studentData.phone) {

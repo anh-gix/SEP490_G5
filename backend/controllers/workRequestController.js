@@ -371,7 +371,7 @@ exports.getAllRequests = async (req, res) => {
 
     // Execute query
     const [requests, total] = await Promise.all([
-      WorkRequest.find(query)
+      WorkRequest.find()
         .populate('requestedBy', 'name email username')
         .populate('assignedTo', 'name email username')
         .populate('processedBy', 'name email username')
@@ -1063,7 +1063,6 @@ exports.getStats = async (req, res) => {
  *   requestNote: string,
  *   entityType?: 'Course',
  *   entityId?: courseId (for edit_course),
- *   changeDetails?: object (for edit_course),
  *   requestedBy: centerHeadUserId
  * }
  * Files: attachmentFile, inputFile (multipart/form-data)
@@ -1079,7 +1078,6 @@ exports.createTopDownRequest = async (req, res) => {
       requestNote,
       entityType,
       entityId,
-      changeDetails,
       requestedBy
     } = req.body;
 
@@ -1134,16 +1132,6 @@ exports.createTopDownRequest = async (req, res) => {
       }
       workRequestData.entityType = entityType;
       workRequestData.entityId = entityId;
-
-      if (changeDetails) {
-        try {
-          workRequestData.changeDetails = typeof changeDetails === 'string'
-            ? JSON.parse(changeDetails)
-            : changeDetails;
-        } catch (e) {
-          workRequestData.changeDetails = { description: changeDetails };
-        }
-      }
     }
 
     // Handle file uploads (if using multer)

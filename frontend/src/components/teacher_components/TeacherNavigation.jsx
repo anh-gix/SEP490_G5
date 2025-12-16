@@ -77,6 +77,12 @@ const TeacherNavigation = () => {
       icon: 'fa-file-alt',
       path: '/teacher/exams',
       color: 'info'
+    },
+    {
+      title: 'Tips học tập',
+      icon: 'fa-lightbulb',
+      path: '/teacher/tips',
+      color: 'warning'
     }
   ];
 

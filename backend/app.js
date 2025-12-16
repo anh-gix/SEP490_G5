@@ -44,7 +44,6 @@ app.use('/api/cam-sessions', require('./routes/camSessionRoutes'));
 app.use('/api/rooms', require('./routes/roomRoutes'));
 app.use('/api/teachers', require('./routes/teacherRoutes'));
 app.use('/api/students', require('./routes/studentRoutes'));
-app.use('/api/reports', require('./routes/reportRoutes'));
 
 // Class Routes
 app.use('/api/classes', require('./routes/classRoutes'));

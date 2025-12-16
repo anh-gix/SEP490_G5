@@ -21,8 +21,9 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
   const { sessionId } = useParams();
   const navigate = useNavigate();
 
-  // Determine base path
+  // Determine base path and permissions
   const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
+  const canEdit = viewMode === 'teacher'; // Only teacher can edit
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(null);
@@ -286,21 +287,27 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
     <div className="cam-session-edit">
       <div className="d-flex justify-content-between align-items-start mb-4">
         <div>
-          <h5 className="mb-1">Chỉnh sửa CAM Session</h5>
-          <p className="text-muted mb-0">Quản lý nội dung, quiz và từ vựng của buổi học.</p>
+          <h5 className="mb-1">{canEdit ? 'Chỉnh sửa CAM Session' : 'Xem chi tiết CAM Session'}</h5>
+          <p className="text-muted mb-0">
+            {canEdit
+              ? 'Quản lý nội dung, quiz và từ vựng của buổi học.'
+              : 'Xem nội dung, quiz và từ vựng của buổi học.'}
+          </p>
         </div>
         <div className="d-flex gap-2">
           <Button variant="outline" icon="ph ph-arrow-left" onClick={handleBack}>
             Quay lại
           </Button>
-          <Button
-            variant="primary"
-            icon="ph ph-check"
-            onClick={handleSave}
-            disabled={saving}
-          >
-            Lưu thay đổi
-          </Button>
+          {canEdit && (
+            <Button
+              variant="primary"
+              icon="ph ph-check"
+              onClick={handleSave}
+              disabled={saving}
+            >
+              Lưu thay đổi
+            </Button>
+          )}
         </div>
       </div>
 
@@ -312,6 +319,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
               className="form-control"
               value={formData.title}
               onChange={(e) => handleFieldChange('title', e.target.value)}
+              disabled={!canEdit}
             />
           </div>
           <div className="col-md-6">
@@ -320,6 +328,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
               className="form-select"
               value={formData.sessionType}
               onChange={(e) => handleFieldChange('sessionType', e.target.value)}
+              disabled={!canEdit}
             >
               <option value="reading">Reading</option>
               <option value="listening">Listening</option>
@@ -334,6 +343,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
               rows={3}
               value={formData.description}
               onChange={(e) => handleFieldChange('description', e.target.value)}
+              disabled={!canEdit}
             />
           </div>
           <div className="col-12">
@@ -341,6 +351,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
             <input
               className="form-control"
               value={formData.videoURL}
+              disabled={!canEdit}
               onChange={(e) => handleFieldChange('videoURL', e.target.value)}
             />
           </div>
@@ -357,28 +368,30 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                 className="form-control"
                 value={formData?.quizzes?.quiz?.length || 0}
                 onChange={(e) => handleSetQuizCount(e.target.value)}
-                disabled={saving}
+                disabled={!canEdit || saving}
               />
             </div>
-            <div className="col-md-8 d-flex justify-content-end">
-              <div className="d-flex align-items-center gap-2">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  icon="ph ph-plus"
-                  onClick={() => {
-                    if ((formData?.quizzes?.quiz?.length || 0) >= 10) {
-                      alert('Số lượng quiz không được vượt quá 10.');
-                      return;
-                    }
-                    handleAddQuiz();
-                  }}
-                  disabled={saving}
-                >
-                  Thêm 1 quiz
-                </Button>
+            {canEdit && (
+              <div className="col-md-8 d-flex justify-content-end">
+                <div className="d-flex align-items-center gap-2">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon="ph ph-plus"
+                    onClick={() => {
+                      if ((formData?.quizzes?.quiz?.length || 0) >= 10) {
+                        alert('Số lượng quiz không được vượt quá 10.');
+                        return;
+                      }
+                      handleAddQuiz();
+                    }}
+                    disabled={saving}
+                  >
+                    Thêm 1 quiz
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
           {(formData?.quizzes?.quiz || []).length === 0 ? (
             <p className="text-muted mb-0">Chưa có quiz nào.</p>
@@ -404,12 +417,12 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                       <Button
                         variant="outline"
                         size="sm"
-                        icon="ph ph-pencil"
+                        icon={canEdit ? "ph ph-pencil" : "ph ph-eye"}
                         onClick={() => openQuizModal(index)}
                         disabled={saving}
                       >
-                        Xem Chi Tiết
-                      </Button>                     
+                        {canEdit ? 'Xem Chi Tiết' : 'Xem'}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -429,28 +442,30 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                 className="form-control"
                 value={formData?.vocabulary?.items?.length || 0}
                 onChange={(e) => handleSetVocabularyCount(e.target.value)}
-                disabled={saving}
+                disabled={!canEdit || saving}
               />
             </div>
-            <div className="col-md-8 d-flex justify-content-end">
-              <div className="d-flex align-items-center gap-2">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  icon="ph ph-plus"
-                  onClick={() => {
-                    if ((formData?.vocabulary?.items?.length || 0) >= 10) {
-                      alert('Số lượng từ vựng không được vượt quá 10.');
-                      return;
-                    }
-                    handleAddVocabulary();
-                  }}
-                  disabled={saving}
-                >
-                  Thêm 1 từ vựng
-                </Button>
+            {canEdit && (
+              <div className="col-md-8 d-flex justify-content-end">
+                <div className="d-flex align-items-center gap-2">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon="ph ph-plus"
+                    onClick={() => {
+                      if ((formData?.vocabulary?.items?.length || 0) >= 10) {
+                        alert('Số lượng từ vựng không được vượt quá 10.');
+                        return;
+                      }
+                      handleAddVocabulary();
+                    }}
+                    disabled={saving}
+                  >
+                    Thêm 1 từ vựng
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
           {(formData?.vocabulary?.items || []).length === 0 ? (
             <p className="text-muted mb-0">Chưa có từ vựng nào.</p>
@@ -466,13 +481,12 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                       <Button
                         variant="outline"
                         size="sm"
-                        icon="ph ph-pencil"
+                        icon={canEdit ? "ph ph-pencil" : "ph ph-eye"}
                         onClick={() => openVocabModal(idx)}
                         disabled={saving}
                       >
-                        Xem Chi Tiết
+                        {canEdit ? 'Xem Chi Tiết' : 'Xem'}
                       </Button>
-                    
                     </div>
                   </div>
                 </div>
@@ -487,36 +501,44 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
         onClose={closeEditModal}
         title={
           editModal.type === 'quiz'
-            ? `Chỉnh sửa Quiz #${(editModal.index ?? 0) + 1}`
+            ? `${canEdit ? 'Chỉnh sửa' : 'Xem'} Quiz #${(editModal.index ?? 0) + 1}`
             : editModal.type === 'vocab'
-              ? `Chỉnh sửa Từ vựng #${(editModal.index ?? 0) + 1}`
+              ? `${canEdit ? 'Chỉnh sửa' : 'Xem'} Từ vựng #${(editModal.index ?? 0) + 1}`
               : ''
         }
         size="lg"
         footer={
-          <div className="d-flex justify-content-between align-items-center w-100">
-            <Button
-              variant="danger"
-              icon="ph ph-trash"
-              onClick={handleDeleteFromModal}
-              disabled={saving || editModal.index == null}
-            >
-              Xóa mục này
-            </Button>
-            <div className="d-flex gap-2">
-              <Button variant="outline" onClick={closeEditModal} disabled={saving}>
-                Hủy
-              </Button>
+          canEdit ? (
+            <div className="d-flex justify-content-between align-items-center w-100">
               <Button
-                variant="primary"
-                icon="ph ph-check"
-                onClick={handleSaveModal}
-                disabled={saving || !editItemData}
+                variant="danger"
+                icon="ph ph-trash"
+                onClick={handleDeleteFromModal}
+                disabled={saving || editModal.index == null}
               >
-                Lưu thay đổi
+                Xóa mục này
+              </Button>
+              <div className="d-flex gap-2">
+                <Button variant="outline" onClick={closeEditModal} disabled={saving}>
+                  Hủy
+                </Button>
+                <Button
+                  variant="primary"
+                  icon="ph ph-check"
+                  onClick={handleSaveModal}
+                  disabled={saving || !editItemData}
+                >
+                  Lưu thay đổi
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="d-flex justify-content-end w-100">
+              <Button variant="outline" onClick={closeEditModal}>
+                Đóng
               </Button>
             </div>
-          </div>
+          )
         }
       >
         {!editItemData ? (
@@ -530,6 +552,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                   className="form-select"
                   value={editItemData.Type || 'multiple-choice'}
                   onChange={(e) => handleModalFieldChange('Type', e.target.value)}
+                  disabled={!canEdit}
                 >
                   <option value="multiple-choice">Multiple Choice</option>
                   <option value="yes-no">Yes/No</option>
@@ -545,29 +568,32 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                     placeholder="Dán URL ảnh..."
                     value={editItemData.Img || ''}
                     onChange={(e) => handleModalFieldChange('Img', e.target.value)}
+                    disabled={!canEdit}
                   />
-                  <div className="d-flex flex-column gap-1">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="form-control"
-                      onChange={(e) => handleModalImageFileChange(e, 'Img')}
-                    />
-                    <p className="text-xs text-neutral-500 mb-0">
-                      <i className="ph ph-info me-1"></i>
-                      Bạn có thể dán URL ảnh hoặc chọn file từ thiết bị. File sẽ được hiển thị bằng URL tạm thời.
-                    </p>
-                    {editItemData.Img && (
-                      <div className="mt-1">
-                        <img
-                          src={editItemData.Img}
-                          alt="Quiz preview"
-                          style={{ maxHeight: '160px', borderRadius: '8px' }}
-                          className="border border-neutral-200"
-                        />
-                      </div>
-                    )}
-                  </div>
+                  {canEdit && (
+                    <div className="d-flex flex-column gap-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="form-control"
+                        onChange={(e) => handleModalImageFileChange(e, 'Img')}
+                      />
+                      <p className="text-xs text-neutral-500 mb-0">
+                        <i className="ph ph-info me-1"></i>
+                        Bạn có thể dán URL ảnh hoặc chọn file từ thiết bị. File sẽ được hiển thị bằng URL tạm thời.
+                      </p>
+                    </div>
+                  )}
+                  {editItemData.Img && (
+                    <div className="mt-1">
+                      <img
+                        src={editItemData.Img}
+                        alt="Quiz preview"
+                        style={{ maxHeight: '160px', borderRadius: '8px' }}
+                        className="border border-neutral-200"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="col-12">
@@ -577,6 +603,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                   rows={3}
                   value={editItemData.Question || ''}
                   onChange={(e) => handleModalFieldChange('Question', e.target.value)}
+                  disabled={!canEdit}
                 />
               </div>
             </div>
@@ -589,23 +616,28 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                     className="form-control"
                     value={answer}
                     onChange={(e) => handleModalAnswerList('Answer', idx, e.target.value)}
+                    disabled={!canEdit}
                   />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    icon="ph ph-x"
-                    onClick={() => handleModalRemoveAnswer('Answer', idx)}
-                  />
+                  {canEdit && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon="ph ph-x"
+                      onClick={() => handleModalRemoveAnswer('Answer', idx)}
+                    />
+                  )}
                 </div>
               ))}
-              <Button
-                variant="secondary"
-                size="xs"
-                icon="ph ph-plus"
-                onClick={() => handleModalAddAnswer('Answer')}
-              >
-                Thêm đáp án
-              </Button>
+              {canEdit && (
+                <Button
+                  variant="secondary"
+                  size="xs"
+                  icon="ph ph-plus"
+                  onClick={() => handleModalAddAnswer('Answer')}
+                >
+                  Thêm đáp án
+                </Button>
+              )}
             </div>
 
             <div>
@@ -616,23 +648,28 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                     className="form-control"
                     value={answer}
                     onChange={(e) => handleModalAnswerList('AnswerKey', idx, e.target.value)}
+                    disabled={!canEdit}
                   />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    icon="ph ph-x"
-                    onClick={() => handleModalRemoveAnswer('AnswerKey', idx)}
-                  />
+                  {canEdit && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon="ph ph-x"
+                      onClick={() => handleModalRemoveAnswer('AnswerKey', idx)}
+                    />
+                  )}
                 </div>
               ))}
-              <Button
-                variant="secondary"
-                size="xs"
-                icon="ph ph-plus"
-                onClick={() => handleModalAddAnswer('AnswerKey')}
-              >
-                Thêm đáp án đúng
-              </Button>
+              {canEdit && (
+                <Button
+                  variant="secondary"
+                  size="xs"
+                  icon="ph ph-plus"
+                  onClick={() => handleModalAddAnswer('AnswerKey')}
+                >
+                  Thêm đáp án đúng
+                </Button>
+              )}
             </div>
           </div>
         ) : editModal.type === 'vocab' ? (
@@ -643,6 +680,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                 className="form-control"
                 value={editItemData.word || ''}
                 onChange={(e) => handleModalFieldChange('word', e.target.value)}
+                disabled={!canEdit}
               />
             </div>
             <div className="col-md-6">
@@ -653,29 +691,32 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                   placeholder="Dán URL ảnh..."
                   value={editItemData.img || ''}
                   onChange={(e) => handleModalFieldChange('img', e.target.value)}
+                  disabled={!canEdit}
                 />
-                <div className="d-flex flex-column gap-1">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="form-control"
-                    onChange={(e) => handleModalImageFileChange(e, 'img')}
-                  />
-                  <p className="text-xs text-neutral-500 mb-0">
-                    <i className="ph ph-info me-1"></i>
-                    Bạn có thể dán URL ảnh hoặc chọn file từ thiết bị.
-                  </p>
-                  {editItemData.img && (
-                    <div className="mt-1">
-                      <img
-                        src={editItemData.img}
-                        alt="Vocabulary preview"
-                        style={{ maxHeight: '120px', borderRadius: '8px' }}
-                        className="border border-neutral-200"
-                      />
-                    </div>
-                  )}
-                </div>
+                {canEdit && (
+                  <div className="d-flex flex-column gap-1">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="form-control"
+                      onChange={(e) => handleModalImageFileChange(e, 'img')}
+                    />
+                    <p className="text-xs text-neutral-500 mb-0">
+                      <i className="ph ph-info me-1"></i>
+                      Bạn có thể dán URL ảnh hoặc chọn file từ thiết bị.
+                    </p>
+                  </div>
+                )}
+                {editItemData.img && (
+                  <div className="mt-1">
+                    <img
+                      src={editItemData.img}
+                      alt="Vocabulary preview"
+                      style={{ maxHeight: '120px', borderRadius: '8px' }}
+                      className="border border-neutral-200"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>

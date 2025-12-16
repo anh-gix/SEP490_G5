@@ -27,6 +27,10 @@ import TeacherExamCreatePage from "../pages/TeacherPages/TeacherExamCreatePage.j
 import TeacherExamViewPage from "../pages/TeacherPages/TeacherExamViewPage.jsx";
 import TeacherExamEditPage from "../pages/TeacherPages/TeacherExamEditPage.jsx";
 
+// Tips Management
+import TeacherTipsManagementPage from "../pages/TeacherPages/TeacherTipsManagementPage.jsx";
+import TeacherTipEditorPage from "../pages/TeacherPages/TeacherTipEditorPage.jsx";
+
 /**
  * TeacherRoutes
  *
@@ -99,4 +103,8 @@ export const teacherRoutes = [
   { path: '/teacher/exams/create', element: <TeacherExamCreatePage /> },
   { path: '/teacher/exams/:id', element: <TeacherExamViewPage /> },
   { path: '/teacher/exams/:id/edit', element: <TeacherExamEditPage /> },
+
+  // IX. Tips Management
+  { path: '/teacher/tips', element: <TeacherTipsManagementPage /> },
+  { path: '/teacher/tips/edit/:section', element: <TeacherTipEditorPage /> },
 ];

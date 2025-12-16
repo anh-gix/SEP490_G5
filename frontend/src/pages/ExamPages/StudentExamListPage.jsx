@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import examService from "../../services/examService";
 
 
-const StudentExamListPage2 = () => {
+const StudentExamListPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState("all");
@@ -470,4 +470,4 @@ const StudentExamListPage2 = () => {
   );
 };
 
-export default StudentExamListPage2;
+export default StudentExamListPage;

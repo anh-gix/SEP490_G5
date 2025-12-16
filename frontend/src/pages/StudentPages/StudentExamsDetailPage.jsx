@@ -1,7 +1,7 @@
 import React from 'react';
 
 import StudentNavigation from '../../components/student_components/StudentNavigation';
-import ExamDetailPage from '../ExamPages/ExamDetailPage2';
+import ExamDetailPage from '../ExamPages/ExamDetailPage';
 
 
 

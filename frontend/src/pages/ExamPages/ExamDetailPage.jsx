@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import examService from "../../services/examService";
 
 
-const ExamDetailPage2 = () => {
+const ExamDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [exam, setExam] = useState(null);
@@ -621,5 +621,5 @@ const ExamDetailPage2 = () => {
   );
 };
 
-export default ExamDetailPage2;
+export default ExamDetailPage;
 

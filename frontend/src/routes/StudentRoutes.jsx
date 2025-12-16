@@ -58,6 +58,7 @@ export const studentRoutes = [
   { path: '/student/toeic/test/:testId', element: <ToeicTestTaking /> },
   { path: '/student/toeic/result/:testId', element: <ToeicTestResult /> },
   { path: '/student/toeic/history', element: <ToeicTestHistory /> },
+  // Exams Practice
   { path: '/student/practice-exams', element: <StudentExamPage /> },
   { path: '/student/exams/:id', element: <StudentExamsDetailPage /> },
   { path: '/student/exams/:examId/submissions/:submissionId/reading/result', element: <StudentReadingResultPage /> },

@@ -365,14 +365,14 @@ const WritingResultPage = () => {
               {/* Actions */}
               <div className="text-center">
                 <Link
-                  to={`/exams/${examId}/2`}
+                  to={`/student/exams/${examId}`}
                   className="btn btn-main px-40 py-16 rounded-pill me-16"
                 >
                   <i className="ph ph-arrow-left me-8" />
                   Quay lại bài thi
                 </Link>
                 <Link
-                  to="/exams2"
+                  to={"/student/practice-exams"}
                   className="btn btn-outline-main px-40 py-16 rounded-pill"
                 >
                   <i className="ph ph-list me-8" />

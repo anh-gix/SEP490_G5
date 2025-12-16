@@ -34,6 +34,12 @@ router.get("/", examController.getAllExams);
 // 🧩 Bắt đầu làm bài (protected - cần đăng nhập)
 router.post("/start", verifyToken, examController.startExam);
 
+// 🧩 Tạo submission mới (làm lại) (protected - cần đăng nhập)
+router.post("/create-new-submission", verifyToken, examController.createNewSubmission);
+
+// 🧩 Lấy danh sách submissions của một exam (protected)
+router.get("/:examId/submissions", verifyToken, examController.getExamSubmissions);
+
 // ================== SECTION ROUTES - Mỗi section type có route riêng ==================
 //  Lấy thông tin section Reading (protected) - phải đặt trước route /:id
 router.get("/:examId/submissions/:submissionId/reading", verifyToken, examController.getReadingSection);

@@ -16,6 +16,7 @@ import StudentOnlineCourseDetailPage from "../pages/StudentPages/StudentOnlineCo
 import StudentSessionLearningPage from "../pages/StudentPages/StudentSessionLearningPage.jsx";
 import StudentApplicationsPage from "../pages/StudentPages/StudentApplicationsPage.jsx";
 import StudentExamPage from "../pages/StudentPages/StudentExamPage.jsx";
+import StudentExamsDetailPage from "../pages/StudentPages/StudentExamsDetailPage.jsx";
 
 /**
  * StudentRoutes
@@ -54,6 +55,7 @@ export const studentRoutes = [
   { path: '/student/toeic/result/:testId', element: <ToeicTestResult /> },
   { path: '/student/toeic/history', element: <ToeicTestHistory /> },
   { path: '/student/practice-exams', element: <StudentExamPage /> },
+  { path: '/student/exams/:id', element: <StudentExamsDetailPage /> },
 
   // VII. Materials (future)
   // { path: '/student/materials', element: <StudentMaterialsPage /> },

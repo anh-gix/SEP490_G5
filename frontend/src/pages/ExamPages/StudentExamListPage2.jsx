@@ -449,7 +449,7 @@ const StudentExamListPage2 = () => {
                       {/* Action Button */}
                       <div className="pt-24 border-top border-neutral-50 mt-28">
                         <Link
-                          to={`/exams/${exam._id}/2`}
+                          to={`/student/exams/${exam._id}`}
                           className="btn btn-main flex-center gap-8 transition-2"
                           style={{ width: '100%' }}
                         >

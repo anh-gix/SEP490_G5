@@ -7,10 +7,17 @@ const ExamDetailPage2 = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [exam, setExam] = useState(null);
-  const [submission, setSubmission] = useState(null);
+  const [submissions, setSubmissions] = useState([]);
+  const [selectedSubmissionId, setSelectedSubmissionId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [startingExam, setStartingExam] = useState(false);
+
+  // Tính submission hiện tại từ submissions và selectedSubmissionId
+  const submission = useMemo(() => {
+    if (!selectedSubmissionId || submissions.length === 0) return null;
+    return submissions.find(sub => sub._id === selectedSubmissionId) || null;
+  }, [submissions, selectedSubmissionId]);
 
   // Fetch exam data on component mount
   useEffect(() => {
@@ -33,17 +40,25 @@ const ExamDetailPage2 = () => {
     }
   }, [id]);
 
-  // Fetch submission after exam is loaded
+  // Fetch submissions history after exam is loaded
   useEffect(() => {
-    const fetchSubmission = async () => {
+    const fetchSubmissions = async () => {
       if (!exam || !id) return;
       
       try {
-        // Try to get existing submission by calling startExam
-        // This will return existing submission if available, or create new one
-        const result = await examService.startExam(id);
-        if (result.submission) {
-          setSubmission(result.submission);
+        // Fetch all submissions for this exam
+        const result = await examService.getExamSubmissions(id);
+        if (result.submissions && result.submissions.length > 0) {
+          setSubmissions(result.submissions);
+          // Set the latest submission as default
+          setSelectedSubmissionId(result.submissions[0]._id);
+        } else {
+          // If no submissions, try to get/create one by calling startExam
+          const startResult = await examService.startExam(id);
+          if (startResult.submission) {
+            setSubmissions([startResult.submission]);
+            setSelectedSubmissionId(startResult.submission._id);
+          }
         }
       } catch (err) {
         // If error (e.g., not authenticated), submission will remain null
@@ -51,8 +66,26 @@ const ExamDetailPage2 = () => {
       }
     };
 
-    fetchSubmission();
+    fetchSubmissions();
   }, [exam, id]);
+
+  // Handle submission selection from dropdown
+  const handleSubmissionChange = (submissionId) => {
+    setSelectedSubmissionId(submissionId);
+  };
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Chưa có';
+    const date = new Date(dateString);
+    return date.toLocaleString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   // Get section configuration
   const getSectionConfig = (type) => {
@@ -136,17 +169,38 @@ const ExamDetailPage2 = () => {
     try {
       setStartingExam(true);
       
+      // Check if section is completed (user clicked "Làm lại")
+      const isCompleted = isSectionCompleted(sectionType);
+      
       // If no submission exists, create one by starting the exam
       if (!submission) {
         const result = await examService.startExam(id);
         if (result.submission) {
-          setSubmission(result.submission);
+          setSubmissions([result.submission]);
+          setSelectedSubmissionId(result.submission._id);
           navigate(`/exams/${id}/submissions/${result.submission._id}/${sectionType}`);
         } else {
           throw new Error('Không thể tạo bài làm');
         }
+      } else if (isCompleted) {
+        // If section is completed, create a new submission for retry
+        const result = await examService.createNewSubmission(id);
+        if (result.submission) {
+          // Refresh submissions list and set new submission as selected
+          const submissionsResult = await examService.getExamSubmissions(id);
+          if (submissionsResult.submissions) {
+            setSubmissions(submissionsResult.submissions);
+            setSelectedSubmissionId(result.submission._id);
+          } else {
+            setSubmissions([result.submission]);
+            setSelectedSubmissionId(result.submission._id);
+          }
+          navigate(`/exams/${id}/submissions/${result.submission._id}/${sectionType}`);
+        } else {
+          throw new Error('Không thể tạo bài làm mới');
+        }
       } else {
-        // If submission exists, navigate directly
+        // If submission exists and section not completed, navigate directly
         navigate(`/exams/${id}/submissions/${submission._id}/${sectionType}`);
       }
     } catch (err) {
@@ -277,8 +331,104 @@ const ExamDetailPage2 = () => {
               position: "relative",
             }}
           >
-            {/* Title */}
-            <h1 className="mb-40 text-neutral-900">{exam.title}</h1>
+            {/* Title and Submission History Dropdown */}
+            <div className="d-flex flex-wrap justify-content-between align-items-center mb-40 gap-16">
+              <h1 className="mb-0 text-neutral-900">{exam.title}</h1>
+              
+              {/* Submission History Dropdown */}
+              {submissions.length > 0 && (
+                <div 
+                  className="d-flex flex-align gap-12"
+                  style={{
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                    padding: '12px 20px',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                  }}
+                >
+                  <div className="d-flex flex-align gap-8">
+                    <div 
+                      className="flex-center rounded-8"
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                      }}
+                    >
+                      <i className="ph ph-clock-clockwise text-white text-lg" />
+                    </div>
+                    <div>
+                      <label 
+                        className="text-neutral-700 fw-semibold d-block mb-4" 
+                        style={{ 
+                          whiteSpace: 'nowrap',
+                          fontSize: '13px',
+                          color: '#64748b'
+                        }}
+                      >
+                        Lịch sử làm bài
+                      </label>
+                      <div className="position-relative">
+                        <select
+                          value={selectedSubmissionId || ''}
+                          onChange={(e) => handleSubmissionChange(e.target.value)}
+                          style={{
+                            minWidth: '320px',
+                            padding: '10px 40px 10px 16px',
+                            border: '2px solid #e2e8f0',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            backgroundColor: '#fff',
+                            cursor: 'pointer',
+                            fontWeight: '500',
+                            color: '#1e293b',
+                            appearance: 'none',
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364758b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                            backgroundRepeat: 'no-repeat',
+                            backgroundPosition: 'right 12px center',
+                            transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#3b82f6';
+                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#e2e8f0';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                          onFocus={(e) => {
+                            e.currentTarget.style.borderColor = '#3b82f6';
+                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                            e.currentTarget.style.outline = 'none';
+                          }}
+                          onBlur={(e) => {
+                            e.currentTarget.style.borderColor = '#e2e8f0';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        >
+                          {submissions.map((sub, index) => {
+                            const statusConfig = {
+                              'completed': { text: 'Hoàn thành', color: '#10b981', bg: '#d1fae5' },
+                              'partially-submitted': { text: 'Đã nộp một phần', color: '#f59e0b', bg: '#fef3c7' },
+                              'in-progress': { text: 'Đang làm', color: '#3b82f6', bg: '#dbeafe' },
+                            };
+                            const status = statusConfig[sub.status] || { text: '', color: '', bg: '' };
+                            
+                            return (
+                              <option key={sub._id} value={sub._id}>
+                                Lần {submissions.length - index} • {formatDate(sub.createdAt)} 
+                                {status.text ? ` • ${status.text}` : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Sections Grid - Group by section type */}
             <div className="row gy-4 mb-40">
@@ -372,31 +522,35 @@ const ExamDetailPage2 = () => {
                         )}
                       </button>
 
-                      {/* Key and Document Icons - Only show when section is completed */}
+                      {/* Xem kết quả Button - Only show when section is completed */}
                       {isCompleted && (
-                        <div className="flex-center gap-8 justify-content-center">
-                        
-                          <i 
-                            className="ph ph-file-text text-neutral-400 text-xl transition-2"
-                            style={{
-                              cursor: "pointer",
-                              transition: "all 0.2s ease",
-                            }}
-                            onClick={() => {
-                              if (submission && submission._id) {
-                                navigate(`/exams/${id}/submissions/${submission._id}/${sectionType}/result`);
-                              }
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color = "#3b82f6";
-                              e.currentTarget.style.transform = "scale(1.2)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.color = "";
-                              e.currentTarget.style.transform = "scale(1)";
-                            }}
-                          />
-                        </div>
+                        <button
+                          className="btn py-12 rounded-8 fw-semibold transition-2 flex-center gap-8"
+                          style={{
+                            width: "100%",
+                            background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                            border: "none",
+                            color: "#fff",
+                          }}
+                          onClick={() => {
+                            if (submission && submission._id) {
+                              navigate(`/exams/${id}/submissions/${submission._id}/${sectionType}/result`);
+                            }
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)";
+                            e.currentTarget.style.transform = "translateY(-2px)";
+                            e.currentTarget.style.boxShadow = "0 4px 12px rgba(59, 130, 246, 0.4)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)";
+                            e.currentTarget.style.transform = "translateY(0)";
+                            e.currentTarget.style.boxShadow = "none";
+                          }}
+                        >
+                          <i className="ph ph-eye" />
+                          Xem kết quả
+                        </button>
                       )}
                     </div>
                   </div>

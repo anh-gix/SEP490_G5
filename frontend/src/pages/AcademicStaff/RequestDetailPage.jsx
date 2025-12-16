@@ -1462,4 +1462,3 @@ const RequestDetailPage = ({
 };
 
 export default RequestDetailPage;
-

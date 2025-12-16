@@ -5,11 +5,22 @@ import Button from '../compo/Button';
 import camSessionService from '../../../services/camSessionService';
 import courseService from '../../../services/courseService';
 
+<<<<<<< HEAD
 const CamSession = ({ courseData }) => {
+=======
+const CamSession = ({ courseData, viewMode = 'center-head' }) => {
+>>>>>>> origin/Namvv-teacher-class-management
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [camSessions, setCamSessions] = useState([]);
 
+<<<<<<< HEAD
+=======
+  // Determine base path and permissions
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
+  const canEdit = viewMode === 'teacher'; // Only teacher can edit/delete
+
+>>>>>>> origin/Namvv-teacher-class-management
   useEffect(() => {
     if (courseData?._id) {
       ensureCamSessions();
@@ -24,6 +35,7 @@ const CamSession = ({ courseData }) => {
         ? existingResponse
         : existingResponse.data || [];
 
+<<<<<<< HEAD
       const targetOrdersFromSessions =
         (courseData.sessions || [])
           .map((session) => session?.order)
@@ -62,6 +74,52 @@ const CamSession = ({ courseData }) => {
     } catch (error) {
       console.error('Error ensuring cam sessions:', error);
       alert(error.response?.data?.message || 'Lỗi khi tự động tạo CAM Session');
+=======
+      // Only auto-create CAM sessions for teacher
+      if (canEdit) {
+        const targetOrdersFromSessions =
+          (courseData.sessions || [])
+            .map((session) => session?.order)
+            .filter((order) => typeof order === 'number' && order > 0);
+
+        const fallbackCount = courseData.numberOfSessions || targetOrdersFromSessions.length || 0;
+        const fallbackOrders = Array.from({ length: fallbackCount }, (_, idx) => idx + 1);
+        const targetOrders = targetOrdersFromSessions.length ? targetOrdersFromSessions : fallbackOrders;
+
+        const missingOrders = targetOrders.filter(
+          (order) => !existing.some((camSession) => camSession.order === order)
+        );
+
+        const createdCamSessions = [];
+        for (const order of missingOrders) {
+          const payload = {
+            course: courseData._id,
+            title: `CAM Session ${order}`,
+            order,
+          };
+
+          const created = await camSessionService.createCamSession(payload);
+          createdCamSessions.push(created.data || created);
+        }
+
+        if (createdCamSessions.length) {
+          await courseService.updateCourse(courseData._id, {
+            camSessions: [...existing, ...createdCamSessions].map((camSession) => camSession._id),
+          });
+        }
+
+        const nextSessions = [...existing, ...createdCamSessions].sort(
+          (a, b) => (a.order || 0) - (b.order || 0)
+        );
+        setCamSessions(nextSessions);
+      } else {
+        // Center head only views existing sessions
+        setCamSessions(existing.sort((a, b) => (a.order || 0) - (b.order || 0)));
+      }
+    } catch (error) {
+      console.error('Error ensuring cam sessions:', error);
+      alert(error.response?.data?.message || 'Lỗi khi tải CAM Session');
+>>>>>>> origin/Namvv-teacher-class-management
     } finally {
       setLoading(false);
     }
@@ -74,8 +132,13 @@ const CamSession = ({ courseData }) => {
       params.set('courseId', courseData._id);
     }
 
+<<<<<<< HEAD
     const basePath = `/center-head/cam-sessions/${camSession._id}/edit`;
     navigate(params.toString() ? `${basePath}?${params.toString()}` : basePath);
+=======
+    const editPath = `${basePath}/cam-sessions/${camSession._id}/edit`;
+    navigate(params.toString() ? `${editPath}?${params.toString()}` : editPath);
+>>>>>>> origin/Namvv-teacher-class-management
   };
 
   const handleDelete = async (camSessionId) => {
@@ -159,6 +222,7 @@ const CamSession = ({ courseData }) => {
                     </td>
                     <td className="px-16 py-12 text-center">
                       <div className="d-flex gap-1 justify-content-center">
+<<<<<<< HEAD
                         <Button
                           variant="warning"
                           size="sm"
@@ -173,6 +237,34 @@ const CamSession = ({ courseData }) => {
                           onClick={() => handleDelete(camSession._id)}
                           disabled={loading}
                         />
+=======
+                        {canEdit ? (
+                          <>
+                            <Button
+                              variant="warning"
+                              size="sm"
+                              icon="ph ph-pencil"
+                              onClick={() => handleEditClick(camSession)}
+                              disabled={loading}
+                            />
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              icon="ph ph-trash"
+                              onClick={() => handleDelete(camSession._id)}
+                              disabled={loading}
+                            />
+                          </>
+                        ) : (
+                          <Button
+                            variant="info"
+                            size="sm"
+                            icon="ph ph-eye"
+                            onClick={() => handleEditClick(camSession)}
+                            disabled={loading}
+                          />
+                        )}
+>>>>>>> origin/Namvv-teacher-class-management
                       </div>
                     </td>
                   </tr>

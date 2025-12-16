@@ -354,7 +354,7 @@ const BulkUserUploadPage = () => {
                   </>
                 ) : (
                   <>
-                    <i className="fas fa-upload me-2"></i>
+                    
                     Generate
                   </>
                 )}
@@ -513,7 +513,6 @@ const BulkUserUploadPage = () => {
                 onClick={handleSave}
                 disabled={!selectedRoleId || saving}
               >
-                <i className="fas fa-eye me-2"></i>
                 Preview
               </Button>
             </div>

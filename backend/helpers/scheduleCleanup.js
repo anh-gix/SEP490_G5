@@ -97,7 +97,7 @@ async function getSchedulesToDeletePreview(classId, courseId = null) {
     // Lưu ý: Cần xử lý cả trường hợp hiện tại đã vượt quá numberOfSessions
     const newTotalSchedules = totalSchedules + 1;
     
-    console.log('🔍 [PREVIEW DEBUG] Calculation:', {
+    console.log(' [PREVIEW DEBUG] Calculation:', {
       totalSchedules,
       newTotalSchedules,
       attendedCount,
@@ -135,7 +135,7 @@ async function getSchedulesToDeletePreview(classId, courseId = null) {
       //     => toDelete = unattendedAfterAdd - unattendedToKeep
       //     => toDelete = newTotalSchedules - numberOfSessions
 
-      console.log('🔍 [PREVIEW DEBUG] Delete calculation:', {
+      console.log(' [PREVIEW DEBUG] Delete calculation:', {
         totalSchedules,
         newTotalSchedules,
         attendedCount,
@@ -174,7 +174,7 @@ async function getSchedulesToDeletePreview(classId, courseId = null) {
       } else if (toDelete > 0 && schedulesWithoutAttendance.length === 0) {
         // Edge case: Cần xóa nhưng không có buổi chưa học nào để xóa
         // (Không nên xảy ra vì đã check attendedCount >= numberOfSessions ở trên)
-        console.log('⚠️ [PREVIEW DEBUG] Cần xóa nhưng không có buổi chưa học để xóa');
+        console.log(' [PREVIEW DEBUG] Cần xóa nhưng không có buổi chưa học để xóa');
         return {
           canAdd: false,
           errorMessage: `Không thể thêm buổi học. Cần xóa ${toDelete} buổi nhưng không có buổi chưa học nào để xóa.`,
@@ -185,12 +185,12 @@ async function getSchedulesToDeletePreview(classId, courseId = null) {
         };
       } else {
         // toDelete <= 0 hoặc không có buổi chưa học
-        console.log('🔍 [PREVIEW DEBUG] Không cần xóa hoặc không có buổi để xóa');
+        console.log(' [PREVIEW DEBUG] Không cần xóa hoặc không có buổi để xóa');
       }
     }
 
     // Không cần xóa buổi nào (newTotalSchedules <= numberOfSessions)
-    console.log('🔍 [PREVIEW DEBUG] Không cần xóa buổi nào');
+    console.log(' [PREVIEW DEBUG] Không cần xóa buổi nào');
     return {
       canAdd: true,
       totalSchedules: newTotalSchedules,
@@ -265,15 +265,15 @@ async function cleanupSchedulesAfterAdding(classId, courseId = null) {
     }
 
     // 3. Lấy tất cả schedules của lớp, sắp xếp theo date tăng dần
-    console.log('🔍 [CLEANUP] Đang lấy tất cả schedules của lớp...');
+    console.log(' [CLEANUP] Đang lấy tất cả schedules của lớp...');
     const allSchedules = await ClassSchedule.find({ class: classId })
       .sort({ date: 1 })
       .session(session)
       .lean();
 
-    console.log(`📊 [CLEANUP] Tổng số schedules hiện tại: ${allSchedules.length}`);
+    console.log(` [CLEANUP] Tổng số schedules hiện tại: ${allSchedules.length}`);
     if (allSchedules.length > 0) {
-      console.log('📅 Danh sách schedules:');
+      console.log(' Danh sách schedules:');
       allSchedules.forEach((schedule, index) => {
         const scheduleDate = new Date(schedule.date);
         console.log(`   ${index + 1}. ${scheduleDate.toLocaleDateString('vi-VN')} - ${schedule.startTime} đến ${schedule.endTime} (ID: ${schedule._id})`);
@@ -291,7 +291,7 @@ async function cleanupSchedulesAfterAdding(classId, courseId = null) {
     }
 
     // 4. Kiểm tra attendance cho tất cả schedules (tối ưu: 1 query)
-    console.log('🔍 [CLEANUP] Đang kiểm tra attendance...');
+    console.log(' [CLEANUP] Đang kiểm tra attendance...');
     const allScheduleIds = allSchedules.map(s => s._id);
     const studentSchedulesWithAttendance = await StudentSchedule.find({
       classSchedule: { $in: allScheduleIds },
@@ -303,7 +303,7 @@ async function cleanupSchedulesAfterAdding(classId, courseId = null) {
       studentSchedulesWithAttendance.map(s => s.classSchedule.toString())
     );
 
-    console.log(`📊 [CLEANUP] Số schedules có attendance: ${scheduleIdsWithAttendance.size}`);
+    console.log(` [CLEANUP] Số schedules có attendance: ${scheduleIdsWithAttendance.size}`);
 
     // 5. Phân loại: đã học vs chưa học
     const schedulesWithAttendance = [];
@@ -317,7 +317,7 @@ async function cleanupSchedulesAfterAdding(classId, courseId = null) {
       }
     }
 
-    console.log(`📊 [CLEANUP] Phân loại:`);
+    console.log(` [CLEANUP] Phân loại:`);
     console.log(`   - Buổi đã học (KHÔNG XÓA): ${schedulesWithAttendance.length}`);
     if (schedulesWithAttendance.length > 0) {
       schedulesWithAttendance.forEach((schedule, index) => {
@@ -337,7 +337,7 @@ async function cleanupSchedulesAfterAdding(classId, courseId = null) {
     const attendedCount = schedulesWithAttendance.length;
     const unattendedCount = schedulesWithoutAttendance.length;
 
-    console.log('🔍 [CLEANUP DEBUG] Schedule counts:', {
+    console.log(' [CLEANUP DEBUG] Schedule counts:', {
       totalSchedules,
       attendedCount,
       unattendedCount,
@@ -350,7 +350,7 @@ async function cleanupSchedulesAfterAdding(classId, courseId = null) {
       const unattendedToKeep = Math.max(0, numberOfSessions - attendedCount);
       const toDelete = schedulesWithoutAttendance.length - unattendedToKeep;
 
-      console.log('🔍 [CLEANUP DEBUG] Calculation:', {
+      console.log(' [CLEANUP DEBUG] Calculation:', {
         unattendedToKeep,
         toDelete,
         schedulesWithoutAttendanceCount: schedulesWithoutAttendance.length
@@ -368,7 +368,7 @@ async function cleanupSchedulesAfterAdding(classId, courseId = null) {
         const schedulesToDelete = schedulesWithoutAttendance.slice(0, toDelete);
         const scheduleIdsToDelete = schedulesToDelete.map(s => s._id);
 
-        console.log('🔍 [CLEANUP DEBUG] Schedules to delete:', {
+        console.log(' [CLEANUP DEBUG] Schedules to delete:', {
           count: schedulesToDelete.length,
           schedules: schedulesToDelete.map(s => ({
             _id: s._id,
@@ -383,45 +383,45 @@ async function cleanupSchedulesAfterAdding(classId, courseId = null) {
         const deletedHomework = await HomeworkSubmission.deleteMany({
           classSchedule: { $in: scheduleIdsToDelete }
         }).session(session);
-        console.log(`🔍 [CLEANUP DEBUG] Deleted ${deletedHomework.deletedCount} HomeworkSubmissions`);
+        console.log(` [CLEANUP DEBUG] Deleted ${deletedHomework.deletedCount} HomeworkSubmissions`);
 
         // 7.2. Delete StudentSchedules
         const deletedStudentSchedules = await StudentSchedule.deleteMany({
           classSchedule: { $in: scheduleIdsToDelete }
         }).session(session);
-        console.log(`🔍 [CLEANUP DEBUG] Deleted ${deletedStudentSchedules.deletedCount} StudentSchedules`);
+        console.log(` [CLEANUP DEBUG] Deleted ${deletedStudentSchedules.deletedCount} StudentSchedules`);
 
         // 7.3. Delete ClassSchedules
         const deletedClassSchedules = await ClassSchedule.deleteMany({
           _id: { $in: scheduleIdsToDelete }
         }).session(session);
-        console.log(`🔍 [CLEANUP DEBUG] Deleted ${deletedClassSchedules.deletedCount} ClassSchedules`);
+        console.log(` [CLEANUP DEBUG] Deleted ${deletedClassSchedules.deletedCount} ClassSchedules`);
 
         deletedCount = deletedClassSchedules.deletedCount || toDelete;
-        console.log(`✅ Đã xóa ${deletedCount} buổi học chưa học để đảm bảo tổng số buổi = ${numberOfSessions}`);
+        console.log(` Đã xóa ${deletedCount} buổi học chưa học để đảm bảo tổng số buổi = ${numberOfSessions}`);
       } else {
-        console.log('🔍 [CLEANUP DEBUG] No schedules to delete (toDelete <= 0)');
+        console.log(' [CLEANUP DEBUG] No schedules to delete (toDelete <= 0)');
       }
     } else {
-      console.log('🔍 [CLEANUP DEBUG] No cleanup needed (totalSchedules <= numberOfSessions)');
+      console.log(' [CLEANUP DEBUG] No cleanup needed (totalSchedules <= numberOfSessions)');
     }
 
     // 8. Gán lại session cho TẤT CẢ buổi học còn lại
     console.log('');
-    console.log('🔄 ========== GÁN LẠI SESSION ==========');
+    console.log(' ========== GÁN LẠI SESSION ==========');
     // Lấy lại danh sách schedules sau khi xóa (nếu có xóa)
     const remainingSchedules = await ClassSchedule.find({ class: classId })
       .sort({ date: 1 }) // Sắp xếp theo date tăng dần
       .session(session)
       .lean();
 
-    console.log(`📊 Số buổi học còn lại: ${remainingSchedules.length}`);
+    console.log(` Số buổi học còn lại: ${remainingSchedules.length}`);
 
     if (remainingSchedules.length > 0 && courseData.sessions && courseData.sessions.length > 0) {
       // Sắp xếp course sessions theo order
       const courseSessions = [...courseData.sessions].sort((a, b) => (a.order || 0) - (b.order || 0));
 
-      console.log(`📚 Course có ${courseSessions.length} sessions (theo order):`);
+      console.log(` Course có ${courseSessions.length} sessions (theo order):`);
       courseSessions.forEach((s, index) => {
         console.log(`   ${index + 1}. Session ${s.order || index + 1} (ID: ${s._id})`);
       });
@@ -447,16 +447,16 @@ async function cleanupSchedulesAfterAdding(classId, courseId = null) {
       });
 
       await Promise.all(updatePromises);
-      console.log(`✅ Đã gán lại session cho ${remainingSchedules.length} buổi học`);
+      console.log(` Đã gán lại session cho ${remainingSchedules.length} buổi học`);
     } else {
-      console.log('⚠️ Không có sessions để gán hoặc không có buổi học còn lại');
+      console.log(' Không có sessions để gán hoặc không có buổi học còn lại');
     }
     console.log('==========================================');
 
     await session.commitTransaction();
     session.endSession();
 
-    console.log('🔍 [CLEANUP DEBUG] Final result:', {
+    console.log(' [CLEANUP DEBUG] Final result:', {
       deletedCount,
       totalSchedulesBefore: totalSchedules,
       totalSchedulesAfter: remainingSchedules.length,

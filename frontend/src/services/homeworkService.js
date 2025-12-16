@@ -10,7 +10,11 @@ const getAuthHeader = () => {
 
 const homeworkService = {
   // ========================
+<<<<<<< HEAD
   // 📝 TEACHER - HOMEWORK ASSIGNMENT
+=======
+  //  TEACHER - HOMEWORK ASSIGNMENT
+>>>>>>> origin/Namvv-teacher-class-management
   // ========================
 
   /**
@@ -57,6 +61,10 @@ const homeworkService = {
       
       // Add text fields
       formData.append('title', homeworkData.title);
+<<<<<<< HEAD
+=======
+      if (homeworkData.description) formData.append('description', homeworkData.description);
+>>>>>>> origin/Namvv-teacher-class-management
       formData.append('deadline', homeworkData.deadline);
       
       // Add assignment files (max 5)
@@ -114,6 +122,10 @@ const homeworkService = {
       
       // Add text fields
       if (homeworkData.title) formData.append('title', homeworkData.title);
+<<<<<<< HEAD
+=======
+      if (homeworkData.description !== undefined) formData.append('description', homeworkData.description);
+>>>>>>> origin/Namvv-teacher-class-management
       if (homeworkData.deadline) formData.append('deadline', homeworkData.deadline);
       
       // Add new files
@@ -197,7 +209,11 @@ const homeworkService = {
   },
 
   // ========================
+<<<<<<< HEAD
   // 📚 STUDENT - HOMEWORK SUBMISSION
+=======
+  //  STUDENT - HOMEWORK SUBMISSION
+>>>>>>> origin/Namvv-teacher-class-management
   // ========================
 
   /**

@@ -3,16 +3,12 @@ const ClassSchedule = require("../models/classScheduleModel");
 const HomeworkSubmission = require("../models/homeworkSubmissionModel");
 const StudentSchedule = require("../models/studentScheduleModel");
 
-// =========================
-// 📊 LẤY DỮ LIỆU DASHBOARD GIẢNG VIÊN
-// =========================
 exports.getTeacherDashboard = async (req, res) => {
   try {
     const teacherId = req.user._id;
     
-    console.log('📊 Getting dashboard data for teacher:', teacherId);
+    console.log(' Getting dashboard data for teacher:', teacherId);
 
-    // Get all classes taught by this teacher
     const classes = await Class.find({ teacher: teacherId })
       .populate('course', 'name')
       .populate('students', 'username email')
@@ -37,7 +33,6 @@ exports.getTeacherDashboard = async (req, res) => {
 
     const classIds = classes.map(cls => cls._id);
 
-    // Get current date range for stats
     const now = new Date();
     const today = new Date(now);
     today.setHours(0, 0, 0, 0);
@@ -45,7 +40,6 @@ exports.getTeacherDashboard = async (req, res) => {
     const weekFromNow = new Date(today);
     weekFromNow.setDate(today.getDate() + 7);
 
-    // Get upcoming lessons (this week)
     const upcomingLessons = await ClassSchedule.find({
       class: { $in: classIds },
       date: {
@@ -54,10 +48,8 @@ exports.getTeacherDashboard = async (req, res) => {
       }
     });
 
-    // Count total students
     const totalStudents = classes.reduce((sum, cls) => sum + (cls.students?.length || 0), 0);
 
-    // Get schedules with homework to count pending grading
     const schedulesWithHomework = await ClassSchedule.find({
       class: { $in: classIds },
       'homework.0': { $exists: true }
@@ -74,7 +66,6 @@ exports.getTeacherDashboard = async (req, res) => {
       }
     }
 
-    // Get schedules that need attendance (past schedules without full attendance)
     const pastSchedules = await ClassSchedule.find({
       class: { $in: classIds },
       date: { $lt: today }
@@ -95,7 +86,6 @@ exports.getTeacherDashboard = async (req, res) => {
       }
     }
 
-    // Get upcoming schedule (next 7 days)
     const upcomingSchedules = await ClassSchedule.find({
       class: { $in: classIds },
       date: {
@@ -128,7 +118,6 @@ exports.getTeacherDashboard = async (req, res) => {
       };
     });
 
-    // Get classes summary
     const classesSummary = await Promise.all(
       classes.map(async (classInfo) => {
         const schedules = await ClassSchedule.find({
@@ -141,7 +130,6 @@ exports.getTeacherDashboard = async (req, res) => {
         const completedLessons = schedules.filter(s => new Date(s.date) < now).length;
         const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
-        // Get next test/mocktest
         const Course = require('../models/courseModel');
         const course = await Course.findById(classInfo.course._id);
         const mocktestOrders = course?.mocktestSessionOrders || [];
@@ -151,7 +139,6 @@ exports.getTeacherDashboard = async (req, res) => {
           return mocktestOrders.includes(sessionOrder) && new Date(s.date) > now;
         });
 
-        // Get upcoming homework
         const upcomingHomework = await ClassSchedule.findOne({
           class: classInfo._id,
           'homework.deadline': { $gt: now }
@@ -188,12 +175,6 @@ exports.getTeacherDashboard = async (req, res) => {
       classesSummary
     };
 
-    console.log('✅ Dashboard data:', {
-      upcomingLessons: upcomingLessons.length,
-      totalStudents,
-      classesCount: classes.length
-    });
-
     res.status(200).json({
       success: true,
       message: 'Lấy dữ liệu dashboard thành công',
@@ -201,8 +182,7 @@ exports.getTeacherDashboard = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error getting teacher dashboard:', error);
-    res.status(500).json({
+      res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy dữ liệu dashboard',
       error: error.message

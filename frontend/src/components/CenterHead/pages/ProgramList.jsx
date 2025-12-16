@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
@@ -14,10 +14,12 @@ const ProgramList = () => {
   const navigate = useNavigate();
   const [programs, setPrograms] = useState([]);
   const [filteredPrograms, setFilteredPrograms] = useState([]);
+  const [paginatedPrograms, setPaginatedPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [filterValues, setFilterValues] = useState({});
   const [stats, setStats] = useState({ total: 0, active: 0, draft: 0, archived: 0 });
+<<<<<<< HEAD
 
   useEffect(() => {
     fetchPrograms();
@@ -88,6 +90,13 @@ const ProgramList = () => {
   };
 
   const applyFilters = () => {
+=======
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(0);
+
+  const applyFilters = useCallback(() => {
+>>>>>>> origin/Namvv-teacher-class-management
     let filtered = [...programs];
 
     if (searchKeyword) {
@@ -103,7 +112,74 @@ const ProgramList = () => {
     }
 
     setFilteredPrograms(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [programs, searchKeyword, filterValues]);
+
+  const applyPagination = useCallback(() => {
+    const totalItems = filteredPrograms.length;
+    const totalPagesCount = Math.ceil(totalItems / itemsPerPage);
+    setTotalPages(totalPagesCount);
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = filteredPrograms.slice(startIndex, endIndex);
+
+    setPaginatedPrograms(paginatedData);
+  }, [filteredPrograms, currentPage, itemsPerPage]);
+
+  const fetchPrograms = async () => {
+    try {
+      setLoading(true);
+
+      const response = await programService.getAllPrograms();
+      const programsData = response.data || [];
+
+      setPrograms(programsData);
+
+      // Set stats from API response
+      if (response.stats) {
+        setStats(response.stats);
+      } else {
+        // Calculate stats if not provided by API
+        const calculatedStats = {
+          total: programsData.length,
+          active: programsData.filter(p => p.status === 'active').length,
+          draft: programsData.filter(p => p.status === 'draft').length,
+          archived: programsData.filter(p => p.status === 'archived').length
+        };
+        setStats(calculatedStats);
+      }
+
+      console.log('Programs loaded from API:', programsData);
+    } catch (err) {
+      console.error('Error fetching programs:', err);
+      alert('Không thể tải danh sách chương trình!');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (e) => {
+    const newItemsPerPage = parseInt(e.target.value);
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when items per page changes
+  };
+
+  useEffect(() => {
+    fetchPrograms();
+  }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [searchKeyword, filterValues, programs, applyFilters]);
+
+  useEffect(() => {
+    applyPagination();
+  }, [filteredPrograms, currentPage, itemsPerPage, applyPagination]);
 
   const breadcrumbItems = [
     { label: 'Dashboard', path: '/center-head/dashboard' },
@@ -153,6 +229,13 @@ const ProgramList = () => {
       render: (row) => <StatusBadge status={row.status} size="sm" />,
     },
     {
+      header: 'Người tạo',
+      field: 'createdBy',
+      render: (row) => (
+        <span className="text-neutral-700">{row.createdBy?.username || 'N/A'}</span>
+      ),
+    },
+    {
       header: 'Cập nhật',
       field: 'updatedAt',
       render: (row) => (
@@ -174,6 +257,7 @@ const ProgramList = () => {
           >
             <i className="ph ph-eye"></i>
           </button>
+<<<<<<< HEAD
           <button
             className="btn btn-sm btn-outline-secondary"
             onClick={(e) => {
@@ -194,6 +278,8 @@ const ProgramList = () => {
           >
             <i className="ph ph-trash"></i>
           </button>
+=======
+>>>>>>> origin/Namvv-teacher-class-management
         </div>
       ),
     },
@@ -214,8 +300,9 @@ const ProgramList = () => {
       <div className="d-flex justify-content-between align-items-center mb-24">
         <div>
           <h4 className="mb-8 text-neutral-900 fw-bold">Chương trình đào tạo</h4>
-          <p className="text-neutral-600 mb-0">Quản lý các chương trình và PLOs</p>
+          <p className="text-neutral-600 mb-0">Xem tất cả các chương trình trong hệ thống</p>
         </div>
+<<<<<<< HEAD
         <Button
           variant="primary"
           icon="ph ph-plus"
@@ -223,6 +310,8 @@ const ProgramList = () => {
         >
           Tạo chương trình mới
         </Button>
+=======
+>>>>>>> origin/Namvv-teacher-class-management
       </div>
 
       {/* Stats */}
@@ -274,10 +363,87 @@ const ProgramList = () => {
       <Card>
         <Table
           columns={columns}
-          data={filteredPrograms}
+          data={paginatedPrograms}
           onRowClick={(row) => navigate(`/center-head/programs/${row._id}`)}
         />
       </Card>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="d-flex justify-content-between align-items-center mt-4">
+          <div className="d-flex align-items-center gap-3">
+            <span className="text-sm text-neutral-600">Hiển thị</span>
+            <select
+              className="form-select form-select-sm"
+              style={{ width: 'auto' }}
+              value={itemsPerPage}
+              onChange={handleItemsPerPageChange}
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+            <span className="text-sm text-neutral-600">
+              bản ghi trên trang
+            </span>
+          </div>
+
+          <div className="d-flex align-items-center gap-2">
+            <span className="text-sm text-neutral-600">
+              Trang {currentPage} / {totalPages} ({filteredPrograms.length} bản ghi)
+            </span>
+
+            <div className="d-flex gap-1">
+              <button
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                title="Trang trước"
+              >
+                <i className="ph ph-caret-left"></i>
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(page => {
+                  const distance = Math.abs(page - currentPage);
+                  return distance === 0 || distance === 1 || page === 1 || page === totalPages;
+                })
+                .map((page, index, array) => {
+                  const prevPage = array[index - 1];
+                  const showEllipsis = prevPage && page - prevPage > 1;
+
+                  return (
+                    <div key={page} className="d-flex">
+                      {showEllipsis && (
+                        <span className="px-2 py-1 text-neutral-600">...</span>
+                      )}
+                      <button
+                        className={`btn btn-sm ${
+                          page === currentPage
+                            ? 'btn-primary'
+                            : 'btn-outline-secondary'
+                        }`}
+                        onClick={() => handlePageChange(page)}
+                      >
+                        {page}
+                      </button>
+                    </div>
+                  );
+                })}
+
+              <button
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                title="Trang sau"
+              >
+                <i className="ph ph-caret-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

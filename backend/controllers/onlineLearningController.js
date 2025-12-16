@@ -3,13 +3,13 @@ const CamSession = require("../models/camSession");
 const StudentOnlineLearning = require("../models/studentOnlineLearning");
 
 // =========================
-// 📚 LẤY DANH SÁCH KHÓA HỌC ONLINE CỦA HỌC VIÊN
+//  LẤY DANH SÁCH KHÓA HỌC ONLINE CỦA HỌC VIÊN
 // =========================
 exports.getMyOnlineCourses = async (req, res) => {
   try {
     const studentId = req.user._id;
 
-    console.log('📚 [OnlineLearning] Lấy danh sách khóa học online cho student:', studentId);
+    console.log(' [OnlineLearning] Lấy danh sách khóa học online cho student:', studentId);
 
     // Find all online courses where student is enrolled
     const courses = await Course.find({
@@ -22,7 +22,7 @@ exports.getMyOnlineCourses = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    console.log(`✅ [OnlineLearning] Tìm thấy ${courses.length} khóa học online`);
+    console.log(` [OnlineLearning] Tìm thấy ${courses.length} khóa học online`);
 
     // Get progress for each course
     const coursesWithProgress = await Promise.all(
@@ -76,7 +76,7 @@ exports.getMyOnlineCourses = async (req, res) => {
       courses: coursesWithProgress
     });
   } catch (error) {
-    console.error('❌ [OnlineLearning] Lỗi khi lấy danh sách khóa học online:', error);
+    console.error(' [OnlineLearning] Lỗi khi lấy danh sách khóa học online:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy danh sách khóa học online',
@@ -86,14 +86,14 @@ exports.getMyOnlineCourses = async (req, res) => {
 };
 
 // =========================
-// 📖 LẤY CHI TIẾT KHÓA HỌC ONLINE
+//  LẤY CHI TIẾT KHÓA HỌC ONLINE
 // =========================
 exports.getCourseDetail = async (req, res) => {
   try {
     const studentId = req.user._id;
     const { courseId } = req.params;
 
-    console.log('📖 [OnlineLearning] Lấy chi tiết khóa học:', courseId);
+    console.log(' [OnlineLearning] Lấy chi tiết khóa học:', courseId);
 
     // Find course
     const course = await Course.findById(courseId)
@@ -185,7 +185,7 @@ exports.getCourseDetail = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ [OnlineLearning] Lỗi khi lấy chi tiết khóa học:', error);
+    console.error(' [OnlineLearning] Lỗi khi lấy chi tiết khóa học:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy chi tiết khóa học',
@@ -195,14 +195,14 @@ exports.getCourseDetail = async (req, res) => {
 };
 
 // =========================
-// 📝 LẤY NỘI DUNG BÀI HỌC
+//  LẤY NỘI DUNG BÀI HỌC
 // =========================
 exports.getSessionContent = async (req, res) => {
   try {
     const studentId = req.user._id;
     const { courseId, sessionId } = req.params;
 
-    console.log('📝 [OnlineLearning] Lấy nội dung bài học:', sessionId);
+    console.log(' [OnlineLearning] Lấy nội dung bài học:', sessionId);
 
     // Check if student is enrolled in course
     const course = await Course.findById(courseId).lean();
@@ -265,7 +265,7 @@ exports.getSessionContent = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ [OnlineLearning] Lỗi khi lấy nội dung bài học:', error);
+    console.error(' [OnlineLearning] Lỗi khi lấy nội dung bài học:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy nội dung bài học',
@@ -275,7 +275,7 @@ exports.getSessionContent = async (req, res) => {
 };
 
 // =========================
-// ✅ CẬP NHẬT TIẾN ĐỘ HỌC TẬP
+//  CẬP NHẬT TIẾN ĐỘ HỌC TẬP
 // =========================
 exports.updateProgress = async (req, res) => {
   try {
@@ -283,7 +283,7 @@ exports.updateProgress = async (req, res) => {
     const { courseId, sessionId } = req.params;
     const { video, quiz, vocabulary } = req.body;
 
-    console.log('✅ [OnlineLearning] Cập nhật tiến độ:', {
+    console.log(' [OnlineLearning] Cập nhật tiến độ:', {
       courseId,
       sessionId,
       video,
@@ -365,7 +365,7 @@ exports.updateProgress = async (req, res) => {
     const updatedProgress = await StudentOnlineLearning.findById(progress._id).lean();
     const updatedSession = updatedProgress.sessionProgress[sessionIndex];
 
-    console.log('✅ [OnlineLearning] Đã cập nhật tiến độ thành công');
+    console.log(' [OnlineLearning] Đã cập nhật tiến độ thành công');
 
     res.status(200).json({
       success: true,
@@ -373,7 +373,7 @@ exports.updateProgress = async (req, res) => {
       progress: updatedSession.isCompleted
     });
   } catch (error) {
-    console.error('❌ [OnlineLearning] Lỗi khi cập nhật tiến độ:', error);
+    console.error(' [OnlineLearning] Lỗi khi cập nhật tiến độ:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi cập nhật tiến độ',
@@ -383,14 +383,14 @@ exports.updateProgress = async (req, res) => {
 };
 
 // =========================
-// 📊 LẤY TỔNG QUAN TIẾN ĐỘ KHÓA HỌC
+//  LẤY TỔNG QUAN TIẾN ĐỘ KHÓA HỌC
 // =========================
 exports.getCourseProgress = async (req, res) => {
   try {
     const studentId = req.user._id;
     const { courseId } = req.params;
 
-    console.log('📊 [OnlineLearning] Lấy tổng quan tiến độ khóa học:', courseId);
+    console.log(' [OnlineLearning] Lấy tổng quan tiến độ khóa học:', courseId);
 
     // Get course
     const course = await Course.findById(courseId)
@@ -465,7 +465,7 @@ exports.getCourseProgress = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ [OnlineLearning] Lỗi khi lấy tổng quan tiến độ:', error);
+    console.error(' [OnlineLearning] Lỗi khi lấy tổng quan tiến độ:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy tổng quan tiến độ',

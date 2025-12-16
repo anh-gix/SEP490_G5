@@ -69,7 +69,13 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
       };
 
       let response;
+<<<<<<< HEAD
       if (isEdit && courseData._id) {
+=======
+      // If courseData._id exists, it means we already created the course, so UPDATE it
+      // Otherwise, CREATE a new course
+      if (courseData._id) {
+>>>>>>> origin/Namvv-teacher-class-management
         response = await courseService.updateCourse(courseData._id, dataToSave);
       } else {
         response = await courseService.createCourse(dataToSave);
@@ -97,7 +103,13 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
         status: response.data.status || 'draft'
       }));
 
+<<<<<<< HEAD
       alert(isEdit ? 'Cập nhật thông tin học phần thành công!' : 'Tạo học phần thành công!');
+=======
+      // Show appropriate message based on whether we created or updated
+      const isUpdate = courseData._id !== null;
+      alert(isUpdate ? 'Cập nhật thông tin học phần thành công!' : 'Tạo học phần thành công!');
+>>>>>>> origin/Namvv-teacher-class-management
       onNext();
     } catch (error) {
       console.error('Error saving course:', error);
@@ -105,7 +117,11 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
 
       // Show more detailed error for duplicate courseCode
       if (errorMsg.includes('Mã môn học đã tồn tại')) {
+<<<<<<< HEAD
         alert(`❌ Lỗi: Mã môn học "${courseData.courseCode}" đã tồn tại trong hệ thống!\n\nVui lòng sử dụng mã môn học khác.`);
+=======
+        alert(` Lỗi: Mã môn học "${courseData.courseCode}" đã tồn tại trong hệ thống!\n\nVui lòng sử dụng mã môn học khác.`);
+>>>>>>> origin/Namvv-teacher-class-management
       } else {
         alert(errorMsg);
       }
@@ -135,11 +151,19 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
               onChange={handleInputChange}
               className={`form-control radius-8 ${errors.courseCode ? 'is-invalid' : ''}`}
               placeholder="Ví dụ: IELTS-B1-01"
+<<<<<<< HEAD
               disabled={isEdit}
               style={{ height: '44px' }}
             />
             {errors.courseCode && <div className="invalid-feedback">{errors.courseCode}</div>}
             {isEdit && <small className="text-muted">Mã học phần không thể thay đổi khi chỉnh sửa</small>}
+=======
+              disabled={courseData._id !== null}
+              style={{ height: '44px' }}
+            />
+            {errors.courseCode && <div className="invalid-feedback">{errors.courseCode}</div>}
+            {courseData._id && <small className="text-muted">Mã học phần không thể thay đổi sau khi đã tạo</small>}
+>>>>>>> origin/Namvv-teacher-class-management
           </div>
 
           {/* Tên học phần */}

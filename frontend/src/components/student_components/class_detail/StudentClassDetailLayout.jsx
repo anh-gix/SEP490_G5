@@ -36,6 +36,7 @@ const StudentClassDetailLayout = () => {
       setLoading(true);
       setError(null);
       
+<<<<<<< HEAD
       const response = await studentService.getMyClasses();
       
       if (response.success && response.classes) {
@@ -48,6 +49,16 @@ const StudentClassDetailLayout = () => {
         }
       } else {
         setError('Không thể tải danh sách lớp học');
+=======
+      // Use getMyClassDetail to get full class info with mocktest scores
+      const response = await studentService.getMyClassDetail(classId);
+      
+      if (response.success) {
+        console.log('📚 Class Detail:', response.data); // Debug log
+        setClassInfo(response.data);
+      } else {
+        setError('Không thể tải thông tin lớp học');
+>>>>>>> origin/Namvv-teacher-class-management
       }
     } catch (error) {
       console.error('Error fetching class info:', error);

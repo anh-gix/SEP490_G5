@@ -152,6 +152,10 @@ const ClassHomework = () => {
             Sắp đến hạn
           </Button>
         </div>
+<<<<<<< HEAD
+=======
+        
+>>>>>>> origin/Namvv-teacher-class-management
 
         {/* Content Container - 70% width, centered */}
         <div className="d-flex justify-content-center">
@@ -160,14 +164,24 @@ const ClassHomework = () => {
         {getFilteredHomework().length > 0 ? (
           filterType === 'by-lesson' ? (
             // Grouped by lesson view
+<<<<<<< HEAD
             <div className="d-flex flex-column gap-4">
               {groupHomeworkByLesson(getFilteredHomework()).map(group => (
                 <div key={`lesson-${group.lessonNumber}`}>
+=======
+            <div className="d-flex flex-column gap-4 mt-10 mb-10">
+              {groupHomeworkByLesson(getFilteredHomework()).map(group => (
+                <div key={`lesson-${group.lessonNumber}`} className="mt-14 mb-14">
+>>>>>>> origin/Namvv-teacher-class-management
                   <h6 className="text-neutral-700 fw-bold mb-12 text-15">
                     <i className="fas fa-book-reader me-2 text-primary-600"></i>
                     Buổi {group.lessonNumber}: {group.lessonTitle}
                   </h6>
+<<<<<<< HEAD
                   <div className="d-flex flex-column gap-2">
+=======
+                  <div className="d-flex flex-column gap-3">
+>>>>>>> origin/Namvv-teacher-class-management
                     {group.homework.map(hw => renderHomeworkCard(hw, false))}
                   </div>
                 </div>
@@ -219,6 +233,7 @@ const ClassHomework = () => {
             Buổi {hw.lessonNumber}: {hw.lessonTitle}
           </div>
         )}
+<<<<<<< HEAD
         <Card 
           className="bg-white border-0 rounded-12 hover-shadow-lg transition-all"
           style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}
@@ -271,6 +286,59 @@ const ClassHomework = () => {
             )}
           </Card.Body>
         </Card>
+=======
+        <div 
+          className="bg-white border-0 rounded-12 p-16 transition-all"
+          style={{ 
+            boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)',
+            cursor: 'pointer'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.12)';
+            e.currentTarget.style.backgroundColor = '#f5f5f5';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = '0 2px 12px rgba(0, 0, 0, 0.08)';
+            e.currentTarget.style.backgroundColor = '#ffffff';
+          }}
+          onClick={() => handleViewDetail(hw)}
+        >
+          <div className="d-flex justify-content-between align-items-center">
+            {/* Left: Title */}
+            <h6 className="text-neutral-900 fw-bold mb-0 flex-shrink-0 me-4 text-15">
+              {hw.title}
+            </h6>
+            
+            {/* Right: Deadline and Status */}
+            <div className="d-flex align-items-center gap-4 flex-shrink-0">
+              {/* Deadline */}
+              <div className={`text-15 fw-medium ${isDeadlinePassed && hw.status === 'not_submitted' ? 'text-danger-600' : 'text-neutral-700'}`}>
+                <i className="fas fa-clock me-2"></i>
+                {new Date(hw.deadline).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(hw.deadline).toLocaleDateString('vi-VN')}
+              </div>
+
+              {/* Status Badge */}
+              <div className="d-flex flex-column align-items-end gap-1">
+                {getHomeworkStatusBadge(hw.status)}
+                {hw.status === 'graded' && hw.score != null && (
+                  <Badge bg="warning" className="px-8 py-4 text-10">
+                    <i className="fas fa-star me-1"></i>
+                    {hw.score}/10
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Warning for overdue */}
+          {isDeadlinePassed && hw.status === 'not_submitted' && (
+            <Alert variant="danger" className="mb-0 mt-12 py-6 px-12 text-11">
+              <i className="fas fa-exclamation-triangle me-2"></i>
+              Đã quá hạn nộp
+            </Alert>
+          )}
+        </div>
+>>>>>>> origin/Namvv-teacher-class-management
       </div>
     );
   }

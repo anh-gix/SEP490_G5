@@ -14,6 +14,10 @@ import StudentTipsPage from "../pages/StudentPages/StudentTipsPage.jsx";
 import StudentOnlineCoursesPage from "../pages/StudentPages/StudentOnlineCoursesPage.jsx";
 import StudentOnlineCourseDetailPage from "../pages/StudentPages/StudentOnlineCourseDetailPage.jsx";
 import StudentSessionLearningPage from "../pages/StudentPages/StudentSessionLearningPage.jsx";
+<<<<<<< HEAD
+=======
+import StudentApplicationsPage from "../pages/StudentPages/StudentApplicationsPage.jsx";
+>>>>>>> origin/Namvv-teacher-class-management
 
 /**
  * StudentRoutes
@@ -61,5 +65,10 @@ export const studentRoutes = [
   // IX. Leave Request (future)
   // { path: '/student/leave-request', element: <StudentLeaveRequestPage /> },
 
+<<<<<<< HEAD
  
+=======
+  // X. Applications
+  { path: '/student/applications', element: <StudentApplicationsPage /> },
+>>>>>>> origin/Namvv-teacher-class-management
 ];

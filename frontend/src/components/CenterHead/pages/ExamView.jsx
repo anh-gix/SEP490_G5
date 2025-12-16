@@ -9,9 +9,19 @@ import { formatDate } from '../../../helper/helper';
 
 const API_BASE_URL = 'http://localhost:8080';
 
+<<<<<<< HEAD
 const ExamView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+=======
+const ExamView = ({ viewMode = 'center-head' }) => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+
+  // Determine base path
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
+  const isViewOnly = viewMode === 'center-head';
+>>>>>>> origin/Namvv-teacher-class-management
   const [exam, setExam] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -194,6 +204,7 @@ const ExamView = () => {
             </Button>
           )}
 
+<<<<<<< HEAD
           <Button
             variant="primary"
             icon="ph ph-pencil"
@@ -201,6 +212,17 @@ const ExamView = () => {
           >
             Chỉnh sửa
           </Button>
+=======
+          {!isViewOnly && (
+            <Button
+              variant="primary"
+              icon="ph ph-pencil"
+              onClick={() => navigate(`${basePath}/exams/${exam._id}/edit`)}
+            >
+              Chỉnh sửa
+            </Button>
+          )}
+>>>>>>> origin/Namvv-teacher-class-management
         </div>
       </div>
 
@@ -347,6 +369,7 @@ const ExamView = () => {
                         {section.answerKey?.length || 0} câu
                       </div>
                     </div>
+<<<<<<< HEAD
                     <Button
                       variant="outline"
                       size="sm"
@@ -355,6 +378,18 @@ const ExamView = () => {
                     >
                       Sửa
                     </Button>
+=======
+                    {!isViewOnly && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon="ph ph-pencil"
+                        onClick={() => navigate(`${basePath}/exams/${exam._id}/edit`)}
+                      >
+                        Sửa
+                      </Button>
+                    )}
+>>>>>>> origin/Namvv-teacher-class-management
                   </div>
                 </div>
 

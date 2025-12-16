@@ -1,6 +1,6 @@
 const Exam = require("../models/examModel");
 const Submission = require("../models/submissionModel");
-const ApprovalRequest = require("../models/approvalRequestModel");
+const WorkRequest = require("../models/workRequestModel");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
@@ -36,27 +36,8 @@ exports.uploadMiddleware = upload;
 // ================== 1. LẤY DANH SÁCH BÀI THI CHO QUẢN LÝ ==================
 exports.getAllExamsForManagement = async (req, res) => {
   try {
-    const { search = '', examType = '', level = '', isPublished } = req.query;
 
-    // Build query
-    const query = {};
-    if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
-      ];
-    }
-    if (examType) {
-      query.examType = examType;
-    }
-    if (level) {
-      query.level = level;
-    }
-    if (isPublished !== undefined) {
-      query.isPublished = isPublished === 'true';
-    }
-
-    const exams = await Exam.find(query)
+    const exams = await Exam.find()
       .populate('createdBy', 'username email phone address')
       .sort({ createdAt: -1 });
 
@@ -175,21 +156,22 @@ exports.getExamByIdForManagement = async (req, res) => {
     // Get submission count
     const submissionCount = await Submission.countDocuments({ examId: id });
 
-    // Get approval request info if exists
-    const approvalRequest = await ApprovalRequest.findOne({
+    // Get work request info if exists
+    const workRequest = await WorkRequest.findOne({
       entityId: id,
-      entityType: 'Exam'
+      entityType: 'Exam',
+      direction: 'bottom_up'
     })
-      .populate('submittedBy', 'username email')
-      .populate('reviewedBy', 'username email')
-      .sort({ submittedAt: -1 });
+      .populate('requestedBy', 'username email')
+      .populate('processedBy', 'username email')
+      .sort({ requestedAt: -1 });
 
     res.status(200).json({
       success: true,
       data: {
         ...exam.toObject(),
         submissionCount,
-        approvalInfo: approvalRequest
+        workRequestInfo: workRequest
       }
     });
   } catch (err) {
@@ -260,6 +242,7 @@ exports.updateExamForManagement = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
+    //exam not found
     const exam = await Exam.findById(id);
     if (!exam) {
       return res.status(404).json({
@@ -268,11 +251,11 @@ exports.updateExamForManagement = async (req, res) => {
       });
     }
 
-    // Không cho phép cập nhật nếu đã xuất bản
-    if (exam.isPublished && !req.body.allowPublishedUpdate) {
+    // check stautus != draft || needs_revision thì ko cho update
+    if (!['draft', 'needs_revision'].includes(exam.status)) {
       return res.status(400).json({
         success: false,
-        message: 'Không thể cập nhật bài thi đã xuất bản'
+        message: 'Không thể cập nhật bài thi khi trạng thái hiện tại'
       });
     }
 
@@ -509,174 +492,12 @@ exports.getExamSubmissionStatus = async (req, res) => {
 
 // ================== 10. NỘP EXAM CHỜ DUYỆT (TEACHER/SUBJECT LEADER) ==================
 exports.submitExamForApproval = async (req, res) => {
-  const mongoose = require('mongoose');
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
-    const { id } = req.params;
-    const { submissionNote, submittedBy } = req.body;
-
-    // Tìm exam
-    const exam = await Exam.findById(id).session(session);
-    if (!exam) {
-      await session.abortTransaction();
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy bài thi'
-      });
-    }
-
-    // Sử dụng submittedBy từ body hoặc từ exam.createdBy
-    const userSubmittedBy = submittedBy || exam.createdBy;
-
-    if (!userSubmittedBy) {
-      await session.abortTransaction();
-      return res.status(401).json({
-        success: false,
-        message: 'Không xác định được người nộp đề thi'
-      });
-    }
-
-    // Kiểm tra quyền (chỉ người tạo mới được submit)
-    if (exam.createdBy && exam.createdBy.toString() !== userSubmittedBy.toString()) {
-      await session.abortTransaction();
-      return res.status(403).json({
-        success: false,
-        message: 'Bạn không có quyền nộp đề thi này'
-      });
-    }
-
-    // Validate exam status
-    if (!['draft', 'needs_revision'].includes(exam.status)) {
-      await session.abortTransaction();
-      return res.status(400).json({
-        success: false,
-        message: `Không thể nộp đề thi với trạng thái ${exam.status}`
-      });
-    }
-
-    // Validate exam has sections
-    if (!exam.sections || exam.sections.length === 0) {
-      await session.abortTransaction();
-      return res.status(400).json({
-        success: false,
-        message: 'Đề thi phải có ít nhất 1 section'
-      });
-    }
-
-    // Validate exam sections have answer keys
-    const sectionsWithoutAnswers = exam.sections.filter(
-      section => !section.answerKey || section.answerKey.length === 0
-    );
-    if (sectionsWithoutAnswers.length > 0) {
-      await session.abortTransaction();
-      return res.status(400).json({
-        success: false,
-        message: `Các section sau chưa có đáp án: ${sectionsWithoutAnswers.map(s => s.type).join(', ')}`
-      });
-    }
-
-    // Kiểm tra xem có pending request nào không
-    const existingPendingRequest = await ApprovalRequest.findOne({
-      entityType: 'Exam',
-      entityId: id,
-      status: 'pending'
-    }).session(session);
-
-    if (existingPendingRequest) {
-      await session.abortTransaction();
-      return res.status(400).json({
-        success: false,
-        message: 'Đề thi đã được nộp và đang chờ duyệt'
-      });
-    }
-
-    // 1. Update exam status to pending_approval
-    await Exam.findByIdAndUpdate(
-      id,
-      { status: 'pending_approval' },
-      { session }
-    );
-
-    // 2. Check if there's a rejected request (resubmit case)
-    const rejectedRequest = await ApprovalRequest.findOne({
-      entityType: 'Exam',
-      entityId: id,
-      status: 'rejected'
-    }).session(session);
-
-    let approvalRequest;
-
-    if (rejectedRequest) {
-      // Resubmit - update existing rejected request
-      approvalRequest = await ApprovalRequest.findByIdAndUpdate(
-        rejectedRequest._id,
-        {
-          status: 'pending',
-          submittedAt: new Date(),
-          submissionNote: submissionNote || '',
-          reviewedBy: null,
-          reviewedAt: null,
-          reviewNote: null,
-          rejectionReason: null,
-          $push: {
-            history: {
-              action: 'resubmitted',
-              performedBy: userSubmittedBy,
-              performedAt: new Date(),
-              note: submissionNote || '',
-              previousStatus: 'rejected'
-            }
-          }
-        },
-        { session, new: true }
-      );
-    } else {
-      // First submit - create new request
-      const newRequest = await ApprovalRequest.create([{
-        requestType: 'exam',
-        entityType: 'Exam',
-        entityId: id,
-        submittedBy: userSubmittedBy,
-        submittedAt: new Date(),
-        submissionNote: submissionNote || '',
-        status: 'pending',
-        history: [{
-          action: 'submitted',
-          performedBy: userSubmittedBy,
-          performedAt: new Date(),
-          note: submissionNote || '',
-          previousStatus: exam.status
-        }]
-      }], { session });
-
-      approvalRequest = newRequest[0];
-    }
-
-    await session.commitTransaction();
-
-    // Populate để trả về thông tin đầy đủ
-    await approvalRequest.populate('submittedBy', 'username email');
-
-    res.status(201).json({
-      success: true,
-      message: 'Nộp đề thi chờ duyệt thành công',
-      data: {
-        exam: await Exam.findById(id),
-        approvalRequest: approvalRequest
-      }
-    });
-  } catch (err) {
-    await session.abortTransaction();
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi nộp đề thi chờ duyệt',
-      error: err.message
-    });
-  } finally {
-    session.endSession();
-  }
+  return res.status(410).json({
+    success: false,
+    message: 'This endpoint is deprecated. Please use POST /api/work-requests/submit/exam/:id instead',
+    deprecatedSince: '2024-01-01',
+    newEndpoint: '/api/work-requests/submit/exam/:id'
+  });
 };
 
 // ================== 11. LẤY DANH SÁCH EXAM ĐÃ NỘP CỦA TEACHER ==================
@@ -711,24 +532,25 @@ exports.getMySubmittedExams = async (req, res) => {
     const exams = await Exam.find(examQuery)
       .sort({ updatedAt: -1 });
 
-    // Get approval requests for these exams
+    // Get work requests for these exams
     const examIds = exams.map(e => e._id);
-    const approvalRequests = await ApprovalRequest.find({
+    const workRequests = await WorkRequest.find({
       entityType: 'Exam',
-      entityId: { $in: examIds }
+      entityId: { $in: examIds },
+      direction: 'bottom_up'
     })
-      .populate('reviewedBy', 'username email')
-      .sort({ submittedAt: -1 });
+      .populate('processedBy', 'username email')
+      .sort({ requestedAt: -1 });
 
-    // Map approval requests to exams
-    const examWithApprovalInfo = exams.map(exam => {
-      const approvalInfo = approvalRequests.find(
+    // Map work requests to exams
+    const examWithWorkRequestInfo = exams.map(exam => {
+      const workRequestInfo = workRequests.find(
         req => req.entityId.toString() === exam._id.toString()
       );
 
       return {
         ...exam.toObject(),
-        approvalInfo: approvalInfo || null
+        workRequestInfo: workRequestInfo || null
       };
     });
 
@@ -743,9 +565,9 @@ exports.getMySubmittedExams = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: examWithApprovalInfo,
+      data: examWithWorkRequestInfo,
       stats,
-      count: examWithApprovalInfo.length
+      count: examWithWorkRequestInfo.length
     });
   } catch (err) {
     res.status(500).json({
@@ -794,15 +616,16 @@ exports.withdrawExamSubmission = async (req, res) => {
       });
     }
 
-    // Tìm và xóa pending approval request
-    const approvalRequest = await ApprovalRequest.findOne({
+    // Tìm và xóa pending work request
+    const workRequest = await WorkRequest.findOne({
       entityType: 'Exam',
       entityId: id,
+      direction: 'bottom_up',
       status: 'pending'
     });
 
-    if (approvalRequest) {
-      await ApprovalRequest.findByIdAndDelete(approvalRequest._id);
+    if (workRequest) {
+      await WorkRequest.findByIdAndDelete(workRequest._id);
     }
 
     // Đổi status về draft

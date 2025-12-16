@@ -4,6 +4,11 @@ import AcademicLayout from '../../components/class_management/AcademicLayout';
 import EditClassForm from '../../components/class_management/EditClassModal';
 import classService from '../../services/classService';
 import { Spinner, Alert } from 'react-bootstrap';
+<<<<<<< HEAD
+=======
+import Swal from 'sweetalert2';
+import { toast } from 'react-toastify';
+>>>>>>> origin/Namvv-teacher-class-management
 
 const EditClassPage = () => {
   const { classId } = useParams();
@@ -69,6 +74,33 @@ const EditClassPage = () => {
     }
   };
 
+<<<<<<< HEAD
+=======
+  const handleDeleteClass = async (classIdToDelete) => {
+    const result = await Swal.fire({
+      title: 'Xác nhận xóa',
+      text: 'Bạn có chắc chắn muốn xóa lớp học này?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+      confirmButtonColor: '#dc3545',
+      cancelButtonColor: '#6c757d'
+    });
+    
+    if (!result.isConfirmed) return;
+    
+    try {
+      await classService.deleteClass(classIdToDelete);
+      toast.success('Xóa lớp học thành công!');
+      navigate('/academic/class-management');
+    } catch (err) {
+      console.error('Error deleting class:', err);
+      toast.error(err.message || 'Có lỗi xảy ra khi xóa lớp học!');
+    }
+  };
+
+>>>>>>> origin/Namvv-teacher-class-management
   if (loading) {
     return (
       <AcademicLayout>
@@ -107,6 +139,11 @@ const EditClassPage = () => {
       <EditClassForm
         classData={classData}
         onSubmit={handleSubmit}
+<<<<<<< HEAD
+=======
+        onDelete={handleDeleteClass}
+        classId={classId}
+>>>>>>> origin/Namvv-teacher-class-management
       />
     </AcademicLayout>
   );

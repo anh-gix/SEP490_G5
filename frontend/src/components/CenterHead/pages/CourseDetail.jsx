@@ -9,7 +9,7 @@ import Modal from '../compo/Modal';
 import { courseService } from '../../../services/courseService';
 import { formatDate } from '../../../helper/helper';
 
-const CourseDetails = () => {
+const CourseDetails = ({ viewMode = 'center-head' }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [course, setCourse] = useState(null);
@@ -19,10 +19,21 @@ const CourseDetails = () => {
   const [selectedCamSession, setSelectedCamSession] = useState(null);
   const [showCamSessionModal, setShowCamSessionModal] = useState(false);
 
+<<<<<<< HEAD
+=======
+  // Determine base path
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
+>>>>>>> origin/Namvv-teacher-class-management
 
   // Get user role from localStorage
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const userRole = user.roleId?.name || user.role;
+<<<<<<< HEAD
+=======
+
+  // Center Head should not see edit/delete buttons
+  const isViewOnly = viewMode === 'center-head' || userRole === 'Center Head';
+>>>>>>> origin/Namvv-teacher-class-management
 
   useEffect(() => {
     fetchCourseDetails();
@@ -74,9 +85,15 @@ console.log(response.data);
   };
 
   const breadcrumbItems = [
+<<<<<<< HEAD
     { label: 'Dashboard', path: '/center-head/dashboard' },
     { label: 'Danh sách môn học', path: '/center-head/courses' },
     { label: 'Chi tiết môn học', path: `/center-head/courses/${id}/details` },
+=======
+    { label: 'Dashboard', path: `${basePath}/dashboard` },
+    { label: 'Danh sách môn học', path: `${basePath}/courses` },
+    { label: 'Chi tiết môn học', path: `${basePath}/courses/${id}/details` },
+>>>>>>> origin/Namvv-teacher-class-management
   ];
 
   if (loading) {
@@ -529,12 +546,20 @@ console.log(response.data);
             Quay lại
           </Button>
           {/* Edit and Delete buttons - only for non-Center Head */}
+<<<<<<< HEAD
           {userRole !== 'Center Head' && (
+=======
+          {!isViewOnly && (
+>>>>>>> origin/Namvv-teacher-class-management
             <>
               <Button
                 variant="primary"
                 icon="ph ph-pencil"
+<<<<<<< HEAD
                 onClick={() => navigate(`/center-head/programs/${course.program?._id || course.program}/courses/${id}/edit-form`)}
+=======
+                onClick={() => navigate(`${basePath}/programs/${course.program?._id || course.program}/courses/${id}/edit-form`)}
+>>>>>>> origin/Namvv-teacher-class-management
               >
                 Sửa
               </Button>

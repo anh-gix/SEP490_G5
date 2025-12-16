@@ -10,7 +10,11 @@ const getAuthHeader = () => {
 
 const onlineLearningService = {
   // ========================
+<<<<<<< HEAD
   // 📚 GET STUDENT'S ONLINE COURSES
+=======
+  //  GET STUDENT'S ONLINE COURSES
+>>>>>>> origin/Namvv-teacher-class-management
   // ========================
   getMyOnlineCourses: async () => {
     try {
@@ -24,7 +28,11 @@ const onlineLearningService = {
   },
 
   // ========================
+<<<<<<< HEAD
   // 📖 GET COURSE DETAIL
+=======
+  //  GET COURSE DETAIL
+>>>>>>> origin/Namvv-teacher-class-management
   // ========================
   getCourseDetail: async (courseId) => {
     try {
@@ -38,7 +46,11 @@ const onlineLearningService = {
   },
 
   // ========================
+<<<<<<< HEAD
   // 📝 GET SESSION CONTENT
+=======
+  //  GET SESSION CONTENT
+>>>>>>> origin/Namvv-teacher-class-management
   // ========================
   getSessionContent: async (courseId, sessionId) => {
     try {
@@ -55,7 +67,11 @@ const onlineLearningService = {
   },
 
   // ========================
+<<<<<<< HEAD
   // 📊 GET COURSE PROGRESS OVERVIEW
+=======
+  //  GET COURSE PROGRESS OVERVIEW
+>>>>>>> origin/Namvv-teacher-class-management
   // ========================
   getCourseProgress: async (courseId) => {
     try {
@@ -72,7 +88,11 @@ const onlineLearningService = {
   },
 
   // ========================
+<<<<<<< HEAD
   // ✅ UPDATE SESSION PROGRESS
+=======
+  //  UPDATE SESSION PROGRESS
+>>>>>>> origin/Namvv-teacher-class-management
   // ========================
   updateProgress: async (courseId, sessionId, progressData) => {
     try {
@@ -97,14 +117,22 @@ const onlineLearningService = {
   },
 
   // ========================
+<<<<<<< HEAD
   // 📝 MARK QUIZ AS COMPLETED
+=======
+  //  MARK QUIZ AS COMPLETED
+>>>>>>> origin/Namvv-teacher-class-management
   // ========================
   markQuizCompleted: async (courseId, sessionId) => {
     return onlineLearningService.updateProgress(courseId, sessionId, { quiz: true });
   },
 
   // ========================
+<<<<<<< HEAD
   // 📚 MARK VOCABULARY AS COMPLETED
+=======
+  //  MARK VOCABULARY AS COMPLETED
+>>>>>>> origin/Namvv-teacher-class-management
   // ========================
   markVocabularyCompleted: async (courseId, sessionId) => {
     return onlineLearningService.updateProgress(courseId, sessionId, { vocabulary: true });

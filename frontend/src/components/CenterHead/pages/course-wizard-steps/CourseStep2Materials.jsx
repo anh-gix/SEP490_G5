@@ -34,7 +34,11 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
     setShowMaterialModal(true);
   };
 
+<<<<<<< HEAD
   const handleSaveMaterial = () => {
+=======
+  const handleSaveMaterial = async () => {
+>>>>>>> origin/Namvv-teacher-class-management
     if (!materialForm.description) {
       alert('Vui lòng nhập mô tả tài liệu!');
       return;
@@ -47,6 +51,7 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
       newMaterials.push(materialForm);
     }
 
+<<<<<<< HEAD
     setCourseData(prev => ({ ...prev, materials: newMaterials }));
     setShowMaterialModal(false);
   };
@@ -57,6 +62,40 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
         ...prev,
         materials: prev.materials.filter((_, i) => i !== index)
       }));
+=======
+    try {
+      // Save to database immediately
+      await courseService.updateCourse(courseData._id, {
+        materials: newMaterials
+      });
+
+      setCourseData(prev => ({ ...prev, materials: newMaterials }));
+      setShowMaterialModal(false);
+    } catch (error) {
+      console.error('Error saving material:', error);
+      alert('Lỗi khi lưu tài liệu!');
+    }
+  };
+
+  const handleDeleteMaterial = async (index) => {
+    if (!window.confirm('Bạn có chắc muốn xóa tài liệu này?')) return;
+
+    const newMaterials = courseData.materials.filter((_, i) => i !== index);
+
+    try {
+      // Save to database immediately
+      await courseService.updateCourse(courseData._id, {
+        materials: newMaterials
+      });
+
+      setCourseData(prev => ({
+        ...prev,
+        materials: newMaterials
+      }));
+    } catch (error) {
+      console.error('Error deleting material:', error);
+      alert('Lỗi khi xóa tài liệu!');
+>>>>>>> origin/Namvv-teacher-class-management
     }
   };
 
@@ -84,6 +123,19 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
     }
   };
 
+<<<<<<< HEAD
+=======
+  // Protection: Course must be created first
+  if (!courseData._id) {
+    return (
+      <div className="alert alert-warning">
+        <i className="ph ph-warning me-2"></i>
+        Vui lòng hoàn thành Bước 1 (Thông tin cơ bản) trước khi thêm tài liệu.
+      </div>
+    );
+  }
+
+>>>>>>> origin/Namvv-teacher-class-management
   return (
     <div>
       <div className="mb-24">

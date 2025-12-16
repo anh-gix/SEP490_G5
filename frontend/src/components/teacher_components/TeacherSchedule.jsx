@@ -2,12 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table } from 'react-bootstrap';
 import teacherService from '../../services/teacherService';
+<<<<<<< HEAD
+=======
+import { useAuth } from '../../contexts/AuthContext';
+import changeRequestService from '../../services/changeRequestService';
+>>>>>>> origin/Namvv-teacher-class-management
 
-/**
- * Teacher Schedule Component
- * Lịch dạy của giảng viên - tương tự student schedule
- */
 const TeacherSchedule = () => {
+<<<<<<< HEAD
+=======
+  const { user } = useAuth();
+  
+>>>>>>> origin/Namvv-teacher-class-management
   const getCurrentWeek = () => {
     const today = new Date();
     const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 1));
@@ -21,6 +27,13 @@ const TeacherSchedule = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+<<<<<<< HEAD
+=======
+  
+  // Recent applications preview
+  const [recentApplications, setRecentApplications] = useState([]);
+  const [loadingApplications, setLoadingApplications] = useState(false);
+>>>>>>> origin/Namvv-teacher-class-management
 
   const fetchSchedules = async () => {
     try {
@@ -40,6 +53,7 @@ const TeacherSchedule = () => {
         startDate = new Date(year, month, 1);
         endDate = new Date(year, month + 1, 0);
       } else {
+<<<<<<< HEAD
         // List view - get 3 months range
         startDate = new Date();
         endDate = new Date();
@@ -73,6 +87,73 @@ const TeacherSchedule = () => {
           // Determine schedule status for filtering
           scheduleStatus: getScheduleStatus(schedule.date, schedule.startTime)
         }));
+=======
+        // List view - don't limit date range, get all schedules
+        startDate = null;
+        endDate = null;
+      }
+
+      const params = {};
+      if (startDate && endDate) {
+        // Format dates as YYYY-MM-DD to avoid timezone issues
+        const formatDateForAPI = (date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+        
+        params.startDate = formatDateForAPI(startDate);
+        params.endDate = formatDateForAPI(endDate);
+      }
+
+      console.log('[TeacherSchedule] Fetching schedules:', {
+        viewMode,
+        params,
+        hasDateRange: !!(startDate && endDate),
+        startDate: startDate ,
+        endDate: endDate
+      });
+
+      const response = await teacherService.getCurrentTeacherSchedule(params);
+      
+      console.log('[TeacherSchedule] Response received:', {
+        success: response.success,
+        total: response.total,
+        schedulesCount: response.schedules?.length || 0
+      });
+
+      
+      if (response.success) {
+        // Transform schedules to match frontend format
+        const transformedSchedules = response.schedules.map(schedule => {
+          // Determine className: use provided className, or class name, or "Lớp học bù" for makeup classes (class is null)
+          let className = schedule.className || schedule.class?.name;
+          if (!className && (schedule.class === null || schedule.class === undefined)) {
+            className = 'Lớp học bù';
+          }
+          return {
+            _id: schedule._id,
+            date: schedule.date,
+            startTime: schedule.startTime,
+            endTime: schedule.endTime,
+            className: className,
+            courseName: schedule.courseName || schedule.class?.course?.name,
+            session: schedule.session,
+            sessionTitle: schedule.sessionTitle || schedule.session?.title,
+            sessionOrder: schedule.sessionOrder || schedule.session?.order,
+            room: schedule.room,
+            roomName: schedule.roomName || schedule.room?.room_name,
+            location: schedule.location || schedule.room?.location,
+            homework: schedule.homework || [],
+            material: schedule.material || [],
+            mocktest: schedule.mocktest,
+            status: schedule.status,
+            // Determine schedule status for filtering
+            scheduleStatus: getScheduleStatus(schedule.date, schedule.startTime)
+          };
+        });
+>>>>>>> origin/Namvv-teacher-class-management
 
         setSchedules(transformedSchedules);
       }
@@ -82,6 +163,78 @@ const TeacherSchedule = () => {
       setSchedules([]);
     } finally {
       setLoading(false);
+<<<<<<< HEAD
+=======
+    }
+  };
+
+
+
+  const getScheduleStatus = (date, startTime) => {
+    // Parse date string safely to avoid timezone issues
+    let scheduleDate;
+    if (date instanceof Date) {
+      scheduleDate = new Date(date);
+    } else {
+      // If date is a string, parse it as local date (YYYY-MM-DD)
+      const dateParts = date.split('T')[0].split('-');
+      if (dateParts.length === 3) {
+        scheduleDate = new Date(
+          parseInt(dateParts[0]), 
+          parseInt(dateParts[1]) - 1, 
+          parseInt(dateParts[2])
+        );
+      } else {
+        scheduleDate = new Date(date);
+      }
+    }
+    
+    const [hours, minutes] = startTime.split(':');
+    scheduleDate.setHours(parseInt(hours), parseInt(minutes));
+    
+    const now = new Date();
+    
+    if (scheduleDate < now) {
+      return 'completed';
+    } else {
+      return 'upcoming';
+    }
+  };
+
+  useEffect(() => {
+    fetchSchedules();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedWeek, selectedMonth, viewMode]);
+
+  // Fetch recent applications for preview
+  useEffect(() => {
+    if (user?._id) {
+      fetchRecentApplications();
+    }
+  }, [user]);
+
+  const fetchRecentApplications = async () => {
+    try {
+      setLoadingApplications(true);
+      const params = { limit: 5 }; // Get only 5 most recent
+      
+      const response = await changeRequestService.getAllChangeRequests(params);
+      if (response.success) {
+        const requests = response.changeRequests || [];
+        // Filter by current user (sender)
+        const userRequests = requests.filter(request => {
+          const senderId = request.sender?._id || request.sender;
+          return senderId?.toString() === user._id.toString();
+        });
+        // Sort by newest and take first 5
+        userRequests.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setRecentApplications(userRequests.slice(0, 5));
+      }
+    } catch (err) {
+      console.error('Error fetching recent applications:', err);
+    } finally {
+      setLoadingApplications(false);
+>>>>>>> origin/Namvv-teacher-class-management
     }
   };
 
@@ -134,18 +287,79 @@ const TeacherSchedule = () => {
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    
+    // Parse date string to avoid timezone conversion issues
+    // If date is already a Date object
+    if (dateString instanceof Date) {
+      const year = dateString.getUTCFullYear();
+      const month = String(dateString.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(dateString.getUTCDate()).padStart(2, '0');
+      return `${day}/${month}/${year}`;
+    }
+    
+    // If date is a string, extract YYYY-MM-DD part
+    const dateStr = typeof dateString === 'string' ? dateString : dateString.toString();
+    const dateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    
+    if (dateMatch) {
+      const year = dateMatch[1];
+      const month = dateMatch[2];
+      const day = dateMatch[3];
+      return `${day}/${month}/${year}`;
+    }
+    
+    // Fallback: use UTC methods to avoid timezone conversion
     const date = new Date(dateString);
-    return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    return `${day}/${month}/${year}`;
   };
 
   const getStatusBadge = (status) => {
     const statusConfig = {
       upcoming: { bg: 'bg-main-600', text: 'Sắp dạy' },
       completed: { bg: 'bg-success-600', text: 'Đã dạy' },
-      cancelled: { bg: 'bg-danger-600', text: 'Đã hủy' }
+      cancelled: { bg: 'bg-danger-600', text: 'Đã hủy' },
+      absent: { bg: 'bg-warning-600', text: 'Nghỉ dạy' } // Thêm trạng thái nghỉ dạy
     };
     const config = statusConfig[status] || statusConfig.upcoming;
     return <Badge className={`${config.bg} text-white px-12 py-6`}>{config.text}</Badge>;
+  };
+
+  // Helper functions for change requests
+  const getRequestStatusBadge = (status) => {
+    const statusConfig = {
+      pending: { variant: 'warning', text: 'Chờ duyệt' },
+      approved: { variant: 'success', text: 'Đã duyệt' },
+      rejected: { variant: 'danger', text: 'Từ chối' }
+    };
+    const config = statusConfig[status] || { variant: 'secondary', text: status };
+    return <Badge bg={config.variant}>{config.text}</Badge>;
+  };
+
+  const getTypeBadge = (type) => {
+    const typeConfig = {
+      create_class: { variant: 'info', text: 'Tạo lớp' },
+      change_class: { variant: 'primary', text: 'Đổi lớp' },
+      makeup_class: { variant: 'warning', text: 'Học bù' },
+      request_replace_teacher: { variant: 'secondary', text: 'Thay giáo viên' }
+    };
+    const config = typeConfig[type] || { variant: 'secondary', text: type || 'N/A' };
+    return <Badge bg={config.variant}>{config.text}</Badge>;
+  };
+
+  const formatRequestDate = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   const getMonthDays = () => {
@@ -172,14 +386,29 @@ const TeacherSchedule = () => {
   };
 
   const filteredSchedules = schedules.filter(schedule => {
+<<<<<<< HEAD
     if (filterStatus === 'all') return true;
     if (filterStatus === 'upcoming') return schedule.scheduleStatus === 'upcoming';
     if (filterStatus === 'completed') return schedule.scheduleStatus === 'completed';
+=======
+    // Filter by status
+    if (filterStatus === 'all') {
+      // Continue to next filter
+    } else if (filterStatus === 'upcoming') {
+      if (schedule.scheduleStatus !== 'upcoming') return false;
+    } else if (filterStatus === 'completed') {
+      if (schedule.scheduleStatus !== 'completed') return false;
+    }
+>>>>>>> origin/Namvv-teacher-class-management
     return true;
   });
 
   const renderWeekView = () => {
     const weekDays = getWeekDays();
+<<<<<<< HEAD
+=======
+    
+>>>>>>> origin/Namvv-teacher-class-management
     const timeSlots = [
       '08:00 - 10:00',
       '10:00 - 12:00',
@@ -192,6 +421,7 @@ const TeacherSchedule = () => {
 
     // Helper function to check if schedule fits in time slot
     const isScheduleInTimeSlot = (schedule, timeSlot) => {
+<<<<<<< HEAD
       const [slotStart, slotEnd] = timeSlot.split(' - ');
       const scheduleStart = schedule.startTime;
       const scheduleEnd = schedule.endTime;
@@ -200,6 +430,31 @@ const TeacherSchedule = () => {
       return (scheduleStart >= slotStart && scheduleStart < slotEnd) ||
              (scheduleEnd > slotStart && scheduleEnd <= slotEnd) ||
              (scheduleStart <= slotStart && scheduleEnd >= slotEnd);
+=======
+      if (!schedule.startTime || !schedule.endTime) return false;
+      
+      const [slotStart, slotEnd] = timeSlot.split(' - ');
+      const scheduleStart = schedule.startTime.trim();
+      const scheduleEnd = schedule.endTime.trim();
+      
+      // Convert time strings to minutes for accurate comparison
+      const timeToMinutes = (timeStr) => {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return hours * 60 + (minutes || 0);
+      };
+      
+      const slotStartMinutes = timeToMinutes(slotStart);
+      const slotEndMinutes = timeToMinutes(slotEnd);
+      const scheduleStartMinutes = timeToMinutes(scheduleStart);
+      const scheduleEndMinutes = timeToMinutes(scheduleEnd);
+      
+      // Check if schedule starts exactly at slot start, or overlaps with time slot
+      // A schedule matches if:
+      // 1. Schedule starts at slot start (exact match)
+      // 2. Schedule overlaps with slot (starts before slot end and ends after slot start)
+      return (scheduleStartMinutes === slotStartMinutes) ||
+             (scheduleStartMinutes < slotEndMinutes && scheduleEndMinutes > slotStartMinutes);
+>>>>>>> origin/Namvv-teacher-class-management
     };
 
     return (
@@ -254,9 +509,40 @@ const TeacherSchedule = () => {
                 {/* Day columns */}
                 {weekDays.map((day, dayIndex) => {
                   const daySchedules = filteredSchedules.filter(s => {
+<<<<<<< HEAD
                     const scheduleDate = new Date(s.date);
                     return scheduleDate.toDateString() === day.toDateString() && 
                            isScheduleInTimeSlot(s, timeSlot);
+=======
+                    // Backend returns date as DD/MM/YYYY string
+                    const dateStr = s.date;
+                    if (!dateStr) return false;
+                    
+                    // Parse DD/MM/YYYY format
+                    const dateMatch = dateStr.toString().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                    if (!dateMatch) return false;
+                    
+                    const scheduleDay = parseInt(dateMatch[1], 10);
+                    const scheduleMonth = parseInt(dateMatch[2], 10) - 1; // Month is 0-indexed
+                    const scheduleYear = parseInt(dateMatch[3], 10);
+                    
+                    // Extract date components from day (local timezone)
+                    const dayYear = day.getFullYear();
+                    const dayMonth = day.getMonth();
+                    const dayDay = day.getDate();
+                    
+                    // Compare date components directly
+                    const dateMatches = scheduleYear === dayYear && 
+                                       scheduleMonth === dayMonth && 
+                                       scheduleDay === dayDay;
+                    
+                    if (!dateMatches) return false;
+                    
+                    // Check time slot match
+                    const timeSlotMatches = isScheduleInTimeSlot(s, timeSlot);
+                    
+                    return timeSlotMatches;
+>>>>>>> origin/Namvv-teacher-class-management
                   });
 
                   const isToday = day.toDateString() === new Date().toDateString();
@@ -382,8 +668,32 @@ const TeacherSchedule = () => {
           <div className="d-flex flex-wrap">
             {monthDays.map((dayInfo, index) => {
               const daySchedules = filteredSchedules.filter(s => {
+<<<<<<< HEAD
                 const scheduleDate = new Date(s.date);
                 return scheduleDate.toDateString() === dayInfo.date.toDateString();
+=======
+                // Backend returns date as DD/MM/YYYY string
+                const dateStr = s.date;
+                if (!dateStr) return false;
+                
+                // Parse DD/MM/YYYY format
+                const dateMatch = dateStr.toString().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                if (!dateMatch) return false;
+                
+                const scheduleDay = parseInt(dateMatch[1], 10);
+                const scheduleMonth = parseInt(dateMatch[2], 10) - 1; // Month is 0-indexed
+                const scheduleYear = parseInt(dateMatch[3], 10);
+                
+                // Extract date components from dayInfo.date (local timezone)
+                const dayYear = dayInfo.date.getFullYear();
+                const dayMonth = dayInfo.date.getMonth();
+                const dayDay = dayInfo.date.getDate();
+                
+                // Compare date components directly
+                return scheduleYear === dayYear && 
+                       scheduleMonth === dayMonth && 
+                       scheduleDay === dayDay;
+>>>>>>> origin/Namvv-teacher-class-management
               });
 
               const isToday = dayInfo.date.toDateString() === new Date().toDateString();
@@ -467,7 +777,11 @@ const TeacherSchedule = () => {
                     <tr key={schedule._id} className="transition-2" style={{ cursor: 'pointer' }}>
                       <td className="px-20 py-16 text-neutral-700 text-13">
                         <Link to={`/teacher/lessons/${schedule._id}`} className="text-decoration-none text-neutral-700">
+<<<<<<< HEAD
                           {formatDate(schedule.date)}
+=======
+                          {schedule.date}
+>>>>>>> origin/Namvv-teacher-class-management
                         </Link>
                       </td>
                       <td className="px-20 py-16 text-neutral-700 text-13">
@@ -661,6 +975,10 @@ const TeacherSchedule = () => {
           )}
         </>
       )}
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/Namvv-teacher-class-management
     </Container>
   );
 };

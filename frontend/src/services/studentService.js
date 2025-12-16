@@ -46,6 +46,21 @@ const studentService = {
     }
   },
 
+<<<<<<< HEAD
+=======
+  // Get current student's class detail (including mocktest scores, course info)
+  getMyClassDetail: async (classId) => {
+    try {
+      const response = await axios.get(`${API_URL}/students/me/classes/${classId}`, {
+        headers: getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+>>>>>>> origin/Namvv-teacher-class-management
   // Get current student's schedule
   getMySchedule: async (params = {}) => {
     try {
@@ -222,6 +237,35 @@ const studentService = {
     } catch (error) {
       throw error.response?.data || error.message;
     }
+<<<<<<< HEAD
+=======
+  },
+
+  // Update student course enrollments
+  updateStudentCourseEnrollments: async (studentId, courseIds) => {
+    try {
+      const response = await axios.patch(`${API_URL}/students/${studentId}/courses`, 
+        { courseIds },
+        { headers: getAuthHeader() }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Change student class
+  changeStudentClass: async (studentId, oldClassId, newClassId) => {
+    try {
+      const response = await axios.patch(`${API_URL}/students/${studentId}/change-class`, 
+        { oldClassId, newClassId },
+        { headers: getAuthHeader() }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+>>>>>>> origin/Namvv-teacher-class-management
   }
 };
 

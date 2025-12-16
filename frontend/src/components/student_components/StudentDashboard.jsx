@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, Alert } from 'react-bootstrap';
+<<<<<<< HEAD
 import { Link, useNavigate } from 'react-router-dom';
+=======
+import { Link } from 'react-router-dom';
+>>>>>>> origin/Namvv-teacher-class-management
 import studentService from '../../services/studentService';
 
 /**
@@ -15,7 +19,11 @@ const StudentDashboard = () => {
   const [assignmentFilter, setAssignmentFilter] = useState('all'); // all, pending, overdue
   const [practiceTests, setPracticeTests] = useState([]);
   const [activeClasses, setActiveClasses] = useState([]);
+<<<<<<< HEAD
   const [practiceTestFilter, setPracticeTestFilter] = useState('all'); // all, toeic, ielts
+=======
+  const [practiceTestFilter, setPracticeTestFilter] = useState('all'); // all, toeic, ielts, cambridge
+>>>>>>> origin/Namvv-teacher-class-management
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -45,6 +53,7 @@ const StudentDashboard = () => {
     }
   };
 
+<<<<<<< HEAD
   const getFilteredAssignments = () => {
     return assignments
       .filter(assignment => {
@@ -71,6 +80,35 @@ const StudentDashboard = () => {
     });
   };
 
+=======
+  // const getFilteredAssignments = () => {
+  //   return assignments
+  //     .filter(assignment => {
+  //       if (assignmentFilter === 'all') return true;
+  //       if (assignmentFilter === 'pending') return assignment.status === 'not_submitted' && !assignment.isOverdue;
+  //       if (assignmentFilter === 'overdue') return assignment.isOverdue;
+  //       return true;
+  //     })
+  //     .sort((a, b) => {
+  //       // Sort by overdue first, then priority, then by due date
+  //       if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+  //       if (a.priority === 'high' && b.priority !== 'high') return -1;
+  //       if (a.priority !== 'high' && b.priority === 'high') return 1;
+  //       return new Date(a.dueDate) - new Date(b.dueDate);
+  //     });
+  // };
+
+  const getFilteredPracticeTests = () => {
+    return practiceTests.filter(result => {
+      if (practiceTestFilter === 'all') return true;
+      if (practiceTestFilter === 'toeic') return result.type === 'toeic';
+      if (practiceTestFilter === 'ielts') return result.type === 'ielts';
+      if (practiceTestFilter === 'cambridge') return result.type === 'cambridge';
+      return true;
+    });
+  };
+
+>>>>>>> origin/Namvv-teacher-class-management
   if (loading) {
     return (
       <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
@@ -100,12 +138,13 @@ const StudentDashboard = () => {
 
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
-      {/* Welcome Banner - Compact with backdrop */}
-      <Card className="border-0 rounded-16 mb-24 overflow-hidden" 
+      {/* Welcome Banner - Compact */}
+      <Card className="border-0 rounded-6 mb-16 overflow-hidden" 
             style={{ 
               background: 'linear-gradient(135deg, #0D74FF 0%, #0A5FD9 100%)',
               boxShadow: '0 4px 20px rgba(13, 116, 255, 0.15)'
             }}>
+<<<<<<< HEAD
         <Card.Body className="p-24">
           <Row className="align-items-center">
             <Col lg={9}>
@@ -125,30 +164,41 @@ const StudentDashboard = () => {
               </div>
             </Col>
           </Row>
+=======
+        <Card.Body className="p-16">
+          <div className="d-flex align-items-center gap-12">
+            <div className="bg-white rounded-circle d-flex align-items-center justify-content-center"
+                 style={{ width: '40px', height: '40px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+              <i className="fas fa-user-graduate text-main-600" style={{ fontSize: '20px' }}></i>
+            </div>
+            <div>
+              <h5 className="text-white fw-bold mb-1">
+                Xin chào, {studentInfo?.name}!
+              </h5>
+              <p className="text-white mb-0" style={{ opacity: 0.9, fontSize: '12px' }}>
+                {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
+            </div>
+          </div>
+>>>>>>> origin/Namvv-teacher-class-management
         </Card.Body>
       </Card>
 
       <Row className="g-3">
         {/* Main Content - Lịch học tuần */}
         <Col lg={8}>
-          {/* Weekly Calendar */}
-          <Card className="bg-white border-0 rounded-16 mb-24" 
+          {/* Weekly Calendar - Compact */}
+          <Card className="bg-white border-0 rounded-6 mb-16" 
                 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-            <Card.Header className="bg-gradient-primary border-0 p-24"
-                         style={{ background: 'linear-gradient(135deg, #0D74FF 0%, #00C9FF 100%)' }}>
+            <Card.Header className="bg-white border-bottom border-neutral-100 p-12">
               <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <h5 className="text-white fw-bold mb-8">
-                    <i className="fas fa-calendar-week me-2"></i>
-                    Lịch học tuần này
-                  </h5>
-                  <p className="text-white mb-0 text-14" style={{ opacity: 0.9 }}>
-                    Tuần {Math.ceil(new Date().getDate() / 7)} - Tháng {new Date().getMonth() + 1}
-                  </p>
-                </div>
+                <h6 className="text-neutral-900 fw-bold mb-0 text-16">
+                  <i className="fas fa-calendar-week text-main-600 me-2"></i>
+                  Lịch học tuần này
+                </h6>
                 <Link to="/student/schedule">
-                  <Button className="btn-white text-main-600 text-13 fw-semibold px-20 py-10 radius-8">
-                    Xem chi tiết <i className="fas fa-arrow-right ms-2"></i>
+                  <Button className="btn-sm btn-outline-main text-11 px-12 py-6">
+                    Chi tiết <i className="fas fa-arrow-right ms-1"></i>
                   </Button>
                 </Link>
               </div>
@@ -159,33 +209,33 @@ const StudentDashboard = () => {
                 <Row className="g-0">
                   {weekSchedule.map((day, index) => (
                     <Col key={index} className="border-end border-neutral-100">
-                      <div className={`text-center py-16 border-bottom border-neutral-100 ${day.isToday ? 'bg-main-50' : 'bg-neutral-50'}`}>
-                        <div className={`text-12 fw-medium mb-4 ${day.isToday ? 'text-main-600' : 'text-neutral-600'}`}>
+                      <div className={`text-center py-8 border-bottom border-neutral-100 ${day.isToday ? 'bg-main-50' : 'bg-neutral-50'}`}>
+                        <div className={`text-10 fw-medium mb-2 ${day.isToday ? 'text-main-600' : 'text-neutral-600'}`}>
                           {day.dayName}
                         </div>
                         <div className={`${day.isToday ? 'bg-main-600 text-white' : 'bg-white text-neutral-800'} rounded-circle d-inline-flex align-items-center justify-content-center fw-bold`}
-                             style={{ width: '32px', height: '32px', fontSize: '14px' }}>
+                             style={{ width: '24px', height: '24px', fontSize: '11px' }}>
                           {day.dayNumber}
                         </div>
                       </div>
-                      <div className="p-12" style={{ minHeight: '120px' }}>
+                      <div className="p-8" style={{ minHeight: '80px' }}>
                         {day.schedules.length > 0 ? (
                           day.schedules.map((schedule, idx) => (
-                            <div key={idx} className="bg-main-50 border border-main-200 rounded-8 p-10 mb-8">
-                              <div className="text-main-600 fw-bold text-12 mb-4">
+                            <div key={idx} className="bg-main-50 border border-main-200 rounded-6 p-8 mb-6">
+                              <div className="text-main-600 fw-bold text-10 mb-2">
                                 <i className="fas fa-clock me-1"></i>
                                 {schedule.time}
                               </div>
-                              <div className="text-neutral-800 text-11 fw-medium mb-2">{schedule.subject}</div>
-                              <div className="text-neutral-600 text-10">
+                              <div className="text-neutral-800 text-10 fw-medium mb-1">{schedule.className}</div>
+                              <div className="text-neutral-600 text-9">
                                 <i className="fas fa-door-open me-1"></i>
                                 {schedule.room}
                               </div>
                             </div>
                           ))
                         ) : (
-                          <div className="text-center text-neutral-400 py-20">
-                            <i className="fas fa-calendar-times text-20"></i>
+                          <div className="text-center text-neutral-400 py-12">
+                            <i className="fas fa-calendar-times text-16"></i>
                           </div>
                         )}
                       </div>
@@ -196,6 +246,7 @@ const StudentDashboard = () => {
             </Card.Body>
           </Card>
 
+<<<<<<< HEAD
           {/* Active Classes */}
           <Card className="bg-white border-0 rounded-16 mb-24" 
                 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
@@ -208,10 +259,59 @@ const StudentDashboard = () => {
                 <Link to="/student/courses">
                   <Button className="btn-sm btn-outline-main text-12 px-16 py-8">
                     Xem tất cả
+=======
+          
+
+          {/* Practice Tests Results */}
+          <Card className="bg-white border-0 rounded-6" 
+                style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+            <Card.Header className="bg-white border-bottom border-neutral-100 p-12">
+              <div className="d-flex justify-content-between align-items-center mb-8">
+                <h6 className="text-neutral-900 fw-bold mb-0 text-16">
+                  <i className="fas fa-chart-line text-success-600 me-2"></i>
+                  Kết quả luyện đề
+                </h6>
+                <Link to="/student/toeic">
+                  <Button className="btn-sm btn-outline-main text-11 px-12 py-6">
+                    Tất cả
+>>>>>>> origin/Namvv-teacher-class-management
                   </Button>
                 </Link>
               </div>
+
+              {/* Filter Buttons */}
+              <div className="d-flex gap-2">
+                <Button
+                  size="sm"
+                  className={`flex-fill text-11 px-8 py-6 rounded-6 ${practiceTestFilter === 'all' ? 'btn-main' : 'btn-outline-main'}`}
+                  onClick={() => setPracticeTestFilter('all')}
+                >
+                  Tất cả
+                </Button>
+                <Button
+                  size="sm"
+                  className={`flex-fill text-11 px-8 py-6 rounded-6 ${practiceTestFilter === 'toeic' ? 'btn-main' : 'btn-outline-main'}`}
+                  onClick={() => setPracticeTestFilter('toeic')}
+                >
+                  TOEIC
+                </Button>
+                <Button
+                  size="sm"
+                  className={`flex-fill text-11 px-8 py-6 rounded-6 ${practiceTestFilter === 'ielts' ? 'btn-main' : 'btn-outline-main'}`}
+                  onClick={() => setPracticeTestFilter('ielts')}
+                >
+                  IELTS
+                </Button>
+                <Button
+                  size="sm"
+                  className={`flex-fill text-11 px-8 py-6 rounded-6 ${practiceTestFilter === 'cambridge' ? 'btn-main' : 'btn-outline-main'}`}
+                  onClick={() => setPracticeTestFilter('cambridge')}
+                >
+                  Cambridge
+                </Button>
+              </div>
             </Card.Header>
+<<<<<<< HEAD
             <Card.Body className="p-20">
               {activeClasses.length > 0 ? (
                 <div className="d-flex flex-column gap-12">
@@ -329,11 +429,17 @@ const StudentDashboard = () => {
             <Card.Body className="p-20">
               {getFilteredPracticeTests().length > 0 ? (
                 <Row className="g-3">
+=======
+            <Card.Body className="p-12">
+              {getFilteredPracticeTests().length > 0 ? (
+                <Row className="g-2">
+>>>>>>> origin/Namvv-teacher-class-management
                   {getFilteredPracticeTests().map(result => (
                     <Col md={6} key={result.id}>
                       <Card className="border-0 h-100 overflow-hidden"
                             style={{ 
                               background: result.type === 'toeic' 
+<<<<<<< HEAD
                                 ? 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%)' 
                                 : 'linear-gradient(135deg, #F3E5F5 0%, #E1BEE7 100%)',
                               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
@@ -347,13 +453,35 @@ const StudentDashboard = () => {
                               </Badge>
                             </div>
                             <Badge className="bg-neutral-900 text-white text-11">
+=======
+                                ? 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%)' : 
+                                result.type === 'ielts'
+                                ? 'linear-gradient(135deg, #F3E5F5 0%, #E1BEE7 100%)'
+                                : 'linear-gradient(135deg, #FFF8E1 0%, #FFECB3 100%)',
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+                            }}>
+                        <Card.Body className="p-12">
+                          <div className="d-flex justify-content-between align-items-start mb-10">
+                            <div>
+                              <h6 className="text-neutral-900 fw-bold text-14 mb-2">{result.testName}</h6>
+                              <Badge className={
+                                result.type === 'toeic' ? 'bg-main-600 text-white text-10' : 
+                                result.type === 'ielts' ? 'bg-purple-600 text-white text-10' :
+                                'bg-warning-600 text-white text-10'
+                              }>
+                                {result.type.toUpperCase()}
+                              </Badge>
+                            </div>
+                            <Badge className="bg-neutral-900 text-white text-10">
+>>>>>>> origin/Namvv-teacher-class-management
                               {new Date(result.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
                             </Badge>
                           </div>
                           
-                          <div className="d-flex justify-content-center mb-16">
+                          <div className="d-flex justify-content-center mb-10">
                             <div className="position-relative">
                               <div className="bg-white rounded-circle d-flex align-items-center justify-content-center"
+<<<<<<< HEAD
                                    style={{ width: '100px', height: '100px', boxShadow: '0 6px 16px rgba(0,0,0,0.15)' }}>
                                 <div className="text-center">
                                   <div className={`fw-bold ${result.type === 'toeic' ? 'text-main-600' : 'text-purple-600'}`} style={{ fontSize: '28px' }}>
@@ -361,6 +489,23 @@ const StudentDashboard = () => {
                                   </div>
                                   <div className="text-neutral-600 text-11">
                                     {result.type === 'toeic' ? '/ 990' : 'Band'}
+=======
+                                   style={{ width: '80px', height: '80px', boxShadow: '0 6px 16px rgba(0,0,0,0.15)' }}>
+                                <div className="text-center">
+                                  <div className={`fw-bold ${
+                                    result.type === 'toeic' ? 'text-main-600' : 
+                                    result.type === 'ielts' ? 'text-purple-600' : 
+                                    'text-warning-600'
+                                  }`} style={{ fontSize: '24px' }}>
+                                    {result.type === 'toeic' ? result.total : 
+                                     result.type === 'ielts' ? result.overallBand :
+                                     result.total}
+                                  </div>
+                                  <div className="text-neutral-600 text-12">
+                                    {result.type === 'toeic' ? '/ 990' : 
+                                     result.type === 'ielts' ? 'Band' :
+                                     '/ 100'}
+>>>>>>> origin/Namvv-teacher-class-management
                                   </div>
                                 </div>
                               </div>
@@ -370,6 +515,7 @@ const StudentDashboard = () => {
                           {result.type === 'toeic' ? (
                             <Row className="g-2">
                               <Col xs={6}>
+<<<<<<< HEAD
                                 <div className="bg-white rounded-8 p-10 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
                                   <i className="fas fa-headphones text-info-500 mb-4"></i>
                                   <div className="text-neutral-900 fw-bold text-14">{result.listening || 0}</div>
@@ -395,12 +541,53 @@ const StudentDashboard = () => {
                                   <i className="fas fa-microphone text-purple-600 mb-4"></i>
                                   <div className="text-neutral-900 fw-bold text-14">{result.speaking || 0}</div>
                                   <div className="text-neutral-600 text-10">Speaking</div>
+=======
+                                <div className="bg-white rounded-6 p-8 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <i className="fas fa-headphones text-info-500 mb-2"></i>
+                                  <div className="text-neutral-900 fw-bold text-12">{result.listening || 0}</div>
+                                  <div className="text-neutral-600 text-12">Listening</div>
+                                </div>
+                              </Col>
+                              <Col xs={6}>
+                                <div className="bg-white rounded-6 p-8 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <i className="fas fa-book-open text-success-500 mb-2"></i>
+                                  <div className="text-neutral-900 fw-bold text-12">{result.reading || 0}</div>
+                                  <div className="text-neutral-600 text-12">Reading</div>
+                                </div>
+                              </Col>
+                            </Row>
+                          ) : result.type === 'ielts' ? (
+                            <Row className="g-2">
+                              <Col xs={6}>
+                                <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <div className="text-purple-600 fw-bold text-12">{result.listening || 0}</div>
+                                  <div className="text-neutral-600 text-12">Listening</div>
+                                </div>
+                              </Col>
+                              <Col xs={6}>
+                                <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <div className="text-purple-600 fw-bold text-12">{result.reading || 0}</div>
+                                  <div className="text-neutral-600 text-12">Reading</div>
+                                </div>
+                              </Col>
+                              <Col xs={6}>
+                                <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <div className="text-purple-600 fw-bold text-12">{result.writing || 0}</div>
+                                  <div className="text-neutral-600 text-12">Writing</div>
+                                </div>
+                              </Col>
+                              <Col xs={6}>
+                                <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <div className="text-purple-600 fw-bold text-12">{result.speaking || 0}</div>
+                                  <div className="text-neutral-600 text-12">Speaking</div>
+>>>>>>> origin/Namvv-teacher-class-management
                                 </div>
                               </Col>
                             </Row>
                           ) : (
                             <Row className="g-2">
                               <Col xs={6}>
+<<<<<<< HEAD
                                 <div className="bg-white rounded-8 p-10 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
                                   <div className="text-neutral-900 fw-bold text-14">{result.listening}</div>
                                   <div className="text-neutral-600 text-10">Listening</div>
@@ -422,6 +609,29 @@ const StudentDashboard = () => {
                                 <div className="bg-white rounded-8 p-10 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
                                   <div className="text-neutral-900 fw-bold text-14">{result.speaking}</div>
                                   <div className="text-neutral-600 text-10">Speaking</div>
+=======
+                                <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <div className="text-warning-600 fw-bold text-12">{result.listening || 0}</div>
+                                  <div className="text-neutral-600 text-12">Listening</div>
+                                </div>
+                              </Col>
+                              <Col xs={6}>
+                                <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <div className="text-warning-600 fw-bold text-12">{result.reading || 0}</div>
+                                  <div className="text-neutral-600 text-12">Reading</div>
+                                </div>
+                              </Col>
+                              <Col xs={6}>
+                                <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <div className="text-warning-600 fw-bold text-12">{result.writing || 0}</div>
+                                  <div className="text-neutral-600 text-12">Writing</div>
+                                </div>
+                              </Col>
+                              <Col xs={6}>
+                                <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <div className="text-warning-600 fw-bold text-12">{result.speaking || 0}</div>
+                                  <div className="text-neutral-600 text-12">Speaking</div>
+>>>>>>> origin/Namvv-teacher-class-management
                                 </div>
                               </Col>
                             </Row>
@@ -432,6 +642,7 @@ const StudentDashboard = () => {
                   ))}
                 </Row>
               ) : (
+<<<<<<< HEAD
                 <div className="text-center py-40">
                   <i className="fas fa-clipboard-list fa-3x text-neutral-300 mb-16"></i>
                   <p className="text-neutral-600 mb-16 fw-medium">
@@ -446,26 +657,33 @@ const StudentDashboard = () => {
                     <i className="fas fa-play-circle me-2"></i>
                     Bắt đầu luyện đề ngay
                   </Button>
+=======
+                <div className="text-center py-32">
+                  <i className="fas fa-file-alt fa-2x text-neutral-300 mb-8"></i>
+                  <p className="text-neutral-600 mb-0 text-12">
+                    {practiceTestFilter === 'all' ? 'Bạn chưa luyện đề thi nào' :
+                     practiceTestFilter === 'toeic' ? 'Bạn chưa có kết quả TOEIC' :
+                     practiceTestFilter === 'ielts' ? 'Bạn chưa có kết quả IELTS' :
+                     'Bạn chưa có kết quả Cambridge'}
+                  </p>
+>>>>>>> origin/Namvv-teacher-class-management
                 </div>
               )}
             </Card.Body>
           </Card>
         </Col>
 
-        {/* Sidebar - Assignments */}
+        {/* Sidebar - Active Classes */}
         <Col lg={4}>
-          <Card className="bg-white border-0 rounded-16" 
-                style={{ 
-                  position: 'sticky', 
-                  top: '24px',
-                  boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' 
-                }}>
-            <Card.Header className="bg-white border-bottom border-neutral-100 p-20">
-              <div className="d-flex align-items-center justify-content-between mb-16">
-                <h6 className="text-neutral-900 fw-bold mb-0">
-                  <i className="fas fa-tasks text-danger-600 me-2"></i>
-                  Bài tập
+          <Card className="bg-white border-0 rounded-6 mb-16" 
+                style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+            <Card.Header className="bg-white border-bottom border-neutral-100 p-12">
+              <div className="d-flex justify-content-between align-items-center">
+                <h6 className="text-neutral-900 fw-bold mb-0 text-14">
+                  <i className="fas fa-graduation-cap text-main-600 me-2"></i>
+                  Các lớp đang học
                 </h6>
+<<<<<<< HEAD
                 <Badge className="bg-danger-100 text-danger-600 px-12 py-6 text-13 fw-bold">
                   {assignments.filter(a => a.status === 'not_submitted' && !a.isOverdue).length}
                 </Badge>
@@ -494,41 +712,47 @@ const StudentDashboard = () => {
                 >
                   Quá hạn
                 </Button>
+=======
+                <Link to="/student/courses">
+                  <Button className="btn-sm btn-outline-main text-11 px-12 py-6">
+                    Tất cả
+                  </Button>
+                </Link>
+>>>>>>> origin/Namvv-teacher-class-management
               </div>
             </Card.Header>
-
-            <Card.Body className="p-20" style={{ maxHeight: '600px', overflowY: 'auto' }}>
-              {getFilteredAssignments().length > 0 ? (
-                <div className="d-flex flex-column gap-12">
-                  {getFilteredAssignments().map(assignment => {
-                    const daysLeft = Math.ceil((new Date(assignment.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
-                    const isOverdue = daysLeft < 0 || assignment.status === 'overdue';
-                    const isUrgent = daysLeft <= 2 && !isOverdue;
-
+            <Card.Body className="p-12">
+              {activeClasses.length > 0 ? (
+                <div className="d-flex flex-column gap-10">
+                  {activeClasses.map(cls => {
+                    const progress = Math.round((cls.completedLessons / cls.totalLessons) * 100);
+                    const absentRate = cls.absentRate || 0;
+                    const upcomingHomework = cls.upcomingHomework || 0;
                     return (
-                      <Card 
-                        key={assignment.id} 
-                        className={`border-0 rounded-12 transition-2 item-hover ${
-                          isOverdue ? 'bg-danger-50 border-danger-200' : 
-                          isUrgent ? 'bg-warning-50 border-warning-200' : 
-                          'bg-neutral-50 border-neutral-200'
-                        }`}
-                        style={{ border: '2px solid' }}
-                      >
-                        <Card.Body className="p-16">
+                      <Card key={cls.id} className="bg-gradient border-0"
+                            style={{ background: 'linear-gradient(135deg, #F8FAFE 0%, #F0F7FF 100%)' }}>
+                        <Card.Body className="p-12">
                           <div className="d-flex justify-content-between align-items-start mb-10">
-                            <Badge className={`text-11 fw-semibold ${
-                              isOverdue ? 'bg-danger-600 text-white' :
-                              isUrgent ? 'bg-warning-600 text-white' :
-                              'bg-main-100 text-main-600'
-                            }`}>
-                              {assignment.subject}
-                            </Badge>
-                            {assignment.priority === 'high' && (
-                              <i className="fas fa-exclamation-circle text-danger-600"></i>
-                            )}
+                            <div className="flex-grow-1">
+                              <h6 className="text-neutral-900 fw-bold text-13 mb-4">{cls.className}</h6>
+                              <div className="d-flex align-items-center gap-6 mb-6">
+                                <Badge className="bg-main-100 text-main-600 text-10 fw-semibold">
+                                  {cls.programType}
+                                </Badge>
+                                <Badge className="bg-success-100 text-success-600 text-10 fw-semibold">
+                                  {cls.course}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div className="text-end ms-2">
+                              <div className={`fw-bold text-14 ${absentRate >= 20 ? 'text-danger-600' : absentRate >= 10 ? 'text-warning-600' : 'text-success-600'}`}>
+                                {absentRate}%
+                              </div>
+                              <div className="text-neutral-600 text-9">Nghỉ</div>
+                            </div>
                           </div>
 
+<<<<<<< HEAD
                           <h6 className="text-neutral-900 fw-semibold mb-8 text-13">
                             {assignment.title}
                           </h6>
@@ -540,60 +764,67 @@ const StudentDashboard = () => {
 
                           <div className="d-flex justify-content-between align-items-center mb-12">
                             <span className="text-neutral-600 text-11">
+=======
+                          {/* Teacher & Schedule Info */}
+                          <div className="mb-8 pb-8 border-bottom border-neutral-200">
+                            <div className="text-neutral-600 text-10 mb-2">
+                              <i className="fas fa-user me-1"></i>
+                              {cls.teacher}
+                            </div>
+                            <div className="text-neutral-600 text-10">
+>>>>>>> origin/Namvv-teacher-class-management
                               <i className="fas fa-calendar-alt me-1"></i>
-                              {new Date(assignment.dueDate).toLocaleDateString('vi-VN')}
-                            </span>
-                            <span className={`text-11 fw-bold ${
-                              isOverdue ? 'text-danger-600' :
-                              isUrgent ? 'text-warning-600' :
-                              'text-success-600'
-                            }`}>
-                              {isOverdue ? (
-                                <>
-                                  <i className="fas fa-exclamation-triangle me-1"></i>
-                                  Quá hạn {Math.abs(daysLeft)} ngày
-                                </>
-                              ) : (
-                                <>
-                                  <i className="fas fa-clock me-1"></i>
-                                  Còn {daysLeft} ngày
-                                </>
-                              )}
-                            </span>
+                              {cls.weekDays} {cls.schedule}
+                            </div>
                           </div>
 
+<<<<<<< HEAD
                           <Link to={`/student/assignments/${assignment.id}`}>
                             <Button className="btn-sm btn-outline-main w-100 text-12 py-8">
                               <i className="fas fa-eye me-2"></i>
                               Chi tiết
                             </Button>
                           </Link>
+=======
+                          {/* Progress Bar */}
+                          <div className="mb-8">
+                            <div className="d-flex justify-content-between align-items-center mb-4">
+                              <span className="text-neutral-700 text-10 fw-medium">Tiến độ</span>
+                              <span className="text-main-600 fw-bold text-10">{progress}%</span>
+                            </div>
+                            <div className="bg-neutral-200 rounded-pill overflow-hidden" style={{ height: '6px' }}>
+                              <div 
+                                className="bg-main-600 h-100 transition-2"
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                            <div className="text-neutral-500 text-9 mt-2">
+                              {cls.completedLessons}/{cls.totalLessons} buổi học
+                            </div>
+                          </div>
+
+                          {/* Upcoming Homework */}
+                          {upcomingHomework > 0 && (
+                            <div className="bg-warning-50 border border-warning-200 rounded-6 p-8 mt-8">
+                              <div className="text-warning-700 text-10 fw-semibold">
+                                <i className="fas fa-tasks me-1"></i>
+                                {upcomingHomework} bài tập sắp đến hạn
+                              </div>
+                            </div>
+                          )}
+>>>>>>> origin/Namvv-teacher-class-management
                         </Card.Body>
                       </Card>
                     );
                   })}
                 </div>
               ) : (
-                <div className="text-center py-40">
-                  <i className="fas fa-check-circle fa-3x text-success-600 mb-12"></i>
-                  <p className="text-neutral-600 mb-0 text-13">
-                    {assignmentFilter === 'all' ? 'Không có bài tập nào' : 
-                     assignmentFilter === 'pending' ? 'Không có bài tập chưa nộp' :
-                     'Không có bài tập quá hạn'}
-                  </p>
+                <div className="text-center py-32">
+                  <i className="fas fa-book-open fa-2x text-neutral-300 mb-8"></i>
+                  <p className="text-neutral-500 mb-0 text-12">Chưa có lớp học nào</p>
                 </div>
               )}
             </Card.Body>
-
-            {getFilteredAssignments().length > 0 && (
-              <Card.Footer className="bg-white border-top border-neutral-100 p-16">
-                <Link to="/student/assignments" className="text-decoration-none">
-                  <Button className="btn-outline-main w-100 text-13 fw-semibold">
-                    Xem tất cả bài tập <i className="fas fa-arrow-right ms-2"></i>
-                  </Button>
-                </Link>
-              </Card.Footer>
-            )}
           </Card>
         </Col>
       </Row>

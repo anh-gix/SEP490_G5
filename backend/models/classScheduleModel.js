@@ -30,7 +30,7 @@ const classScheduleSchema = new Schema({
     
     status: {
         type: String,
-        enum: ['temporary', 'fixed'],//temporary: buổi tạm, fixed: buổi cố định
+        enum: ['temporary', 'fixed', 'completed'],//temporary: buổi tạm, fixed: buổi cố định
         default: 'fixed'
     },
     
@@ -43,6 +43,7 @@ const classScheduleSchema = new Schema({
         },
         assignment: {
             title: { type: String, required: true },
+            description: { type: String }, // Mô tả bài tập
             files: [{ type: String }] // Changed from 'file' to 'files' array
         },
         deadline: { type: Date, required: true },

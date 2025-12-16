@@ -1523,7 +1523,8 @@ exports.updateMocktestScore = async (req, res) => {
     const Course = require('../models/courseModel');
     const Session = require('../models/sessionModel');
     
-    const course = await Course.findById(schedule.class.course);
+    const course = await Course.findById(schedule.class.course)
+      .populate('program', 'name type');
     const session = schedule.session; // Already populated above
     
     console.log(' Update Mocktest - Course & Session Info:', {
@@ -1576,24 +1577,67 @@ exports.updateMocktestScore = async (req, res) => {
       s => s.studentId.toString() === studentId.toString()
     );
 
+    const skillScores = {
+      reading: reading || 0,
+      listening: listening || 0,
+      writing: writing || 0,
+      speaking: speaking || 0
+    };
+
+    // Get program type
+    const programType = course?.program?.type?.toLowerCase() || 'ielts';
+
+    // Calculate total score based on program type
+    let totalScore = 0;
+    if (programType === 'ielts') {
+      const validScores = Object.values(skillScores).filter(s => s > 0);
+      totalScore = validScores.length > 0 
+        ? Math.round((validScores.reduce((a, b) => a + b, 0) / validScores.length) * 2) / 2 
+        : 0;
+    } else if (programType === 'toeic') {
+      totalScore = (skillScores.reading || 0) + (skillScores.listening || 0);
+    } else if (programType === 'cam' || programType === 'cambridge') {
+      const validScores = Object.values(skillScores).filter(s => s > 0);
+      totalScore = validScores.length > 0 
+        ? Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length) 
+        : 0;
+    }
+
     if (studentScore) {
-      // Update existing score
+      // Update existing score in ClassSchedule
       if (reading !== undefined) studentScore.reading = reading;
       if (listening !== undefined) studentScore.listening = listening;
       if (writing !== undefined) studentScore.writing = writing;
       if (speaking !== undefined) studentScore.speaking = speaking;
     } else {
-      // Add new score
+      // Add new score to ClassSchedule
       schedule.mocktest.scores.push({
         studentId,
-        reading: reading || 0,
-        listening: listening || 0,
-        writing: writing || 0,
-        speaking: speaking || 0
+        reading: skillScores.reading,
+        listening: skillScores.listening,
+        writing: skillScores.writing,
+        speaking: skillScores.speaking
       });
     }
 
     await schedule.save();
+
+    // Also save to User.mocktestScores for easy student access
+    const mocktestKey = `mocktest${session.order}`;
+    await User.findByIdAndUpdate(
+      studentId,
+      {
+        $set: {
+          [`mocktestScores.${mocktestKey}`]: {
+            scheduleId: scheduleId,
+            sessionOrder: session.order,
+            totalScore: totalScore,
+            skillScores: skillScores
+          }
+        }
+      },
+      { new: true }
+    );
 
     res.status(200).json({
       success: true,
@@ -1768,27 +1812,70 @@ exports.importMocktestScores = async (req, res) => {
 
         if (hasInvalidScore) continue;
 
-        // Find or create score entry
+        // Find or create score entry in ClassSchedule
         let studentScore = schedule.mocktest.scores.find(
           s => s.studentId.toString() === studentId.toString()
         );
 
+        const skillScores = {
+          reading: reading || 0,
+          listening: listening || 0,
+          writing: writing || 0,
+          speaking: speaking || 0
+        };
+
+        // Calculate total score based on program type
+        let totalScore = 0;
+        if (programType === 'ielts') {
+          // IELTS: average of 4 skills
+          const validScores = Object.values(skillScores).filter(s => s > 0);
+          totalScore = validScores.length > 0 
+            ? Math.round((validScores.reduce((a, b) => a + b, 0) / validScores.length) * 2) / 2 
+            : 0;
+        } else if (programType === 'toeic') {
+          // TOEIC: sum of reading + listening
+          totalScore = (skillScores.reading || 0) + (skillScores.listening || 0);
+        } else if (programType === 'cam' || programType === 'cambridge') {
+          // Cambridge: average of 4 skills
+          const validScores = Object.values(skillScores).filter(s => s > 0);
+          totalScore = validScores.length > 0 
+            ? Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length) 
+            : 0;
+        }
+
         if (studentScore) {
-          // Update existing score
+          // Update existing score in ClassSchedule
           if (reading !== undefined && reading !== null) studentScore.reading = reading;
           if (listening !== undefined && listening !== null) studentScore.listening = listening;
           if (writing !== undefined && writing !== null) studentScore.writing = writing;
           if (speaking !== undefined && speaking !== null) studentScore.speaking = speaking;
         } else {
-          // Add new score
+          // Add new score to ClassSchedule
           schedule.mocktest.scores.push({
             studentId,
-            reading: reading || 0,
-            listening: listening || 0,
-            writing: writing || 0,
-            speaking: speaking || 0
+            reading: skillScores.reading,
+            listening: skillScores.listening,
+            writing: skillScores.writing,
+            speaking: skillScores.speaking
           });
         }
+
+        // Also save to User.mocktestScores for easy student access
+        const mocktestKey = `mocktest${session.order}`;
+        await User.findByIdAndUpdate(
+          studentId,
+          {
+            $set: {
+              [`mocktestScores.${mocktestKey}`]: {
+                scheduleId: scheduleId,
+                sessionOrder: session.order,
+                totalScore: totalScore,
+                skillScores: skillScores
+              }
+            }
+          },
+          { new: true }
+        );
 
         successCount++;
       } catch (error) {

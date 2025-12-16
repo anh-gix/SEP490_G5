@@ -199,6 +199,169 @@ exports.getMyClasses = async (req, res) => {
 };
 
 // =========================
+//  LẤY CHI TIẾT MỘT LỚP HỌC CỦA HỌC VIÊN (bao gồm điểm mocktest)
+// =========================
+exports.getMyClassDetail = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const { classId } = req.params;
+
+    // Validate classId
+    if (!mongoose.Types.ObjectId.isValid(classId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID lớp học không hợp lệ'
+      });
+    }
+
+    // Find class and check if student is enrolled
+    const classData = await Class.findById(classId)
+      .populate({
+        path: 'course',
+        select: 'name description program mocktestSessionOrders',
+        populate: {
+          path: 'program',
+          select: 'name type'
+        }
+      })
+      .populate('teacher', 'username email')
+      .populate('room', 'room_name')
+      .lean();
+
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy lớp học'
+      });
+    }
+
+    // Check if student is enrolled in this class
+    const isEnrolled = classData.students.some(
+      s => s.toString() === studentId.toString()
+    );
+
+    if (!isEnrolled) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền truy cập lớp học này'
+      });
+    }
+
+    // Get student info
+    const student = await User.findById(studentId)
+      .select('username email')
+      .lean();
+
+    // Get all schedules for this class
+    const schedules = await ClassSchedule.find({ class: classId })
+      .sort({ date: 1 })
+      .lean();
+
+    // Get student schedules (attendance records)
+    const studentSchedules = await StudentSchedule.find({
+      student: studentId,
+      classSchedule: { $in: schedules.map(s => s._id) }
+    }).lean();
+
+    // Calculate attendance stats
+    const attendanceStats = {
+      total: studentSchedules.length,
+      present: studentSchedules.filter(s => s.attendance?.status === 'present').length,
+      absent: studentSchedules.filter(s => s.attendance?.status === 'absent').length,
+      late: studentSchedules.filter(s => s.attendance?.status === 'late').length,
+      excused: studentSchedules.filter(s => s.attendance?.status === 'excused').length
+    };
+
+    // Get attendance rate
+    const attendanceRate = studentSchedules.length > 0
+      ? Math.round((attendanceStats.present / studentSchedules.length) * 100)
+      : 0;
+
+    // Calculate schedule pattern
+    let schedulePattern = '';
+    if (schedules.length > 0) {
+      const firstSchedule = schedules[0];
+      schedulePattern = `${firstSchedule.startTime} - ${firstSchedule.endTime}`;
+    }
+
+    // Extract student's mocktest scores from ClassSchedule.mocktest.scores
+    // Structure: { mocktest5: { sessionOrder: 5, totalScore: 6.5, skillScores: {...} }, mocktest11: {...} }
+    const mocktestScores = {};
+    
+    // Filter schedules that have mocktest data
+    const mocktestSchedules = schedules.filter(s => s.mocktest && s.mocktest.scores && s.mocktest.scores.length > 0);
+    
+    mocktestSchedules.forEach(schedule => {
+      // Find this student's score in the mocktest.scores array
+      const studentScore = schedule.mocktest.scores.find(
+        score => score.studentId.toString() === studentId.toString()
+      );
+      
+      if (studentScore) {
+        // Get session order from mocktest.order or session reference
+        const sessionOrder = schedule.mocktest.order;
+        if (sessionOrder) {
+          // Calculate total score (average of 4 skills)
+          const { reading = 0, listening = 0, writing = 0, speaking = 0 } = studentScore;
+          const totalScore = ((reading + listening + writing + speaking) / 4).toFixed(1);
+          
+          // Create mocktest key (e.g., "mocktest5", "mocktest11")
+          const mocktestKey = `mocktest${sessionOrder}`;
+          
+          mocktestScores[mocktestKey] = {
+            scheduleId: schedule._id,
+            sessionOrder: sessionOrder,
+            totalScore: parseFloat(totalScore),
+            skillScores: {
+              reading: reading,
+              listening: listening,
+              writing: writing,
+              speaking: speaking
+            }
+          };
+        }
+      }
+    });
+
+    // Return class detail with student's mocktest scores
+    res.status(200).json({
+      success: true,
+      message: 'Lấy chi tiết lớp học thành công',
+      data: {
+        _id: classData._id,
+        name: classData.name,
+        course: classData.course,
+        teacher: classData.teacher,
+        room: classData.room,
+        startDate: classData.startDate,
+        endDate: classData.endDate,
+        status: classData.status,
+        totalLessons: schedules.length,
+        completedLessons: schedules.filter(s => new Date(s.date) < new Date()).length,
+        attendanceStats,
+        attendanceRate,
+        schedulePattern,
+        // Student's personal mocktest scores extracted from ClassSchedule
+        mocktestScores: mocktestScores,
+        // Student info
+        studentInfo: {
+          _id: student._id,
+          username: student.username,
+          email: student.email
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error in getMyClassDetail:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy chi tiết lớp học',
+      error: error.message
+    });
+  }
+};
+
+// =========================
 //  LẤY LỊCH HỌC CỦA HỌC VIÊN
 // =========================
 exports.getMySchedule = async (req, res) => {
@@ -635,8 +798,9 @@ exports.getClassProgress = async (req, res) => {
       });
     }
 
-    // Get all schedules for this class
+    // Get all schedules for this class with session populated
     const schedules = await ClassSchedule.find({ class: classId })
+      .populate('session', 'order topic')
       .sort({ date: 1 })
       .lean();
 
@@ -646,6 +810,12 @@ exports.getClassProgress = async (req, res) => {
       student: studentId,
       classSchedule: { $in: scheduleIds }
     }).lean();
+
+    // Create a map of classSchedule to studentSchedule for easy lookup
+    const studentScheduleMap = {};
+    studentSchedules.forEach(ss => {
+      studentScheduleMap[ss.classSchedule.toString()] = ss;
+    });
 
     // Calculate attendance stats
     const attendanceStats = {
@@ -660,6 +830,39 @@ exports.getClassProgress = async (req, res) => {
       ? Math.round((attendanceStats.present / attendanceStats.total) * 100)
       : 0;
 
+    // Get list of absent lessons (buổi nghỉ)
+    const absentLessons = [];
+    studentSchedules.forEach(ss => {
+      if (ss.attendance?.status === 'absent') {
+        const schedule = schedules.find(sch => sch._id.toString() === ss.classSchedule.toString());
+        if (schedule) {
+          absentLessons.push({
+            scheduleId: schedule._id,
+            lessonNumber: schedule.session?.order || 0,
+            lessonTopic: schedule.session?.topic || 'Không có chủ đề',
+            date: schedule.date,
+            reason: ss.attendance?.note || 'Không có lý do'
+          });
+        }
+      }
+    });
+
+    // Get all homework from schedules
+    const allHomework = [];
+    schedules.forEach(schedule => {
+      if (schedule.homework && schedule.homework.length > 0) {
+        schedule.homework.forEach(hw => {
+          allHomework.push({
+            classScheduleId: schedule._id,
+            homeworkId: hw._id,
+            title: hw.assignment?.title || 'Bài tập',
+            deadline: hw.deadline,
+            lessonNumber: schedule.session?.order || 0
+          });
+        });
+      }
+    });
+
     // Get homework submissions
     const HomeworkSubmission = require('../models/homeworkSubmissionModel');
     const submissions = await HomeworkSubmission.find({
@@ -667,67 +870,97 @@ exports.getClassProgress = async (req, res) => {
       classSchedule: { $in: scheduleIds }
     }).lean();
 
+    // Create submission map by homeworkId
+    const submissionMap = {};
+    submissions.forEach(sub => {
+      submissionMap[sub.homeworkId.toString()] = sub;
+    });
+
     // Calculate homework stats
     const homeworkStats = {
-      total: submissions.length,
-      submitted: submissions.filter(s => s.status === 'submitted' || s.status === 'graded').length,
-      late: submissions.filter(s => s.isLate).length,
-      graded: submissions.filter(s => s.status === 'graded').length,
-      notSubmitted: submissions.filter(s => s.status === 'not_submitted').length
+      total: allHomework.length,
+      submitted: 0,
+      late: 0,
+      notSubmitted: 0
     };
 
-    // Calculate average score
-    const gradedSubmissions = submissions.filter(s => s.score != null);
-    const averageScore = gradedSubmissions.length > 0
-      ? (gradedSubmissions.reduce((sum, s) => sum + s.score, 0) / gradedSubmissions.length).toFixed(1)
-      : null;
+    const incompleteHomework = [];
+    const lateHomework = [];
 
-    // Weekly attendance data for chart (last 8 weeks)
-    const weeklyAttendance = [];
-    const now = new Date();
-    for (let i = 7; i >= 0; i--) {
-      const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - (i * 7));
-      weekStart.setHours(0, 0, 0, 0);
-      
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
-
-      const weekSchedules = studentSchedules.filter(s => {
-        const schedule = schedules.find(sch => sch._id.toString() === s.classSchedule.toString());
-        if (!schedule) return false;
-        const scheduleDate = new Date(schedule.date);
-        return scheduleDate >= weekStart && scheduleDate <= weekEnd;
-      });
-
-      const weekPresent = weekSchedules.filter(s => s.attendance?.status === 'present').length;
-      const weekTotal = weekSchedules.length;
-      const weekRate = weekTotal > 0 ? Math.round((weekPresent / weekTotal) * 100) : 0;
-
-      weeklyAttendance.push({
-        week: `Tuần ${8 - i}`,
-        rate: weekRate
-      });
-    }
-
-    // Grade history (from mocktest)
-    const gradesHistory = [];
-    schedules.forEach(schedule => {
-      if (schedule.mocktest && schedule.mocktest.studentScores) {
-        const studentScore = schedule.mocktest.studentScores.find(
-          s => s.student.toString() === studentId.toString()
-        );
-        if (studentScore) {
-          gradesHistory.push({
-            lessonNumber: schedule.session?.order || 0,
-            type: 'Mocktest',
-            score: studentScore.score,
-            date: schedule.date
+    allHomework.forEach(hw => {
+      const submission = submissionMap[hw.homeworkId.toString()];
+      if (submission) {
+        if (submission.status === 'submitted' || submission.status === 'late') {
+          homeworkStats.submitted++;
+          if (submission.status === 'late') {
+            homeworkStats.late++;
+            lateHomework.push({
+              homeworkId: hw.homeworkId,
+              title: hw.title,
+              deadline: hw.deadline,
+              submittedAt: submission.submittedAt,
+              lessonNumber: hw.lessonNumber
+            });
+          }
+        } else {
+          homeworkStats.notSubmitted++;
+          incompleteHomework.push({
+            homeworkId: hw.homeworkId,
+            title: hw.title,
+            deadline: hw.deadline,
+            lessonNumber: hw.lessonNumber
           });
         }
+      } else {
+        homeworkStats.notSubmitted++;
+        incompleteHomework.push({
+          homeworkId: hw.homeworkId,
+          title: hw.title,
+          deadline: hw.deadline,
+          lessonNumber: hw.lessonNumber
+        });
       }
     });
+
+    // Get mocktest scores as array (sorted by mocktest order)
+    const mocktestScores = [];
+    const mocktestSchedules = schedules.filter(s => s.mocktest && s.mocktest.scores && s.mocktest.scores.length > 0);
+    console.log('Found mocktestSchedules:', mocktestSchedules.length);
+
+    mocktestSchedules.forEach(schedule => {
+      const studentScore = schedule.mocktest.scores.find(
+        score => score.studentId.toString() === studentId.toString()
+      );
+      console.log('Student Score for mocktest:', studentScore);
+      
+      if (studentScore) {
+        const { reading = 0, listening = 0, writing = 0, speaking = 0 } = studentScore;
+        const totalScore = ((reading + listening + writing + speaking) / 4).toFixed(1);
+        
+        let mocktestOrdertemp = 0;
+        if (!schedule.mocktest.order) {
+          mocktestOrdertemp++;
+        } else {
+          mocktestOrdertemp = schedule.mocktest.order;
+        }
+        mocktestScores.push({
+          mocktestNumber: mocktestOrdertemp,
+          sessionOrder: mocktestOrdertemp,
+          title: schedule.mocktest.title || `Mocktest ${mocktestOrdertemp}`,
+          totalScore: parseFloat(totalScore),
+          skillScores: {
+            reading: reading,
+            listening: listening,
+            writing: writing,
+            speaking: speaking
+          },
+          date: schedule.date
+        });
+      }
+    });
+
+    // Sort mocktest scores by order
+    mocktestScores.sort((a, b) => a.mocktestNumber - b.mocktestNumber);
 
     res.status(200).json({
       success: true,
@@ -739,21 +972,23 @@ exports.getClassProgress = async (req, res) => {
         // Attendance
         attendanceStats,
         attendanceRate,
-        weeklyAttendance,
+        absentLessons, // Danh sách buổi nghỉ
         
         // Homework
         homeworkStats,
-        averageScore,
+        incompleteHomework, // Danh sách bài tập chưa nộp
+        lateHomework, // Danh sách bài tập nộp muộn
         
         // Lessons
         totalLessons: schedules.length,
         completedLessons: schedules.filter(s => new Date(s.date) < new Date()).length,
         
-        // Grades
-        gradesHistory
+        // Mocktest scores (array sorted by order)
+        mocktestScores
       }
     });
   } catch (error) {
+    console.error('Error in getClassProgress:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy tiến độ',

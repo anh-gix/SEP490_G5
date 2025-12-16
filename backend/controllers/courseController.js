@@ -9,34 +9,10 @@ const Program = require('../models/programModel');
 /**
  * Get all courses
  * GET /api/courses
- * Query params: status, program, search
  */
 exports.getAllCourses = async (req, res) => {
     try {
-        const { status, program, search } = req.query;
-        
-        // Build query
-        let query = {};
-        
-        // Filter by status if provided
-        if (status) {
-            query.status = status;
-        }
-        
-        // Filter by program if provided
-        if (program) {
-            query.program = program;
-        }
-        
-        // Search by name or courseCode
-        if (search) {
-            query.$or = [
-                { name: { $regex: search, $options: 'i' } },
-                { courseCode: { $regex: search, $options: 'i' } }
-            ];
-        }
-        
-        const courses = await Course.find(query)
+        const courses = await Course.find()
             .populate('program', 'program_name code')
             .populate('createdBy', 'fullname email')
             .sort({ createdAt: -1 });
@@ -477,6 +453,7 @@ exports.submitCourse = async (req, res) => {
             data: course
         });
     } catch (err) {
+        console.error('Error submitting course:', err);
         res.status(500).json({
             success: false,
             message: 'Lỗi khi nộp giáo trình',
@@ -546,6 +523,7 @@ exports.approveCourse = async (req, res) => {
             data: course
         });
     } catch (err) {
+        console.error('Error approving course:', err);
         res.status(500).json({
             success: false,
             message: 'Lỗi khi duyệt giáo trình',
@@ -622,6 +600,7 @@ exports.rejectCourse = async (req, res) => {
             data: course
         });
     } catch (err) {
+        console.error('Error rejecting course:', err);
         res.status(500).json({
             success: false,
             message: 'Lỗi khi từ chối giáo trình',
@@ -681,6 +660,7 @@ exports.archiveCourse = async (req, res) => {
             data: course
         });
     } catch (err) {
+        console.error('Error archiving course:', err);
         res.status(500).json({
             success: false,
             message: 'Lỗi khi lưu trữ giáo trình',
@@ -875,12 +855,19 @@ exports.getBandByTypeAndLevel = async (req, res) => {
         // Normalize type to lowercase for case-insensitive matching
         const normalizedType = type.toLowerCase().trim();
         
+        console.log('🔍 Searching for band:', { type: normalizedType, level, originalType: type });
+        
         const program = await Program.findOne({
             type: normalizedType,
             level: level.trim(),
             status: 'active'
         });
         
+        console.log('📋 Found program:', program ? { 
+            type: program.type, 
+            level: program.level, 
+            band: program.band 
+        } : 'null');
         
         if (!program || !program.band) {
             return res.status(200).json({
@@ -894,6 +881,7 @@ exports.getBandByTypeAndLevel = async (req, res) => {
             band: program.band
         });
     } catch (err) {
+        console.error('❌ Error in getBandByTypeAndLevel:', err);
         res.status(500).json({
             success: false,
             message: 'Lỗi máy chủ',
@@ -1084,48 +1072,3 @@ exports.updateCoursePLOMapping = async (req, res) => {
     }
 };
 
-// =========================
-// COURSE MATERIALS
-// =========================
-
-/**
- * Get course materials
- * GET /api/courses/:courseId/materials
- */
-exports.getCourseMaterials = async (req, res) => {
-    try {
-        const { courseId } = req.params;
-
-        const course = await Course.findById(courseId).select('materials name');
-
-        if (!course) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy khóa học'
-            });
-        }
-
-        // Format materials array (if it's an array of URLs)
-        const formattedMaterials = (course.materials || []).map((materialUrl, index) => ({
-            id: `course-${courseId}-${index}`,
-            title: `Tài liệu ${index + 1}`,
-            url: materialUrl,
-            type: 'course',
-            uploadDate: null // Course materials may not have upload dates
-        }));
-
-        res.status(200).json({
-            success: true,
-            message: 'Lấy tài liệu khóa học thành công',
-            courseName: course.name,
-            total: formattedMaterials.length,
-            materials: formattedMaterials
-        });
-    } catch (err) {
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi server khi lấy tài liệu khóa học',
-            error: err.message
-        });
-    }
-};

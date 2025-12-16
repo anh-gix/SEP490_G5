@@ -109,7 +109,7 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
 
       // Show more detailed error for duplicate courseCode
       if (errorMsg.includes('Mã môn học đã tồn tại')) {
-        alert(` Lỗi: Mã môn học "${courseData.courseCode}" đã tồn tại trong hệ thống!\n\nVui lòng sử dụng mã môn học khác.`);
+        alert(`❌ Lỗi: Mã môn học "${courseData.courseCode}" đã tồn tại trong hệ thống!\n\nVui lòng sử dụng mã môn học khác.`);
       } else {
         alert(errorMsg);
       }

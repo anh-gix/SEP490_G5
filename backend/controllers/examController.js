@@ -36,27 +36,8 @@ exports.uploadMiddleware = upload;
 // ================== 1. LẤY DANH SÁCH BÀI THI CHO QUẢN LÝ ==================
 exports.getAllExamsForManagement = async (req, res) => {
   try {
-    const { search = '', examType = '', level = '', isPublished } = req.query;
 
-    // Build query
-    const query = {};
-    if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
-      ];
-    }
-    if (examType) {
-      query.examType = examType;
-    }
-    if (level) {
-      query.level = level;
-    }
-    if (isPublished !== undefined) {
-      query.isPublished = isPublished === 'true';
-    }
-
-    const exams = await Exam.find(query)
+    const exams = await Exam.find()
       .populate('createdBy', 'username email phone address')
       .sort({ createdAt: -1 });
 
@@ -261,6 +242,7 @@ exports.updateExamForManagement = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
+    //exam not found
     const exam = await Exam.findById(id);
     if (!exam) {
       return res.status(404).json({
@@ -269,11 +251,11 @@ exports.updateExamForManagement = async (req, res) => {
       });
     }
 
-    // Không cho phép cập nhật nếu đã xuất bản
-    if (exam.isPublished && !req.body.allowPublishedUpdate) {
+    // check stautus != draft || needs_revision thì ko cho update
+    if (!['draft', 'needs_revision'].includes(exam.status)) {
       return res.status(400).json({
         success: false,
-        message: 'Không thể cập nhật bài thi đã xuất bản'
+        message: 'Không thể cập nhật bài thi khi trạng thái hiện tại'
       });
     }
 

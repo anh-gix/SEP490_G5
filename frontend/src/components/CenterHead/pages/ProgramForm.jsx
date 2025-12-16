@@ -8,10 +8,13 @@ import Badge from '../compo/Badge';
 import Tabs from '../compo/Tabs';
 import programService from '../../../services/programService';
 
-const ProgramFormNew = () => {
+const ProgramFormNew = ({ viewMode = 'center-head' }) => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = Boolean(id);
+
+  // Determine base path
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
 
   // Form state
   const [formData, setFormData] = useState({
@@ -39,8 +42,8 @@ const ProgramFormNew = () => {
 
   // Breadcrumb
   const breadcrumbItems = [
-    { label: 'Dashboard', path: '/center-head/dashboard' },
-    { label: 'Quản lý chương trình', path: '/center-head/programs' },
+    { label: 'Dashboard', path: `${basePath}/dashboard` },
+    { label: 'Quản lý chương trình', path: `${basePath}/programs` },
     { label: isEdit ? 'Chỉnh sửa chương trình' : 'Tạo chương trình mới' }
   ];
 
@@ -68,7 +71,7 @@ const ProgramFormNew = () => {
         } catch (error) {
           console.error('Error loading program:', error);
           alert('Không thể tải thông tin chương trình!');
-          navigate('/center-head/programs');
+          navigate(`${basePath}/programs`);
         } finally {
           setLoading(false);
         }
@@ -145,7 +148,7 @@ const ProgramFormNew = () => {
       return;
     }
 
-    navigate(`/center-head/programs/${id}/courses/create`);
+    navigate(`${basePath}/programs/${id}/courses/create`);
   };
 
   // ==================== Form Submission ====================
@@ -204,10 +207,10 @@ const ProgramFormNew = () => {
 
         if (addCourse) {
           // Navigate to course wizard
-          navigate(`/center-head/programs/${newProgramId}/courses/create`);
+          navigate(`${basePath}/programs/${newProgramId}/courses/create`);
         } else {
           // Go back to program list
-          navigate('/center-head/programs');
+          navigate(`${basePath}/programs`);
         }
         return;
       }
@@ -493,7 +496,7 @@ const ProgramFormNew = () => {
                   </thead>
                   <tbody>
                     {formData.courses.map(course => (
-                      <tr key={course._id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/center-head/courses/${course._id}/details`)}>
+                      <tr key={course._id} style={{ cursor: 'pointer' }} onClick={() => navigate(`${basePath}/courses/${course._id}/details`)}>
                         <td className="px-16 py-12">
                           <Badge variant="primary">{course.courseCode}</Badge>
                         </td>

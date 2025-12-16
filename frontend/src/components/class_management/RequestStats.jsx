@@ -45,7 +45,7 @@ const RequestStats = ({ stats, filterType, onFilterTypeChange }) => {
         </Card>
       </Col>
 
-      {/* Đổi lớp */}
+      {/* Đổi lớp
       <Col xs={12} sm={6} md={4} lg style={{ flex: '1', minWidth: '200px' }}>
         <Card 
           className="bg-white rounded-12 box-shadow-sm"
@@ -78,7 +78,7 @@ const RequestStats = ({ stats, filterType, onFilterTypeChange }) => {
             </div>
           </Card.Body>
         </Card>
-      </Col>
+      </Col> */}
 
       {/* Học bù */}
       <Col xs={12} sm={6} md={4} lg style={{ flex: '1', minWidth: '200px' }}>

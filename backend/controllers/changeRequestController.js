@@ -764,14 +764,13 @@ exports.approveChangeRequest = async (req, res) => {
             }
           }
           
+          // Chỉ set substituteTeacher, không thay đổi teacher (giữ nguyên giáo viên gốc)
           const originalTeacher = absentClassSchedule.teacher;
-          if (!absentClassSchedule.substituteTeacher) {
-            absentClassSchedule.substituteTeacher = originalTeacher;
-          }
           
-          absentClassSchedule.teacher = new mongoose.Types.ObjectId(substituteTeacherId);
+          // Set substituteTeacher = giáo viên dạy thay
+          absentClassSchedule.substituteTeacher = new mongoose.Types.ObjectId(substituteTeacherId);
           
-          const substituteNote = `Giáo viên dạy thay: ${substituteTeacherId} (Giáo viên gốc: ${originalTeacher})`;
+          const substituteNote = `Giáo viên dạy thay: ${substituteTeacherId} (Giáo viên gốc: ${originalTeacher._id || originalTeacher})`;
           if (absentClassSchedule.note) {
             absentClassSchedule.note += `\n${substituteNote}`;
           } else {
@@ -1312,7 +1311,6 @@ exports.approveChangeRequest = async (req, res) => {
             if (remainingStudents === 0) {
               // No students using this makeup class anymore, safe to delete
               await ClassSchedule.findByIdAndDelete(scheduleId).session(session);
-              console.log(`✅ Deleted orphaned makeup ClassSchedule: ${scheduleId}`);
             }
           }
         } catch (cleanupError) {

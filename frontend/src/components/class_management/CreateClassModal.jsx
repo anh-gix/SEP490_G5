@@ -801,13 +801,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       return;
     }
 
-    // Validate teacher is selected
-    if (!formData.teacherId) {
-      setErrorMessage('Vui lòng chọn giáo viên!');
-      setShowErrorModal(true);
-      return;
-    }
-
     if (
       formData.scheduleEntries.length === 0 ||
       formData.scheduleEntries.some(entry => !entry.day)
@@ -1927,7 +1920,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               <div className="col-md-6">
                 <Form.Group>
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
-                    Giáo viên <span className="text-danger-600">*</span>
+                    Giáo viên
                   </Form.Label>
                   <Form.Select
                     name="teacherId"
@@ -1935,7 +1928,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     onChange={handleInputChange}
                     className="border-neutral-30 radius-8 px-16 py-10"
                     disabled={teachers.length === 0}
-                    required
                   >
                     <option value="">-- Chọn giáo viên --</option>
                     {teachers.length === 0 ? (

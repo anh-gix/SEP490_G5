@@ -85,7 +85,6 @@ const ClassList = ({ classes, onEdit, onViewDetails }) => {
                   className="btn-outline-main flex-fill text-13 fw-medium px-16 py-8 radius-8"
                   onClick={() => onViewDetails(classItem)}
                 >
-                  <i className="fas fa-eye me-1"></i>
                   Chi tiết
                 </Button>
                 <Button 

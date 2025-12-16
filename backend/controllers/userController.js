@@ -41,10 +41,14 @@ const createUser = async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Check if username already exists
-    const usernameExists = await User.findOne({ username });
-    if (usernameExists) {
-      return res.status(400).json({ message: 'Username already exists' });
+    // Validate phone number length (10-11 digits)
+    if (phone) {
+      const phoneDigits = phone.replace(/\D/g, '');
+      if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+        return res.status(400).json({ 
+          message: 'Số điện thoại phải có 10 hoặc 11 chữ số' 
+        });
+      }
     }
 
     // Check if phone number already exists
@@ -118,9 +122,6 @@ const deleteUser = async (req, res) => {
   }
 };
 
-// =========================
-// 📤 UPLOAD EXCEL VÀ PARSE DỮ LIỆU
-// =========================
 const uploadExcel = async (req, res) => {
   let filePath = null;
   try {
@@ -340,16 +341,18 @@ const saveBulkUsers = async (req, res) => {
           continue;
         }
 
-        // Kiểm tra username đã tồn tại chưa
-        const existingUsername = await User.findOne({ username: userData.username });
-        if (existingUsername) {
-          results.failed.push({
-            email: userData.email,
-            username: userData.username,
-            phone: userData.phone || '',
-            reason: 'Username đã tồn tại trong hệ thống'
-          });
-          continue;
+        // Validate phone number length (10-11 digits)
+        if (userData.phone) {
+          const phoneDigits = userData.phone.replace(/\D/g, '');
+          if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+            results.failed.push({
+              email: userData.email,
+              username: userData.username,
+              phone: userData.phone || '',
+              reason: 'Số điện thoại phải có 10 hoặc 11 chữ số'
+            });
+            continue;
+          }
         }
 
         // Kiểm tra phone number đã tồn tại chưa

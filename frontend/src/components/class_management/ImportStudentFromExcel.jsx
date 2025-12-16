@@ -47,7 +47,8 @@ const ImportStudentFromExcel = () => {
     const programNameMap = {
       'ielts': 'IELTS',
       'toeic': 'TOEIC',
-      'cam': 'Cambridge'
+      'cam': 'Cambridge',
+      'cambridge': 'Cambridge'
     };
     const programName = programNameMap[typeStr] || typeStr;
     
@@ -165,8 +166,22 @@ const ImportStudentFromExcel = () => {
         return;
       }
 
+      // Helper function to normalize Cambridge level names
+      const normalizeCambridgeLevel = (level) => {
+        if (!level) return '';
+        const levelStr = level.toString().trim();
+        const levelLower = levelStr.toLowerCase();
+        if (levelLower === 'starter') return 'Pre-A1';
+        if (levelLower === 'mover') return 'A1';
+        // If already in CEFR format, return as is
+        if (levelStr === 'Pre-A1' || levelStr === 'A1') return levelStr;
+        return levelStr;
+      };
+
       // Helper function to get band order for comparison
       const getLevelOrder = (level) => {
+        // Normalize Cambridge levels first
+        const normalizedLevel = normalizeCambridgeLevel(level);
         const levelMap = {
           'Pre-A1': 0,
           'A1': 1,
@@ -176,7 +191,7 @@ const ImportStudentFromExcel = () => {
           'C1': 5,
           'C2': 6
         };
-        return levelMap[level] !== undefined ? levelMap[level] : -1;
+        return levelMap[normalizedLevel] !== undefined ? levelMap[normalizedLevel] : -1;
       };
 
       // Helper function to get band name from order
@@ -198,12 +213,18 @@ const ImportStudentFromExcel = () => {
         if (!score || !type) return false;
         
         const scoreStr = score.toString().trim();
-        if (type === 'ielts') {
+        const typeStr = type.toString().trim().toLowerCase();
+        
+        if (typeStr === 'ielts') {
           const num = parseFloat(scoreStr);
           return !isNaN(num) && num >= 0 && num <= 9.0;
-        } else if (type === 'toeic') {
+        } else if (typeStr === 'toeic') {
           const num = parseInt(scoreStr);
           return !isNaN(num) && num >= 0 && num <= 990;
+        } else if (typeStr === 'cambridge' || typeStr === 'cam') {
+          // Cambridge uses level names: Starter (Pre-A1) or Mover (A1)
+          const normalized = normalizeCambridgeLevel(scoreStr);
+          return normalized === 'Pre-A1' || normalized === 'A1';
         }
         return false;
       };
@@ -304,6 +325,31 @@ const ImportStudentFromExcel = () => {
         const currentLevelStr = currentLevel.toString().trim();
         const aimStr = aim.toString().trim();
         const typeStr = type ? type.toString().trim().toLowerCase() : '';
+        const isCambridge = typeStr === 'cambridge' || typeStr === 'cam';
+        
+        // For Cambridge, normalize level names first
+        if (isCambridge) {
+          const normalizedCurrent = normalizeCambridgeLevel(currentLevelStr);
+          const normalizedAim = normalizeCambridgeLevel(aimStr);
+          
+          const currentOrder = getLevelOrder(normalizedCurrent);
+          const aimOrder = getLevelOrder(normalizedAim);
+          
+          if (currentOrder === -1 || aimOrder === -1 || aimOrder <= currentOrder) {
+            return '';
+          }
+          
+          // Calculate all levels from currentLevel to aim
+          const levelsToStudy = [];
+          for (let order = currentOrder; order <= aimOrder; order++) {
+            const levelName = getLevelName(order);
+            if (levelName) {
+              levelsToStudy.push(levelName);
+            }
+          }
+          
+          return levelsToStudy.join(' → ');
+        }
         
         // Check if values are numeric scores
         const currentLevelIsNumeric = isNumericScore(currentLevelStr);
@@ -406,6 +452,12 @@ const ImportStudentFromExcel = () => {
 
         if (!phone || !phone.toString().trim()) {
           errors.push('Số điện thoại không được để trống');
+        } else {
+          // Validate phone length (10-11 digits after normalization)
+          const phoneDigits = phone.replace(/\D/g, '');
+          if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+            errors.push('Số điện thoại phải có 10 hoặc 11 chữ số');
+          }
         }
 
         if (!address || !address.toString().trim()) {
@@ -418,36 +470,59 @@ const ImportStudentFromExcel = () => {
           const currentLevelStr = currentLevel.toString().trim();
           const typeStr = type ? type.toString().trim().toLowerCase() : '';
           
-          // Check if values are numeric scores or CEFR levels
-          const aimIsNumeric = isNumericScore(aimStr);
-          const currentLevelIsNumeric = isNumericScore(currentLevelStr);
+          // Check if Cambridge type
+          const isCambridge = typeStr === 'cambridge' || typeStr === 'cam';
           
-          if (typeStr && (aimIsNumeric || currentLevelIsNumeric)) {
-            // Validate as numeric scores based on type
+          if (isCambridge) {
+            // Cambridge uses level names (Starter/Mover or Pre-A1/A1)
+            const normalizedAim = normalizeCambridgeLevel(aimStr);
+            const normalizedCurrentLevel = normalizeCambridgeLevel(currentLevelStr);
+            
             if (!validateScore(aimStr, typeStr)) {
-              errors.push(`Điểm mục tiêu không hợp lệ cho ${typeStr.toUpperCase()}. ${typeStr === 'ielts' ? 'Phải là số từ 0.0 đến 9.0' : 'Phải là số từ 0 đến 990'}`);
+              errors.push(`Điểm mục tiêu không hợp lệ cho Cambridge. Phải là Starter hoặc Mover (hoặc Pre-A1, A1)`);
             } else if (!validateScore(currentLevelStr, typeStr)) {
-              errors.push(`Trình độ hiện tại không hợp lệ cho ${typeStr.toUpperCase()}. ${typeStr === 'ielts' ? 'Phải là số từ 0.0 đến 9.0' : 'Phải là số từ 0 đến 990'}`);
+              errors.push(`Trình độ hiện tại không hợp lệ cho Cambridge. Phải là Starter hoặc Mover (hoặc Pre-A1, A1)`);
             } else {
-              // Compare numeric scores
-              const aimNum = typeStr === 'ielts' ? parseFloat(aimStr) : parseInt(aimStr);
-              const currentLevelNum = typeStr === 'ielts' ? parseFloat(currentLevelStr) : parseInt(currentLevelStr);
+              // Compare levels
+              const aimOrder = getLevelOrder(normalizedAim);
+              const currentLevelOrder = getLevelOrder(normalizedCurrentLevel);
               
-              if (aimNum <= currentLevelNum) {
-                errors.push('Điểm mục tiêu phải cao hơn trình độ hiện tại');
+              if (aimOrder <= currentLevelOrder) {
+                errors.push('Điểm mục tiêu phải cao hơn trình độ hiện tại (Starter → Mover)');
               }
             }
           } else {
-            // Validate as CEFR levels (backward compatibility)
-            const aimOrder = getLevelOrder(aimStr);
-            const currentLevelOrder = getLevelOrder(currentLevelStr);
+            // Check if values are numeric scores or CEFR levels
+            const aimIsNumeric = isNumericScore(aimStr);
+            const currentLevelIsNumeric = isNumericScore(currentLevelStr);
             
-            if (aimOrder === -1) {
-              errors.push('Band mục tiêu không hợp lệ');
-            } else if (currentLevelOrder === -1) {
-              errors.push('Trình độ hiện tại không hợp lệ');
-            } else if (aimOrder <= currentLevelOrder) {
-              errors.push('Band mục tiêu phải cao hơn trình độ hiện tại');
+            if (typeStr && (aimIsNumeric || currentLevelIsNumeric)) {
+              // Validate as numeric scores based on type
+              if (!validateScore(aimStr, typeStr)) {
+                errors.push(`Điểm mục tiêu không hợp lệ cho ${typeStr.toUpperCase()}. ${typeStr === 'ielts' ? 'Phải là số từ 0.0 đến 9.0' : 'Phải là số từ 0 đến 990'}`);
+              } else if (!validateScore(currentLevelStr, typeStr)) {
+                errors.push(`Trình độ hiện tại không hợp lệ cho ${typeStr.toUpperCase()}. ${typeStr === 'ielts' ? 'Phải là số từ 0.0 đến 9.0' : 'Phải là số từ 0 đến 990'}`);
+              } else {
+                // Compare numeric scores
+                const aimNum = typeStr === 'ielts' ? parseFloat(aimStr) : parseInt(aimStr);
+                const currentLevelNum = typeStr === 'ielts' ? parseFloat(currentLevelStr) : parseInt(currentLevelStr);
+                
+                if (aimNum <= currentLevelNum) {
+                  errors.push('Điểm mục tiêu phải cao hơn trình độ hiện tại');
+                }
+              }
+            } else {
+              // Validate as CEFR levels (backward compatibility)
+              const aimOrder = getLevelOrder(aimStr);
+              const currentLevelOrder = getLevelOrder(currentLevelStr);
+              
+              if (aimOrder === -1) {
+                errors.push('Band mục tiêu không hợp lệ');
+              } else if (currentLevelOrder === -1) {
+                errors.push('Trình độ hiện tại không hợp lệ');
+              } else if (aimOrder <= currentLevelOrder) {
+                errors.push('Band mục tiêu phải cao hơn trình độ hiện tại');
+              }
             }
           }
         }
@@ -657,6 +732,15 @@ const ImportStudentFromExcel = () => {
         aim: '600',
         currentLevel: '400',
         type: 'toeic'
+      },
+      {
+        username: 'student3',
+        email: 'student3@email.com',
+        phone: '0123456789',
+        address: '789 Đường DEF, Quận 3, TP.HCM',
+        aim: 'Mover',
+        currentLevel: 'Starter',
+        type: 'cambridge'
       }
     ];
 
@@ -741,6 +825,14 @@ const ImportStudentFromExcel = () => {
             Hướng dẫn Format Excel
           </h6>
           <p className="mb-2">Vui lòng đảm bảo file Excel của bạn có đúng format như bảng trên</p>
+          <p className="mb-2 text-muted">
+            <strong>Lưu ý về định dạng:</strong>
+          </p>
+          <ul className="mb-3 text-muted" style={{ fontSize: '0.9rem' }}>
+            <li><strong>IELTS:</strong> Aim và Trình độ hiện tại dùng điểm số từ 0.0 đến 9.0 (ví dụ: 6.0, 4.0)</li>
+            <li><strong>TOEIC:</strong> Aim và Trình độ hiện tại dùng điểm số từ 0 đến 990 (ví dụ: 600, 400)</li>
+            <li><strong>Cambridge:</strong> Aim và Trình độ hiện tại dùng level: Starter (hoặc Pre-A1) và Mover (hoặc A1) (ví dụ: Mover, Starter)</li>
+          </ul>
           <p className="mb-3 text-muted">
             Lưu ý: Password sẽ tự động được tạo cho mỗi học viên
           </p>
@@ -787,6 +879,15 @@ const ImportStudentFromExcel = () => {
                 <td>400</td>
                 <td>toeic</td>
               </tr>
+              <tr>
+                <td>student3</td>
+                <td>student3@email.com</td>
+                <td>0123456789</td>
+                <td>789 Đường DEF</td>
+                <td>Mover</td>
+                <td>Starter</td>
+                <td>cambridge</td>
+              </tr>
             </tbody>
           </Table>
         </Card.Body>
@@ -830,7 +931,7 @@ const ImportStudentFromExcel = () => {
                 </>
               ) : (
                 <>
-                  
+                  <i className="fas fa-upload me-2"></i>
                   Tải lên và xem trước
                 </>
               )}

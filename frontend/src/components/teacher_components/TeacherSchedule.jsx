@@ -5,10 +5,6 @@ import teacherService from '../../services/teacherService';
 import { useAuth } from '../../contexts/AuthContext';
 import changeRequestService from '../../services/changeRequestService';
 
-/**
- * Teacher Schedule Component
- * Lịch dạy của giảng viên - tương tự student schedule
- */
 const TeacherSchedule = () => {
   const { user } = useAuth();
   
@@ -83,6 +79,7 @@ const TeacherSchedule = () => {
         schedulesCount: response.schedules?.length || 0
       });
 
+      
       if (response.success) {
         // Transform schedules to match frontend format
         const transformedSchedules = response.schedules.map(schedule => {
@@ -257,7 +254,8 @@ const TeacherSchedule = () => {
     const statusConfig = {
       upcoming: { bg: 'bg-main-600', text: 'Sắp dạy' },
       completed: { bg: 'bg-success-600', text: 'Đã dạy' },
-      cancelled: { bg: 'bg-danger-600', text: 'Đã hủy' }
+      cancelled: { bg: 'bg-danger-600', text: 'Đã hủy' },
+      absent: { bg: 'bg-warning-600', text: 'Nghỉ dạy' } // Thêm trạng thái nghỉ dạy
     };
     const config = statusConfig[status] || statusConfig.upcoming;
     return <Badge className={`${config.bg} text-white px-12 py-6`}>{config.text}</Badge>;
@@ -321,9 +319,14 @@ const TeacherSchedule = () => {
   };
 
   const filteredSchedules = schedules.filter(schedule => {
-    if (filterStatus === 'all') return true;
-    if (filterStatus === 'upcoming') return schedule.scheduleStatus === 'upcoming';
-    if (filterStatus === 'completed') return schedule.scheduleStatus === 'completed';
+    // Filter by status
+    if (filterStatus === 'all') {
+      // Continue to next filter
+    } else if (filterStatus === 'upcoming') {
+      if (schedule.scheduleStatus !== 'upcoming') return false;
+    } else if (filterStatus === 'completed') {
+      if (schedule.scheduleStatus !== 'completed') return false;
+    }
     return true;
   });
 

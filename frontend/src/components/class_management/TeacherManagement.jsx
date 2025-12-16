@@ -13,10 +13,6 @@ import TeacherListView from './TeacherListView';
 import AddTeacherModal from './AddTeacherModal';
 import ImportTeacherModal from './ImportTeacherModal';
 
-/**
- * TeacherManagement Component
- * Component chính quản lý Giảng viên
- */
 const TeacherManagement = () => {
   const navigate = useNavigate();
   const [teachers, setTeachers] = useState([]);
@@ -278,7 +274,7 @@ const TeacherManagement = () => {
       // Parse and validate each row
       const previewData = [];
       jsonData.forEach((row, index) => {
-        const rowNumber = index + 2; // +2 vì có header và index bắt đầu từ 0
+        const rowNumber = index + 1; // +2 vì có header và index bắt đầu từ 0
         const errors = [];
 
         // Get data from Excel (support both Vietnamese and English)
@@ -314,6 +310,12 @@ const TeacherManagement = () => {
 
         if (!phone || !phone.toString().trim()) {
           errors.push('Số điện thoại không được để trống');
+        }else {
+          // Validate phone length (10-11 digits after normalization)
+          const phoneDigits = phone.replace(/\D/g, '');
+          if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+            errors.push('Số điện thoại phải có 10 hoặc 11 chữ số');
+          }
         }
 
         if (!address || !address.toString().trim()) {

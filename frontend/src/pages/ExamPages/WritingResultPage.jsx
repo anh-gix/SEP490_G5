@@ -1,8 +1,5 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import HeaderOne from "../../components/HomePageforStudent/HeaderOne";
-import Animation from "../../helper/Animation";
-import Preloader from "../../helper/Preloader";
 import { examService } from "../../services/examService";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -105,9 +102,7 @@ const WritingResultPage = () => {
   if (loading) {
     return (
       <>
-        <Preloader />
-        <Animation />
-        <HeaderOne />
+     
         <div className="text-center py-80">
           <div className="spinner-border text-main-600" role="status">
             <span className="visually-hidden">Loading...</span>
@@ -119,10 +114,6 @@ const WritingResultPage = () => {
 
   return (
     <>
-      <Preloader />
-      <Animation />
-      <HeaderOne />
-      
 
       <section className="py-120">
         <div className="container">

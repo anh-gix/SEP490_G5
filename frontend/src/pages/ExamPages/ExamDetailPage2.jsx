@@ -1,11 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import examService from "../../services/examService";
-import HeaderOne from "../../components/HomePageforStudent/HeaderOne";
-import FooterOne from "../../components/FooterOne";
-import Breadcrumb from "../../components/Breadcrumb";
-import Animation from "../../helper/Animation";
-import Preloader from "../../helper/Preloader";
+
 
 const ExamDetailPage2 = () => {
   const { id } = useParams();
@@ -166,9 +162,7 @@ const ExamDetailPage2 = () => {
   if (loading) {
     return (
       <>
-        <Preloader />
-        <Animation />
-        <HeaderOne />
+
        
         <section className="py-120">
           <div className="container">
@@ -180,7 +174,7 @@ const ExamDetailPage2 = () => {
             </div>
           </div>
         </section>
-        <FooterOne />
+      
       </>
     );
   }
@@ -189,9 +183,7 @@ const ExamDetailPage2 = () => {
   if (error || !exam) {
     return (
       <>
-        <Preloader />
-        <Animation />
-        <HeaderOne />
+     
        
         <section className="py-120">
           <div className="container">
@@ -222,16 +214,14 @@ const ExamDetailPage2 = () => {
             </div>
           </div>
         </section>
-        <FooterOne />
+    
       </>
     );
   }
 
   return (
     <>
-      <Preloader />
-      <Animation />
-      <HeaderOne />
+   
      
 
       <section 
@@ -472,7 +462,7 @@ const ExamDetailPage2 = () => {
         </div>
       </section>
 
-      <FooterOne />
+     
     </>
   );
 };

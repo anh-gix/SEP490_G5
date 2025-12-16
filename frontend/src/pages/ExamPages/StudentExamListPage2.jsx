@@ -1,11 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import examService from "../../services/examService";
-import HeaderOne from "../../components/HomePageforStudent/HeaderOne";
-import FooterOne from "../../components/FooterOne";
-import Breadcrumb from "../../components/Breadcrumb";
-import Animation from "../../helper/Animation";
-import Preloader from "../../helper/Preloader";
+
 
 const StudentExamListPage2 = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -201,10 +197,7 @@ const StudentExamListPage2 = () => {
   if (loading) {
     return (
       <>
-        <Preloader />
-        <Animation />
-        <HeaderOne />
-        <Breadcrumb title={"Đề thi"} />
+       
         <section className="course-grid-view py-120">
           <div className="container">
             <div className="text-center py-80">
@@ -215,7 +208,7 @@ const StudentExamListPage2 = () => {
             </div>
           </div>
         </section>
-        <FooterOne />
+       
       </>
     );
   }
@@ -224,10 +217,7 @@ const StudentExamListPage2 = () => {
   if (error) {
     return (
       <>
-        <Preloader />
-        <Animation />
-        <HeaderOne />
-        <Breadcrumb title={"Đề thi"} />
+       
         <section className="course-grid-view py-120">
           <div className="container">
             <div className="text-center py-80">
@@ -247,18 +237,13 @@ const StudentExamListPage2 = () => {
             </div>
           </div>
         </section>
-        <FooterOne />
+        
       </>
     );
   }
 
   return (
     <>
-      <Preloader />
-      <Animation />
-      <HeaderOne />
-      <Breadcrumb title={"Đề thi"} />
-
       <section className="course-grid-view py-120">
         <div className="container">
           {/* Header Section */}
@@ -481,7 +466,6 @@ const StudentExamListPage2 = () => {
         </div>
       </section>
 
-      <FooterOne />
     </>
   );
 };

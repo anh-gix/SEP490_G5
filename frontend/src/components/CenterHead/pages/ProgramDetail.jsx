@@ -181,7 +181,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
           <h5 className="text-neutral-600 mt-3 mb-3">Không tìm thấy chương trình</h5>
           <Button
             variant="primary"
-            onClick={() => navigate('/center-head/programs')}
+            onClick={() => navigate(`${basePath}/programs`)}
           >
             Quay lại danh sách
           </Button>
@@ -318,7 +318,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
             <Button
               variant="ghost"
               icon="ph ph-arrow-left"
-              onClick={() => navigate('/center-head/programs')}
+              onClick={() => navigate(`${basePath}/programs`)}
             >
               Quay lại
             </Button>

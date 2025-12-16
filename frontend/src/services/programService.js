@@ -146,6 +146,16 @@ export const programService = {
       throw error.response?.data || { message: 'Lưu trữ chương trình thất bại' };
     }
   },
+
+  // Get band options by type
+  getBandOptions: async (type) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/band-options/${type}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy band options' };
+    }
+  },
 };
 
 export default programService;

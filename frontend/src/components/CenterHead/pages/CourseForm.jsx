@@ -118,14 +118,14 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
       } catch (error) {
         console.error("Error loading program:", error);
         alert("Không thể tải thông tin Program!");
-        navigate("/center-head/programs");
+        navigate(`${basePath}/programs`);
       } finally {
         setLoadingProgram(false);
       }
     };
 
     fetchProgramData();
-  }, [programId, navigate]);
+  }, [programId, navigate, basePath]);
 
   // Load course data if editing
   useEffect(() => {
@@ -834,7 +834,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
       <div className="text-center py-5">
         <i className="ph ph-warning-circle ph-3x text-warning mb-3"></i>
         <p>Không tìm thấy thông tin chương trình!</p>
-        <Button onClick={() => navigate("/center-head/programs")}>
+        <Button onClick={() => navigate(`${basePath}/programs`)}>
           Quay lại danh sách
         </Button>
       </div>

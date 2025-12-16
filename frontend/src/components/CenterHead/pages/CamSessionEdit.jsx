@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Button from '../compo/Button';
 import Modal from '../compo/Modal';
 import camSessionService from '../../../services/camSessionService';
@@ -20,6 +20,7 @@ const emptyVocabularyItem = () => ({
 const CamSessionEdit = ({ viewMode = 'center-head' }) => {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // Determine base path and permissions
   const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
@@ -27,6 +28,10 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(null);
+
+  // Get courseId and programId from URL params
+  const courseId = searchParams.get('courseId');
+  const programId = searchParams.get('programId');
   const [editModal, setEditModal] = useState({
     type: null, // 'quiz' | 'vocab'
     index: null,
@@ -260,7 +265,18 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
         vocabulary: { items: formData?.vocabulary?.items || [] },
       });
       alert('Cập nhật CAM Session thành công');
-      navigate(-1);
+
+      // Navigate back based on context
+      if (courseId && programId) {
+        // If came from course wizard, go back to course wizard
+        navigate(`${basePath}/programs/${programId}/courses/${courseId}/edit`);
+      } else if (courseId) {
+        // If only courseId is available, go to course detail
+        navigate(`${basePath}/courses/${courseId}/details`);
+      } else {
+        // Otherwise go back to programs list
+        navigate(`${basePath}/programs`);
+      }
     } catch (error) {
       console.error('Error updating cam session:', error);
       alert(error.response?.data?.message || 'Không thể cập nhật CAM Session');
@@ -270,7 +286,17 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
   };
 
   const handleBack = () => {
-    navigate(-1);
+    // Navigate back based on context
+    if (courseId && programId) {
+      // If came from course wizard, go back to course wizard
+      navigate(`${basePath}/programs/${programId}/courses/${courseId}/edit`);
+    } else if (courseId) {
+      // If only courseId is available, go to course detail
+      navigate(`${basePath}/courses/${courseId}/details`);
+    } else {
+      // Otherwise go back to programs list
+      navigate(`${basePath}/programs`);
+    }
   };
 
   if (loading || !formData) {

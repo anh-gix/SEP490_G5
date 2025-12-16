@@ -5,6 +5,8 @@ import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import studentService from '../../services/studentService';
 import { courseService } from '../../services/courseService';
+import StudentDetail from './StudentDetail';
+import ImportStudentFromExcel from './ImportStudentFromExcel';
 
 /**
  * Student Management Component with API Integration
@@ -36,6 +38,13 @@ const StudentManagementAPI = () => {
   });
   const [formErrors, setFormErrors] = useState({});
   const [filterNoClass, setFilterNoClass] = useState(null); // null = all, true = no class only
+
+  // Student Detail states
+  const [showStudentDetail, setShowStudentDetail] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
+
+  // Import Student states
+  const [showImportStudent, setShowImportStudent] = useState(false);
 
   // Fetch program types and levels on mount
   useEffect(() => {
@@ -265,7 +274,8 @@ const StudentManagementAPI = () => {
   // };
 
   const handleViewDetail = (student) => {
-    navigate(`/academic/student-management/${student._id}`);
+    setSelectedStudentId(student._id);
+    setShowStudentDetail(true);
   };
 
   const handleCloseModal = () => {
@@ -310,6 +320,31 @@ const StudentManagementAPI = () => {
     ? allFilteredStudents.slice((page - 1) * 10, page * 10)
     : allFilteredStudents;
 
+  // If showing import student, render ImportStudentFromExcel component
+  if (showImportStudent) {
+    return (
+      <ImportStudentFromExcel
+        onBack={() => {
+          setShowImportStudent(false);
+          // Refresh students list after import
+          fetchStudents();
+        }}
+      />
+    );
+  }
+
+  // If showing student detail, render StudentDetail component
+  if (showStudentDetail && selectedStudentId) {
+    return (
+      <StudentDetail
+        studentId={selectedStudentId}
+        onBack={() => {
+          setShowStudentDetail(false);
+          setSelectedStudentId(null);
+        }}
+      />
+    );
+  }
 
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#f8f9fa' }}>
@@ -331,7 +366,7 @@ const StudentManagementAPI = () => {
           <Button 
             variant="success"
             className="px-20 py-10 radius-8"
-            onClick={() => navigate('/academic/student-management/import')}
+            onClick={() => setShowImportStudent(true)}
             disabled={loading}
           >
             <i className="fas fa-file-excel me-2"></i>

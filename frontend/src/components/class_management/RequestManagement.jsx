@@ -11,9 +11,8 @@ import RequestStats from './RequestStats';
 import RequestFilters from './RequestFilters';
 import RequestTable from './RequestTable';
 import RejectRequestModal from './RejectRequestModal';
-import ChangeClassModal from './ChangeClassModal';
 import MakeupClassModalForAcademicStaff from './MakeupClassModalForAcademicStaff';
-import RequestDetailPage from '../../pages/AcademicStaff/RequestDetailPage';
+import RequestDetailPage from './RequestDetailPage';
 import WorkRequestDetail from '../AcademicStaff/WorkRequestDetail';
 import { formatDate, naturalCompare } from '../../utils/requestHelpers';
 
@@ -47,14 +46,13 @@ const RequestManagement = () => {
     pending: 0,
     approved: 0,
     rejected: 0,
-    changeClass: 0,
     makeupClass: 0,
     requestReplaceTeacher: 0,
     assignStudents: 0
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('pending');
   const [filterType, setFilterType] = useState('all');
   const [sortBy, setSortBy] = useState('oldest');
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -66,9 +64,6 @@ const RequestManagement = () => {
   const [processing, setProcessing] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [requestToReject, setRequestToReject] = useState(null);
-  const [showChangeClassModal, setShowChangeClassModal] = useState(false);
-  const [selectedClassToChange, setSelectedClassToChange] = useState(null);
-  const [pendingClassChange, setPendingClassChange] = useState(null);
   const [pendingMakeupClasses, setPendingMakeupClasses] = useState([]);
   const [pendingMakeupSessions, setPendingMakeupSessions] = useState([]);
   const [showMakeupModal, setShowMakeupModal] = useState(false);
@@ -170,7 +165,6 @@ const RequestManagement = () => {
           pending: (changeStats.pending || 0) + (workStats.pending || 0),
           approved: changeStats.approved || 0,
           rejected: (changeStats.rejected || 0) + (workStats.rejected || 0),
-          changeClass: changeStats.changeClass || 0,
           makeupClass: changeStats.makeupClass || 0,
           requestReplaceTeacher: changeStats.requestReplaceTeacher || 0,
           assignStudents: workStats.assign_students || 0
@@ -350,7 +344,7 @@ const RequestManagement = () => {
       
       // Only filter by ChangeRequest types or fetch all if 'all' or WorkRequest type
       if (filterType && filterType !== 'all' && 
-          ['change_class', 'makeup_class', 'request_replace_teacher'].includes(filterType)) {
+          ['makeup_class', 'request_replace_teacher'].includes(filterType)) {
         changeParams.type = filterType;
       }
       
@@ -393,7 +387,7 @@ const RequestManagement = () => {
         if (filterType && filterType === 'assign_students') {
           workReqs = workReqs.filter(req => req.requestType === 'assign_students');
           changeReqs = []; // Don't show ChangeRequests
-        } else if (filterType && ['change_class', 'makeup_class', 'request_replace_teacher'].includes(filterType)) {
+        } else if (filterType && ['makeup_class', 'request_replace_teacher'].includes(filterType)) {
           workReqs = []; // Don't show WorkRequests
         }
         
@@ -632,13 +626,6 @@ const RequestManagement = () => {
       });
     }
     
-    // Handle class change
-    if (pendingClassChange) {
-      const oldClassName = pendingClassChange.oldClassInfo?.className || pendingClassChange.oldClassInfo?.name || 'N/A';
-      const newClassName = pendingClassChange.newClassInfo?.className || pendingClassChange.newClassInfo?.name || 'N/A';
-      parts.push(`Đã chuyển từ lớp ${oldClassName} sang lớp ${newClassName}`);
-    }
-    
     return parts.length > 0 ? parts.join('. ') : 'Đã chấp nhận đơn';
   };
 
@@ -666,10 +653,6 @@ const RequestManagement = () => {
           newMakeupTeacherId: makeup.newMakeupTeacherId || null,
           newMakeupSessionId: makeup.newMakeupSessionId || null
         })),
-        pendingClassChange: pendingClassChange ? {
-          oldClassId: pendingClassChange.oldClassId,
-          newClassId: pendingClassChange.newClassId
-        } : null,
         responseContent: responseContent
       };
       
@@ -679,7 +662,6 @@ const RequestManagement = () => {
       setSelectedRequest(null);
       setRejectReason('');
       setSenderSchedule([]);
-      setPendingClassChange(null);
       setPendingMakeupClasses([]);
       setPendingMakeupSessions([]);
       fetchAllRequests();
@@ -707,7 +689,6 @@ const RequestManagement = () => {
       setSelectedRequest(null);
       setSenderSchedule([]);
       setSenderRole(null);
-      setPendingClassChange(null);
       setPendingMakeupClasses([]);
       setPendingMakeupSessions([]);
       fetchAllRequests();
@@ -720,128 +701,6 @@ const RequestManagement = () => {
     }
   };
 
-  const handleChangeClassClick = async (classItem) => {
-    try {
-      console.log(' handleChangeClassClick called', { classItem });
-      
-      if (!classItem) {
-        console.error(' classItem is undefined');
-        toast.error('Không tìm thấy thông tin lớp học');
-        return;
-      }
-
-      const classSchedules = senderSchedule.filter(sch => {
-        const classId = sch.class?._id?.toString() || sch.class?.toString();
-        const targetClassId = (classItem.classId?._id?.toString() || classItem.classId?.toString() || String(classItem.classId));
-        return classId === targetClassId;
-      });
-
-      let fixedSchedulesList = [];
-      let courseId = null;
-
-      if (classSchedules.length > 0) {
-        const fixedSchedules = classSchedules.filter(sch => {
-          const status = sch.status || 'fixed';
-          return status === 'fixed';
-        });
-        
-        const sortedSchedules = [...fixedSchedules].sort((a, b) => {
-          const dateA = new Date(a.date);
-          const dateB = new Date(b.date);
-          if (dateA.getTime() !== dateB.getTime()) {
-            return dateA - dateB;
-          }
-          return (a.startTime || '').localeCompare(b.startTime || '');
-        });
-
-        fixedSchedulesList = sortedSchedules.map(sch => ({
-          title: sch.session?.title || 'N/A',
-          order: sch.session?.order || null,
-          date: sch.date || null,
-          startTime: sch.startTime || 'N/A',
-          endTime: sch.endTime || 'N/A',
-          roomName: sch.room?.room_name || 'N/A'
-        }));
-
-        // Extract courseId - xử lý cả object và ObjectId string
-        const courseInfo = classSchedules[0]?.class?.course;
-        if (courseInfo) {
-          if (typeof courseInfo === 'object' && courseInfo._id) {
-            courseId = courseInfo._id.toString();
-          } else if (typeof courseInfo === 'string') {
-            courseId = courseInfo;
-          } else if (courseInfo && typeof courseInfo === 'object' && courseInfo.toString) {
-            courseId = courseInfo.toString();
-          }
-        }
-      } else if (classItem.fixedSchedules && Array.isArray(classItem.fixedSchedules) && classItem.fixedSchedules.length > 0) {
-        const sortedSchedules = [...classItem.fixedSchedules].sort((a, b) => {
-          const dateA = new Date(a.date);
-          const dateB = new Date(b.date);
-          if (dateA.getTime() !== dateB.getTime()) {
-            return dateA - dateB;
-          }
-          return (a.startTime || '').localeCompare(b.startTime || '');
-        });
-
-        fixedSchedulesList = sortedSchedules.map(sch => ({
-          title: sch.session?.title || sch.title || 'N/A',
-          order: sch.session?.order || sch.order || null,
-          date: sch.date || null,
-          startTime: sch.startTime || 'N/A',
-          endTime: sch.endTime || 'N/A',
-          roomName: sch.roomName || sch.room?.room_name || 'N/A'
-        }));
-
-        // Extract courseId từ classItem - xử lý cả object và ObjectId string
-        if (classItem.courseId) {
-          if (typeof classItem.courseId === 'object' && classItem.courseId._id) {
-            courseId = classItem.courseId._id.toString();
-          } else if (typeof classItem.courseId === 'string') {
-            courseId = classItem.courseId;
-          } else if (classItem.courseId && typeof classItem.courseId === 'object' && classItem.courseId.toString) {
-            courseId = classItem.courseId.toString();
-          }
-        }
-      }
-
-      if (!courseId) {
-        console.error(' courseId is null or undefined', { classItem, classSchedules });
-        toast.error('Không tìm thấy thông tin khóa học. Vui lòng thử lại sau.');
-        return;
-      }
-
-      const currentClassInfo = {
-        classId: classItem.classId,
-        className: classItem.className,
-        courseName: classItem.courseName,
-        courseId: courseId,
-        fixedSchedules: fixedSchedulesList,
-        roomName: fixedSchedulesList.length > 0 ? fixedSchedulesList[0].roomName : null,
-        currentSessionTitle: classItem.currentSessionTitle || 'Chưa có session',
-        currentSessionOrder: classItem.currentSessionOrder || null
-      };
-
-      console.log(' Opening ChangeClassModal', { currentClassInfo });
-      setSelectedClassToChange(currentClassInfo);
-      setShowChangeClassModal(true);
-    } catch (error) {
-      console.error(' Error in handleChangeClassClick:', error);
-      toast.error('Có lỗi xảy ra khi mở form đổi lớp. Vui lòng thử lại.');
-    }
-  };
-
-  const handleChangeClassConfirm = (data) => {
-    setPendingClassChange({
-      oldClassId: data.oldClassId,
-      newClassId: data.newClassId,
-      oldClassInfo: data.oldClassInfo,
-      newClassInfo: data.newClassInfo
-    });
-    setPendingMakeupSessions(data.makeupSessions || []);
-    setShowChangeClassModal(false);
-  };
-
   const handleRemoveMakeupClass = (index) => {
     if (index < 0 || index >= pendingMakeupClasses.length) return;
     setPendingMakeupClasses(prev => {
@@ -849,10 +708,6 @@ const RequestManagement = () => {
       newList.splice(index, 1);
       return newList;
     });
-  };
-
-  const handleRemoveClassChange = () => {
-    setPendingClassChange(null);
   };
 
   const handleMakeupClassSubmit = (makeupData) => {
@@ -882,38 +737,6 @@ const RequestManagement = () => {
     toast.success('Đã thêm buổi học bù thành công!');
   };
 
-  const renderClassInfo = (classInfo, isOldClass = true) => {
-    const borderColor = isOldClass ? 'border-primary' : 'border-success';
-    const bgColor = isOldClass ? 'bg-primary-25' : 'bg-success-25';
-    const textColor = isOldClass ? 'text-primary' : 'text-success';
-    const title = isOldClass ? 'Lớp đang học' : 'Lớp muốn đổi';
-
-    return (
-      <div className={`border ${borderColor} rounded-4 p-6 ${bgColor}`}>
-        <h6 className={`${textColor} fw-bold mb-4 text-12`} style={{ lineHeight: '1.2' }}>{title}</h6>
-        <div className="d-flex flex-column" style={{ gap: '2px' }}>
-          <div className="d-flex align-items-center" style={{ gap: '6px' }}>
-            <small className="text-muted text-11" style={{ minWidth: '65px', lineHeight: '1.3' }}>Tên lớp:</small>
-            <div className="fw-semibold text-12" style={{ lineHeight: '1.3' }}>{classInfo.className || 'N/A'}</div>
-          </div>
-          <div className="d-flex align-items-center" style={{ gap: '6px' }}>
-            <small className="text-muted text-11" style={{ minWidth: '65px', lineHeight: '1.3' }}>Khóa học:</small>
-            <div className="fw-semibold text-12" style={{ lineHeight: '1.3' }}>{classInfo.courseName || 'N/A'}</div>
-          </div>
-          <div className="d-flex align-items-center" style={{ gap: '6px' }}>
-            <small className="text-muted text-11" style={{ minWidth: '65px', lineHeight: '1.3' }}>Session:</small>
-            <div className="fw-semibold text-12" style={{ lineHeight: '1.3' }}>
-              {classInfo.currentSessionTitle || 'Chưa có session'}
-              {classInfo.currentSessionOrder !== null && (
-                <span className="text-neutral-500 ms-1">(STT: {classInfo.currentSessionOrder})</span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   // If showing detail modal, render RequestDetailPage
   if (showDetailModal && selectedRequest) {
     return (
@@ -923,7 +746,6 @@ const RequestManagement = () => {
           senderSchedule={senderSchedule}
           senderRole={senderRole}
           loadingSchedule={loadingSchedule}
-          pendingClassChange={pendingClassChange}
           pendingMakeupClasses={pendingMakeupClasses}
           pendingMakeupSessions={pendingMakeupSessions}
           onBack={() => {
@@ -932,7 +754,6 @@ const RequestManagement = () => {
             setSelectedRequest(null);
             setSenderSchedule([]);
             setSenderRole(null);
-            setPendingClassChange(null);
             setPendingMakeupClasses([]);
             setPendingMakeupSessions([]);
             setShowMakeupModal(false);
@@ -940,17 +761,13 @@ const RequestManagement = () => {
           }}
           onApprove={handleApprove}
           onReject={handleReject}
-          onChangeClass={handleChangeClassClick}
-          onChangeClassConfirm={handleChangeClassConfirm}
           onAddMakeupClass={(studentScheduleId) => {
             setSelectedStudentScheduleId(studentScheduleId);
             setShowMakeupModal(true);
           }}
           onRemoveMakeupClass={handleRemoveMakeupClass}
-          onRemoveClassChange={handleRemoveClassChange}
           processing={processing}
           formatDate={formatDate}
-          renderClassInfo={renderClassInfo}
         />
         {/* Makeup Class Modal - render here so it's available when detail page is shown */}
         <MakeupClassModalForAcademicStaff
@@ -1069,7 +886,7 @@ const RequestManagement = () => {
         filterType={filterType}
         onFilterTypeChange={(type) => {
           setFilterType(type);
-          setFilterStatus('all'); // Reset status when changing type
+          // Bỏ dòng này: setFilterStatus('all'); // Reset status when changing type
           setPage(1);
         }}
       />
@@ -1141,18 +958,6 @@ const RequestManagement = () => {
         processing={processing}
       />
 
-      {/* Change Class Modal */}
-      <ChangeClassModal
-        show={showChangeClassModal}
-        onHide={() => {
-          setShowChangeClassModal(false);
-          setSelectedClassToChange(null);
-        }}
-        selectedClassToChange={selectedClassToChange}
-        senderSchedule={senderSchedule}
-        onConfirm={handleChangeClassConfirm}
-        processing={processing}
-      />
     </Container>
   );
 };

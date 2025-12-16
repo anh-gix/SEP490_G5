@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Badge, Alert, Spinner, Tabs, Tab } from 'react-bootstrap';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { Container, Row, Col, Card, Badge, Alert, Spinner, Tabs, Tab, Button } from 'react-bootstrap';
 import classService from '../../services/classService';
 
 // Import tab components
@@ -14,29 +13,16 @@ import AcademicClassLessons from './AcademicClassLessons';
  * - Tổng quan (từ student)
  * - Học viên (từ teacher)
  * - Lịch trình (từ teacher)
+ * @param {string} classId - ID của lớp học (từ props thay vì route params)
+ * @param {function} onBack - Callback để quay lại danh sách
  */
-const AcademicClassDetailLayout = () => {
-  const { classId } = useParams();
-  const location = useLocation();
-  
+const AcademicClassDetailLayout = ({ classId, onBack }) => {
   const [classInfo, setClassInfo] = useState(null);
   const [students, setStudents] = useState([]);
   const [lessons, setLessons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
-
-  // Determine active tab from URL or default to overview
-  useEffect(() => {
-    const path = location.pathname;
-    if (path.includes('/students')) {
-      setActiveTab('students');
-    } else if (path.includes('/lessons')) {
-      setActiveTab('lessons');
-    } else {
-      setActiveTab('overview');
-    }
-  }, [location.pathname]);
 
   useEffect(() => {
     if (classId) {
@@ -203,12 +189,10 @@ const AcademicClassDetailLayout = () => {
           </Alert.Heading>
           <p>{error}</p>
           <hr />
-          <Link to="/academic/class-management">
-            <button className="btn btn-outline-secondary">
-              <i className="fas fa-arrow-left me-2"></i>
-              Quay lại danh sách
-            </button>
-          </Link>
+          <Button variant="outline-secondary" onClick={onBack || (() => {})}>
+            <i className="fas fa-arrow-left me-2"></i>
+            Quay lại danh sách
+          </Button>
         </Alert>
       </Container>
     );
@@ -223,12 +207,10 @@ const AcademicClassDetailLayout = () => {
             <i className="fas fa-inbox text-neutral-300" style={{ fontSize: '48px' }}></i>
             <h5 className="text-neutral-700 mt-3 mb-2">Không tìm thấy lớp học</h5>
             <p className="text-neutral-500 mb-3">Lớp học này không tồn tại hoặc bạn không có quyền truy cập</p>
-            <Link to="/academic/class-management">
-              <button className="btn btn-primary">
-                <i className="fas fa-arrow-left me-2"></i>
-                Quay lại danh sách
-              </button>
-            </Link>
+            <Button variant="primary" onClick={onBack || (() => {})}>
+              <i className="fas fa-arrow-left me-2"></i>
+              Quay lại danh sách
+            </Button>
           </Card.Body>
         </Card>
       </Container>
@@ -251,10 +233,15 @@ const AcademicClassDetailLayout = () => {
             <Col lg={8}>
               {/* Breadcrumb back to class list */}
               <div className="mb-16">
-                <Link to="/academic/class-management" className="text-white text-13 text-decoration-none">
+                <Button 
+                  variant="link" 
+                  onClick={onBack || (() => {})}
+                  className="text-white text-13 text-decoration-none p-0"
+                  style={{ textDecoration: 'none' }}
+                >
                   <i className="fas fa-arrow-left me-2"></i>
                   Quay lại danh sách lớp
-                </Link>
+                </Button>
               </div>
               <div className="d-flex align-items-center gap-12 mb-12">
                 <h4 className="text-white fw-bold mb-0">{classInfo.name}</h4>

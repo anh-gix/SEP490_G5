@@ -13,7 +13,8 @@ const ScheduleCalendar = ({
   readOnly = false, 
   showLegend = true,
   selectedMonth,  // Thêm prop này
-  onMonthChange    // Thêm prop này
+  onMonthChange,    // Thêm prop này
+  onLessonClick     // Thêm prop này để handle click vào schedule card
 }) => {
   // Sử dụng selectedMonth từ props, nếu không có thì dùng current date
   const [currentDate, setCurrentDate] = useState(selectedMonth || new Date());
@@ -462,6 +463,10 @@ const ScheduleCalendar = ({
                             title={tooltipText}
                             onClick={(e) => {
                               e.stopPropagation(); // Prevent triggering parent div's onClick
+                              // Nếu có onLessonClick, gọi nó với schedule.id
+                              if (onLessonClick) {
+                                onLessonClick(schedule.id);
+                              }
                             }}
                           >
                             <div className="fw-bold d-flex align-items-center justify-content-between">

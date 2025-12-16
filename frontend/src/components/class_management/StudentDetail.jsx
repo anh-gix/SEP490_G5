@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Container, Button, Badge, Alert, Tabs, Tab, Table, Row, Col, Card, Pagination, ButtonGroup, Form, Modal } from 'react-bootstrap';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import studentService from '../../services/studentService';
 import { courseService } from '../../services/courseService';
@@ -13,10 +13,10 @@ import MakeupClassModalForStudent from './MakeupClassModalForStudent';
 /**
  * Student Detail Component
  * Hiển thị chi tiết học viên với các tab: Thông tin, Lớp học, Lịch học
- * Sử dụng route parameter để lấy studentId
+ * @param {string} studentId - ID của học viên (từ props thay vì route params)
+ * @param {function} onBack - Callback để quay lại danh sách
  */
-const StudentDetail = () => {
-  const { studentId } = useParams();
+const StudentDetail = ({ studentId, onBack }) => {
   const navigate = useNavigate();
   
   // State management
@@ -172,7 +172,11 @@ const StudentDetail = () => {
   };
 
   const handleGoBack = () => {
-    navigate('/academic/student-management');
+    if (onBack) {
+      onBack();
+    } else {
+      navigate('/academic/student-management');
+    }
   };
 
   // Handler to open edit courses modal

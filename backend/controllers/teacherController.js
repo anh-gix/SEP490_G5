@@ -1357,14 +1357,14 @@ exports.getLessonDetail = async (req, res) => {
     }).populate('student', 'username email fullName').lean();
 
     // Map students with their attendance status
-    // Lấy từ StudentSchedule (nguồn chính xác nhất) để bao gồm cả học sinh học ké
+    // Lấy từ StudentSchedule (nguồn chính xác nhất) để bao gồm cả học sinh học tạm thời
     // Với lớp thường: merge với class.students để đảm bảo hiển thị đầy đủ
     // Với lớp học bù: chỉ lấy từ StudentSchedule
     
     let studentsWithAttendance = [];
     
     if (schedule.class) {
-      // Regular class: lấy từ StudentSchedule (bao gồm cả học ké)
+      // Regular class: lấy từ StudentSchedule (bao gồm cả học tạm thời)
       // Tạo map từ class.students để có thông tin đầy đủ
       const classStudentsMap = new Map();
       (schedule.class?.students || []).forEach(student => {
@@ -1382,7 +1382,7 @@ exports.getLessonDetail = async (req, res) => {
           email: student.email,
           fullName: student.fullName || student.username,
           attendance: ss.attendance || null,
-          isEnrolled: !!classStudent // Đánh dấu học sinh chính thức hay học ké
+          isEnrolled: !!classStudent // Đánh dấu học sinh chính thức hay học tạm thời
         };
       });
       

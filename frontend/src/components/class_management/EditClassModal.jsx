@@ -21,7 +21,7 @@ const createEmptyScheduleEntry = () => ({
   endTime: '10:00'
 });
 
-const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
+const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     id: '',
@@ -3100,7 +3100,11 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
   };
 
   const handleBack = () => {
-    navigate('/academic/class-management');
+    if (onBack) {
+      onBack();
+    } else {
+      navigate('/academic/class-management');
+    }
   };
 
   return (
@@ -3381,9 +3385,15 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                 {calendarViewMode === 'month' ? (
                   <ScheduleCalendar
                     schedules={calendarSchedules}
-                    onEditSchedule={(schedule) => {
-                      setSelectedScheduleDetail(schedule);
-                      setShowScheduleDetailModal(true);
+                    onLessonClick={(scheduleId) => {
+                      // Tìm schedule từ calendarSchedules dựa trên scheduleId
+                      const schedule = calendarSchedules.find(s => 
+                        s.id === scheduleId || s._id === scheduleId || String(s.id) === String(scheduleId)
+                      );
+                      if (schedule) {
+                        setSelectedScheduleDetail(schedule);
+                        setShowScheduleDetailModal(true);
+                      }
                     }}
                     onDeleteSchedule={() => {}} // Read-only in this context
                     showLegend={false}
@@ -4148,7 +4158,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                   )}
                   
                   {scheduleValidationResult.conflicts.students && scheduleValidationResult.conflicts.students.length > 0 && (
-                    <div className="mb-0">
+                    <div className="mb-8">
                       <div className="fw-medium mb-4">Xung đột với học viên:</div>
                       <ul className="mb-0 ps-16">
                         {scheduleValidationResult.conflicts.students.map((studentConflict, idx) => (
@@ -4164,6 +4174,30 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                           </li>
                         ))}
                       </ul>
+                    </div>
+                  )}
+                  
+                  {scheduleValidationResult.conflicts.auditingStudents && scheduleValidationResult.conflicts.auditingStudents.length > 0 && (
+                    <div className="mb-0">
+                      <div className="d-flex align-items-center gap-8 mb-2">
+                        <i className="fas fa-exclamation-triangle text-warning-600"></i>
+                        <span className="fw-semibold text-14">
+                          Học sinh học tạm thời bị ảnh hưởng:
+                        </span>
+                      </div>
+                      {scheduleValidationResult.conflicts.auditingStudents.map((conflict, idx) => (
+                        <div key={idx} className="bg-warning-50 border border-warning-200 rounded-8 p-12 mb-2">
+                          <div className="text-warning-900 text-13 mb-2">
+                            {conflict.message}
+                          </div>
+                          <div className="text-warning-700 text-12">
+                            <strong>Danh sách học sinh:</strong> {conflict.auditingStudents.join(', ')}
+                          </div>
+                          <div className="text-warning-700 text-12 mt-1">
+                            <strong>Session:</strong> {conflict.originalSessionOrder} → {conflict.newSessionOrder}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </Alert>
@@ -4217,13 +4251,28 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                     <Form.Control
                       type="time"
                       value={editedSchedule.startTime}
-                      onChange={(e) => setEditedSchedule({
-                        ...editedSchedule,
-                        startTime: e.target.value
-                      })}
+                      max={editedSchedule.endTime || '23:59'}
+                      onChange={(e) => {
+                        const newStartTime = e.target.value;
+                        // Validate: startTime must be less than endTime
+                        if (editedSchedule.endTime && newStartTime >= editedSchedule.endTime) {
+                          alert('Giờ bắt đầu phải nhỏ hơn giờ kết thúc!');
+                          return;
+                        }
+                        setEditedSchedule({
+                          ...editedSchedule,
+                          startTime: newStartTime
+                        });
+                      }}
                       className="border-neutral-30 radius-8 px-16 py-10"
                       disabled={hasAttendance || checkingAttendance}
                     />
+                    {editedSchedule.startTime && editedSchedule.endTime && editedSchedule.startTime >= editedSchedule.endTime && (
+                      <Form.Text className="text-danger text-12 mt-1">
+                        <i className="fas fa-exclamation-circle me-1"></i>
+                        Giờ bắt đầu phải nhỏ hơn giờ kết thúc
+                      </Form.Text>
+                    )}
                   </Form.Group>
                 </div>
                 <div className="col-md-6">
@@ -4234,13 +4283,28 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId }) => {
                     <Form.Control
                       type="time"
                       value={editedSchedule.endTime}
-                      onChange={(e) => setEditedSchedule({
-                        ...editedSchedule,
-                        endTime: e.target.value
-                      })}
+                      min={editedSchedule.startTime || '00:00'}
+                      onChange={(e) => {
+                        const newEndTime = e.target.value;
+                        // Validate: endTime must be greater than startTime
+                        if (editedSchedule.startTime && newEndTime <= editedSchedule.startTime) {
+                          alert('Giờ kết thúc phải lớn hơn giờ bắt đầu!');
+                          return;
+                        }
+                        setEditedSchedule({
+                          ...editedSchedule,
+                          endTime: newEndTime
+                        });
+                      }}
                       className="border-neutral-30 radius-8 px-16 py-10"
                       disabled={hasAttendance || checkingAttendance}
                     />
+                    {editedSchedule.startTime && editedSchedule.endTime && editedSchedule.endTime <= editedSchedule.startTime && (
+                      <Form.Text className="text-danger text-12 mt-1">
+                        <i className="fas fa-exclamation-circle me-1"></i>
+                        Giờ kết thúc phải lớn hơn giờ bắt đầu
+                      </Form.Text>
+                    )}
                   </Form.Group>
                 </div>
               </div>

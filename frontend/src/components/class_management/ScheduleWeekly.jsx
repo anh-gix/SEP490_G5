@@ -1,9 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { Card, Button, Badge } from 'react-bootstrap';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
 
-const ScheduleWeekly = ({ schedules, onScheduleClick, selectedWeek, onWeekChange }) => {
+const ScheduleWeekly = ({ schedules, onScheduleClick, selectedWeek, onWeekChange, onLessonClick }) => {
   // Sử dụng selectedWeek từ props, nếu không có thì dùng current date
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     if (selectedWeek) {
@@ -327,7 +326,21 @@ const ScheduleWeekly = ({ schedules, onScheduleClick, selectedWeek, onWeekChange
                           </Card>
                         );
 
-                        // If onScheduleClick is provided, use div wrapper, otherwise use Link
+                        // If onLessonClick is provided, use onClick handler, otherwise use onScheduleClick or Link fallback
+                        if (onLessonClick) {
+                          return (
+                            <div 
+                              key={schedule.id} 
+                              className="text-decoration-none"
+                              onClick={() => onLessonClick(schedule.id)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              {ScheduleCard}
+                            </div>
+                          );
+                        }
+
+                        // If onScheduleClick is provided, use div wrapper
                         if (onScheduleClick) {
                           return (
                             <div key={schedule.id} className="text-decoration-none">
@@ -336,14 +349,11 @@ const ScheduleWeekly = ({ schedules, onScheduleClick, selectedWeek, onWeekChange
                           );
                         }
 
+                        // Fallback: no handler provided, just render card
                         return (
-                          <Link
-                            key={schedule.id}
-                            to={`/academic/lessons/${schedule.id}`}
-                            className="text-decoration-none"
-                          >
+                          <div key={schedule.id} className="text-decoration-none">
                             {ScheduleCard}
-                          </Link>
+                          </div>
                         );
                       })
                     ) : null}

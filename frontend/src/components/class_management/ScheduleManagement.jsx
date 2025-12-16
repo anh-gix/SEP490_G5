@@ -7,6 +7,7 @@ import ScheduleCalendar from './ScheduleCalendar';
 import ScheduleWeekly from './ScheduleWeekly';
 import ScheduleList from './ScheduleList';
 import CreateScheduleModal from './CreateScheduleModal';
+import AcademicLessonDetail from './AcademicLessonDetail';
 import scheduleService from '../../services/scheduleService';
 import classService from '../../services/classService';
 import teacherService from '../../services/teacherService';
@@ -22,6 +23,8 @@ const ScheduleManagement = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showLessonDetail, setShowLessonDetail] = useState(false);
+  const [selectedLessonId, setSelectedLessonId] = useState(null);
   
   // State cho tuần và tháng được chọn
   const [selectedWeek, setSelectedWeek] = useState(() => {
@@ -411,6 +414,24 @@ const ScheduleManagement = () => {
     toast.info('Chức năng xuất lịch học sẽ được triển khai sau!');
   };
 
+  const handleLessonClick = (lessonId) => {
+    setSelectedLessonId(lessonId);
+    setShowLessonDetail(true);
+  };
+
+  // Conditional rendering: nếu đang hiển thị lesson detail, render AcademicLessonDetail
+  if (showLessonDetail && selectedLessonId) {
+    return (
+      <AcademicLessonDetail
+        lessonId={selectedLessonId}
+        onBack={() => {
+          setShowLessonDetail(false);
+          setSelectedLessonId(null);
+        }}
+      />
+    );
+  }
+
   return (
     <Container fluid className="p-24">
 
@@ -737,6 +758,7 @@ const ScheduleManagement = () => {
             onDeleteSchedule={handleDeleteSchedule}
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
+            onLessonClick={handleLessonClick}
           />
         ) : viewMode === 'weekly' ? (
           <ScheduleWeekly 
@@ -749,6 +771,7 @@ const ScheduleManagement = () => {
               // Handle assign substitute logic
             }}
             classService={classService}
+            onLessonClick={handleLessonClick}
           />
         ) : (
           <ScheduleList 

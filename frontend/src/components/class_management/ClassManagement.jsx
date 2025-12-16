@@ -5,6 +5,8 @@ import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import ClassList from './ClassList';
 import CreateClassModal from './CreateClassModal';
+import AcademicClassDetailLayout from './AcademicClassDetailLayout';
+import EditClassForm from './EditClassModal';
 import classService from '../../services/classService';
 
 const ClassManagement = () => {
@@ -18,6 +20,17 @@ const ClassManagement = () => {
     status: '',
     search: ''
   });
+  
+  // Class Detail states
+  const [showClassDetail, setShowClassDetail] = useState(false);
+  const [selectedClassId, setSelectedClassId] = useState(null);
+
+  // Edit Class states
+  const [showEditClass, setShowEditClass] = useState(false);
+  const [selectedClassIdForEdit, setSelectedClassIdForEdit] = useState(null);
+  const [editClassData, setEditClassData] = useState(null);
+  const [loadingEditClass, setLoadingEditClass] = useState(false);
+  const [errorEditClass, setErrorEditClass] = useState(null);
 
   const fetchClasses = async () => {
     try {
@@ -84,12 +97,98 @@ const ClassManagement = () => {
     }
   };
 
-  const handleEditClass = (classItem) => {
-    navigate(`/academic/class-management/${classItem.id}/edit`);
+  const fetchClassDataForEdit = async (classId) => {
+    if (!classId) {
+      setErrorEditClass('Không tìm thấy ID lớp học');
+      setLoadingEditClass(false);
+      return;
+    }
+
+    try {
+      setLoadingEditClass(true);
+      setErrorEditClass(null);
+      const response = await classService.getClassById(classId);
+      
+      // Handle different response formats
+      let fetchedClassData = null;
+      if (response && response.success && response.class) {
+        fetchedClassData = response.class;
+      } else if (response && response.data) {
+        fetchedClassData = response.data;
+      } else if (response && response.class) {
+        fetchedClassData = response.class;
+      } else {
+        fetchedClassData = response;
+      }
+
+      if (fetchedClassData) {
+        // Transform to match EditClassForm expected format
+        setEditClassData({
+          ...fetchedClassData,
+          id: fetchedClassData._id || fetchedClassData.id || classId
+        });
+      } else {
+        setErrorEditClass('Không tìm thấy thông tin lớp học');
+      }
+    } catch (err) {
+      console.error('Error fetching class data:', err);
+      setErrorEditClass(err.message || 'Không thể tải thông tin lớp học');
+    } finally {
+      setLoadingEditClass(false);
+    }
+  };
+
+  const handleEditClass = async (classItem) => {
+    setSelectedClassIdForEdit(classItem.id);
+    setShowEditClass(true);
+    await fetchClassDataForEdit(classItem.id);
+  };
+
+  const handleSubmitEdit = async (submitData) => {
+    try {
+      await classService.updateClass(submitData.id, submitData);
+      toast.success('Cập nhật lớp học thành công!');
+      setShowEditClass(false);
+      setSelectedClassIdForEdit(null);
+      setEditClassData(null);
+      await fetchClasses(); // Refresh list
+    } catch (err) {
+      console.error('Error updating class:', err);
+      toast.error(err.message || 'Có lỗi xảy ra khi cập nhật lớp học!');
+      throw err; // Re-throw to let EditClassForm handle it
+    }
+  };
+
+  const handleDeleteClass = async (classIdToDelete) => {
+    const result = await Swal.fire({
+      title: 'Xác nhận xóa',
+      text: 'Bạn có chắc chắn muốn xóa lớp học này?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+      confirmButtonColor: '#dc3545',
+      cancelButtonColor: '#6c757d'
+    });
+    
+    if (!result.isConfirmed) return;
+    
+    try {
+      await classService.deleteClass(classIdToDelete);
+      toast.success('Xóa lớp học thành công!');
+      setShowEditClass(false);
+      setSelectedClassIdForEdit(null);
+      setEditClassData(null);
+      await fetchClasses(); // Refresh list
+    } catch (err) {
+      console.error('Error deleting class:', err);
+      toast.error(err.message || 'Có lỗi xảy ra khi xóa lớp học!');
+    }
   };
 
   const handleViewDetails = (classItem) => {
-    navigate(`/academic/class-management/${classItem.id}`);
+    setSelectedClassId(classItem.id);
+    setShowClassDetail(true);
   };
 
   const handleFilterChange = (e) => {
@@ -105,6 +204,84 @@ const ClassManagement = () => {
     });
   };
 
+  // Render full-screen create form when showCreateModal is true
+  if (showCreateModal) {
+    return (
+      <CreateClassModal
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleCreateClass}
+      />
+    );
+  }
+
+  // If showing edit class, render EditClassForm component
+  if (showEditClass) {
+    if (loadingEditClass) {
+      return (
+        <Container fluid className="py-24 px-24">
+          <div className="text-center py-5">
+            <Spinner animation="border" variant="primary" />
+            <p className="text-neutral-600 mt-16">Đang tải thông tin lớp học...</p>
+          </div>
+        </Container>
+      );
+    }
+
+    if (errorEditClass) {
+      return (
+        <Container fluid className="py-24 px-24">
+          <Alert variant="danger" className="mb-24">
+            <Alert.Heading>Lỗi!</Alert.Heading>
+            <p>{errorEditClass}</p>
+            <Button 
+              variant="secondary" 
+              onClick={() => {
+                setShowEditClass(false);
+                setSelectedClassIdForEdit(null);
+                setEditClassData(null);
+                setErrorEditClass(null);
+              }}
+            >
+              Quay lại
+            </Button>
+          </Alert>
+        </Container>
+      );
+    }
+
+    if (editClassData) {
+      return (
+        <EditClassForm
+          classData={editClassData}
+          onSubmit={handleSubmitEdit}
+          onDelete={handleDeleteClass}
+          classId={selectedClassIdForEdit}
+          onBack={() => {
+            setShowEditClass(false);
+            setSelectedClassIdForEdit(null);
+            setEditClassData(null);
+            setErrorEditClass(null);
+            fetchClasses(); // Refresh list
+          }}
+        />
+      );
+    }
+  }
+
+  // If showing class detail, render AcademicClassDetailLayout component
+  if (showClassDetail && selectedClassId) {
+    return (
+      <AcademicClassDetailLayout
+        classId={selectedClassId}
+        onBack={() => {
+          setShowClassDetail(false);
+          setSelectedClassId(null);
+        }}
+      />
+    );
+  }
+
+  // Render class list view when showCreateModal is false
   return (
     <Container fluid className="py-24 px-24">
 
@@ -278,13 +455,6 @@ const ClassManagement = () => {
         onEdit={handleEditClass}
         onViewDetails={handleViewDetails}
       />
-
-      {showCreateModal && (
-        <CreateClassModal
-          onClose={() => setShowCreateModal(false)}
-          onSubmit={handleCreateClass}
-        />
-      )}
     </Container>
   );
 };

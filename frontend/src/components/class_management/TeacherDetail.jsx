@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, Tabs, Tab, Pagination, ButtonGroup, Alert } from 'react-bootstrap';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import teacherService from '../../services/teacherService';
 import { classScheduleService } from '../../services/classScheduleService';
 import ScheduleCalendar from './ScheduleCalendar';
@@ -8,9 +8,10 @@ import ScheduleCalendar from './ScheduleCalendar';
 /**
  * Teacher Detail Component
  * Hiển thị chi tiết giảng viên với 3 tabs: Thông tin, Lớp học, Lịch giảng dạy
+ * @param {string} teacherId - ID của giảng viên (từ props thay vì route params)
+ * @param {function} onBack - Callback để quay lại danh sách
  */
-const TeacherDetail = () => {
-  const { teacherId } = useParams();
+const TeacherDetail = ({ teacherId, onBack }) => {
   const navigate = useNavigate();
   
   const [teacher, setTeacher] = useState(null);
@@ -508,7 +509,7 @@ const TeacherDetail = () => {
           <i className="fas fa-exclamation-triangle me-2"></i>
           {error || 'Không tìm thấy thông tin giảng viên'}
         </div>
-        <Button variant="secondary" onClick={() => navigate('/academic/teacher-management')}>
+        <Button variant="secondary" onClick={onBack || (() => navigate('/academic/teacher-management'))}>
           <i className="fas fa-arrow-left me-2"></i>
           Quay lại danh sách
         </Button>
@@ -523,7 +524,7 @@ const TeacherDetail = () => {
         <div>
           <Button 
             variant="outline-secondary" 
-            onClick={() => navigate('/academic/teacher-management')}
+            onClick={onBack || (() => navigate('/academic/teacher-management'))}
             className="mb-3"
           >
             <i className="fas fa-arrow-left me-2"></i>

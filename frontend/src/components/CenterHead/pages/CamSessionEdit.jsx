@@ -32,8 +32,10 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
   const [formData, setFormData] = useState(null);
   const [activeTab, setActiveTab] = useState('basic');
   const [validationErrors, setValidationErrors] = useState({});
-  // eslint-disable-next-line no-unused-vars
-  const [videoFile, setVideoFile] = useState(null);
+  
+  // File upload states
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Quiz Type Selection Modal
   const [showQuizTypeModal, setShowQuizTypeModal] = useState(false);
@@ -77,6 +79,8 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
             : [],
         },
       });
+      
+      console.log('Loaded videoURL:', sessionPayload?.videoURL);
     } catch (error) {
       console.error('Error loading cam session:', error);
       alert(error.response?.data?.message || 'Không thể tải CAM Session');
@@ -103,7 +107,38 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
     }));
   };
 
-  const handleVideoFileChange = (event) => {
+  // Helper to check if URL is YouTube
+  const isYouTubeUrl = (url) => {
+    if (!url) return false;
+    return url.includes('youtube.com') || url.includes('youtu.be');
+  };
+
+  // Convert YouTube URL to embed URL
+  const getYouTubeEmbedUrl = (url) => {
+    if (!url) return '';
+    
+    // youtu.be format
+    if (url.includes('youtu.be/')) {
+      const videoId = url.split('youtu.be/')[1]?.split('?')[0];
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    
+    // youtube.com/watch?v= format
+    if (url.includes('youtube.com/watch')) {
+      const urlParams = new URLSearchParams(url.split('?')[1]);
+      const videoId = urlParams.get('v');
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    
+    // Already embed format
+    if (url.includes('youtube.com/embed/')) {
+      return url;
+    }
+    
+    return url;
+  };
+
+  const handleVideoFileChange = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -113,15 +148,27 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
       return;
     }
 
-    // Create local URL for preview
-    const localUrl = URL.createObjectURL(file);
-    setVideoFile(file);
-    handleFieldChange('videoURL', localUrl);
-
-    // TODO: Upload to server
-    // const formData = new FormData();
-    // formData.append('video', file);
-    // await camSessionService.uploadVideo(formData);
+    // Upload immediately
+    try {
+      setUploadingVideo(true);
+      toast.info('Đang upload video...', { position: 'top-right', autoClose: false, toastId: 'upload-video' });
+      
+      const result = await camSessionService.uploadVideo(file);
+      
+      // Set server URL directly
+      console.log('Video uploaded to:', result.url);
+      handleFieldChange('videoURL', result.url);
+      
+      toast.dismiss('upload-video');
+      toast.success('Upload video thành công!', { position: 'top-right', autoClose: 2000 });
+    } catch (error) {
+      console.error('Upload video error:', error);
+      toast.dismiss('upload-video');
+      toast.error(error.message || 'Upload video thất bại!', { position: 'top-right' });
+      event.target.value = '';
+    } finally {
+      setUploadingVideo(false);
+    }
   };
 
   const handleAddQuiz = () => {
@@ -242,7 +289,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
     }));
   };
 
-  const handleModalImageFileChange = (event, field) => {
+  const handleModalImageFileChange = async (event, field) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -252,12 +299,29 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
       return;
     }
 
-    const localUrl = URL.createObjectURL(file);
-    setEditItemData((prev) => ({
-      ...prev,
-      [field]: localUrl,
-    }));
-    toast.success('Đã chọn ảnh!', { position: 'top-right', autoClose: 1500 });
+    // Upload immediately
+    try {
+      setUploadingImage(true);
+      toast.info('Đang upload ảnh...', { position: 'top-right', autoClose: false, toastId: 'upload-image' });
+      
+      const result = await camSessionService.uploadImage(file);
+      
+      // Set server URL directly in edit modal
+      setEditItemData((prev) => ({
+        ...prev,
+        [field]: result.url,
+      }));
+      
+      toast.dismiss('upload-image');
+      toast.success('Upload ảnh thành công!', { position: 'top-right', autoClose: 2000 });
+    } catch (error) {
+      console.error('Upload image error:', error);
+      toast.dismiss('upload-image');
+      toast.error(error.message || 'Upload ảnh thất bại!', { position: 'top-right' });
+      event.target.value = '';
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const handleModalAnswerList = (field, answerIndex, value) => {
@@ -405,7 +469,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
       return;
     }
 
-    // 4. Save
+    // 4. Save to database
     try {
       setSaving(true);
       await camSessionService.updateCamSession(sessionId, {
@@ -490,8 +554,18 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                     Quay lại
                   </Button>
                   {canEdit && (
-                    <Button variant="primary" onClick={handleSave} disabled={saving}>
-                      {saving ? (
+                    <Button variant="primary" onClick={handleSave} disabled={saving || uploadingVideo || uploadingImage}>
+                      {uploadingVideo ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2"></span>
+                          Đang upload video...
+                        </>
+                      ) : uploadingImage ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2"></span>
+                          Đang upload ảnh...
+                        </>
+                      ) : saving ? (
                         <>
                           <span className="spinner-border spinner-border-sm me-2"></span>
                           Đang lưu...
@@ -623,9 +697,10 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                             type="file"
                             accept="video/*"
                             onChange={handleVideoFileChange}
+                            disabled={uploadingVideo}
                           />
                           <Form.Text className="text-muted small">
-                            File video sẽ được upload và URL sẽ tự động cập nhật
+                            {uploadingVideo ? 'Đang upload video...' : 'Video sẽ được upload ngay lập tức'}
                           </Form.Text>
                         </Form.Group>
                       )}
@@ -633,12 +708,32 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                       {formData.videoURL && (
                         <div className="mt-3">
                           <p className="fw-semibold small mb-2">Preview:</p>
-                          <video
-                            src={formData.videoURL}
-                            controls
-                            className="w-100 rounded"
-                            style={{ maxHeight: '300px' }}
-                          />
+                          {isYouTubeUrl(formData.videoURL) ? (
+                            <iframe
+                              key={formData.videoURL}
+                              src={getYouTubeEmbedUrl(formData.videoURL)}
+                              className="w-100 rounded"
+                              style={{ height: '300px', border: 'none' }}
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                              title="YouTube Video Preview"
+                            />
+                          ) : (
+                            <video
+                              key={formData.videoURL}
+                              src={formData.videoURL}
+                              controls
+                              className="w-100 rounded"
+                              style={{ maxHeight: '300px' }}
+                              onError={(e) => {
+                                console.error('Video load error:', e);
+                                toast.error('Không thể tải video. Vui lòng kiểm tra URL.', { position: 'top-right' });
+                              }}
+                            >
+                              <source src={formData.videoURL} type="video/mp4" />
+                              Trình duyệt của bạn không hỗ trợ video HTML5.
+                            </video>
+                          )}
                         </div>
                       )}
                     </div>
@@ -863,12 +958,35 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                 {activeTab === 'video' && formData.videoURL && (
                   <div>
                     <p className="fw-semibold small mb-2">Video bài giảng:</p>
-                    <video
-                      src={formData.videoURL}
-                      controls
-                      className="w-100 rounded"
-                      style={{ maxHeight: '200px' }}
-                    />
+                    {isYouTubeUrl(formData.videoURL) ? (
+                      <iframe
+                        key={formData.videoURL}
+                        src={getYouTubeEmbedUrl(formData.videoURL)}
+                        className="w-100 rounded"
+                        style={{ height: '200px', border: 'none' }}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        title="YouTube Video"
+                      />
+                    ) : (
+                      <video
+                        key={formData.videoURL}
+                        src={formData.videoURL}
+                        controls
+                        className="w-100 rounded"
+                        style={{ maxHeight: '200px' }}
+                        onError={(e) => {
+                          console.error('Video preview error:', e);
+                        }}
+                      >
+                        <source src={formData.videoURL} type="video/mp4" />
+                        Không thể tải video
+                      </video>
+                    )}
+                    <p className="text-muted small mt-2">
+                      <i className="ph ph-info me-1"></i>
+                      {isYouTubeUrl(formData.videoURL) ? 'YouTube' : 'Server'}: {formData.videoURL.substring(0, 40)}...
+                    </p>
                   </div>
                 )}
 
@@ -1205,6 +1323,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                       <MultipleChoiceQuizForm
                         editItemData={editItemData}
                         canEdit={canEdit}
+                        uploadingImage={uploadingImage}
                         handleModalFieldChange={handleModalFieldChange}
                         handleModalImageFileChange={handleModalImageFileChange}
                         handleModalAnswerList={handleModalAnswerList}
@@ -1217,6 +1336,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                       <YesNoQuizForm
                         editItemData={editItemData}
                         canEdit={canEdit}
+                        uploadingImage={uploadingImage}
                         handleModalFieldChange={handleModalFieldChange}
                         handleModalImageFileChange={handleModalImageFileChange}
                         handleModalAnswerList={handleModalAnswerList}
@@ -1229,6 +1349,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                       <SpellQuizForm
                         editItemData={editItemData}
                         canEdit={canEdit}
+                        uploadingImage={uploadingImage}
                         handleModalFieldChange={handleModalFieldChange}
                         handleModalImageFileChange={handleModalImageFileChange}
                         handleModalAnswerList={handleModalAnswerList}
@@ -1241,6 +1362,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                       <WordFromBoxQuizForm
                         editItemData={editItemData}
                         canEdit={canEdit}
+                        uploadingImage={uploadingImage}
                         handleModalFieldChange={handleModalFieldChange}
                         handleModalImageFileChange={handleModalImageFileChange}
                         handleModalAnswerList={handleModalAnswerList}
@@ -1273,7 +1395,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                         value={editItemData.img}
                         onChange={(e) => handleModalFieldChange('img', e.target.value)}
                         placeholder="https://example.com/image.jpg"
-                        disabled={!canEdit}
+                        disabled={!canEdit || uploadingImage}
                       />
                       {canEdit && (
                         <>
@@ -1284,7 +1406,14 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                             type="file"
                             accept="image/*"
                             onChange={(e) => handleModalImageFileChange(e, 'img')}
+                            disabled={uploadingImage}
                           />
+                          {uploadingImage && (
+                            <Form.Text className="text-info small d-block mt-1">
+                              <i className="ph ph-spinner ph-spin me-1"></i>
+                              Đang upload ảnh...
+                            </Form.Text>
+                          )}
                         </>
                       )}
                       {editItemData.img && (

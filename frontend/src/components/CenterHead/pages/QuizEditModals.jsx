@@ -8,7 +8,8 @@ import { QUIZ_TYPES } from './camSessionHelpers';
  */
 export const MultipleChoiceQuizForm = ({ 
   editItemData, 
-  canEdit, 
+  canEdit,
+  uploadingImage,
   handleModalFieldChange,
   handleModalImageFileChange,
   handleModalAnswerList,
@@ -26,7 +27,7 @@ export const MultipleChoiceQuizForm = ({
           value={editItemData.Img || ''}
           onChange={(e) => handleModalFieldChange('Img', e.target.value)}
           placeholder="https://example.com/image.jpg"
-          disabled={!canEdit}
+          disabled={!canEdit || uploadingImage}
         />
         {canEdit && (
           <>
@@ -37,7 +38,14 @@ export const MultipleChoiceQuizForm = ({
               type="file"
               accept="image/*"
               onChange={(e) => handleModalImageFileChange(e, 'Img')}
+              disabled={uploadingImage}
             />
+            {uploadingImage && (
+              <Form.Text className="text-info small d-block mt-1">
+                <i className="ph ph-spinner ph-spin me-1"></i>
+                Đang upload ảnh...
+              </Form.Text>
+            )}
           </>
         )}
         {editItemData.Img && (
@@ -129,7 +137,8 @@ export const MultipleChoiceQuizForm = ({
  */
 export const YesNoQuizForm = ({ 
   editItemData, 
-  canEdit, 
+  canEdit,
+  uploadingImage,
   handleModalFieldChange,
   handleModalImageFileChange,
   handleModalAnswerList,
@@ -147,7 +156,7 @@ export const YesNoQuizForm = ({
           value={editItemData.Img || ''}
           onChange={(e) => handleModalFieldChange('Img', e.target.value)}
           placeholder="https://example.com/image.jpg"
-          disabled={!canEdit}
+          disabled={!canEdit || uploadingImage}
         />
         {canEdit && (
           <>
@@ -158,7 +167,14 @@ export const YesNoQuizForm = ({
               type="file"
               accept="image/*"
               onChange={(e) => handleModalImageFileChange(e, 'Img')}
+              disabled={uploadingImage}
             />
+            {uploadingImage && (
+              <Form.Text className="text-info small d-block mt-1">
+                <i className="ph ph-spinner ph-spin me-1"></i>
+                Đang upload ảnh...
+              </Form.Text>
+            )}
           </>
         )}
         {editItemData.Img && (
@@ -272,7 +288,8 @@ export const YesNoQuizForm = ({
  */
 export const SpellQuizForm = ({ 
   editItemData, 
-  canEdit, 
+  canEdit,
+  uploadingImage,
   handleModalFieldChange,
   handleModalImageFileChange,
   handleModalAnswerList,
@@ -290,7 +307,7 @@ export const SpellQuizForm = ({
           value={editItemData.Img || ''}
           onChange={(e) => handleModalFieldChange('Img', e.target.value)}
           placeholder="https://example.com/image.jpg"
-          disabled={!canEdit}
+          disabled={!canEdit || uploadingImage}
         />
         {canEdit && (
           <>
@@ -301,7 +318,14 @@ export const SpellQuizForm = ({
               type="file"
               accept="image/*"
               onChange={(e) => handleModalImageFileChange(e, 'Img')}
+              disabled={uploadingImage}
             />
+            {uploadingImage && (
+              <Form.Text className="text-info small d-block mt-1">
+                <i className="ph ph-spinner ph-spin me-1"></i>
+                Đang upload ảnh...
+              </Form.Text>
+            )}
           </>
         )}
         {editItemData.Img && (
@@ -413,7 +437,8 @@ export const SpellQuizForm = ({
  */
 export const WordFromBoxQuizForm = ({ 
   editItemData, 
-  canEdit, 
+  canEdit,
+  uploadingImage,
   handleModalFieldChange,
   handleModalImageFileChange,
   handleModalAnswerList,
@@ -436,7 +461,7 @@ export const WordFromBoxQuizForm = ({
           value={editItemData.Img || ''}
           onChange={(e) => handleModalFieldChange('Img', e.target.value)}
           placeholder="https://example.com/image.jpg"
-          disabled={!canEdit}
+          disabled={!canEdit || uploadingImage}
         />
         {canEdit && (
           <>
@@ -447,7 +472,14 @@ export const WordFromBoxQuizForm = ({
               type="file"
               accept="image/*"
               onChange={(e) => handleModalImageFileChange(e, 'Img')}
+              disabled={uploadingImage}
             />
+            {uploadingImage && (
+              <Form.Text className="text-info small d-block mt-1">
+                <i className="ph ph-spinner ph-spin me-1"></i>
+                Đang upload ảnh...
+              </Form.Text>
+            )}
           </>
         )}
         {editItemData.Img && (

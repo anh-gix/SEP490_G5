@@ -7,6 +7,8 @@ exports.approveChangeRequest = changeRequestController.approveChangeRequest;
 
 exports.rejectChangeRequest = changeRequestController.rejectChangeRequest;
 
+exports.revertChangeRequest = changeRequestController.revertChangeRequest;
+
 
 exports.getAttendanceByClassSchedule = async (req, res) => {
   try {

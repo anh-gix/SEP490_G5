@@ -14,6 +14,7 @@ router.get('/dashboard', academicDashboardController.getDashboardData);
 // Change Request Management
 router.put('/change-requests/:id/approve', academicStaffController.approveChangeRequest);
 router.put('/change-requests/:id/reject', academicStaffController.rejectChangeRequest);
+router.put('/change-requests/:id/revert', academicStaffController.revertChangeRequest);
 
 // Attendance Management
 router.get('/class-schedules/:classScheduleId/attendance', academicStaffController.getAttendanceByClassSchedule);

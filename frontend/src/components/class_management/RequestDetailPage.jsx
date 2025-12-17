@@ -1,9 +1,11 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Container, Card, Button, Spinner, Alert, Modal, Form } from 'react-bootstrap';
+import { toast } from 'react-toastify';
 import ScheduleCalendar from './ScheduleCalendar';
 import { formatDateToYYYYMMDD, parseDateString } from '../../helper/helper';
 import classService from '../../services/classService';
 import { studentScheduleService } from '../../services/studentScheduleService';
+import academicStaffService from '../../services/academicStaffService';
 
 const RequestDetailPage = ({
   selectedRequest,
@@ -21,7 +23,9 @@ const RequestDetailPage = ({
   formatDate
 }) => {
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showRevertModal, setShowRevertModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [reverting, setReverting] = useState(false);
   const [loadingStudentScheduleIds, setLoadingStudentScheduleIds] = useState({}); // Map session index -> loading state
   const [resolvedStudentScheduleIds, setResolvedStudentScheduleIds] = useState({}); // Map session index -> studentScheduleId
   const [replaceTeacherStudentScheduleId, setReplaceTeacherStudentScheduleId] = useState(null); // studentScheduleId cho đơn request_replace_teacher
@@ -318,17 +322,47 @@ const RequestDetailPage = ({
       }
     }
     
-    const schedules = senderSchedule.map((schedule, index) => {
-      const dateStr = formatDateToYYYYMMDD(schedule.date);
-      
-      // Lấy attendance status nếu có
-      const attendanceStatus = schedule.attendance?.status || null;
-      
-      // Lấy scheduleStatus từ StudentSchedule (cancelled, scheduled, etc.)
-      const scheduleStatus = schedule.scheduleStatus || 'scheduled';
-      
-      // Kiểm tra xem buổi này có phải là buổi nghỉ không (từ pendingMakeupClasses, đã bị cancelled, hoặc từ đơn)
-      const scheduleId = schedule._id || schedule.id || index;
+    // 🆕 Lấy ID của buổi nghỉ và buổi học bù từ đơn (nếu đơn đã được duyệt)
+    const requestAbsentStudentScheduleId = selectedRequest?.studentScheduleId?._id || 
+                                           selectedRequest?.studentScheduleId?.id ||
+                                           selectedRequest?.studentScheduleId;
+    const requestMakeupStudentScheduleId = selectedRequest?.makeupStudentScheduleId?._id || 
+                                          selectedRequest?.makeupStudentScheduleId?.id ||
+                                          selectedRequest?.makeupStudentScheduleId;
+    
+    const schedules = senderSchedule
+      .map((schedule, index) => {
+        const dateStr = formatDateToYYYYMMDD(schedule.date);
+        
+        // Lấy attendance status nếu có
+        const attendanceStatus = schedule.attendance?.status || null;
+        
+        // Lấy scheduleStatus từ StudentSchedule (cancelled, scheduled, etc.)
+        const scheduleStatus = schedule.scheduleStatus || 'scheduled';
+        
+        // 🆕 Lấy StudentSchedule ID của buổi này (từ _id, id, hoặc studentScheduleId)
+        const currentStudentScheduleId = schedule.studentScheduleId || schedule._id || schedule.id;
+        const currentStudentScheduleIdStr = currentStudentScheduleId?.toString();
+        
+        // 🆕 Kiểm tra xem buổi cancelled này có thuộc đơn này không
+        const isCancelledFromThisRequest = scheduleStatus === 'cancelled' && 
+                                           requestAbsentStudentScheduleId &&
+                                           currentStudentScheduleIdStr &&
+                                           currentStudentScheduleIdStr === requestAbsentStudentScheduleId.toString();
+        
+        // 🆕 Ẩn các buổi cancelled không thuộc đơn này
+        if (scheduleStatus === 'cancelled' && !isCancelledFromThisRequest) {
+          return null; // Filter ra
+        }
+        
+        // 🆕 Kiểm tra xem buổi rescheduled này có thuộc đơn này không
+        const isMakeupFromThisRequest = scheduleStatus === 'rescheduled' && 
+                                       requestMakeupStudentScheduleId &&
+                                       currentStudentScheduleIdStr &&
+                                       currentStudentScheduleIdStr === requestMakeupStudentScheduleId.toString();
+        
+        // Kiểm tra xem buổi này có phải là buổi nghỉ không (từ pendingMakeupClasses, đã bị cancelled, hoặc từ đơn)
+        const scheduleId = schedule._id || schedule.id || index;
       
       // Kiểm tra xem có phải buổi nghỉ từ đơn không (cho đơn makeup_class)
       let isAbsentFromRequest = false;
@@ -374,7 +408,7 @@ const RequestDetailPage = ({
         }
       }
       
-      const isAbsentSchedule = isAbsentFromRequest || (pendingMakeupClasses && pendingMakeupClasses.some(makeup => {
+      const isAbsentSchedule = isAbsentFromRequest || isCancelledFromThisRequest || (pendingMakeupClasses && pendingMakeupClasses.some(makeup => {
         // Bỏ qua nếu là giáo viên dạy thay (buổi học vẫn diễn ra, chỉ đổi giáo viên)
         if (makeup.isSubstituteClass) return false;
         const absentId = makeup.absentScheduleId || makeup.absentSchedule?.id || makeup.absentSchedule?._id;
@@ -404,14 +438,18 @@ const RequestDetailPage = ({
       let displayStatus = 'scheduled';
       if ((isCancelled || isAbsentSchedule) && !hasSubstituteTeacher) {
         displayStatus = 'cancelled';
-      } else if (scheduleStatus === 'rescheduled' || schedule.status === 'temporary') {
+      } else if (isMakeupFromThisRequest || schedule.status === 'temporary') {
+        // 🆕 Chỉ buổi rescheduled của đơn này hoặc temporary mới là makeup
         displayStatus = 'makeup';
       } else if (schedule.status === 'fixed') {
         displayStatus = 'scheduled';
+      } else if (scheduleStatus === 'rescheduled' && !isMakeupFromThisRequest) {
+        // 🆕 Buổi rescheduled không phải của đơn này → hiển thị như buổi bình thường
+        displayStatus = 'scheduled';
       }
       
-      // Kiểm tra xem có phải buổi học bù không (từ database với scheduleStatus: 'rescheduled')
-      const isMakeupFromDB = scheduleStatus === 'rescheduled';
+      // 🆕 Kiểm tra xem có phải buổi học bù không - chỉ buổi rescheduled của đơn này
+      const isMakeupFromDB = isMakeupFromThisRequest; // Chỉ buổi rescheduled của đơn này mới là học bù
       
       // Xác định className: nếu không có class và là makeup/temporary thì hiển thị "Lớp học bù"
       let className = schedule.class?.name;
@@ -430,7 +468,7 @@ const RequestDetailPage = ({
         roomName: schedule.room?.room_name || 'N/A',
         topic: schedule.topic || '',
         status: displayStatus,
-        scheduleStatus: scheduleStatus,
+        scheduleStatus: isMakeupFromThisRequest ? scheduleStatus : (scheduleStatus === 'rescheduled' ? 'scheduled' : scheduleStatus), // 🆕 Đổi rescheduled thành scheduled nếu không phải của đơn
         attendanceStatus: attendanceStatus,
         hasAttendance: !!attendanceStatus,
         teacherName: hasSubstituteTeacher 
@@ -440,16 +478,16 @@ const RequestDetailPage = ({
         lessonTopic: schedule.topic || '',
         isAbsentSchedule: isAbsentSchedule || (isCancelled && !hasSubstituteTeacher),
         isCancelled: isCancelled && !hasSubstituteTeacher,
-        isMakeupSchedule: isMakeupFromDB,
+        isMakeupSchedule: isMakeupFromDB, // 🆕 Chỉ buổi rescheduled của đơn này mới là học bù
         isSubstituteClass: hasSubstituteTeacher,
         cancellationReason: schedule.studentScheduleReason || null,
         makeupReason: isMakeupFromDB ? schedule.studentScheduleReason : null,
-        // isOldClassSchedule: isOldClassSchedule, // Commented out - đổi lớp học
         isOldClassSchedule: false,
         isNewClassSchedule: false,
         programType: schedule.class?.course?.program?.type || schedule.programType || schedule.sessionCourse?.program?.type || null
       };
-    });
+      })
+      .filter(Boolean); // 🆕 Filter ra các null (buổi cancelled không thuộc đơn)
     
     // Lấy danh sách ID của các buổi học bù đã có trong schedules (từ database)
     const existingMakeupScheduleIds = schedules
@@ -500,6 +538,31 @@ const RequestDetailPage = ({
     
     return [...schedules, ...makeupSchedules];
   }, [senderSchedule, pendingMakeupClasses, selectedRequest]);
+
+  // Handler để hoàn tác đơn
+  const handleRevert = async () => {
+    if (!selectedRequest) return;
+    
+    try {
+      setReverting(true);
+      const response = await academicStaffService.revertChangeRequest(selectedRequest._id);
+      
+      if (response.success) {
+        toast.success('Hoàn tác đơn thành công!');
+        setShowRevertModal(false);
+        if (onBack) {
+          onBack(); // Quay lại danh sách và refresh
+        }
+      } else {
+        toast.error(response.message || 'Có lỗi xảy ra khi hoàn tác đơn');
+      }
+    } catch (error) {
+      console.error('Error reverting request:', error);
+      toast.error(error.message || 'Có lỗi xảy ra khi hoàn tác đơn');
+    } finally {
+      setReverting(false);
+    }
+  };
 
   if (!selectedRequest) {
     return null;
@@ -1021,6 +1084,19 @@ const RequestDetailPage = ({
 
           {/* Footer với các nút hành động */}
           <div className="d-flex justify-content-end gap-12">
+            {/* Nút Hoàn tác - chỉ hiển thị khi đơn đã được duyệt */}
+            {selectedRequest?.status === 'approved' && (
+              <Button 
+                variant="warning" 
+                onClick={() => setShowRevertModal(true)}
+                disabled={reverting}
+                className="d-flex align-items-center gap-2"
+              >
+                <i className="fas fa-undo"></i>
+                {reverting ? 'Đang xử lý...' : 'Hoàn tác'}
+              </Button>
+            )}
+            
             <Button 
               variant="secondary" 
               onClick={onBack}
@@ -1111,6 +1187,49 @@ const RequestDetailPage = ({
             disabled={processing}
           >
             {processing ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal xác nhận hoàn tác */}
+      <Modal show={showRevertModal} onHide={() => setShowRevertModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Xác nhận hoàn tác đơn</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Alert variant="warning" className="mb-3">
+            <i className="fas fa-exclamation-triangle me-2"></i>
+            Bạn có chắc chắn muốn hoàn tác đơn này không?
+          </Alert>
+          <p className="text-neutral-700 mb-2">
+            <strong>Hành động sẽ thực hiện:</strong>
+          </p>
+          <ul className="text-neutral-700">
+            <li>Khôi phục buổi nghỉ về trạng thái ban đầu</li>
+            <li>Xóa buổi học bù đã được tạo</li>
+            <li>Chuyển đơn sang trạng thái "Từ chối"</li>
+          </ul>
+          {selectedRequest && (
+            <div className="mt-3 p-3 bg-light rounded">
+              <p className="mb-1"><strong>Người gửi:</strong> {selectedRequest.sender?.username}</p>
+              <p className="mb-1"><strong>Nội dung:</strong> {selectedRequest.content}</p>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button 
+            variant="secondary" 
+            onClick={() => setShowRevertModal(false)}
+            disabled={reverting}
+          >
+            Hủy
+          </Button>
+          <Button 
+            variant="warning" 
+            onClick={handleRevert}
+            disabled={reverting}
+          >
+            {reverting ? 'Đang xử lý...' : 'Xác nhận hoàn tác'}
           </Button>
         </Modal.Footer>
       </Modal>

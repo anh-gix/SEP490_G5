@@ -129,6 +129,15 @@ exports.getAllChangeRequests = async (req, res) => {
           select: 'name'
         }
       })
+      .populate({
+        path: 'makeupStudentScheduleId',
+        select: 'scheduleStatus reason classSchedule',
+        populate: {
+          path: 'classSchedule',
+          select: 'date startTime endTime session class room'
+        }
+      })
+      .populate('substituteTeacherId', 'username email')
       .sort(sortObj)
       .skip(skip)
       .limit(limitNum)
@@ -470,6 +479,7 @@ exports.getSenderSchedule = async (req, res) => {
           const classSchedule = ss.classSchedule;
           return {
             _id: classSchedule._id,
+            studentScheduleId: ss._id, // 🆕 Thêm StudentSchedule ID để frontend có thể so khớp
             date: classSchedule.date,
             startTime: classSchedule.startTime,
             endTime: classSchedule.endTime,
@@ -641,6 +651,10 @@ exports.approveChangeRequest = async (req, res) => {
     // Track ClassSchedule IDs that students moved FROM (for cleanup later)
     const affectedClassScheduleIds = new Set();
     
+    // Biến để lưu các ID cần cập nhật vào ChangeRequest
+    let makeupStudentScheduleIdToSave = null;
+    let substituteTeacherIdToSave = null;
+    
     if (pendingMakeupClasses && Array.isArray(pendingMakeupClasses) && pendingMakeupClasses.length > 0) {
       try {
         for (const makeup of pendingMakeupClasses) {
@@ -769,6 +783,9 @@ exports.approveChangeRequest = async (req, res) => {
           
           // Set substituteTeacher = giáo viên dạy thay
           absentClassSchedule.substituteTeacher = new mongoose.Types.ObjectId(substituteTeacherId);
+          
+          // 🆕 Lưu substituteTeacherId để cập nhật vào ChangeRequest
+          substituteTeacherIdToSave = substituteTeacherId;
           
           const substituteNote = `Giáo viên dạy thay: ${substituteTeacherId} (Giáo viên gốc: ${originalTeacher._id || originalTeacher})`;
           if (absentClassSchedule.note) {
@@ -981,6 +998,8 @@ exports.approveChangeRequest = async (req, res) => {
           classSchedule: finalMakeupScheduleId
         }).session(session);
         
+        let makeupStudentScheduleId = null;
+        
         if (existingMakeupSchedule) {
           // Nếu StudentSchedule đã tồn tại nhưng bị cancelled, khôi phục nó
           if (existingMakeupSchedule.scheduleStatus === 'cancelled') {
@@ -988,6 +1007,8 @@ exports.approveChangeRequest = async (req, res) => {
             existingMakeupSchedule.reason = `Học bù cho buổi nghỉ ngày ${new Date(absentClassSchedule.date).toLocaleDateString('vi-VN')}`;
             await existingMakeupSchedule.save({ session });
           }
+          // 🆕 Lưu ID của StudentSchedule đã tồn tại
+          makeupStudentScheduleId = existingMakeupSchedule._id;
         } else {
           const newStudentSchedule = new StudentSchedule({
             student: studentId,
@@ -997,6 +1018,13 @@ exports.approveChangeRequest = async (req, res) => {
           });
           
           await newStudentSchedule.save({ session });
+          // 🆕 Lưu ID của StudentSchedule mới tạo
+          makeupStudentScheduleId = newStudentSchedule._id;
+        }
+        
+        // 🆕 Lưu makeupStudentScheduleId (chỉ lưu phần tử đầu tiên vì mỗi đơn chỉ có 1 buổi học bù)
+        if (!makeupStudentScheduleIdToSave) {
+          makeupStudentScheduleIdToSave = makeupStudentScheduleId;
         }
         
         let absentStudentSchedule = null;
@@ -1311,6 +1339,7 @@ exports.approveChangeRequest = async (req, res) => {
             if (remainingStudents === 0) {
               // No students using this makeup class anymore, safe to delete
               await ClassSchedule.findByIdAndDelete(scheduleId).session(session);
+              console.log(`✅ Deleted orphaned makeup ClassSchedule: ${scheduleId}`);
             }
           }
         } catch (cleanupError) {
@@ -1320,14 +1349,27 @@ exports.approveChangeRequest = async (req, res) => {
       }
     }
     
+    // 🆕 Cập nhật ChangeRequest với makeupStudentScheduleId và substituteTeacherId
+    const updateData = {
+      status: 'approved',
+      approver: approverId,
+      approvedDate: new Date(),
+      responseContent: responseContent || null
+    };
+    
+    // Chỉ thêm makeupStudentScheduleId nếu có (cho đơn học bù)
+    if (makeupStudentScheduleIdToSave) {
+      updateData.makeupStudentScheduleId = makeupStudentScheduleIdToSave;
+    }
+    
+    // Chỉ thêm substituteTeacherId nếu có (cho đơn thay giáo viên)
+    if (substituteTeacherIdToSave) {
+      updateData.substituteTeacherId = substituteTeacherIdToSave;
+    }
+    
     await ChangeRequest.findByIdAndUpdate(
       id,
-      {
-        status: 'approved',
-        approver: approverId,
-        approvedDate: new Date(),
-        responseContent: responseContent || null
-      },
+      updateData,
       { 
         new: true,
         session: session
@@ -1339,7 +1381,9 @@ exports.approveChangeRequest = async (req, res) => {
     
     const updatedChangeRequest = await ChangeRequest.findById(id)
       .populate('sender', 'username email phone')
-      .populate('approver', 'username email');
+      .populate('approver', 'username email')
+      .populate('makeupStudentScheduleId', 'scheduleStatus reason')
+      .populate('substituteTeacherId', 'username email');
     
     res.status(200).json({
       success: true,
@@ -1395,6 +1439,142 @@ exports.rejectChangeRequest = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Lỗi server khi từ chối đơn",
+      error: error.message
+    });
+  }
+};
+
+exports.revertChangeRequest = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
+  try {
+    const { id } = req.params;
+    const approverId = req.user?._id || req.body.approverId;
+    
+    const changeRequest = await ChangeRequest.findById(id)
+      .populate('studentScheduleId')
+      .populate('makeupStudentScheduleId')
+      .populate('classScheduleId')
+      .session(session);
+    
+    if (!changeRequest) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy đơn'
+      });
+    }
+    
+    if (changeRequest.status !== 'approved') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'Chỉ có thể hoàn tác đơn đã được duyệt'
+      });
+    }
+    
+    // 1. Khôi phục buổi nghỉ (nếu có)
+    if (changeRequest.studentScheduleId) {
+      const absentStudentScheduleId = changeRequest.studentScheduleId._id || changeRequest.studentScheduleId;
+      const absentStudentSchedule = await StudentSchedule.findById(absentStudentScheduleId)
+        .session(session);
+      
+      if (absentStudentSchedule && absentStudentSchedule.scheduleStatus === 'cancelled') {
+        absentStudentSchedule.scheduleStatus = 'scheduled';
+        absentStudentSchedule.reason = null; // Xóa lý do cancelled
+        await absentStudentSchedule.save({ session });
+      }
+    }
+    
+    // 2. Xóa buổi học bù (nếu có)
+    if (changeRequest.makeupStudentScheduleId) {
+      const makeupStudentScheduleId = changeRequest.makeupStudentScheduleId._id || changeRequest.makeupStudentScheduleId;
+      
+      // Lấy StudentSchedule học bù trước khi xóa để lấy ClassSchedule
+      const makeupStudentSchedule = await StudentSchedule.findById(makeupStudentScheduleId)
+        .populate('classSchedule')
+        .session(session);
+      
+      if (makeupStudentSchedule) {
+        const makeupClassScheduleId = makeupStudentSchedule.classSchedule?._id || makeupStudentSchedule.classSchedule;
+        
+        // Xóa StudentSchedule của học sinh này
+        await StudentSchedule.findByIdAndDelete(makeupStudentScheduleId).session(session);
+        
+        // Kiểm tra ClassSchedule để quyết định có xóa không
+        if (makeupClassScheduleId) {
+          const makeupClassSchedule = await ClassSchedule.findById(makeupClassScheduleId).session(session);
+          
+          if (makeupClassSchedule) {
+            // Nếu là buổi học bù mới tạo (class=null, status='temporary)
+            if (makeupClassSchedule.class === null && makeupClassSchedule.status === 'temporary') {
+              // Đếm số học sinh còn lại trong ClassSchedule
+              const remainingStudents = await StudentSchedule.countDocuments({
+                classSchedule: makeupClassScheduleId,
+                scheduleStatus: { $nin: ['cancelled'] }
+              }).session(session);
+              
+              // Nếu không còn học sinh nào → Xóa ClassSchedule
+              if (remainingStudents === 0) {
+                await ClassSchedule.findByIdAndDelete(makeupClassScheduleId).session(session);
+              }
+              // Nếu còn học sinh khác → Giữ lại ClassSchedule (không làm gì)
+            }
+            // Nếu là buổi học ké (có class) → CHỈ xóa StudentSchedule, KHÔNG xóa ClassSchedule
+            // (Đã xóa StudentSchedule ở trên, không cần làm gì thêm)
+          }
+        }
+      }
+    }
+    
+    // 3. Xóa substituteTeacher nếu có (cho đơn request_replace_teacher)
+    if (changeRequest.type === 'request_replace_teacher' && changeRequest.classScheduleId) {
+      const classScheduleId = changeRequest.classScheduleId._id || changeRequest.classScheduleId;
+      const classSchedule = await ClassSchedule.findById(classScheduleId).session(session);
+      
+      if (classSchedule && classSchedule.substituteTeacher) {
+        classSchedule.substituteTeacher = undefined;
+        // Xóa note về giáo viên dạy thay
+        if (classSchedule.note) {
+          classSchedule.note = classSchedule.note.replace(/Giáo viên dạy thay:.*/g, '').trim();
+        }
+        await classSchedule.save({ session });
+      }
+    }
+    
+    // 4. Chuyển đơn sang trạng thái rejected
+    changeRequest.status = 'rejected';
+    changeRequest.approver = approverId;
+    changeRequest.approvedDate = new Date();
+    changeRequest.responseContent = 'Đơn đã được hoàn tác';
+    // Xóa các ID liên quan
+    changeRequest.makeupStudentScheduleId = undefined;
+    changeRequest.substituteTeacherId = undefined;
+    
+    await changeRequest.save({ session });
+    
+    await session.commitTransaction();
+    session.endSession();
+    
+    const updatedChangeRequest = await ChangeRequest.findById(id)
+      .populate('sender', 'username email phone')
+      .populate('approver', 'username email');
+    
+    res.status(200).json({
+      success: true,
+      message: 'Đã hoàn tác đơn thành công',
+      changeRequest: updatedChangeRequest
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error(" Lỗi khi hoàn tác đơn:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi hoàn tác đơn",
       error: error.message
     });
   }

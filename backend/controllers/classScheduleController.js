@@ -2153,6 +2153,38 @@ exports.assignSubstituteTeacher = async (req, res) => {
     }
 
     const originalTeacher = classSchedule.teacher;
+    const originalTeacherId = originalTeacher?._id?.toString() || originalTeacher?.toString();
+
+    // 🆕 Kiểm tra: Nếu substituteTeacher trùng với teacher gốc thì xóa substituteTeacher
+    if (substituteTeacherId.toString() === originalTeacherId) {
+      // Xóa substituteTeacher
+      classSchedule.substituteTeacher = undefined;
+      
+      // Xóa note về giáo viên dạy thay (nếu có)
+      if (classSchedule.note) {
+        classSchedule.note = classSchedule.note.replace(/Giáo viên dạy thay:.*/g, '').trim();
+        // Nếu note rỗng sau khi xóa, set về null
+        if (!classSchedule.note) {
+          classSchedule.note = null;
+        }
+      }
+      
+      await classSchedule.save();
+      
+      const updatedSchedule = await ClassSchedule.findById(classSchedule._id)
+        .populate('class', 'name')
+        .populate('room', 'room_name location')
+        .populate('teacher', 'username email')
+        .populate('substituteTeacher', 'username email')
+        .populate('session', 'title order')
+        .lean();
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Đã xóa giáo viên dạy thay (trùng với giáo viên gốc)',
+        schedule: updatedSchedule
+      });
+    }
 
     const substituteTeacherClasses = await Class.find({
       $or: [

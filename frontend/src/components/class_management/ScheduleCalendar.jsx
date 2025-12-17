@@ -501,13 +501,13 @@ const ScheduleCalendar = ({
                                 <Badge bg="primary" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#2196F3' }}>Lớp mới</Badge>
                               )}
                               {(schedule.isCancelled || schedule.scheduleStatus === 'cancelled') && (
-                                <Badge bg="secondary" style={{ fontSize: '8px', padding: '2px 4px' }}>Đã hủy</Badge>
+                                <Badge bg="secondary" style={{ fontSize: '8px', padding: '2px 4px' }}>Buổi nghỉ</Badge>
                               )}
                               {(schedule.isAbsentSchedule || schedule.status === 'absent') && !(schedule.isCancelled || schedule.scheduleStatus === 'cancelled') && (
                                 <Badge bg="danger" style={{ fontSize: '8px', padding: '2px 4px' }}>Buổi nghỉ</Badge>
                               )}
                               {(schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled') && (
-                                <Badge bg="warning" text="dark" style={{ fontSize: '8px', padding: '2px 4px' }}>Học bù</Badge>
+                                <Badge bg="warning" text="dark" style={{ fontSize: '8px', padding: '2px 4px' }}>Buổi học bù</Badge>
                               )}
                             </div>
                             <div className="mt-1 d-flex justify-content-end gap-1">
@@ -572,7 +572,7 @@ const ScheduleCalendar = ({
                                     title="Xếp buổi học bù"
                                   >
                                     <i className="fas fa-calendar-plus me-1"></i>
-                                    Học bù
+                                    Buổi học bù
                                   </Button>
                                 );
                               })()}

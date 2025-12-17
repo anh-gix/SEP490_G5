@@ -230,12 +230,82 @@ const getCamSessionsByCourseId = async (req, res) => {
   }
 };
 
+// =========================
+// FILE UPLOAD HANDLERS
+// =========================
+
+/**
+ * Upload video file
+ * POST /api/cam-sessions/upload/video
+ */
+const uploadVideoFile = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không có file video được upload'
+      });
+    }
+
+    // Return the URL to access the uploaded file
+    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/online-learning/${req.file.filename}`;
+
+    res.status(200).json({
+      success: true,
+      message: 'Upload video thành công',
+      url: fileUrl,
+      filename: req.file.filename
+    });
+  } catch (error) {
+    console.error('Error uploading video:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi upload video',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Upload image file
+ * POST /api/cam-sessions/upload/image
+ */
+const uploadImageFile = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không có file ảnh được upload'
+      });
+    }
+
+    // Return the URL to access the uploaded file
+    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/online-learning/${req.file.filename}`;
+
+    res.status(200).json({
+      success: true,
+      message: 'Upload ảnh thành công',
+      url: fileUrl,
+      filename: req.file.filename
+    });
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi upload ảnh',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getAllCamSessions,
   getCamSessionById,
   createCamSession,
   updateCamSession,
   deleteCamSession,
-  getCamSessionsByCourseId
+  getCamSessionsByCourseId,
+  uploadVideoFile,
+  uploadImageFile
 };
 

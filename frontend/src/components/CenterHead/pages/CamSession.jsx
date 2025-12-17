@@ -69,6 +69,11 @@ const CamSession = ({ courseData, viewMode = 'center-head', programId }) => {
         // Center head only views existing sessions
         setCamSessions(existing.sort((a, b) => (a.order || 0) - (b.order || 0)));
       }
+
+      const nextSessions = [...existing, ...createdCamSessions].sort(
+        (a, b) => (a.order || 0) - (b.order || 0)
+      );
+      setCamSessions(nextSessions);
     } catch (error) {
       console.error('Error ensuring cam sessions:', error);
       alert(error.response?.data?.message || 'Lỗi khi tải CAM Session');

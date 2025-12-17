@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import Select from "react-select";
 import { useAuth } from "../../contexts/AuthContext";
+import logo from "../../assets/Homepage_img/LOGO.png";
 const HeaderOne = () => {
   let { pathname } = useLocation();
   const navigate = useNavigate();
@@ -128,7 +129,7 @@ const HeaderOne = () => {
               {/* Logo Start */}
               <div className='logo'>
                 <Link to='/' className='link'>
-                  <img src='assets/images/logo/logo.png' alt='Logo' />
+                  <img src={logo} alt='Logo' />
                 </Link>
               </div>
               {/* Logo End  */}
@@ -242,7 +243,7 @@ const HeaderOne = () => {
                                 className='d-block px-16 py-10 hover-bg-neutral-30 text-neutral-700'
                                 onClick={() => setIsUserMenuOpen(false)}
                               >
-                                <i className='ph ph-user me-8' /> Profile
+                                <i className='ph ph-user me-8' /> Hồ Sơ
                               </Link>
                             </li>
                             <li>
@@ -251,7 +252,7 @@ const HeaderOne = () => {
                                 className='w-100 text-start px-16 py-10 hover-bg-neutral-30 text-danger-600'
                                 onClick={handleLogout}
                               >
-                                <i className='ph ph-sign-out me-8' /> Logout
+                                <i className='ph ph-sign-out me-8' /> Đăng Xuất
                               </button>
                             </li>
                           </ul>
@@ -291,7 +292,7 @@ const HeaderOne = () => {
         </button>
         <div className='mobile-menu__inner'>
           <Link to='/' className='mobile-menu__logo'>
-            <img src='assets/images/logo/logo.png' alt='Logo' />
+            <img src={logo} alt='Logo' />
           </Link>
           <div className='mobile-menu__menu'>
             <ul className='nav-menu flex-align nav-menu--mobile'>

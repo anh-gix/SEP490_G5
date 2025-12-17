@@ -25,15 +25,8 @@ api.interceptors.request.use(
 
 // Auth service functions
 export const authService = {
-  // Đăng ký user mới
-  register: async (userData) => {
-    try {
-      const response = await api.post('/register', userData);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Đăng ký thất bại' };
-    }
-  },
+
+  
 
   // Đăng nhập
   login: async (credentials) => {
@@ -97,6 +90,26 @@ export const authService = {
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Đổi mật khẩu thất bại' };
+    }
+  },
+
+  // Quên mật khẩu - Gửi mã xác thực về email
+  sendForgotPasswordCode: async (email) => {
+    try {
+      const response = await api.post('/forgot-password', { email });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Gửi mã xác thực thất bại' };
+    }
+  },
+
+  // Reset mật khẩu với email, code và mật khẩu mới
+  resetPassword: async ({ email, code, newPassword }) => {
+    try {
+      const response = await api.post('/reset-password', { email, code, newPassword });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Đặt lại mật khẩu thất bại' };
     }
   },
 

@@ -698,6 +698,101 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
     }
   };
 
+  const isCamOnlineCourse =
+    program?.type === "cam" && formData.learningType === "online";
+
+  // ==================== CAM SESSION QUICK CREATE (FORM VIEW) ====================
+  const handleQuickCreateCamSession = async () => {
+    if (!courseId) {
+      alert("Không tìm thấy ID học phần. Vui lòng lưu học phần trước khi tạo CAM Session.");
+      return;
+    }
+
+    const totalPlannedSessions = Number(formData.numberOfSessions) || 0;
+    const currentCamSessions = formData.camSessions || [];
+
+    if (totalPlannedSessions > 0 && currentCamSessions.length >= totalPlannedSessions) {
+      alert(
+        `Bạn đã tạo đủ CAM Session cho ${totalPlannedSessions} buổi học. ` +
+        "Vui lòng tăng số lượng buổi học nếu muốn tạo thêm CAM Session."
+      );
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const currentCamSessions = formData.camSessions || [];
+      const nextOrder =
+        currentCamSessions.length > 0
+          ? Math.max(...currentCamSessions.map((cs) => cs.order || 0)) + 1
+          : 1;
+
+      const payload = {
+        course: courseId,
+        title: `CAM Session ${nextOrder}`,
+        order: nextOrder,
+        sessionType: "reading",
+      };
+
+      const created = await camSessionService.createCamSession(payload);
+      const createdSession = created?.data || created;
+
+      // Cập nhật course để liên kết CAM Session mới
+      await courseService.updateCourse(courseId, {
+        camSessions: [...currentCamSessions, createdSession].map((cs) => cs._id),
+      });
+
+      // Cập nhật state local
+      setFormData((prev) => ({
+        ...prev,
+        camSessions: [...(prev.camSessions || []), createdSession],
+      }));
+
+      alert("Đã tạo CAM Session mới thành công!");
+    } catch (error) {
+      console.error("Error creating CAM Session:", error);
+      alert(error.response?.data?.message || "Lỗi khi tạo CAM Session!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCamSessionRow = async (camSessionId) => {
+    if (!camSessionId) return;
+    if (!window.confirm("Bạn có chắc chắn muốn xóa CAM Session này?")) return;
+
+    try {
+      setLoading(true);
+
+      const remaining = (formData.camSessions || []).filter(
+        (cs) => cs._id !== camSessionId
+      );
+
+      // 1. Cập nhật course để bỏ liên kết CAM Session đã xóa
+      if (courseId) {
+        await courseService.updateCourse(courseId, {
+          camSessions: remaining.map((cs) => cs._id),
+        });
+      }
+
+      // 2. Xóa document CamSession sau khi đã gỡ khỏi course
+      await camSessionService.deleteCamSession(camSessionId);
+
+      setFormData((prev) => ({
+        ...prev,
+        camSessions: remaining,
+      }));
+
+      alert("Xóa CAM Session thành công!");
+    } catch (error) {
+      console.error("Error deleting CAM Session:", error);
+      alert(error.response?.data?.message || "Lỗi khi xóa CAM Session!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ==================== FORM SUBMISSION ====================
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();

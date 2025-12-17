@@ -21,7 +21,7 @@ const Profile = () => {
 
   const initialValues = useMemo(
     () => ({
-      name: user?.name || user?.fullName || "",
+      name: user?.username || "",
       email: user?.email || "",
       phone: user?.phone || "",
     }),
@@ -45,7 +45,7 @@ const Profile = () => {
     setSubmitMessage("");
     try {
       const payload = {
-        name: formValues.name,
+        username: formValues.name,
         email: formValues.email,
         phone: formValues.phone,
       };
@@ -149,13 +149,7 @@ const Profile = () => {
                 </button>
               </div>
               <div className='mt-20 pt-16 border-top border-neutral-30'>
-                {user?.username && (
-                  <div className='text-sm text-neutral-700 d-flex align-items-center'>
-                    <i className='ph ph-identification-badge me-8 text-neutral-500' />
-                    <span>Tên đăng nhập:&nbsp;</span>
-                    <span className='fw-medium'>{user.username}</span>
-                  </div>
-                )}
+               
                 {user?.email && (
                   <div className='text-sm text-neutral-700 mt-10 d-flex align-items-center'>
                     <i className='ph ph-envelope me-8 text-neutral-500' />
@@ -242,7 +236,7 @@ const Profile = () => {
                 </div>
                 <div className='mt-10'>
                   {submitMessage && (
-                    <span className={`text-sm ${submitMessage.includes("thất bại") ? "text-danger-600" : "text-success"}`}>
+                    <span className={`text-sm ${submitMessage.includes("thành công") ? "text-success" : "text-danger-600"}`}>
                       {submitMessage}
                     </span>
                   )}

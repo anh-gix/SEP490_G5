@@ -671,6 +671,40 @@ exports.getExamById = async (req, res) => {
   }
 };
 
+// ================== LẤY DANH SÁCH SUBMISSIONS CỦA MỘT EXAM ==================
+exports.getExamSubmissions = async (req, res) => {
+  try {
+    const { examId } = req.params;
+    const studentId = req.user._id; // Lấy từ middleware verifyToken
+
+    if (!examId) {
+      return res.status(400).json({ message: "Vui lòng cung cấp examId" });
+    }
+
+    // Kiểm tra exam có tồn tại không
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+      return res.status(404).json({ message: "Không tìm thấy bài thi" });
+    }
+
+    // Lấy tất cả submissions của student cho exam này
+    const submissions = await Submission.find({
+      examId: examId,
+      studentId: studentId,
+    })
+      .sort({ createdAt: -1 }) // Sắp xếp theo thời gian tạo mới nhất
+      .select('-sections.answers'); // Không trả về chi tiết answers để giảm dung lượng
+
+    res.json({
+      success: true,
+      count: submissions.length,
+      submissions: submissions,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // ================== 3. BẮT ĐẦU LÀM BÀI THI ==================
 exports.startExam = async (req, res) => {
   try {
@@ -725,6 +759,53 @@ exports.startExam = async (req, res) => {
     await submission.save();
     res.status(201).json({
       message: "Bắt đầu làm bài thành công",
+      submission: submission,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ================== TẠO SUBMISSION MỚI (LÀM LẠI) ==================
+exports.createNewSubmission = async (req, res) => {
+  try {
+    const { examId } = req.body;
+    const studentId = req.user._id; // Lấy từ middleware verifyToken
+
+    if (!examId) {
+      return res.status(400).json({ message: "Vui lòng cung cấp examId" });
+    }
+
+    // Kiểm tra bài thi có tồn tại không
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+      return res.status(404).json({ message: "Không tìm thấy bài thi" });
+    }
+
+    if (!exam.isPublished) {
+      return res.status(403).json({ message: "Bài thi chưa được công bố" });
+    }
+
+    // Luôn tạo submission mới (không kiểm tra submission cũ)
+    const sections = exam.sections.map((section) => ({
+      sectionType: section.type,
+      part: section.part || 1,
+      answers: [],
+      sectionScore: 0,
+    }));
+
+    const submission = new Submission({
+      examId: examId,
+      studentId: studentId,
+      status: "in-progress",
+      sections: sections,
+      totalScore: 0,
+      bandScore: 0,
+    });
+
+    await submission.save();
+    res.status(201).json({
+      message: "Tạo bài làm mới thành công",
       submission: submission,
     });
   } catch (err) {

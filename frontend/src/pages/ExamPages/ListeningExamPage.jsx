@@ -119,7 +119,7 @@ const ListeningExamPage = () => {
         await examService.submitListeningAnswers(examId, submissionId, { parts: partsData });
 
         // Navigate to result page
-        navigate(`/exams/${examId}/submissions/${submissionId}/listening/result`);
+        navigate(`/student/exams/${examId}/submissions/${submissionId}/listening/result`);
       } catch (err) {
         setError(err?.message || "Không thể nộp bài");
         setSubmitting(false);

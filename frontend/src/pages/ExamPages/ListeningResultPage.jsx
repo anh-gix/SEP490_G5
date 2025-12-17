@@ -1,8 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import HeaderOne from "../../components/HomePageforStudent/HeaderOne";
-import Animation from "../../helper/Animation";
-import Preloader from "../../helper/Preloader";
+
 import { examService } from "../../services/examService";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -277,9 +275,7 @@ const ListeningResultPage = () => {
   if (loading) {
     return (
       <>
-        <Preloader />
-        <Animation />
-        <HeaderOne />
+   
         <div className='text-center py-80'>
           <div className='spinner-border text-main-600' role='status'>
             <span className='visually-hidden'>Loading...</span>
@@ -291,9 +287,7 @@ const ListeningResultPage = () => {
 
   return (
     <>
-      <Preloader />
-      <Animation />
-      <HeaderOne />
+  
      
 
       <section className='py-120'>
@@ -758,14 +752,14 @@ const ListeningResultPage = () => {
               {/* Actions */}
               <div className='text-center'>
                 <Link
-                  to={`/exams/${examId}/2`}
+                  to={`/student/exams/${examId}`}
                   className='btn btn-main px-40 py-16 rounded-pill me-16'
                 >
                   <i className='ph ph-arrow-left me-8' />
                   Quay lại bài thi
                 </Link>
                 <Link
-                  to='/exams2'
+                  to={'/student/practice-exams'}
                   className='btn btn-outline-main px-40 py-16 rounded-pill'
                 >
                   <i className='ph ph-list me-8' />

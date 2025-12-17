@@ -63,7 +63,7 @@ const WritingExamPage = () => {
         await examService.submitWritingAnswers(examId, submissionId, { parts: partsData });
 
         // Navigate to result page
-        navigate(`/exams/${examId}/submissions/${submissionId}/writing/result`);
+        navigate(`/student/exams/${examId}/submissions/${submissionId}/writing/result`);
       } catch (err) {
         setError(err?.message || "Không thể nộp bài");
         setSubmitting(false);

@@ -223,6 +223,16 @@ export const examService = {
     }
   },
 
+  // Tạo submission mới (làm lại)
+  createNewSubmission: async (examId) => {
+    try {
+      const response = await api.post('/create-new-submission', { examId });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể tạo bài làm mới' };
+    }
+  },
+
   // Lấy thông tin section Reading
   getReadingSection: async (examId, submissionId) => {
     try {
@@ -359,6 +369,16 @@ export const examService = {
         return [];
       }
       throw error.response?.data || { message: 'Không thể lấy danh sách bài làm' };
+    }
+  },
+
+  // Lấy danh sách submissions của một exam cụ thể
+  getExamSubmissions: async (examId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy lịch sử bài làm' };
     }
   },
 };

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import bannerImage from "../../assets/Homepage_img/cate1.png";
 
 const BannerTwo = () => {
   return (
@@ -56,7 +57,7 @@ const BannerTwo = () => {
                 Chào mừng đến với EduAll, nơi việc học tập không có giới hạn. Dù bạn là học sinh, 
                 chuyên gia hay người học suốt đời...
               </p>
-              <div className='buttons-wrapper flex-align flex-wrap gap-24 mt-40'>
+              <div className='buttons-wrapper flex-align flex-wrap gap-24 mt-40 pb-10'>
                 <Link
                   to='/course'
                   className='btn btn-main rounded-pill flex-align gap-8'
@@ -79,8 +80,8 @@ const BannerTwo = () => {
           <div className='col-xl-6'>
             <div className='banner-thumb position-relative'>
               <img
-                src='assets/images/thumbs/banner-img-2.png'
-                alt=''
+                src={bannerImage}
+                style={{ width: '300%', height: 'auto'}}
                 className='banner-thumb__img rounded-12'
                 data-aos='fade-up'
               />
@@ -112,3 +113,4 @@ const BannerTwo = () => {
 };
 
 export default BannerTwo;
+

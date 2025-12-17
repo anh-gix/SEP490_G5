@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import aboutImage from "../../assets/Homepage_img/ab2.png";
 
 const AboutTwo = () => {
   return (
@@ -9,9 +10,9 @@ const AboutTwo = () => {
             <div className='col-xl-6 pe-xl-5'>
               <div className='about-two__thumb position-relative'>
                 <img
-                  src='assets/images/thumbs/about-two-img.png'
+                  src={aboutImage}
                   className='rounded-16 cover-img  wow bounceIn'
-                  alt=''
+                  style={{ width: '180%', height: 'auto', maxWidth: '650px' }}
                   data-tilt=''
                   data-tilt-max={10}
                   data-tilt-speed={500}

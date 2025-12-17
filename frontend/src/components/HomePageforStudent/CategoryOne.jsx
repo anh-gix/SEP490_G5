@@ -47,14 +47,14 @@ const CategoryOne = () => {
             <span className='text-main-600 text-2xl d-flex'>
               <i className='ph-bold ph-book' />
             </span>
-            <h5 className='text-main-600 mb-0'>Danh Mục</h5>
+            <h5 className='text-main-600 mb-0'>Danh Mục Khóa Học</h5>
           </div>
           <h2 className='mb-24 wow bounceIn'>
-            Nâng Tầm Trải Nghiệm Học Tập Của Bạn
+            Khám Phá Các Khóa Học Tiếng Anh
           </h2>
           <p className=' wow bounceInUp'>
-            Nền tảng của chúng tôi được xây dựng trên các nguyên tắc đổi mới, chất lượng và
-            toàn diện, nhằm cung cấp trải nghiệm học tập liền mạch
+            Nâng cao kỹ năng tiếng Anh của bạn với các khóa học đa dạng từ cơ bản đến nâng cao,
+            được thiết kế phù hợp với mọi trình độ và mục tiêu học tập
           </p>
         </div>
         <Slider ref={sliderRef} {...settings} className='category-item-slider'>
@@ -71,16 +71,16 @@ const CategoryOne = () => {
               />
             </span>
             <h4 className='display-four mb-16 text-neutral-700'>
-              Nghệ Thuật &amp; Thiết Kế
+              Ngữ Pháp
             </h4>
             <p className='text-neutral-500 text-lg text-line-2'>
-              Các khóa học về dinh dưỡng, thể dục, yoga...
+              Nắm vững các cấu trúc ngữ pháp tiếng Anh từ cơ bản đến nâng cao
             </p>
             <Link
               to='/courses'
               className='py-12 px-24 bg-white rounded-8 border border-neutral-30 mt-28 fw-semibold text-main-600 hover-bg-main-600 hover-text-white hover-border-main-600'
             >
-              14 Khóa học
+              24 Khóa học
             </Link>
           </div>
           <div
@@ -95,15 +95,15 @@ const CategoryOne = () => {
                 alt=''
               />
             </span>
-            <h4 className='display-four mb-16 text-neutral-700'>Thiết Kế Nghệ Thuật</h4>
+            <h4 className='display-four mb-16 text-neutral-700'>Từ Vựng</h4>
             <p className='text-neutral-500 text-lg text-line-2'>
-              Các khóa học về dinh dưỡng, thể dục, yoga...
+              Mở rộng vốn từ vựng tiếng Anh theo chủ đề và ngữ cảnh thực tế
             </p>
             <Link
               to='/courses'
               className='py-12 px-24 bg-white rounded-8 border border-neutral-30 mt-28 fw-semibold text-main-two-600 hover-bg-main-two-600 hover-text-white hover-border-main-two-600'
             >
-              15 Khóa học
+              32 Khóa học
             </Link>
           </div>
           <div
@@ -119,16 +119,16 @@ const CategoryOne = () => {
               />
             </span>
             <h4 className='display-four mb-16 text-neutral-700'>
-              Khoa Học Dữ Liệu
+              Kỹ Năng Nghe
             </h4>
             <p className='text-neutral-500 text-lg text-line-2'>
-              Các khóa học về dinh dưỡng, thể dục, yoga...
+              Rèn luyện khả năng nghe hiểu tiếng Anh qua các tình huống thực tế
             </p>
             <Link
               to='/courses'
               className='py-12 px-24 bg-white rounded-8 border border-neutral-30 mt-28 fw-semibold text-main-three-600 hover-bg-main-three-600 hover-text-white hover-border-main-three-600'
             >
-              14 Khóa học
+              28 Khóa học
             </Link>
           </div>
           <div
@@ -144,16 +144,16 @@ const CategoryOne = () => {
               />
             </span>
             <h4 className='display-four mb-16 text-neutral-700'>
-              Kinh Doanh &amp; Tài Chính
+              Kỹ Năng Nói
             </h4>
             <p className='text-neutral-500 text-lg text-line-2'>
-              Các khóa học về dinh dưỡng, thể dục, yoga...
+              Tự tin giao tiếp tiếng Anh với phát âm chuẩn và lưu loát
             </p>
             <Link
               to='/courses'
               className='py-12 px-24 bg-white rounded-8 border border-neutral-30 mt-28 fw-semibold text-main-two-600 hover-bg-main-two-600 hover-text-white hover-border-main-two-600'
             >
-              21 Khóa học
+              26 Khóa học
             </Link>
           </div>
           <div
@@ -169,16 +169,16 @@ const CategoryOne = () => {
               />
             </span>
             <h4 className='display-four mb-16 text-neutral-700'>
-              Khoa Học Dữ Liệu
+              Kỹ Năng Đọc
             </h4>
             <p className='text-neutral-500 text-lg text-line-2'>
-              Các khóa học về dinh dưỡng, thể dục, yoga...
+              Nâng cao khả năng đọc hiểu và phân tích văn bản tiếng Anh
             </p>
             <Link
               to='/courses'
               className='py-12 px-24 bg-white rounded-8 border border-neutral-30 mt-28 fw-semibold text-main-three-600 hover-bg-main-three-600 hover-text-white hover-border-main-three-600'
             >
-              14 Khóa học
+              22 Khóa học
             </Link>
           </div>
           <div
@@ -193,15 +193,15 @@ const CategoryOne = () => {
                 alt=''
               />
             </span>
-            <h4 className='display-four mb-16 text-neutral-700'>Thiết Kế Nghệ Thuật</h4>
+            <h4 className='display-four mb-16 text-neutral-700'>Kỹ Năng Viết</h4>
             <p className='text-neutral-500 text-lg text-line-2'>
-              Các khóa học về dinh dưỡng, thể dục, yoga...
+              Viết tiếng Anh chuẩn xác từ email đến văn bản học thuật
             </p>
             <Link
               to='/courses'
               className='py-12 px-24 bg-white rounded-8 border border-neutral-30 mt-28 fw-semibold text-main-two-600 hover-bg-main-two-600 hover-text-white hover-border-main-two-600'
             >
-              15 Khóa học
+              19 Khóa học
             </Link>
           </div>
         </Slider>
@@ -229,3 +229,4 @@ const CategoryOne = () => {
 };
 
 export default CategoryOne;
+

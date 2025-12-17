@@ -23,7 +23,7 @@ const FooterTwo = () => {
             >
               <div className='footer-item'>
                 <h4 className='footer-item__title fw-medium text-white mb-32'>
-                  Quick Link
+                  Liên Kết Nhanh
                 </h4>
                 <ul className='footer-menu'>
                   <li className='mb-16'>
@@ -31,7 +31,7 @@ const FooterTwo = () => {
                       to='/about'
                       className='text-white hover-text-main-600 hover-text-decoration-underline'
                     >
-                      About us
+                      Về Chúng Tôi
                     </Link>
                   </li>
                   <li className='mb-16'>
@@ -39,7 +39,7 @@ const FooterTwo = () => {
                       to='/courses'
                       className='text-white hover-text-main-600 hover-text-decoration-underline'
                     >
-                      Courses
+                      Khóa Học
                     </Link>
                   </li>
                   <li className='mb-16'>
@@ -47,7 +47,7 @@ const FooterTwo = () => {
                       to='/instructor'
                       className='text-white hover-text-main-600 hover-text-decoration-underline'
                     >
-                      Instructor
+                      Giảng Viên
                     </Link>
                   </li>
                   <li className='mb-16'>
@@ -55,7 +55,7 @@ const FooterTwo = () => {
                       to='/faq'
                       className='text-white hover-text-main-600 hover-text-decoration-underline'
                     >
-                      FAQs
+                      Câu Hỏi Thường Gặp
                     </Link>
                   </li>
                   <li className='mb-0'>
@@ -63,7 +63,7 @@ const FooterTwo = () => {
                       to='/blog'
                       className='text-white hover-text-main-600 hover-text-decoration-underline'
                     >
-                      Blogs
+                      Tin Tức
                     </Link>
                   </li>
                 </ul>
@@ -76,47 +76,39 @@ const FooterTwo = () => {
             >
               <div className='footer-item'>
                 <h4 className='footer-item__title fw-medium text-white mb-32'>
-                  Category
+                  Danh Mục
                 </h4>
                 <ul className='footer-menu'>
                   <li className='mb-16'>
                     <Link
-                      to='/courses'
+                      to='/course-cam'
                       className='text-white hover-text-main-600 hover-text-decoration-underline'
                     >
-                      UI/UX Design
+                      Tiếng Anh Trẻ Em
                     </Link>
                   </li>
                   <li className='mb-16'>
                     <Link
-                      to='/courses'
+                      to='/course-ielts'
                       className='text-white hover-text-main-600 hover-text-decoration-underline'
                     >
-                      Web Development
+                      IELTS
                     </Link>
                   </li>
                   <li className='mb-16'>
                     <Link
-                      to='/courses'
+                      to='/course-toeic'
                       className='text-white hover-text-main-600 hover-text-decoration-underline'
                     >
-                      Python Development
+                      TOEIC
                     </Link>
                   </li>
                   <li className='mb-16'>
                     <Link
-                      to='/courses'
+                      to='/exams'
                       className='text-white hover-text-main-600 hover-text-decoration-underline'
                     >
-                      Digital Marketing
-                    </Link>
-                  </li>
-                  <li className='mb-16'>
-                    <Link
-                      to='/courses'
-                      className='text-white hover-text-main-600 hover-text-decoration-underline'
-                    >
-                      Graphic Design
+                      Đề Thi 
                     </Link>
                   </li>
                 </ul>
@@ -129,7 +121,7 @@ const FooterTwo = () => {
             >
               <div className='footer-item'>
                 <h4 className='footer-item__title fw-medium text-white mb-32'>
-                  Contact Us
+                  Liên Hệ Chúng Tôi
                 </h4>
                 <div className='flex-align gap-20 mb-24'>
                   <span className='icon d-flex text-32 text-main-600'>
@@ -191,11 +183,11 @@ const FooterTwo = () => {
             >
               <div className='footer-item'>
                 <h4 className='footer-item__title fw-medium text-white mb-32'>
-                  Subscribe Here
+                  Đăng Ký Nhận Tin
                 </h4>
                 <p className='text-white'>
-                  Enter your email address to register to our newsletter
-                  subscription
+                  Nhập địa chỉ email của bạn để đăng ký nhận bản tin
+                  của chúng tôi
                 </p>
                 <form action='#' className='mt-24 position-relative'>
                   <input
@@ -231,10 +223,10 @@ const FooterTwo = () => {
                 data-aos='zoom-in'
               >
                 {" "}
-                Copyright © 2025 <span className='fw-semibold'>
+                Bản Quyền © 2025 <span className='fw-semibold'>
                   EduAll{" "}
                 </span>{" "}
-                All Rights Reserved.
+                Đã Đăng Ký Bản Quyền.
               </p>
               <ul
                 className='social-list flex-align gap-24'
@@ -282,3 +274,4 @@ const FooterTwo = () => {
 };
 
 export default FooterTwo;
+

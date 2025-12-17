@@ -24,8 +24,10 @@ const ViewRequestModal = ({ show, onClose, request, onRequestUpdated }) => {
     try {
       setLoading(true);
 
-      // Call API to start processing
-      await workRequestService.startProcessing(request._id);
+      // Call API to start processing - sẽ tự động tạo program draft
+      const response = await workRequestService.startProcessing(request._id);
+
+      console.log('Start processing response:', response);
 
       // Close modal
       onClose();
@@ -35,15 +37,14 @@ const ViewRequestModal = ({ show, onClose, request, onRequestUpdated }) => {
         onRequestUpdated();
       }
 
-      // Navigate to program create page
-      navigate('/teacher/programs/create', {
-        state: {
-          fromRequest: true,
-          requestId: request._id,
-          requestNote: request.requestNote,
-          requestedBy: request.requestedBy
-        }
-      });
+      // Navigate đến trang edit program đã được tạo
+      if (response.programId) {
+        navigate(`/teacher/programs/${response.programId}/edit`);
+      } else {
+        // Fallback (không nên xảy ra)
+        console.warn('No programId returned, navigating to create page');
+        navigate('/teacher/programs/create');
+      }
     } catch (error) {
       console.error('Error starting processing:', error);
       alert(error.message || 'Không thể bắt đầu xử lý yêu cầu!');
@@ -267,15 +268,15 @@ const ViewRequestModal = ({ show, onClose, request, onRequestUpdated }) => {
             icon="ph ph-pencil"
             onClick={() => {
               onClose();
-              navigate('/teacher/programs/create', {
-                state: {
-                  fromRequest: true,
-                  requestId: request._id,
-                  requestNote: request.requestNote,
-                  requestedBy: request.requestedBy
-                }
-              });
+              // Navigate đến program đã được tạo
+              if (request.entityId) {
+                const programId = typeof request.entityId === 'object' ? request.entityId._id : request.entityId;
+                navigate(`/teacher/programs/${programId}/edit`);
+              } else {
+                alert('Chưa có program được tạo cho request này.');
+              }
             }}
+            disabled={!request.entityId}
           >
             Tiếp tục tạo program
           </Button>

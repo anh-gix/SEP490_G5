@@ -5,6 +5,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Table from '../compo/Table';
+import Button from '../compo/Button';
 import SearchBox from '../compo/SearchBox';
 import FilterBar from '../compo/FilterBar';
 import StatusBadge from '../compo/StatusBadge';
@@ -132,23 +133,39 @@ const ProgramList = () => {
       field: 'program_name',
       render: (row) => (
         <div>
-          <div className="fw-semibold text-neutral-900 mb-4">{row.program_name}</div>
-          <div className="text-sm text-neutral-600">Mã: {row.code}</div>
+          <div className="fw-semibold text-neutral-900 mb-1" style={{ fontSize: '0.875rem' }}>{row.program_name}</div>
+          <div className="text-neutral-600" style={{ fontSize: '0.75rem' }}>Mã: {row.code}</div>
         </div>
       ),
+    },
+    {
+      header: 'Loại chương trình',
+      field: 'type',
+      render: (row) => {
+        const typeLabels = {
+          'ielts': 'IELTS',
+          'toeic': 'TOEIC',
+          'cam': 'Cambridge'
+        };
+        return (
+          <span className="badge bg-info-600 text-white" style={{ fontSize: '0.75rem' }}>
+            {typeLabels[row.type] || row.type?.toUpperCase() || 'N/A'}
+          </span>
+        );
+      },
     },
     {
       header: 'PLOs',
       field: 'plos',
       render: (row) => (
-        <span className="text-neutral-700">{row.plos?.length || 0} PLOs</span>
+        <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>{row.plos?.length || 0} PLOs</span>
       ),
     },
     {
       header: 'Khóa học',
       field: 'courseCount',
       render: (row) => (
-        <span className="text-neutral-700">{row.courseCount} khóa học</span>
+        <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>{row.courseCount} khóa học</span>
       ),
     },
     {
@@ -160,14 +177,14 @@ const ProgramList = () => {
       header: 'Người tạo',
       field: 'createdBy',
       render: (row) => (
-        <span className="text-neutral-700">{row.createdBy?.username || 'N/A'}</span>
+        <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>{row.createdBy?.username || 'N/A'}</span>
       ),
     },
     {
       header: 'Cập nhật',
       field: 'updatedAt',
       render: (row) => (
-        <span className="text-neutral-700">{formatDate(row.updatedAt)}</span>
+        <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>{formatDate(row.updatedAt)}</span>
       ),
     },
     {
@@ -175,16 +192,18 @@ const ProgramList = () => {
       field: 'actions',
       render: (row) => (
         <div className="d-flex gap-2 justify-content-center">
-          <button
-            className="btn btn-sm btn-outline-primary"
+          <Button
+            variant="outline"
+            size="sm"
+            icon="ph ph-eye"
             onClick={(e) => {
               e.stopPropagation();
               navigate(`/center-head/programs/${row._id}`);
             }}
-            title="Xem chi tiết"
           >
-            <i className="ph ph-eye"></i>
-          </button>
+            <span className="d-none d-md-inline">Xem</span>
+            <span className="d-inline d-md-none">👁</span>
+          </Button>
         </div>
       ),
     },

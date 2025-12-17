@@ -342,6 +342,32 @@ const deleteProgram = async (req, res) => {
       });
     }
 
+    // Check if program is linked to any active work requests
+    const activeWorkRequest = await WorkRequest.findOne({
+      entityType: 'Program',
+      entityId: id,
+      status: { $in: ['pending', 'in_progress', 'pending_approval'] }
+    }).populate('requestedBy', 'username email');
+
+    if (activeWorkRequest) {
+      const statusLabels = {
+        'pending': 'Chờ xử lý',
+        'in_progress': 'Đang xử lý',
+        'pending_approval': 'Chờ phê duyệt'
+      };
+
+      return res.status(400).json({
+        success: false,
+        message: `Không thể xóa chương trình này vì đang có work request liên quan!\n\n` +
+                 `• Loại request: ${activeWorkRequest.requestType === 'create_program' ? 'Tạo chương trình' : activeWorkRequest.requestType}\n` +
+                 `• Trạng thái: ${statusLabels[activeWorkRequest.status] || activeWorkRequest.status}\n` +
+                 `• Người yêu cầu: ${activeWorkRequest.requestedBy?.username || 'N/A'}\n\n` +
+                 `Vui lòng hoàn thành hoặc hủy work request trước khi xóa chương trình.`,
+        workRequestId: activeWorkRequest._id,
+        workRequestStatus: activeWorkRequest.status
+      });
+    }
+
     console.log(`Starting CASCADE deletion for program: ${program.program_name} (${id})`);
 
     // Step 1: Find all courses in this program

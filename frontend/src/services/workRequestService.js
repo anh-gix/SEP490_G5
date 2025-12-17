@@ -298,6 +298,25 @@ export const workRequestService = {
     }
   },
 
+  /**
+   * Recreate entity for work request (when entity was deleted)
+   * @param {string} id - Request ID
+   * @param {object} data - { userId: string, programCode: string, programName: string, programType: string }
+   */
+  recreateEntity: async (id, data = {}) => {
+    try {
+      if (!data.userId) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        data.userId = user._id;
+      }
+
+      const response = await api.post(`/work-requests/${id}/recreate-entity`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể tạo lại entity' };
+    }
+  },
+
   // =========================
   // HELPERS - BACKWARD COMPATIBILITY
   // =========================

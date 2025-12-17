@@ -222,21 +222,22 @@ const TeacherProgramList = () => {
 
   const handleStartProcessing = async (request) => {
     try {
-      // Call API to start processing
-      await workRequestService.startProcessing(request._id);
+      // Call API to start processing - sẽ tự động tạo program draft
+      const response = await workRequestService.startProcessing(request._id);
+
+      console.log('Start processing response:', response);
 
       // Refresh work requests
       await fetchWorkRequests();
 
-      // Navigate to program create page with request data
-      navigate('/teacher/programs/create', {
-        state: {
-          fromRequest: true,
-          requestId: request._id,
-          requestNote: request.requestNote,
-          requestedBy: request.requestedBy
-        }
-      });
+      // Nếu API trả về programId, navigate đến trang edit program đó
+      if (response.programId) {
+        navigate(`/teacher/programs/${response.programId}/edit`);
+      } else {
+        // Fallback: navigate to create page (không nên xảy ra)
+        console.warn('No programId returned, navigating to create page');
+        navigate('/teacher/programs/create');
+      }
     } catch (error) {
       console.error('Error starting processing:', error);
       alert(error.message || 'Không thể bắt đầu xử lý yêu cầu!');
@@ -314,23 +315,39 @@ const TeacherProgramList = () => {
       field: 'program_name',
       render: (row) => (
         <div>
-          <div className="fw-semibold text-neutral-900 mb-4">{row.program_name}</div>
-          <div className="text-sm text-neutral-600">Mã: {row.code}</div>
+          <div className="fw-semibold text-neutral-900 mb-1" style={{ fontSize: '0.875rem' }}>{row.program_name}</div>
+          <div className="text-neutral-600" style={{ fontSize: '0.75rem' }}>Mã: {row.code}</div>
         </div>
       ),
+    },
+    {
+      header: 'Loại chương trình',
+      field: 'type',
+      render: (row) => {
+        const typeLabels = {
+          'ielts': 'IELTS',
+          'toeic': 'TOEIC',
+          'cam': 'Cambridge'
+        };
+        return (
+          <span className="badge bg-info-600 text-white" style={{ fontSize: '0.75rem' }}>
+            {typeLabels[row.type] || row.type?.toUpperCase() || 'N/A'}
+          </span>
+        );
+      },
     },
     {
       header: 'PLOs',
       field: 'plos',
       render: (row) => (
-        <span className="text-neutral-700">{row.plos?.length || 0} PLOs</span>
+        <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>{row.plos?.length || 0} PLOs</span>
       ),
     },
     {
       header: 'Khóa học',
       field: 'courseCount',
       render: (row) => (
-        <span className="text-neutral-700">{row.courseCount} khóa học</span>
+        <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>{row.courseCount} khóa học</span>
       ),
     },
     {
@@ -342,7 +359,7 @@ const TeacherProgramList = () => {
       header: 'Cập nhật',
       field: 'updatedAt',
       render: (row) => (
-        <span className="text-neutral-700">{formatDate(row.updatedAt)}</span>
+        <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>{formatDate(row.updatedAt)}</span>
       ),
     },
     {
@@ -350,38 +367,44 @@ const TeacherProgramList = () => {
       field: 'actions',
       render: (row) => (
         <div className="d-flex gap-2 justify-content-center">
-          <button
-            className="btn btn-sm btn-outline-primary"
+          <Button
+            variant="outline"
+            size="sm"
+            icon="ph ph-eye"
             onClick={(e) => {
               e.stopPropagation();
               navigate(`/teacher/programs/${row._id}`);
             }}
-            title="Xem chi tiết"
           >
-            <i className="ph ph-eye"></i>
-          </button>
+            <span className="d-none d-md-inline">Xem</span>
+            <span className="d-inline d-md-none">👁</span>
+          </Button>
           {activeTab === 'my-programs' && (
             <>
-              <button
-                className="btn btn-sm btn-outline-secondary"
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="ph ph-pencil"
                 onClick={(e) => {
                   e.stopPropagation();
                   navigate(`/teacher/programs/${row._id}/edit`);
                 }}
-                title="Chỉnh sửa"
               >
-                <i className="ph ph-pencil"></i>
-              </button>
-              <button
-                className="btn btn-sm btn-outline-danger"
+                <span className="d-none d-md-inline">Sửa</span>
+                <span className="d-inline d-md-none">✏️</span>
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                icon="ph ph-trash"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleDeleteProgram(row._id, row.program_name);
                 }}
-                title="Xóa chương trình"
               >
-                <i className="ph ph-trash"></i>
-              </button>
+                <span className="d-none d-md-inline">Xóa</span>
+                <span className="d-inline d-md-none">🗑️</span>
+              </Button>
             </>
           )}
         </div>
@@ -456,18 +479,54 @@ const TeacherProgramList = () => {
           {row.status === 'in_progress' && (
             <button
               className="btn btn-sm btn-info d-flex align-items-center gap-1"
-              onClick={(e) => {
+              onClick={async (e) => {
                 e.stopPropagation();
-                navigate('/teacher/programs/create', {
-                  state: {
-                    fromRequest: true,
-                    requestId: row._id,
-                    requestNote: row.requestNote,
-                    requestedBy: row.requestedBy
+                // Navigate đến program đã được tạo
+                if (row.entityId) {
+                  const programId = typeof row.entityId === 'object' ? row.entityId._id : row.entityId;
+
+                  // Kiểm tra program có tồn tại không trước khi navigate
+                  try {
+                    await programService.getProgramById(programId);
+                    navigate(`/teacher/programs/${programId}/edit`);
+                  } catch (error) {
+                    // Program đã bị xóa - hỏi user có muốn tạo lại không
+                    const recreate = window.confirm(
+                      '⚠️ Program liên kết với request này đã bị xóa.\n\n' +
+                      'Bạn có muốn tạo lại program để tiếp tục không?\n\n' +
+                      'Ấn OK để tạo lại program mới, hoặc Cancel để hủy.'
+                    );
+
+                    if (recreate) {
+                      // Gọi API recreateEntity để tạo program mới cho request in_progress
+                      try {
+                        const response = await workRequestService.recreateEntity(row._id, {
+                          programName: `Program for ${row.requestType}`,
+                          programType: 'ielts'
+                        });
+
+                        console.log('Recreated program:', response);
+
+                        // Refresh work requests
+                        await fetchWorkRequests();
+
+                        // Navigate to new program
+                        if (response.entityId) {
+                          alert('✅ Đã tạo lại program thành công!');
+                          navigate(`/teacher/programs/${response.entityId}/edit`);
+                        }
+                      } catch (recreateError) {
+                        console.error('Error recreating program:', recreateError);
+                        alert(recreateError.message || 'Không thể tạo lại program. Vui lòng thử lại sau.');
+                      }
+                    }
                   }
-                });
+                } else {
+                  alert('Chưa có program được tạo cho request này. Vui lòng ấn "Bắt đầu" trước.');
+                }
               }}
               title="Tiếp tục tạo"
+              disabled={!row.entityId}
             >
               <i className="ph ph-pencil"></i>
               <span className="d-none d-md-inline">Tiếp tục</span>

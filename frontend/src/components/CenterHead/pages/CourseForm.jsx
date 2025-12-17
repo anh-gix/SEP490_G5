@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import Swal from 'sweetalert2';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Breadcrumb from "../compo/Breadcrumb";
 import Card from "../compo/Card";
 import Button from "../compo/Button";
@@ -21,7 +24,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
   // Only allow edit mode - redirect if no courseId
   useEffect(() => {
     if (!courseId) {
-      alert('Vui lòng sử dụng Wizard để tạo học phần mới!');
+      toast.error('Vui lòng sử dụng Wizard để tạo học phần mới!', { position: 'top-right' });
       navigate(`${basePath}/programs/${programId || ''}`);
     }
   }, [courseId, programId, navigate, basePath]);
@@ -117,7 +120,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
         setProgram(response.data);
       } catch (error) {
         console.error("Error loading program:", error);
-        alert("Không thể tải thông tin Program!");
+        toast.error("Không thể tải thông tin Program!", { position: "top-right" });
         navigate(`${basePath}/programs`);
       } finally {
         setLoadingProgram(false);
@@ -138,7 +141,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
 
           // Redirect draft courses to wizard
           if (courseData.status === 'draft') {
-            alert('Học phần chưa hoàn thành! Vui lòng tiếp tục tạo theo wizard.');
+            toast.warning('Học phần chưa hoàn thành! Vui lòng tiếp tục tạo theo wizard.', { position: 'top-right' });
             navigate(`${basePath}/programs/${programId}/courses/${courseId}/edit`);
             return;
           }
@@ -177,7 +180,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
           });
         } catch (error) {
           console.error("Error loading course:", error);
-          alert("Không thể tải thông tin học phần!");
+          toast.error("Không thể tải thông tin học phần!", { position: "top-right" });
           navigate(`${basePath}/programs/${programId}/edit`);
         } finally {
           setLoading(false);
@@ -241,19 +244,19 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
 
   const handleSaveMaterial = () => {
     if (!materialForm.description) {
-      alert("Vui lòng nhập tên/mô tả tài liệu!");
+      toast.warning("Vui lòng nhập tên/mô tả tài liệu!", { position: "top-right" });
       return;
     }
 
     // Kiểm tra nếu chọn link thì phải có URL
     if (materialForm.uploadType === 'link' && !materialForm.url) {
-      alert("Vui lòng nhập URL tài liệu!");
+      toast.warning("Vui lòng nhập URL tài liệu!", { position: "top-right" });
       return;
     }
 
     // Kiểm tra nếu chọn file thì phải có file (khi thêm mới)
     if (materialForm.uploadType === 'file' && editingMaterialIndex === null && !materialForm.file) {
-      alert("Vui lòng chọn file để upload!");
+      toast.warning("Vui lòng chọn file để upload!", { position: "top-right" });
       return;
     }
 
@@ -301,12 +304,24 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
   };
 
   const handleDeleteMaterial = (index) => {
-    if (window.confirm("Bạn có chắc muốn xóa tài liệu này?")) {
-      setFormData((prev) => ({
-        ...prev,
-        materials: prev.materials.filter((_, i) => i !== index),
-      }));
-    }
+    Swal.fire({
+      title: 'Xác nhận xóa',
+      text: "Bạn có chắc muốn xóa tài liệu này?",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+    }).then((result) => {
+      if (result.isConfirmed) {
+        setFormData((prev) => ({
+          ...prev,
+          materials: prev.materials.filter((_, i) => i !== index),
+        }));
+        toast.success('Đã xóa tài liệu!', { position: "top-right" });
+      }
+    });
   };
 
   // ==================== CLO MANAGEMENT ====================
@@ -346,12 +361,12 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
 
   const handleSaveCLO = () => {
     if (!cloForm.code || !cloForm.name || !cloForm.detail) {
-      alert("Vui lòng điền đầy đủ thông tin CLO!");
+      toast.warning("Vui lòng điền đầy đủ thông tin CLO!", { position: "top-right" });
       return;
     }
 
     if (cloForm.mappedPLOs.length === 0) {
-      alert("CLO phải mapping với ít nhất 1 PLO!");
+      toast.warning("CLO phải mapping với ít nhất 1 PLO!", { position: "top-right" });
       return;
     }
 
@@ -360,7 +375,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
       clo.code === cloForm.code && index !== editingCLOIndex
     );
     if (isDuplicate) {
-      alert(`Mã CLO "${cloForm.code}" đã tồn tại trong giáo trình này!`);
+      toast.error(`Mã CLO "${cloForm.code}" đã tồn tại trong giáo trình này!`, { position: "top-right" });
       return;
     }
 
@@ -381,7 +396,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
 
     setFormData((prev) => ({ ...prev, clos }));
     setShowCLOModal(false);
-    alert(editingCLOIndex !== null ? 'Cập nhật CLO thành công!' : 'Thêm CLO mới thành công! Nhấn "Lưu" để lưu giáo trình.');
+    toast.success(editingCLOIndex !== null ? 'Cập nhật CLO thành công!' : 'Thêm CLO mới thành công! Nhấn "Lưu" để lưu giáo trình.', { position: "top-right" });
   };
 
   const handleDeleteCLO = (index) => {
@@ -391,24 +406,37 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
     );
 
     if (sessionsUsingCLO.length > 0) {
-      alert(
-        `Không thể xóa CLO này vì đang được sử dụng trong ${sessionsUsingCLO.length} session(s)!`
+      toast.error(
+        `Không thể xóa CLO này vì đang được sử dụng trong ${sessionsUsingCLO.length} session(s)!`,
+        { position: "top-right" }
       );
       return;
     }
 
-    if (window.confirm("Bạn có chắc muốn xóa CLO này?")) {
-      setFormData((prev) => ({
-        ...prev,
-        clos: prev.clos.filter((_, i) => i !== index),
-      }));
-    }
+    Swal.fire({
+      title: 'Xác nhận xóa',
+      text: "Bạn có chắc muốn xóa CLO này?",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+    }).then((result) => {
+      if (result.isConfirmed) {
+        setFormData((prev) => ({
+          ...prev,
+          clos: prev.clos.filter((_, i) => i !== index),
+        }));
+        toast.success('Đã xóa CLO!', { position: "top-right" });
+      }
+    });
   };
 
   // ==================== SESSION MANAGEMENT ====================
   const handleAddSession = () => {
     if (formData.clos.length === 0) {
-      alert("Vui lòng tạo ít nhất 1 CLO trước khi tạo Session!");
+      toast.warning("Vui lòng tạo ít nhất 1 CLO trước khi tạo Session!", { position: "top-right" });
       setActiveTab("clo");
       return;
     }
@@ -416,7 +444,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
     // Kiểm tra không vượt quá số lượng buổi học
     const numberOfSessions = parseInt(formData.numberOfSessions) || 0;
     if (numberOfSessions > 0 && formData.sessions.length >= numberOfSessions) {
-      alert(`Không thể thêm session! Đã đạt giới hạn ${numberOfSessions} buổi học.`);
+      toast.warning(`Không thể thêm session! Đã đạt giới hạn ${numberOfSessions} buổi học.`, { position: "top-right" });
       return;
     }
 
@@ -462,25 +490,25 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
 
   const handleSaveSession = () => {
     if (!sessionForm.title || !sessionForm.content) {
-      alert("Vui lòng điền đầy đủ thông tin Session!");
+      toast.warning("Vui lòng điền đầy đủ thông tin Session!", { position: "top-right" });
       return;
     }
 
     if (sessionForm.clos.length === 0) {
-      alert("Session phải gán ít nhất 1 CLO!");
+      toast.warning("Session phải gán ít nhất 1 CLO!", { position: "top-right" });
       return;
     }
 
     // Kiểm tra số lượng buổi học khi thêm mới
     const numberOfSessions = parseInt(formData.numberOfSessions) || 0;
     if (editingSessionIndex === null && numberOfSessions > 0 && formData.sessions.length >= numberOfSessions) {
-      alert(`Không thể thêm session! Đã đạt giới hạn ${numberOfSessions} buổi học.`);
+      toast.warning(`Không thể thêm session! Đã đạt giới hạn ${numberOfSessions} buổi học.`, { position: "top-right" });
       return;
     }
 
     // Kiểm tra order không được vượt quá numberOfSessions
     if (numberOfSessions > 0 && sessionForm.order > numberOfSessions) {
-      alert(`Order không được vượt quá số lượng buổi học (${numberOfSessions})!`);
+      toast.warning(`Order không được vượt quá số lượng buổi học (${numberOfSessions})!`, { position: "top-right" });
       return;
     }
 
@@ -496,35 +524,56 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
   };
 
   const handleDeleteSession = (index) => {
-    if (window.confirm("Bạn có chắc muốn xóa Session này?")) {
-      const updatedSessions = formData.sessions
-        .filter((_, i) => i !== index)
-        .map((session, idx) => ({
-          ...session,
-          order: idx + 1  // Reorder lại từ 1, 2, 3...
-        }));
+    Swal.fire({
+      title: "Xác nhận xóa",
+      text: "Bạn có chắc muốn xóa Session này?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Xóa",
+      cancelButtonText: "Hủy"
+    }).then((result) => {
+      if (result.isConfirmed) {
+        const updatedSessions = formData.sessions
+          .filter((_, i) => i !== index)
+          .map((session, idx) => ({
+            ...session,
+            order: idx + 1  // Reorder lại từ 1, 2, 3...
+          }));
 
-      setFormData((prev) => ({
-        ...prev,
-        sessions: updatedSessions,
-      }));
-    }
+        setFormData((prev) => ({
+          ...prev,
+          sessions: updatedSessions,
+        }));
+        toast.success('Đã xóa session!', { position: "top-right" });
+      }
+    });
   };
 
   // Generate sessions tự động
-  const handleGenerateSessions = () => {
+  const handleGenerateSessions = async () => {
     const numberOfSessions = parseInt(formData.numberOfSessions);
 
     if (!numberOfSessions || numberOfSessions <= 0) {
-      alert("Vui lòng nhập số lượng buổi dạy!");
+      toast.warning("Vui lòng nhập số lượng buổi dạy!", { position: "top-right" });
       return;
     }
 
     // Confirm nếu đã có sessions
     if (formData.sessions.length > 0) {
-      if (!window.confirm(
-        `Bạn đã có ${formData.sessions.length} buổi học. Tạo lại sẽ xóa tất cả sessions hiện tại. Bạn có chắc chắn?`
-      )) {
+      const result = await Swal.fire({
+        title: 'Xác nhận tạo lại',
+        text: `Bạn đã có ${formData.sessions.length} buổi học. Tạo lại sẽ xóa tất cả sessions hiện tại. Bạn có chắc chắn?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Tạo lại',
+        cancelButtonText: 'Hủy',
+      });
+
+      if (!result.isConfirmed) {
         return;
       }
     }
@@ -551,7 +600,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
     // Chuyển sang tab sessions
     setActiveTab("sessions");
 
-    alert(`Đã tạo ${numberOfSessions} buổi học thành công! Vui lòng chỉnh sửa thông tin cho từng buổi.`);
+    toast.success(`Đã tạo ${numberOfSessions} buổi học thành công! Vui lòng chỉnh sửa thông tin cho từng buổi.`, { position: "top-right" });
   };
 
   const isCamOnlineCourse =
@@ -560,7 +609,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
   // ==================== CAM SESSION QUICK CREATE (FORM VIEW) ====================
   const handleQuickCreateCamSession = async () => {
     if (!courseId) {
-      alert("Không tìm thấy ID học phần. Vui lòng lưu học phần trước khi tạo CAM Session.");
+      toast.error("Không tìm thấy ID học phần. Vui lòng lưu học phần trước khi tạo CAM Session.", { position: "top-right" });
       return;
     }
 
@@ -568,7 +617,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
     const currentCamSessions = formData.camSessions || [];
 
     if (totalPlannedSessions > 0 && currentCamSessions.length >= totalPlannedSessions) {
-      alert(
+      toast.error(
         `Bạn đã tạo đủ CAM Session cho ${totalPlannedSessions} buổi học. ` +
         "Vui lòng tăng số lượng buổi học nếu muốn tạo thêm CAM Session."
       );
@@ -605,10 +654,10 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
         camSessions: [...(prev.camSessions || []), createdSession],
       }));
 
-      alert("Đã tạo CAM Session mới thành công!");
+      toast.success("Đã tạo CAM Session mới thành công!", { position: "top-right" });
     } catch (error) {
       console.error("Error creating CAM Session:", error);
-      alert(error.response?.data?.message || "Lỗi khi tạo CAM Session!");
+      toast.error(error.response?.data?.message || "Lỗi khi tạo CAM Session!");
     } finally {
       setLoading(false);
     }
@@ -616,7 +665,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
 
   const handleDeleteCamSessionRow = async (camSessionId) => {
     if (!camSessionId) return;
-    if (!window.confirm("Bạn có chắc chắn muốn xóa CAM Session này?")) return;
+    const result = await Swal.fire({ title: "Xác nhận xóa", text: "Bạn có chắc chắn muốn xóa CAM Session này?", icon: "warning", showCancelButton: true, confirmButtonColor: "#d33", cancelButtonColor: "#3085d6", confirmButtonText: "Xóa", cancelButtonText: "Hủy" }); if (!result.isConfirmed) return;
 
     try {
       setLoading(true);
@@ -640,10 +689,10 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
         camSessions: remaining,
       }));
 
-      alert("Xóa CAM Session thành công!");
+      toast.success("Xóa CAM Session thành công!", { position: "top-right" });
     } catch (error) {
       console.error("Error deleting CAM Session:", error);
-      alert(error.response?.data?.message || "Lỗi khi xóa CAM Session!");
+      toast.error(error.response?.data?.message || "Lỗi khi xóa CAM Session!");
     } finally {
       setLoading(false);
     }
@@ -654,7 +703,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
     if (e) e.preventDefault();
 
     if (!formData.courseCode || !formData.name) {
-      alert("Vui lòng điền đầy đủ thông tin bắt buộc!");
+      toast.warning("Vui lòng điền đầy đủ thông tin bắt buộc!", { position: "top-right" });
       return;
     }
 
@@ -729,19 +778,19 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
               courseData.createdBy = userId;
             } else {
               console.error('No user ID found in localStorage');
-              alert('Không tìm thấy thông tin user. Vui lòng đăng nhập lại!');
+              toast.error('Không tìm thấy thông tin user. Vui lòng đăng nhập lại!');
               setLoading(false);
               return;
             }
           } catch (e) {
             console.error('Error parsing user from localStorage:', e);
-            alert('Lỗi đọc thông tin user. Vui lòng đăng nhập lại!');
+            toast.error('Lỗi đọc thông tin user. Vui lòng đăng nhập lại!');
             setLoading(false);
             return;
           }
         } else {
           console.error('No user found in localStorage');
-          alert('Vui lòng đăng nhập trước khi tạo course!');
+          toast.error('Vui lòng đăng nhập trước khi tạo course!');
           setLoading(false);
           return;
         }
@@ -749,16 +798,16 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
 
       if (isEdit) {
         await courseService.updateCourse(courseId, courseData);
-        alert("Cập nhật học phần thành công!");
+        toast.success("Cập nhật học phần thành công!", { position: "top-right" });
       } else {
         await courseService.createCourse(courseData);
-        alert("Tạo học phần thành công!");
+        toast.success("Tạo học phần thành công!", { position: "top-right" });
       }
 
       navigate(`${basePath}/programs/${programId}/edit`);
     } catch (error) {
       console.error("Error submitting course:", error);
-      alert(error.message || "Lỗi khi lưu học phần!");
+      toast.error(error.message || "Lỗi khi lưu học phần!");
     } finally {
       setLoading(false);
     }
@@ -1921,6 +1970,9 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
           </Button>
         </div>
       </Modal>
+
+      {/* Toast Container */}
+      <ToastContainer />
     </div>
   );
 };

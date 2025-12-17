@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
 import Modal from '../compo/Modal';
 import Badge from '../compo/Badge';
 import ProgramSuccessModal from '../compo/ProgramSuccessModal';
-import { ToastContainer } from '../compo/Toast';
 import programService from '../../../services/programService';
 
 const ProgramFormNew = ({ viewMode = 'center-head' }) => {
@@ -35,7 +36,6 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
   const [bandMapping, setBandMapping] = useState({});
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [createdProgram, setCreatedProgram] = useState(null);
-  const [toasts, setToasts] = useState([]);
 
   // New PLO form
   const [newPLO, setNewPLO] = useState({
@@ -50,22 +50,6 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
     { label: 'Quản lý chương trình', path: `${basePath}/programs` },
     { label: isEdit ? 'Chỉnh sửa chương trình' : 'Tạo chương trình mới' }
   ];
-
-  // Toast helpers
-  const showToast = (message, type = 'info', duration = 3000) => {
-    const newToast = {
-      id: Date.now(),
-      message,
-      type,
-      duration,
-      position: 'top-right'
-    };
-    setToasts(prev => [...prev, newToast]);
-  };
-
-  const removeToast = (id) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-  };
 
   // Load band mapping when component mounts or type changes
   useEffect(() => {
@@ -115,7 +99,7 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
           // PLOs are now embedded in program, no need for separate state
         } catch (error) {
           console.error('Error loading program:', error);
-          alert('Không thể tải thông tin chương trình!');
+          toast.error('Không thể tải thông tin chương trình!', { position: 'top-right' });
           navigate(`${basePath}/programs`);
         } finally {
           setLoading(false);
@@ -157,7 +141,7 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
       ...prev,
       plos: prev.plos.filter(plo => plo._id !== ploId)
     }));
-    showToast('Đã xóa PLO khỏi chương trình', 'success');
+    toast.success('Đã xóa PLO khỏi chương trình', { position: 'top-right' });
   };
 
   // Create new PLO
@@ -176,14 +160,14 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
 
   const handleSaveNewPLO = () => {
     if (!newPLO.code || !newPLO.name || !newPLO.detail) {
-      showToast('Vui lòng điền đầy đủ thông tin PLO!', 'warning');
+      toast.warning('Vui lòng điền đầy đủ thông tin PLO!', { position: 'top-right' });
       return;
     }
 
     // Check for duplicate PLO code in current program
     const isDuplicate = formData.plos.some(plo => plo.code === newPLO.code);
     if (isDuplicate) {
-      showToast(`Mã PLO "${newPLO.code}" đã tồn tại trong chương trình này!`, 'error');
+      toast.error(`Mã PLO "${newPLO.code}" đã tồn tại trong chương trình này!`, { position: 'top-right' });
       return;
     }
 
@@ -199,7 +183,7 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
     }));
 
     setShowCreatePLOModal(false);
-    showToast('Thêm PLO mới thành công!', 'success');
+    toast.success('Thêm PLO mới thành công!', { position: 'top-right' });
   };
 
   // ==================== Form Submission ====================
@@ -207,7 +191,7 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
     e.preventDefault();
 
     if (!formData.code || !formData.program_name || !formData.type || !formData.level) {
-      showToast('Vui lòng điền đầy đủ thông tin bắt buộc!', 'warning');
+      toast.warning('Vui lòng điền đầy đủ thông tin bắt buộc!', { position: 'top-right' });
       return;
     }
 
@@ -219,7 +203,7 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
       const userId = user?._id || user?.id;
 
       if (!userId && !isEdit) {
-        showToast('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại!', 'error');
+        toast.error('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại!', { position: 'top-right' });
         setLoading(false);
         return;
       }
@@ -245,7 +229,7 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
 
       if (isEdit) {
         await programService.updateProgram(id, programData);
-        showToast('Cập nhật chương trình thành công!', 'success');
+        toast.success('Cập nhật chương trình thành công!', { position: 'top-right' });
         navigate(`${basePath}/programs`);
       } else {
         const response = await programService.createProgram(programData);
@@ -257,7 +241,7 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
       }
     } catch (error) {
       console.error('Error submitting program:', error);
-      showToast(error.message || 'Lỗi khi lưu chương trình!', 'error');
+      toast.error(error.message || 'Lỗi khi lưu chương trình!', { position: 'top-right' });
     } finally {
       setLoading(false);
     }
@@ -283,7 +267,7 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
   return (
     <div className="program-form-container">
       {/* Toast Notifications */}
-      <ToastContainer toasts={toasts} removeToast={removeToast} />
+      <ToastContainer />
 
       {/* Success Modal */}
       <ProgramSuccessModal

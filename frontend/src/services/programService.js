@@ -39,6 +39,14 @@ export const programService = {
   // Lấy programs của teacher hiện tại
   getMyPrograms: async (params = {}) => {
     try {
+      // Auto-add teacherId from localStorage if not provided
+      if (!params.teacherId) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user._id) {
+          params.teacherId = user._id;
+        }
+      }
+
       const response = await api.get('/my-programs', { params });
       return response.data;
     } catch (error) {

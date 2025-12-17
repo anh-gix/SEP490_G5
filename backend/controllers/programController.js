@@ -15,7 +15,11 @@ const { getBandByTypeAndLevel, getBandOptionsByType } = require('../utils/progra
  */
 const getAllPrograms = async (req, res) => {
   try {
-    const programs = await Program.find()
+    // Filter out draft, needs_revision, pending_approval programs
+    // Only show approved and active programs for reference
+    const programs = await Program.find({
+      status: { $nin: ['draft', 'needs_revision', 'pending_approval'] }
+    })
       .populate('createdBy', 'username email phone address')
       .sort({ createdAt: -1 });
 

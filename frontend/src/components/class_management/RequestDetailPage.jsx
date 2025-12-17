@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Container, Card, Button, Spinner, Alert, Modal, Form } from 'react-bootstrap';
-import ScheduleCalendar from '../../components/class_management/ScheduleCalendar';
-import ChangeClassModal from '../../components/class_management/ChangeClassModal';
+import ScheduleCalendar from './ScheduleCalendar';
 import { formatDateToYYYYMMDD, parseDateString } from '../../helper/helper';
 import classService from '../../services/classService';
 import { studentScheduleService } from '../../services/studentScheduleService';
@@ -11,20 +10,15 @@ const RequestDetailPage = ({
   senderSchedule,
   senderRole,
   loadingSchedule,
-  pendingClassChange,
   pendingMakeupClasses,
   pendingMakeupSessions,
   onBack,
   onApprove,
   onReject,
-  onChangeClass,
-  onChangeClassConfirm,
   onAddMakeupClass,
   onRemoveMakeupClass,
-  onRemoveClassChange,
   processing,
-  formatDate,
-  renderClassInfo
+  formatDate
 }) => {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -32,8 +26,6 @@ const RequestDetailPage = ({
   const [resolvedStudentScheduleIds, setResolvedStudentScheduleIds] = useState({}); // Map session index -> studentScheduleId
   const [replaceTeacherStudentScheduleId, setReplaceTeacherStudentScheduleId] = useState(null); // studentScheduleId cho đơn request_replace_teacher
   const [loadingReplaceTeacherScheduleId, setLoadingReplaceTeacherScheduleId] = useState(false); // Loading state cho request_replace_teacher
-  const [showChangeClassModal, setShowChangeClassModal] = useState(false);
-  const [selectedClassToChange, setSelectedClassToChange] = useState(null);
 
   const isStudent = senderRole === 'Student';
   const isTeacher = senderRole === 'Teacher';
@@ -149,26 +141,6 @@ const RequestDetailPage = ({
           }
         }
         
-        // Nếu vẫn không có, tìm theo ngày, giờ, và lớp
-        if (!sessionStudentScheduleId && session.date && session.startTime && pendingClassChange?.oldClassId) {
-          const sessionDate = new Date(session.date);
-          sessionDate.setHours(0, 0, 0, 0);
-          
-          const found = senderSchedule.find(sch => {
-            const schDate = new Date(sch.date);
-            schDate.setHours(0, 0, 0, 0);
-            
-            const classId = sch.class?._id?.toString() || sch.class?.toString();
-            return classId === pendingClassChange.oldClassId.toString() &&
-                   schDate.getTime() === sessionDate.getTime() &&
-                   sch.startTime === session.startTime &&
-                   sch.endTime === session.endTime;
-          });
-          
-          if (found) {
-            sessionStudentScheduleId = (found._id || found.id)?.toString();
-          }
-        }
       }
       
       // Nếu không có studentScheduleId, coi như chưa xếp
@@ -189,11 +161,11 @@ const RequestDetailPage = ({
       
       return !isAlreadyScheduled;
     }).length;
-  }, [pendingMakeupSessions, pendingMakeupClasses, resolvedStudentScheduleIds, senderSchedule, pendingClassChange]);
+  }, [pendingMakeupSessions, pendingMakeupClasses, resolvedStudentScheduleIds, senderSchedule]);
 
   // useEffect để gọi API lấy studentScheduleId khi không tìm thấy
   useEffect(() => {
-    if (!pendingClassChange || !filteredPendingMakeupSessions || filteredPendingMakeupSessions.length === 0 || !selectedRequest?.sender) {
+    if (!filteredPendingMakeupSessions || filteredPendingMakeupSessions.length === 0 || !selectedRequest?.sender) {
       return;
     }
     
@@ -267,7 +239,7 @@ const RequestDetailPage = ({
         });
       }
     });
-  }, [filteredPendingMakeupSessions, selectedRequest, pendingClassChange, senderSchedule, resolvedStudentScheduleIds, loadingStudentScheduleIds]);
+  }, [filteredPendingMakeupSessions, selectedRequest, senderSchedule, resolvedStudentScheduleIds, loadingStudentScheduleIds]);
 
   // useEffect để gọi API lấy studentScheduleId cho đơn request_replace_teacher
   useEffect(() => {
@@ -332,10 +304,6 @@ const RequestDetailPage = ({
 
   // Tính toán calendarSchedules từ senderSchedule
   const calendarSchedules = useMemo(() => {
-    // Kiểm tra xem có đổi lớp không
-    // const isClassChangeRequest = selectedRequest?.type === 'change_class' && pendingClassChange;
-    // const oldClassId = pendingClassChange?.oldClassId?.toString();
-    
     // Debug: Kiểm tra dữ liệu programType từ backend
     if (senderSchedule && senderSchedule.length > 0) {
       const firstSchedule = senderSchedule[0];
@@ -361,10 +329,6 @@ const RequestDetailPage = ({
       
       // Kiểm tra xem buổi này có phải là buổi nghỉ không (từ pendingMakeupClasses, đã bị cancelled, hoặc từ đơn)
       const scheduleId = schedule._id || schedule.id || index;
-      
-      // Kiểm tra xem buổi này có phải của lớp cũ không (khi có đổi lớp)
-      // const scheduleClassId = schedule.class?._id?.toString() || schedule.class?.toString();
-      // const isOldClassSchedule = isClassChangeRequest && oldClassId && scheduleClassId === oldClassId;
       
       // Kiểm tra xem có phải buổi nghỉ từ đơn không (cho đơn makeup_class)
       let isAbsentFromRequest = false;
@@ -481,7 +445,7 @@ const RequestDetailPage = ({
         cancellationReason: schedule.studentScheduleReason || null,
         makeupReason: isMakeupFromDB ? schedule.studentScheduleReason : null,
         // isOldClassSchedule: isOldClassSchedule, // Commented out - đổi lớp học
-        isOldClassSchedule: false, // Không dùng đổi lớp học
+        isOldClassSchedule: false,
         isNewClassSchedule: false,
         programType: schedule.class?.course?.program?.type || schedule.programType || schedule.sessionCourse?.program?.type || null
       };
@@ -534,47 +498,8 @@ const RequestDetailPage = ({
       })
       .filter(Boolean);
     
-    // Thêm các buổi của lớp mới khi có đổi lớp
-    // const newClassSchedules = [];
-    // if (isClassChangeRequest && pendingClassChange?.newClassInfo?.fixedSchedules) {
-    //   const newClassInfo = pendingClassChange.newClassInfo;
-    //   const newClassSchedulesList = newClassInfo.fixedSchedules || [];
-    //   
-    //   newClassSchedulesList.forEach((newSchedule, index) => {
-    //     if (!newSchedule.date) return;
-    //     
-    //     const dateStr = formatDateToYYYYMMDD(newSchedule.date);
-    //     
-    //     newClassSchedules.push({
-    //       id: `new-class-${index}-${newSchedule.date}`,
-    //       date: dateStr,
-    //       startTime: newSchedule.startTime || '',
-    //       endTime: newSchedule.endTime || '',
-    //       className: newClassInfo.className || 'N/A',
-    //       roomName: newSchedule.roomName || 'N/A',
-    //       topic: newSchedule.title || '',
-    //       status: 'scheduled',
-    //       scheduleStatus: 'scheduled',
-    //       attendanceStatus: null,
-    //       hasAttendance: false,
-    //       teacherName: 'N/A',
-    //       lessonNumber: newSchedule.order || '',
-    //       lessonTopic: newSchedule.title || '',
-    //       isAbsentSchedule: false,
-    //       isCancelled: false,
-    //       isMakeupSchedule: false,
-    //       isSubstituteClass: false,
-    //       isOldClassSchedule: false,
-    //       isNewClassSchedule: true,
-    //       programType: newClassInfo?.programType || newSchedule?.class?.course?.program?.type || newSchedule?.programType || newSchedule?.sessionCourse?.program?.type || null
-    //     });
-    //   });
-    // }
-    
-    return [...schedules, ...makeupSchedules]; // Bỏ newClassSchedules
-    // return [...schedules, ...makeupSchedules, ...newClassSchedules]; // Commented out - đổi lớp học
-  }, [senderSchedule, pendingMakeupClasses, selectedRequest]); // Bỏ pendingClassChange
-  // }, [senderSchedule, pendingMakeupClasses, selectedRequest, pendingClassChange]); // Commented out - đổi lớp học
+    return [...schedules, ...makeupSchedules];
+  }, [senderSchedule, pendingMakeupClasses, selectedRequest]);
 
   if (!selectedRequest) {
     return null;
@@ -601,7 +526,7 @@ const RequestDetailPage = ({
                 const requestType = selectedRequest?.type;
                 if (requestType === 'request_replace_teacher') {
                   return 'Chi tiết đơn - Lịch dạy';
-                } else if (requestType === 'makeup_class' || requestType === 'change_class') {
+                } else if (requestType === 'makeup_class') {
                   return isStudent ? 'Chi tiết đơn - Lịch học' : isTeacher ? 'Chi tiết đơn - Lịch dạy' : 'Chi tiết đơn - Lịch học/dạy';
                 } else {
                   return isStudent ? 'Chi tiết đơn - Lịch học' : isTeacher ? 'Chi tiết đơn - Lịch dạy' : 'Chi tiết đơn - Lịch học/dạy';
@@ -628,10 +553,9 @@ const RequestDetailPage = ({
                   {/* Hiển thị thông tin request dựa trên type */}
                   {(() => {
                     const requestType = selectedRequest?.type;
-                    // Chỉ hiển thị phần này cho 3 loại đơn: makeup_class, request_replace_teacher, change_class
+                    // Chỉ hiển thị phần này cho 2 loại đơn: makeup_class, request_replace_teacher
                     const shouldShowSection = requestType === 'makeup_class' || 
-                                            requestType === 'request_replace_teacher' || 
-                                            requestType === 'change_class';
+                                            requestType === 'request_replace_teacher';
                     
                     if (!shouldShowSection) return null;
                     
@@ -963,198 +887,6 @@ const RequestDetailPage = ({
                       );
                     }
                     
-                    // ============================================
-                    // 3. CHANGE_CLASS: Hiển thị từ classId
-                    // ============================================
-                    // if (requestType === 'change_class' && selectedRequest?.classId) {
-                    //   const classInfo = selectedRequest.classId;
-                    //   const courseInfo = classInfo?.course;
-                      
-                    //   // Chỉ lấy các buổi cố định (status='fixed'), không lấy buổi tạm
-                    //   const allSchedules = classInfo?.fixedSchedules || [];
-                    //   const fixedSchedules = allSchedules.filter(schedule => 
-                    //     schedule.status === 'fixed' || !schedule.status // Nếu không có status thì coi như fixed
-                    //   );
-                    //   const currentSession = classInfo?.currentSession;
-                      
-                    //   // Format thời khóa biểu
-                    //   const formatSchedule = (schedules) => {
-                    //     if (!schedules || schedules.length === 0) return 'Chưa có lịch học';
-                        
-                    //     // Nhóm theo thứ trong tuần
-                    //     const scheduleGroups = {};
-                    //     schedules.forEach(schedule => {
-                    //       const date = new Date(schedule.date);
-                    //       const dayOfWeek = date.getDay();
-                    //       const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-                    //       const dayName = dayNames[dayOfWeek];
-                    //       const key = `${dayOfWeek}-${schedule.startTime}-${schedule.endTime}`;
-                          
-                    //       if (!scheduleGroups[key]) {
-                    //         scheduleGroups[key] = {
-                    //           dayName,
-                    //           startTime: schedule.startTime,
-                    //           endTime: schedule.endTime
-                    //         };
-                    //       }
-                    //     });
-                        
-                    //     return Object.values(scheduleGroups).map(group => 
-                    //       `${group.dayName} | ${group.startTime}-${group.endTime}`
-                    //     ).join(', ');
-                    //   };
-                      
-                    //   // Extract courseId - xử lý cả object và ObjectId string
-                    //   let extractedCourseId = null;
-                    //   if (courseInfo) {
-                    //     if (typeof courseInfo === 'object' && courseInfo._id) {
-                    //       extractedCourseId = courseInfo._id.toString();
-                    //     } else if (typeof courseInfo === 'string') {
-                    //       extractedCourseId = courseInfo;
-                    //     } else if (courseInfo && typeof courseInfo === 'object' && courseInfo.toString) {
-                    //       extractedCourseId = courseInfo.toString();
-                    //     }
-                    //   }
-                      
-                    //   // Tạo classItem để truyền vào onChangeClass
-                    //   const classItemForChange = {
-                    //     classId: String(classInfo?._id || classInfo),
-                    //     className: classInfo?.name || 'N/A',
-                    //     courseName: courseInfo?.name || 'N/A',
-                    //     courseId: extractedCourseId,
-                    //     currentSessionTitle: currentSession?.title || 'Chưa có thông tin session',
-                    //     currentSessionOrder: currentSession?.order || null,
-                    //     fixedSchedules: fixedSchedules
-                    //   };
-                      
-                    //   // Kiểm tra xem có pendingClassChange không
-                    //   const isPendingChange = pendingClassChange && 
-                    //     String(pendingClassChange.oldClassId) === String(classItemForChange.classId);
-                      
-                    //   // Kiểm tra xem có thể đổi lớp không (cần có courseId và onChangeClass)
-                    //   const canChangeClass = !!onChangeClass && !!extractedCourseId;
-                      
-                    //   return (
-                    //     <div className="mb-12">
-                    //       <h6 className="text-neutral-900 fw-bold mb-8 text-14">Lớp xin đổi:</h6>
-                    //       <div className="border border-neutral-200 rounded-6 p-12 bg-white">
-                    //         <div className="d-flex align-items-start justify-content-between gap-12">
-                    //           <div className="flex-grow-1 d-flex flex-column gap-8">
-                    //             {/* Lớp cũ (lớp xin đổi) */}
-                    //             <div className="d-flex align-items-start gap-8">
-                    //               <i className="fas fa-book text-primary text-14 mt-1"></i>
-                    //               <div className="flex-grow-1 d-flex flex-column gap-4">
-                    //                 <div className="text-primary fw-semibold text-13">Lớp đang học:</div>
-                    //                 <div className="d-flex flex-column gap-2">
-                    //                   <div>
-                    //                     <span className="text-neutral-600 text-13">Lớp: </span>
-                    //                     <span className="text-neutral-900 fw-semibold text-14">{classInfo?.name || 'N/A'}</span>
-                    //                   </div>
-                    //                   <div>
-                    //                     <span className="text-neutral-600 text-13">Thời khóa biểu hiện tại: </span>
-                    //                     <div className="text-neutral-700 text-13 fw-medium mt-2">
-                    //                       {formatSchedule(fixedSchedules)}
-                    //                     </div>
-                    //                   </div>
-                    //                   <div>
-                    //                     <span className="text-neutral-600 text-13">Đang học session: </span>
-                    //                     <span className="text-neutral-700 text-13 fw-medium">
-                    //                       {currentSession?.title || 'Chưa có thông tin session'}
-                    //                       {currentSession?.order !== null && currentSession?.order !== undefined && (
-                    //                         <span className="text-neutral-500 ms-4">(Số thứ tự: {currentSession.order})</span>
-                    //                       )}
-                    //                     </span>
-                    //                   </div>
-                    //                 </div>
-                    //               </div>
-                    //             </div>
-                                
-                    //             {/* Lớp mới (lớp muốn đổi) - nếu đã chọn */}
-                    //             {isPendingChange && pendingClassChange.newClassInfo && (
-                    //               <>
-                    //                 <div className="border-top border-neutral-200 pt-8 mt-4">
-                    //                   <div className="d-flex align-items-start gap-8">
-                    //                     <i className="fas fa-exchange-alt text-success text-14 mt-1"></i>
-                    //                     <div className="flex-grow-1 d-flex flex-column gap-2">
-                    //                       <div className="text-success fw-semibold text-13">Lớp muốn đổi:</div>
-                    //                       <div className="d-flex flex-column gap-2">
-                    //                         <div>
-                    //                           <span className="text-neutral-600 text-13">Lớp: </span>
-                    //                           <span className="text-neutral-900 fw-semibold text-14">{pendingClassChange.newClassInfo.className || 'N/A'}</span>
-                    //                         </div>
-                    //                         {pendingClassChange.newClassInfo.fixedSchedules && pendingClassChange.newClassInfo.fixedSchedules.length > 0 && (
-                    //                           <div>
-                    //                             <span className="text-neutral-600 text-13">Thời khóa biểu: </span>
-                    //                             <div className="text-neutral-700 text-13 fw-medium mt-2">
-                    //                               {formatSchedule(pendingClassChange.newClassInfo.fixedSchedules)}
-                    //                             </div>
-                    //                           </div>
-                    //                         )}
-                    //                         <div>
-                    //                           <span className="text-neutral-600 text-13">Đang học session: </span>
-                    //                           <span className="text-neutral-700 text-13 fw-medium">
-                    //                             {pendingClassChange.newClassInfo.currentSessionTitle || 'Chưa có thông tin session'}
-                    //                             {pendingClassChange.newClassInfo.currentSessionOrder !== null && (
-                    //                               <span className="text-neutral-500 ms-4">(Số thứ tự: {pendingClassChange.newClassInfo.currentSessionOrder})</span>
-                    //                             )}
-                    //                           </span>
-                    //                         </div>
-                    //                       </div>
-                    //                     </div>
-                    //                   </div>
-                    //                 </div>
-                    //               </>
-                    //             )}
-                    //           </div>
-                    //           <div className="d-flex flex-column gap-2 align-items-end">
-                    //             {isPendingChange ? (
-                    //               <Button
-                    //                 variant="outline-danger"
-                    //                 size="sm"
-                    //                 onClick={onRemoveClassChange}
-                    //                 className="d-flex align-items-center gap-2"
-                    //                 title="Xóa thông tin đổi lớp"
-                    //               >
-                    //                 <i className="fas fa-trash"></i>
-                    //                 Xóa
-                    //               </Button>
-                    //             ) : selectedRequest?.status === 'pending' ? (
-                    //               <Button
-                    //                 variant="outline-primary"
-                    //                 size="sm"
-                    //                 onClick={() => {
-                    //                   console.log('🔵 Đổi lớp button clicked', { classItemForChange, onChangeClass: !!onChangeClass, courseId: extractedCourseId });
-                    //                   if (!onChangeClass) {
-                    //                     console.error(' onChangeClass is undefined');
-                    //                     return;
-                    //                   }
-                    //                   if (!extractedCourseId) {
-                    //                     console.error(' courseId is null or undefined', { courseInfo });
-                    //                     return;
-                    //                   }
-                    //                   try {
-                    //                     // Mở modal local trong RequestDetailPage
-                    //                     setSelectedClassToChange(classItemForChange);
-                    //                     setShowChangeClassModal(true);
-                    //                   } catch (error) {
-                    //                     console.error(' Error opening change class modal:', error);
-                    //                   }
-                    //                 }}
-                    //                 className="d-flex align-items-center gap-2"
-                    //                 disabled={!canChangeClass}
-                    //                 title={!canChangeClass ? (!extractedCourseId ? 'Không thể đổi lớp: Thiếu thông tin khóa học' : 'Không thể đổi lớp') : 'Đổi lớp học'}
-                    //               >
-                    //                 <i className="fas fa-exchange-alt"></i>
-                    //                 Đổi lớp
-                    //               </Button>
-                    //             ) : null}
-                    //           </div>
-                    //         </div>
-                    //       </div>
-                    //     </div>
-                    //   );
-                    // }
-                    
                     // Fallback: Hiển thị từ studentClasses (cho các trường hợp khác)
                     return shouldShowSection && studentClasses.length > 0 && (
                       <div className="mb-12">
@@ -1167,80 +899,34 @@ const RequestDetailPage = ({
                         </h6>
                         <div className="border border-neutral-200 rounded-6 p-8 bg-neutral-25">
                           <div className="d-flex flex-column" style={{ gap: '12px' }}>
-                            {studentClasses.map((classItem, index) => {
-                              const isPendingChange = pendingClassChange && 
-                                pendingClassChange.oldClassId === classItem.classId;
-                              
-                              if (isPendingChange) {
-                                return (
-                                  <div key={index} className="row g-3">
-                                    <div className="col-md-6">
-                                      {renderClassInfo(pendingClassChange.oldClassInfo, true)}
-                                    </div>
-                                    <div className="col-md-6">
-                                      {renderClassInfo(pendingClassChange.newClassInfo, false)}
-                                    </div>
+                            {studentClasses.map((classItem, index) => (
+                              <div 
+                                key={index}
+                                className="d-flex align-items-start justify-content-between gap-12 p-12 bg-white rounded-8 border border-neutral-100"
+                              >
+                                <div className="flex-grow-1">
+                                  <div className="d-flex align-items-center gap-8 mb-4">
+                                    <i className="fas fa-book text-main-600"></i>
+                                    <span className="text-neutral-900 fw-semibold text-14">{classItem.className}</span>
                                   </div>
-                                );
-                              } else {
-                                return (
-                                  <div 
-                                    key={index}
-                                    className="d-flex align-items-start justify-content-between gap-12 p-12 bg-white rounded-8 border border-neutral-100"
-                                  >
-                                    <div className="flex-grow-1">
-                                      <div className="d-flex align-items-center gap-8 mb-4">
-                                        <i className="fas fa-book text-main-600"></i>
-                                        <span className="text-neutral-900 fw-semibold text-14">{classItem.className}</span>
-                                      </div>
-                                      <div className="ps-20 mb-4">
-                                        <span className="text-neutral-600 text-13">Khóa học: </span>
-                                        <span className="text-neutral-700 text-13">{classItem.courseName}</span>
-                                      </div>
-                                      <div className="ps-20">
-                                        <span className="text-neutral-600 text-13">
-                                          {isStudent ? 'Session đang học: ' : isTeacher ? 'Session đang dạy: ' : 'Session đang học: '}
-                                        </span>
-                                        <span className="text-neutral-700 text-13 fw-medium">
-                                          {classItem.currentSessionTitle}
-                                          {classItem.currentSessionOrder !== null && (
-                                            <span className="text-neutral-500 ms-4">(Số thứ tự: {classItem.currentSessionOrder})</span>
-                                          )}
-                                        </span>
-                                      </div>
-                                    </div>
-                                    {isStudent && selectedRequest?.status === 'pending' && (
-                                      <div className="d-flex align-items-center">
-                                        <Button
-                                          variant="outline-primary"
-                                          size="sm"
-                                          onClick={() => {
-                                            console.log('🔵 Đổi lớp button clicked (fallback)', { classItem, onChangeClass: !!onChangeClass });
-                                            if (!onChangeClass) {
-                                              console.error(' onChangeClass is undefined');
-                                              return;
-                                            }
-                                            try {
-                                              // Mở modal local trong RequestDetailPage
-                                              setSelectedClassToChange(classItem);
-                                              setShowChangeClassModal(true);
-                                            } catch (error) {
-                                              console.error(' Error opening change class modal:', error);
-                                            }
-                                          }}
-                                          className="d-flex align-items-center gap-2"
-                                          disabled={!onChangeClass}
-                                          title={!onChangeClass ? 'Không thể đổi lớp' : 'Đổi lớp học'}
-                                        >
-                                          <i className="fas fa-exchange-alt"></i>
-                                          Đổi lớp
-                                        </Button>
-                                      </div>
-                                    )}
+                                  <div className="ps-20 mb-4">
+                                    <span className="text-neutral-600 text-13">Khóa học: </span>
+                                    <span className="text-neutral-700 text-13">{classItem.courseName}</span>
                                   </div>
-                                );
-                              }
-                            })}
+                                  <div className="ps-20">
+                                    <span className="text-neutral-600 text-13">
+                                      {isStudent ? 'Session đang học: ' : isTeacher ? 'Session đang dạy: ' : 'Session đang học: '}
+                                    </span>
+                                    <span className="text-neutral-700 text-13 fw-medium">
+                                      {classItem.currentSessionTitle}
+                                      {classItem.currentSessionOrder !== null && (
+                                        <span className="text-neutral-500 ms-4">(Số thứ tự: {classItem.currentSessionOrder})</span>
+                                      )}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       </div>
@@ -1428,32 +1114,9 @@ const RequestDetailPage = ({
           </Button>
         </Modal.Footer>
       </Modal>
-
-      {/* Change Class Modal */}
-      <ChangeClassModal
-        show={showChangeClassModal}
-        onHide={() => {
-          setShowChangeClassModal(false);
-          setSelectedClassToChange(null);
-        }}
-        selectedClassToChange={selectedClassToChange}
-        senderSchedule={senderSchedule}
-        onConfirm={(data) => {
-          console.log(' ChangeClassModal confirmed', { data });
-          // Gọi onChangeClassConfirm từ parent để cập nhật pendingClassChange
-          if (onChangeClassConfirm) {
-            onChangeClassConfirm(data);
-          } else {
-            console.error(' onChangeClassConfirm is undefined');
-          }
-          // Đóng modal
-          setShowChangeClassModal(false);
-          setSelectedClassToChange(null);
-        }}
-        processing={processing}
-      />
     </>
   );
 };
 
 export default RequestDetailPage;
+

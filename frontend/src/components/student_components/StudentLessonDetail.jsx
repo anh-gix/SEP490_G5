@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Badge, Button, Alert, Spinner } from 'react-bootstrap';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import studentService from '../../services/studentService';
 
@@ -12,6 +12,7 @@ const StudentLessonDetail = () => {
   const { lessonId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [lessonData, setLessonData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -54,6 +55,20 @@ const StudentLessonDetail = () => {
         preselectedScheduleId: lessonData.studentScheduleId
       }
     });
+  };
+
+  // Xác định đường dẫn quay lại
+  const getBackPath = () => {
+    // Kiểm tra location.state để biết trang trước đó
+    if (location.state?.from === 'class' && location.state?.classId) {
+      return `/student/class/${location.state.classId}`;
+    }
+    // Mặc định quay về schedule
+    return '/student/schedule';
+  };
+
+  const handleGoBack = () => {
+    navigate(getBackPath());
   };
 
   const getAttendanceBadge = (attendance) => {
@@ -112,19 +127,17 @@ const StudentLessonDetail = () => {
 
   return (
     <Container fluid className="py-24 px-24">
-      {/* Breadcrumb */}
+      {/* Back Button */}
       <div className="mb-24">
-        <div className="d-flex align-items-center gap-2 mb-8">
-          <Link to="/student/dashboard" className="text-neutral-600 text-14 text-decoration-none">
-            Dashboard
-          </Link>
-          <i className="fas fa-chevron-right text-neutral-400" style={{ fontSize: '10px' }}></i>
-          <Link to="/student/schedule" className="text-neutral-600 text-14 text-decoration-none">
-            Lịch học
-          </Link>
-          <i className="fas fa-chevron-right text-neutral-400" style={{ fontSize: '10px' }}></i>
-          <span className="text-neutral-900 text-14 fw-semibold">Chi tiết buổi học</span>
-        </div>
+        <Button 
+          variant="link" 
+          onClick={handleGoBack}
+          className="text-neutral-600 text-14 text-decoration-none p-0 mb-16"
+          style={{ textDecoration: 'none' }}
+        >
+          <i className="fas fa-arrow-left me-2"></i>
+          Quay lại
+        </Button>
         <div className="d-flex justify-content-between align-items-start">
           <div>
             <h4 className="text-neutral-900 fw-bold mb-8">{lessonData.topic}</h4>

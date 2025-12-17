@@ -1,8 +1,11 @@
 import React from 'react';
 import { Table, Badge, Button } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 
 const ClassLessons = ({ lessons, getLessonStatusBadge }) => {
+  const { classId } = useParams();
+  const navigate = useNavigate();
+  
   return (
     <div className="p-0">
       <Table hover className="mb-0">
@@ -55,12 +58,15 @@ const ClassLessons = ({ lessons, getLessonStatusBadge }) => {
                 {getLessonStatusBadge(lesson.status)}
               </td>
               <td className="px-20 py-16 text-center">
-                <Link to={`/teacher/lessons/${lesson._id}`}>
-                  <Button className="btn-outline-main text-12 px-12 py-6 radius-6">
-                    <i className="fas fa-eye me-1"></i>
-                    Chi tiết
-                  </Button>
-                </Link>
+                <Button 
+                  className="btn-outline-main text-12 px-12 py-6 radius-6"
+                  onClick={() => navigate(`/teacher/lessons/${lesson._id}`, { 
+                    state: { from: 'class', classId: classId } 
+                  })}
+                >
+                  <i className="fas fa-eye me-1"></i>
+                  Chi tiết
+                </Button>
               </td>
             </tr>
           ))}

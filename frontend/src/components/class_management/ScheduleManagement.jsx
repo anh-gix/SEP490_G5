@@ -776,6 +776,7 @@ const ScheduleManagement = () => {
         ) : (
           <ScheduleList 
             schedules={schedules}
+            onLessonClick={handleLessonClick}
           />
         )}
       </div>

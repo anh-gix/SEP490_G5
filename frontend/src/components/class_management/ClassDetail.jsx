@@ -322,6 +322,7 @@ const ClassDetail = ({ classId, onBack }) => {
                   students={students}
                   onViewStudentDetail={() => {}} // Disable modal for academic staff
                   hideActions={true} // Hide actions column for academic staff
+                  hideImportMocktest={true} // Hide Import Mocktest button for academic staff
                 />
               </div>
             </Tab>

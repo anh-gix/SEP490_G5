@@ -193,7 +193,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
   const breadcrumbItems = [
     { label: 'Dashboard', path: `${basePath}/dashboard` },
     { label: 'Chương trình đào tạo', path: `${basePath}/programs` },
-    { label: program.program_name, path: `${basePath}/programs/${id}` },
+    { label: program.program_name },
   ];
 
   const courseColumns = [
@@ -280,7 +280,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
             icon="ph ph-eye"
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`${basePath}/courses/${row._id}/details`);
+              navigate(`${basePath}/programs/${id}/courses/${row._id}/details`);
             }}
           >
             <span className="d-none d-md-inline">Xem</span>
@@ -567,7 +567,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
           <Table
             columns={courseColumns}
             data={courses}
-            onRowClick={(row) => navigate(`${basePath}/courses/${row._id}/details`)}
+            onRowClick={(row) => navigate(`${basePath}/programs/${id}/courses/${row._id}/details`)}
           />
         ) : (
           <div className="text-center py-5 text-neutral-600">

@@ -10,7 +10,7 @@ import { courseService } from '../../../services/courseService';
 import { formatDate } from '../../../helper/helper';
 
 const CourseDetails = ({ viewMode = 'center-head' }) => {
-  const { id } = useParams();
+  const { id, programId } = useParams();
   const navigate = useNavigate();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -78,10 +78,16 @@ console.log(response.data);
     }
   };
 
-  const breadcrumbItems = [
+  // Build breadcrumb dynamically based on whether we have programId
+  const breadcrumbItems = programId && course?.program ? [
+    { label: 'Dashboard', path: `${basePath}/dashboard` },
+    { label: 'Chương trình đào tạo', path: `${basePath}/programs` },
+    { label: course.program.program_name, path: `${basePath}/programs/${programId}` },
+    { label: course.name },
+  ] : [
     { label: 'Dashboard', path: `${basePath}/dashboard` },
     { label: 'Danh sách môn học', path: `${basePath}/courses` },
-    { label: 'Chi tiết môn học', path: `${basePath}/courses/${id}/details` },
+    { label: course?.name || 'Chi tiết môn học' },
   ];
 
   if (loading) {
@@ -529,7 +535,14 @@ console.log(response.data);
           <Button
             variant="outline"
             icon="ph ph-arrow-left"
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              // Navigate back to program detail if programId exists, otherwise go back
+              if (programId) {
+                navigate(`${basePath}/programs/${programId}`);
+              } else {
+                navigate(-1);
+              }
+            }}
           >
             Quay lại
           </Button>
@@ -539,7 +552,10 @@ console.log(response.data);
               <Button
                 variant="primary"
                 icon="ph ph-pencil"
-                onClick={() => navigate(`${basePath}/programs/${course.program?._id || course.program}/courses/${id}/edit-form`)}
+                onClick={() => {
+                  const programIdToUse = programId || course.program?._id || course.program;
+                  navigate(`${basePath}/programs/${programIdToUse}/courses/${id}/edit-form`);
+                }}
               >
                 Sửa
               </Button>

@@ -51,6 +51,7 @@ export const centerHeadRoutes = [
 
   // Program Detail & Course Management
   { path: '/center-head/programs/:id', element: <ProgramDetailPage /> },
+  { path: '/center-head/programs/:programId/courses/:id/details', element: <CourseDetailPage /> },
   { path: '/center-head/courses/:id/details', element: <CourseDetailPage /> },
 
   // III. Approval Requests Management

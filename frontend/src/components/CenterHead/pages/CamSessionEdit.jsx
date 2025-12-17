@@ -1,28 +1,24 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Container, Row, Col, Card, Button, Form, Badge, Alert, Tabs, Tab } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Form, Badge, Alert, Tabs, Tab, Modal } from 'react-bootstrap';
+import Swal from 'sweetalert2';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import camSessionService from '../../../services/camSessionService';
 import {
   QUIZ_TYPES,
   SESSION_TYPES,
   validateQuiz,
   validateVocabulary,
-  getAnswerPlaceholder,
-  getAnswerKeyPlaceholder,
+  emptyQuiz,
+  emptyVocabularyItem,
 } from './camSessionHelpers';
-
-const emptyQuiz = () => ({
-  Type: 'multiple-choice',
-  Img: '',
-  Question: '',
-  Answer: [''],
-  AnswerKey: [''],
-});
-
-const emptyVocabularyItem = () => ({
-  word: '',
-  img: '',
-});
+import {
+  MultipleChoiceQuizForm,
+  YesNoQuizForm,
+  SpellQuizForm,
+  WordFromBoxQuizForm,
+} from './QuizEditModals';
 
 const CamSessionEdit = ({ viewMode = 'center-head' }) => {
   const { sessionId } = useParams();
@@ -38,6 +34,13 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
   const [validationErrors, setValidationErrors] = useState({});
   // eslint-disable-next-line no-unused-vars
   const [videoFile, setVideoFile] = useState(null);
+
+  // Quiz Type Selection Modal
+  const [showQuizTypeModal, setShowQuizTypeModal] = useState(false);
+
+  // Preview tracking
+  const [previewQuizIndex, setPreviewQuizIndex] = useState(null);
+  const [previewVocabIndex, setPreviewVocabIndex] = useState(null);
 
   const [editModal, setEditModal] = useState({
     show: false,
@@ -105,7 +108,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
     if (!file) return;
 
     if (!file.type.startsWith('video/')) {
-      alert('Vui lòng chọn file video hợp lệ (mp4, webm, ...).');
+      toast.error('Vui lòng chọn file video hợp lệ (mp4, webm, ...)!', { position: 'top-right' });
       event.target.value = '';
       return;
     }
@@ -122,18 +125,50 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
   };
 
   const handleAddQuiz = () => {
-    setFormData((prev) => ({
-      ...prev,
-      quizzes: { quiz: [...(prev?.quizzes?.quiz || []), emptyQuiz()] },
-    }));
+    setShowQuizTypeModal(true);
   };
 
-  const handleRemoveQuiz = (index) => {
-    if (!confirm('Bạn có chắc muốn xóa quiz này?')) return;
+  const handleQuizTypeSelected = (quizType) => {
+    const newQuiz = {
+      ...emptyQuiz(),
+      Type: quizType,
+      Answer: QUIZ_TYPES[quizType].multipleQuestions ? [''] : [''],
+      AnswerKey: [''],
+    };
+    
     setFormData((prev) => ({
       ...prev,
-      quizzes: { quiz: (prev?.quizzes?.quiz || []).filter((_, i) => i !== index) },
+      quizzes: { quiz: [...(prev?.quizzes?.quiz || []), newQuiz] },
     }));
+    
+    setShowQuizTypeModal(false);
+    toast.success(`Đã thêm quiz ${QUIZ_TYPES[quizType].label}!`, { position: 'top-right', autoClose: 2000 });
+    
+    // Mở modal edit ngay
+    setTimeout(() => {
+      openQuizModal((formData?.quizzes?.quiz?.length || 0));
+    }, 100);
+  };
+
+  const handleRemoveQuiz = async (index) => {
+    const result = await Swal.fire({
+      title: 'Xóa quiz?',
+      text: `Bạn có chắc muốn xóa quiz #${index + 1}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (result.isConfirmed) {
+      setFormData((prev) => ({
+        ...prev,
+        quizzes: { quiz: (prev?.quizzes?.quiz || []).filter((_, i) => i !== index) },
+      }));
+      toast.success('Đã xóa quiz!', { position: 'top-right', autoClose: 2000 });
+    }
   };
 
   const handleAddVocabulary = () => {
@@ -143,17 +178,31 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
     }));
   };
 
-  const handleRemoveVocabulary = (index) => {
-    if (!confirm('Bạn có chắc muốn xóa từ vựng này?')) return;
-    setFormData((prev) => ({
-      ...prev,
-      vocabulary: { items: (prev?.vocabulary?.items || []).filter((_, i) => i !== index) },
-    }));
+  const handleRemoveVocabulary = async (index) => {
+    const result = await Swal.fire({
+      title: 'Xóa từ vựng?',
+      text: `Bạn có chắc muốn xóa từ vựng #${index + 1}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (result.isConfirmed) {
+      setFormData((prev) => ({
+        ...prev,
+        vocabulary: { items: (prev?.vocabulary?.items || []).filter((_, i) => i !== index) },
+      }));
+      toast.success('Đã xóa từ vựng!', { position: 'top-right', autoClose: 2000 });
+    }
   };
 
   const openQuizModal = (index) => {
     const quiz = formData?.quizzes?.quiz?.[index];
     if (!quiz) return;
+    setPreviewQuizIndex(index); // Set preview
     setEditModal({ show: true, type: 'quiz', index });
     setEditItemData({
       ...quiz,
@@ -165,6 +214,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
   const openVocabModal = (index) => {
     const vocab = formData?.vocabulary?.items?.[index];
     if (!vocab) return;
+    setPreviewVocabIndex(index); // Set preview
     setEditModal({ show: true, type: 'vocab', index });
     setEditItemData({ ...vocab });
   };
@@ -172,6 +222,17 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
   const closeEditModal = () => {
     setEditModal({ show: false, type: null, index: null });
     setEditItemData(null);
+    // Keep preview state
+  };
+
+  const handlePreviewQuiz = (index) => {
+    setPreviewQuizIndex(index);
+    setActiveTab('quiz'); // Switch to quiz tab
+  };
+
+  const handlePreviewVocab = (index) => {
+    setPreviewVocabIndex(index);
+    setActiveTab('vocab'); // Switch to vocab tab
   };
 
   const handleModalFieldChange = (field, value) => {
@@ -186,7 +247,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Vui lòng chọn file ảnh hợp lệ (png, jpg, jpeg, webp, ...).');
+      toast.error('Vui lòng chọn file ảnh hợp lệ (png, jpg, jpeg, webp, ...)!', { position: 'top-right' });
       event.target.value = '';
       return;
     }
@@ -196,6 +257,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
       ...prev,
       [field]: localUrl,
     }));
+    toast.success('Đã chọn ảnh!', { position: 'top-right', autoClose: 1500 });
   };
 
   const handleModalAnswerList = (field, answerIndex, value) => {
@@ -228,7 +290,12 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
     if (editModal.type === 'quiz') {
       const errors = validateQuiz(editItemData);
       if (errors.length > 0) {
-        alert('Vui lòng sửa các lỗi:\n\n' + errors.join('\n'));
+        Swal.fire({
+          title: 'Lỗi validation!',
+          html: errors.map(err => `• ${err}`).join('<br>'),
+          icon: 'error',
+          confirmButtonText: 'OK',
+        });
         return;
       }
 
@@ -237,10 +304,16 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
         quizList[editModal.index] = { ...editItemData };
         return { ...prev, quizzes: { quiz: quizList } };
       });
+      toast.success('Đã lưu quiz!', { position: 'top-right', autoClose: 2000 });
     } else if (editModal.type === 'vocab') {
       const errors = validateVocabulary(editItemData);
       if (errors.length > 0) {
-        alert('Vui lòng sửa các lỗi:\n\n' + errors.join('\n'));
+        Swal.fire({
+          title: 'Lỗi validation!',
+          html: errors.map(err => `• ${err}`).join('<br>'),
+          icon: 'error',
+          confirmButtonText: 'OK',
+        });
         return;
       }
 
@@ -249,6 +322,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
         vocabList[editModal.index] = { ...editItemData };
         return { ...prev, vocabulary: { items: vocabList } };
       });
+      toast.success('Đã lưu từ vựng!', { position: 'top-right', autoClose: 2000 });
     }
     closeEditModal();
   };
@@ -280,7 +354,12 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
   const handleSave = async () => {
     // 1. Validate basic form
     if (!validateForm()) {
-      alert('Vui lòng điền đầy đủ thông tin bắt buộc');
+      Swal.fire({
+        title: 'Thiếu thông tin!',
+        text: 'Vui lòng điền đầy đủ thông tin bắt buộc',
+        icon: 'warning',
+        confirmButtonText: 'OK',
+      });
       setActiveTab('basic');
       return;
     }
@@ -294,10 +373,15 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
       .filter((q) => q.errors.length > 0);
 
     if (quizErrors.length > 0) {
-      const errorMsg = quizErrors
-        .map((q) => `Quiz #${q.index + 1}:\n${q.errors.join('\n')}`)
-        .join('\n\n');
-      alert('Có lỗi trong các quiz:\n\n' + errorMsg);
+      const errorHtml = quizErrors
+        .map((q) => `<strong>Quiz #${q.index + 1}:</strong><br>${q.errors.map(e => `• ${e}`).join('<br>')}`)
+        .join('<br><br>');
+      Swal.fire({
+        title: 'Lỗi trong các quiz!',
+        html: errorHtml,
+        icon: 'error',
+        confirmButtonText: 'OK',
+      });
       setActiveTab('quiz');
       return;
     }
@@ -311,7 +395,12 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
       .filter((v) => v.errors.length > 0);
 
     if (vocabErrors.length > 0) {
-      alert('Có lỗi trong từ vựng. Vui lòng kiểm tra lại.');
+      Swal.fire({
+        title: 'Lỗi trong từ vựng!',
+        text: 'Có lỗi trong từ vựng. Vui lòng kiểm tra lại.',
+        icon: 'error',
+        confirmButtonText: 'OK',
+      });
       setActiveTab('vocab');
       return;
     }
@@ -328,11 +417,22 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
         quizzes: { quiz: formData?.quizzes?.quiz || [] },
         vocabulary: { items: formData?.vocabulary?.items || [] },
       });
-      alert('Cập nhật CAM Session thành công');
+      
+      await Swal.fire({
+        title: 'Thành công!',
+        text: 'Cập nhật CAM Session thành công',
+        icon: 'success',
+        confirmButtonText: 'OK',
+      });
       navigate(-1);
     } catch (error) {
       console.error('Error updating cam session:', error);
-      alert(error.response?.data?.message || 'Không thể cập nhật CAM Session');
+      Swal.fire({
+        title: 'Lỗi!',
+        text: error.response?.data?.message || 'Không thể cập nhật CAM Session',
+        icon: 'error',
+        confirmButtonText: 'OK',
+      });
     } finally {
       setSaving(false);
     }
@@ -568,13 +668,17 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                             const quizType = QUIZ_TYPES[quiz.Type];
                             const errors = validateQuiz(quiz);
                             const hasErrors = errors.length > 0;
+                            const isSelected = previewQuizIndex === index; // Check if selected for preview
 
                             return (
                               <Card
                                 key={index}
-                                className={`border-0 ${hasErrors ? 'border-start border-danger border-3' : ''}`}
+                                className={`border-0 ${
+                                  hasErrors ? 'border-start border-danger border-3' : 
+                                  isSelected ? 'border-start border-primary border-3 shadow-sm' : ''
+                                }`}
                                 style={{
-                                  backgroundColor: hasErrors ? '#FEF2F2' : '#F8FAFE',
+                                  backgroundColor: hasErrors ? '#FEF2F2' : isSelected ? '#EEF2FF' : '#F8FAFE',
                                 }}
                               >
                                 <Card.Body className="p-3">
@@ -591,6 +695,11 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                                             {errors.length} lỗi
                                           </Badge>
                                         )}
+                                        {isSelected && (
+                                          <Badge bg="primary" className="small">
+                                            <i className="ph ph-eye me-1"></i>Previewing
+                                          </Badge>
+                                        )}
                                       </div>
 
                                       <p className="small mb-1">
@@ -603,14 +712,24 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                                       </div>
                                     </div>
 
-                                    <Button
-                                      variant={hasErrors ? 'danger' : 'outline-primary'}
-                                      size="sm"
-                                      onClick={() => openQuizModal(index)}
-                                    >
-                                      <i className={`ph ${canEdit ? 'ph-pencil' : 'ph-eye'}`}></i>
-                                      {canEdit ? ' Sửa' : ' Xem'}
-                                    </Button>
+                                    <div className="d-flex gap-2">
+                                      <Button
+                                        variant={isSelected ? 'primary' : 'outline-secondary'}
+                                        size="sm"
+                                        onClick={() => handlePreviewQuiz(index)}
+                                        title="Xem preview"
+                                      >
+                                        <i className="ph ph-eye"></i>
+                                      </Button>
+                                      <Button
+                                        variant={hasErrors ? 'danger' : 'outline-primary'}
+                                        size="sm"
+                                        onClick={() => openQuizModal(index)}
+                                      >
+                                        <i className={`ph ${canEdit ? 'ph-pencil' : 'ph-eye'}`}></i>
+                                        {canEdit ? ' Sửa' : ' Xem'}
+                                      </Button>
+                                    </div>
                                   </div>
 
                                   {hasErrors && (
@@ -658,41 +777,60 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                         </div>
                       ) : (
                         <Row className="g-2">
-                          {formData.vocabulary.items.map((item, idx) => (
-                            <Col md={6} lg={4} key={idx}>
-                              <Card className="border-0 h-100" style={{ backgroundColor: '#F8FAFE' }}>
-                                <Card.Body className="p-3">
-                                  {item.img && (
-                                    <div className="mb-2">
-                                      <img
-                                        src={item.img}
-                                        alt={item.word}
-                                        className="w-100 rounded"
-                                        style={{ height: '120px', objectFit: 'cover' }}
-                                      />
+                          {formData.vocabulary.items.map((item, idx) => {
+                            const isSelected = previewVocabIndex === idx; // Check if selected for preview
+                            
+                            return (
+                              <Col md={6} lg={4} key={idx}>
+                                <Card 
+                                  className={`border-0 h-100 ${isSelected ? 'border border-primary border-2 shadow-sm' : ''}`}
+                                  style={{ backgroundColor: isSelected ? '#EEF2FF' : '#F8FAFE' }}
+                                >
+                                  <Card.Body className="p-3">
+                                    {item.img && (
+                                      <div className="mb-2">
+                                        <img
+                                          src={item.img}
+                                          alt={item.word}
+                                          className="w-100 rounded"
+                                          style={{ height: '120px', objectFit: 'cover' }}
+                                        />
+                                      </div>
+                                    )}
+                                    <div className="text-center mb-2">
+                                      <h6 className="fw-bold mb-0" style={{ fontSize: '0.9rem' }}>
+                                        {item.word || <span className="text-muted fst-italic">Chưa có từ</span>}
+                                      </h6>
+                                      <p className="text-muted mb-0" style={{ fontSize: '0.7rem' }}>
+                                        Từ #{idx + 1}
+                                        {isSelected && <Badge bg="primary" className="ms-2 small">Previewing</Badge>}
+                                      </p>
                                     </div>
-                                  )}
-                                  <div className="text-center mb-2">
-                                    <h6 className="fw-bold mb-0" style={{ fontSize: '0.9rem' }}>
-                                      {item.word || <span className="text-muted fst-italic">Chưa có từ</span>}
-                                    </h6>
-                                    <p className="text-muted mb-0" style={{ fontSize: '0.7rem' }}>
-                                      Từ #{idx + 1}
-                                    </p>
-                                  </div>
-                                  <Button
-                                    variant="outline-primary"
-                                    size="sm"
-                                    className="w-100"
-                                    onClick={() => openVocabModal(idx)}
-                                  >
-                                    <i className={`ph ${canEdit ? 'ph-pencil' : 'ph-eye'} me-1`}></i>
-                                    {canEdit ? 'Sửa' : 'Xem'}
-                                  </Button>
-                                </Card.Body>
-                              </Card>
-                            </Col>
-                          ))}
+                                    <div className="d-flex gap-1">
+                                      <Button
+                                        variant={isSelected ? 'primary' : 'outline-secondary'}
+                                        size="sm"
+                                        className="flex-grow-1"
+                                        onClick={() => handlePreviewVocab(idx)}
+                                        title="Xem preview"
+                                      >
+                                        <i className="ph ph-eye"></i>
+                                      </Button>
+                                      <Button
+                                        variant="outline-primary"
+                                        size="sm"
+                                        className="flex-grow-1"
+                                        onClick={() => openVocabModal(idx)}
+                                      >
+                                        <i className={`ph ${canEdit ? 'ph-pencil' : 'ph-eye'} me-1`}></i>
+                                        {canEdit ? 'Sửa' : 'Xem'}
+                                      </Button>
+                                    </div>
+                                  </Card.Body>
+                                </Card>
+                              </Col>
+                            );
+                          })}
                         </Row>
                       )}
                     </div>
@@ -732,148 +870,246 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
                 )}
 
                 {/* Quiz Preview */}
-                {activeTab === 'quiz' && editModal.show && editModal.type === 'quiz' && editItemData && (
-                  <div>
-                    <p className="fw-semibold small mb-2">Preview Quiz:</p>
-                    <Card className="border-0" style={{ backgroundColor: '#F8FAFE' }}>
-                      <Card.Body className="p-3">
-                        {editItemData.Img && (
-                          <img
-                            src={editItemData.Img}
-                            className="w-100 rounded mb-2"
-                            style={{ maxHeight: '150px', objectFit: 'cover' }}
-                            alt="Quiz"
-                          />
-                        )}
+                {activeTab === 'quiz' && previewQuizIndex !== null && formData?.quizzes?.quiz?.[previewQuizIndex] && (() => {
+                  const quiz = formData.quizzes.quiz[previewQuizIndex];
+                  const quizType = QUIZ_TYPES[quiz.Type];
+                  
+                  return (
+                    <div>
+                      <p className="fw-semibold small mb-2">
+                        <Badge bg={quizType.color} className="me-2">
+                          <i className={`ph ${quizType.icon} me-1`}></i>
+                          {quizType.label}
+                        </Badge>
+                        Preview Quiz #{previewQuizIndex + 1}
+                      </p>
+                      
+                      <Card className="border shadow-sm">
+                        <Card.Body className="p-3">
+                          {/* Image - no height limit */}
+                          {quiz.Img && (
+                            <div className="mb-3">
+                              <img
+                                src={quiz.Img}
+                                className="w-100 rounded"
+                                style={{ objectFit: 'cover' }}
+                                alt="Quiz"
+                              />
+                            </div>
+                          )}
 
-                        <p className="fw-semibold small mb-2">{editItemData.Question || 'Câu hỏi...'}</p>
+                          {/* Question */}
+                          <div className="mb-3">
+                            <Badge bg="primary" className="mb-2">Question</Badge>
+                            <p className="fw-semibold mb-0">{quiz.Question || 'Chưa có câu hỏi'}</p>
+                          </div>
 
-                        {editItemData.Type === 'multiple-choice' && (
-                          <div className="d-flex flex-column gap-2">
-                            {(editItemData.Answer || ['']).map((ans, idx) => (
-                              <div
-                                key={idx}
-                                className={`p-2 rounded border ${
-                                  editItemData.AnswerKey?.[0] === ans
-                                    ? 'bg-success bg-opacity-10 border-success'
-                                    : 'bg-white border-secondary'
-                                }`}
-                                style={{ fontSize: '0.8rem' }}
-                              >
-                                {ans || `Đáp án ${idx + 1}`}
-                                {editItemData.AnswerKey?.[0] === ans && (
-                                  <i className="ph ph-check-circle text-success float-end"></i>
-                                )}
+                          {/* Multiple Choice Preview */}
+                          {quiz.Type === 'multiple-choice' && (
+                            <div>
+                              <p className="small text-muted mb-2">Lựa chọn:</p>
+                              <ul className="list-unstyled d-flex flex-column gap-2">
+                                {(quiz.Answer || []).map((ans, idx) => {
+                                  const isCorrect = quiz.AnswerKey?.includes(ans);
+                                  const letterLabel = String.fromCharCode(65 + idx);
+                                  
+                                  return (
+                                    <li
+                                      key={idx}
+                                      className={`border rounded-pill px-3 py-2 d-flex align-items-center gap-2 ${
+                                        isCorrect
+                                          ? 'border-success bg-success bg-opacity-10 text-success fw-semibold'
+                                          : 'border-secondary bg-light'
+                                      }`}
+                                      style={{ fontSize: '0.85rem' }}
+                                    >
+                                      <span className="fw-bold">{letterLabel}.</span>
+                                      <span className="flex-grow-1">{ans || `Đáp án ${idx + 1}`}</span>
+                                      {isCorrect && <i className="ph-fill ph-check-circle"></i>}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Yes/No Preview */}
+                          {quiz.Type === 'yes-no' && (
+                            <div>
+                              <p className="small text-muted mb-2">Câu hỏi Yes/No:</p>
+                              <div className="d-flex flex-column gap-3">
+                                {(quiz.Answer || []).map((statement, idx) => {
+                                  const answer = quiz.AnswerKey?.[idx];
+                                  
+                                  return (
+                                    <div key={idx}>
+                                      <p className="mb-2 small fw-medium">{idx + 1}. {statement}</p>
+                                      <div className="d-flex gap-2">
+                                        <div
+                                          className={`flex-grow-1 p-2 rounded border text-center small ${
+                                            answer === 'Yes'
+                                              ? 'bg-success bg-opacity-10 border-success text-success fw-semibold'
+                                              : 'border-secondary bg-light'
+                                          }`}
+                                        >
+                                          ✓ Yes
+                                          {answer === 'Yes' && <i className="ph-fill ph-check-circle ms-1"></i>}
+                                        </div>
+                                        <div
+                                          className={`flex-grow-1 p-2 rounded border text-center small ${
+                                            answer === 'No'
+                                              ? 'bg-success bg-opacity-10 border-success text-success fw-semibold'
+                                              : 'border-secondary bg-light'
+                                          }`}
+                                        >
+                                          ✗ No
+                                          {answer === 'No' && <i className="ph-fill ph-check-circle ms-1"></i>}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {editItemData.Type === 'yes-no' && (
-                          <div className="d-flex gap-2">
-                            <div
-                              className={`flex-grow-1 p-2 rounded border text-center ${
-                                editItemData.AnswerKey?.includes('Yes')
-                                  ? 'bg-success bg-opacity-10 border-success'
-                                  : 'bg-white border-secondary'
-                              }`}
-                              style={{ fontSize: '0.8rem' }}
-                            >
-                              Yes
-                              {editItemData.AnswerKey?.includes('Yes') && (
-                                <i className="ph ph-check-circle text-success ms-2"></i>
-                              )}
                             </div>
-                            <div
-                              className={`flex-grow-1 p-2 rounded border text-center ${
-                                editItemData.AnswerKey?.includes('No')
-                                  ? 'bg-success bg-opacity-10 border-success'
-                                  : 'bg-white border-secondary'
-                              }`}
-                              style={{ fontSize: '0.8rem' }}
-                            >
-                              No
-                              {editItemData.AnswerKey?.includes('No') && (
-                                <i className="ph ph-check-circle text-success ms-2"></i>
-                              )}
-                            </div>
-                          </div>
-                        )}
+                          )}
 
-                        {editItemData.Type === 'spell' && (
-                          <div className="text-center py-3">
-                            <Form.Control
-                              placeholder="Nhập câu trả lời..."
-                              disabled
-                              className="text-center"
-                              style={{ fontSize: '0.9rem' }}
-                            />
-                            <p className="text-muted small mt-2">
-                              Đáp án: {editItemData.AnswerKey?.[0] || '___'}
-                            </p>
-                          </div>
-                        )}
-
-                        {editItemData.Type === 'word-from-box' && (
-                          <div>
-                            <div className="p-2 bg-light rounded mb-2">
-                              <p className="small fw-semibold mb-1">Hộp từ:</p>
-                              <div className="d-flex flex-wrap gap-1">
-                                {(editItemData.Answer || ['']).map((word, idx) => (
-                                  <Badge key={idx} bg="secondary">
-                                    {word || `Từ ${idx + 1}`}
-                                  </Badge>
-                                ))}
+                          {/* Spell Preview */}
+                          {quiz.Type === 'spell' && (
+                            <div>
+                              <p className="small text-muted mb-2">Spell the words based on the questions:</p>
+                              <div className="d-flex flex-column gap-3">
+                                {(quiz.Answer || []).map((question, idx) => {
+                                  const word = quiz.AnswerKey?.[idx] || '';
+                                  
+                                  return (
+                                    <div key={idx}>
+                                      <p className="mb-2 small fw-medium">
+                                        {idx + 1}. {question || '(No question)'}
+                                      </p>
+                                      <div className="d-flex gap-1 justify-content-center">
+                                        {Array.from({ length: word.length || 3 }).map((_, letterIdx) => (
+                                          <div
+                                            key={letterIdx}
+                                            className="border border-2 border-secondary rounded text-center fw-bold bg-light"
+                                            style={{
+                                              width: '32px',
+                                              height: '32px',
+                                              lineHeight: '28px',
+                                              fontSize: '1rem',
+                                            }}
+                                          >
+                                            {word[letterIdx] || ''}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
-                            <p className="small">
-                              {editItemData.Question?.split('___').map((part, idx, arr) => (
-                                <span key={idx}>
-                                  {part}
-                                  {idx < arr.length - 1 && (
-                                    <span className="text-primary fw-bold">___</span>
-                                  )}
-                                </span>
-                              )) || 'Câu với chỗ trống ___'}
-                            </p>
-                          </div>
-                        )}
-                      </Card.Body>
-                    </Card>
-                  </div>
-                )}
+                          )}
 
-                {activeTab === 'quiz' && !editModal.show && (
-                  <div className="text-center py-4 text-muted">
+                          {/* Word from Box Preview */}
+                          {quiz.Type === 'word-from-box' && (
+                            <div>
+                              {/* Word Box */}
+                              <div className="p-2 bg-primary bg-opacity-10 border border-primary rounded mb-3">
+                                <p className="small fw-semibold mb-1 text-primary">
+                                  <i className="ph ph-package me-1"></i>Word Box:
+                                </p>
+                                <div className="d-flex flex-wrap gap-1">
+                                  {(quiz.AnswerKey || []).map((word, idx) => (
+                                    <Badge key={idx} bg="primary" className="px-2 py-1">
+                                      {word || `Từ ${idx + 1}`}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Sentences */}
+                              <p className="small text-muted mb-2">Điền vào chỗ trống:</p>
+                              <div className="d-flex flex-column gap-2">
+                                {(quiz.Answer || []).map((sentence, idx) => {
+                                  const parts = sentence.split('___');
+                                  
+                                  return (
+                                    <div key={idx} className="small">
+                                      <span className="fw-medium text-muted me-1">{idx + 1}.</span>
+                                      {parts.map((part, partIdx) => (
+                                        <span key={partIdx}>
+                                          {part}
+                                          {partIdx < parts.length - 1 && (
+                                            <span className="border-bottom border-2 border-primary px-2 mx-1">___</span>
+                                          )}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </Card.Body>
+                      </Card>
+                    </div>
+                  );
+                })()}
+
+                {activeTab === 'quiz' && previewQuizIndex === null && (
+                  <div className="text-center py-5 text-muted">
                     <i className="ph ph-question display-4 opacity-25"></i>
-                    <p className="small mt-2">Chọn quiz để xem preview</p>
+                    <p className="small mt-2">Nhấn nút <i className="ph ph-eye"></i> để xem preview</p>
                   </div>
                 )}
 
                 {/* Vocab Preview */}
-                {activeTab === 'vocab' && editModal.show && editModal.type === 'vocab' && editItemData && (
-                  <div>
-                    <p className="fw-semibold small mb-2">Preview Flashcard:</p>
-                    <Card className="border-0 bg-gradient text-white" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-                      <Card.Body className="p-4 text-center">
-                        {editItemData.img && (
-                          <img
-                            src={editItemData.img}
-                            className="w-100 rounded mb-3"
-                            style={{ maxHeight: '180px', objectFit: 'cover' }}
-                            alt="Vocabulary"
-                          />
-                        )}
-                        <h4 className="fw-bold">{editItemData.word || 'word'}</h4>
-                      </Card.Body>
-                    </Card>
-                  </div>
-                )}
+                {activeTab === 'vocab' && previewVocabIndex !== null && formData?.vocabulary?.items?.[previewVocabIndex] && (() => {
+                  const vocab = formData.vocabulary.items[previewVocabIndex];
+                  
+                  return (
+                    <div>
+                      <p className="fw-semibold small mb-2">
+                        Preview Flashcard #{previewVocabIndex + 1}
+                      </p>
+                      
+                      {/* Front side */}
+                      <Card className="border-0 shadow-sm mb-3">
+                        <Card.Body className="p-0">
+                          {vocab.img && (
+                            <div className="bg-gradient-primary d-flex align-items-center justify-content-center p-3">
+                              <img
+                                src={vocab.img}
+                                className="w-100 rounded"
+                                style={{ objectFit: 'cover' }}
+                                alt="Vocabulary"
+                              />
+                            </div>
+                          )}
+                          <div className="p-3 text-center bg-light">
+                            <p className="small text-muted mb-1">FRONT</p>
+                            <p className="small text-muted mb-0">
+                              <i className="ph ph-hand-pointing me-1"></i>
+                              Click to flip
+                            </p>
+                          </div>
+                        </Card.Body>
+                      </Card>
 
-                {activeTab === 'vocab' && !editModal.show && (
-                  <div className="text-center py-4 text-muted">
+                      {/* Back side */}
+                      <Card className="border-0 shadow-sm bg-primary text-white">
+                        <Card.Body className="p-4 text-center">
+                          <p className="small text-white-50 mb-2">BACK</p>
+                          <h4 className="fw-bold mb-0">{vocab.word || 'word'}</h4>
+                        </Card.Body>
+                      </Card>
+                    </div>
+                  );
+                })()}
+
+                {activeTab === 'vocab' && previewVocabIndex === null && (
+                  <div className="text-center py-5 text-muted">
                     <i className="ph ph-book-bookmark display-4 opacity-25"></i>
-                    <p className="small mt-2">Chọn từ vựng để xem preview</p>
+                    <p className="small mt-2">Nhấn nút <i className="ph ph-eye"></i> để xem preview</p>
                   </div>
                 )}
 
@@ -942,180 +1178,66 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
               <div className="modal-body">
                 {editModal.type === 'quiz' && editItemData && (
                   <div>
-                    {/* Quiz Type Selection */}
-                    <Form.Group className="mb-3">
-                      <Form.Label className="fw-semibold">
-                        Loại Quiz <span className="text-danger">*</span>
-                      </Form.Label>
-                      <Row className="g-2">
-                        {Object.entries(QUIZ_TYPES).map(([key, type]) => (
-                          <Col md={6} key={key}>
-                            <Card
-                              className={`cursor-pointer border-2 ${
-                                editItemData.Type === key
-                                  ? `border-${type.color} bg-${type.color} bg-opacity-10`
-                                  : 'border-secondary border-opacity-25'
-                              }`}
-                              onClick={() => canEdit && handleModalFieldChange('Type', key)}
-                              style={{ cursor: canEdit ? 'pointer' : 'default' }}
-                            >
-                              <Card.Body className="p-2">
-                                <div className="d-flex align-items-start gap-2">
-                                  <i className={`ph ${type.icon} text-${type.color}`} style={{ fontSize: '1.5rem' }}></i>
-                                  <div className="flex-grow-1">
-                                    <h6 className="fw-bold mb-1 small">{type.label}</h6>
-                                    <p className="mb-0" style={{ fontSize: '0.75rem' }}>
-                                      {type.description}
-                                    </p>
-                                  </div>
-                                  {editItemData.Type === key && (
-                                    <i className={`ph ph-check-circle text-${type.color}`}></i>
-                                  )}
-                                </div>
-                              </Card.Body>
-                            </Card>
-                          </Col>
-                        ))}
-                      </Row>
+                    {/* Quiz Type Display (Read-only) */}
+                    <div className="mb-3">
+                      <Form.Label className="fw-semibold small text-muted">Loại Quiz</Form.Label>
+                      <div>
+                        <Badge bg={QUIZ_TYPES[editItemData.Type].color} className="px-3 py-2">
+                          <i className={`ph ${QUIZ_TYPES[editItemData.Type].icon} me-2`}></i>
+                          {QUIZ_TYPES[editItemData.Type].label}
+                        </Badge>
+                        <span className="ms-2 small text-muted">{QUIZ_TYPES[editItemData.Type].description}</span>
+                      </div>
+                    </div>
 
-                      {editItemData.Type && (
-                        <Alert variant={QUIZ_TYPES[editItemData.Type].color} className="mt-2 small">
-                          <strong>Hướng dẫn:</strong>
-                          <br />
-                          Answer: {QUIZ_TYPES[editItemData.Type].answerFormat}
-                          <br />
-                          AnswerKey: {QUIZ_TYPES[editItemData.Type].answerKeyFormat}
-                        </Alert>
-                      )}
-                    </Form.Group>
-
-                    {/* Image URL */}
-                    <Form.Group className="mb-3">
-                      <Form.Label className="fw-semibold">Ảnh minh họa (URL)</Form.Label>
-                      <Form.Control
-                        value={editItemData.Img}
-                        onChange={(e) => handleModalFieldChange('Img', e.target.value)}
-                        placeholder="https://example.com/image.jpg"
-                        disabled={!canEdit}
+                    {/* Quiz Type Specific Form */}
+                    {editItemData.Type === 'multiple-choice' && (
+                      <MultipleChoiceQuizForm
+                        editItemData={editItemData}
+                        canEdit={canEdit}
+                        handleModalFieldChange={handleModalFieldChange}
+                        handleModalImageFileChange={handleModalImageFileChange}
+                        handleModalAnswerList={handleModalAnswerList}
+                        handleModalAddAnswer={handleModalAddAnswer}
+                        handleModalRemoveAnswer={handleModalRemoveAnswer}
                       />
-                      {canEdit && (
-                        <>
-                          <Form.Text className="text-muted small d-block mb-2">
-                            Hoặc tải lên file ảnh:
-                          </Form.Text>
-                          <Form.Control
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => handleModalImageFileChange(e, 'Img')}
-                          />
-                        </>
-                      )}
-                      {editItemData.Img && (
-                        <div className="mt-2">
-                          <img
-                            src={editItemData.Img}
-                            alt="Preview"
-                            className="w-100 rounded"
-                            style={{ maxHeight: '200px', objectFit: 'cover' }}
-                          />
-                        </div>
-                      )}
-                    </Form.Group>
-
-                    {/* Question */}
-                    <Form.Group className="mb-3">
-                      <Form.Label className="fw-semibold">
-                        Câu hỏi <span className="text-danger">*</span>
-                      </Form.Label>
-                      <Form.Control
-                        as="textarea"
-                        rows={2}
-                        value={editItemData.Question}
-                        onChange={(e) => handleModalFieldChange('Question', e.target.value)}
-                        placeholder={
-                          editItemData.Type === 'word-from-box'
-                            ? 'Nhập câu với chỗ trống, dùng ___ để đánh dấu. Ví dụ: The ___ is blue.'
-                            : 'Nhập câu hỏi'
-                        }
-                        disabled={!canEdit}
+                    )}
+                    
+                    {editItemData.Type === 'yes-no' && (
+                      <YesNoQuizForm
+                        editItemData={editItemData}
+                        canEdit={canEdit}
+                        handleModalFieldChange={handleModalFieldChange}
+                        handleModalImageFileChange={handleModalImageFileChange}
+                        handleModalAnswerList={handleModalAnswerList}
+                        handleModalAddAnswer={handleModalAddAnswer}
+                        handleModalRemoveAnswer={handleModalRemoveAnswer}
                       />
-                    </Form.Group>
-
-                    {/* Answer */}
-                    <Form.Group className="mb-3">
-                      <Form.Label className="fw-semibold">
-                        Answer (Các đáp án) <span className="text-danger">*</span>
-                      </Form.Label>
-                      {(editItemData.Answer || ['']).map((ans, idx) => (
-                        <div key={idx} className="d-flex gap-2 mb-2">
-                          <Form.Control
-                            value={ans}
-                            onChange={(e) => handleModalAnswerList('Answer', idx, e.target.value)}
-                            placeholder={getAnswerPlaceholder(editItemData.Type, idx)}
-                            disabled={!canEdit}
-                          />
-                          {canEdit && (
-                            <Button
-                              variant="outline-danger"
-                              size="sm"
-                              onClick={() => handleModalRemoveAnswer('Answer', idx)}
-                            >
-                              <i className="ph ph-x"></i>
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                      {canEdit && (
-                        <Button variant="outline-primary" size="sm" onClick={() => handleModalAddAnswer('Answer')}>
-                          <i className="ph ph-plus me-2"></i>
-                          Thêm đáp án
-                        </Button>
-                      )}
-                    </Form.Group>
-
-                    {/* AnswerKey */}
-                    <Form.Group className="mb-3">
-                      <Form.Label className="fw-semibold">
-                        AnswerKey (Đáp án đúng) <span className="text-danger">*</span>
-                      </Form.Label>
-                      {(editItemData.AnswerKey || ['']).map((key, idx) => (
-                        <div key={idx} className="d-flex gap-2 mb-2">
-                          {editItemData.Type === 'yes-no' ? (
-                            <Form.Select
-                              value={key}
-                              onChange={(e) => handleModalAnswerList('AnswerKey', idx, e.target.value)}
-                              disabled={!canEdit}
-                            >
-                              <option value="">-- Chọn --</option>
-                              <option value="Yes">Yes</option>
-                              <option value="No">No</option>
-                            </Form.Select>
-                          ) : (
-                            <Form.Control
-                              value={key}
-                              onChange={(e) => handleModalAnswerList('AnswerKey', idx, e.target.value)}
-                              placeholder={getAnswerKeyPlaceholder(editItemData.Type, idx)}
-                              disabled={!canEdit}
-                            />
-                          )}
-                          {canEdit && (
-                            <Button
-                              variant="outline-danger"
-                              size="sm"
-                              onClick={() => handleModalRemoveAnswer('AnswerKey', idx)}
-                            >
-                              <i className="ph ph-x"></i>
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                      {canEdit && (
-                        <Button variant="outline-primary" size="sm" onClick={() => handleModalAddAnswer('AnswerKey')}>
-                          <i className="ph ph-plus me-2"></i>
-                          Thêm đáp án đúng
-                        </Button>
-                      )}
-                    </Form.Group>
+                    )}
+                    
+                    {editItemData.Type === 'spell' && (
+                      <SpellQuizForm
+                        editItemData={editItemData}
+                        canEdit={canEdit}
+                        handleModalFieldChange={handleModalFieldChange}
+                        handleModalImageFileChange={handleModalImageFileChange}
+                        handleModalAnswerList={handleModalAnswerList}
+                        handleModalAddAnswer={handleModalAddAnswer}
+                        handleModalRemoveAnswer={handleModalRemoveAnswer}
+                      />
+                    )}
+                    
+                    {editItemData.Type === 'word-from-box' && (
+                      <WordFromBoxQuizForm
+                        editItemData={editItemData}
+                        canEdit={canEdit}
+                        handleModalFieldChange={handleModalFieldChange}
+                        handleModalImageFileChange={handleModalImageFileChange}
+                        handleModalAnswerList={handleModalAnswerList}
+                        handleModalAddAnswer={handleModalAddAnswer}
+                        handleModalRemoveAnswer={handleModalRemoveAnswer}
+                      />
+                    )}
                   </div>
                 )}
 
@@ -1191,6 +1313,69 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
           </div>
         </div>
       )}
+
+      {/* Quiz Type Selection Modal */}
+      <Modal show={showQuizTypeModal} onHide={() => setShowQuizTypeModal(false)} centered size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="ph ph-plus-circle me-2"></i>
+            Chọn loại Quiz
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted mb-3">
+            Chọn loại quiz bạn muốn tạo. Mỗi loại có cấu trúc và mục đích khác nhau.
+          </p>
+          <Row className="g-3">
+            {Object.entries(QUIZ_TYPES).map(([key, type]) => (
+              <Col md={6} key={key}>
+                <Card
+                  className="h-100 border-2 cursor-pointer hover-shadow"
+                  style={{ 
+                    cursor: 'pointer',
+                    transition: 'all 0.3s',
+                  }}
+                  onClick={() => handleQuizTypeSelected(key)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = `var(--bs-${type.color})`;
+                    e.currentTarget.style.transform = 'translateY(-4px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  <Card.Body className="p-3">
+                    <div className="d-flex align-items-start gap-3">
+                      <div 
+                        className={`bg-${type.color} bg-opacity-10 rounded-circle p-3 d-flex align-items-center justify-content-center`}
+                        style={{ width: '60px', height: '60px' }}
+                      >
+                        <i 
+                          className={`ph ${type.icon} text-${type.color}`} 
+                          style={{ fontSize: '28px' }}
+                        ></i>
+                      </div>
+                      <div className="flex-grow-1">
+                        <h5 className="fw-bold mb-2">{type.label}</h5>
+                        <p className="text-muted small mb-0">{type.description}</p>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowQuizTypeModal(false)}>
+            Hủy
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Toast Container */}
+      <ToastContainer />
     </div>
   );
 };

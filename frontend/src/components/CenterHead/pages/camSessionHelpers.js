@@ -1,13 +1,33 @@
 // Quiz Type Definitions and Helpers for Cambridge Session Edit
 
+/**
+ * CẤU TRÚC QUIZ:
+ * - Question (Đề bài): 
+ *   + Multiple Choice: Câu hỏi đơn
+ *   + Yes/No, Spell, Word-from-Box: Đề bài chung/Yêu cầu của quiz
+ * 
+ * - Answer:
+ *   + Multiple Choice: Các lựa chọn đáp án
+ *   + Yes/No, Spell, Word-from-Box: Các câu hỏi/câu cần trả lời
+ * 
+ * - AnswerKey (Đáp án đúng):
+ *   + Multiple Choice: 1 đáp án đúng trong các Answer
+ *   + Yes/No, Spell, Word-from-Box: Đáp án đúng tương ứng với mỗi Answer
+ */
+
 export const QUIZ_TYPES = {
   'multiple-choice': {
     label: 'Multiple Choice',
     icon: 'ph-check-circle',
-    description: 'Chọn 1 đáp án đúng từ nhiều lựa chọn',
+    description: '1 câu hỏi, nhiều lựa chọn, 1 đáp án đúng',
     color: 'primary',
-    answerFormat: 'Danh sách các lựa chọn (Answer)',
-    answerKeyFormat: '1 đáp án đúng (AnswerKey)',
+    questionLabel: 'Câu hỏi',
+    questionPlaceholder: 'Nhập câu hỏi (ví dụ: What animal is this?)',
+    answerLabel: 'Các lựa chọn đáp án',
+    answerPlaceholder: (idx) => `Lựa chọn ${idx + 1}`,
+    answerKeyLabel: 'Đáp án đúng',
+    answerKeyFormat: '1 đáp án (chọn từ danh sách Answer)',
+    multipleQuestions: false,
     example: {
       Question: 'What animal is this?',
       Answer: ['Cat', 'Dog', 'Bird', 'Fish'],
@@ -17,10 +37,15 @@ export const QUIZ_TYPES = {
   'yes-no': {
     label: 'Yes/No',
     icon: 'ph-question',
-    description: 'Trả lời Yes/No cho nhiều câu hỏi',
+    description: '1 đề bài, nhiều câu hỏi Yes/No',
     color: 'success',
-    answerFormat: 'Danh sách các câu hỏi (Answer)',
-    answerKeyFormat: 'Yes hoặc No cho mỗi câu (AnswerKey)',
+    questionLabel: 'Đề bài chung',
+    questionPlaceholder: 'Nhập yêu cầu/đề bài (ví dụ: Look at the picture and answer Yes or No)',
+    answerLabel: 'Câu hỏi',
+    answerPlaceholder: (idx) => `Câu hỏi ${idx + 1} (ví dụ: The elephant is big)`,
+    answerKeyLabel: 'Đáp án',
+    answerKeyFormat: 'Yes hoặc No cho mỗi câu hỏi',
+    multipleQuestions: true,
     example: {
       Question: 'Look at the picture and answer Yes or No:',
       Answer: [
@@ -34,30 +59,38 @@ export const QUIZ_TYPES = {
   'spell': {
     label: 'Spell',
     icon: 'ph-text-aa',
-    description: 'Đánh vần từ vựng',
+    description: '1 đề bài, nhiều từ cần đánh vần',
     color: 'warning',
-    answerFormat: 'Danh sách các từ cần đánh vần (Answer)',
-    answerKeyFormat: 'Giống Answer - từ đúng (AnswerKey)',
+    questionLabel: 'Đề bài chung',
+    questionPlaceholder: 'Nhập yêu cầu/đề bài (ví dụ: Spell these animals in the picture)',
+    answerLabel: 'Đề bài/Câu hỏi',
+    answerPlaceholder: (idx) => `Câu hỏi ${idx + 1} (ví dụ: Number 1, The first word)`,
+    answerKeyLabel: 'Từ cần đánh vần',
+    answerKeyFormat: 'Từ đúng cho mỗi câu hỏi',
+    multipleQuestions: true,
     example: {
       Question: 'Spell these animals:',
-      Answer: ['CAT', 'DOG', 'BIRD'],
+      Answer: ['Number 1', 'Number 2', 'Number 3'],
       AnswerKey: ['CAT', 'DOG', 'BIRD']
     }
   },
   'word-from-box': {
     label: 'Word from Box',
     icon: 'ph-textbox',
-    description: 'Điền từ vào chỗ trống',
+    description: '1 đề bài, nhiều câu có chỗ trống, chọn từ trong hộp',
     color: 'info',
-    answerFormat: 'Các câu có chỗ trống - dùng ___ (Answer)',
-    answerKeyFormat: 'Danh sách từ đúng theo thứ tự (AnswerKey)',
+    questionLabel: 'Đề bài chung',
+    questionPlaceholder: 'Nhập yêu cầu/đề bài (ví dụ: Fill in the blanks with words from the box)',
+    answerLabel: 'Câu có chỗ trống',
+    answerPlaceholder: (idx) => `Câu ${idx + 1} (dùng ___ cho chỗ trống)`,
+    answerKeyLabel: 'Từ điền vào',
+    answerKeyFormat: 'Từ đúng cho mỗi chỗ trống',
+    multipleQuestions: true,
+    wordBoxLabel: 'Word Box (các từ trong hộp)',
     example: {
-      Question: 'Fill in the blanks with words from the box:',
-      Answer: [
-        'The _____ can _____ in the sky.',
-        'Birds like to _____ on the _____.'
-      ],
-      AnswerKey: ['bird', 'fly', 'sing', 'tree']
+      Question: 'Fill in the blanks:',
+      Answer: ['The ___ is blue', 'I have a ___', 'The ___ is red'],
+      AnswerKey: ['sky', 'cat', 'apple']
     }
   }
 };
@@ -98,7 +131,7 @@ export const validateQuiz = (quiz) => {
   const errors = [];
   
   if (!quiz.Question?.trim()) {
-    errors.push('Câu hỏi không được để trống');
+    errors.push('Đề bài/Câu hỏi không được để trống');
   }
 
   const type = quiz.Type;
@@ -108,51 +141,48 @@ export const validateQuiz = (quiz) => {
   switch (type) {
     case 'multiple-choice':
       if (answerCount < 2) {
-        errors.push('Multiple Choice cần ít nhất 2 lựa chọn trong Answer');
+        errors.push('Multiple Choice cần ít nhất 2 lựa chọn đáp án');
       }
       if (keyCount !== 1) {
-        errors.push('Multiple Choice cần đúng 1 đáp án đúng trong AnswerKey');
+        errors.push('Multiple Choice cần đúng 1 đáp án đúng');
       }
       if (keyCount === 1 && !quiz.Answer?.includes(quiz.AnswerKey[0])) {
-        errors.push('AnswerKey phải là một trong các lựa chọn trong Answer');
+        errors.push('Đáp án đúng phải là một trong các lựa chọn');
       }
       break;
       
     case 'yes-no':
       if (answerCount < 1) {
-        errors.push('Yes/No cần ít nhất 1 câu hỏi trong Answer');
+        errors.push('Cần ít nhất 1 câu hỏi Yes/No');
       }
       if (keyCount !== answerCount) {
-        errors.push(`Yes/No cần ${answerCount} đáp án trong AnswerKey (bằng số câu hỏi)`);
+        errors.push(`Cần ${answerCount} đáp án (mỗi câu hỏi 1 đáp án Yes/No)`);
       }
       quiz.AnswerKey?.forEach((key, idx) => {
         if (key !== 'Yes' && key !== 'No') {
-          errors.push(`AnswerKey[${idx}] phải là "Yes" hoặc "No" (hiện tại: "${key}")`);
+          errors.push(`Đáp án câu ${idx + 1} phải là "Yes" hoặc "No"`);
         }
       });
       break;
       
     case 'spell':
       if (answerCount < 1) {
-        errors.push('Spell cần ít nhất 1 từ trong Answer');
+        errors.push('Cần ít nhất 1 câu hỏi cần đánh vần');
       }
       if (keyCount !== answerCount) {
-        errors.push('Spell: AnswerKey phải có số lượng giống Answer');
+        errors.push(`Cần ${answerCount} từ cần đánh vần (mỗi câu hỏi 1 từ)`);
       }
-      // Check if AnswerKey matches Answer (case-insensitive)
-      quiz.Answer?.forEach((ans, idx) => {
-        if (quiz.AnswerKey?.[idx]?.toLowerCase() !== ans?.toLowerCase()) {
-          errors.push(`Spell: AnswerKey[${idx}] phải giống Answer[${idx}]`);
+      // Validate English only for spell answers
+      quiz.AnswerKey?.forEach((word, idx) => {
+        if (word?.trim() && !/^[a-zA-Z\s'-]+$/.test(word)) {
+          errors.push(`Từ ${idx + 1} chỉ được chứa chữ cái tiếng Anh`);
         }
       });
       break;
       
     case 'word-from-box': {
       if (answerCount < 1) {
-        errors.push('Word from Box cần ít nhất 1 câu có chỗ trống trong Answer');
-      }
-      if (keyCount < 1) {
-        errors.push('Word from Box cần ít nhất 1 từ đúng trong AnswerKey');
+        errors.push('Cần ít nhất 1 câu có chỗ trống (dùng ___)');
       }
       
       // Count total blanks (___) in all Answer sentences
@@ -161,12 +191,19 @@ export const validateQuiz = (quiz) => {
       }, 0) || 0;
       
       if (blanksCount === 0) {
-        errors.push('Answer phải chứa chỗ trống (___) để điền từ');
+        errors.push('Các câu phải chứa chỗ trống (___) để điền từ');
       }
       
-      if (blanksCount !== keyCount) {
-        errors.push(`Số chỗ trống (${blanksCount}) phải bằng số từ trong AnswerKey (${keyCount})`);
+      if (keyCount !== blanksCount) {
+        errors.push(`Cần ${blanksCount} từ trong Word Box (bằng số chỗ trống)`);
       }
+      
+      // Validate English only for word box
+      quiz.AnswerKey?.forEach((word, idx) => {
+        if (word?.trim() && !/^[a-zA-Z\s'-]+$/.test(word)) {
+          errors.push(`Từ ${idx + 1} trong Word Box chỉ được chứa chữ cái tiếng Anh`);
+        }
+      });
       break;
     }
       

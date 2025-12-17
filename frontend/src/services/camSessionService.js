@@ -63,6 +63,40 @@ export const camSessionService = {
       throw error.response?.data || { message: 'Không thể lấy danh sách buổi học CAM của giáo trình' };
     }
   },
+
+  // Upload video file
+  uploadVideo: async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append('video', file);
+      
+      const response = await axios.post(`${API_BASE_URL}/upload/video`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data; // { url: 'http://localhost:8080/uploads/online-learning/video-xxx.mp4' }
+    } catch (error) {
+      throw error.response?.data || { message: 'Upload video thất bại' };
+    }
+  },
+
+  // Upload image file
+  uploadImage: async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      const response = await axios.post(`${API_BASE_URL}/upload/image`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data; // { url: 'http://localhost:8080/uploads/online-learning/image-xxx.jpg' }
+    } catch (error) {
+      throw error.response?.data || { message: 'Upload ảnh thất bại' };
+    }
+  },
 };
 
 export default camSessionService;

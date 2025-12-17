@@ -1,245 +1,622 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import Breadcrumb from "../../components/Breadcrumb";
-import FooterOne from "../../components/FooterOne";
-import HeaderOne from "../../components/HomePageforStudent/HeaderOne";
-import Animation from "../../helper/Animation";
-import Preloader from "../../helper/Preloader";
-import { examService } from "../../services/examService";
-import { useAuth } from "../../contexts/AuthContext";
+import { useState, useEffect, useMemo } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import examService from "../../services/examService";
+
 
 const ExamDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
   const [exam, setExam] = useState(null);
-  const [submission, setSubmission] = useState(null);
+  const [submissions, setSubmissions] = useState([]);
+  const [selectedSubmissionId, setSelectedSubmissionId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [starting, setStarting] = useState(false);
+  const [startingExam, setStartingExam] = useState(false);
 
+  // Tính submission hiện tại từ submissions và selectedSubmissionId
+  const submission = useMemo(() => {
+    if (!selectedSubmissionId || submissions.length === 0) return null;
+    return submissions.find(sub => sub._id === selectedSubmissionId) || null;
+  }, [submissions, selectedSubmissionId]);
+
+  // Fetch exam data on component mount
   useEffect(() => {
     const fetchExam = async () => {
       try {
         setLoading(true);
+        setError(null);
         const examData = await examService.getExamById(id);
         setExam(examData);
-        
-        // Check if user already has a submission for this exam
-        if (isAuthenticated) {
-          try {
-            const result = await examService.startExam(id);
-            if (result.submission) {
-              setSubmission(result.submission);
-            }
-          } catch (error) {
-            // If no submission exists, that's okay - user will start new one
-            console.log("No existing submission", error);
-          }
-        }
-        
-        setError(null);
       } catch (err) {
-        setError(err.message || "Không thể tải thông tin bài thi");
+        console.error('Error fetching exam:', err);
+        setError(err.message || 'Không thể tải thông tin đề thi');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchExam();
-  }, [id, isAuthenticated]);
+    if (id) {
+      fetchExam();
+    }
+  }, [id]);
 
-  
+  // Fetch submissions history after exam is loaded
+  useEffect(() => {
+    const fetchSubmissions = async () => {
+      if (!exam || !id) return;
+      
+      try {
+        // Fetch all submissions for this exam
+        const result = await examService.getExamSubmissions(id);
+        if (result.submissions && result.submissions.length > 0) {
+          setSubmissions(result.submissions);
+          // Set the latest submission as default
+          setSelectedSubmissionId(result.submissions[0]._id);
+        } else {
+          // If no submissions, try to get/create one by calling startExam
+          const startResult = await examService.startExam(id);
+          if (startResult.submission) {
+            setSubmissions([startResult.submission]);
+            setSelectedSubmissionId(startResult.submission._id);
+          }
+        }
+      } catch (err) {
+        // If error (e.g., not authenticated), submission will remain null
+        console.log('No submission found or not authenticated:', err);
+      }
+    };
 
-  const getSectionIcon = (type) => {
+    fetchSubmissions();
+  }, [exam, id]);
+
+  // Handle submission selection from dropdown
+  const handleSubmissionChange = (submissionId) => {
+    setSelectedSubmissionId(submissionId);
+  };
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Chưa có';
+    const date = new Date(dateString);
+    return date.toLocaleString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Get section configuration
+  const getSectionConfig = (type) => {
     switch (type) {
-      case "reading":
-        return "ph-book-open";
       case "listening":
-        return "ph-headphones";
-      case "writing":
-        return "ph-pencil";
-      case "speaking":
-        return "ph-microphone";
-      default:
-        return "ph-file";
-    }
-  };
-
-  const getSectionName = (type) => {
-    switch (type) {
+        return {
+          icon: "ph-headphones",
+          name: "Listening",
+          gradient: "linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)",
+          bgColor: "rgba(6, 182, 212, 0.1)",
+          iconColor: "#06b6d4",
+        };
       case "reading":
-        return "Reading";
-      case "listening":
-        return "Listening";
+        return {
+          icon: "ph-file-text",
+          name: "Reading",
+          gradient: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+          bgColor: "rgba(16, 185, 129, 0.1)",
+          iconColor: "#10b981",
+        };
       case "writing":
-        return "Writing";
+        return {
+          icon: "ph-pencil",
+          name: "Writing",
+          gradient: "linear-gradient(135deg, #f97316 0%, #c2410c 100%)",
+          bgColor: "rgba(249, 115, 22, 0.1)",
+          iconColor: "#f97316",
+        };
       case "speaking":
-        return "Speaking";
+        return {
+          icon: "ph-microphone",
+          name: "Speaking",
+          gradient: "linear-gradient(135deg, #ec4899 0%, #be185d 100%)",
+          bgColor: "rgba(236, 72, 153, 0.1)",
+          iconColor: "#ec4899",
+        };
       default:
-        return type;
+        return {
+          icon: "ph-file",
+          name: type,
+          gradient: "linear-gradient(135deg, #6b7280 0%, #374151 100%)",
+          bgColor: "rgba(107, 114, 128, 0.1)",
+          iconColor: "#6b7280",
+        };
     }
   };
 
-  const handleSectionClick = (sectionType) => {
-    if (!submission) {
-      alert("Vui lòng bắt đầu làm bài trước");
-      return;
-    }
+  // Calculate total questions
+  const getTotalQuestions = (exam) => {
+    if (!exam || !exam.sections) return 0;
+    return exam.sections.reduce(
+      (total, section) => total + (section.questionCount || 0),
+      0
+    );
+  };
 
-    if (sectionType === "reading") {
-      navigate(`/exams/${id}/submissions/${submission._id}/reading`);
-    } else if (sectionType === "listening") {
-      navigate(`/exams/${id}/submissions/${submission._id}/listening`);
-    } else if (sectionType === "writing") {
-      navigate(`/exams/${id}/submissions/${submission._id}/writing`);
-    } else if (sectionType === "speaking") {
-      navigate(`/exams/${id}/submissions/${submission._id}/speaking`);
+  // Calculate progress based on submission
+  const progress = useMemo(() => {
+    if (!submission || !exam || !exam.sections) return 0;
+    
+    const totalSections = exam.sections.length;
+    if (totalSections === 0) return 0;
+    
+    const submittedSections = submission.sections?.filter(
+      (section) => section.submittedAt !== null
+    ).length || 0;
+    
+    return Math.round((submittedSections / totalSections) * 100);
+  }, [submission, exam]);
+
+  // Check if a section is completed (has submittedAt)
+  const isSectionCompleted = (sectionType) => {
+    if (!submission || !submission.sections) return false;
+    const sectionSubmission = submission.sections.find(
+      (s) => s.sectionType === sectionType
+    );
+    return sectionSubmission?.submittedAt !== null && sectionSubmission?.submittedAt !== undefined;
+  };
+
+  const handleSectionClick = async (sectionType) => {
+    try {
+      setStartingExam(true);
+      
+      // Check if section is completed (user clicked "Làm lại")
+      const isCompleted = isSectionCompleted(sectionType);
+      
+      // If no submission exists, create one by starting the exam
+      if (!submission) {
+        const result = await examService.startExam(id);
+        if (result.submission) {
+          setSubmissions([result.submission]);
+          setSelectedSubmissionId(result.submission._id);
+          navigate(`/exams/${id}/submissions/${result.submission._id}/${sectionType}`);
+        } else {
+          throw new Error('Không thể tạo bài làm');
+        }
+      } else if (isCompleted) {
+        // If section is completed, create a new submission for retry
+        const result = await examService.createNewSubmission(id);
+        if (result.submission) {
+          // Refresh submissions list and set new submission as selected
+          const submissionsResult = await examService.getExamSubmissions(id);
+          if (submissionsResult.submissions) {
+            setSubmissions(submissionsResult.submissions);
+            setSelectedSubmissionId(result.submission._id);
+          } else {
+            setSubmissions([result.submission]);
+            setSelectedSubmissionId(result.submission._id);
+          }
+          navigate(`/exams/${id}/submissions/${result.submission._id}/${sectionType}`);
+        } else {
+          throw new Error('Không thể tạo bài làm mới');
+        }
+      } else {
+        // If submission exists and section not completed, navigate directly
+        navigate(`/exams/${id}/submissions/${submission._id}/${sectionType}`);
+      }
+    } catch (err) {
+      console.error('Error starting exam:', err);
+      alert(err.message || 'Không thể bắt đầu làm bài. Vui lòng thử lại.');
+    } finally {
+      setStartingExam(false);
     }
   };
 
-  const getSectionStatus = (sectionType) => {
-    if (!submission) return "not-started";
-    const section = submission.sections.find((s) => s.sectionType === sectionType);
-    if (!section) return "not-started";
-    if (section.submittedAt) return "completed";
-    if (section.answers?.length > 0) return "in-progress";
-    return "not-started";
-  };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <>
+
+       
+        <section className="py-120">
+          <div className="container">
+            <div className="text-center py-80">
+              <div className="spinner-border text-main-600" role="status">
+                <span className="visually-hidden">Đang tải...</span>
+              </div>
+              <p className="mt-16 text-neutral-600">Đang tải thông tin đề thi...</p>
+            </div>
+          </div>
+        </section>
+      
+      </>
+    );
+  }
+
+  // Show error state
+  if (error || !exam) {
+    return (
+      <>
+     
+       
+        <section className="py-120">
+          <div className="container">
+            <div className="text-center py-80">
+              <div className="inline-flex flex-center w-80 h-80 rounded-circle bg-danger-25 mb-24">
+                <i className="ph-bold ph-warning text-4xl text-danger" />
+              </div>
+              <h3 className="text-xl fw-semibold text-neutral-900 mb-16">
+                {error ? 'Có lỗi xảy ra' : 'Không tìm thấy đề thi'}
+              </h3>
+              <p className="text-neutral-500 text-lg mb-24">
+                {error || 'Đề thi không tồn tại hoặc đã bị xóa'}
+              </p>
+              <button
+                onClick={() => navigate('/exams')}
+                className="btn btn-main me-12"
+              >
+                Quay lại danh sách
+              </button>
+              {error && (
+                <button
+                  onClick={() => window.location.reload()}
+                  className="btn btn-outline-main"
+                >
+                  Thử lại
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+    
+      </>
+    );
+  }
 
   return (
     <>
-      <Preloader />
-      <Animation />
-      <HeaderOne />
-      <Breadcrumb title={exam?.title || "Chi tiết bài thi"} />
+   
+     
 
-      <section className='py-120'>
-        <div className='container'>
-          {loading ? (
-            <div className='text-center py-80'>
-              <div className='spinner-border text-main-600' role='status'>
-                <span className='visually-hidden'>Loading...</span>
+      <section 
+        className="py-120 position-relative"
+        style={{
+          background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f0f9ff 50%, #e0f2fe 75%, #f0f9ff 100%)",
+          backgroundSize: "400% 400%",
+          animation: "gradientShift 15s ease infinite",
+          minHeight: "100vh",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        {/* Decorative background elements */}
+        <div 
+          style={{
+            position: "absolute",
+            top: "-50%",
+            right: "-10%",
+            width: "600px",
+            height: "600px",
+            background: "radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)",
+            borderRadius: "50%",
+            zIndex: 0,
+          }}
+        />
+        <div 
+          style={{
+            position: "absolute",
+            bottom: "-30%",
+            left: "-5%",
+            width: "500px",
+            height: "500px",
+            background: "radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%)",
+            borderRadius: "50%",
+            zIndex: 0,
+          }}
+        />
+        <style>{`
+          @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+          }
+        `}</style>
+        <div className="container position-relative" style={{ zIndex: 1 }}>
+          {/* Main Card Container */}
+          <div 
+            className="bg-white rounded-16 p-32 border border-neutral-30 box-shadow-md"
+            style={{
+              boxShadow: "0 20px 60px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(59, 130, 246, 0.08)",
+              backdropFilter: "blur(10px)",
+              position: "relative",
+            }}
+          >
+            {/* Title and Submission History Dropdown */}
+            <div className="d-flex flex-wrap justify-content-between align-items-center mb-40 gap-16">
+              <h1 className="mb-0 text-neutral-900">{exam.title}</h1>
+              
+              {/* Submission History Dropdown */}
+              {submissions.length > 0 && (
+                <div 
+                  className="d-flex flex-align gap-12"
+                  style={{
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                    padding: '12px 20px',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                  }}
+                >
+                  <div className="d-flex flex-align gap-8">
+                    <div 
+                      className="flex-center rounded-8"
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                      }}
+                    >
+                      <i className="ph ph-clock-clockwise text-white text-lg" />
+                    </div>
+                    <div>
+                      <label 
+                        className="text-neutral-700 fw-semibold d-block mb-4" 
+                        style={{ 
+                          whiteSpace: 'nowrap',
+                          fontSize: '13px',
+                          color: '#64748b'
+                        }}
+                      >
+                        Lịch sử làm bài
+                      </label>
+                      <div className="position-relative">
+                        <select
+                          value={selectedSubmissionId || ''}
+                          onChange={(e) => handleSubmissionChange(e.target.value)}
+                          style={{
+                            minWidth: '320px',
+                            padding: '10px 40px 10px 16px',
+                            border: '2px solid #e2e8f0',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            backgroundColor: '#fff',
+                            cursor: 'pointer',
+                            fontWeight: '500',
+                            color: '#1e293b',
+                            appearance: 'none',
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364758b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                            backgroundRepeat: 'no-repeat',
+                            backgroundPosition: 'right 12px center',
+                            transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#3b82f6';
+                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#e2e8f0';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                          onFocus={(e) => {
+                            e.currentTarget.style.borderColor = '#3b82f6';
+                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                            e.currentTarget.style.outline = 'none';
+                          }}
+                          onBlur={(e) => {
+                            e.currentTarget.style.borderColor = '#e2e8f0';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        >
+                          {submissions.map((sub, index) => {
+                            const statusConfig = {
+                              'completed': { text: 'Hoàn thành', color: '#10b981', bg: '#d1fae5' },
+                              'partially-submitted': { text: 'Đã nộp một phần', color: '#f59e0b', bg: '#fef3c7' },
+                              'in-progress': { text: 'Đang làm', color: '#3b82f6', bg: '#dbeafe' },
+                            };
+                            const status = statusConfig[sub.status] || { text: '', color: '', bg: '' };
+                            
+                            return (
+                              <option key={sub._id} value={sub._id}>
+                                Lần {submissions.length - index} • {formatDate(sub.createdAt)} 
+                                {status.text ? ` • ${status.text}` : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sections Grid - Group by section type */}
+            <div className="row gy-4 mb-40">
+              {(() => {
+                // Group sections by type
+                const sectionsByType = {};
+                exam.sections?.forEach((section) => {
+                  const type = section.type;
+                  if (!sectionsByType[type]) {
+                    sectionsByType[type] = [];
+                  }
+                  sectionsByType[type].push(section);
+                });
+
+                // Get unique section types
+                const uniqueTypes = Object.keys(sectionsByType);
+
+                return uniqueTypes.map((sectionType, index) => {
+                  const config = getSectionConfig(sectionType);
+                  const isCompleted = isSectionCompleted(sectionType);
+                  const sectionsOfType = sectionsByType[sectionType];
+                  const totalQuestions = sectionsOfType.reduce((sum, s) => sum + (s.questionCount || 0), 0);
+                  const totalDuration = sectionsOfType.reduce((sum, s) => sum + (s.duration || 0), 0);
+                  
+                  return (
+                    <div key={index} className="col-lg-3 col-md-6 col-sm-6">
+                      <div
+                        className="bg-white rounded-12 p-24 border border-neutral-30 box-shadow-sm transition-2 h-100 d-flex flex-column text-center"
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.1)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.boxShadow = "";
+                        }}
+                      >
+                        {/* Icon */}
+                        <div
+                          className="mb-16 flex-center rounded-12 mx-auto"
+                          style={{
+                            width: "64px",
+                            height: "64px",
+                            backgroundColor: config.bgColor,
+                          }}
+                        >
+                          <i
+                            className={`ph ${config.icon} text-3xl`}
+                            style={{ color: config.iconColor }}
+                          />
+                        </div>
+
+                        {/* Section Name */}
+                        <h4 className="mb-16 text-neutral-900 text-center">
+                          {config.name}
+                        </h4>
+                        
+                        {/* Part count info */}
+                        {sectionsOfType.length > 1 && (
+                          <p className="text-neutral-600 text-sm mb-8">
+                            {sectionsOfType.length} phần
+                          </p>
+                        )}
+
+                      {/* Take Test / Làm lại Button */}
+                      <button
+                        className="btn py-12 rounded-8 text-white fw-semibold transition-2 mb-16 flex-center gap-8"
+                        style={{
+                          width: "100%",
+                          background: isCompleted 
+                            ? "linear-gradient(135deg, #6b7280 0%, #4b5563 100%)"
+                            : config.gradient,
+                          border: "none",
+                        }}
+                        onClick={() => handleSectionClick(sectionType)}
+                        disabled={startingExam}
+                      >
+                        {startingExam ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-8" />
+                            Đang tải...
+                          </>
+                        ) : isCompleted ? (
+                          <>
+                            Làm lại
+                            <i className="ph ph-arrow-counter-clockwise" />
+                          </>
+                        ) : (
+                          <>
+                            Làm Bài
+                            <i className="ph ph-lightning" />
+                          </>
+                        )}
+                      </button>
+
+                      {/* Xem kết quả Button - Only show when section is completed */}
+                      {isCompleted && (
+                        <button
+                          className="btn py-12 rounded-8 fw-semibold transition-2 flex-center gap-8"
+                          style={{
+                            width: "100%",
+                            background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                            border: "none",
+                            color: "#fff",
+                          }}
+                          onClick={() => {
+                            if (submission && submission._id) {
+                              navigate(`/student/exams/${id}/submissions/${submission._id}/${sectionType}/result`);
+                            }
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)";
+                            e.currentTarget.style.transform = "translateY(-2px)";
+                            e.currentTarget.style.boxShadow = "0 4px 12px rgba(59, 130, 246, 0.4)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)";
+                            e.currentTarget.style.transform = "translateY(0)";
+                            e.currentTarget.style.boxShadow = "none";
+                          }}
+                        >
+                          <i className="ph ph-eye" />
+                          Xem kết quả
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+                });
+              })()}
+            </div>
+              
+            {/* Full Test Section */}
+            <div
+              className="bg-main-25 rounded-12 p-24 border border-neutral-30 position-relative"
+            >
+              <div className="d-flex flex-wrap flex-center gap-16" style={{ justifyContent: "center", alignItems: "center" }}>
+                {/* Icon and Label */}
+                <div className="flex-align gap-12">
+                  <div className="w-48 h-48 bg-main-600 rounded-12 flex-center text-white text-2xl">
+                    <i className="ph ph-squares-four" />
+                  </div>
+                  <div>
+                    <h4 className="mb-0 text-neutral-900">Full Test®</h4>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div style={{ width: "100%", maxWidth: "400px" }}>
+                  <div
+                    className="position-relative rounded-pill"
+                    style={{
+                      height: "24px",
+                      backgroundColor: "#e5e7eb",
+                      border: "1px solid #d1d5db",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      className="position-absolute rounded-pill transition-2"
+                      style={{
+                        top: 0,
+                        left: 0,
+                        height: "100%",
+                        width: `${progress}%`,
+                        background: "linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)",
+                      }}
+                    />
+                    <div
+                      className="position-absolute flex-center text-xs fw-semibold text-neutral-700"
+                      style={{
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 1,
+                      }}
+                    >
+                      {progress}%
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </div>
-          ) : error ? (
-            <div className='alert alert-danger' role='alert'>
-              {error}
-            </div>
-          ) : exam ? (
-            <>
-              {!isAuthenticated ? (
-                <>
-                  {/* Hiển thị thông báo khi chưa đăng nhập */}
-                
-
-                  <div className='bg-warning-25 rounded-16 p-32 mb-40 border border-warning-200'>
-                    <div className='text-center'>
-                      <div className='mb-16'>
-                        <i className='ph ph-warning text-warning-600 text-4xl' />
-                      </div>
-                      <h3 className='mb-8'>Bạn chưa đăng nhập</h3>
-                      <p className='text-neutral-600 mb-24'>
-                        Vui lòng đăng nhập để có thể bắt đầu làm bài thi
-                      </p>
-                      <button
-                        onClick={() => navigate("/sign-in")}
-                        className='btn btn-primary btn-lg px-40 py-16 rounded-pill'
-                      >
-                        Tiến hành đăng nhập
-                        <i className='ph ph-arrow-right ms-8' />
-                      </button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Chỉ hiển thị các phần thi khi đã bắt đầu làm bài */}
-                  <div className='mb-40'>
-                    <h2 className='mb-24'>Các phần thi</h2>
-                    <div className='row gy-4'>
-                      {exam.sections?.map((section, index) => {
-                        const status = getSectionStatus(section.type);
-                        return (
-                          <div key={index} className='col-lg-6 col-md-6'>
-                            <div
-                              className={`bg-white rounded-16 p-24 border border-neutral-30 cursor-pointer transition-2 ${
-                                status === "completed"
-                                  ? "border-success"
-                                  : status === "in-progress"
-                                  ? "border-warning"
-                                  : ""
-                              } hover-shadow-sm`}
-                              onClick={() => handleSectionClick(section.type)}
-                            >
-                              <div className='flex-between gap-16 mb-16'>
-                                <div className='flex-align gap-12'>
-                                  <div className='w-48 h-48 bg-main-25 rounded-12 flex-center text-main-600 text-2xl'>
-                                    <i className={`ph ${getSectionIcon(section.type)}`} />
-                                  </div>
-                                  <div>
-                                    <h4 className='mb-4'>{getSectionName(section.type)}</h4>
-                                    {section.duration && (
-                                      <p className='text-neutral-500 text-sm mb-0'>
-                                        {section.duration} phút
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                                <div>
-                                  {status === "completed" && (
-                                    <span className='badge bg-success text-white px-12 py-4 rounded-pill'>
-                                      Hoàn thành
-                                    </span>
-                                  )}
-                                  {status === "in-progress" && (
-                                    <span className='badge bg-warning text-white px-12 py-4 rounded-pill'>
-                                      Đang làm
-                                    </span>
-                                  )}
-                                  {status === "not-started" && (
-                                    <span className='badge bg-neutral-200 text-neutral-600 px-12 py-4 rounded-pill'>
-                                      Chưa bắt đầu
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              {section.instructions && (
-                                <p className='text-neutral-600 text-sm mb-0'>
-                                  {section.instructions}
-                                </p>
-                              )}
-                              {section.questionCount && (
-                                <p className='text-neutral-500 text-sm mt-8 mb-0'>
-                                  {section.questionCount} câu hỏi
-                                </p>
-                              )}
-                              <div className='mt-16 pt-16 border-top border-neutral-30'>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSectionClick(section.type);
-                                  }}
-                                  className='btn btn-primary w-100 px-16 py-8 rounded-pill'
-                                >
-                                  Bắt đầu
-                                  <i className='ph ph-arrow-right ms-8' />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </>
-              )}
-            </>
-          ) : null}
+          </div>
         </div>
       </section>
 
-      <FooterOne />
+     
     </>
   );
 };

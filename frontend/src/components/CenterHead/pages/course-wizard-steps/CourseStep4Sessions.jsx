@@ -4,7 +4,7 @@ import Badge from '../../compo/Badge';
 import sessionService from '../../../../services/sessionService';
 import courseService from '../../../../services/courseService';
 
-const CourseStep4Sessions = ({ courseData, onPrevious, navigate }) => {
+const CourseStep4Sessions = ({ courseData, onPrevious, navigate, basePath = '/center-head' }) => {
   const [loading, setLoading] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [clos, setCLOs] = useState([]);
@@ -250,7 +250,7 @@ const CourseStep4Sessions = ({ courseData, onPrevious, navigate }) => {
       const programId = typeof courseData.program === 'object'
         ? (courseData.program._id || courseData.program.id)
         : courseData.program;
-      navigate(`/center-head/programs/${programId}`);
+      navigate(`${basePath}/programs/${programId}`);
     } catch (error) {
       console.error('Error updating course status:', error);
       alert('Lỗi khi hoàn thành học phần!');

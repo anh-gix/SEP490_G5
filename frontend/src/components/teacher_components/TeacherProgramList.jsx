@@ -8,53 +8,95 @@ import FilterBar from '../CenterHead/compo/FilterBar';
 import StatusBadge from '../CenterHead/compo/StatusBadge';
 import { formatDate } from '../../helper/helper';
 import programService from '../../services/programService';
+import workRequestService from '../../services/workRequestService';
+import ViewRequestModal from './ViewRequestModal';
 
 const TeacherProgramList = () => {
   const navigate = useNavigate();
   const [programs, setPrograms] = useState([]);
   const [myPrograms, setMyPrograms] = useState([]);
+  const [workRequests, setWorkRequests] = useState([]);
   const [filteredPrograms, setFilteredPrograms] = useState([]);
+  const [filteredRequests, setFilteredRequests] = useState([]);
   const [paginatedPrograms, setPaginatedPrograms] = useState([]);
+  const [paginatedRequests, setPaginatedRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [filterValues, setFilterValues] = useState({});
   const [stats, setStats] = useState({ total: 0, active: 0, draft: 0, archived: 0 });
+  const [requestStats, setRequestStats] = useState({ total: 0, pending: 0, in_progress: 0, completed: 0 });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
-  const [activeTab, setActiveTab] = useState('my-programs'); // 'my-programs' or 'all-programs'
+  const [activeTab, setActiveTab] = useState('my-programs'); // 'my-programs', 'all-programs', 'work-requests'
+
+  // View Request Modal
+  const [showViewRequestModal, setShowViewRequestModal] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
   const applyFilters = useCallback(() => {
-    const sourceData = activeTab === 'my-programs' ? myPrograms : programs;
-    let filtered = [...sourceData];
+    if (activeTab === 'work-requests') {
+      // Filter work requests
+      let filtered = [...workRequests];
 
-    if (searchKeyword) {
-      const keyword = searchKeyword.toLowerCase();
-      filtered = filtered.filter(program =>
-        program.program_name?.toLowerCase().includes(keyword) ||
-        program.code?.toLowerCase().includes(keyword)
-      );
+      if (searchKeyword) {
+        const keyword = searchKeyword.toLowerCase();
+        filtered = filtered.filter(req =>
+          req.requestNote?.toLowerCase().includes(keyword) ||
+          req.requestedBy?.username?.toLowerCase().includes(keyword)
+        );
+      }
+
+      if (filterValues.status && filterValues.status !== "all") {
+        filtered = filtered.filter(req => req.status === filterValues.status);
+      }
+
+      setFilteredRequests(filtered);
+    } else {
+      // Filter programs
+      const sourceData = activeTab === 'my-programs' ? myPrograms : programs;
+      let filtered = [...sourceData];
+
+      if (searchKeyword) {
+        const keyword = searchKeyword.toLowerCase();
+        filtered = filtered.filter(program =>
+          program.program_name?.toLowerCase().includes(keyword) ||
+          program.code?.toLowerCase().includes(keyword)
+        );
+      }
+
+      if (filterValues.status && filterValues.status !== "all") {
+        filtered = filtered.filter(program => program.status === filterValues.status);
+      }
+
+      setFilteredPrograms(filtered);
     }
-
-    if (filterValues.status && filterValues.status !== "all") {
-      filtered = filtered.filter(program => program.status === filterValues.status);
-    }
-
-    setFilteredPrograms(filtered);
     setCurrentPage(1);
-  }, [programs, myPrograms, searchKeyword, filterValues, activeTab]);
+  }, [programs, myPrograms, workRequests, searchKeyword, filterValues, activeTab]);
 
   const applyPagination = useCallback(() => {
-    const totalItems = filteredPrograms.length;
-    const totalPagesCount = Math.ceil(totalItems / itemsPerPage);
-    setTotalPages(totalPagesCount);
+    if (activeTab === 'work-requests') {
+      const totalItems = filteredRequests.length;
+      const totalPagesCount = Math.ceil(totalItems / itemsPerPage);
+      setTotalPages(totalPagesCount);
 
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const paginatedData = filteredPrograms.slice(startIndex, endIndex);
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = filteredRequests.slice(startIndex, endIndex);
 
-    setPaginatedPrograms(paginatedData);
-  }, [filteredPrograms, currentPage, itemsPerPage]);
+      setPaginatedRequests(paginatedData);
+    } else {
+      const totalItems = filteredPrograms.length;
+      const totalPagesCount = Math.ceil(totalItems / itemsPerPage);
+      setTotalPages(totalPagesCount);
+
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedData = filteredPrograms.slice(startIndex, endIndex);
+
+      setPaginatedPrograms(paginatedData);
+    }
+  }, [filteredPrograms, filteredRequests, currentPage, itemsPerPage, activeTab]);
 
   const fetchPrograms = async () => {
     try {
@@ -92,6 +134,35 @@ const TeacherProgramList = () => {
     } catch (err) {
       console.error('Error fetching programs:', err);
       alert('Không thể tải danh sách chương trình!');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchWorkRequests = async () => {
+    try {
+      setLoading(true);
+
+      // Fetch work requests assigned to current user (Subject Leader)
+      const response = await workRequestService.getAssignedToMe({
+        requestType: 'create_program' // Only get create_program requests
+      });
+      const requestsData = response.data || [];
+      setWorkRequests(requestsData);
+
+      // Calculate request stats
+      const calculatedRequestStats = {
+        total: requestsData.length,
+        pending: requestsData.filter(r => r.status === 'pending').length,
+        in_progress: requestsData.filter(r => r.status === 'in_progress').length,
+        completed: requestsData.filter(r => r.status === 'completed').length
+      };
+      setRequestStats(calculatedRequestStats);
+
+      console.log('Work Requests loaded from API:', requestsData);
+    } catch (err) {
+      console.error('Error fetching work requests:', err);
+      alert('Không thể tải danh sách yêu cầu công việc!');
     } finally {
       setLoading(false);
     }
@@ -137,6 +208,44 @@ const TeacherProgramList = () => {
     setSearchKeyword('');
     setFilterValues({});
     setCurrentPage(1);
+
+    // Fetch work requests when switching to work-requests tab
+    if (tab === 'work-requests' && workRequests.length === 0) {
+      fetchWorkRequests();
+    }
+  };
+
+  const handleViewRequest = (request) => {
+    setSelectedRequest(request);
+    setShowViewRequestModal(true);
+  };
+
+  const handleStartProcessing = async (request) => {
+    try {
+      // Call API to start processing
+      await workRequestService.startProcessing(request._id);
+
+      // Refresh work requests
+      await fetchWorkRequests();
+
+      // Navigate to program create page with request data
+      navigate('/teacher/programs/create', {
+        state: {
+          fromRequest: true,
+          requestId: request._id,
+          requestNote: request.requestNote,
+          requestedBy: request.requestedBy
+        }
+      });
+    } catch (error) {
+      console.error('Error starting processing:', error);
+      alert(error.message || 'Không thể bắt đầu xử lý yêu cầu!');
+    }
+  };
+
+  const handleRequestUpdated = () => {
+    // Refresh work requests after update
+    fetchWorkRequests();
   };
 
   useEffect(() => {
@@ -145,25 +254,35 @@ const TeacherProgramList = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [searchKeyword, filterValues, programs, myPrograms, activeTab, applyFilters]);
+  }, [searchKeyword, filterValues, programs, myPrograms, workRequests, activeTab, applyFilters]);
 
   useEffect(() => {
     applyPagination();
-  }, [filteredPrograms, currentPage, itemsPerPage, applyPagination]);
+  }, [filteredPrograms, filteredRequests, currentPage, itemsPerPage, applyPagination]);
 
   useEffect(() => {
     // Recalculate stats when tab changes
-    const sourceData = activeTab === 'my-programs' ? myPrograms : programs;
-    const calculatedStats = {
-      total: sourceData.length,
-      active: sourceData.filter(p => p.status === 'active').length,
-      draft: sourceData.filter(p => p.status === 'draft').length,
-      archived: sourceData.filter(p => p.status === 'archived').length
-    };
-    setStats(calculatedStats);
-  }, [activeTab, programs, myPrograms]);
+    if (activeTab === 'work-requests') {
+      const calculatedRequestStats = {
+        total: workRequests.length,
+        pending: workRequests.filter(r => r.status === 'pending').length,
+        in_progress: workRequests.filter(r => r.status === 'in_progress').length,
+        completed: workRequests.filter(r => r.status === 'completed').length
+      };
+      setRequestStats(calculatedRequestStats);
+    } else {
+      const sourceData = activeTab === 'my-programs' ? myPrograms : programs;
+      const calculatedStats = {
+        total: sourceData.length,
+        active: sourceData.filter(p => p.status === 'active').length,
+        draft: sourceData.filter(p => p.status === 'draft').length,
+        archived: sourceData.filter(p => p.status === 'archived').length
+      };
+      setStats(calculatedStats);
+    }
+  }, [activeTab, programs, myPrograms, workRequests]);
 
-  const filters = [
+  const programFilters = [
     {
       key: "status",
       label: "Trạng thái",
@@ -174,6 +293,20 @@ const TeacherProgramList = () => {
       ]
     }
   ];
+
+  const requestFilters = [
+    {
+      key: "status",
+      label: "Trạng thái",
+      options: [
+        { value: "pending", label: "Chờ xử lý" },
+        { value: "in_progress", label: "Đang xử lý" },
+        { value: "completed", label: "Hoàn thành" },
+      ]
+    }
+  ];
+
+  const filters = activeTab === 'work-requests' ? requestFilters : programFilters;
 
   const columns = [
     {
@@ -256,6 +389,95 @@ const TeacherProgramList = () => {
     },
   ];
 
+  const requestColumns = [
+    {
+      header: 'Yêu cầu',
+      field: 'requestNote',
+      render: (row) => (
+        <div>
+          <div className="fw-semibold text-neutral-900 mb-1">Tạo chương trình mới</div>
+          <div className="text-sm text-neutral-600" style={{ maxWidth: '300px' }}>
+            {row.requestNote || 'Không có ghi chú'}
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: 'Người giao',
+      field: 'requestedBy',
+      render: (row) => (
+        <div>
+          <div className="text-neutral-900">{row.requestedBy?.username || 'N/A'}</div>
+          <div className="text-sm text-neutral-600">{row.requestedBy?.email || ''}</div>
+        </div>
+      ),
+    },
+    {
+      header: 'Ngày giao',
+      field: 'requestedAt',
+      render: (row) => (
+        <span className="text-neutral-700">{formatDate(row.requestedAt)}</span>
+      ),
+    },
+    {
+      header: 'Trạng thái',
+      field: 'status',
+      render: (row) => <StatusBadge status={row.status} size="sm" />,
+    },
+    {
+      header: 'Hành động',
+      field: 'actions',
+      render: (row) => (
+        <div className="d-flex gap-2 justify-content-center">
+          <button
+            className="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleViewRequest(row);
+            }}
+            title="Xem chi tiết"
+          >
+            <i className="ph ph-eye"></i>
+            <span className="d-none d-md-inline">Xem</span>
+          </button>
+          {row.status === 'pending' && (
+            <button
+              className="btn btn-sm btn-success d-flex align-items-center gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleStartProcessing(row);
+              }}
+              title="Bắt đầu xử lý"
+            >
+              <i className="ph ph-play"></i>
+              <span className="d-none d-md-inline">Bắt đầu</span>
+            </button>
+          )}
+          {row.status === 'in_progress' && (
+            <button
+              className="btn btn-sm btn-info d-flex align-items-center gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate('/teacher/programs/create', {
+                  state: {
+                    fromRequest: true,
+                    requestId: row._id,
+                    requestNote: row.requestNote,
+                    requestedBy: row.requestedBy
+                  }
+                });
+              }}
+              title="Tiếp tục tạo"
+            >
+              <i className="ph ph-pencil"></i>
+              <span className="d-none d-md-inline">Tiếp tục</span>
+            </button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   if (loading) {
     return (
       <div className="d-flex justify-content-center align-items-center min-vh-100">
@@ -303,42 +525,80 @@ const TeacherProgramList = () => {
               Tất cả chương trình ({programs.length})
             </button>
           </li>
+          <li className="nav-item">
+            <button
+              className={`nav-link ${activeTab === 'work-requests' ? 'active' : ''}`}
+              onClick={() => handleTabChange('work-requests')}
+            >
+              <i className="ph ph-clipboard-text me-2"></i>
+              Yêu cầu từ Center Head ({workRequests.length})
+            </button>
+          </li>
         </ul>
       </div>
 
       {/* Stats */}
-      <div className="row g-4 mb-24">
-        <div className="col-md-3">
-          <Card>
-            <h6 className="text-neutral-600 mb-8">Tổng Programs</h6>
-            <h4 className="text-neutral-900 fw-bold mb-0">{stats.total}</h4>
-          </Card>
+      {activeTab === 'work-requests' ? (
+        <div className="row g-4 mb-24">
+          <div className="col-md-3">
+            <Card>
+              <h6 className="text-neutral-600 mb-8">Tổng yêu cầu</h6>
+              <h4 className="text-neutral-900 fw-bold mb-0">{requestStats.total}</h4>
+            </Card>
+          </div>
+          <div className="col-md-3">
+            <Card>
+              <h6 className="text-neutral-600 mb-8">Chờ xử lý</h6>
+              <h4 className="text-warning-600 fw-bold mb-0">{requestStats.pending}</h4>
+            </Card>
+          </div>
+          <div className="col-md-3">
+            <Card>
+              <h6 className="text-neutral-600 mb-8">Đang xử lý</h6>
+              <h4 className="text-info-600 fw-bold mb-0">{requestStats.in_progress}</h4>
+            </Card>
+          </div>
+          <div className="col-md-3">
+            <Card>
+              <h6 className="text-neutral-600 mb-8">Hoàn thành</h6>
+              <h4 className="text-success-600 fw-bold mb-0">{requestStats.completed}</h4>
+            </Card>
+          </div>
         </div>
-        <div className="col-md-3">
-          <Card>
-            <h6 className="text-neutral-600 mb-8">Đang hoạt động</h6>
-            <h4 className="text-success-600 fw-bold mb-0">{stats.active}</h4>
-          </Card>
+      ) : (
+        <div className="row g-4 mb-24">
+          <div className="col-md-3">
+            <Card>
+              <h6 className="text-neutral-600 mb-8">Tổng Programs</h6>
+              <h4 className="text-neutral-900 fw-bold mb-0">{stats.total}</h4>
+            </Card>
+          </div>
+          <div className="col-md-3">
+            <Card>
+              <h6 className="text-neutral-600 mb-8">Đang hoạt động</h6>
+              <h4 className="text-success-600 fw-bold mb-0">{stats.active}</h4>
+            </Card>
+          </div>
+          <div className="col-md-3">
+            <Card>
+              <h6 className="text-neutral-600 mb-8">Bản nháp</h6>
+              <h4 className="text-warning-600 fw-bold mb-0">{stats.draft}</h4>
+            </Card>
+          </div>
+          <div className="col-md-3">
+            <Card>
+              <h6 className="text-neutral-600 mb-8">Đã lưu trữ</h6>
+              <h4 className="text-neutral-600 fw-bold mb-0">{stats.archived}</h4>
+            </Card>
+          </div>
         </div>
-        <div className="col-md-3">
-          <Card>
-            <h6 className="text-neutral-600 mb-8">Bản nháp</h6>
-            <h4 className="text-warning-600 fw-bold mb-0">{stats.draft}</h4>
-          </Card>
-        </div>
-        <div className="col-md-3">
-          <Card>
-            <h6 className="text-neutral-600 mb-8">Đã lưu trữ</h6>
-            <h4 className="text-neutral-600 fw-bold mb-0">{stats.archived}</h4>
-          </Card>
-        </div>
-      </div>
+      )}
 
       {/* Search & Filter */}
       <Card className="mb-24">
         <div className="d-flex gap-3 align-items-center justify-content-between">
           <SearchBox
-            placeholder="Tìm kiếm chương trình..."
+            placeholder={activeTab === 'work-requests' ? "Tìm kiếm yêu cầu..." : "Tìm kiếm chương trình..."}
             value={searchKeyword}
             onChange={setSearchKeyword}
           />
@@ -354,9 +614,12 @@ const TeacherProgramList = () => {
       {/* Table */}
       <Card>
         <Table
-          columns={columns}
-          data={paginatedPrograms}
-          onRowClick={(row) => navigate(`/teacher/programs/${row._id}`)}
+          columns={activeTab === 'work-requests' ? requestColumns : columns}
+          data={activeTab === 'work-requests' ? paginatedRequests : paginatedPrograms}
+          onRowClick={activeTab === 'work-requests'
+            ? null
+            : (row) => navigate(`/teacher/programs/${row._id}`)
+          }
         />
       </Card>
 
@@ -383,7 +646,7 @@ const TeacherProgramList = () => {
 
           <div className="d-flex align-items-center gap-2">
             <span className="text-sm text-neutral-600">
-              Trang {currentPage} / {totalPages} ({filteredPrograms.length} bản ghi)
+              Trang {currentPage} / {totalPages} ({activeTab === 'work-requests' ? filteredRequests.length : filteredPrograms.length} bản ghi)
             </span>
 
             <div className="d-flex gap-1">
@@ -436,6 +699,17 @@ const TeacherProgramList = () => {
           </div>
         </div>
       )}
+
+      {/* View Request Modal */}
+      <ViewRequestModal
+        show={showViewRequestModal}
+        onClose={() => {
+          setShowViewRequestModal(false);
+          setSelectedRequest(null);
+        }}
+        request={selectedRequest}
+        onRequestUpdated={handleRequestUpdated}
+      />
     </div>
   );
 };

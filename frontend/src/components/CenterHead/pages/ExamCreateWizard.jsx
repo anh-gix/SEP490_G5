@@ -10,8 +10,9 @@ import Step3AnswerKeys from '../compo/exam/Step3AnswerKeys';
 import Step4Publish from '../compo/exam/Step4Publish';
 import examService from '../../../services/examService';
 
-const ExamCreateWizard = () => {
+const ExamCreateWizard = ({ viewMode = 'center-head' }) => {
   const navigate = useNavigate();
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
   const [currentStep, setCurrentStep] = useState(1);
   const [examData, setExamData] = useState({
     title: '',
@@ -35,8 +36,8 @@ const ExamCreateWizard = () => {
   ];
 
   const breadcrumbItems = [
-    { label: 'Dashboard', path: '/center-head/dashboard' },
-    { label: 'Quản lý đề thi', path: '/center-head/exams' },
+    { label: 'Dashboard', path: `${basePath}/dashboard` },
+    { label: 'Quản lý đề thi', path: `${basePath}/exams` },
     { label: 'Tạo đề thi mới' }
   ];
 
@@ -164,7 +165,7 @@ const ExamCreateWizard = () => {
 
   const handleCancel = () => {
     if (window.confirm('Bạn có chắc muốn hủy? Tất cả dữ liệu sẽ bị mất.')) {
-      navigate('/center-head/exams');
+      navigate(`${basePath}/exams`);
     }
   };
 
@@ -190,7 +191,7 @@ const ExamCreateWizard = () => {
 
       if (response.success) {
         alert('Hoàn tất tạo đề thi! Bạn có thể publish hoặc submit để duyệt từ danh sách đề thi.');
-        navigate('/center-head/exams');
+        navigate(`${basePath}/exams`);
       }
     } catch (err) {
       console.error('Error completing exam:', err);

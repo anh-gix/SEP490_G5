@@ -3,6 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
+import CourseWizardIntro from '../compo/CourseWizardIntro';
+import CourseSuccessModal from '../compo/CourseSuccessModal';
+import { ToastContainer } from '../compo/Toast';
 import programService from '../../../services/programService';
 import courseService from '../../../services/courseService';
 
@@ -22,12 +25,15 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
   // Determine base path
   const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
 
+  const [showIntro, setShowIntro] = useState(!isEdit); // Show intro for new courses only
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [program, setProgram] = useState(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState('saved'); // 'saved', 'saving', 'error'
   const autoSaveTimeoutRef = useRef(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [toasts, setToasts] = useState([]);
 
   // Course data state
   const [courseData, setCourseData] = useState({
@@ -109,6 +115,48 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
     { label: isEdit ? 'Chỉnh sửa học phần' : 'Tạo học phần mới' }
   ];
 
+  // Toast helpers
+  const showToast = (message, type = 'info', duration = 3000) => {
+    const newToast = {
+      id: Date.now(),
+      message,
+      type,
+      duration,
+      position: 'top-right'
+    };
+    setToasts(prev => [...prev, newToast]);
+  };
+
+  const removeToast = (id) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  };
+
+  // Intro Screen handlers
+  const handleStartWizard = () => {
+    setShowIntro(false);
+  };
+
+  const handleCancelIntro = () => {
+    navigate(`${basePath}/programs/${programId}`);
+  };
+
+  // Success Modal handlers
+  const handleViewCourse = () => {
+    setShowSuccessModal(false);
+    navigate(`${basePath}/courses/${courseData._id}/details`);
+  };
+
+  const handleCreateAnother = () => {
+    setShowSuccessModal(false);
+    // Reset wizard
+    window.location.href = `${basePath}/programs/${programId}/courses/create`;
+  };
+
+  const handleGoToProgram = () => {
+    setShowSuccessModal(false);
+    navigate(`${basePath}/programs/${programId}`);
+  };
+
   // Load program data
   useEffect(() => {
     const fetchProgramData = async () => {
@@ -118,8 +166,8 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
         setProgram(response.data);
       } catch (error) {
         console.error('Error loading program:', error);
-        alert('Không thể tải thông tin chương trình!');
-        navigate('/center-head/programs');
+        showToast('Không thể tải thông tin chương trình!', 'error');
+        navigate(`${basePath}/programs`);
       } finally {
         setLoading(false);
       }
@@ -128,7 +176,8 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
     if (programId) {
       fetchProgramData();
     }
-  }, [programId, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [programId, navigate, basePath]);
 
   // Load existing course if editing
   useEffect(() => {
@@ -166,12 +215,13 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
           }
         } catch (error) {
           console.error('Error loading existing course:', error);
-          alert('Không thể tải thông tin học phần hiện tại!');
+          showToast('Không thể tải thông tin học phần hiện tại!', 'error');
         }
       }
     };
 
     fetchExistingCourse();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit, courseId, programId]);
 
   // Handle step navigation
@@ -194,14 +244,8 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
     }
   };
 
-  // Handle exit with confirmation if unsaved changes
+  // Handle exit - just navigate back (auto-save handles saving)
   const handleExit = () => {
-    if (hasUnsavedChanges) {
-      const confirm = window.confirm(
-        'Bạn có thay đổi chưa lưu. Bạn có chắc muốn thoát không?\n\nLưu ý: Các thay đổi đã lưu vẫn được giữ lại.'
-      );
-      if (!confirm) return;
-    }
     navigate(`${basePath}/programs/${programId}`);
   };
 
@@ -227,7 +271,8 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
       onNext: handleNext,
       onPrevious: handlePrevious,
       isEdit,
-      navigate
+      navigate,
+      basePath
     };
 
     switch (currentStep) {
@@ -251,6 +296,7 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
                 courseData={courseData}
                 setCourseData={setCourseData}
                 viewMode={viewMode}
+                programId={programId}
               />
               {/* Custom navigation for wizard mode */}
               <div className="d-flex justify-content-between gap-3 mt-4 pt-4 border-top">
@@ -268,14 +314,10 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
                           lastCompletedStep: 5
                         });
                       }
-                      alert('Hoàn thành tạo học phần với CAM Sessions!');
-                      const programId = typeof courseData.program === 'object'
-                        ? (courseData.program._id || courseData.program.id)
-                        : courseData.program;
-                      navigate(`${basePath}/programs/${programId}`);
+                      setShowSuccessModal(true);
                     } catch (error) {
                       console.error('Error updating course status:', error);
-                      alert('Có lỗi khi cập nhật trạng thái học phần!');
+                      showToast('Có lỗi khi cập nhật trạng thái học phần!', 'error');
                     }
                   }}
                   icon="ph ph-check-circle"
@@ -305,8 +347,35 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
     );
   }
 
+  // Show Intro Screen for new courses
+  if (showIntro && !isEdit) {
+    return (
+      <div className="dashboard-body wizard-container py-5">
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+        <CourseWizardIntro
+          program={program}
+          onStart={handleStartWizard}
+          onCancel={handleCancelIntro}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="dashboard-body wizard-container">
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+
+      {/* Success Modal */}
+      <CourseSuccessModal
+        show={showSuccessModal}
+        courseData={courseData}
+        program={program}
+        onViewCourse={handleViewCourse}
+        onCreateAnother={handleCreateAnother}
+        onGoToProgram={handleGoToProgram}
+      />
+
       {/* Sticky Header with Progress */}
       <div className="wizard-header sticky-top bg-white shadow-sm mb-24 pb-16 pt-16" style={{ top: 0, zIndex: 100 }}>
         <div className="container-fluid">

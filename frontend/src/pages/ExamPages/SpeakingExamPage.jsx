@@ -90,7 +90,7 @@ const SpeakingExamPage = () => {
         await examService.submitSpeakingAnswers(examId, submissionId, formData);
 
         // Navigate to result page
-        navigate(`/exams/${examId}/submissions/${submissionId}/speaking/result`);
+        navigate(`/student/exams/${examId}/submissions/${submissionId}/speaking/result`);
       } catch (err) {
         setError(err?.message || "Không thể nộp bài");
         setSubmitting(false);

@@ -110,7 +110,7 @@ const ReadingExamPage = () => {
         await examService.submitReadingAnswers(examId, submissionId, { parts: partsData });
 
         // Navigate to result page
-        navigate(`/exams/${examId}/submissions/${submissionId}/reading/result`);
+        navigate(`/student/exams/${examId}/submissions/${submissionId}/reading/result`);
       } catch (err) {
         setError(err?.message || "Không thể nộp bài");
         setSubmitting(false);

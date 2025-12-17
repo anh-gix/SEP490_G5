@@ -244,7 +244,7 @@ exports.deleteTip = async (req, res) => {
 
 
 
-// ➕ THÊM VIDEO VÀO CATEGORY
+// THÊM VIDEO VÀO CATEGORY
 exports.addVideoToCategory = async (req, res) => {
   try {
     const { section } = req.params;
@@ -421,7 +421,7 @@ exports.updateVideo = async (req, res) => {
   }
 };
 
-// 🗑️ XÓA VIDEO
+// XÓA VIDEO
 exports.deleteVideo = async (req, res) => {
   try {
     const { section, videoId } = req.params;

@@ -39,6 +39,14 @@ export const programService = {
   // Lấy programs của teacher hiện tại
   getMyPrograms: async (params = {}) => {
     try {
+      // Auto-add teacherId from localStorage if not provided
+      if (!params.teacherId) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user._id) {
+          params.teacherId = user._id;
+        }
+      }
+
       const response = await api.get('/my-programs', { params });
       return response.data;
     } catch (error) {
@@ -144,6 +152,16 @@ export const programService = {
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Lưu trữ chương trình thất bại' };
+    }
+  },
+
+  // Get band options by type
+  getBandOptions: async (type) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/band-options/${type}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy band options' };
     }
   },
 };

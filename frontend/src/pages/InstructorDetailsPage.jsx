@@ -4,7 +4,7 @@ import CourseAllOne from "../components/CourseAllOne";
 import FooterOne from "../components/FooterOne";
 import HeaderOne from "../components/HeaderOne";
 import InstructorDetails from "../components/InstructorDetails";
-import TestimonialsTwo from "../components/HomePageforStudent/TestimonialsTwo";
+import TestimonialsTwo from "../components/TestimonialsTwo";
 import Animation from "../helper/Animation";
 import Preloader from "../helper/Preloader";
 

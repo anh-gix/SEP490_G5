@@ -1,5 +1,3 @@
-import faqImage from "../../assets/Homepage_img/faq.png";
-
 const FaqOne = () => {
   return (
     <section className='faq py-120 position-relative'>
@@ -8,8 +6,8 @@ const FaqOne = () => {
           <div className='col-lg-6 d-lg-block d-none'>
             <div className='faq-thumb'>
               <img
-                src={faqImage}
-                alt='FAQ - Câu hỏi thường gặp'
+                src='assets/images/thumbs/faq-img.png'
+                alt=''
                 data-tilt=''
                 data-tilt-max={6}
                 data-tilt-speed={500}
@@ -200,4 +198,3 @@ const FaqOne = () => {
 };
 
 export default FaqOne;
-

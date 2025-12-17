@@ -1,14 +1,14 @@
-import AboutTwo from "../components/HomePageforStudent/AboutTwo";
-import BannerTwo from "../components/HomePageforStudent/BannerTwo";
-import CategoryOne from "../components/HomePageforStudent/CategoryOne";
-import CertificateTwo from "../components/HomePageforStudent/CertificateTwo";
-import FaqOne from "../components/HomePageforStudent/FaqOne";
-import FeaturesTwo from "../components/HomePageforStudent/FeaturesTwo";
-import FooterTwo from "../components/HomePageforStudent/FooterTwo";
+import AboutTwo from "../components/AboutTwo";
+import BannerTwo from "../components/BannerTwo";
+import CategoryOne from "../components/CategoryOne";
+import CertificateTwo from "../components/CertificateTwo";
+import FaqOne from "../components/FaqOne";
+import FeaturesTwo from "../components/FeaturesTwo";
+import FooterTwo from "../components/FooterTwo";
 import HeaderOne from "../components/HomePageforStudent/HeaderOne";
-import InfoSectionOne from "../components/HomePageforStudent/InfoSectionOne";
-import JoinCommunityOne from "../components/HomePageforStudent/JoinCommunityOne";
-import TestimonialsTwo from "../components/HomePageforStudent/TestimonialsTwo";
+import InfoSectionOne from "../components/InfoSectionOne";
+import JoinCommunityOne from "../components/JoinCommunityOne";
+import TestimonialsTwo from "../components/TestimonialsTwo";
 import Animation from "../helper/Animation";
 import Preloader from "../helper/Preloader";
 
@@ -45,6 +45,9 @@ const HomePageTwo = () => {
 
       {/* TestimonialsTwo */}
       <TestimonialsTwo />
+
+      {/* JoinCommunityOne */}
+      <JoinCommunityOne />
 
       {/* FaqOne */}
       <FaqOne />

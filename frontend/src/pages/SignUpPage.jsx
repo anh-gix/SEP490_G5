@@ -1,11 +1,11 @@
 import Breadcrumb from "../components/Breadcrumb";
 import FooterOne from "../components/FooterOne";
-import HeaderOne from "../components/HomePageforStudent/HeaderOne";
-import ForgotPasswordInner from "../components/Authen/ForgotPasswordInner";
+import HeaderOne from "../components/HeaderOne";
+import SignUpInner from "../components/Authen/SignUpInner";
 import Animation from "../helper/Animation";
 import Preloader from "../helper/Preloader";
 
-const ForgotPasswordPage = () => {
+const SignUpPage = () => {
   return (
     <>
       {/* Preloader */}
@@ -14,14 +14,14 @@ const ForgotPasswordPage = () => {
       {/* Animation */}
       <Animation />
 
-      {/* HeaderOne */}
+      {/* HeaderTwo */}
       <HeaderOne />
 
       {/* Breadcrumb */}
-      <Breadcrumb title={"Quên Mật Khẩu"} />
+      <Breadcrumb title={"Sign Up"} />
 
-      {/* ForgotPasswordInner */}
-      <ForgotPasswordInner />
+      {/* SignUpInner */}
+      <SignUpInner />
 
       {/* FooterOne */}
       <FooterOne />
@@ -29,5 +29,4 @@ const ForgotPasswordPage = () => {
   );
 };
 
-export default ForgotPasswordPage;
-
+export default SignUpPage;

@@ -107,4 +107,3 @@ const JoinCommunityOne = () => {
 };
 
 export default JoinCommunityOne;
-

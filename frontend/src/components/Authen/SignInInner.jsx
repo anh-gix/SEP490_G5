@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import loginImage from "../../assets/Login_img/ảnhlogin.png";
 
 const SignInInner = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -26,7 +25,7 @@ const SignInInner = () => {
       [name]: value
     }));
     
-    // Xóa lỗi khi người dùng bắt đầu nhập
+    // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -65,9 +64,9 @@ const SignInInner = () => {
     setIsLoading(true);
     try {
       await login(formData);
-      navigate('/'); // Chuyển hướng về trang chủ sau khi đăng nhập thành công
+      navigate('/'); // Redirect to home page after successful login
     } catch (error) {
-      console.error('Đăng nhập thất bại:', error);
+      console.error('Login failed:', error);
     } finally {
       setIsLoading(false);
     }
@@ -79,9 +78,9 @@ const SignInInner = () => {
           <div className='col-lg-6'>
             <div className='bg-main-25 border border-neutral-30 rounded-8 p-32'>
               <div className='mb-40'>
-                <h3 className='mb-16 text-neutral-500'>Chào Mừng Trở Lại!</h3>
+                <h3 className='mb-16 text-neutral-500'>Welcome Back!</h3>
                 <p className='text-neutral-500'>
-                  Đăng nhập vào tài khoản của bạn và tham gia với chúng tôi
+                  Sign in to your account and join us
                 </p>
               </div>
               <form onSubmit={handleSubmit}>
@@ -96,7 +95,7 @@ const SignInInner = () => {
                     htmlFor='email'
                     className='fw-medium text-lg text-neutral-500 mb-16'
                   >
-                    Nhập Email Của Bạn
+                    Enter Your Email ID
                   </label>
                   <input
                     type='email'
@@ -105,7 +104,7 @@ const SignInInner = () => {
                     name='email'
                     value={formData.email}
                     onChange={handleChange}
-                    placeholder='Nhập Email...'
+                    placeholder='Enter Your Email...'
                   />
                   {errors.email && (
                     <div className='text-danger mt-8 small'>
@@ -119,7 +118,7 @@ const SignInInner = () => {
                     htmlFor='password'
                     className='fw-medium text-lg text-neutral-500 mb-16'
                   >
-                    Nhập Mật Khẩu Của Bạn
+                    Enter Your Password
                   </label>
                   <div className='position-relative'>
                     <input
@@ -129,7 +128,7 @@ const SignInInner = () => {
                       name='password'
                       value={formData.password}
                       onChange={handleChange}
-                      placeholder='Nhập Mật Khẩu...'
+                      placeholder='Enter Your Password...'
                     />
                     <span
                       className={`toggle-password position-absolute top-50 inset-inline-end-0 me-16 translate-middle-y ph-bold ${
@@ -146,11 +145,22 @@ const SignInInner = () => {
                 </div>
                 <div className='mb-16 text-end'>
                   <Link
-                    to='/forgot-password'
+                    to='#'
                     className='text-warning-600 hover-text-decoration-underline'
                   >
-                    Quên Mật Khẩu
+                    Forget password
                   </Link>
+                </div>
+                <div className='mb-16'>
+                  <p className='text-neutral-500'>
+                    Don't have an account?{" "}
+                    <Link
+                      to='/sign-up'
+                      className='fw-semibold text-main-600 hover-text-decoration-underline'
+                    >
+                      Sign Up
+                    </Link>
+                  </p>
                 </div>
                 <div className='mt-40'>
                   <button
@@ -158,7 +168,7 @@ const SignInInner = () => {
                     disabled={isLoading}
                     className='btn btn-main rounded-pill flex-center gap-8 mt-40'
                   >
-                    {isLoading ? 'Đang đăng nhập...' : 'Đăng Nhập'}
+                    {isLoading ? 'Đang đăng nhập...' : 'Sign In'}
                     <i className='ph-bold ph-arrow-up-right d-flex text-lg' />
                   </button>
                 </div>
@@ -167,7 +177,7 @@ const SignInInner = () => {
           </div>
           <div className='col-lg-6 d-lg-block d-none'>
             <div className='account-img'>
-              <img src={loginImage} alt='Đăng Nhập' />
+              <img src='assets/images/thumbs/account-img.png' alt='' />
             </div>
           </div>
         </div>

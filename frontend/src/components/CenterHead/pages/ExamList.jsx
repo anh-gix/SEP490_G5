@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Table from '../compo/Table';
@@ -39,11 +41,11 @@ const ExamList = ({ viewMode = 'center-head' }) => {
         setExams(response.data || []);
       } else {
         console.error('Failed to fetch exams:', response.message);
-        alert(response.message || 'Không thể tải danh sách đề thi');
+        toast.error(response.message || 'Không thể tải danh sách đề thi', { position: 'top-right' });
       }
     } catch (err) {
       console.error('Error:', err);
-      alert(err.message || 'Không thể tải danh sách đề thi');
+      toast.error(err.message || 'Không thể tải danh sách đề thi', { position: 'top-right' });
     } finally {
       setLoading(false);
     }
@@ -146,16 +148,17 @@ const ExamList = ({ viewMode = 'center-head' }) => {
       render: (row) => (
         <div className="d-flex gap-2 justify-content-center">
           {/* Nút Xem */}
-          <button
-            className="btn btn-sm btn-outline-primary"
+          <Button
+            variant="outline"
+            size="sm"
+            icon="ph ph-eye"
             onClick={(e) => {
               e.stopPropagation();
               navigate(`${basePath}/exams/${row._id}`);
             }}
-            title="Xem chi tiết"
           >
-            <i className="ph ph-eye"></i>
-          </button>
+            Xem
+          </Button>
         </div>
       ),
     },
@@ -231,6 +234,9 @@ const ExamList = ({ viewMode = 'center-head' }) => {
           onRowClick={(row) => navigate(`${basePath}/exams/${row._id}`)}
         />
       </Card>
+
+      {/* Toast Container */}
+      <ToastContainer />
     </div>
   );
 };

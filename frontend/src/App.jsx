@@ -35,7 +35,8 @@ import PrivacyPolicyPage from "./pages/PrivacyPolicyPage.jsx";
 import ProductPage from "./pages/ProductPage.jsx";
 import ProductDetailsPage from "./pages/ProductDetailsPage.jsx";
 import SignInPage from "./pages/SignInPage.jsx";
-import SignUpPage from "./pages/SignUpPage.jsx";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
+import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 import TuitionJobsPage from "./pages/TuitionJobsPage.jsx";
 import TutorPage from "./pages/TutorPage.jsx";
 import TutorDetailsPage from "./pages/TutorDetailsPage.jsx";
@@ -152,8 +153,9 @@ function App() {
             element={<ProductDetailsPage />}
           />
           <Route exact path="/sign-in" element={<SignInPage />} />
+          <Route exact path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route exact path="/reset-password" element={<ResetPasswordPage />} />
           <Route exact path="/profile" element={<Profile />} />
-          <Route exact path="/sign-up" element={<SignUpPage />} />
           <Route exact path="/tuition-jobs" element={<TuitionJobsPage />} />
           <Route exact path="/tutor" element={<TutorPage />} />
           <Route exact path="/tutor-details" element={<TutorDetailsPage />} />

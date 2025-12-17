@@ -14,10 +14,10 @@ const InfoSectionOne = () => {
               </span>
               <div className='flex-grow-1'>
                 <h5 className='mb-8 text-white fw-medium'>
-                  50,000 online courses
+                  50,000 Khóa Học Trực Tuyến
                 </h5>
                 <span className='text-sm text-white'>
-                  Enjoy a variety of fresh topics
+                  Trải nghiệm đa dạng các chủ đề mới mẻ
                 </span>
               </div>
             </div>
@@ -33,10 +33,10 @@ const InfoSectionOne = () => {
               </span>
               <div className='flex-grow-1'>
                 <h5 className='mb-8 text-white fw-medium'>
-                  Expert instruction
+                  Giảng Viên Chuyên Gia
                 </h5>
                 <span className='text-sm text-white'>
-                  Find the right instructor for you
+                  Tìm giảng viên phù hợp với bạn
                 </span>
               </div>
             </div>
@@ -51,9 +51,9 @@ const InfoSectionOne = () => {
                 <i className='animate__heartBeat ph-bold ph-clock' />
               </span>
               <div className='flex-grow-1'>
-                <h5 className='mb-8 text-white fw-medium'>Life time access</h5>
+                <h5 className='mb-8 text-white fw-medium'>Truy Cập Trọn Đời</h5>
                 <span className='text-sm text-white'>
-                  Learn on your schedule{" "}
+                  Học theo lịch trình của bạn
                 </span>
               </div>
             </div>
@@ -68,9 +68,9 @@ const InfoSectionOne = () => {
                 <i className='animate__heartBeat ph-bold ph-certificate' />
               </span>
               <div className='flex-grow-1'>
-                <h5 className='mb-8 text-white fw-medium'>Get Certificate</h5>
+                <h5 className='mb-8 text-white fw-medium'>Nhận Chứng Chỉ</h5>
                 <span className='text-sm text-white'>
-                  When Courses Complete
+                  Khi hoàn thành khóa học
                 </span>
               </div>
             </div>

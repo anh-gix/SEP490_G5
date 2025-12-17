@@ -73,35 +73,40 @@ const StudentDashboard = () => {
 
   if (loading) {
     return (
-      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
-        <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Đang tải...</span>
+      <div className="min-vh-100" style={{ backgroundColor: '#F5F7FA' }}>
+        <Container fluid className="py-24 px-24">
+          <div className="text-center py-5">
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Đang tải...</span>
+            </div>
+            <p className="mt-3 text-neutral-600">Đang tải dữ liệu dashboard...</p>
           </div>
-          <p className="mt-3 text-neutral-600">Đang tải dữ liệu dashboard...</p>
-        </div>
-      </Container>
+        </Container>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
-        <Alert variant="danger">
-          <Alert.Heading>Lỗi tải dữ liệu</Alert.Heading>
-          <p>{error}</p>
-          <Button onClick={fetchStudentData} variant="outline-danger">
-            <i className="fas fa-redo me-2"></i>Thử lại
-          </Button>
-        </Alert>
-      </Container>
+      <div className="min-vh-100" style={{ backgroundColor: '#F5F7FA' }}>
+        <Container fluid className="py-24 px-24">
+          <Alert variant="danger">
+            <Alert.Heading>Lỗi tải dữ liệu</Alert.Heading>
+            <p>{error}</p>
+            <Button onClick={fetchStudentData} variant="outline-danger">
+              <i className="fas fa-redo me-2"></i>Thử lại
+            </Button>
+          </Alert>
+        </Container>
+      </div>
     );
   }
 
   return (
-    <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
-      {/* Welcome Banner - Compact */}
-      <Card className="border-0 rounded-6 mb-16 overflow-hidden" 
+    <div className="min-vh-100" style={{ backgroundColor: '#F5F7FA' }}>
+      <Container fluid className="py-24 px-24">
+        {/* Welcome Banner - Compact */}
+        <Card className="border-0 rounded-6 mb-16 overflow-hidden" 
             style={{ 
               background: 'linear-gradient(135deg, #0D74FF 0%, #0A5FD9 100%)',
               boxShadow: '0 4px 20px rgba(13, 116, 255, 0.15)'
@@ -484,7 +489,8 @@ const StudentDashboard = () => {
           </Card>
         </Col>
       </Row>
-    </Container>
+      </Container>
+    </div>
   );
 };
 

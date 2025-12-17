@@ -507,12 +507,20 @@ async function seedClassSchedules() {
                     continue;
                 }
                 
+                // Tạo date ở UTC 00:00:00 để tránh timezone issues
+                // Lấy year, month, day từ scheduleDate (local timezone)
+                const year = scheduleDate.getFullYear();
+                const month = scheduleDate.getMonth();
+                const day = scheduleDate.getDate();
+                // Tạo Date object ở UTC 00:00:00
+                const dateInUTC = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+                
                 // Tạo schedule tạm thời (chưa gán session)
                 // Use academicStaffUser if available, otherwise use class teacher
                 const createdByUser = academicStaffUser ? academicStaffUser._id : classItem.teacher;
                 tempSchedules.push({
                     class: classItem._id,
-                    date: new Date(scheduleDate), // Tạo copy để tránh reference issue
+                    date: dateInUTC, // Dùng date ở UTC 00:00:00
                     startTime: patternItem.startTime,
                     endTime: patternItem.endTime,
                     room: classItem.room,

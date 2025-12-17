@@ -257,6 +257,48 @@ export const workRequestService = {
   },
 
   // =========================
+  // START PROCESSING (TOP-DOWN)
+  // =========================
+
+  /**
+   * Start processing a work request (change status to in_progress)
+   * @param {string} id - Request ID
+   * @param {object} data - { userId: string }
+   */
+  startProcessing: async (id, data = {}) => {
+    try {
+      if (!data.userId) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        data.userId = user._id;
+      }
+
+      const response = await api.post(`/work-requests/${id}/start-processing`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể bắt đầu xử lý yêu cầu' };
+    }
+  },
+
+  /**
+   * Complete a work request
+   * @param {string} id - Request ID
+   * @param {object} data - { userId: string, note: string }
+   */
+  completeRequest: async (id, data = {}) => {
+    try {
+      if (!data.userId) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        data.userId = user._id;
+      }
+
+      const response = await api.post(`/work-requests/${id}/complete`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể hoàn thành yêu cầu' };
+    }
+  },
+
+  // =========================
   // HELPERS - BACKWARD COMPATIBILITY
   // =========================
 

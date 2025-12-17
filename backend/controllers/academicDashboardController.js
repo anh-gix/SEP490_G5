@@ -107,41 +107,40 @@ exports.getDashboardData = async (req, res) => {
       };
     });
 
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    // Fixed time slots
+    const fixedTimeSlots = ['08:00-10:00', '10:00-12:00', '14:00-16:00', '16:00-18:00', '18:00-20:00'];
+    const fixedTimeSlotSet = new Set(fixedTimeSlots);
     
-    const allSchedulesForTimeSlots = await ClassSchedule.find({
-      date: { $gte: currentMonthStart, $lte: currentMonthEnd }
-    })
-      .select('startTime endTime')
-      .lean();
-
     const normalizeTime = (timeStr) => timeStr ? timeStr.substring(0, 5) : '';
-    const timeSlotSet = new Set();
+    const additionalTimeSlotSet = new Set();
     
-    allSchedulesForTimeSlots.forEach(schedule => {
+    // Find time slots from schedules that are not in fixed slots
+    todaySchedules.forEach(schedule => {
       if (schedule.startTime && schedule.endTime) {
         const start = normalizeTime(schedule.startTime);
         const end = normalizeTime(schedule.endTime);
         if (start && end) {
-          timeSlotSet.add(`${start}-${end}`);
+          const timeSlot = `${start}-${end}`;
+          // Only add if not in fixed slots
+          if (!fixedTimeSlotSet.has(timeSlot)) {
+            additionalTimeSlotSet.add(timeSlot);
+          }
         }
       }
     });
 
-    let timeSlots = Array.from(timeSlotSet).sort((a, b) => {
+    // Combine fixed slots with additional slots and sort
+    const additionalTimeSlots = Array.from(additionalTimeSlotSet).sort((a, b) => {
       const [startA] = a.split('-');
       const [startB] = b.split('-');
       return startA.localeCompare(startB);
     });
 
-    if (timeSlots.length === 0) {
-      timeSlots = ['08:00-10:00', '10:30-12:30', '14:00-16:00', '18:00-20:00'];
-    }
+    const timeSlots = [...fixedTimeSlots, ...additionalTimeSlots];
 
     const rooms = await Room.find()
       .select('room_name location')
-      .limit(4)
+      .sort({ room_name: 1 })
       .lean();
 
     const roomScheduleData = rooms.map(room => {
@@ -179,41 +178,6 @@ exports.getDashboardData = async (req, res) => {
         room: room.room_name || 'N/A',
         location: room.location || 'N/A',
         schedules
-      };
-    });
-
-    const classes = await Class.find({ status: 'active' })
-      .populate('course', 'name level')
-      .select('name course startDate endDate students')
-      .limit(3)
-      .lean();
-
-    const classIds = classes.map(c => c._id);
-    const classSchedulesCount = await ClassSchedule.aggregate([
-      { $match: { class: { $in: classIds } } },
-      { $group: { _id: '$class', total: { $sum: 1 }, completed: { $sum: { $cond: [{ $lt: ['$date', new Date()] }, 1, 0] } } } }
-    ]);
-
-    const scheduleCountMap = {};
-    classSchedulesCount.forEach(item => {
-      scheduleCountMap[item._id.toString()] = {
-        total: item.total,
-        completed: item.completed
-      };
-    });
-
-    const classProgressData = classes.map(cls => {
-      const counts = scheduleCountMap[cls._id.toString()] || { total: 0, completed: 0 };
-      const progress = counts.total > 0 ? Math.round((counts.completed / counts.total) * 100) : 0;
-
-      return {
-        id: cls._id,
-        name: cls.name || 'N/A',
-        level: cls.course?.level || cls.name?.split('-')[0] || 'N/A',
-        progress,
-        students: cls.students?.length || 0,
-        completedLessons: counts.completed,
-        totalLessons: counts.total
       };
     });
 
@@ -323,11 +287,9 @@ exports.getDashboardData = async (req, res) => {
         totalRequestsLastWeek,
         pendingChangeClassRequests
       },
-      todaySchedule: processedSchedules.slice(0, 10),
       absentStudentsList,
       roomSchedule: roomScheduleData,
       timeSlots: timeSlots,
-      classProgress: classProgressData,
       recentActivities
     };
 

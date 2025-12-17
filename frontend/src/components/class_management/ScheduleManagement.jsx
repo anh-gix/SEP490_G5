@@ -7,7 +7,6 @@ import ScheduleCalendar from './ScheduleCalendar';
 import ScheduleWeekly from './ScheduleWeekly';
 import ScheduleList from './ScheduleList';
 import CreateScheduleModal from './CreateScheduleModal';
-import EditScheduleModal from './EditScheduleModal';
 import MakeupClassModal from './MakeupClassModal';
 import scheduleService from '../../services/scheduleService';
 import classService from '../../services/classService';
@@ -468,20 +467,6 @@ const ScheduleManagement = () => {
         />
       )}
 
-      {showEditModal && selectedSchedule && (
-        <EditScheduleModal
-          schedule={selectedSchedule}
-          classes={classes}
-          teachers={teachers}
-          rooms={rooms}
-          onClose={() => {
-            setShowEditModal(false);
-            setSelectedSchedule(null);
-          }}
-          onSubmit={handleEditSchedule}
-          existingSchedules={schedules}
-        />
-      )}
 
       {showMakeupModal && selectedSchedule && (
         <MakeupClassModal

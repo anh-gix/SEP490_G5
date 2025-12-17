@@ -10,8 +10,9 @@ import * as XLSX from 'xlsx';
 /**
  * Import Student From Excel Component
  * Component để import học viên từ file Excel
+ * @param {function} onBack - Callback để quay lại danh sách (optional, fallback to navigate)
  */
-const ImportStudentFromExcel = () => {
+const ImportStudentFromExcel = ({ onBack }) => {
   const navigate = useNavigate();
   const [importFile, setImportFile] = useState(null);
   const [previewStudents, setPreviewStudents] = useState([]);
@@ -703,7 +704,11 @@ const ImportStudentFromExcel = () => {
       alert(message.trim());
       
       // Navigate back to student management page after successful import
-      navigate('/academic/student-management');
+      if (onBack) {
+        onBack();
+      } else {
+        navigate('/academic/student-management');
+      }
     } catch (err) {
       const errorMessage = err.message || (typeof err === 'string' ? err : 'Không thể import học viên');
       alert(errorMessage);
@@ -810,7 +815,7 @@ const ImportStudentFromExcel = () => {
         <Button 
           variant="secondary"
           className="px-20 py-10 radius-8"
-          onClick={() => navigate('/academic/student-management')}
+          onClick={onBack || (() => navigate('/academic/student-management'))}
         >
           <i className="fas fa-arrow-left me-2"></i>
           Quay lại
@@ -1053,7 +1058,7 @@ const ImportStudentFromExcel = () => {
             <div className="d-flex justify-content-end gap-3">
               <Button 
                 variant="secondary" 
-                onClick={() => navigate('/academic/student-management')} 
+                onClick={onBack || (() => navigate('/academic/student-management'))} 
                 disabled={loading || importing}
               >
                 Hủy

@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Swal from 'sweetalert2';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
 import { workRequestService } from '../../../services/workRequestService';
 import { formatDate } from '../../../helper/helper';
-import CreateWorkRequestModal from './CreateWorkRequestModal';
+import CreateWorkRequestModal from '../compo/CreateWorkRequestModal';
+import userService from '../../../services/userService';
 
 const ApprovalRequests = () => {
   const navigate = useNavigate();
@@ -33,11 +37,15 @@ const ApprovalRequests = () => {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showRevokeModal, setShowRevokeModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createRequestType, setCreateRequestType] = useState('create_program'); // 'create_program' | 'create_exam'
   const [approveNote, setApproveNote] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [reviewNote, setReviewNote] = useState('');
   const [revokeReason, setRevokeReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Assignee list (Subject Leaders for program/exam, Academic Staff for assign_students)
+  const [assigneeList, setAssigneeList] = useState([]);
 
   // Statistics
   const [stats, setStats] = useState({
@@ -59,6 +67,34 @@ const ApprovalRequests = () => {
   useEffect(() => {
     fetchStats();
   }, []);
+
+  // Fetch assignees based on request type
+  const fetchAssignees = async (requestType) => {
+    try {
+      let rolesToQuery = [];
+
+      if (requestType === 'create_program' || requestType === 'create_exam') {
+        rolesToQuery = ['Subject Leader'];
+      } else if (requestType === 'assign_students') {
+        rolesToQuery = ['Academic Staff'];
+      }
+
+      const response = await userService.getUsersByRoles(rolesToQuery);
+      if (response.success && response.data && response.data.length > 0) {
+        setAssigneeList(response.data);
+      } else {
+        toast.warning(`Không tìm thấy ${requestType === 'assign_students' ? 'Academic Staff' : 'Subject Leader'} nào trong hệ thống!`, {
+          position: 'top-right'
+        });
+        setAssigneeList([]);
+      }
+    } catch (error) {
+      console.error('Error fetching assignees:', error);
+      console.error('Error details:', error.response || error);
+      toast.error('Không thể tải danh sách người phụ trách!', { position: 'top-right' });
+      setAssigneeList([]);
+    }
+  };
 
   const fetchRequests = async () => {
     try {
@@ -219,6 +255,71 @@ const ApprovalRequests = () => {
     }
   };
 
+  const handleCreateWorkRequest = async (requestData) => {
+    try {
+      // Check if a similar work request already exists
+      const existingRequests = await workRequestService.getAllRequests({
+        direction: 'top_down',
+        requestType: createRequestType,
+        status: 'pending,in_progress,pending_approval'
+      });
+
+      // Check if there's already a pending/in-progress request for the same assignee and type
+      if (existingRequests.data && existingRequests.data.length > 0) {
+        const duplicate = existingRequests.data.find(req =>
+          req.assignedTo?._id === requestData.assignedTo &&
+          req.requestType === createRequestType &&
+          ['pending', 'in_progress', 'pending_approval'].includes(req.status)
+        );
+
+        if (duplicate) {
+          const result = await Swal.fire({
+            title: 'Yêu cầu đã tồn tại',
+            text: `Đã có yêu cầu ${createRequestType === 'create_program' ? 'tạo chương trình' : 'tạo đề thi'} cho Subject Leader này đang trong trạng thái "${getStatusBadge(duplicate.status).props.children}". Bạn có muốn tạo yêu cầu mới không?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Tạo mới',
+            cancelButtonText: 'Hủy'
+          });
+
+          if (!result.isConfirmed) {
+            return;
+          }
+        }
+      }
+
+      // Prepare FormData for file upload
+      const formData = new FormData();
+      formData.append('requestType', createRequestType);
+      formData.append('assignedTo', requestData.assignedTo);
+      formData.append('requestNote', requestData.requestNote);
+
+      if (requestData.attachmentType === 'link' && requestData.attachmentUrl) {
+        formData.append('attachmentUrl', requestData.attachmentUrl);
+      } else if (requestData.attachmentType === 'file' && requestData.attachmentFile) {
+        formData.append('attachmentFile', requestData.attachmentFile);
+      }
+
+      // Create work request
+      const response = await workRequestService.createRequest(formData);
+
+      if (response.success) {
+        toast.success(`Đã tạo yêu cầu ${createRequestType === 'create_program' ? 'tạo chương trình' : 'tạo đề thi'} thành công!`, {
+          position: 'top-right'
+        });
+        setShowCreateModal(false);
+        fetchRequests();
+        fetchStats();
+      }
+    } catch (error) {
+      console.error('Error creating work request:', error);
+      toast.error(error.message || 'Có lỗi xảy ra khi tạo yêu cầu!', { position: 'top-right' });
+      throw error;
+    }
+  };
+
   const handleViewEntityDetail = () => {
     if (!selectedRequest) return;
 
@@ -323,13 +424,60 @@ const ApprovalRequests = () => {
           <p className="text-muted mb-0">Phê duyệt và theo dõi tiến độ công việc</p>
         </div>
         {activeTab === 'top_down' && (
-          <Button
-            variant="primary"
-            onClick={() => setShowCreateModal(true)}
-          >
-            <i className="ph ph-plus me-2"></i>
-            Tạo yêu cầu mới
-          </Button>
+          <div className="dropdown">
+            <button
+              className="btn btn-primary dropdown-toggle"
+              type="button"
+              id="createRequestDropdown"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              <i className="ph ph-plus me-2"></i>
+              Tạo yêu cầu mới
+            </button>
+            <ul className="dropdown-menu" aria-labelledby="createRequestDropdown">
+              <li>
+                <button
+                  className="dropdown-item"
+                  onClick={async () => {
+                    setCreateRequestType('create_program');
+                    await fetchAssignees('create_program');
+                    setShowCreateModal(true);
+                  }}
+                >
+                  <i className="ph ph-book me-2"></i>
+                  Tạo chương trình mới
+                </button>
+              </li>
+              <li>
+                <button
+                  className="dropdown-item"
+                  onClick={async () => {
+                    setCreateRequestType('create_exam');
+                    await fetchAssignees('create_exam');
+                    setShowCreateModal(true);
+                  }}
+                >
+                  <i className="ph ph-file-text me-2"></i>
+                  Tạo đề thi mới
+                </button>
+              </li>
+              <li><hr className="dropdown-divider" /></li>
+              <li>
+                <button
+                  className="dropdown-item"
+                  onClick={async () => {
+                    setCreateRequestType('assign_students');
+                    await fetchAssignees('assign_students');
+                    setShowCreateModal(true);
+                  }}
+                >
+                  <i className="ph ph-users me-2"></i>
+                  Cấp tài khoản
+                </button>
+              </li>
+            </ul>
+          </div>
         )}
       </div>
 
@@ -1363,11 +1511,13 @@ const ApprovalRequests = () => {
       <CreateWorkRequestModal
         show={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onSuccess={() => {
-          fetchRequests();
-          fetchStats();
-        }}
+        onSuccess={handleCreateWorkRequest}
+        requestType={createRequestType}
+        assigneeList={assigneeList}
       />
+
+      {/* Toast Container */}
+      <ToastContainer />
 
       <style jsx>{`
         .nav-tabs-custom {

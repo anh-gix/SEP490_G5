@@ -1213,6 +1213,8 @@ exports.getDashboardData = async (req, res) => {
       .select('name course teacher room startDate endDate')
       .lean();
 
+    const classIds = activeClasses.map(cls => cls._id);
+
     const startOfWeek = new Date();
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
@@ -1221,21 +1223,54 @@ exports.getDashboardData = async (req, res) => {
     endOfWeek.setDate(endOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
 
-    const classIds = activeClasses.map(cls => cls._id);
-    
-    const weekSchedules = await ClassSchedule.find({
-      class: { $in: classIds },
-      date: { $gte: startOfWeek, $lte: endOfWeek }
+    // Query từ StudentSchedule để lấy TẤT CẢ buổi học (bao gồm cả học bù)
+    const studentSchedules = await StudentSchedule.find({
+      student: studentId,
+      scheduleStatus: { $nin: ['cancelled'] } // Không lấy buổi đã bị hủy
     })
-      .populate('class', 'name course')
       .populate({
-        path: 'class',
-        populate: { path: 'course', select: 'name' }
+        path: 'classSchedule',
+        match: {
+          date: { $gte: startOfWeek, $lte: endOfWeek }
+        },
+        populate: [
+          {
+            path: 'class',
+            select: 'name course',
+            populate: {
+              path: 'course',
+              select: 'name'
+            }
+          },
+          {
+            path: 'room',
+            select: 'room_name'
+          },
+          {
+            path: 'session',
+            select: 'title order'
+          }
+        ]
       })
-      .populate('room', 'room_name')
-      .populate('session', 'title order')
-      .sort({ date: 1, startTime: 1 })
       .lean();
+
+    // Lọc bỏ những StudentSchedule không có classSchedule hoặc classSchedule không match date
+    // Và transform thành format giống ClassSchedule
+    const weekSchedules = studentSchedules
+      .filter(ss => ss.classSchedule && ss.classSchedule.date)
+      .map(ss => ({
+        ...ss.classSchedule,
+        studentScheduleId: ss._id,
+        scheduleStatus: ss.scheduleStatus
+      }))
+      .sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        if (dateA.getTime() !== dateB.getTime()) {
+          return dateA - dateB;
+        }
+        return (a.startTime || '').localeCompare(b.startTime || '');
+      });
 
     const allSchedules = await ClassSchedule.find({
       class: { $in: classIds },
@@ -1419,7 +1454,7 @@ exports.getDashboardData = async (req, res) => {
           time: `${s.startTime} - ${s.endTime}`,
           subject: s.class?.course?.name || s.session?.title || 'N/A',
           room: s.room?.room_name || 'N/A',
-          className: s.class?.name
+          className: s.class?.name || 'Lớp học bù' // Hiển thị "Lớp học bù" nếu không có class
         }))
       });
     }

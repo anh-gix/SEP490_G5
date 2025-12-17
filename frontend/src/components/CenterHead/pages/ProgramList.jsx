@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Table from '../compo/Table';
-import Button from '../compo/Button';
 import SearchBox from '../compo/SearchBox';
 import FilterBar from '../compo/FilterBar';
 import StatusBadge from '../compo/StatusBadge';
@@ -80,7 +81,7 @@ const ProgramList = () => {
       console.log('Programs loaded from API:', programsData);
     } catch (err) {
       console.error('Error fetching programs:', err);
-      alert('Không thể tải danh sách chương trình!');
+      toast.error('Không thể tải danh sách chương trình!', { position: 'top-right' });
     } finally {
       setLoading(false);
     }
@@ -338,6 +339,9 @@ const ProgramList = () => {
           </div>
         </div>
       )}
+
+      {/* Toast Container */}
+      <ToastContainer />
     </div>
   );
 };

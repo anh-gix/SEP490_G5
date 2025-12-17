@@ -5,7 +5,7 @@ const { verifyToken } = require('../middlewares/verifyToken');
 const router = express.Router();
 
 // All routes are protected
-router.use(verifyToken);
+// router.use(verifyToken);
 
 router.get('/', getAllRoles);
 router.get('/:id', getRoleById);

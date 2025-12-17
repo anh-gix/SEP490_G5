@@ -251,14 +251,6 @@ const ClassDetails = () => {
   );
 
   const renderStudentsTab = () => {
-    if (loading) {
-      return (
-        <div className="p-3 p-md-4 text-center" style={{ paddingTop: '60px', paddingBottom: '60px', maxWidth: '100%', overflowX: 'hidden' }}>
-          <Spinner animation="border" variant="primary" style={{ width: '48px', height: '48px' }} />
-          <p className="mt-4 text-muted" style={{ fontSize: '16px' }}>Đang tải dữ liệu học viên...</p>
-        </div>
-      );
-    }
 
     return (
       <div className="p-3 p-md-4" style={{ maxWidth: '100%', overflowX: 'hidden' }}>

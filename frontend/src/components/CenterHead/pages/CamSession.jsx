@@ -5,7 +5,7 @@ import Button from '../compo/Button';
 import camSessionService from '../../../services/camSessionService';
 import courseService from '../../../services/courseService';
 
-const CamSession = ({ courseData, viewMode = 'center-head' }) => {
+const CamSession = ({ courseData, viewMode = 'center-head', programId }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [camSessions, setCamSessions] = useState([]);
@@ -82,6 +82,9 @@ const CamSession = ({ courseData, viewMode = 'center-head' }) => {
     const params = new URLSearchParams();
     if (courseData?._id) {
       params.set('courseId', courseData._id);
+    }
+    if (programId) {
+      params.set('programId', programId);
     }
 
     const editPath = `${basePath}/cam-sessions/${camSession._id}/edit`;

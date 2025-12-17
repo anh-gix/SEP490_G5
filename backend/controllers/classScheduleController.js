@@ -59,6 +59,7 @@ exports.validateAddClassSchedule = async (req, res) => {
       teacher: [],
       room: [],
       students: [],
+      auditingStudents: [],
       hasConflict: false
     };
 
@@ -89,16 +90,19 @@ exports.validateAddClassSchedule = async (req, res) => {
       });
     }
     
-    const scheduleDate = new Date(
+    // Tạo UTC date object để match với MongoDB (date được lưu dưới dạng UTC)
+    const scheduleDate = new Date(Date.UTC(
       parseInt(dateParts[0]), // year
       parseInt(dateParts[1]) - 1, // month (0-indexed)
-      parseInt(dateParts[2]) // day
-    );
-    scheduleDate.setHours(0, 0, 0, 0);
+      parseInt(dateParts[2]), // day
+      0, // hour
+      0, // minute
+      0, // second
+      0  // millisecond
+    ));
     
     console.log(' Parse date từ string:', date);
     console.log('  - Date parts:', dateParts);
-    console.log('  - Date object (local):', scheduleDate.toLocaleString('vi-VN'));
     console.log('  - Date object (UTC):', scheduleDate.toISOString());
 
     // Helper function để check time overlap
@@ -174,9 +178,27 @@ exports.validateAddClassSchedule = async (req, res) => {
     console.log('  - Số học sinh:', students.length);
 
     console.log('\n KIỂM TRA CONFLICT VỚI CÁC BUỔI HỌC HIỆN TẠI CỦA LỚP:');
+    // Tạo range query để tìm tất cả schedules trong ngày (dùng UTC để match với MongoDB)
+    const startOfDay = new Date(Date.UTC(
+      parseInt(dateParts[0]),
+      parseInt(dateParts[1]) - 1,
+      parseInt(dateParts[2]),
+      0, 0, 0, 0
+    ));
+
+    const endOfDay = new Date(Date.UTC(
+      parseInt(dateParts[0]),
+      parseInt(dateParts[1]) - 1,
+      parseInt(dateParts[2]),
+      23, 59, 59, 999
+    ));
+
     const currentClassSchedulesOnSameDate = await ClassSchedule.find({
       class: new mongoose.Types.ObjectId(classId),
-      date: scheduleDate,
+      date: {
+        $gte: startOfDay,
+        $lte: endOfDay
+      },
       status: { $in: ['temporary', 'fixed'] }
     })
       .select('_id date startTime endTime')
@@ -188,10 +210,12 @@ exports.validateAddClassSchedule = async (req, res) => {
       : currentClassSchedulesOnSameDate;
     
     console.log(`  - Tìm thấy ${schedulesToCheck.length} buổi học của lớp hiện tại vào ngày ${newDateStr}`);
+    console.log(`  - Date range query: ${startOfDay.toISOString()} đến ${endOfDay.toISOString()}`);
     
     schedulesToCheck.forEach((schedule, idx) => {
       const hasOverlap = hasTimeOverlap(startTime, endTime, schedule.startTime, schedule.endTime);
       console.log(`  [${idx + 1}] Schedule ID: ${schedule._id}`);
+      console.log(`      - Date trong DB: ${schedule.date}`);
       console.log(`      - Thời gian: ${schedule.startTime} - ${schedule.endTime}`);
       console.log(`      - Trùng giờ với ${startTime}-${endTime}: ${hasOverlap ? 'CÓ ' : 'KHÔNG ✓'}`);
       
@@ -217,7 +241,10 @@ exports.validateAddClassSchedule = async (req, res) => {
     // Loại trừ tất cả schedules của lớp hiện tại để tránh báo conflict trùng lặp
     const roomScheduleQuery = {
       room: new mongoose.Types.ObjectId(room),
-      date: scheduleDate,
+      date: {
+        $gte: startOfDay,
+        $lte: endOfDay
+      },
       status: { $in: ['temporary', 'fixed'] }
     };
     
@@ -295,7 +322,10 @@ exports.validateAddClassSchedule = async (req, res) => {
         // Build query for teacher schedules, excluding current schedule if updating
         const teacherScheduleQuery = {
           class: { $in: teacherClassIds },
-          date: scheduleDate,
+          date: {
+            $gte: startOfDay,
+            $lte: endOfDay
+          },
           status: { $in: ['temporary', 'fixed'] }
         };
         if (excludeScheduleId) {
@@ -421,7 +451,10 @@ exports.validateAddClassSchedule = async (req, res) => {
         // Loại trừ tất cả schedules của lớp hiện tại để tránh báo conflict với chính lớp đang chỉnh sửa
         const currentClassSchedulesForStudents = await ClassSchedule.find({
           class: new mongoose.Types.ObjectId(classId),
-          date: scheduleDate,
+          date: {
+            $gte: startOfDay,
+            $lte: endOfDay
+          },
           status: { $in: ['temporary', 'fixed'] }
         }).select('_id').lean();
         
@@ -429,7 +462,10 @@ exports.validateAddClassSchedule = async (req, res) => {
         
         const studentScheduleQuery = {
           class: { $in: studentClassIds },
-          date: scheduleDate,
+          date: {
+            $gte: startOfDay,
+            $lte: endOfDay
+          },
           status: { $in: ['temporary', 'fixed'] }
         };
         
@@ -543,11 +579,95 @@ exports.validateAddClassSchedule = async (req, res) => {
       console.log('  ✓ Không có conflict học sinh');
     }
 
+// KIỂM TRA HỌC SINH HỌC tạm thời VÀ SESSION THAY ĐỔI (chỉ khi đang update schedule)
+if (excludeScheduleId) {
+  console.log('\n ========== KIỂM TRA HỌC SINH HỌC tạm thời ==========');
+  console.log('  - ScheduleId đang chỉnh sửa:', excludeScheduleId);
+  
+  // 1. Lấy danh sách học sinh chính thức của lớp
+  const classDataForAuditing = await Class.findById(classId)
+    .select('students')
+    .lean();
+  
+  const officialStudentIds = (classDataForAuditing?.students || []).map(s => 
+    s._id?.toString() || s.toString()
+  );
+  
+  console.log(`  - Số học sinh chính thức: ${officialStudentIds.length}`);
+  
+  // 2. Kiểm tra có StudentSchedule (học sinh học tạm thời) không
+  const allStudentSchedules = await StudentSchedule.find({
+    classSchedule: new mongoose.Types.ObjectId(excludeScheduleId),
+    scheduleStatus: { $nin: ['cancelled'] }
+  })
+    .populate('student', 'username fullName')
+    .lean();
+  
+  // 3. Lọc ra chỉ học sinh học tạm thời (không có trong danh sách học sinh chính thức)
+  const auditingStudentSchedules = allStudentSchedules.filter(ss => {
+    const studentId = ss.student?._id?.toString() || ss.student?.toString();
+    return !officialStudentIds.includes(studentId);
+  });
+  
+  console.log(`  - Tổng số StudentSchedule: ${allStudentSchedules.length}`);
+  console.log(`  - Số học sinh học tạm thời: ${auditingStudentSchedules.length}`);
+  
+  if (auditingStudentSchedules.length > 0) {
+    console.log('  - Danh sách học sinh học tạm thời:');
+    auditingStudentSchedules.forEach((ss, idx) => {
+      const studentName = ss.student?.username || ss.student?.fullName || 'N/A';
+      const studentId = ss.student?._id?.toString() || 'N/A';
+      console.log(`    [${idx + 1}] ${studentName} (ID: ${studentId})`);
+    });
+    
+    // 4. Simulate reassignSessionsByOrder để kiểm tra session có thay đổi không
+    const sessionCheckResult = await simulateReassignAndCheckSessionChange(
+      new mongoose.Types.ObjectId(classId),
+      new mongoose.Types.ObjectId(excludeScheduleId),
+      newDateStr,
+      startTime,
+      endTime
+    );
+    
+    console.log('  - Session order ban đầu:', sessionCheckResult.originalSessionOrder);
+    console.log('  - Session order mới (sau khi reassign):', sessionCheckResult.newSessionOrder);
+    console.log('  - Session có thay đổi:', sessionCheckResult.sessionChanged ? 'CÓ ⚠️' : 'KHÔNG ✓');
+    
+    if (sessionCheckResult.sessionChanged) {
+      // Thêm vào conflicts như một conflict mới
+      const studentNames = auditingStudentSchedules.map(ss => 
+        ss.student?.username || ss.student?.fullName || 'N/A'
+      );
+      
+      conflicts.auditingStudents = [{
+        message: `Buổi học này có ${auditingStudentSchedules.length} học sinh học tạm thời (${studentNames.join(', ')}). 
+
+Việc chỉnh sửa sẽ làm thay đổi session từ ${sessionCheckResult.originalSessionOrder} sang ${sessionCheckResult.newSessionOrder}, ảnh hưởng đến lịch học của học sinh học tạm thời. Vui lòng thay đổi lịch của học sinh học tạm thời trước khi chỉnh sửa buổi học này.`,
+        auditingStudentsCount: auditingStudentSchedules.length,
+        auditingStudents: studentNames,
+        originalSessionOrder: sessionCheckResult.originalSessionOrder,
+        newSessionOrder: sessionCheckResult.newSessionOrder,
+        scheduleId: excludeScheduleId
+      }];
+      
+      conflicts.hasConflict = true;
+      
+      console.log('  ⚠️ PHÁT HIỆN CONFLICT: Session thay đổi và có học sinh học tạm thời');
+    } else {
+      console.log('  ✓ Session không thay đổi, không có conflict');
+    }
+  } else {
+    console.log('  ✓ Không có học sinh học tạm thời');
+  }
+  console.log('  ============================================\n');
+}
+
     console.log('\n KẾT QUẢ VALIDATION:');
     console.log('  - Có conflict:', conflicts.hasConflict ? 'CÓ ' : 'KHÔNG ✓');
     console.log('  - Conflict phòng học:', conflicts.room.length);
     console.log('  - Conflict giáo viên:', conflicts.teacher.length);
     console.log('  - Conflict học sinh:', conflicts.students.length);
+    console.log('  - Conflict học sinh học tạm thời:', conflicts.auditingStudents ? conflicts.auditingStudents.length : 0);
     console.log('========== VALIDATE SCHEDULE - END ==========\n');
 
     res.status(200).json({
@@ -567,6 +687,117 @@ exports.validateAddClassSchedule = async (req, res) => {
     });
   }
 };
+
+/**
+ * Simulate reassignSessionsByOrder để kiểm tra xem session có thay đổi không
+ * @param {ObjectId} classId - ID của lớp học
+ * @param {ObjectId} scheduleId - ID của schedule cần kiểm tra
+ * @param {String} newDate - Date mới (YYYY-MM-DD)
+ * @param {String} newStartTime - StartTime mới
+ * @param {String} newEndTime - EndTime mới
+ * @returns {Object} { sessionChanged: boolean, originalSessionOrder: Number, newSessionOrder: Number }
+ */
+async function simulateReassignAndCheckSessionChange(classId, scheduleId, newDate, newStartTime, newEndTime) {
+  // 1. Lấy schedule hiện tại với session order
+  const originalSchedule = await ClassSchedule.findById(scheduleId)
+    .populate('session', 'order')
+    .lean();
+  
+  if (!originalSchedule) {
+    return {
+      sessionChanged: false,
+      originalSessionOrder: null,
+      newSessionOrder: null
+    };
+  }
+  
+  const originalSessionOrder = originalSchedule?.session?.order ?? null;
+  
+  // 2. Lấy tất cả schedules của lớp (bao gồm cả schedule đang chỉnh sửa với thông tin mới)
+  const allSchedules = await ClassSchedule.find({
+    class: classId
+  })
+    .sort({ date: 1, startTime: 1 })
+    .lean();
+  
+  // 3. Tạo danh sách schedules với schedule đang chỉnh sửa có thông tin mới
+  const schedulesWithUpdate = allSchedules.map(s => {
+    if (s._id.toString() === scheduleId.toString()) {
+      return {
+        ...s,
+        date: new Date(newDate),
+        startTime: newStartTime,
+        endTime: newEndTime
+      };
+    }
+    return s;
+  });
+  
+  // 4. Sắp xếp lại theo date và startTime
+  schedulesWithUpdate.sort((a, b) => {
+    const dateA = new Date(a.date);
+    const dateB = new Date(b.date);
+    if (dateA.getTime() !== dateB.getTime()) {
+      return dateA.getTime() - dateB.getTime();
+    }
+    return a.startTime.localeCompare(b.startTime);
+  });
+  
+  // 5. Lấy course để biết số sessions
+  const classData = await Class.findById(classId)
+    .populate('course', 'sessions')
+    .lean();
+  
+  if (!classData || !classData.course) {
+    return {
+      sessionChanged: false,
+      originalSessionOrder: originalSessionOrder,
+      newSessionOrder: null
+    };
+  }
+  
+  const courseData = await Course.findById(classData.course._id || classData.course)
+    .populate('sessions', 'order')
+    .select('sessions')
+    .lean();
+  
+  if (!courseData || !courseData.sessions || courseData.sessions.length === 0) {
+    return {
+      sessionChanged: false,
+      originalSessionOrder: originalSessionOrder,
+      newSessionOrder: null
+    };
+  }
+  
+  const courseSessions = [...courseData.sessions].sort((a, b) => (a.order || 0) - (b.order || 0));
+  
+  // 6. Tìm index của schedule đang chỉnh sửa trong danh sách đã sắp xếp
+  const scheduleIndex = schedulesWithUpdate.findIndex(s => s._id.toString() === scheduleId.toString());
+  
+  if (scheduleIndex === -1) {
+    return {
+      sessionChanged: false,
+      originalSessionOrder: originalSessionOrder,
+      newSessionOrder: null
+    };
+  }
+  
+  // 7. Tính session order mới dựa trên index
+  const sessionIndex = scheduleIndex < courseSessions.length 
+    ? scheduleIndex 
+    : scheduleIndex % courseSessions.length;
+  const newSessionId = courseSessions[sessionIndex]?._id || null;
+  const newSessionOrder = courseSessions[sessionIndex]?.order || sessionIndex + 1;
+  
+  // 8. So sánh
+  const sessionChanged = originalSessionOrder !== newSessionOrder;
+  
+  return {
+    sessionChanged: sessionChanged,
+    originalSessionOrder: originalSessionOrder,
+    newSessionOrder: newSessionOrder
+  };
+}
 
 // =========================
 //  PREVIEW: XEM TRƯỚC KHI THÊM BUỔI HỌC

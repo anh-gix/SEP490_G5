@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Container, Card, Row, Col, Badge, Button, Spinner, Alert } from 'react-bootstrap';
-import EditScheduleModal from './EditScheduleModal';
 import MakeupClassModal from './MakeupClassModal';
 import scheduleService from '../../services/scheduleService';
 import classService from '../../services/classService';
@@ -12,13 +11,13 @@ import { formatDateToYYYYMMDD } from '../../helper/helper';
 /**
  * Academic Lesson Detail Component
  * Trang chi tiết buổi học cho giáo vụ
+ * @param {string} lessonId - ID của buổi học (từ props thay vì route params)
+ * @param {function} onBack - Callback để quay lại danh sách lịch học
  */
-const AcademicLessonDetail = () => {
-  const { lessonId } = useParams();
+const AcademicLessonDetail = ({ lessonId, onBack }) => {
   const [lessonData, setLessonData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showMakeupModal, setShowMakeupModal] = useState(false);
   const [classes, setClasses] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -131,19 +130,6 @@ const AcademicLessonDetail = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonId]);
 
-  const handleEditSchedule = async (scheduleData) => {
-    try {
-      // TODO: Call API to update schedule
-      console.log('Update schedule:', scheduleData);
-      setShowEditModal(false);
-      alert('Cập nhật lịch học thành công!');
-      await fetchLessonData();
-    } catch (err) {
-      console.error('Error updating schedule:', err);
-      alert('Có lỗi xảy ra khi cập nhật lịch học!');
-    }
-  };
-
   const handleCreateMakeup = async (makeupData) => {
     try {
       // TODO: Call API to create makeup class
@@ -173,9 +159,9 @@ const AcademicLessonDetail = () => {
         <Alert variant="danger">
           <Alert.Heading>Lỗi</Alert.Heading>
           <p>{error || 'Không tìm thấy thông tin buổi học'}</p>
-          <Link to="/academic/schedule" className="btn btn-primary">
+          <Button variant="primary" onClick={onBack || (() => {})}>
             Quay lại lịch học
-          </Link>
+          </Button>
         </Alert>
       </Container>
     );
@@ -186,15 +172,15 @@ const AcademicLessonDetail = () => {
       {/* Breadcrumb & Header */}
       <div className="mb-24">
         <div className="d-flex align-items-center gap-2 mb-8">
-          <Link to="/academic/dashboard" className="text-neutral-600 text-14 text-decoration-none">
-            Dashboard
-          </Link>
-          <i className="fas fa-chevron-right text-neutral-400" style={{ fontSize: '10px' }}></i>
-          <Link to="/academic/schedule" className="text-neutral-600 text-14 text-decoration-none">
-            Lịch học
-          </Link>
-          <i className="fas fa-chevron-right text-neutral-400" style={{ fontSize: '10px' }}></i>
-          <span className="text-neutral-900 text-14 fw-semibold">Chi tiết buổi học</span>
+          <Button 
+            variant="link" 
+            onClick={onBack || (() => {})}
+            className="text-neutral-600 text-14 text-decoration-none p-0"
+            style={{ textDecoration: 'none' }}
+          >
+            <i className="fas fa-arrow-left me-2"></i>
+            Quay lại lịch học
+          </Button>
         </div>
         <div className="d-flex justify-content-between align-items-start">
           <div>
@@ -209,13 +195,6 @@ const AcademicLessonDetail = () => {
             </p>
           </div>
           <div className="d-flex gap-12">
-            <Button 
-              className="btn-outline-warning text-13 px-16 py-8 radius-8"
-              onClick={() => setShowEditModal(true)}
-            >
-              <i className="fas fa-edit me-2"></i>
-              Chỉnh sửa lịch
-            </Button>
             <Button 
               className="btn-outline-info text-13 px-16 py-8 radius-8"
               onClick={() => setShowMakeupModal(true)}
@@ -245,9 +224,6 @@ const AcademicLessonDetail = () => {
                 <div>
                   <div className="text-neutral-500 text-12 mb-4">Lớp học</div>
                   <div className="text-neutral-900 fw-semibold text-14">{lessonData.className}</div>
-                  <Badge className="bg-main-100 text-main-600 px-8 py-4 text-11 mt-4">
-                    {lessonData.level}
-                  </Badge>
                 </div>
               </div>
             </Col>
@@ -459,31 +435,6 @@ const AcademicLessonDetail = () => {
           </Card>
         </Col>
       </Row>
-
-      {/* Modals */}
-      {showEditModal && lessonData && (
-        <EditScheduleModal
-          schedule={{
-            id: lessonData.id,
-            classId: lessonData.classId,
-            teacherId: lessonData.teacherId,
-            roomId: lessonData.roomId,
-            date: lessonData.date,
-            startTime: lessonData.startTime,
-            endTime: lessonData.endTime,
-            lessonNumber: lessonData.lessonNumber,
-            lessonTopic: lessonData.lessonTopic,
-            status: lessonData.status,
-            type: lessonData.type
-          }}
-          classes={classes}
-          teachers={teachers}
-          rooms={rooms}
-          onClose={() => setShowEditModal(false)}
-          onSubmit={handleEditSchedule}
-          existingSchedules={schedules}
-        />
-      )}
 
       {showMakeupModal && lessonData && (
         <MakeupClassModal

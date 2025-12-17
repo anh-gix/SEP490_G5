@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
+import CourseWizardIntro from '../compo/CourseWizardIntro';
+import CourseSuccessModal from '../compo/CourseSuccessModal';
+import { ToastContainer } from '../compo/Toast';
 import programService from '../../../services/programService';
 import courseService from '../../../services/courseService';
 
@@ -14,14 +17,23 @@ import CourseStep4CLOMapping from './course-wizard-steps/CourseStep3CLOMapping';
 import CourseStep5Sessions from './course-wizard-steps/CourseStep4Sessions';
 import CamSession from './CamSession';
 
-const CourseWizard = () => {
+const CourseWizard = ({ viewMode = 'center-head' }) => {
   const navigate = useNavigate();
   const { programId, courseId } = useParams();
   const isEdit = Boolean(courseId);
 
+  // Determine base path
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
+
+  const [showIntro, setShowIntro] = useState(!isEdit); // Show intro for new courses only
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [program, setProgram] = useState(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState('saved'); // 'saved', 'saving', 'error'
+  const autoSaveTimeoutRef = useRef(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [toasts, setToasts] = useState([]);
 
   // Course data state
   const [courseData, setCourseData] = useState({
@@ -97,11 +109,53 @@ const CourseWizard = () => {
 
   // Breadcrumb
   const breadcrumbItems = [
-    { label: 'Dashboard', path: '/center-head/dashboard' },
-    { label: 'Quản lý chương trình', path: '/center-head/programs' },
-    { label: 'Chi tiết chương trình', path: `/center-head/programs/${programId}` },
+    { label: 'Dashboard', path: `${basePath}/dashboard` },
+    { label: 'Quản lý chương trình', path: `${basePath}/programs` },
+    { label: 'Chi tiết chương trình', path: `${basePath}/programs/${programId}` },
     { label: isEdit ? 'Chỉnh sửa học phần' : 'Tạo học phần mới' }
   ];
+
+  // Toast helpers
+  const showToast = (message, type = 'info', duration = 3000) => {
+    const newToast = {
+      id: Date.now(),
+      message,
+      type,
+      duration,
+      position: 'top-right'
+    };
+    setToasts(prev => [...prev, newToast]);
+  };
+
+  const removeToast = (id) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  };
+
+  // Intro Screen handlers
+  const handleStartWizard = () => {
+    setShowIntro(false);
+  };
+
+  const handleCancelIntro = () => {
+    navigate(`${basePath}/programs/${programId}`);
+  };
+
+  // Success Modal handlers
+  const handleViewCourse = () => {
+    setShowSuccessModal(false);
+    navigate(`${basePath}/courses/${courseData._id}/details`);
+  };
+
+  const handleCreateAnother = () => {
+    setShowSuccessModal(false);
+    // Reset wizard
+    window.location.href = `${basePath}/programs/${programId}/courses/create`;
+  };
+
+  const handleGoToProgram = () => {
+    setShowSuccessModal(false);
+    navigate(`${basePath}/programs/${programId}`);
+  };
 
   // Load program data
   useEffect(() => {
@@ -112,8 +166,8 @@ const CourseWizard = () => {
         setProgram(response.data);
       } catch (error) {
         console.error('Error loading program:', error);
-        alert('Không thể tải thông tin chương trình!');
-        navigate('/center-head/programs');
+        showToast('Không thể tải thông tin chương trình!', 'error');
+        navigate(`${basePath}/programs`);
       } finally {
         setLoading(false);
       }
@@ -122,7 +176,8 @@ const CourseWizard = () => {
     if (programId) {
       fetchProgramData();
     }
-  }, [programId, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [programId, navigate, basePath]);
 
   // Load existing course if editing
   useEffect(() => {
@@ -160,12 +215,13 @@ const CourseWizard = () => {
           }
         } catch (error) {
           console.error('Error loading existing course:', error);
-          alert('Không thể tải thông tin học phần hiện tại!');
+          showToast('Không thể tải thông tin học phần hiện tại!', 'error');
         }
       }
     };
 
     fetchExistingCourse();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit, courseId, programId]);
 
   // Handle step navigation
@@ -182,10 +238,28 @@ const CourseWizard = () => {
   };
 
   const handleStepClick = (stepNumber) => {
-    // Allow navigation to completed steps or next step only
-    if (stepNumber <= currentStep + 1 && stepNumber >= 1) {
+    // Allow navigation to completed steps only (based on lastCompletedStep)
+    if (stepNumber <= courseData.lastCompletedStep + 1 && stepNumber >= 1) {
       setCurrentStep(stepNumber);
     }
+  };
+
+  // Handle exit - just navigate back (auto-save handles saving)
+  const handleExit = () => {
+    navigate(`${basePath}/programs/${programId}`);
+  };
+
+  // Calculate completion percentage
+  const getProgressPercentage = () => {
+    return Math.round((courseData.lastCompletedStep / 5) * 100);
+  };
+
+  // Get step status
+  const getStepStatus = (stepNumber) => {
+    if (stepNumber <= courseData.lastCompletedStep) return 'completed';
+    if (stepNumber === currentStep) return 'active';
+    if (stepNumber === courseData.lastCompletedStep + 1) return 'available';
+    return 'locked';
   };
 
   // Render current step component
@@ -197,7 +271,8 @@ const CourseWizard = () => {
       onNext: handleNext,
       onPrevious: handlePrevious,
       isEdit,
-      navigate
+      navigate,
+      basePath
     };
 
     switch (currentStep) {
@@ -220,6 +295,8 @@ const CourseWizard = () => {
                 isWizardMode={true}
                 courseData={courseData}
                 setCourseData={setCourseData}
+                viewMode={viewMode}
+                programId={programId}
               />
               {/* Custom navigation for wizard mode */}
               <div className="d-flex justify-content-between gap-3 mt-4 pt-4 border-top">
@@ -237,14 +314,10 @@ const CourseWizard = () => {
                           lastCompletedStep: 5
                         });
                       }
-                      alert('Hoàn thành tạo học phần với CAM Sessions!');
-                      const programId = typeof courseData.program === 'object'
-                        ? (courseData.program._id || courseData.program.id)
-                        : courseData.program;
-                      navigate(`/center-head/programs/${programId}`);
+                      setShowSuccessModal(true);
                     } catch (error) {
                       console.error('Error updating course status:', error);
-                      alert('Có lỗi khi cập nhật trạng thái học phần!');
+                      showToast('Có lỗi khi cập nhật trạng thái học phần!', 'error');
                     }
                   }}
                   icon="ph ph-check-circle"
@@ -274,86 +347,326 @@ const CourseWizard = () => {
     );
   }
 
+  // Show Intro Screen for new courses
+  if (showIntro && !isEdit) {
+    return (
+      <div className="dashboard-body wizard-container py-5">
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+        <CourseWizardIntro
+          program={program}
+          onStart={handleStartWizard}
+          onCancel={handleCancelIntro}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="dashboard-body">
-      <Breadcrumb items={breadcrumbItems} />
+    <div className="dashboard-body wizard-container">
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
 
-      {/* Program Info Alert */}
-      {program && (
-        <div className="alert alert-info mb-24">
-          <i className="ph ph-info me-2"></i>
-          Đang tạo học phần cho chương trình: <strong>{program.program_name}</strong> ({program.code})
-        </div>
-      )}
+      {/* Success Modal */}
+      <CourseSuccessModal
+        show={showSuccessModal}
+        courseData={courseData}
+        program={program}
+        onViewCourse={handleViewCourse}
+        onCreateAnother={handleCreateAnother}
+        onGoToProgram={handleGoToProgram}
+      />
 
-      <div className="row gy-4">
-        {/* Progress Steps */}
-        <div className="col-lg-12">
-          <Card>
-            <div className="row">
-              {steps.map((step, index) => (
-                <div key={step.number} className="col-lg col-md-4 col-6">
-                  <div
-                    className={`text-center cursor-pointer ${
-                      currentStep === step.number ? 'text-primary-600' :
-                      currentStep > step.number ? 'text-success-600' :
-                      'text-neutral-400'
-                    }`}
-                    onClick={() => handleStepClick(step.number)}
-                    style={{
-                      cursor: step.number <= currentStep + 1 ? 'pointer' : 'not-allowed',
-                      opacity: step.number <= currentStep + 1 ? 1 : 0.5
-                    }}
-                  >
-                    <div className="d-flex flex-column align-items-center gap-2 mb-3">
-                      <div
-                        className={`rounded-circle d-flex align-items-center justify-content-center ${
-                          currentStep === step.number
-                            ? 'bg-primary-600 text-white'
-                            : currentStep > step.number
-                            ? 'bg-success-600 text-white'
-                            : 'bg-neutral-100 text-neutral-400'
-                        }`}
-                        style={{ width: '48px', height: '48px', fontSize: '20px' }}
-                      >
-                        {currentStep > step.number ? (
-                          <i className="ph ph-check"></i>
-                        ) : (
-                          <i className={step.icon}></i>
-                        )}
-                      </div>
-                      <div>
-                        <div className="fw-semibold text-sm">Bước {step.number}</div>
-                        <div className="text-xs">{step.title}</div>
-                      </div>
-                    </div>
-                    {index < steps.length - 1 && (
-                      <div className="d-none d-lg-block">
-                        <hr
-                          className={`${
-                            currentStep > step.number
-                              ? 'border-success-600'
-                              : 'border-neutral-200'
-                          }`}
-                          style={{ margin: '0 auto', width: '80%' }}
-                        />
-                      </div>
-                    )}
+      {/* Sticky Header with Progress */}
+      <div className="wizard-header sticky-top bg-white shadow-sm mb-24 pb-16 pt-16" style={{ top: 0, zIndex: 100 }}>
+        <div className="container-fluid">
+          <div className="d-flex align-items-center justify-content-between mb-12">
+            <div className="d-flex align-items-center gap-3">
+              <Button
+                variant="ghost"
+                onClick={handleExit}
+                icon="ph ph-x"
+                className="text-neutral-600 hover:text-neutral-900"
+              />
+              <div>
+                <h5 className="mb-0 fw-bold text-neutral-900">
+                  {isEdit ? 'Chỉnh sửa học phần' : 'Tạo học phần mới'}
+                </h5>
+                {program && (
+                  <small className="text-neutral-600">
+                    <i className="ph ph-folder me-1"></i>
+                    {program.program_name} ({program.code})
+                  </small>
+                )}
+              </div>
+            </div>
+            <div className="d-flex align-items-center gap-3">
+              {/* Auto-save indicator */}
+              <div className="d-flex align-items-center gap-2 px-3 py-2 rounded bg-light">
+                {autoSaveStatus === 'saving' && (
+                  <>
+                    <i className="ph ph-spinner-gap text-primary-600" style={{ animation: 'spin 1s linear infinite' }}></i>
+                    <span className="text-xs text-neutral-600">Đang lưu...</span>
+                  </>
+                )}
+                {autoSaveStatus === 'saved' && (
+                  <>
+                    <i className="ph ph-check-circle text-success-600"></i>
+                    <span className="text-xs text-success-600">Đã lưu</span>
+                  </>
+                )}
+                {autoSaveStatus === 'error' && (
+                  <>
+                    <i className="ph ph-warning-circle text-danger-600"></i>
+                    <span className="text-xs text-danger-600">Lỗi lưu</span>
+                  </>
+                )}
+              </div>
+
+              {/* Progress percentage */}
+              <div className="d-flex align-items-center gap-2">
+                <div className="text-end">
+                  <div className="fw-bold text-sm text-neutral-900">{getProgressPercentage()}%</div>
+                  <div className="text-xxs text-neutral-600">Hoàn thành</div>
+                </div>
+                <div className="position-relative" style={{ width: '60px', height: '60px' }}>
+                  <svg width="60" height="60" className="progress-ring">
+                    <circle
+                      cx="30"
+                      cy="30"
+                      r="26"
+                      fill="none"
+                      stroke="#e5e7eb"
+                      strokeWidth="4"
+                    />
+                    <circle
+                      cx="30"
+                      cy="30"
+                      r="26"
+                      fill="none"
+                      stroke="#3b82f6"
+                      strokeWidth="4"
+                      strokeDasharray={`${2 * Math.PI * 26}`}
+                      strokeDashoffset={`${2 * Math.PI * 26 * (1 - getProgressPercentage() / 100)}`}
+                      strokeLinecap="round"
+                      transform="rotate(-90 30 30)"
+                      style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+                    />
+                  </svg>
+                  <div className="position-absolute top-50 start-50 translate-middle">
+                    <span className="fw-bold text-xs text-primary-600">{currentStep}/5</span>
                   </div>
                 </div>
-              ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="progress" style={{ height: '6px' }}>
+            <div
+              className="progress-bar bg-success-600"
+              role="progressbar"
+              style={{ width: `${getProgressPercentage()}%`, transition: 'width 0.5s ease' }}
+              aria-valuenow={getProgressPercentage()}
+              aria-valuemin="0"
+              aria-valuemax="100"
+            ></div>
+          </div>
+        </div>
+      </div>
+
+      <div className="row gy-4">
+        {/* Enhanced Progress Steps */}
+        <div className="col-lg-12">
+          <Card className="shadow-sm">
+            <div className="row g-3">
+              {steps.map((step) => {
+                const status = getStepStatus(step.number);
+                const isClickable = status === 'completed' || status === 'active' || status === 'available';
+
+                return (
+                  <div key={step.number} className="col-lg col-md-4 col-sm-6">
+                    <div
+                      className={`wizard-step ${status} ${isClickable ? 'clickable' : ''}`}
+                      onClick={() => isClickable && handleStepClick(step.number)}
+                      style={{
+                        cursor: isClickable ? 'pointer' : 'not-allowed',
+                        opacity: isClickable ? 1 : 0.5
+                      }}
+                    >
+                      <div className="d-flex flex-column align-items-center gap-2 position-relative">
+                        {/* Step circle */}
+                        <div
+                          className={`step-circle ${
+                            status === 'completed'
+                              ? 'bg-success-600 text-white shadow'
+                              : status === 'active'
+                              ? 'bg-primary-600 text-white shadow-lg'
+                              : status === 'available'
+                              ? 'bg-primary-100 text-primary-600 border border-primary-600'
+                              : 'bg-neutral-100 text-neutral-400'
+                          }`}
+                        >
+                          {status === 'completed' ? (
+                            <i className="ph-fill ph-check-circle"></i>
+                          ) : status === 'locked' ? (
+                            <i className="ph ph-lock"></i>
+                          ) : (
+                            <i className={step.icon}></i>
+                          )}
+                        </div>
+
+                        {/* Step info */}
+                        <div className="text-center">
+                          <div className={`fw-bold text-xs mb-1 ${
+                            status === 'active' ? 'text-primary-600' :
+                            status === 'completed' ? 'text-success-600' :
+                            'text-neutral-600'
+                          }`}>
+                            Bước {step.number}
+                          </div>
+                          <div className={`text-xs ${
+                            status === 'active' ? 'text-neutral-900 fw-semibold' :
+                            status === 'completed' ? 'text-neutral-700' :
+                            'text-neutral-500'
+                          }`}>
+                            {step.title}
+                          </div>
+
+                          {/* Status badge */}
+                          {status === 'active' && (
+                            <span className="badge bg-primary-100 text-primary-600 mt-1 text-xxs">
+                              Đang thực hiện
+                            </span>
+                          )}
+                          {status === 'completed' && (
+                            <span className="badge bg-success-100 text-success-600 mt-1 text-xxs">
+                              <i className="ph ph-check me-1"></i>
+                              Hoàn thành
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </Card>
         </div>
 
+        {/* Data Summary Card */}
+        {courseData._id && (
+          <div className="col-lg-12">
+            <div className="alert alert-light border d-flex align-items-start gap-3">
+              <i className="ph ph-info text-primary-600 fs-4"></i>
+              <div className="flex-grow-1">
+                <div className="fw-semibold text-neutral-900 mb-2">Thông tin học phần</div>
+                <div className="row g-2 text-xs">
+                  <div className="col-md-3">
+                    <span className="text-neutral-600">Mã học phần:</span>
+                    <span className="fw-semibold text-neutral-900 ms-2">{courseData.courseCode || 'Chưa có'}</span>
+                  </div>
+                  <div className="col-md-3">
+                    <span className="text-neutral-600">Tên:</span>
+                    <span className="fw-semibold text-neutral-900 ms-2">{courseData.name || 'Chưa có'}</span>
+                  </div>
+                  <div className="col-md-2">
+                    <span className="text-neutral-600">Số buổi học:</span>
+                    <span className="fw-semibold text-neutral-900 ms-2">{courseData.numberOfSessions || 0}</span>
+                  </div>
+                  <div className="col-md-2">
+                    <span className="text-neutral-600">PLO đã ánh xạ:</span>
+                    <span className="fw-semibold text-primary-600 ms-2">{courseData.mappedPLOs?.length || 0}</span>
+                  </div>
+                  <div className="col-md-2">
+                    <span className="text-neutral-600">CLO đã tạo:</span>
+                    <span className="fw-semibold text-success-600 ms-2">{courseData.clos?.length || 0}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Step Content */}
         <div className="col-lg-12">
-          <Card title={steps[currentStep - 1].title}>
-            <p className="text-neutral-600 mb-24">{steps[currentStep - 1].description}</p>
+          <Card className="shadow-sm">
+            <div className="d-flex align-items-center justify-content-between mb-16 pb-16 border-bottom">
+              <div>
+                <h5 className="mb-1 fw-bold text-neutral-900">
+                  <i className={`${steps[currentStep - 1].icon} me-2 text-primary-600`}></i>
+                  {steps[currentStep - 1].title}
+                </h5>
+                <p className="mb-0 text-sm text-neutral-600">{steps[currentStep - 1].description}</p>
+              </div>
+              <span className="badge bg-primary-50 text-primary-600 px-3 py-2">
+                Bước {currentStep} / {steps.length}
+              </span>
+            </div>
             {renderStepContent()}
           </Card>
         </div>
       </div>
+
+      {/* Custom Styles */}
+      <style jsx>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        .wizard-step {
+          padding: 16px;
+          border-radius: 12px;
+          transition: all 0.3s ease;
+          position: relative;
+        }
+
+        .wizard-step.clickable:hover {
+          background-color: #f8f9fa;
+          transform: translateY(-2px);
+        }
+
+        .wizard-step.active {
+          background-color: #eff6ff;
+          border: 2px solid #3b82f6;
+        }
+
+        .step-circle {
+          width: 56px;
+          height: 56px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 24px;
+          transition: all 0.3s ease;
+        }
+
+        .wizard-step.active .step-circle {
+          animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+          50% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+        }
+
+        .wizard-header {
+          animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 };

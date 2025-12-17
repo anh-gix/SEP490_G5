@@ -8,13 +8,8 @@ const Step4Publish = ({
   totalQuestions,
   totalScore,
   onSave,
-  onPublish,
   examId
 }) => {
-  const navigate = useNavigate();
-  const [publishStatus, setPublishStatus] = useState('draft'); // 'draft' or 'publish'
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   const getSectionLabel = (type) => {
     const labels = {
       reading: 'Reading',
@@ -25,16 +20,22 @@ const Step4Publish = ({
     return labels[type] || type;
   };
 
-  // Check if exam is ready to publish
-  const isReadyToPublish = () => {
+  const getExamTypeLabel = (examType) => {
+    const labels = {
+      cambridge: 'Cambridge',
+      ielts: 'IELTS',
+      toeic: 'TOEIC'
+    };
+    return labels[examType] || examType;
+  };
+
+  // Check if exam is complete
+  const isExamComplete = () => {
     // Basic info complete
     const hasBasicInfo = examData.title && examData.totalDuration > 0;
 
     // At least one section
     const hasSections = examData.sections.length > 0;
-
-    // All sections have PDFs
-    const allSectionsHavePdf = examData.sections.every(section => section.fileUrl);
 
     // Sections that need answer keys have them
     const answersComplete = examData.sections.every(section => {
@@ -44,111 +45,25 @@ const Step4Publish = ({
       return true;
     });
 
-    return hasBasicInfo && hasSections && allSectionsHavePdf && answersComplete;
+    return hasBasicInfo && hasSections && answersComplete;
   };
 
-  const handleSaveAndPublish = async () => {
-    setIsSubmitting(true);
-
-    try {
-      // Save exam first (if not already saved)
-      if (onSave) {
-        const saved = await onSave();
-        if (!saved) {
-          setIsSubmitting(false);
-          return;
-        }
-      }
-
-      // If publish status is 'publish', call publish API
-      if (publishStatus === 'publish') {
-        if (!examId) {
-          alert('Vui lòng lưu đề thi trước');
-          setIsSubmitting(false);
-          return;
-        }
-
-        if (onPublish) {
-          await onPublish();
-        }
-      } else {
-        // Just save as draft
-        alert('Đề thi đã được lưu nháp thành công!');
-        navigate('/center-head/exams');
-      }
-    } catch (error) {
-      console.error('Error saving exam:', error);
-      alert('Có lỗi xảy ra khi lưu đề thi!');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const readyToPublish = isReadyToPublish();
+  const examComplete = isExamComplete();
 
   return (
     <div className="row g-3">
-      {/* Publication Status */}
+      {/* Review Instructions */}
       <div className="col-12">
-        <h6 className="text-neutral-900 fw-semibold mb-3">Trạng thái xuất bản</h6>
-        <p className="text-neutral-600 text-sm mb-3">
-          Chọn cách xuất bản đề thi của bạn
-        </p>
-
-        <div className="d-flex flex-column gap-2">
-          {/* Save as Draft */}
-          <label
-            className={`border rounded p-3 ${
-              publishStatus === 'draft'
-                ? 'border-main-600 bg-main-50'
-                : 'border-neutral-200 bg-white'
-            }`}
-            style={{ cursor: 'pointer' }}
-          >
-            <div className="d-flex align-items-start gap-3">
-              <input
-                type="radio"
-                name="publishStatus"
-                value="draft"
-                checked={publishStatus === 'draft'}
-                onChange={(e) => setPublishStatus(e.target.value)}
-                className="form-check-input mt-1"
-              />
-              <div className="flex-grow-1">
-                <div className="fw-semibold text-neutral-900 mb-1">Lưu nháp</div>
-                <div className="text-neutral-600 text-sm">
-                  Đề thi sẽ được lưu nhưng chưa hiển thị cho học viên
-                </div>
-              </div>
+        <div className="alert alert-info border-0 bg-blue-50">
+          <div className="d-flex align-items-start gap-2">
+            <i className="ph ph-info text-blue-600 mt-1" style={{ fontSize: '20px' }}></i>
+            <div>
+              <p className="fw-semibold mb-2 text-blue-900">Xem lại thông tin đề thi</p>
+              <p className="text-sm mb-0 text-blue-700">
+                Vui lòng kiểm tra kỹ thông tin đề thi trước khi hoàn tất. Sau khi lưu, bạn có thể Publish hoặc Submit để duyệt từ danh sách đề thi.
+              </p>
             </div>
-          </label>
-
-          {/* Publish Now */}
-          <label
-            className={`border rounded p-3 ${
-              publishStatus === 'publish'
-                ? 'border-main-600 bg-main-50'
-                : 'border-neutral-200 bg-white'
-            }`}
-            style={{ cursor: 'pointer' }}
-          >
-            <div className="d-flex align-items-start gap-3">
-              <input
-                type="radio"
-                name="publishStatus"
-                value="publish"
-                checked={publishStatus === 'publish'}
-                onChange={(e) => setPublishStatus(e.target.value)}
-                className="form-check-input mt-1"
-              />
-              <div className="flex-grow-1">
-                <div className="fw-semibold text-neutral-900 mb-1">Xuất bản ngay</div>
-                <div className="text-neutral-600 text-sm">
-                  Đề thi sẽ được xuất bản ngay lập tức cho học viên
-                </div>
-              </div>
-            </div>
-          </label>
+          </div>
         </div>
       </div>
 
@@ -216,17 +131,16 @@ const Step4Publish = ({
         </div>
       </div>
 
-      {/* Ready to Publish Message */}
+      {/* Completion Status */}
       <div className="col-12">
-        {readyToPublish ? (
+        {examComplete ? (
           <div className="alert alert-success mb-0">
             <div className="d-flex align-items-start gap-2">
               <i className="ph ph-check-circle text-success-600 mt-1" style={{ fontSize: '20px' }}></i>
               <div>
-                <p className="fw-semibold mb-2">Sẵn sàng xuất bản</p>
+                <p className="fw-semibold mb-2">Đề thi hoàn tất</p>
                 <p className="text-sm mb-0">
-                  Đề thi của bạn đã được cấu hình đầy đủ các sections và đáp án. Nhấn "Lưu & Xuất bản"
-                  để hoàn tất tạo đề thi.
+                  Đề thi của bạn đã được cấu hình đầy đủ. Nhấn "Hoàn tất" để lưu và quay về danh sách đề thi.
                 </p>
               </div>
             </div>
@@ -238,7 +152,7 @@ const Step4Publish = ({
               <div>
                 <p className="fw-semibold mb-2">Thông tin chưa đầy đủ</p>
                 <p className="text-sm mb-0">
-                  Vui lòng hoàn thành tất cả các trường bắt buộc và thêm đáp án để xuất bản đề thi.
+                  Vui lòng hoàn thành tất cả các trường bắt buộc và thêm đáp án trước khi hoàn tất.
                 </p>
               </div>
             </div>
@@ -272,12 +186,18 @@ const Step4Publish = ({
             <div className="col-6">
               <span className="text-neutral-500 text-xs d-block mb-1">Loại đề thi</span>
               <span className="text-neutral-900 fw-medium text-sm">
-                {examData.examType === 'practice' ? 'Luyện tập' : 'Chính thức'}
+                {getExamTypeLabel(examData.examType)}
               </span>
             </div>
             <div className="col-6">
               <span className="text-neutral-500 text-xs d-block mb-1">Cấp độ</span>
               <span className="text-neutral-900 fw-medium text-sm">{examData.level}</span>
+            </div>
+            <div className="col-6">
+              <span className="text-neutral-500 text-xs d-block mb-1">Hiển thị</span>
+              <span className={`badge ${examData.isPublished ? 'bg-success' : 'bg-primary'}`}>
+                {examData.isPublished ? 'Public' : 'Private'}
+              </span>
             </div>
             <div className="col-6">
               <span className="text-neutral-500 text-xs d-block mb-1">Sections</span>
@@ -305,48 +225,30 @@ const Step4Publish = ({
           <div>
             <span className="text-neutral-700 fw-semibold text-sm d-block mb-2">Chi tiết Sections</span>
             <div className="d-flex flex-column gap-2">
-              {examData.sections.map((section, index) => (
-                <div
-                  key={section.id}
-                  className="d-flex justify-content-between align-items-center p-2 bg-neutral-50 rounded"
-                >
-                  <div>
-                    <span className="text-neutral-900 fw-medium text-sm">
-                      Section {index + 1}: {getSectionLabel(section.type)}
-                    </span>
+              {examData.sections.length > 0 ? (
+                examData.sections.map((section, index) => (
+                  <div
+                    key={section.id || index}
+                    className="d-flex justify-content-between align-items-center p-2 bg-neutral-50 rounded"
+                  >
+                    <div className="d-flex align-items-center gap-2">
+                      <span className="badge bg-primary">Part {section.part || index + 1}</span>
+                      <span className="text-neutral-900 fw-medium text-sm">
+                        {getSectionLabel(section.type)}
+                      </span>
+                    </div>
+                    <div className="d-flex gap-3 text-xs text-neutral-600">
+                      <span>{section.duration || 0} phút</span>
+                      <span>{section.answerKey?.length || 0} câu hỏi</span>
+                    </div>
                   </div>
-                  <div className="d-flex gap-3 text-xs text-neutral-600">
-                    <span>{section.duration} phút</span>
-                    <span>{section.answerKey?.length || 0} câu hỏi</span>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-neutral-400 text-sm mb-0 fst-italic">Chưa có section nào</p>
+              )}
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Action Button */}
-      <div className="col-12">
-        <Button
-          variant="primary"
-          size="lg"
-          icon={isSubmitting ? null : 'ph ph-check-circle'}
-          onClick={handleSaveAndPublish}
-          disabled={isSubmitting || (publishStatus === 'publish' && !readyToPublish)}
-          className="w-100"
-        >
-          {isSubmitting ? (
-            <>
-              <span className="spinner-border spinner-border-sm me-2"></span>
-              Đang lưu...
-            </>
-          ) : (
-            <>
-              {publishStatus === 'publish' ? 'Lưu & Xuất bản' : 'Lưu nháp'}
-            </>
-          )}
-        </Button>
       </div>
     </div>
   );

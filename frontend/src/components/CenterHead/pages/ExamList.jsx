@@ -10,8 +10,12 @@ import StatusBadge from '../compo/StatusBadge';
 import examService from '../../../services/examService';
 import { formatDate } from '../../../helper/helper';
 
-const ExamList = () => {
+const ExamList = ({ viewMode = 'center-head' }) => {
   const navigate = useNavigate();
+
+  // Determine base path
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
+  const isViewOnly = viewMode === 'center-head';
   const [exams, setExams] = useState([]);
   const [filteredExams, setFilteredExams] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,26 +46,6 @@ const ExamList = () => {
       alert(err.message || 'Không thể tải danh sách đề thi');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDeleteExam = async (examId, examTitle) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa đề thi "${examTitle}"? Hành động này không thể hoàn tác.`)) {
-      return;
-    }
-
-    try {
-      const response = await examService.deleteExamForManagement(examId);
-
-      if (response.success) {
-        alert('Xóa đề thi thành công!');
-        fetchExams(); // Reload the list
-      } else {
-        alert(response.message || 'Xóa đề thi thất bại');
-      }
-    } catch (err) {
-      console.error('Error deleting exam:', err);
-      alert(err.message || 'Xóa đề thi thất bại');
     }
   };
 
@@ -161,55 +145,16 @@ const ExamList = () => {
       field: 'actions',
       render: (row) => (
         <div className="d-flex gap-2 justify-content-center">
+          {/* Nút Xem */}
           <button
             className="btn btn-sm btn-outline-primary"
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/center-head/exams/${row._id}`);
+              navigate(`${basePath}/exams/${row._id}`);
             }}
             title="Xem chi tiết"
           >
             <i className="ph ph-eye"></i>
-          </button>
-          <button
-            className="btn btn-sm btn-outline-secondary"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/center-head/exams/${row._id}/edit`);
-            }}
-            title="Chỉnh sửa"
-          >
-            <i className="ph ph-pencil"></i>
-          </button>
-          <button
-            className="btn btn-sm btn-outline-info"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/center-head/exams/${row._id}/submissions`);
-            }}
-            title="Xem bài làm"
-          >
-            <i className="ph ph-notebook"></i>
-          </button>
-          <button
-            className={`btn btn-sm ${row.isPublished ? 'btn-outline-warning' : 'btn-outline-success'}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              console.log('Toggle publish', row._id);
-            }}
-            title={row.isPublished ? 'Hủy xuất bản' : 'Xuất bản'}
-          >
-            <i className={row.isPublished ? 'ph ph-eye-slash' : 'ph ph-book-open'}></i>
-          </button>
-          <button
-            className="btn btn-sm btn-outline-danger"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDeleteExam(row._id, row.title);
-            }}
-            title="Xóa"
-          >
-            <i className="ph ph-trash"></i>
           </button>
         </div>
       ),
@@ -230,12 +175,9 @@ const ExamList = () => {
 
       <div className="d-flex justify-content-between align-items-center mb-24">
         <div>
-          <h4 className="mb-8 text-neutral-900 fw-bold">Quản lý đề thi</h4>
-          <p className="text-neutral-600 mb-0">Quản lý đề thi và bài làm</p>
+          <h4 className="mb-8 text-neutral-900 fw-bold">{isViewOnly ? 'Danh sách đề thi' : 'Quản lý đề thi'}</h4>
+          <p className="text-neutral-600 mb-0">{isViewOnly ? 'Xem tất cả các đề thi trong hệ thống' : 'Quản lý đề thi và bài làm'}</p>
         </div>
-        <Button variant="primary" styles={{ "text": "white"}} icon="ph ph-plus" onClick={() => navigate('/center-head/exams/create')}>
-          Tạo đề thi
-        </Button>
       </div>
 
       {/* Stats */}
@@ -286,7 +228,7 @@ const ExamList = () => {
         <Table
           columns={columns}
           data={filteredExams}
-          onRowClick={(row) => navigate(`/center-head/exams/${row._id}`)}
+          onRowClick={(row) => navigate(`${basePath}/exams/${row._id}`)}
         />
       </Card>
     </div>

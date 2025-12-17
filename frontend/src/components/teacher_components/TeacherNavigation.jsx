@@ -15,6 +15,7 @@ const TeacherNavigation = () => {
     const fetchTeacherInfo = async () => {
       try {
         const response = await teacherService.getCurrentTeacher();
+        console.log(response);
         if (response.success) {
           setTeacherInfo(response.teacher);
         }
@@ -42,29 +43,54 @@ const TeacherNavigation = () => {
       color: 'info'
     },
     {
+      title: 'Quản lý đơn đã gửi',
+      icon: 'fa-file-alt',
+      path: '/teacher/applications',
+      color: 'warning'
+    },
+    {
       title: 'Lớp học của tôi',
       icon: 'fa-chalkboard-teacher',
       path: '/teacher/classes',
       color: 'success'
     },
-    {
-      title: 'Bài tập',
-      icon: 'fa-tasks',
-      path: '/teacher/assignments',
-      color: 'warning'
-    },
+    // {
+    //   title: 'Bài tập',
+    //   icon: 'fa-tasks',
+    //   path: '/teacher/assignments',
+    //   color: 'warning'
+    // },
     {
       title: 'Điểm danh',
       icon: 'fa-user-check',
       path: '/teacher/attendance',
       color: 'main'
     },
+    // {
+    //   title: 'Tài liệu giảng dạy',
+    //   icon: 'fa-file-alt',
+    //   path: '/teacher/materials',
+    //   color: 'info'
+    // }
     {
-      title: 'Tài liệu giảng dạy',
-      icon: 'fa-file-alt',
-      path: '/teacher/materials',
-      color: 'info'
+      title: 'Chương trình đào tạo',
+      icon: 'fa-user-check',
+      path: '/teacher/programs',
+      color: 'main'
+    },
+    {
+      title: 'Đề thi',
+      icon: 'fa-user-check',
+      path: '/teacher/exams',
+      color: 'main'
+    },
+    {
+      title: 'Đề Quản lý tips',
+      icon: 'fa-user-check',
+      path: '/teacher/tips',
+      color: 'main'
     }
+    
   ];
 
   const userInfo = {

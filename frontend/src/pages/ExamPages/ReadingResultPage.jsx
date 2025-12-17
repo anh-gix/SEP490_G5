@@ -1,10 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import Breadcrumb from "../../components/Breadcrumb";
-import FooterOne from "../../components/FooterOne";
-import HeaderOne from "../../components/HomePageforStudent/HeaderOne";
-import Animation from "../../helper/Animation";
-import Preloader from "../../helper/Preloader";
 import { examService } from "../../services/examService";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -48,8 +43,42 @@ const ReadingResultPage = () => {
   }, [examId, submissionId, isAuthenticated, navigate]);
 
   const getScorePercentage = () => {
-    if (!result || !result.maxScore) return 0;
-    return Math.round((result.sectionScore / result.maxScore) * 100);
+    const totalMaxScore = getTotalMaxScore();
+    if (!result || !result.sectionScore || totalMaxScore === 0) return 0;
+    return Math.round((result.sectionScore / totalMaxScore) * 100);
+  };
+
+  const getCorrectAnswersCount = () => {
+    if (!result || !result.parts) return 0;
+    let correctCount = 0;
+    result.parts.forEach(part => {
+      if (part.results) {
+        part.results.forEach(item => {
+          if (item.isCorrect) {
+            correctCount++;
+          }
+        });
+      }
+    });
+    return correctCount;
+  };
+
+  const getTotalQuestionsCount = () => {
+    if (!examData || !examData.sections) return 0;
+    const readingSections = examData.sections.filter(s => s.type === "reading");
+    return readingSections.reduce((sum, s) => sum + (s.questionCount || 0), 0);
+  };
+
+  const getTotalMaxScore = () => {
+    if (!examData || !examData.sections) return result?.maxScore || 0;
+    const readingSections = examData.sections.filter(s => s.type === "reading");
+    return readingSections.reduce((sum, section) => {
+      if (!section.answerKey || !Array.isArray(section.answerKey)) return sum;
+      const sectionMaxScore = section.answerKey.reduce((sectionSum, item) => {
+        return sectionSum + (item.maxScore || 1);
+      }, 0);
+      return sum + sectionMaxScore;
+    }, 0);
   };
 
   const getScoreColor = () => {
@@ -77,6 +106,52 @@ const ReadingResultPage = () => {
     return option ? `${option.key}. ${option.text}` : answerKey;
   };
 
+  // Hàm merge tất cả câu hỏi từ examData với kết quả từ result
+  const getAllQuestionsForPart = (partNumber) => {
+    if (!examData?.sections || !result?.parts) return [];
+    
+    // Lấy section tương ứng với part
+    const section = examData.sections.find(
+      s => s.type === "reading" && (s.part || 1) === partNumber
+    );
+    
+    if (!section || !section.answerKey) return [];
+    
+    // Lấy kết quả đã làm cho part này
+    const partResult = result.parts.find(p => p.part === partNumber);
+    const answeredQuestions = partResult?.results || [];
+    
+    // Tạo map để tra cứu nhanh câu đã trả lời
+    const answeredMap = new Map();
+    answeredQuestions.forEach(item => {
+      answeredMap.set(item.questionNumber, item);
+    });
+    
+    // Merge tất cả câu hỏi từ answerKey với kết quả đã làm
+    return section.answerKey.map(answerKeyItem => {
+      const answeredItem = answeredMap.get(answerKeyItem.questionNumber);
+      
+      if (answeredItem) {
+        // Câu đã được trả lời
+        return answeredItem;
+      } else {
+        // Câu chưa được trả lời
+        return {
+          questionNumber: answerKeyItem.questionNumber,
+          questionTitle: answerKeyItem.questionTitle || "",
+          questionAnswer: answerKeyItem.questionAnswer || [],
+          studentAnswer: null,
+          correctAnswer: Array.isArray(answerKeyItem.correctAnswer) 
+            ? answerKeyItem.correctAnswer 
+            : [answerKeyItem.correctAnswer || ""],
+          score: 0,
+          maxScore: answerKeyItem.maxScore || 1,
+          isCorrect: false,
+        };
+      }
+    }).sort((a, b) => a.questionNumber - b.questionNumber);
+  };
+
   // Band Score mapping (hardcoded)
   const bandScoreData = {
     9: { correctAnswers: "39-40", skillLevel: "Expert user", description: "You have a full operational command of the language. Your use of English is appropriate, accurate and fluent, and you show complete understanding." },
@@ -95,9 +170,12 @@ const ReadingResultPage = () => {
   };
 
   const getBandScore = () => {
-    if (!result || !result.maxScore || result.maxScore === 0) return null;
-    const percentage = getScorePercentage();
-    const correctAnswers = Math.round((result.sectionScore / result.maxScore) * 40); // Assuming max 40 questions
+    const totalMaxScore = getTotalMaxScore();
+    const totalQuestions = getTotalQuestionsCount();
+    if (!result || !result.sectionScore || totalMaxScore === 0 || totalQuestions === 0) return null;
+    
+    // Calculate correct answers based on score ratio and total questions
+    const correctAnswers = Math.round((result.sectionScore / totalMaxScore) * totalQuestions);
     
     // Map percentage/score to band score
     if (correctAnswers >= 39) return 9;
@@ -115,9 +193,16 @@ const ReadingResultPage = () => {
     return 3;
   };
 
-  const getPDFUrl = () => {
+  const getPDFUrl = (part) => {
     if (!examData?.sections) return null;
-    const readingSection = examData.sections.find(s => s.type === "reading");
+    const readingSections = examData.sections.filter(s => s.type === "reading");
+    if (readingSections.length === 0) return null;
+    
+    // If part is specified, find that part, otherwise use first part
+    const readingSection = part 
+      ? readingSections.find(s => (s.part || 1) === part)
+      : readingSections[0];
+    
     if (!readingSection?.fileUrl) return null;
     
     if (readingSection.fileUrl.startsWith("http")) {
@@ -171,20 +256,19 @@ const ReadingResultPage = () => {
 
   // Initialize selected band score when result changes
   useEffect(() => {
-    if (result && result.maxScore > 0) {
+    const totalMaxScore = getTotalMaxScore();
+    if (result && totalMaxScore > 0) {
       const bandScore = getBandScore();
       if (bandScore !== null) {
         setSelectedBandScore(bandScore);
       }
     }
-  }, [result]);
+  }, [result, examData]);
 
   if (loading) {
     return (
       <>
-        <Preloader />
-        <Animation />
-        <HeaderOne />
+       
         <div className='text-center py-80'>
           <div className='spinner-border text-main-600' role='status'>
             <span className='visually-hidden'>Loading...</span>
@@ -196,11 +280,7 @@ const ReadingResultPage = () => {
 
   return (
     <>
-      <Preloader />
-      <Animation />
-      <HeaderOne />
-   
-  
+ 
       <section className='py-120'>
         <div className='container'>
           {error ? (
@@ -236,7 +316,7 @@ const ReadingResultPage = () => {
                     </div>
                     <p className='text-neutral-600 text-sm mb-8 fw-medium'>Điểm số</p>
                     <h3 className={`text-${getScoreColor()}-600 mb-0 fw-bold`}>
-                      {result.sectionScore} / {result.maxScore}
+                      {result.sectionScore} / {getTotalMaxScore()}
                     </h3>
                   </div>
                 </div>
@@ -254,16 +334,18 @@ const ReadingResultPage = () => {
                 <div className='col-md-4'>
                   <div className='bg-white box-shadow-md rounded-16 p-32 border border-neutral-30 text-center h-100'>
                     <div className='w-60 h-60 flex-center bg-main-25 text-main-600 text-28 rounded-circle mx-auto mb-16'>
-                      <i className='ph-bold ph-star' />
+                      <i className='ph-bold ph-check-circle' />
                     </div>
-                    <p className='text-neutral-600 text-sm mb-8 fw-medium'>Tổng điểm</p>
-                    <h3 className='text-main-600 mb-0 fw-bold'>{result.totalScore}</h3>
+                    <p className='text-neutral-600 text-sm mb-8 fw-medium'>Số câu đúng</p>
+                    <h3 className='text-main-600 mb-0 fw-bold'>
+                      {getCorrectAnswersCount()} / {getTotalQuestionsCount()}
+                    </h3>
                   </div>
                 </div>
               </div>
 
               {/* Band Score Section */}
-              {result.maxScore > 0 && (() => {
+              {getTotalMaxScore() > 0 && (() => {
                 const currentBandScore = getBandScore();
                 const bandScores = [9, 8.5, 8, 7.5, 7, 6.5, 6, 5.5, 5, 4.5, 4, 3.5, 3];
                 const displayBandScore = selectedBandScore !== null ? selectedBandScore : currentBandScore;
@@ -380,7 +462,7 @@ const ReadingResultPage = () => {
               `}</style>
               <div className="resizable-container mb-40" ref={containerRef}>
                 {/* Left side - PDF Viewer */}
-                {getPDFUrl() && (
+                {result.parts && result.parts.length > 0 && getPDFUrl(result.parts[0].part) && (
                   <>
                     <div
                       className="resizable-panel bg-white border-end border-neutral-30"
@@ -397,7 +479,7 @@ const ReadingResultPage = () => {
                         }}
                       >
                         <iframe
-                          src={getPDFUrl()}
+                          src={getPDFUrl(result.parts[0].part)}
                           className="w-100 h-100 border-0 rounded-8"
                           title="Reading PDF"
                           style={{ 
@@ -431,81 +513,109 @@ const ReadingResultPage = () => {
                         </div>
                       </div>
                       <div className="p-16" style={{ height: "calc(100vh - 400px)", overflow: "auto" }}>
-                        <div className='row gy-2'>
-                          {result.results?.map((item, index) => (
-                            <div key={index} className='col-12'>
-                              <div
-                                className={`rounded-8 p-12 border ${
-                                  item.isCorrect
-                                    ? "border-success bg-success-25"
-                                    : "border-danger bg-danger-25"
-                                }`}
-                              >
-                                <div className='flex-between gap-8 mb-8 flex-wrap'>
-                                  <div className='flex-align gap-8'>
-                                    
-                                    <span className='fw-semibold text-neutral-700 text-sm'>
-                                      Câu {item.questionNumber}: {item.questionTitle && (
-                                  <div className='mb-8'>
-                                    <p className='text-neutral-700 fw-semibold mb-0 text-sm'>{item.questionTitle}</p>
-                                  </div>
-                                )}
-                                    </span>
-                                  </div>
-                                  {item.isCorrect ? (
-                                    <span className='badge bg-success text-white px-8 py-2 rounded-pill text-xs'>
-                                      <i className='ph ph-check-circle me-2' />
-                                      Đúng
-                                    </span>
-                                  ) : (
-                                    <span className='badge bg-danger text-white px-8 py-2 rounded-pill text-xs'>
-                                      <i className='ph ph-x-circle me-2' />
-                                      Sai
-                                    </span>
-                                  )}
+                        {result.parts?.map((partData, partIndex) => {
+                          const allQuestions = getAllQuestionsForPart(partData.part);
+                          return (
+                            <div key={partIndex} className="mb-24">
+                              {result.parts.length > 1 && (
+                                <div className="mb-16">
+                                  <h5 className="text-main-600 fw-semibold">Part {partData.part}</h5>
                                 </div>
-                                {/* Question Title */}
-                               
+                              )}
+                              <div className='row gy-2'>
+                                {allQuestions.map((item, index) => {
+                                  const isAnswered = item.studentAnswer !== null && item.studentAnswer !== undefined;
+                                  const isUnanswered = !isAnswered;
+                                  return (
+                                    <div key={index} className='col-12'>
+                                      <div
+                                        className={`rounded-8 p-12 border ${
+                                          isUnanswered
+                                            ? "border-warning bg-warning-25"
+                                            : item.isCorrect
+                                            ? "border-success bg-success-25"
+                                            : "border-danger bg-danger-25"
+                                        }`}
+                                      >
+                                        <div className='flex-between gap-8 mb-8 flex-wrap'>
+                                          <div className='flex-align gap-8'>
+                                            <span className='fw-semibold text-neutral-700 text-sm'>
+                                              Câu {item.questionNumber}: {item.questionTitle && (
+                                                <div className='mb-8'>
+                                                  <p className='text-neutral-700 fw-semibold mb-0 text-sm'>{item.questionTitle}</p>
+                                                </div>
+                                              )}
+                                            </span>
+                                          </div>
+                                          {isUnanswered ? (
+                                            <span className='badge bg-warning text-white px-8 py-2 rounded-pill text-xs'>
+                                              <i className='ph ph-clock me-2' />
+                                              Chưa làm
+                                            </span>
+                                          ) : item.isCorrect ? (
+                                            <span className='badge bg-success text-white px-8 py-2 rounded-pill text-xs'>
+                                              <i className='ph ph-check-circle me-2' />
+                                              Đúng
+                                            </span>
+                                          ) : (
+                                            <span className='badge bg-danger text-white px-8 py-2 rounded-pill text-xs'>
+                                              <i className='ph ph-x-circle me-2' />
+                                              Sai
+                                            </span>
+                                          )}
+                                        </div>
 
-                                <div className='mb-0'>
-                                  <p className='text-neutral-600 text-xs mb-4'>
-                                    <span className='fw-semibold'>Đáp án của bạn:</span>
-                                  </p>
-                                  <div className={`bg-white rounded-6 p-8 border ${
-                                    item.isCorrect ? "border-success" : "border-danger"
-                                  }`}>
-                                    <p className={`mb-0 fw-medium text-sm ${
-                                      item.isCorrect ? "text-success" : "text-danger"
-                                    }`}>
-                                      {item.studentAnswer 
-                                        ? getAnswerText(item.studentAnswer, item.questionAnswer)
-                                        : "Chưa trả lời"}
-                                    </p>
-                                  </div>
-                                  {!item.isCorrect && item.correctAnswer && (
-                                    <div className='mt-6'>
-                                      <p className='text-neutral-600 text-xs mb-4'>
-                                        <span className='fw-semibold'>Đáp án đúng:</span>
-                                      </p>
-                                      <div className='bg-success-25 rounded-6 p-8 border border-success'>
-                                        <p className='mb-0 fw-medium text-success text-sm'>
-                                          {getAnswerText(item.correctAnswer, item.questionAnswer)}
-                                        </p>
+                                        <div className='mb-0'>
+                                          <p className='text-neutral-600 text-xs mb-4'>
+                                            <span className='fw-semibold'>Đáp án của bạn:</span>
+                                          </p>
+                                          <div className={`bg-white rounded-6 p-8 border ${
+                                            isUnanswered 
+                                              ? "border-warning" 
+                                              : item.isCorrect 
+                                              ? "border-success" 
+                                              : "border-danger"
+                                          }`}>
+                                            <p className={`mb-0 fw-medium text-sm ${
+                                              isUnanswered
+                                                ? "text-warning"
+                                                : item.isCorrect 
+                                                ? "text-success" 
+                                                : "text-danger"
+                                            }`}>
+                                              {item.studentAnswer 
+                                                ? getAnswerText(item.studentAnswer, item.questionAnswer)
+                                                : "Chưa trả lời"}
+                                            </p>
+                                          </div>
+                                          {(isUnanswered || !item.isCorrect) && item.correctAnswer && (
+                                            <div className='mt-6'>
+                                              <p className='text-neutral-600 text-xs mb-4'>
+                                                <span className='fw-semibold'>Đáp án đúng:</span>
+                                              </p>
+                                              <div className='bg-success-25 rounded-6 p-8 border border-success'>
+                                                <p className='mb-0 fw-medium text-success text-sm'>
+                                                  {getAnswerText(item.correctAnswer, item.questionAnswer)}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
-                                  )}
-                                </div>
+                                  );
+                                })}
                               </div>
                             </div>
-                          ))}
-                        </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </>
                 )}
 
                 {/* If no PDF, show results in full width */}
-                {!getPDFUrl() && (
+                {(!result.parts || result.parts.length === 0 || !getPDFUrl(result.parts[0]?.part)) && (
                   <div className="resizable-panel bg-white" style={{ width: "100%" }}>
                     <div className="p-24 border-bottom border-neutral-30">
                       <div className='flex-align gap-12'>
@@ -516,72 +626,99 @@ const ReadingResultPage = () => {
                       </div>
                     </div>
                     <div className="p-16" style={{ minHeight: "400px", overflow: "auto" }}>
-                      <div className='row gy-2'>
-                        {result.results?.map((item, index) => (
-                          <div key={index} className='col-md-6 col-lg-4'>
-                            <div
-                              className={`rounded-8 p-10 border h-100 ${
-                                item.isCorrect
-                                  ? "border-success bg-success-25"
-                                  : "border-danger bg-danger-25"
-                              }`}
-                            >
-                              <div className='flex-between gap-8 mb-6'>
-                                <span className='fw-semibold text-neutral-700 text-sm'>
-                                  Câu {item.questionNumber}
-                                </span>
-                                {item.isCorrect ? (
-                                  <span className='badge bg-success text-white px-8 py-2 rounded-pill text-xs'>
-                                    <i className='ph ph-check-circle me-2' />
-                                    Đúng
-                                  </span>
-                                ) : (
-                                  <span className='badge bg-danger text-white px-8 py-2 rounded-pill text-xs'>
-                                    <i className='ph ph-x-circle me-2' />
-                                    Sai
-                                  </span>
-                                )}
+                      {result.parts?.map((partData, partIndex) => {
+                        const allQuestions = getAllQuestionsForPart(partData.part);
+                        return (
+                          <div key={partIndex} className="mb-24">
+                            {result.parts.length > 1 && (
+                              <div className="mb-16">
+                                <h5 className="text-main-600 fw-semibold">Part {partData.part}</h5>
                               </div>
-                              {/* Question Title */}
-                              {item.questionTitle && (
-                                <div className='mb-6'>
-                                  <p className='text-neutral-700 fw-semibold mb-0 text-xs'>{item.questionTitle}</p>
-                                </div>
-                              )}
+                            )}
+                            <div className='row gy-2'>
+                              {allQuestions.map((item, index) => {
+                                const isAnswered = item.studentAnswer !== null && item.studentAnswer !== undefined;
+                                const isUnanswered = !isAnswered;
+                                return (
+                                  <div key={index} className='col-md-6 col-lg-4'>
+                                    <div
+                                      className={`rounded-8 p-10 border h-100 ${
+                                        isUnanswered
+                                          ? "border-warning bg-warning-25"
+                                          : item.isCorrect
+                                          ? "border-success bg-success-25"
+                                          : "border-danger bg-danger-25"
+                                      }`}
+                                    >
+                                      <div className='flex-between gap-8 mb-6'>
+                                        <span className='fw-semibold text-neutral-700 text-sm'>
+                                          Câu {item.questionNumber}
+                                        </span>
+                                        {isUnanswered ? (
+                                          <span className='badge bg-warning text-white px-8 py-2 rounded-pill text-xs'>
+                                            <i className='ph ph-clock me-2' />
+                                            Chưa làm
+                                          </span>
+                                        ) : item.isCorrect ? (
+                                          <span className='badge bg-success text-white px-8 py-2 rounded-pill text-xs'>
+                                            <i className='ph ph-check-circle me-2' />
+                                            Đúng
+                                          </span>
+                                        ) : (
+                                          <span className='badge bg-danger text-white px-8 py-2 rounded-pill text-xs'>
+                                            <i className='ph ph-x-circle me-2' />
+                                            Sai
+                                          </span>
+                                        )}
+                                      </div>
+                                      {/* Question Title */}
+                                      {item.questionTitle && (
+                                        <div className='mb-6'>
+                                          <p className='text-neutral-700 fw-semibold mb-0 text-xs'>{item.questionTitle}</p>
+                                        </div>
+                                      )}
 
-                              <div className='mb-0'>
-                                <p className='text-neutral-600 text-xs mb-3'>
-                                  <span className='fw-semibold'>Đáp án của bạn:</span>{" "}
-                                  <span
-                                    className={`fw-medium ${
-                                      item.isCorrect ? "text-success" : "text-danger"
-                                    }`}
-                                  >
-                                    {item.studentAnswer 
-                                      ? getAnswerText(item.studentAnswer, item.questionAnswer)
-                                      : "Chưa trả lời"}
-                                  </span>
-                                </p>
-                                {!item.isCorrect && item.correctAnswer && (
-                                  <p className='text-neutral-600 text-xs mb-0'>
-                                    <span className='fw-semibold'>Đáp án đúng:</span>{" "}
-                                    <span className='fw-medium text-success'>
-                                      {getAnswerText(item.correctAnswer, item.questionAnswer)}
-                                    </span>
-                                  </p>
-                                )}
-                              </div>
+                                      <div className='mb-0'>
+                                        <p className='text-neutral-600 text-xs mb-3'>
+                                          <span className='fw-semibold'>Đáp án của bạn:</span>{" "}
+                                          <span
+                                            className={`fw-medium ${
+                                              isUnanswered
+                                                ? "text-warning"
+                                                : item.isCorrect 
+                                                ? "text-success" 
+                                                : "text-danger"
+                                            }`}
+                                          >
+                                            {item.studentAnswer 
+                                              ? getAnswerText(item.studentAnswer, item.questionAnswer)
+                                              : "Chưa trả lời"}
+                                          </span>
+                                        </p>
+                                        {(isUnanswered || !item.isCorrect) && item.correctAnswer && (
+                                          <p className='text-neutral-600 text-xs mb-0'>
+                                            <span className='fw-semibold'>Đáp án đúng:</span>{" "}
+                                            <span className='fw-medium text-success'>
+                                              {getAnswerText(item.correctAnswer, item.questionAnswer)}
+                                            </span>
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
-                        ))}
-                      </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Feedback */}
-              {result.feedback && (
+              {/* Feedback - Show feedback from all parts */}
+              {result.parts?.some((part) => part.feedback) && (
                 <div className='bg-warning-25 rounded-16 p-32 mb-40 border border-warning box-shadow-sm'>
                   <div className='flex-align gap-12 mb-16'>
                     <span className='text-warning-600 text-xl'>
@@ -589,23 +726,32 @@ const ReadingResultPage = () => {
                     </span>
                     <h4 className='mb-0'>Nhận xét từ giáo viên</h4>
                   </div>
-                  <p className='text-neutral-700 mb-0' style={{ whiteSpace: "pre-wrap", lineHeight: "1.8" }}>
-                    {result.feedback}
-                  </p>
+                  {result.parts.map((partData, index) => (
+                    partData.feedback && (
+                      <div key={index} className={index > 0 ? "mt-16 pt-16 border-top border-warning" : ""}>
+                        {result.parts.length > 1 && (
+                          <p className='fw-semibold text-warning-600 mb-8'>Part {partData.part}:</p>
+                        )}
+                        <p className='text-neutral-700 mb-0' style={{ whiteSpace: "pre-wrap", lineHeight: "1.8" }}>
+                          {partData.feedback}
+                        </p>
+                      </div>
+                    )
+                  ))}
                 </div>
               )}
 
               {/* Actions */}
               <div className='text-center'>
                 <Link
-                  to={`/exams/${examId}`}
+                  to={`/student/exams/${examId}`}
                   className='btn btn-main px-40 py-16 rounded-pill me-16'
                 >
                   <i className='ph ph-arrow-left me-8' />
                   Quay lại bài thi
                 </Link>
                 <Link
-                  to='/exams2'
+                  to={'/student/practice-exams'}
                   className='btn btn-outline-main px-40 py-16 rounded-pill'
                 >
                   <i className='ph ph-list me-8' />

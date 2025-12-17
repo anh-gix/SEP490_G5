@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Modal, Button, Form, Alert, ButtonGroup } from 'react-bootstrap';
+import { Container, Card, Modal, Button, Form, Alert, ButtonGroup } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import classService from '../../services/classService';
 import teacherService from '../../services/teacherService';
@@ -20,7 +21,8 @@ const createEmptyScheduleEntry = () => ({
   endTime: '10:00'
 });
 
-const EditClassModal = ({ classData, onClose, onSubmit }) => {
+const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     id: '',
     name: '',
@@ -140,9 +142,9 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
         
         // Debug log to check if schedules are present
         if (classDataWithSchedules && classDataWithSchedules.schedules) {
-          console.log('✅ Full class data loaded with schedules:', classDataWithSchedules.schedules.length);
+          console.log(' Full class data loaded with schedules:', classDataWithSchedules.schedules.length);
         } else {
-          console.log('⚠️ Full class data loaded but no schedules found');
+          console.log(' Full class data loaded but no schedules found');
         }
       } catch (error) {
         console.error('Error fetching full class data:', error);
@@ -277,7 +279,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           const typeMap = {
             'IELTS': 'ielts',
             'TOEIC': 'toeic',
-            'Tiếng Anh Giao tiếp': 'cam'
+            'Cambridge': 'cam'
           };
           return typeMap[dataToUse.programName] || '';
         })() : '') ||
@@ -291,7 +293,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           const typeMap = {
             'IELTS': 'ielts',
             'TOEIC': 'toeic',
-            'Tiếng Anh Giao tiếp': 'cam'
+            'Cambridge': 'cam'
           };
           return typeMap[dataToUse.program] || '';
         })() : '') ||
@@ -382,7 +384,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
       const day = String(scheduleDate.getDate()).padStart(2, '0');
       const dateString = `${year}-${month}-${day}`;
 
-      console.log('🔍 [VALIDATE] Convert thứ sang date:');
+      console.log(' [VALIDATE] Convert thứ sang date:');
       console.log('  - Thứ được chọn:', newScheduleData.day);
       console.log('  - targetDay (0=CN, 1=T2, ..., 6=T7):', targetDay);
       console.log('  - Hôm nay là thứ:', today.getDay(), `(${['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][today.getDay()]})`);
@@ -491,9 +493,9 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           excludeScheduleId: excludeScheduleId
         };
         
-        console.log('\n🔍 ========== FRONTEND: VALIDATE SCHEDULE EDIT ==========');
-        console.log('📋 Request data:', JSON.stringify(validationData, null, 2));
-        console.log('📅 Thông tin buổi học:');
+        console.log('\n ========== FRONTEND: VALIDATE SCHEDULE EDIT ==========');
+        console.log(' Request data:', JSON.stringify(validationData, null, 2));
+        console.log(' Thông tin buổi học:');
         console.log('  - ClassId:', classId);
         console.log('  - Date:', editedSchedule.date);
         console.log('  - Time:', `${editedSchedule.startTime} - ${editedSchedule.endTime}`);
@@ -505,7 +507,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
         
         const response = await classScheduleService.validateAddClassSchedule(validationData);
         
-        console.log('✅ Response từ server:');
+        console.log(' Response từ server:');
         console.log('  - Success:', response.success);
         console.log('  - HasConflict:', response.conflicts?.hasConflict);
         console.log('  - Room conflicts:', response.conflicts?.room?.length || 0);
@@ -540,7 +542,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
         
         setScheduleValidationResult(response);
       } catch (error) {
-        console.error('❌ Error validating schedule edit:', error);
+        console.error(' Error validating schedule edit:', error);
         console.error('  - Error message:', error.message);
         console.error('  - Error response:', error.response?.data);
         setScheduleValidationResult({
@@ -967,7 +969,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
             };
           }).filter(s => s.date);
 
-          console.log('📅 Lịch dạy hiện tại của giáo viên được chọn:', {
+          console.log(' Lịch dạy hiện tại của giáo viên được chọn:', {
             teacherId: teacherId,
             totalSchedules: teacherSchedules.length,
             schedules: teacherSchedules.map(s => ({
@@ -982,7 +984,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           });
 
           // Log current class schedule with detailed info
-          console.log('📚 Lịch học của lớp hiện tại:', {
+          console.log(' Lịch học của lớp hiện tại:', {
             classId: classId,
             className: fullClassData?.name || 'N/A',
             totalSchedules: currentClassSchedules.length,
@@ -998,7 +1000,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           
           // Log which dates have schedules
           const classScheduleDates = currentClassSchedules.map(s => s.date);
-          console.log('📅 Các ngày có lịch học của lớp hiện tại:', classScheduleDates);
+          console.log(' Các ngày có lịch học của lớp hiện tại:', classScheduleDates);
 
           // Check which teacher schedules have attendance (already taught)
           // Get schedule IDs from teacher schedules
@@ -1121,7 +1123,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
 
                 // Check time overlap
                 if (hasTimeOverlap(classStart, classEnd, teacherStart, teacherEnd)) {
-                  console.log('🔍 [DEBUG] Phát hiện xung đột:', {
+                  console.log(' [DEBUG] Phát hiện xung đột:', {
                     date: classSchedule.date,
                     currentClass: {
                       startTime: classSchedule.startTime,
@@ -1158,7 +1160,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           // Log comparison results and update state for filtering
           try {
             if (conflicts.length > 0) {
-              console.warn('⚠️ PHÁT HIỆN XUNG ĐỘT LỊCH:', {
+              console.warn(' PHÁT HIỆN XUNG ĐỘT LỊCH:', {
                 totalConflicts: conflicts.length,
                 conflicts: conflicts.map(c => {
                   try {
@@ -1215,7 +1217,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                 conflictingRoomIds: prev.conflictingRoomIds || []
               }));
             } else {
-              console.log('✅ KHÔNG CÓ XUNG ĐỘT: Lịch giáo viên và lịch lớp hiện tại không trùng nhau (đã loại trừ các buổi của chính lớp hiện tại)');
+              console.log(' KHÔNG CÓ XUNG ĐỘT: Lịch giáo viên và lịch lớp hiện tại không trùng nhau (đã loại trừ các buổi của chính lớp hiện tại)');
               
               // Clear teacher conflicts for this teacher if no conflicts found
               setTeacherRoomConflicts(prev => {
@@ -1234,13 +1236,13 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
               });
             }
           } catch (error) {
-            console.error('❌ Lỗi khi xử lý conflicts:', error);
+            console.error(' Lỗi khi xử lý conflicts:', error);
             // Don't update state on error to prevent breaking the UI
           }
         } else {
-          console.log('📅 Giáo viên được chọn chưa có lịch dạy nào:', teacherId);
+          console.log(' Giáo viên được chọn chưa có lịch dạy nào:', teacherId);
           if (currentClassSchedules.length > 0) {
-            console.log('📚 Lịch học của lớp hiện tại:', {
+            console.log(' Lịch học của lớp hiện tại:', {
               classId: classId,
               className: fullClassData?.name || 'N/A',
               totalSchedules: currentClassSchedules.length,
@@ -1249,7 +1251,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           }
         }
       } catch (error) {
-        console.error('❌ Lỗi khi lấy và so sánh lịch:', error);
+        console.error(' Lỗi khi lấy và so sánh lịch:', error);
       }
     };
 
@@ -1328,25 +1330,30 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           
           // Get class IDs from room schedules to filter out current class
           const roomSchedules = roomResponse.schedules.map(schedule => {
-            // Try to get classId from various possible fields
-            const scheduleClassId = schedule.class?._id?.toString() || 
-                                   schedule.classId?.toString() || 
-                                   schedule.class?.id?.toString() ||
-                                   schedule._id?.toString(); // Fallback to schedule ID if class info not available
+            // Get class ID from various possible paths in API response
+            // Primary path from API: class._id
+            const scheduleClassId = 
+              schedule.class?._id?.toString() ||  // Primary path from API
+              schedule.class?._id ||              // In case it's already a string
+              schedule.classId?.toString() ||
+              schedule.classId ||
+              schedule.class?.id?.toString() ||
+              schedule.class?.id ||
+              null; // Don't use schedule._id as fallback - that's wrong
             
             return {
               date: formatDateLocal(schedule.date),
               startTime: schedule.startTime,
               endTime: schedule.endTime,
               className: schedule.className || schedule.class?.name || 'N/A',
-              classId: scheduleClassId,
+              classId: scheduleClassId, // Can be null if no class info
               room: roomName, // Use room name from response
               status: schedule.status,
               _id: schedule._id
             };
           }).filter(s => s.date);
 
-          console.log('📅 Lịch sử dụng hiện tại của phòng được chọn:', {
+          console.log(' Lịch sử dụng hiện tại của phòng được chọn:', {
             roomId: roomId,
             totalSchedules: roomSchedules.length,
             schedules: roomSchedules.map(s => ({
@@ -1361,7 +1368,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           });
 
           // Log current class schedule with detailed info
-          console.log('📚 Lịch học của lớp hiện tại:', {
+          console.log(' Lịch học của lớp hiện tại:', {
             classId: classId,
             className: fullClassData?.name || 'N/A',
             totalSchedules: currentClassSchedules.length,
@@ -1377,7 +1384,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           
           // Log which dates have schedules
           const classScheduleDates = currentClassSchedules.map(s => s.date);
-          console.log('📅 Các ngày có lịch học của lớp hiện tại:', classScheduleDates);
+          console.log(' Các ngày có lịch học của lớp hiện tại:', classScheduleDates);
 
           // Check which room schedules have attendance (already taught)
           // Get schedule IDs from room schedules
@@ -1476,9 +1483,13 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
               // Skip if it's from the same class (compare by classId)
               const roomClassIdStr = roomSchedule.classId ? String(roomSchedule.classId) : null;
               
-              // Also check by className as fallback
-              const isSameClass = roomClassIdStr && roomClassIdStr === currentClassIdStr;
-              const isSameClassByName = roomSchedule.className === (fullClassData?.name || 'Lớp hiện tại');
+              // Exclude if same class ID
+              const isSameClass = currentClassIdStr && roomClassIdStr && roomClassIdStr === currentClassIdStr;
+              
+              // Also check by class name as fallback
+              const scheduleClassName = roomSchedule.className || 'N/A';
+              const currentClassName = fullClassData?.name || formData.name || 'Lớp hiện tại';
+              const isSameClassByName = currentClassName && scheduleClassName && scheduleClassName === currentClassName;
               
               if (isSameClass || isSameClassByName) {
                 return; // Skip schedules from the same class
@@ -1518,7 +1529,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           // Log comparison results and update state for filtering
           try {
             if (conflicts.length > 0) {
-              console.warn('⚠️ PHÁT HIỆN XUNG ĐỘT PHÒNG HỌC:', {
+              console.warn(' PHÁT HIỆN XUNG ĐỘT PHÒNG HỌC:', {
                 totalConflicts: conflicts.length,
                 conflicts: conflicts.map(c => {
                   try {
@@ -1569,7 +1580,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                 conflictingTeacherIds: prev.conflictingTeacherIds || []
               }));
             } else {
-              console.log('✅ KHÔNG CÓ XUNG ĐỘT PHÒNG: Lịch phòng và lịch lớp hiện tại không trùng nhau (đã loại trừ các buổi của chính lớp hiện tại)');
+              console.log(' KHÔNG CÓ XUNG ĐỘT PHÒNG: Lịch phòng và lịch lớp hiện tại không trùng nhau (đã loại trừ các buổi của chính lớp hiện tại)');
               
               // Clear room conflicts for this room if no conflicts found
               setTeacherRoomConflicts(prev => {
@@ -1588,13 +1599,13 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
               });
             }
           } catch (error) {
-            console.error('❌ Lỗi khi xử lý conflicts phòng học:', error);
+            console.error(' Lỗi khi xử lý conflicts phòng học:', error);
             // Don't update state on error to prevent breaking the UI
           }
         } else {
-          console.log('📅 Phòng được chọn chưa có lịch sử dụng nào:', roomId);
+          console.log(' Phòng được chọn chưa có lịch sử dụng nào:', roomId);
           if (currentClassSchedules.length > 0) {
-            console.log('📚 Lịch học của lớp hiện tại:', {
+            console.log(' Lịch học của lớp hiện tại:', {
               classId: classId,
               className: fullClassData?.name || 'N/A',
               totalSchedules: currentClassSchedules.length,
@@ -1603,7 +1614,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           }
         }
       } catch (error) {
-        console.error('❌ Lỗi khi lấy và so sánh lịch phòng:', error);
+        console.error(' Lỗi khi lấy và so sánh lịch phòng:', error);
       }
     };
 
@@ -1828,22 +1839,34 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
       // Loại trừ các schedules của lớp hiện tại khỏi lịch học của học sinh
       // để tránh báo conflict với chính lớp đang chỉnh sửa
       const studentScheduleList = allStudentSchedules.filter(studentSchedule => {
-        // Kiểm tra xem schedule này có thuộc về lớp hiện tại không
+        // Get class ID from various possible paths in API response
+        // Primary path from API: classSchedule.class._id
         const scheduleClassId = 
+          studentSchedule.classSchedule?.class?._id ||  // Primary path from API
+          studentSchedule.classSchedule?.class?.id ||
           studentSchedule.classId ||
           studentSchedule.class?._id ||
-          studentSchedule.class?.id ||
-          studentSchedule.classSchedule?.class?._id ||
-          studentSchedule.classSchedule?.class?.id;
+          studentSchedule.class?.id;
         
         const scheduleClassIdStr = scheduleClassId ? String(scheduleClassId) : null;
         
-        // Loại trừ nếu là lớp hiện tại
+        // Exclude if same class ID
         if (currentClassIdStr && scheduleClassIdStr && scheduleClassIdStr === currentClassIdStr) {
-          return false; // Loại trừ schedule của lớp hiện tại
+          return false; // Exclude schedule of current class
         }
         
-        return true; // Giữ lại schedule của lớp khác
+        // Also check by class name as fallback
+        const scheduleClassName = 
+          studentSchedule.classSchedule?.class?.name ||
+          studentSchedule.className ||
+          studentSchedule.class?.name;
+        const currentClassName = fullClassData?.name || formData.name;
+        
+        if (currentClassName && scheduleClassName && scheduleClassName === currentClassName) {
+          return false; // Exclude schedule of current class by name
+        }
+        
+        return true; // Keep schedule from other classes
       });
       
       const studentConflictsList = [];
@@ -2046,14 +2069,14 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
   const programTypeMap = {
     'IELTS': 'ielts',
     'TOEIC': 'toeic',
-    'Tiếng Anh Giao tiếp': 'cam'
+    'Cambridge': 'cam'
   };
 
   // Reverse mapping: type to program name
   const typeToProgramMap = {
     'ielts': 'IELTS',
     'toeic': 'TOEIC',
-    'cam': 'Tiếng Anh Giao tiếp'
+    'cam': 'Cambridge'
   };
 
   // Map program name to type
@@ -2198,6 +2221,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
       // Match students by email or phone
       const matchedStudentIds = [];
       const notFound = [];
+      const matchedStudentMap = new Map(); // Map<studentId, studentObject> for later use
 
       emailsOrPhones.forEach((value) => {
         const normalizedValue = value.toLowerCase().trim();
@@ -2215,25 +2239,69 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           const studentId = foundStudent._id || foundStudent.id;
           if (studentId && !matchedStudentIds.includes(String(studentId))) {
             matchedStudentIds.push(String(studentId));
+            matchedStudentMap.set(String(studentId), foundStudent);
           }
         } else {
           notFound.push(value);
         }
       });
 
-      // Add matched students to selectedStudents (avoid duplicates)
-      if (matchedStudentIds.length > 0) {
+      // Validate student enrollment in course if course is selected
+      let validStudentIds = matchedStudentIds;
+      let invalidStudents = [];
+      
+      if (formData.course && matchedStudentIds.length > 0) {
+        try {
+          // Fetch course details to get studentEnrollments
+          const courseResponse = await courseService.getCourseDetails(formData.course);
+          
+          if (courseResponse && courseResponse.success && courseResponse.data) {
+            const course = courseResponse.data;
+            const enrolledStudentIds = (course.studentEnrollments || []).map(id => String(id));
+            
+            // Separate valid and invalid students
+            validStudentIds = matchedStudentIds.filter(studentId => 
+              enrolledStudentIds.includes(studentId)
+            );
+            
+            const invalidStudentIds = matchedStudentIds.filter(studentId => 
+              !enrolledStudentIds.includes(studentId)
+            );
+            
+            // Get student info for invalid students
+            invalidStudents = invalidStudentIds.map(studentId => {
+              const student = matchedStudentMap.get(studentId);
+              const studentName = student?.fullName || student?.name || student?.username || 
+                                 student?.email?.split('@')[0] || `Học viên ${studentId}`;
+              return {
+                studentId: studentId,
+                studentName: studentName,
+                reason: 'Học viên chưa có trong danh sách đăng ký khóa học'
+              };
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching course details for validation:', error);
+          // If error fetching course, proceed with all matched students but log warning
+          console.warn('Could not validate student enrollment, proceeding with all matched students');
+        }
+      }
+
+      // Add only valid students to selectedStudents (avoid duplicates)
+      if (validStudentIds.length > 0) {
         setSelectedStudents(prev => {
-          const newSelected = [...new Set([...prev, ...matchedStudentIds])];
+          const newSelected = [...new Set([...prev, ...validStudentIds])];
           return newSelected;
         });
       }
 
       // Show results in modal
       setImportResult({
-        success: matchedStudentIds.length,
+        success: validStudentIds.length,
         notFound: notFound,
-        total: emailsOrPhones.length
+        total: emailsOrPhones.length,
+        invalidStudents: invalidStudents.length > 0 ? invalidStudents : undefined,
+        courseName: formData.course && selectedCourse ? (selectedCourse.name || 'N/A') : undefined
       });
       setShowImportResultModal(true);
 
@@ -2263,6 +2331,26 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    
+    // Auto-update maxStudents when room is selected/deselected
+    if (name === 'roomId') {
+      if (value) {
+        // Find selected room and set maxStudents to room capacity
+        const selectedRoom = rooms.find(r => {
+          const roomId = r._id || r.id;
+          return String(roomId) === String(value);
+        });
+        if (selectedRoom) {
+          const capacity = selectedRoom.capacity || selectedRoom.maxCapacity || selectedRoom.maxStudents;
+          setFormData(prev => ({ ...prev, roomId: value, maxStudents: capacity }));
+          return; // Don't process further
+        }
+      } else {
+        // Room deselected, clear maxStudents
+        setFormData(prev => ({ ...prev, roomId: '', maxStudents: null }));
+        return; // Don't process further
+      }
+    }
     
     // If program or level changes, clear course if it doesn't belong to the new program/level
     if (name === 'program' || name === 'level') {
@@ -2419,7 +2507,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
         if (roomCapacity && studentCount > roomCapacity) {
           setCapacityWarning({
             type: 'danger',
-            message: `⚠️ Cảnh báo: Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`
+            message: ` Cảnh báo: Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`
           });
         } else {
           setCapacityWarning(null);
@@ -3011,17 +3099,44 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
     onSubmit(submitData);
   };
 
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      navigate('/academic/class-management');
+    }
+  };
+
   return (
-    <Modal show={true} onHide={onClose} size="xl" centered>
-      <Modal.Header closeButton className="bg-warning-600 text-white border-0 p-24">
-        <Modal.Title className="fw-bold">
-          <i className="fas fa-edit me-2"></i>
-          Chỉnh sửa thông tin lớp học
-        </Modal.Title>
-      </Modal.Header>
+    <Container fluid className="py-24 px-24">
+      {/* Page Header */}
+      <div className="mb-24">
+        <div className="d-flex align-items-center gap-12 mb-16">
+          <Button
+            variant="outline-secondary"
+            size="sm"
+            onClick={handleBack}
+            className="d-flex align-items-center gap-2"
+          >
+            <i className="fas fa-arrow-left"></i>
+            Quay lại
+          </Button>
+        </div>
+        <div className="d-flex align-items-center gap-12 mb-8">
+          <div className="bg-warning-600 text-white rounded-8 d-flex align-items-center justify-content-center"
+               style={{ width: '48px', height: '48px', minWidth: '48px' }}>
+            <i className="fas fa-edit fa-lg"></i>
+          </div>
+          <div>
+            <h2 className="text-neutral-900 fw-bold mb-0">Chỉnh sửa thông tin lớp học</h2>
+            <p className="text-neutral-500 mb-0 text-14 mt-4">Cập nhật thông tin và cài đặt cho lớp học</p>
+          </div>
+        </div>
+      </div>
 
       <Form onSubmit={handleSubmit}>
-        <Modal.Body className="p-24" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+        <Card className="bg-white border-0 rounded-12 mb-24" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
+          <Card.Body className="p-32">
           {/* Basic Information */}
           <div className="mb-24">
             <h5 className="text-neutral-900 fw-semibold mb-16 pb-12 border-bottom border-neutral-100">
@@ -3034,15 +3149,21 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Tên lớp <span className="text-danger-600">*</span>
                   </Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="VD: A1-Morning-01"
-                    required
-                    className="border-neutral-30 radius-8 px-16 py-10"
-                  />
+                  {formData.status === 'active' ? (
+                    <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
+                      {formData.name}
+                    </div>
+                  ) : (
+                    <Form.Control
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      placeholder="VD: A1-Morning-01"
+                      required
+                      className="border-neutral-30 radius-8 px-16 py-10"
+                    />
+                  )}
                 </Form.Group>
               </div>
 
@@ -3233,22 +3354,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
               </h5>
               
               <div className="d-flex align-items-center gap-2">
-                <Button
-                  className="btn-main text-14 fw-medium px-16 py-8"
-                  onClick={() => {
-                    setShowAddScheduleModal(true);
-                    // Reset form data
-                    setNewScheduleData({
-                      day: '',
-                      startTime: '08:00',
-                      endTime: '10:00',
-                      repeatWeekly: false
-                    });
-                  }}
-                >
-                  <i className="fas fa-plus me-2"></i>
-                  Thêm buổi học
-                </Button>
                 
                 {calendarSchedules.length > 0 && (
                   <ButtonGroup>
@@ -3280,12 +3385,18 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                 {calendarViewMode === 'month' ? (
                   <ScheduleCalendar
                     schedules={calendarSchedules}
-                    onEditSchedule={(schedule) => {
-                      setSelectedScheduleDetail(schedule);
-                      setShowScheduleDetailModal(true);
+                    onLessonClick={(scheduleId) => {
+                      // Tìm schedule từ calendarSchedules dựa trên scheduleId
+                      const schedule = calendarSchedules.find(s => 
+                        s.id === scheduleId || s._id === scheduleId || String(s.id) === String(scheduleId)
+                      );
+                      if (schedule) {
+                        setSelectedScheduleDetail(schedule);
+                        setShowScheduleDetailModal(true);
+                      }
                     }}
                     onDeleteSchedule={() => {}} // Read-only in this context
-                    onCreateMakeup={() => {}} // Read-only in this context
+                    showLegend={false}
                   />
                 ) : (
                   <ScheduleWeekly
@@ -3364,7 +3475,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                    teacherRoomConflicts.teacherConflicts.some(c => c.teacherId === (formData.teacherId?.toString() || String(formData.teacherId))) && (
                     <Alert variant="warning" className="mt-12 mb-0">
                       <i className="fas fa-exclamation-triangle me-2"></i>
-                      <strong>⚠️ CẢNH BÁO XUNG ĐỘT LỊCH HỌC:</strong> Giáo viên đã chọn có <strong>{teacherRoomConflicts.teacherConflicts.filter(c => c.teacherId === (formData.teacherId?.toString() || String(formData.teacherId))).length} xung đột</strong> với các lớp khác.
+                      <strong> CẢNH BÁO XUNG ĐỘT LỊCH HỌC:</strong> Giáo viên đã chọn có <strong>{teacherRoomConflicts.teacherConflicts.filter(c => c.teacherId === (formData.teacherId?.toString() || String(formData.teacherId))).length} xung đột</strong> với các lớp khác.
                       <div className="mt-8">
                         <details>
                           <summary className="cursor-pointer fw-medium text-13 mb-8">
@@ -3416,7 +3527,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                                     
                                     // Nếu vẫn không có, log warning và dùng fallback
                                     if (!currentClassTime || currentClassTime === 'N/A') {
-                                      console.warn('⚠️ [DEBUG] Không tìm thấy thời gian lớp hiện tại cho conflict:', {
+                                      console.warn(' [DEBUG] Không tìm thấy thời gian lớp hiện tại cho conflict:', {
                                         conflict,
                                         currentSchedule,
                                         currentClassSchedulesForRender: currentClassSchedulesForRender?.filter(s => s?.date === conflict?.date)
@@ -3428,7 +3539,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                                     
                                     // Log để debug
                                     if (conflict.date === '2025-12-01') {
-                                      console.log('🔍 [DEBUG] Hiển thị conflict cho ngày 2025-12-01:', {
+                                      console.log(' [DEBUG] Hiển thị conflict cho ngày 2025-12-01:', {
                                         conflict,
                                         currentSchedule,
                                         currentClassTime,
@@ -3508,7 +3619,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                    teacherRoomConflicts.roomConflicts.some(c => c.roomId === (formData.roomId?.toString() || String(formData.roomId))) && (
                     <Alert variant="warning" className="mt-12 mb-0">
                       <i className="fas fa-exclamation-triangle me-2"></i>
-                      <strong>⚠️ CẢNH BÁO XUNG ĐỘT LỊCH HỌC:</strong> Phòng học đã chọn có <strong>{teacherRoomConflicts.roomConflicts.filter(c => c.roomId === (formData.roomId?.toString() || String(formData.roomId))).length} xung đột</strong> với các lớp khác.
+                      <strong> CẢNH BÁO XUNG ĐỘT LỊCH HỌC:</strong> Phòng học đã chọn có <strong>{teacherRoomConflicts.roomConflicts.filter(c => c.roomId === (formData.roomId?.toString() || String(formData.roomId))).length} xung đột</strong> với các lớp khác.
                       <div className="mt-8">
                         <details>
                           <summary className="cursor-pointer fw-medium text-13 mb-8">
@@ -3758,16 +3869,6 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                                 </div>
                               )}
                             </div>
-                            <Button
-                              type="button"
-                              variant="outline-danger"
-                              size="sm"
-                              onClick={() => handleRemoveStudent(selectedStudentId)}
-                              className="text-12 fw-medium px-12 py-6 radius-8"
-                              title="Xóa học viên khỏi danh sách"
-                            >
-                              <i className="fas fa-times"></i>
-                            </Button>
                           </div>
                         );
                       })}
@@ -3781,24 +3882,42 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
               </Form.Text>
             </div>
           </div>
-        </Modal.Body>
+          </Card.Body>
+        </Card>
 
-        <Modal.Footer className="bg-neutral-25 border-0 p-20">
-          <Button 
-            className="btn-outline-neutral text-15 fw-medium px-20 py-10 radius-8"
-            onClick={onClose}
-          >
-            <i className="fas fa-times me-2"></i>
-            Hủy
-          </Button>
-          <Button 
-            className="btn-warning text-white text-15 fw-semibold px-24 py-10 radius-8"
-            type="submit"
-          >
-            <i className="fas fa-save me-2"></i>
-            Lưu thay đổi
-          </Button>
-        </Modal.Footer>
+        {/* Action Buttons */}
+        <div className="d-flex justify-content-between align-items-center gap-12 mt-24">
+          <div>
+            {formData.status === 'pending' && onDelete && (
+              <Button 
+                variant="outline-danger"
+                className="text-15 fw-medium px-24 py-12 radius-8"
+                onClick={() => onDelete(classId || formData.id)}
+              >
+                <i className="fas fa-trash me-2"></i>
+                Xóa lớp học
+              </Button>
+            )}
+          </div>
+          <div className="d-flex gap-12">
+            <Button 
+              variant="outline-secondary"
+              className="text-15 fw-medium px-24 py-12 radius-8"
+              onClick={handleBack}
+            >
+              <i className="fas fa-times me-2"></i>
+              Hủy
+            </Button>
+            <Button 
+              variant="warning"
+              className="text-white text-15 fw-semibold px-24 py-12 radius-8"
+              type="submit"
+            >
+              <i className="fas fa-save me-2"></i>
+              Lưu thay đổi
+            </Button>
+          </div>
+        </div>
       </Form>
 
       {/* Select Student Modal */}
@@ -3808,6 +3927,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
         onConfirm={handleStudentsConfirmed}
         initialSelectedStudents={selectedStudents}
         generatedSessions={generatedSessions}
+        courseId={formData.course || fullClassData?.course?._id || fullClassData?.course?.id || fullClassData?.course || null}
       />
 
       {/* Import Result Modal */}
@@ -3846,7 +3966,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
               )}
 
               {importResult?.notFound && importResult.notFound.length > 0 && (
-                <div className="mb-0">
+                <div className="mb-16">
                   <div className="text-neutral-700 fw-medium mb-8">
                     <i className="fas fa-info-circle me-2"></i>
                     Không tìm thấy {importResult.notFound.length} học viên:
@@ -3867,6 +3987,46 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                         </div>
                       )}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {importResult?.invalidStudents && importResult.invalidStudents.length > 0 && (
+                <div className="mb-0">
+                  <Alert variant="warning" className="mb-8">
+                    <i className="fas fa-exclamation-triangle me-2"></i>
+                    <strong>
+                      {importResult.invalidStudents.length} học viên chưa đăng ký khóa học
+                      {importResult.courseName && ` "${importResult.courseName}"`}
+                    </strong>
+                  </Alert>
+                  <div className="text-neutral-700 fw-medium mb-8">
+                    <i className="fas fa-user-times me-2"></i>
+                    Danh sách học viên chưa đăng ký:
+                  </div>
+                  <div 
+                    className="border border-warning rounded-8 p-12 bg-warning-25"
+                    style={{ maxHeight: '200px', overflowY: 'auto' }}
+                  >
+                    <div className="d-flex flex-column gap-4">
+                      {importResult.invalidStudents.slice(0, 20).map((student, index) => (
+                        <div key={student.studentId || index} className="text-neutral-700 text-13">
+                          • <strong>{student.studentName}</strong>
+                          <span className="text-neutral-500 text-12 ms-2">
+                            ({student.reason || 'Chưa đăng ký khóa học'})
+                          </span>
+                        </div>
+                      ))}
+                      {importResult.invalidStudents.length > 20 && (
+                        <div className="text-neutral-500 text-12 mt-4">
+                          ... và {importResult.invalidStudents.length - 20} học viên khác
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-neutral-600 text-12 mt-8">
+                    <i className="fas fa-info-circle me-2"></i>
+                    Các học viên này sẽ không được thêm vào lớp. Vui lòng đăng ký khóa học cho họ trước.
                   </div>
                 </div>
               )}
@@ -3998,7 +4158,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                   )}
                   
                   {scheduleValidationResult.conflicts.students && scheduleValidationResult.conflicts.students.length > 0 && (
-                    <div className="mb-0">
+                    <div className="mb-8">
                       <div className="fw-medium mb-4">Xung đột với học viên:</div>
                       <ul className="mb-0 ps-16">
                         {scheduleValidationResult.conflicts.students.map((studentConflict, idx) => (
@@ -4014,6 +4174,30 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                           </li>
                         ))}
                       </ul>
+                    </div>
+                  )}
+                  
+                  {scheduleValidationResult.conflicts.auditingStudents && scheduleValidationResult.conflicts.auditingStudents.length > 0 && (
+                    <div className="mb-0">
+                      <div className="d-flex align-items-center gap-8 mb-2">
+                        <i className="fas fa-exclamation-triangle text-warning-600"></i>
+                        <span className="fw-semibold text-14">
+                          Học sinh học tạm thời bị ảnh hưởng:
+                        </span>
+                      </div>
+                      {scheduleValidationResult.conflicts.auditingStudents.map((conflict, idx) => (
+                        <div key={idx} className="bg-warning-50 border border-warning-200 rounded-8 p-12 mb-2">
+                          <div className="text-warning-900 text-13 mb-2">
+                            {conflict.message}
+                          </div>
+                          <div className="text-warning-700 text-12">
+                            <strong>Danh sách học sinh:</strong> {conflict.auditingStudents.join(', ')}
+                          </div>
+                          <div className="text-warning-700 text-12 mt-1">
+                            <strong>Session:</strong> {conflict.originalSessionOrder} → {conflict.newSessionOrder}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </Alert>
@@ -4067,13 +4251,28 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                     <Form.Control
                       type="time"
                       value={editedSchedule.startTime}
-                      onChange={(e) => setEditedSchedule({
-                        ...editedSchedule,
-                        startTime: e.target.value
-                      })}
+                      max={editedSchedule.endTime || '23:59'}
+                      onChange={(e) => {
+                        const newStartTime = e.target.value;
+                        // Validate: startTime must be less than endTime
+                        if (editedSchedule.endTime && newStartTime >= editedSchedule.endTime) {
+                          alert('Giờ bắt đầu phải nhỏ hơn giờ kết thúc!');
+                          return;
+                        }
+                        setEditedSchedule({
+                          ...editedSchedule,
+                          startTime: newStartTime
+                        });
+                      }}
                       className="border-neutral-30 radius-8 px-16 py-10"
                       disabled={hasAttendance || checkingAttendance}
                     />
+                    {editedSchedule.startTime && editedSchedule.endTime && editedSchedule.startTime >= editedSchedule.endTime && (
+                      <Form.Text className="text-danger text-12 mt-1">
+                        <i className="fas fa-exclamation-circle me-1"></i>
+                        Giờ bắt đầu phải nhỏ hơn giờ kết thúc
+                      </Form.Text>
+                    )}
                   </Form.Group>
                 </div>
                 <div className="col-md-6">
@@ -4084,13 +4283,28 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                     <Form.Control
                       type="time"
                       value={editedSchedule.endTime}
-                      onChange={(e) => setEditedSchedule({
-                        ...editedSchedule,
-                        endTime: e.target.value
-                      })}
+                      min={editedSchedule.startTime || '00:00'}
+                      onChange={(e) => {
+                        const newEndTime = e.target.value;
+                        // Validate: endTime must be greater than startTime
+                        if (editedSchedule.startTime && newEndTime <= editedSchedule.startTime) {
+                          alert('Giờ kết thúc phải lớn hơn giờ bắt đầu!');
+                          return;
+                        }
+                        setEditedSchedule({
+                          ...editedSchedule,
+                          endTime: newEndTime
+                        });
+                      }}
                       className="border-neutral-30 radius-8 px-16 py-10"
                       disabled={hasAttendance || checkingAttendance}
                     />
+                    {editedSchedule.startTime && editedSchedule.endTime && editedSchedule.endTime <= editedSchedule.startTime && (
+                      <Form.Text className="text-danger text-12 mt-1">
+                        <i className="fas fa-exclamation-circle me-1"></i>
+                        Giờ kết thúc phải lớn hơn giờ bắt đầu
+                      </Form.Text>
+                    )}
                   </Form.Group>
                 </div>
               </div>
@@ -4306,7 +4520,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                 // Check if schedule has real ID (from database)
                 const scheduleId = selectedScheduleDetail.id;
 
-                console.log('📝 Cập nhật buổi học:');
+                console.log(' Cập nhật buổi học:');
                 console.log('  - ScheduleId:', scheduleId);
                 console.log('  - UpdateScope:', updateScope);
                 console.log('  - Date:', updateData.date);
@@ -4582,7 +4796,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                 const calculatedDay = scheduleDate.getDay();
                 const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
                 console.log('   - Ngày được tính:', scheduleDate.toLocaleDateString('vi-VN'), `(${dayNames[calculatedDay]})`);
-                console.log('   - Kiểm tra: Ngày tính có đúng thứ được chọn không?', calculatedDay === targetDay ? '✅ ĐÚNG' : '❌ SAI');
+                console.log('   - Kiểm tra: Ngày tính có đúng thứ được chọn không?', calculatedDay === targetDay ? ' ĐÚNG' : ' SAI');
                 
                 // Format date để tránh timezone issues (dùng local time, không dùng UTC)
                 const year = scheduleDate.getFullYear();
@@ -4604,8 +4818,8 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                 };
 
                 // ========== LOGGING: Trước khi tạo ==========
-                console.log('📋 ========== TẠO BUỔI HỌC ==========');
-                console.log('📅 Thông tin buổi học sẽ được thêm:');
+                console.log(' ========== TẠO BUỔI HỌC ==========');
+                console.log(' Thông tin buổi học sẽ được thêm:');
                 console.log('   - Lớp học ID:', classId);
                 console.log('   - Lặp lại vào các tuần:', newScheduleData.repeatWeekly ? 'Có' : 'Không');
                 console.log('   - Ngày đầu tiên:', scheduleData.date);
@@ -4622,8 +4836,8 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                 const response = await classScheduleService.createClassSchedule(scheduleData);
 
                 // ========== LOGGING: Kết quả từ API ==========
-                console.log('✅ ========== KẾT QUẢ TẠO BUỔI HỌC ==========');
-                console.log('📊 Response:', response);
+                console.log(' ========== KẾT QUẢ TẠO BUỔI HỌC ==========');
+                console.log(' Response:', response);
                 console.log('');
                 
                 if (response.cleanupInfo) {
@@ -4668,7 +4882,7 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
                     
                     if (updatedClassData) {
                       setFullClassData(updatedClassData);
-                      console.log('✅ Đã refresh lại class data với schedules mới');
+                      console.log(' Đã refresh lại class data với schedules mới');
                     }
                   } catch (refreshError) {
                     console.error('Error refreshing class data:', refreshError);
@@ -4794,9 +5008,9 @@ const EditClassModal = ({ classData, onClose, onSubmit }) => {
           </Button>
         </Modal.Footer>
       </Modal>
-    </Modal>
+    </Container>
   );
 };
 
-export default EditClassModal;
+export default EditClassForm;
 

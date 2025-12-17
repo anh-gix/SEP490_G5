@@ -12,7 +12,6 @@ const classSchema = new mongoose.Schema({
   teacher: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
-    required: true,
   },
   students: [{
     type: mongoose.Schema.Types.ObjectId,
@@ -29,7 +28,6 @@ const classSchema = new mongoose.Schema({
   endDate: {
     type: Date
   },
-  //Luu lai so luong sinh vien toi da cua lop luc khai giang
   maxStudents: {
     type: Number,
   },

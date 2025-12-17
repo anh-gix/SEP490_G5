@@ -36,7 +36,6 @@ app.use('/api/student-schedules', require('./routes/studentScheduleRoutes'));
 // Center Head Routes
 app.use('/api/center-head', require('./routes/centerHeadRoutes'));
 app.use('/api/programs', require('./routes/programRoutes'));
-app.use('/api/courses', require('./routes/courseRoute'));
 app.use('/api/courseshome', require('./routes/courseHomeRoutes'));
 app.use('/api/sessions', require('./routes/sessionRoutes'));
 app.use('/api/cam-sessions', require('./routes/camSessionRoutes'));
@@ -45,7 +44,6 @@ app.use('/api/cam-sessions', require('./routes/camSessionRoutes'));
 app.use('/api/rooms', require('./routes/roomRoutes'));
 app.use('/api/teachers', require('./routes/teacherRoutes'));
 app.use('/api/students', require('./routes/studentRoutes'));
-app.use('/api/reports', require('./routes/reportRoutes'));
 
 // Class Routes
 app.use('/api/classes', require('./routes/classRoutes'));
@@ -59,8 +57,8 @@ app.use('/api/homework', require('./routes/homeworkRoutes'));
 // Change Request Routes
 app.use('/api/change-requests', require('./routes/changeRequestRoutes'));
 
-// Approval Request Routes
-app.use('/api/approval-requests', require('./routes/approvalRequestRoutes'));
+// Work Request Routes
+app.use('/api/work-requests', require('./routes/workRequestRoutes'));
 
 // Academic Staff Routes
 app.use('/api/academic-staff', require('./routes/academicStaffRoutes'));

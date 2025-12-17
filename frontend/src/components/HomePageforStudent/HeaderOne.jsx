@@ -21,6 +21,19 @@ const HeaderOne = () => {
       return () => (window.onscroll = null);
     };
   }, []);
+
+  const options = [
+    { value: 1, label: "Physics" },
+    { value: 2, label: "Math" },
+    { value: 3, label: "Biology" },
+    { value: 4, label: "English" },
+    { value: 5, label: "Higher Math" },
+    { value: 6, label: "Social Science" },
+    { value: 7, label: "Chemistry" },
+  ];
+
+  const [selectedOption, setSelectedOption] = useState(options[0]);
+
   const toggleMenu = () => {
     setIsMenuActive(!isMenuActive);
     if (!isMenuActive) {
@@ -70,12 +83,40 @@ const HeaderOne = () => {
   };
 
   const menuItems = [
-    { to: "/", label: "Trang Chủ" },
-    { to: "/course-cam", label: "Tiếng Anh Trẻ Em" },
-    { to: "/course-ielts", label: "IELTS" },
-    { to: "/course-toeic", label: "TOEIC" },
-    { to: "/exams", label: "Đề thi IELTS" },
-    { to: "/contact", label: "Liên Hệ" },
+    {
+      label: "Home",
+      links: [
+        { to: "/", label: "Home LMS" },
+      ],
+    },
+    {
+      label: "Courses",
+      links: [
+        { to: "/course", label: "Course Grid View" },
+        { to: "/course-list-view", label: "Course List View" },
+        { to: "/course-details", label: "Course Details" },
+        { to: "/lesson-details", label: "Lesson Details" },
+      ],
+    },
+    {
+      label: "Lịch Học",
+      links: [
+        { to: "/attendance", label: "About" },
+        { to: "/student/dashboard", label: "Khóa học của tôi" },
+      ],
+    },
+
+    {
+      label: "Blog",
+      links: [
+        { to: "/blog", label: "Blog Grid" },
+        { to: "/blog-list", label: "Blog List" },
+        { to: "/blog-classic", label: "Blog Classic" },
+        { to: "/blog-details", label: "Blog Details" },
+      ],
+    },
+    { to: "/exams2", label: "Đề thi IELTS" },
+    { to: "/contact", label: "Contact" },
   ];
 
   return (
@@ -92,6 +133,26 @@ const HeaderOne = () => {
                 </Link>
               </div>
               {/* Logo End  */}
+              {/* Select Start */}
+              <div className='d-sm-block d-none'>
+                <div className='header-select   rounded-pill position-relative'>
+                  <div className='custom__select'>
+                    <Select
+                      classNames={{
+                        control: (state) =>
+                          state.isFocused
+                            ? " border-focus"
+                            : "border-neutral-30",
+                      }}
+                      value={selectedOption}
+                      onChange={setSelectedOption}
+                      options={options}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Select End */}
               {/* Menu Start  */}
               <div className='header-menu d-lg-block d-none'>
                 <ul className='nav-menu flex-align'>
@@ -101,14 +162,9 @@ const HeaderOne = () => {
                         key={`menu-item-${index}`}
                         className='nav-menu__item has-submenu'
                       >
-                        <Link 
-                          to={item.mainLink || '#'} 
-                          className={`nav-menu__link ${
-                            pathname === item.mainLink && "activePage"
-                          }`}
-                        >
+                        <span to='#' className='nav-menu__link'>
                           {item.label}
-                        </Link>
+                        </span>
                         <ul className={`nav-submenu scroll-sm`}>
                           {item.links.map((link, linkIndex) => (
                             <li
@@ -153,7 +209,7 @@ const HeaderOne = () => {
                 <input
                   type='text'
                   className='common-input rounded-pill bg-main-25 pe-48 border-neutral-30'
-                  placeholder='Tìm kiếm...'
+                  placeholder='Search...'
                 />
                 <button
                   type='submit'
@@ -247,28 +303,15 @@ const HeaderOne = () => {
                     className={`nav-menu__item has-submenu ${
                       activeSubmenu === index ? "activePage" : ""
                     }`}
+                    onClick={() => handleSubmenuClick(index)}
                   >
-                    <Link 
-                      to={item.mainLink || '#'} 
-                      className={`nav-menu__link ${
-                        pathname === item.mainLink && "activePage"
-                      }`}
-                      onClick={(e) => {
-                        if (windowWidth < 992) {
-                          e.preventDefault();
-                          handleSubmenuClick(index);
-                        }
-                      }}
-                    >
-                      {item.label}
-                    </Link>
+                    <span className='nav-menu__link'>{item.label}</span>
                     <ul className={`nav-submenu scroll-sm`}>
                       {item.links.map((link, linkIndex) => (
                         <li key={linkIndex} className='nav-submenu__item'>
                           <Link
                             to={link.to}
                             className='nav-submenu__link hover-bg-neutral-30'
-                            onClick={closeMenu}
                           >
                             {link.label}
                           </Link>
@@ -290,6 +333,21 @@ const HeaderOne = () => {
                 )
               )}
             </ul>
+            <div className='d-sm-none d-block mt-24'>
+              <div className='header-select mobile  rounded-pill position-relative'>
+                <div className='custom__select'>
+                  <Select
+                    classNames={{
+                      control: (state) =>
+                        state.isFocused ? " border-focus" : "border-neutral-30",
+                    }}
+                    value={selectedOption}
+                    onChange={setSelectedOption}
+                    options={options}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

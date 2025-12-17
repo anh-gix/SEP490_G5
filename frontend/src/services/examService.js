@@ -96,6 +96,41 @@ export const examService = {
     }
   },
 
+  // Submit exam for approval
+  submitExamForApproval: async (examId, submissionNote) => {
+    try {
+      // Lấy user info từ localStorage
+      const userStr = localStorage.getItem('user');
+      let submittedBy = null;
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          submittedBy = user._id || user.id;
+        } catch (e) {
+          console.error('Error parsing user from localStorage:', e);
+        }
+      }
+
+      const response = await api.post(`/management/${examId}/submit-for-approval`, {
+        submissionNote,
+        submittedBy
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể nộp đề thi để duyệt' };
+    }
+  },
+
+  // Withdraw exam submission
+  withdrawExamSubmission: async (examId) => {
+    try {
+      const response = await api.post(`/management/${examId}/withdraw`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể rút lại đề thi' };
+    }
+  },
+
   // Upload answer key CSV/Excel
   uploadAnswerKeyForManagement: async (formData) => {
     try {
@@ -138,13 +173,21 @@ export const examService = {
 
   // Format exam data trước khi gửi
   formatExamData: (examData) => {
+    // Format sections - loại bỏ id frontend (Date.now()) để MongoDB tự tạo _id
+    const formattedSections = (examData.sections || []).map(section => {
+      const { id, ...rest } = section; // Remove frontend id
+      return rest;
+    });
+
     return {
       title: examData.title?.trim(),
       description: examData.description?.trim() || '',
-      examType: examData.examType || 'practice',
+      examType: examData.examType || 'cambridge', // Default to cambridge
       level: examData.level,
       totalDuration: parseInt(examData.totalDuration) || 0,
-      sections: examData.sections || []
+      sections: formattedSections,
+      isPublished: examData.isPublished || false,
+      lastCompletedStep: examData.lastCompletedStep || 0
     };
   },
 
@@ -180,6 +223,16 @@ export const examService = {
     }
   },
 
+  // Tạo submission mới (làm lại)
+  createNewSubmission: async (examId) => {
+    try {
+      const response = await api.post('/create-new-submission', { examId });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể tạo bài làm mới' };
+    }
+  },
+
   // Lấy thông tin section Reading
   getReadingSection: async (examId, submissionId) => {
     try {
@@ -191,11 +244,9 @@ export const examService = {
   },
 
   // Nộp đáp án Reading
-  submitReadingAnswers: async (examId, submissionId, answers) => {
+  submitReadingAnswers: async (examId, submissionId, data) => {
     try {
-      const response = await api.post(`/${examId}/submissions/${submissionId}/reading/submit`, {
-        answers,
-      });
+      const response = await api.post(`/${examId}/submissions/${submissionId}/reading/submit`, data);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể nộp đáp án' };
@@ -223,11 +274,9 @@ export const examService = {
   },
 
   // Nộp đáp án Listening
-  submitListeningAnswers: async (examId, submissionId, answers) => {
+  submitListeningAnswers: async (examId, submissionId, data) => {
     try {
-      const response = await api.post(`/${examId}/submissions/${submissionId}/listening/submit`, {
-        answers,
-      });
+      const response = await api.post(`/${examId}/submissions/${submissionId}/listening/submit`, data);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể nộp đáp án' };
@@ -255,11 +304,9 @@ export const examService = {
   },
 
   // Nộp đáp án Writing
-  submitWritingAnswers: async (examId, submissionId, answers) => {
+  submitWritingAnswers: async (examId, submissionId, data) => {
     try {
-      const response = await api.post(`/${examId}/submissions/${submissionId}/writing/submit`, {
-        answers,
-      });
+      const response = await api.post(`/${examId}/submissions/${submissionId}/writing/submit`, data);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể nộp đáp án' };
@@ -289,6 +336,7 @@ export const examService = {
   // Nộp đáp án Speaking (với file upload)
   submitSpeakingAnswers: async (examId, submissionId, formData) => {
     try {
+      // formData should already contain parts and files
       const response = await api.post(`/${examId}/submissions/${submissionId}/speaking/submit`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -321,6 +369,16 @@ export const examService = {
         return [];
       }
       throw error.response?.data || { message: 'Không thể lấy danh sách bài làm' };
+    }
+  },
+
+  // Lấy danh sách submissions của một exam cụ thể
+  getExamSubmissions: async (examId) => {
+    try {
+      const response = await api.get(`/${examId}/submissions`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy lịch sử bài làm' };
     }
   },
 };

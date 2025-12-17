@@ -3,7 +3,8 @@ import ExamBasicInfo from '../compo/exam/ExamBasicInfo';
 import SectionForm from '../compo/exam/SectionForm';
 import ExamSummary from '../compo/exam/ExamSummary';
 
-const ExamCreate = () => {
+const ExamCreate = ({ viewMode = 'center-head' }) => {
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
   const [activeTab, setActiveTab] = useState('info');
   const [examData, setExamData] = useState({
     title: '',

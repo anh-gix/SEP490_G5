@@ -13,15 +13,19 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Cấu hình multer cho student homework submissions
+const homeworkUploadsDir = path.join(__dirname, '../uploads/homeworks');
+if (!fs.existsSync(homeworkUploadsDir)) {
+  fs.mkdirSync(homeworkUploadsDir, { recursive: true });
+}
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, uploadsDir);
+    cb(null, homeworkUploadsDir);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
-    const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    cb(null, `student-hw-${uniqueSuffix}-${safeName}`);
+    cb(null, `submission-${uniqueSuffix}${ext}`);
   }
 });
 
@@ -53,6 +57,7 @@ const upload = multer({
 router.get('/me', verifyToken, isStudent, studentController.getCurrentStudent);
 router.get('/me/dashboard', verifyToken, isStudent, studentController.getDashboardData);
 router.get('/me/classes', verifyToken, isStudent, studentController.getMyClasses);
+router.get('/me/classes/:classId', verifyToken, isStudent, studentController.getMyClassDetail);
 router.get('/me/schedule', verifyToken, isStudent, studentController.getMySchedule);
 router.get('/me/lessons/:scheduleId', verifyToken, isStudent, studentController.getLessonDetail);
 
@@ -65,8 +70,23 @@ router.get('/me/classes/:classId/progress', verifyToken, isStudent, studentContr
 router.post('/me/classes/:classId/schedules/:scheduleId/homework/:homeworkId/submit', 
   verifyToken, 
   isStudent, 
-  upload.array('files', 5), // Allow up to 5 files
+  upload.array('submissionFile', 5), // Allow up to 5 files
   studentController.submitHomework
+);
+
+// Get student's own submission for a homework
+router.get('/me/classes/:classId/schedules/:scheduleId/homework/:homeworkId/submission',
+  verifyToken,
+  isStudent,
+  studentController.getMySubmission
+);
+
+// Create change request (for absence request)
+const changeRequestController = require('../controllers/changeRequestController');
+router.post('/me/change-requests', 
+  verifyToken, 
+  isStudent, 
+  changeRequestController.createChangeRequest
 );
 
 // ==========================================
@@ -81,6 +101,12 @@ router.get('/stats', studentController.getStudentStats);
 
 // Get student by ID
 router.get('/:id', studentController.getStudentById);
+
+// Update student course enrollments (must be before /:id routes to avoid conflict)
+router.patch('/:id/courses', studentController.updateStudentCourseEnrollments);
+
+// Change student class (must be before /:id routes to avoid conflict)
+router.patch('/:id/change-class', studentController.changeStudentClass);
 
 // Create student
 router.post('/', studentController.createStudent);

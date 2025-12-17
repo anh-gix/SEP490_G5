@@ -9,12 +9,19 @@ import { formatDate } from '../../../helper/helper';
 
 const API_BASE_URL = 'http://localhost:8080';
 
-const ExamView = () => {
+const ExamView = ({ viewMode = 'center-head' }) => {
   const { id } = useParams();
   const navigate = useNavigate();
+
+  // Determine base path
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
+  const isViewOnly = viewMode === 'center-head';
   const [exam, setExam] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [submissionNote, setSubmissionNote] = useState('');
 
   useEffect(() => {
     fetchExamDetails();
@@ -58,6 +65,51 @@ const ExamView = () => {
       'essay': 'Tự luận'
     };
     return labels[type] || type;
+  };
+
+  const handleSubmitForApproval = async () => {
+    if (!submissionNote.trim()) {
+      alert('Vui lòng nhập ghi chú nộp đề');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const response = await examService.submitExamForApproval(id, submissionNote);
+
+      if (response.success) {
+        alert('Nộp đề thi để duyệt thành công!');
+        setShowSubmitModal(false);
+        setSubmissionNote('');
+        fetchExamDetails(); // Reload to get updated status
+      }
+    } catch (err) {
+      console.error('Error submitting exam:', err);
+      alert(err.message || 'Nộp đề thi thất bại');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleWithdrawSubmission = async () => {
+    if (!window.confirm('Bạn có chắc muốn rút lại đề thi này?')) {
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const response = await examService.withdrawExamSubmission(id);
+
+      if (response.success) {
+        alert('Rút lại đề thi thành công!');
+        fetchExamDetails(); // Reload to get updated status
+      }
+    } catch (err) {
+      console.error('Error withdrawing exam:', err);
+      alert(err.message || 'Rút lại đề thi thất bại');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const breadcrumbItems = [
@@ -121,13 +173,40 @@ const ExamView = () => {
           >
             Quay lại
           </Button>
-          <Button
-            variant="primary"
-            icon="ph ph-pencil"
-            onClick={() => navigate(`/center-head/exams/${exam._id}/edit`)}
-          >
-            Chỉnh sửa
-          </Button>
+
+          {/* Nút Nộp đề để duyệt - chỉ hiển thị khi status = draft hoặc needs_revision */}
+          {(exam.status === 'draft' || exam.status === 'needs_revision') && (
+            <Button
+              variant="success"
+              icon="ph ph-paper-plane-tilt"
+              onClick={() => setShowSubmitModal(true)}
+              disabled={submitting}
+            >
+              Nộp đề để duyệt
+            </Button>
+          )}
+
+          {/* Nút Rút lại - chỉ hiển thị khi status = pending_approval */}
+          {exam.status === 'pending_approval' && (
+            <Button
+              variant="warning"
+              icon="ph ph-arrow-u-up-left"
+              onClick={handleWithdrawSubmission}
+              disabled={submitting}
+            >
+              Rút lại
+            </Button>
+          )}
+
+          {!isViewOnly && (
+            <Button
+              variant="primary"
+              icon="ph ph-pencil"
+              onClick={() => navigate(`${basePath}/exams/${exam._id}/edit`)}
+            >
+              Chỉnh sửa
+            </Button>
+          )}
         </div>
       </div>
 
@@ -152,11 +231,28 @@ const ExamView = () => {
               </div>
               <div className="col-md-6">
                 <div className="mb-3">
-                  <span className="text-neutral-500 text-sm d-block mb-1">Trạng thái</span>
+                  <span className="text-neutral-500 text-sm d-block mb-1">Trạng thái xuất bản</span>
                   <StatusBadge
                     status={exam.isPublished ? 'published' : 'draft'}
                     size="sm"
                   />
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="mb-3">
+                  <span className="text-neutral-500 text-sm d-block mb-1">Trạng thái duyệt</span>
+                  <span className={`badge ${
+                    exam.status === 'approved' ? 'bg-success' :
+                    exam.status === 'pending_approval' ? 'bg-warning' :
+                    exam.status === 'needs_revision' ? 'bg-danger' :
+                    'bg-secondary'
+                  }`}>
+                    {exam.status === 'draft' && 'Bản nháp'}
+                    {exam.status === 'pending_approval' && 'Chờ duyệt'}
+                    {exam.status === 'approved' && 'Đã duyệt'}
+                    {exam.status === 'needs_revision' && 'Cần chỉnh sửa'}
+                    {exam.status === 'archived' && 'Đã lưu trữ'}
+                  </span>
                 </div>
               </div>
               <div className="col-md-6">
@@ -257,14 +353,16 @@ const ExamView = () => {
                         {section.answerKey?.length || 0} câu
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      icon="ph ph-pencil"
-                      onClick={() => navigate(`/center-head/exams/${exam._id}/edit`)}
-                    >
-                      Sửa
-                    </Button>
+                    {!isViewOnly && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon="ph ph-pencil"
+                        onClick={() => navigate(`${basePath}/exams/${exam._id}/edit`)}
+                      >
+                        Sửa
+                      </Button>
+                    )}
                   </div>
                 </div>
 
@@ -367,6 +465,72 @@ const ExamView = () => {
           </div>
         )}
       </Card>
+
+      {/* Submit Modal */}
+      {showSubmitModal && (
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Nộp đề thi để duyệt</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowSubmitModal(false)}
+                  disabled={submitting}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="alert alert-info">
+                  <i className="ph ph-info me-2"></i>
+                  Đề thi sẽ được gửi đến Center Head để duyệt. Vui lòng nhập ghi chú (nếu có).
+                </div>
+                <div className="mb-3">
+                  <label className="form-label fw-semibold">
+                    Ghi chú nộp đề <span className="text-danger">*</span>
+                  </label>
+                  <textarea
+                    className="form-control"
+                    rows="4"
+                    placeholder="Nhập ghi chú về đề thi này..."
+                    value={submissionNote}
+                    onChange={(e) => setSubmissionNote(e.target.value)}
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowSubmitModal(false)}
+                  disabled={submitting}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={handleSubmitForApproval}
+                  disabled={submitting || !submissionNote.trim()}
+                >
+                  {submitting ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2"></span>
+                      Đang nộp...
+                    </>
+                  ) : (
+                    <>
+                      <i className="ph ph-paper-plane-tilt me-2"></i>
+                      Nộp đề
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -98,7 +98,7 @@ export const mockPendingCourses = [
   },
   {
     _id: "course002",
-    name: "Tiếng Anh Giao tiếp B1",
+    name: "Cambridge B1",
     description: "Khóa học giúp học viên đạt trình độ B1 theo chuẩn CEFR, tập trung vào kỹ năng giao tiếp thực tế.",
     status: "pending_approval",
     program: {
@@ -375,7 +375,7 @@ export const mockPendingSchedules = [
     reason: "Tăng cường buổi thực hành cho sinh viên yếu",
     course: {
       _id: "course002",
-      name: "Tiếng Anh Giao tiếp B1",
+      name: "Cambridge B1",
       code: "ENG_B1"
     },
     session: {

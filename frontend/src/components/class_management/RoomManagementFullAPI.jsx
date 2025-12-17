@@ -1,6 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup } from 'react-bootstrap';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Alert, Spinner } from 'react-bootstrap';
+import { toast } from 'react-toastify';
+import Swal from 'sweetalert2';
 import roomService from '../../services/roomService';
+import ScheduleCalendar from './ScheduleCalendar';
+import { formatDateToYYYYMMDD } from '../../helper/helper';
 
 /**
  * Room Management Full Component with API Integration
@@ -9,14 +13,16 @@ import roomService from '../../services/roomService';
 const RoomManagementFull = () => {
   const [rooms, setRooms] = useState([]);
   const [stats, setStats] = useState({});
+  const [todayRoomUsage, setTodayRoomUsage] = useState([]);
+  const [timeSlots, setTimeSlots] = useState([]); // Time slots from database
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState('grid');
   const [showModal, setShowModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [editingRoom, setEditingRoom] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [roomSchedule, setRoomSchedule] = useState([]);
+  const [scheduleViewMode, setScheduleViewMode] = useState('calendar'); // table or calendar
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [formData, setFormData] = useState({
@@ -30,6 +36,7 @@ const RoomManagementFull = () => {
   useEffect(() => {
     fetchRooms();
     fetchStats();
+    fetchTodayRoomUsage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, filterStatus]);
 
@@ -60,6 +67,16 @@ const RoomManagementFull = () => {
     }
   };
 
+  const fetchTodayRoomUsage = async () => {
+    try {
+      const data = await roomService.getTodayRoomUsage();
+      setTodayRoomUsage(data.roomSchedule || []);
+      setTimeSlots(data.timeSlots || []); // Set time slots from API
+    } catch (err) {
+      console.error('Error fetching today room usage:', err);
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -72,10 +89,10 @@ const RoomManagementFull = () => {
       setLoading(true);
       if (editingRoom) {
         await roomService.updateRoom(editingRoom._id, formData);
-        alert('Cập nhật phòng học thành công!');
+        toast.success('Cập nhật phòng học thành công!');
       } else {
         await roomService.createRoom(formData);
-        alert('Thêm phòng học thành công!');
+        toast.success('Thêm phòng học thành công!');
       }
       
       handleCloseModal();
@@ -83,7 +100,7 @@ const RoomManagementFull = () => {
       fetchStats();
     } catch (err) {
       console.error('Error saving room:', err);
-      alert(err.message || 'Không thể lưu phòng học');
+      toast.error(err.message || 'Không thể lưu phòng học');
     } finally {
       setLoading(false);
     }
@@ -102,17 +119,29 @@ const RoomManagementFull = () => {
   };
 
   const handleDelete = async (roomId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa phòng học này?')) return;
+    const result = await Swal.fire({
+      title: 'Xác nhận xóa',
+      text: 'Bạn có chắc chắn muốn xóa phòng học này?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+      confirmButtonColor: '#dc3545',
+      cancelButtonColor: '#6c757d'
+    });
+    
+    if (!result.isConfirmed) return;
     
     try {
       setLoading(true);
       await roomService.deleteRoom(roomId);
-      alert('Xóa phòng học thành công!');
+      toast.success('Xóa phòng học thành công!');
+      handleCloseModal();
       fetchRooms();
       fetchStats();
     } catch (err) {
       console.error('Error deleting room:', err);
-      alert(err.message || 'Không thể xóa phòng học');
+      toast.error(err.message || 'Không thể xóa phòng học');
     } finally {
       setLoading(false);
     }
@@ -120,6 +149,7 @@ const RoomManagementFull = () => {
 
   const handleViewSchedule = async (room) => {
     setSelectedRoom(room);
+    setScheduleViewMode('calendar'); // Reset to calendar view when opening modal
     try {
       setLoading(true);
       const data = await roomService.getRoomSchedule(room._id);
@@ -127,7 +157,7 @@ const RoomManagementFull = () => {
       setShowScheduleModal(true);
     } catch (err) {
       console.error('Error fetching room schedule:', err);
-      alert('Không thể tải lịch sử dụng phòng');
+      toast.error('Không thể tải lịch sử dụng phòng');
     } finally {
       setLoading(false);
     }
@@ -160,7 +190,54 @@ const RoomManagementFull = () => {
     );
   };
 
-  const filteredRooms = rooms;
+  // Format room schedule data for ScheduleCalendar component
+  const formatRoomSchedulesForCalendar = useMemo(() => {
+    return roomSchedule.map(schedule => {
+      let dateStr = 'N/A';
+      if (schedule.date) {
+        if (schedule.date instanceof Date) {
+          dateStr = formatDateToYYYYMMDD(schedule.date);
+        } else if (typeof schedule.date === 'string') {
+          dateStr = schedule.date.split('T')[0];
+        }
+      }
+      
+      // Determine className: if it's a make-up class (temporary) without a class, show "Lớp học bù"
+      let className = schedule.class?.name;
+      if (!className && schedule.status === 'temporary') {
+        className = 'Lớp học bù';
+      } else if (!className) {
+        className = 'N/A';
+      }
+      
+      // Extract program type: ưu tiên schedule.programType (từ backend cho buổi học bù),
+      // sau đó mới fallback về schedule.class?.course?.program?.type
+      const programType = schedule.programType || schedule.class?.course?.program?.type || schedule._course?.program?.type || null;
+      
+      return {
+        id: schedule._id || schedule.id,
+        date: dateStr,
+        startTime: schedule.startTime || '',
+        endTime: schedule.endTime || '',
+        className: className,
+        topic: schedule.session?.title || schedule.topic || 'N/A',
+        status: schedule.status || 'fixed',
+        programType: programType
+      };
+    });
+  }, [roomSchedule]);
+
+  const filteredRooms = useMemo(() => {
+    return rooms.filter(room => {
+      const matchesSearch = !searchTerm || 
+        room.room_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        room.location?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = filterStatus === 'all' || room.status === filterStatus;
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [rooms, searchTerm, filterStatus]);
 
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#f8f9fa' }}>
@@ -275,196 +352,110 @@ const RoomManagementFull = () => {
         </Col>
       </Row>
 
-      {/* Filters and View Toggle */}
-      <Card className="bg-white border-0 rounded-12 box-shadow-sm mb-24">
-        <Card.Body className="p-20">
-          <Row className="g-3 align-items-center">
-            <Col md={4}>
-              <InputGroup>
-                <InputGroup.Text className="bg-neutral-50 border-neutral-200">
-                  <i className="fas fa-search text-neutral-600"></i>
-                </InputGroup.Text>
-                <Form.Control
-                  placeholder="Tìm theo tên phòng hoặc vị trí..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="border-neutral-200"
-                />
-              </InputGroup>
-            </Col>
+      {/* Search and Filter */}
+      <Row className="mb-24">
+        <Col md={6}>
+          <InputGroup>
+            <InputGroup.Text>
+              <i className="fas fa-search"></i>
+            </InputGroup.Text>
+            <Form.Control
+              type="text"
+              placeholder="Tìm kiếm phòng..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </InputGroup>
+        </Col>
+        <Col md={3}>
+          <Form.Select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <option value="all">Tất cả trạng thái</option>
+            <option value="available">Sẵn sàng</option>
+            <option value="in_use">Đang sử dụng</option>
+            <option value="maintenance">Bảo trì</option>
+          </Form.Select>
+        </Col>
+      </Row>
 
-            <Col md={3}>
-              <Form.Select 
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="border-neutral-200"
-              >
-                <option value="all">Tất cả trạng thái</option>
-                <option value="available">Sẵn sàng</option>
-                <option value="in_use">Đang sử dụng</option>
-                <option value="maintenance">Bảo trì</option>
-              </Form.Select>
-            </Col>
-
-            <Col md={5} className="text-end">
-              <div className="btn-group">
-                <Button
-                  variant={viewMode === 'grid' ? 'primary' : 'outline-secondary'}
-                  onClick={() => setViewMode('grid')}
-                  className="px-16"
-                >
-                  <i className="fas fa-th me-2"></i>
-                  Grid
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'primary' : 'outline-secondary'}
-                  onClick={() => setViewMode('list')}
-                  className="px-16"
-                >
-                  <i className="fas fa-list me-2"></i>
-                  List
-                </Button>
-              </div>
-            </Col>
-          </Row>
-        </Card.Body>
-      </Card>
-
-      {/* Loading State */}
-      {loading && (
-        <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Đang tải...</span>
-          </div>
-        </div>
-      )}
-
-      {/* Error State */}
+      {/* Error Message */}
       {error && (
-        <div className="alert alert-danger" role="alert">
-          <i className="fas fa-exclamation-triangle me-2"></i>
+        <Alert variant="danger" dismissible onClose={() => setError(null)} className="mb-24">
           {error}
-        </div>
+        </Alert>
       )}
 
-      {/* Grid View */}
-      {!loading && !error && viewMode === 'grid' && (
-        <Row className="g-3">
-          {filteredRooms.map(room => (
-            <Col key={room._id} lg={4} md={6}>
-              <Card className="bg-white border-0 rounded-12 box-shadow-sm h-100">
-                <Card.Body className="p-20">
-                  <div className="d-flex justify-content-between align-items-start mb-16">
-                    <div>
-                      <h6 className="text-neutral-900 fw-semibold mb-4">{room.room_name}</h6>
-                      <p className="text-neutral-600 text-13 mb-0">{room.location}</p>
-                    </div>
-                    {getStatusBadge(room.status)}
-                  </div>
-
-                  <div className="mb-16">
-                    <div className="d-flex align-items-center gap-8 mb-8">
-                      <i className="fas fa-users text-neutral-400"></i>
-                      <span className="text-neutral-700 text-14">Sức chứa: {room.capacity} người</span>
-                    </div>
-                  </div>
-
-                  {room.description && (
-                    <p className="text-neutral-600 text-13 mb-16">{room.description}</p>
-                  )}
-
-                  <div className="d-flex gap-8">
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={() => handleViewSchedule(room)}
-                      className="flex-grow-1"
-                    >
-                      <i className="fas fa-calendar me-1"></i>
-                      Lịch sử dụng
-                    </Button>
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={() => handleEdit(room)}
-                    >
-                      <i className="fas fa-edit"></i>
-                    </Button>
-                    <Button
-                      variant="outline-danger"
-                      size="sm"
-                      onClick={() => handleDelete(room._id)}
-                    >
-                      <i className="fas fa-trash"></i>
-                    </Button>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          ))}
-        </Row>
-      )}
-
-      {/* List View */}
-      {!loading && !error && viewMode === 'list' && (
-        <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-          <Card.Body className="p-0">
+      {/* Rooms List */}
+      <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+        <Card.Header className="bg-white border-0 p-20">
+          <h5 className="text-neutral-900 fw-bold mb-0">Danh sách phòng học</h5>
+        </Card.Header>
+        <Card.Body className="p-0">
+          {loading ? (
+            <div className="text-center py-5">
+              <Spinner animation="border" variant="primary" />
+              <p className="text-neutral-600 mt-3">Đang tải danh sách phòng...</p>
+            </div>
+          ) : filteredRooms.length === 0 ? (
+            <div className="text-center py-5">
+              <i className="fas fa-door-open fa-3x text-neutral-300 mb-3"></i>
+              <p className="text-neutral-600">Không có phòng nào</p>
+            </div>
+          ) : (
             <Table hover className="mb-0">
-              <thead>
-                <tr className="bg-neutral-25">
-                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Phòng</th>
-                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Vị trí</th>
-                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Sức chứa</th>
-                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Trạng thái</th>
-                  <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Thao tác</th>
+              <thead style={{ backgroundColor: 'var(--neutral-50)' }}>
+                <tr>
+                  <th className="px-16 py-12 text-13 fw-medium">Tên phòng</th>
+                  <th className="px-16 py-12 text-13 fw-medium">Vị trí</th>
+                  <th className="px-16 py-12 text-13 fw-medium">Sức chứa</th>
+                  <th className="px-16 py-12 text-13 fw-medium">Trạng thái</th>
+                  <th className="px-16 py-12 text-13 fw-medium text-end">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredRooms.map(room => (
+                {filteredRooms.map((room) => (
                   <tr key={room._id}>
-                    <td className="px-20 py-16">
+                    <td className="px-16 py-12">
                       <div className="text-neutral-900 fw-semibold text-14">{room.room_name}</div>
                     </td>
-                    <td className="px-20 py-16 text-neutral-700 text-14">{room.location}</td>
-                    <td className="px-20 py-16 text-center text-neutral-700 fw-medium text-14">
-                      {room.capacity}
+                    <td className="px-16 py-12">
+                      <div className="text-neutral-600 text-13">{room.location}</div>
                     </td>
-                    <td className="px-20 py-16">
+                    <td className="px-16 py-12">
+                      <div className="text-neutral-600 text-13">{room.capacity} người</div>
+                    </td>
+                    <td className="px-16 py-12">
                       {getStatusBadge(room.status)}
                     </td>
-                    <td className="px-20 py-16">
-                      <div className="d-flex gap-8">
-                        <Button
-                          variant="outline-info"
-                          size="sm"
-                          onClick={() => handleViewSchedule(room)}
-                        >
-                          <i className="fas fa-calendar me-1"></i>
-                          Lịch
-                        </Button>
-                        <Button
-                          variant="outline-secondary"
-                          size="sm"
-                          onClick={() => handleEdit(room)}
-                        >
-                          <i className="fas fa-edit"></i>
-                        </Button>
-                        <Button
-                          variant="outline-danger"
-                          size="sm"
-                          onClick={() => handleDelete(room._id)}
-                        >
-                          <i className="fas fa-trash"></i>
-                        </Button>
-                      </div>
+                    <td className="px-16 py-12 text-end">
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        className="me-2"
+                        onClick={() => handleViewSchedule(room)}
+                      >
+                        <i className="fas fa-calendar me-1"></i>
+                        Lịch
+                      </Button>
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        className="me-2"
+                        onClick={() => handleEdit(room)}
+                      >
+                        <i className="fas fa-edit me-1"></i>
+                        Sửa
+                      </Button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </Table>
-          </Card.Body>
-        </Card>
-      )}
+          )}
+        </Card.Body>
+      </Card>
 
       {/* Add/Edit Modal */}
       <Modal show={showModal} onHide={handleCloseModal} size="lg">
@@ -551,6 +542,16 @@ const RoomManagementFull = () => {
             <Button variant="secondary" onClick={handleCloseModal} disabled={loading}>
               Hủy
             </Button>
+            {editingRoom && (
+              <Button
+                variant="danger"
+                onClick={() => handleDelete(editingRoom._id)}
+                disabled={loading}
+              >
+                <i className="fas fa-trash me-1"></i>
+                Xóa
+              </Button>
+            )}
             <Button variant="primary" type="submit" disabled={loading}>
               {loading ? 'Đang lưu...' : (editingRoom ? 'Cập nhật' : 'Thêm mới')}
             </Button>
@@ -559,7 +560,7 @@ const RoomManagementFull = () => {
       </Modal>
 
       {/* Room Schedule Modal */}
-      <Modal show={showScheduleModal} onHide={() => setShowScheduleModal(false)} size="lg">
+      <Modal show={showScheduleModal} onHide={() => setShowScheduleModal(false)} size="xl">
         <Modal.Header closeButton>
           <Modal.Title>
             Lịch sử dụng - {selectedRoom?.room_name}
@@ -572,47 +573,97 @@ const RoomManagementFull = () => {
               <div className="text-muted">Sức chứa: {selectedRoom.capacity} người</div>
             </div>
           )}
-          
-          {roomSchedule.length > 0 ? (
-            <Table hover>
-              <thead className="bg-neutral-25">
-                <tr>
-                  <th className="px-16 py-12 text-13">Thời gian</th>
-                  <th className="px-16 py-12 text-13">Lớp học</th>
-                  <th className="px-16 py-12 text-13">Chủ đề</th>
-                  <th className="px-16 py-12 text-13">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody>
-                {roomSchedule.map((schedule, index) => (
-                  <tr key={index}>
-                    <td className="px-16 py-12">
-                      <div className="text-14">
-                        {new Date(schedule.date).toLocaleDateString('vi-VN')}
-                      </div>
-                      <div className="text-13 text-muted">
-                        {schedule.startTime} - {schedule.endTime}
-                      </div>
-                    </td>
-                    <td className="px-16 py-12">
-                      {schedule.class?.name || 'N/A'}
-                    </td>
-                    <td className="px-16 py-12">
-                      {schedule.session?.title || schedule.topic || 'N/A'}
-                    </td>
-                    <td className="px-16 py-12">
-                      <Badge bg={schedule.status === 'fixed' ? 'success' : schedule.status === 'temporary' ? 'warning' : 'secondary'}>
-                        {schedule.status === 'fixed' ? 'Buổi cố định' : schedule.status === 'temporary' ? 'Buổi tạm' : schedule.status}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          ) : (
-            <div className="text-center py-4 text-muted">
-              Chưa có lịch sử dụng
+
+          {/* View Toggle Buttons */}
+          <div className="d-flex justify-content-end mb-3">
+            <div className="btn-group">
+              <Button
+                variant={scheduleViewMode === 'calendar' ? 'primary' : 'outline-secondary'}
+                size="sm"
+                onClick={() => setScheduleViewMode('calendar')}
+              >
+                <i className="fas fa-calendar me-2"></i>
+                Calendar
+              </Button>
+              <Button
+                variant={scheduleViewMode === 'table' ? 'primary' : 'outline-secondary'}
+                size="sm"
+                onClick={() => setScheduleViewMode('table')}
+              >
+                <i className="fas fa-list me-2"></i>
+                Bảng
+              </Button>
             </div>
+          </div>
+          
+          {/* Table View */}
+          {scheduleViewMode === 'table' && (
+            <>
+              {roomSchedule.length > 0 ? (
+                <Table hover>
+                  <thead className="bg-neutral-25">
+                    <tr>
+                      <th className="px-16 py-12 text-13">Thời gian</th>
+                      <th className="px-16 py-12 text-13">Lớp học</th>
+                      <th className="px-16 py-12 text-13">Chủ đề</th>
+                      <th className="px-16 py-12 text-13">Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {roomSchedule.map((schedule, index) => (
+                      <tr key={index}>
+                        <td className="px-16 py-12">
+                          <div className="text-14">
+                            {new Date(schedule.date).toLocaleDateString('vi-VN')}
+                          </div>
+                          <div className="text-13 text-muted">
+                            {schedule.startTime} - {schedule.endTime}
+                          </div>
+                        </td>
+                        <td className="px-16 py-12">
+                          {schedule.status === 'temporary' && !schedule.class?.name 
+                            ? 'Lớp học bù' 
+                            : (schedule.class?.name || 'N/A')}
+                        </td>
+                        <td className="px-16 py-12">
+                          {schedule.session?.title || schedule.topic || 'N/A'}
+                        </td>
+                        <td className="px-16 py-12">
+                          <Badge bg={schedule.status === 'fixed' ? 'success' : schedule.status === 'temporary' ? 'warning' : 'secondary'}>
+                            {schedule.status === 'fixed' ? 'Buổi cố định' : schedule.status === 'temporary' ? 'Buổi tạm' : schedule.status}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              ) : (
+                <div className="text-center py-4 text-muted">
+                  Chưa có lịch sử dụng
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Calendar View */}
+          {scheduleViewMode === 'calendar' && (
+            <>
+              {roomSchedule.length > 0 ? (
+                <>
+                  <ScheduleCalendar
+                    schedules={formatRoomSchedulesForCalendar}
+                    onEditSchedule={() => {}}
+                    onDeleteSchedule={() => {}}
+                    onCreateMakeup={() => {}}
+                    readOnly={true}
+                  />
+                </>
+              ) : (
+                <div className="text-center py-4 text-muted">
+                  Chưa có lịch sử dụng
+                </div>
+              )}
+            </>
           )}
         </Modal.Body>
         <Modal.Footer>

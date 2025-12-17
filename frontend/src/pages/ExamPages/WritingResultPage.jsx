@@ -1,10 +1,5 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import Breadcrumb from "../../components/Breadcrumb";
-import FooterOne from "../../components/FooterOne";
-import HeaderOne from "../../components/HomePageforStudent/HeaderOne";
-import Animation from "../../helper/Animation";
-import Preloader from "../../helper/Preloader";
 import { examService } from "../../services/examService";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -107,9 +102,7 @@ const WritingResultPage = () => {
   if (loading) {
     return (
       <>
-        <Preloader />
-        <Animation />
-        <HeaderOne />
+     
         <div className="text-center py-80">
           <div className="spinner-border text-main-600" role="status">
             <span className="visually-hidden">Loading...</span>
@@ -121,10 +114,6 @@ const WritingResultPage = () => {
 
   return (
     <>
-      <Preloader />
-      <Animation />
-      <HeaderOne />
-      
 
       <section className="py-120">
         <div className="container">
@@ -163,28 +152,6 @@ const WritingResultPage = () => {
                     <h3 className={`text-${getScoreColor()}-600 mb-0 fw-bold`}>
                       {result.sectionScore} / {result.maxScore || "Chưa chấm"}
                     </h3>
-                  </div>
-                </div>
-                {result.maxScore > 0 && (
-                  <div className="col-md-4">
-                    <div className="bg-white box-shadow-md rounded-16 p-32 border border-neutral-30 text-center h-100">
-                      <div className="w-60 h-60 flex-center bg-main-25 text-main-600 text-28 rounded-circle mx-auto mb-16">
-                        <i className="ph-bold ph-percent" />
-                      </div>
-                      <p className="text-neutral-600 text-sm mb-8 fw-medium">Tỷ lệ đạt</p>
-                      <h3 className={`text-${getScoreColor()}-600 mb-0 fw-bold`}>
-                        {getScorePercentage()}%
-                      </h3>
-                    </div>
-                  </div>
-                )}
-                <div className="col-md-4">
-                  <div className="bg-white box-shadow-md rounded-16 p-32 border border-neutral-30 text-center h-100">
-                    <div className="w-60 h-60 flex-center bg-main-25 text-main-600 text-28 rounded-circle mx-auto mb-16">
-                      <i className="ph-bold ph-star" />
-                    </div>
-                    <p className="text-neutral-600 text-sm mb-8 fw-medium">Tổng điểm</p>
-                    <h3 className="text-main-600 mb-0 fw-bold">{result.totalScore}</h3>
                   </div>
                 </div>
               </div>
@@ -285,85 +252,94 @@ const WritingResultPage = () => {
                   </span>
                   <h3 className="mb-0">Chi tiết bài làm</h3>
                 </div>
-                <div className="row gy-4">
-                  {result.results?.map((item, index) => {
-                    const wordCount = getWordCount(item.studentAnswer);
-                    return (
-                      <div key={index} className="col-12">
-                        <div className="rounded-16 p-24 border border-neutral-30 box-shadow-sm">
-                          <div className="flex-between gap-16 mb-16 flex-wrap">
-                            <div className="flex-align gap-12">
-                              <span className="w-40 h-40 flex-center bg-main-25 text-main-600 rounded-circle flex-shrink-0">
-                                <i className="ph-bold ph-question" />
-                              </span>
-                              <span className="fw-semibold text-neutral-700 text-lg">
-                                Câu {item.questionNumber}
-                              </span>
-                            </div>
-                            <div className="flex-align gap-16">
-                              {item.score > 0 && (
-                                <span className="badge bg-success text-white px-16 py-6 rounded-pill">
-                                  <i className="ph ph-check-circle me-4" />
-                                  Đã chấm: {item.score} điểm
-                                </span>
-                              )}
-                              {item.score === 0 && (
-                                <span className="badge bg-warning text-white px-16 py-6 rounded-pill">
-                                  <i className="ph ph-clock me-4" />
-                                  Chờ chấm
-                                </span>
-                              )}
-                              {wordCount > 0 && (
-                                <span className="badge bg-main-600 text-white px-16 py-6 rounded-pill">
-                                  <i className="ph ph-text-aa me-4" />
-                                  {wordCount} từ
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Question Title */}
-                          {item.questionTitle && (
-                            <div className="mb-16">
-                              <p className="text-neutral-700 fw-semibold mb-0">{item.questionTitle}</p>
-                            </div>
-                          )}
-
-                          <div className="mb-16">
-                            <p className="text-neutral-600 text-sm mb-12 fw-semibold">
-                              <i className="ph ph-pencil-simple me-8" />
-                              Bài làm của bạn:
-                            </p>
-                            <div className="bg-main-25 rounded-12 p-20 border border-neutral-30">
-                              <p
-                                className="text-neutral-700 mb-0"
-                                style={{
-                                  whiteSpace: "pre-wrap",
-                                  lineHeight: "1.8",
-                                  minHeight: "100px",
-                                }}
-                              >
-                                {item.studentAnswer || "Chưa có bài làm"}
-                              </p>
-                            </div>
-                          </div>
-                          {item.score > 0 && (
-                            <div className="pt-16 border-top border-neutral-30">
-                              <span className="text-neutral-600 text-sm">
-                                Điểm: <span className="fw-bold text-main-600">{item.score}</span> /{" "}
-                                {item.maxScore || "N/A"}
-                              </span>
-                            </div>
-                          )}
-                        </div>
+                {result.parts?.map((partData, partIndex) => (
+                  <div key={partIndex} className={partIndex > 0 ? "mt-32 pt-32 border-top border-neutral-30" : ""}>
+                    {result.parts.length > 1 && (
+                      <div className="mb-24">
+                        <h4 className="text-main-600 fw-semibold">Part {partData.part}</h4>
                       </div>
-                    );
-                  })}
-                </div>
+                    )}
+                    <div className="row gy-4">
+                      {partData.results?.map((item, index) => {
+                        const wordCount = getWordCount(item.studentAnswer);
+                        return (
+                          <div key={index} className="col-12">
+                            <div className="rounded-16 p-24 border border-neutral-30 box-shadow-sm">
+                              <div className="flex-between gap-16 mb-16 flex-wrap">
+                                <div className="flex-align gap-12">
+                                  <span className="w-40 h-40 flex-center bg-main-25 text-main-600 rounded-circle flex-shrink-0">
+                                    <i className="ph-bold ph-question" />
+                                  </span>
+                                  <span className="fw-semibold text-neutral-700 text-lg">
+                                    Câu {item.questionNumber}
+                                  </span>
+                                </div>
+                                <div className="flex-align gap-16">
+                                  {item.score > 0 && (
+                                    <span className="badge bg-success text-white px-16 py-6 rounded-pill">
+                                      <i className="ph ph-check-circle me-4" />
+                                      Đã chấm: {item.score} điểm
+                                    </span>
+                                  )}
+                                  {item.score === 0 && (
+                                    <span className="badge bg-warning text-white px-16 py-6 rounded-pill">
+                                      <i className="ph ph-clock me-4" />
+                                      Chờ chấm
+                                    </span>
+                                  )}
+                                  {wordCount > 0 && (
+                                    <span className="badge bg-main-600 text-white px-16 py-6 rounded-pill">
+                                      <i className="ph ph-text-aa me-4" />
+                                      {wordCount} từ
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Question Title */}
+                              {item.questionTitle && (
+                                <div className="mb-16">
+                                  <p className="text-neutral-700 fw-semibold mb-0">{item.questionTitle}</p>
+                                </div>
+                              )}
+
+                              <div className="mb-16">
+                                <p className="text-neutral-600 text-sm mb-12 fw-semibold">
+                                  <i className="ph ph-pencil-simple me-8" />
+                                  Bài làm của bạn:
+                                </p>
+                                <div className="bg-main-25 rounded-12 p-20 border border-neutral-30">
+                                  <p
+                                    className="text-neutral-700 mb-0"
+                                    style={{
+                                      whiteSpace: "pre-wrap",
+                                      lineHeight: "1.8",
+                                      minHeight: "100px",
+                                    }}
+                                  >
+                                    {item.studentAnswer || "Chưa có bài làm"}
+                                  </p>
+                                </div>
+                              </div>
+                              {item.score > 0 && (
+                                <div className="pt-16 border-top border-neutral-30">
+                                  <span className="text-neutral-600 text-sm">
+                                    Điểm: <span className="fw-bold text-main-600">{item.score}</span> /{" "}
+                                    {item.maxScore || "N/A"}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              {/* Feedback */}
-              {result.feedback && (
+              {/* Feedback - Show feedback from all parts */}
+              {result.parts?.some((part) => part.feedback) && (
                 <div className="bg-warning-25 rounded-16 p-32 mb-40 border border-warning box-shadow-sm">
                   <div className="flex-align gap-12 mb-16">
                     <span className="text-warning-600 text-xl">
@@ -371,23 +347,32 @@ const WritingResultPage = () => {
                     </span>
                     <h4 className="mb-0">Nhận xét từ giáo viên</h4>
                   </div>
-                  <p className="text-neutral-700 mb-0" style={{ whiteSpace: "pre-wrap", lineHeight: "1.8" }}>
-                    {result.feedback}
-                  </p>
+                  {result.parts.map((partData, index) => (
+                    partData.feedback && (
+                      <div key={index} className={index > 0 ? "mt-16 pt-16 border-top border-warning" : ""}>
+                        {result.parts.length > 1 && (
+                          <p className="fw-semibold text-warning-600 mb-8">Part {partData.part}:</p>
+                        )}
+                        <p className="text-neutral-700 mb-0" style={{ whiteSpace: "pre-wrap", lineHeight: "1.8" }}>
+                          {partData.feedback}
+                        </p>
+                      </div>
+                    )
+                  ))}
                 </div>
               )}
 
               {/* Actions */}
               <div className="text-center">
                 <Link
-                  to={`/exams/${examId}`}
+                  to={`/student/exams/${examId}`}
                   className="btn btn-main px-40 py-16 rounded-pill me-16"
                 >
                   <i className="ph ph-arrow-left me-8" />
                   Quay lại bài thi
                 </Link>
                 <Link
-                  to="/exams2"
+                  to={"/student/practice-exams"}
                   className="btn btn-outline-main px-40 py-16 rounded-pill"
                 >
                   <i className="ph ph-list me-8" />

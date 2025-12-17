@@ -34,7 +34,7 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
     setShowMaterialModal(true);
   };
 
-  const handleSaveMaterial = () => {
+  const handleSaveMaterial = async () => {
     if (!materialForm.description) {
       alert('Vui lòng nhập mô tả tài liệu!');
       return;
@@ -47,16 +47,38 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
       newMaterials.push(materialForm);
     }
 
-    setCourseData(prev => ({ ...prev, materials: newMaterials }));
-    setShowMaterialModal(false);
+    try {
+      // Save to database immediately
+      await courseService.updateCourse(courseData._id, {
+        materials: newMaterials
+      });
+
+      setCourseData(prev => ({ ...prev, materials: newMaterials }));
+      setShowMaterialModal(false);
+    } catch (error) {
+      console.error('Error saving material:', error);
+      alert('Lỗi khi lưu tài liệu!');
+    }
   };
 
-  const handleDeleteMaterial = (index) => {
-    if (window.confirm('Bạn có chắc muốn xóa tài liệu này?')) {
+  const handleDeleteMaterial = async (index) => {
+    if (!window.confirm('Bạn có chắc muốn xóa tài liệu này?')) return;
+
+    const newMaterials = courseData.materials.filter((_, i) => i !== index);
+
+    try {
+      // Save to database immediately
+      await courseService.updateCourse(courseData._id, {
+        materials: newMaterials
+      });
+
       setCourseData(prev => ({
         ...prev,
-        materials: prev.materials.filter((_, i) => i !== index)
+        materials: newMaterials
       }));
+    } catch (error) {
+      console.error('Error deleting material:', error);
+      alert('Lỗi khi xóa tài liệu!');
     }
   };
 
@@ -83,6 +105,16 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
       setLoading(false);
     }
   };
+
+  // Protection: Course must be created first
+  if (!courseData._id) {
+    return (
+      <div className="alert alert-warning">
+        <i className="ph ph-warning me-2"></i>
+        Vui lòng hoàn thành Bước 1 (Thông tin cơ bản) trước khi thêm tài liệu.
+      </div>
+    );
+  }
 
   return (
     <div>

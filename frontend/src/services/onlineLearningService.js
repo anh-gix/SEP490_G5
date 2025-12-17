@@ -10,7 +10,7 @@ const getAuthHeader = () => {
 
 const onlineLearningService = {
   // ========================
-  // 📚 GET STUDENT'S ONLINE COURSES
+  //  GET STUDENT'S ONLINE COURSES
   // ========================
   getMyOnlineCourses: async () => {
     try {
@@ -24,7 +24,7 @@ const onlineLearningService = {
   },
 
   // ========================
-  // 📖 GET COURSE DETAIL
+  //  GET COURSE DETAIL
   // ========================
   getCourseDetail: async (courseId) => {
     try {
@@ -38,7 +38,7 @@ const onlineLearningService = {
   },
 
   // ========================
-  // 📝 GET SESSION CONTENT
+  //  GET SESSION CONTENT
   // ========================
   getSessionContent: async (courseId, sessionId) => {
     try {
@@ -55,7 +55,7 @@ const onlineLearningService = {
   },
 
   // ========================
-  // 📊 GET COURSE PROGRESS OVERVIEW
+  //  GET COURSE PROGRESS OVERVIEW
   // ========================
   getCourseProgress: async (courseId) => {
     try {
@@ -72,7 +72,7 @@ const onlineLearningService = {
   },
 
   // ========================
-  // ✅ UPDATE SESSION PROGRESS
+  //  UPDATE SESSION PROGRESS
   // ========================
   updateProgress: async (courseId, sessionId, progressData) => {
     try {
@@ -97,14 +97,14 @@ const onlineLearningService = {
   },
 
   // ========================
-  // 📝 MARK QUIZ AS COMPLETED
+  //  MARK QUIZ AS COMPLETED
   // ========================
   markQuizCompleted: async (courseId, sessionId) => {
     return onlineLearningService.updateProgress(courseId, sessionId, { quiz: true });
   },
 
   // ========================
-  // 📚 MARK VOCABULARY AS COMPLETED
+  //  MARK VOCABULARY AS COMPLETED
   // ========================
   markVocabularyCompleted: async (courseId, sessionId) => {
     return onlineLearningService.updateProgress(courseId, sessionId, { vocabulary: true });

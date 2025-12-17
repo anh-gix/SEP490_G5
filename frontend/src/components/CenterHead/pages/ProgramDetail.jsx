@@ -7,9 +7,10 @@ import StatusBadge from '../compo/StatusBadge';
 import Table from '../compo/Table';
 import programService from '../../../services/programService';
 import { courseService } from '../../../services/courseService';
+import approvalRequestService from '../../../services/approvalRequestService';
 import { formatDate } from '../../../helper/helper';
 
-const ProgramDetail = () => {
+const ProgramDetail = ({ viewMode = 'center-head' }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [program, setProgram] = useState(null);
@@ -19,10 +20,18 @@ const ProgramDetail = () => {
   const [showRejectProgramModal, setShowRejectProgramModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [submissionNote, setSubmissionNote] = useState('');
 
   // Get user role from localStorage
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const userRole = user.role;
+  const userRole = user.roleId?.name || user.role;
+
+  // Determine base path based on viewMode
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
+
+  // Center Head should not see edit/delete buttons
+  const isViewOnly = viewMode === 'center-head' || userRole === 'Center Head';
 
   useEffect(() => {
     fetchProgramDetail();
@@ -80,16 +89,23 @@ const ProgramDetail = () => {
   };
 
   // ===== PROGRAM WORKFLOW HANDLERS =====
-  const handleSubmitProgram = async () => {
-    if (!window.confirm('Bạn có chắc chắn muốn nộp chương trình này để phê duyệt?')) {
-      return;
-    }
+  const handleSubmitProgram = () => {
+    setShowSubmitModal(true);
+  };
 
+  const handleConfirmSubmitProgram = async () => {
     try {
       setActionLoading(true);
-      await programService.submitProgram(id, {});
-      alert('Đã nộp chương trình thành công!');
-      fetchProgramDetail();
+      const response = await approvalRequestService.submitProgram(id, {
+        note: submissionNote.trim() || undefined
+      });
+
+      if (response.success) {
+        alert('Đã nộp chương trình thành công! Chờ Center Head phê duyệt.');
+        setShowSubmitModal(false);
+        setSubmissionNote('');
+        fetchProgramDetail();
+      }
     } catch (err) {
       console.error('Error submitting program:', err);
       alert(err.message || 'Có lỗi xảy ra khi nộp chương trình');
@@ -165,7 +181,7 @@ const ProgramDetail = () => {
           <h5 className="text-neutral-600 mt-3 mb-3">Không tìm thấy chương trình</h5>
           <Button
             variant="primary"
-            onClick={() => navigate('/center-head/programs')}
+            onClick={() => navigate(`${basePath}/programs`)}
           >
             Quay lại danh sách
           </Button>
@@ -175,9 +191,9 @@ const ProgramDetail = () => {
   }
 
   const breadcrumbItems = [
-    { label: 'Dashboard', path: '/center-head/dashboard' },
-    { label: 'Chương trình đào tạo', path: '/center-head/programs' },
-    { label: program.program_name, path: `/center-head/programs/${id}` },
+    { label: 'Dashboard', path: `${basePath}/dashboard` },
+    { label: 'Chương trình đào tạo', path: `${basePath}/programs` },
+    { label: program.program_name, path: `${basePath}/programs/${id}` },
   ];
 
   const courseColumns = [
@@ -225,15 +241,15 @@ const ProgramDetail = () => {
       field: 'actions',
       render: (row) => (
         <div className="d-flex flex-wrap gap-2">
-          {/* Draft: Show "Continue" button to continue wizard */}
-          {row.status === 'draft' && (
+          {/* Draft: Show "Continue" button to continue wizard - only for non-Center Head */}
+          {row.status === 'draft' && userRole !== 'Center Head' && (
             <Button
               variant="primary"
               size="sm"
               icon="ph ph-play-circle"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/center-head/programs/${id}/courses/${row._id}/edit`);
+                navigate(`${basePath}/programs/${id}/courses/${row._id}/edit`);
               }}
             >
               <span className="d-none d-md-inline">Tiếp tục</span>
@@ -241,15 +257,15 @@ const ProgramDetail = () => {
             </Button>
           )}
 
-          {/* Completed: Show "Edit" button to edit via form */}
-          {row.status === 'completed' && (
+          {/* Completed: Show "Edit" button to edit via form - only for non-view-only */}
+          {row.status === 'completed' && !isViewOnly && (
             <Button
               variant="outline"
               size="sm"
               icon="ph ph-pencil"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/center-head/programs/${id}/courses/${row._id}/edit-form`);
+                navigate(`${basePath}/programs/${id}/courses/${row._id}/edit-form`);
               }}
             >
               <span className="d-none d-md-inline">Sửa</span>
@@ -264,26 +280,28 @@ const ProgramDetail = () => {
             icon="ph ph-eye"
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/center-head/courses/${row._id}/details`);
+              navigate(`${basePath}/courses/${row._id}/details`);
             }}
           >
             <span className="d-none d-md-inline">Xem</span>
             <span className="d-inline d-md-none">👁</span>
           </Button>
 
-          {/* Delete button */}
-          <Button
-            variant="danger"
-            size="sm"
-            icon="ph ph-trash"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDeleteCourse(row._id, row.name);
-            }}
-          >
-            <span className="d-none d-md-inline">Xóa</span>
-            <span className="d-inline d-md-none">🗑</span>
-          </Button>
+          {/* Delete button - only for non-view-only */}
+          {!isViewOnly && (
+            <Button
+              variant="danger"
+              size="sm"
+              icon="ph ph-trash"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteCourse(row._id, row.name);
+              }}
+            >
+              <span className="d-none d-md-inline">Xóa</span>
+              <span className="d-inline d-md-none">🗑</span>
+            </Button>
+          )}
         </div>
       ),
     },
@@ -300,7 +318,7 @@ const ProgramDetail = () => {
             <Button
               variant="ghost"
               icon="ph ph-arrow-left"
-              onClick={() => navigate('/center-head/programs')}
+              onClick={() => navigate(`${basePath}/programs`)}
             >
               Quay lại
             </Button>
@@ -331,7 +349,7 @@ const ProgramDetail = () => {
         </div>
         <div className="d-flex flex-wrap gap-2">
           {/* Draft or Needs Revision: Subject Leader can submit */}
-          {(program.status === 'draft' || program.status === 'needs_revision') && (
+          {(program.status === 'draft' || program.status === 'needs_revision') && userRole !== 'Center Head' && (
             <Button
               variant="primary"
               icon="ph ph-paper-plane-tilt"
@@ -343,34 +361,95 @@ const ProgramDetail = () => {
           )}
 
           {/* Pending Approval: Center Head can approve/reject */}
-          {program.status === 'pending_approval' && userRole === 'centerhead' && (
+          {program.status === 'pending_approval' && userRole === 'Center Head' && (
             <>
-              <Button
-                variant="success"
-                icon="ph ph-check"
+              <button
+                className="btn"
                 onClick={handleApproveProgram}
                 disabled={actionLoading}
+                style={{
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderColor: '#10b981',
+                  color: '#10b981',
+                  backgroundColor: 'transparent',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: actionLoading ? 'not-allowed' : 'pointer',
+                  opacity: actionLoading ? 0.6 : 1,
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  if (!actionLoading) {
+                    e.currentTarget.style.backgroundColor = '#10b981';
+                    e.currentTarget.style.color = 'white';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!actionLoading) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#10b981';
+                  }
+                }}
               >
+                <i className="ph ph-check"></i>
                 Duyệt Program
-              </Button>
-              <Button
-                variant="danger"
-                icon="ph ph-x"
+              </button>
+              <button
+                className="btn"
                 onClick={handleRejectProgram}
                 disabled={actionLoading}
+                style={{
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderColor: '#ef4444',
+                  color: '#ef4444',
+                  backgroundColor: 'transparent',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: actionLoading ? 'not-allowed' : 'pointer',
+                  opacity: actionLoading ? 0.6 : 1,
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  if (!actionLoading) {
+                    e.currentTarget.style.backgroundColor = '#ef4444';
+                    e.currentTarget.style.color = 'white';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!actionLoading) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#ef4444';
+                  }
+                }}
               >
+                <i className="ph ph-x"></i>
                 Từ chối Program
-              </Button>
+              </button>
             </>
           )}
 
-          <Button
-            variant="outline"
-            icon="ph ph-pencil-simple"
-            onClick={() => navigate(`/center-head/programs/${id}/edit`)}
-          >
-            Chỉnh sửa
-          </Button>
+          {/* Edit button - only for non-view-only */}
+          {!isViewOnly && (
+            <Button
+              variant="outline"
+              icon="ph ph-pencil-simple"
+              onClick={() => navigate(`${basePath}/programs/${id}/edit`)}
+            >
+              Chỉnh sửa
+            </Button>
+          )}
         </div>
       </div>
 
@@ -395,19 +474,25 @@ const ProgramDetail = () => {
 
       {/* Stats Cards */}
       <div className="row g-3 g-md-4 mb-24">
-        <div className="col-6 col-md-4">
+        <div className="col-6 col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng PLOs</h6>
             <h4 className="text-main-600 fw-bold mb-0">{program.plos?.length || 0}</h4>
           </Card>
         </div>
-        <div className="col-6 col-md-4">
+        <div className="col-6 col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Tổng Courses</h6>
             <h4 className="text-success-600 fw-bold mb-0">{courses.length}</h4>
           </Card>
         </div>
-        <div className="col-6 col-md-4">
+        <div className="col-6 col-md-3">
+          <Card>
+            <h6 className="text-neutral-600 mb-8">Người tạo</h6>
+            <h6 className="text-neutral-900 fw-bold mb-0">{program.createdBy?.username || 'N/A'}</h6>
+          </Card>
+        </div>
+        <div className="col-6 col-md-3">
           <Card>
             <h6 className="text-neutral-600 mb-8">Cập nhật lần cuối</h6>
             <h6 className="text-neutral-600 fw-bold mb-0">{formatDate(program.updatedAt)}</h6>
@@ -466,13 +551,23 @@ const ProgramDetail = () => {
               Các môn học thuộc chương trình này
             </p>
           </div>
+          {/* Show Create Course button only when program is draft or needs_revision and not view-only */}
+          {!isViewOnly && (program?.status === 'draft' || program?.status === 'needs_revision') && (
+            <Button
+              variant="primary"
+              onClick={() => navigate(`${basePath}/programs/${id}/courses/create`)}
+            >
+              <i className="ph ph-plus me-2"></i>
+              Tạo học phần mới
+            </Button>
+          )}
         </div>
 
         {courses.length > 0 ? (
           <Table
             columns={courseColumns}
             data={courses}
-            onRowClick={(row) => navigate(`/center-head/courses/${row._id}/details`)}
+            onRowClick={(row) => navigate(`${basePath}/courses/${row._id}/details`)}
           />
         ) : (
           <div className="text-center py-5 text-neutral-600">
@@ -481,6 +576,176 @@ const ProgramDetail = () => {
           </div>
         )}
       </Card>
+
+      {/* Submit Program Modal */}
+      {showSubmitModal && (
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Nộp chương trình để phê duyệt</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowSubmitModal(false);
+                    setSubmissionNote('');
+                  }}
+                  disabled={actionLoading}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <p className="text-neutral-600 mb-3">
+                  Bạn đang nộp chương trình <strong>{program?.program_name}</strong> để chờ phê duyệt.
+                </p>
+                <label className="form-label">Ghi chú (tùy chọn)</label>
+                <textarea
+                  className="form-control"
+                  rows="4"
+                  placeholder="Nhập ghi chú khi nộp chương trình (nếu có)..."
+                  value={submissionNote}
+                  onChange={(e) => setSubmissionNote(e.target.value)}
+                  disabled={actionLoading}
+                ></textarea>
+              </div>
+              <div className="modal-footer">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowSubmitModal(false);
+                    setSubmissionNote('');
+                  }}
+                  disabled={actionLoading}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleConfirmSubmitProgram}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Đang xử lý...' : 'Xác nhận nộp'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sticky Action Bar - Only for Center Head with Pending Approval */}
+      {program.status === 'pending_approval' && userRole === 'Center Head' && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: '280px', // Sidebar width
+            right: 0,
+            backgroundColor: 'white',
+            borderTop: '2px solid #e5e7eb',
+            padding: '16px 32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1)',
+            zIndex: 1000
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: '#f59e0b',
+                animation: 'pulse 2s infinite'
+              }}
+            ></div>
+            <div>
+              <div style={{ fontWeight: '600', fontSize: '14px', color: '#111827' }}>
+                Chương trình đang chờ phê duyệt
+              </div>
+              <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                {program.program_name} - Mã: {program.code}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              className="btn"
+              onClick={handleRejectProgram}
+              disabled={actionLoading}
+              style={{
+                borderWidth: '1px',
+                borderStyle: 'solid',
+                borderColor: '#ef4444',
+                color: '#ef4444',
+                backgroundColor: 'transparent',
+                padding: '10px 24px',
+                borderRadius: '6px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: actionLoading ? 'not-allowed' : 'pointer',
+                opacity: actionLoading ? 0.6 : 1,
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                if (!actionLoading) {
+                  e.currentTarget.style.backgroundColor = '#ef4444';
+                  e.currentTarget.style.color = 'white';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!actionLoading) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = '#ef4444';
+                }
+              }}
+            >
+              <i className="ph ph-x"></i>
+              Từ chối
+            </button>
+            <button
+              className="btn"
+              onClick={handleApproveProgram}
+              disabled={actionLoading}
+              style={{
+                borderWidth: '1px',
+                borderStyle: 'solid',
+                borderColor: '#10b981',
+                color: 'white',
+                backgroundColor: '#10b981',
+                padding: '10px 24px',
+                borderRadius: '6px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: actionLoading ? 'not-allowed' : 'pointer',
+                opacity: actionLoading ? 0.6 : 1,
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                if (!actionLoading) {
+                  e.currentTarget.style.backgroundColor = '#059669';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!actionLoading) {
+                  e.currentTarget.style.backgroundColor = '#10b981';
+                }
+              }}
+            >
+              <i className="ph ph-check"></i>
+              Duyệt chương trình
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Reject Program Modal */}
       {showRejectProgramModal && (

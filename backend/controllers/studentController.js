@@ -1,9 +1,12 @@
+const mongoose = require("mongoose");
 const User = require("../models/userModel");
 const Role = require("../models/roleModel");
 const Class = require("../models/classModel");
 const ClassSchedule = require("../models/classScheduleModel");
 const StudentSchedule = require("../models/studentScheduleModel");
 const HomeworkSubmission = require("../models/homeworkSubmissionModel");
+const Program = require("../models/programModel");
+const Course = require("../models/courseModel");
 
 // =========================
 // 👤 LẤY THÔNG TIN HỌC VIÊN HIỆN TẠI (từ token)
@@ -70,7 +73,6 @@ exports.getCurrentStudent = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy thông tin học viên hiện tại:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy thông tin học viên',
@@ -80,18 +82,41 @@ exports.getCurrentStudent = async (req, res) => {
 };
 
 // =========================
-// 📚 LẤY DANH SÁCH LỚP HỌC CỦA HỌC VIÊN
+//  LẤY DANH SÁCH LỚP HỌC CỦA HỌC VIÊN
 // =========================
 exports.getMyClasses = async (req, res) => {
   try {
     const studentId = req.user._id;
     const { status } = req.query;
 
+    // Ensure studentId is ObjectId
+    const studentObjectId = mongoose.Types.ObjectId.isValid(studentId) 
+      ? (studentId instanceof mongoose.Types.ObjectId ? studentId : new mongoose.Types.ObjectId(studentId))
+      : studentId;
+
+
     // Find all classes where student is enrolled
-    let query = { students: studentId };
+    // Query: find classes where students array contains this studentId
+    // MongoDB automatically searches in array when using { students: studentId }
+    // But we can also use $in to be explicit: { students: { $in: [studentObjectId] } }
+    let query = { students: studentObjectId };
     if (status && status !== 'all') {
       query.status = status;
     }
+
+
+    // Also try to find all classes and filter manually to debug
+    const allClasses = await Class.find({}).select('_id name students status').lean();
+    const classesWithStudent = allClasses.filter(cls => {
+      if (!cls.students || !Array.isArray(cls.students)) return false;
+      return cls.students.some(s => {
+        const sId = s.toString ? s.toString() : s;
+        const studentIdStr = studentObjectId.toString ? studentObjectId.toString() : studentObjectId;
+        return sId === studentIdStr;
+      });
+    });
+    classesWithStudent.forEach(cls => {
+    });
 
     const classes = await Class.find(query)
       .populate('course', 'name description')
@@ -99,6 +124,25 @@ exports.getMyClasses = async (req, res) => {
       .populate('room', 'room_name')
       .sort({ startDate: -1 })
       .lean();
+
+    
+    // If no classes found and status filter is active, try without status filter
+    if (classes.length === 0 && status && status !== 'all') {
+      const queryWithoutStatus = { students: studentObjectId };
+      const classesWithoutStatus = await Class.find(queryWithoutStatus)
+        .populate('course', 'name description')
+        .populate('teacher', 'username email')
+        .populate('room', 'room_name')
+        .sort({ startDate: -1 })
+        .lean();
+      if (classesWithoutStatus.length > 0) {
+        classesWithoutStatus.map(c => ({
+          name: c.name,
+          status: c.status,
+          _id: c._id
+        }));
+      }
+    }
 
     // Get additional stats for each class
     const classesWithStats = await Promise.all(
@@ -146,7 +190,6 @@ exports.getMyClasses = async (req, res) => {
       classes: classesWithStats
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy danh sách lớp học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy danh sách lớp học',
@@ -156,83 +199,287 @@ exports.getMyClasses = async (req, res) => {
 };
 
 // =========================
-// 📅 LẤY LỊCH HỌC CỦA HỌC VIÊN
+//  LẤY CHI TIẾT MỘT LỚP HỌC CỦA HỌC VIÊN (bao gồm điểm mocktest)
+// =========================
+exports.getMyClassDetail = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const { classId } = req.params;
+
+    // Validate classId
+    if (!mongoose.Types.ObjectId.isValid(classId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID lớp học không hợp lệ'
+      });
+    }
+
+    // Find class and check if student is enrolled
+    const classData = await Class.findById(classId)
+      .populate({
+        path: 'course',
+        select: 'name description program mocktestSessionOrders',
+        populate: {
+          path: 'program',
+          select: 'name type'
+        }
+      })
+      .populate('teacher', 'username email')
+      .populate('room', 'room_name')
+      .lean();
+
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy lớp học'
+      });
+    }
+
+    // Check if student is enrolled in this class
+    const isEnrolled = classData.students.some(
+      s => s.toString() === studentId.toString()
+    );
+
+    if (!isEnrolled) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền truy cập lớp học này'
+      });
+    }
+
+    // Get student info
+    const student = await User.findById(studentId)
+      .select('username email')
+      .lean();
+
+    // Get all schedules for this class
+    const schedules = await ClassSchedule.find({ class: classId })
+      .sort({ date: 1 })
+      .lean();
+
+    // Get student schedules (attendance records)
+    const studentSchedules = await StudentSchedule.find({
+      student: studentId,
+      classSchedule: { $in: schedules.map(s => s._id) }
+    }).lean();
+
+    // Calculate attendance stats
+    const attendanceStats = {
+      total: studentSchedules.length,
+      present: studentSchedules.filter(s => s.attendance?.status === 'present').length,
+      absent: studentSchedules.filter(s => s.attendance?.status === 'absent').length,
+      late: studentSchedules.filter(s => s.attendance?.status === 'late').length,
+      excused: studentSchedules.filter(s => s.attendance?.status === 'excused').length
+    };
+
+    // Get attendance rate
+    const attendanceRate = studentSchedules.length > 0
+      ? Math.round((attendanceStats.present / studentSchedules.length) * 100)
+      : 0;
+
+    // Calculate schedule pattern
+    let schedulePattern = '';
+    if (schedules.length > 0) {
+      const firstSchedule = schedules[0];
+      schedulePattern = `${firstSchedule.startTime} - ${firstSchedule.endTime}`;
+    }
+
+    // Extract student's mocktest scores from ClassSchedule.mocktest.scores
+    // Structure: { mocktest5: { sessionOrder: 5, totalScore: 6.5, skillScores: {...} }, mocktest11: {...} }
+    const mocktestScores = {};
+    
+    // Filter schedules that have mocktest data
+    const mocktestSchedules = schedules.filter(s => s.mocktest && s.mocktest.scores && s.mocktest.scores.length > 0);
+    
+    mocktestSchedules.forEach(schedule => {
+      // Find this student's score in the mocktest.scores array
+      const studentScore = schedule.mocktest.scores.find(
+        score => score.studentId.toString() === studentId.toString()
+      );
+      
+      if (studentScore) {
+        // Get session order from mocktest.order or session reference
+        const sessionOrder = schedule.mocktest.order;
+        if (sessionOrder) {
+          // Calculate total score (average of 4 skills)
+          const { reading = 0, listening = 0, writing = 0, speaking = 0 } = studentScore;
+          const totalScore = ((reading + listening + writing + speaking) / 4).toFixed(1);
+          
+          // Create mocktest key (e.g., "mocktest5", "mocktest11")
+          const mocktestKey = `mocktest${sessionOrder}`;
+          
+          mocktestScores[mocktestKey] = {
+            scheduleId: schedule._id,
+            sessionOrder: sessionOrder,
+            totalScore: parseFloat(totalScore),
+            skillScores: {
+              reading: reading,
+              listening: listening,
+              writing: writing,
+              speaking: speaking
+            }
+          };
+        }
+      }
+    });
+
+    // Return class detail with student's mocktest scores
+    res.status(200).json({
+      success: true,
+      message: 'Lấy chi tiết lớp học thành công',
+      data: {
+        _id: classData._id,
+        name: classData.name,
+        course: classData.course,
+        teacher: classData.teacher,
+        room: classData.room,
+        startDate: classData.startDate,
+        endDate: classData.endDate,
+        status: classData.status,
+        totalLessons: schedules.length,
+        completedLessons: schedules.filter(s => new Date(s.date) < new Date()).length,
+        attendanceStats,
+        attendanceRate,
+        schedulePattern,
+        // Student's personal mocktest scores extracted from ClassSchedule
+        mocktestScores: mocktestScores,
+        // Student info
+        studentInfo: {
+          _id: student._id,
+          username: student.username,
+          email: student.email
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error in getMyClassDetail:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy chi tiết lớp học',
+      error: error.message
+    });
+  }
+};
+
+// =========================
+//  LẤY LỊCH HỌC CỦA HỌC VIÊN
 // =========================
 exports.getMySchedule = async (req, res) => {
   try {
     const studentId = req.user._id;
     const { startDate, endDate } = req.query;
 
-    // Find all classes where student is enrolled
-    const studentClasses = await Class.find({ students: studentId })
-      .select('_id name course')
-      .populate('course', 'name')
+    // Query StudentSchedule entries for this student first
+    let studentSchedulesQuery = StudentSchedule.find({ student: studentId })
+      .populate({
+        path: 'classSchedule',
+        select: 'date startTime endTime room class topic session status',
+        populate: [
+          {
+            path: 'class',
+            select: 'name course',
+            populate: {
+              path: 'course',
+              select: 'name'
+            }
+          },
+          {
+            path: 'room',
+            select: 'room_name location'
+          },
+          {
+            path: 'session',
+            select: 'title order content'
+          }
+        ]
+      })
       .lean();
 
-    if (!studentClasses || studentClasses.length === 0) {
+    const studentSchedules = await studentSchedulesQuery;
+
+
+    if (!studentSchedules || studentSchedules.length === 0) {
       return res.status(200).json({
         success: true,
-        message: 'Học viên chưa tham gia lớp nào',
+        message: 'Học viên chưa có lịch học nào',
         total: 0,
         schedules: []
       });
     }
 
-    const classIds = studentClasses.map(cls => cls._id);
+    // Count how many have classSchedule populated
+    const withClassSchedule = studentSchedules.filter(ss => ss.classSchedule).length;
+    const withoutClassSchedule = studentSchedules.length - withClassSchedule;
 
-    let query = { class: { $in: classIds } };
-
-    // Filter by date range if provided
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      query.date = { $gte: start, $lte: end };
-    }
-
-    const classSchedules = await ClassSchedule.find(query)
-      .populate('class', 'name course')
-      .populate({
-        path: 'class',
-        populate: {
-          path: 'course',
-          select: 'name'
+    // Filter by date range if provided (filter after populate)
+    let filteredSchedules = studentSchedules.filter(ss => {
+      if (!ss.classSchedule) {
+        return false;
+      }
+      
+      if (startDate && endDate) {
+        // Normalize dates to avoid timezone issues - compare only date part
+        const scheduleDate = new Date(ss.classSchedule.date);
+        const scheduleDateOnly = new Date(scheduleDate.getFullYear(), scheduleDate.getMonth(), scheduleDate.getDate());
+        
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        
+        const isInRange = scheduleDateOnly >= start && scheduleDateOnly <= end;
+        
+        if (!isInRange) {
         }
-      })
-      .populate('room', 'room_name location')
-      .populate('session', 'title order content')
-      .sort({ date: 1, startTime: 1 })
-      .lean();
+        
+        return isInRange;
+      }
+      
+      return true;
+    });
+    
 
-    // Get student schedule info (attendance, status)
-    const scheduleIds = classSchedules.map(s => s._id);
-    const studentSchedules = await StudentSchedule.find({
-      student: studentId,
-      classSchedule: { $in: scheduleIds }
-    }).lean();
-
-    // Map student schedule info to class schedules
-    const studentScheduleMap = {};
-    studentSchedules.forEach(ss => {
-      studentScheduleMap[ss.classSchedule.toString()] = ss;
+    // Sort by date and startTime
+    filteredSchedules.sort((a, b) => {
+      if (!a.classSchedule || !b.classSchedule) return 0;
+      const dateA = new Date(a.classSchedule.date);
+      const dateB = new Date(b.classSchedule.date);
+      if (dateA.getTime() !== dateB.getTime()) {
+        return dateA - dateB;
+      }
+      return (a.classSchedule.startTime || "").localeCompare(b.classSchedule.startTime || "");
     });
 
-    const formattedSchedules = classSchedules.map(schedule => {
-      const studentSchedule = studentScheduleMap[schedule._id.toString()];
+    // Format schedules to match expected response structure
+    const formattedSchedules = filteredSchedules.map(ss => {
+      const classSchedule = ss.classSchedule;
+      
+      if (!classSchedule) {
+        return null;
+      }
       
       return {
-        ...schedule,
-        className: schedule.class?.name,
-        courseName: schedule.class?.course?.name,
-        sessionTitle: schedule.session?.title,
-        sessionOrder: schedule.session?.order,
-        roomName: schedule.room?.room_name,
-        location: schedule.room?.location,
-        attendance: studentSchedule?.attendance || null,
-        scheduleStatus: studentSchedule?.scheduleStatus || 'scheduled'
+        _id: classSchedule._id, // ClassSchedule ID
+        studentScheduleId: ss._id, // StudentSchedule ID - needed for makeup_class requests
+        date: classSchedule.date,
+        startTime: classSchedule.startTime,
+        endTime: classSchedule.endTime,
+        className: classSchedule.class?.name,
+        courseName: classSchedule.class?.course?.name,
+        sessionTitle: classSchedule.session?.title,
+        sessionOrder: classSchedule.session?.order,
+        roomName: classSchedule.room?.room_name,
+        location: classSchedule.room?.location,
+        topic: classSchedule.topic,
+        status: classSchedule.status,
+        attendance: ss.attendance || null,
+        scheduleStatus: ss.scheduleStatus || 'scheduled',
+        class: classSchedule.class,
+        room: classSchedule.room,
+        session: classSchedule.session
       };
-    });
+    }).filter(schedule => schedule !== null); // Remove null entries
 
     res.status(200).json({
       success: true,
@@ -241,7 +488,6 @@ exports.getMySchedule = async (req, res) => {
       schedules: formattedSchedules
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy lịch học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy lịch học',
@@ -251,12 +497,21 @@ exports.getMySchedule = async (req, res) => {
 };
 
 // =========================
-// 📖 LẤY CHI TIẾT BUỔI HỌC
+//  LẤY CHI TIẾT BUỔI HỌC
 // =========================
 exports.getLessonDetail = async (req, res) => {
   try {
     const studentId = req.user._id;
     const { scheduleId } = req.params;
+
+
+
+const makeup_class = await ClassSchedule.findById(scheduleId)
+      .populate('room', 'room_name location')
+      .populate('session', 'title order content objectives')
+      .populate('teacher', 'username email')
+      .lean();
+
 
     // Find the class schedule
     const classSchedule = await ClassSchedule.findById(scheduleId)
@@ -267,21 +522,47 @@ exports.getLessonDetail = async (req, res) => {
           { path: 'teacher', select: 'username email' }
         ]
       })
+      .populate('teacher', 'username email') // Populate teacher của ClassSchedule
+      .populate('substituteTeacher', 'username email') // Populate substituteTeacher của ClassSchedule
       .populate('room', 'room_name location')
       .populate('session', 'title order content objectives')
       .lean();
 
+
+     
+
     if (!classSchedule) {
-      return res.status(404).json({
+      // const makeup_class = await ClassSchedule.findById(scheduleId)
+      // .populate('room', 'room_name location')
+      // .populate('session', 'title order content objectives')
+      // .populate('teacher', 'username email')
+      // .lean();
+
+
+        return res.status(404).json({
         success: false,
         message: 'Không tìm thấy buổi học'
       });
     }
 
     // Check if student is enrolled in this class
-    const isEnrolled = classSchedule.class.students.some(
-      s => s.toString() === studentId.toString()
-    );
+    // For makeup classes (no class), check via StudentSchedule instead
+    let isEnrolled = false;
+    
+    if (classSchedule.class) {
+      // Regular class: check if student is enrolled
+      isEnrolled = classSchedule.class.students.some(
+        s => s.toString() === studentId.toString()
+      );
+    } else {
+      // Makeup class (no class): check if student has StudentSchedule for this schedule
+      const studentSchedule = await StudentSchedule.findOne({
+        student: studentId,
+        classSchedule: scheduleId
+      }).lean();
+      
+      isEnrolled = !!studentSchedule;
+    }
 
     if (!isEnrolled) {
       return res.status(403).json({
@@ -304,7 +585,7 @@ exports.getLessonDetail = async (req, res) => {
       endTime: classSchedule.endTime,
       
       // Class info
-      className: classSchedule.class?.name,
+      className: classSchedule.class?.name || 'Lớp học bù',
       level: classSchedule.class?.course?.level,
       courseName: classSchedule.class?.course?.name,
       courseDescription: classSchedule.class?.course?.description,
@@ -316,9 +597,14 @@ exports.getLessonDetail = async (req, res) => {
       objectives: classSchedule.session?.objectives || [],
       
       // Teacher info
+      // Ưu tiên: substituteTeacher > teacher (ClassSchedule) > class.teacher
       teacher: {
-        name: classSchedule.class?.teacher?.username,
-        email: classSchedule.class?.teacher?.email
+        name: classSchedule.substituteTeacher?.username || 
+              classSchedule.teacher?.username || 
+              classSchedule.class?.teacher?.username,
+        email: classSchedule.substituteTeacher?.email || 
+               classSchedule.teacher?.email || 
+               classSchedule.class?.teacher?.email
       },
       
       // Room info
@@ -339,6 +625,7 @@ exports.getLessonDetail = async (req, res) => {
       // Student specific info
       attendance: studentSchedule?.attendance || null,
       scheduleStatus: studentSchedule?.scheduleStatus || 'scheduled',
+      studentScheduleId: studentSchedule?._id || null,
       notes: classSchedule.note || '',
       
       // Status (upcoming, completed, cancelled)
@@ -351,7 +638,6 @@ exports.getLessonDetail = async (req, res) => {
       lesson: lessonDetail
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy chi tiết buổi học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy chi tiết buổi học',
@@ -416,7 +702,6 @@ exports.getClassMaterials = async (req, res) => {
       materials
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy tài liệu lớp học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy tài liệu',
@@ -426,7 +711,7 @@ exports.getClassMaterials = async (req, res) => {
 };
 
 // =========================
-// 📝 LẤY BÀI TẬP CỦA LỚP HỌC
+//  LẤY BÀI TẬP CỦA LỚP HỌC
 // =========================
 exports.getClassHomework = async (req, res) => {
   try {
@@ -475,8 +760,8 @@ exports.getClassHomework = async (req, res) => {
           homeworkList.push({
             _id: hw._id,
             scheduleId: schedule._id,
-            title: hw.title,
-            description: hw.description || '',
+            title: hw.assignment?.title || 'Bài tập',
+            description: hw.assignment?.description || '',
             deadline: hw.deadline,
             lessonNumber: schedule.session?.order || 0,
             lessonTitle: schedule.session?.title || schedule.topic || 'Chưa có tiêu đề',
@@ -503,7 +788,6 @@ exports.getClassHomework = async (req, res) => {
       homework: homeworkList
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy bài tập lớp học:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy bài tập',
@@ -513,7 +797,7 @@ exports.getClassHomework = async (req, res) => {
 };
 
 // =========================
-// 📊 LẤY TIẾN ĐỘ HỌC TẬP
+//  LẤY TIẾN ĐỘ HỌC TẬP
 // =========================
 exports.getClassProgress = async (req, res) => {
   try {
@@ -535,8 +819,9 @@ exports.getClassProgress = async (req, res) => {
       });
     }
 
-    // Get all schedules for this class
+    // Get all schedules for this class with session populated
     const schedules = await ClassSchedule.find({ class: classId })
+      .populate('session', 'order topic')
       .sort({ date: 1 })
       .lean();
 
@@ -546,6 +831,12 @@ exports.getClassProgress = async (req, res) => {
       student: studentId,
       classSchedule: { $in: scheduleIds }
     }).lean();
+
+    // Create a map of classSchedule to studentSchedule for easy lookup
+    const studentScheduleMap = {};
+    studentSchedules.forEach(ss => {
+      studentScheduleMap[ss.classSchedule.toString()] = ss;
+    });
 
     // Calculate attendance stats
     const attendanceStats = {
@@ -560,6 +851,39 @@ exports.getClassProgress = async (req, res) => {
       ? Math.round((attendanceStats.present / attendanceStats.total) * 100)
       : 0;
 
+    // Get list of absent lessons (buổi nghỉ)
+    const absentLessons = [];
+    studentSchedules.forEach(ss => {
+      if (ss.attendance?.status === 'absent') {
+        const schedule = schedules.find(sch => sch._id.toString() === ss.classSchedule.toString());
+        if (schedule) {
+          absentLessons.push({
+            scheduleId: schedule._id,
+            lessonNumber: schedule.session?.order || 0,
+            lessonTopic: schedule.session?.topic || 'Không có chủ đề',
+            date: schedule.date,
+            reason: ss.attendance?.note || 'Không có lý do'
+          });
+        }
+      }
+    });
+
+    // Get all homework from schedules
+    const allHomework = [];
+    schedules.forEach(schedule => {
+      if (schedule.homework && schedule.homework.length > 0) {
+        schedule.homework.forEach(hw => {
+          allHomework.push({
+            classScheduleId: schedule._id,
+            homeworkId: hw._id,
+            title: hw.assignment?.title || 'Bài tập',
+            deadline: hw.deadline,
+            lessonNumber: schedule.session?.order || 0
+          });
+        });
+      }
+    });
+
     // Get homework submissions
     const HomeworkSubmission = require('../models/homeworkSubmissionModel');
     const submissions = await HomeworkSubmission.find({
@@ -567,67 +891,97 @@ exports.getClassProgress = async (req, res) => {
       classSchedule: { $in: scheduleIds }
     }).lean();
 
+    // Create submission map by homeworkId
+    const submissionMap = {};
+    submissions.forEach(sub => {
+      submissionMap[sub.homeworkId.toString()] = sub;
+    });
+
     // Calculate homework stats
     const homeworkStats = {
-      total: submissions.length,
-      submitted: submissions.filter(s => s.status === 'submitted' || s.status === 'graded').length,
-      late: submissions.filter(s => s.isLate).length,
-      graded: submissions.filter(s => s.status === 'graded').length,
-      notSubmitted: submissions.filter(s => s.status === 'not_submitted').length
+      total: allHomework.length,
+      submitted: 0,
+      late: 0,
+      notSubmitted: 0
     };
 
-    // Calculate average score
-    const gradedSubmissions = submissions.filter(s => s.score != null);
-    const averageScore = gradedSubmissions.length > 0
-      ? (gradedSubmissions.reduce((sum, s) => sum + s.score, 0) / gradedSubmissions.length).toFixed(1)
-      : null;
+    const incompleteHomework = [];
+    const lateHomework = [];
 
-    // Weekly attendance data for chart (last 8 weeks)
-    const weeklyAttendance = [];
-    const now = new Date();
-    for (let i = 7; i >= 0; i--) {
-      const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - (i * 7));
-      weekStart.setHours(0, 0, 0, 0);
-      
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
-
-      const weekSchedules = studentSchedules.filter(s => {
-        const schedule = schedules.find(sch => sch._id.toString() === s.classSchedule.toString());
-        if (!schedule) return false;
-        const scheduleDate = new Date(schedule.date);
-        return scheduleDate >= weekStart && scheduleDate <= weekEnd;
-      });
-
-      const weekPresent = weekSchedules.filter(s => s.attendance?.status === 'present').length;
-      const weekTotal = weekSchedules.length;
-      const weekRate = weekTotal > 0 ? Math.round((weekPresent / weekTotal) * 100) : 0;
-
-      weeklyAttendance.push({
-        week: `Tuần ${8 - i}`,
-        rate: weekRate
-      });
-    }
-
-    // Grade history (from mocktest)
-    const gradesHistory = [];
-    schedules.forEach(schedule => {
-      if (schedule.mocktest && schedule.mocktest.studentScores) {
-        const studentScore = schedule.mocktest.studentScores.find(
-          s => s.student.toString() === studentId.toString()
-        );
-        if (studentScore) {
-          gradesHistory.push({
-            lessonNumber: schedule.session?.order || 0,
-            type: 'Mocktest',
-            score: studentScore.score,
-            date: schedule.date
+    allHomework.forEach(hw => {
+      const submission = submissionMap[hw.homeworkId.toString()];
+      if (submission) {
+        if (submission.status === 'submitted' || submission.status === 'late') {
+          homeworkStats.submitted++;
+          if (submission.status === 'late') {
+            homeworkStats.late++;
+            lateHomework.push({
+              homeworkId: hw.homeworkId,
+              title: hw.title,
+              deadline: hw.deadline,
+              submittedAt: submission.submittedAt,
+              lessonNumber: hw.lessonNumber
+            });
+          }
+        } else {
+          homeworkStats.notSubmitted++;
+          incompleteHomework.push({
+            homeworkId: hw.homeworkId,
+            title: hw.title,
+            deadline: hw.deadline,
+            lessonNumber: hw.lessonNumber
           });
         }
+      } else {
+        homeworkStats.notSubmitted++;
+        incompleteHomework.push({
+          homeworkId: hw.homeworkId,
+          title: hw.title,
+          deadline: hw.deadline,
+          lessonNumber: hw.lessonNumber
+        });
       }
     });
+
+    // Get mocktest scores as array (sorted by mocktest order)
+    const mocktestScores = [];
+    const mocktestSchedules = schedules.filter(s => s.mocktest && s.mocktest.scores && s.mocktest.scores.length > 0);
+    console.log('Found mocktestSchedules:', mocktestSchedules.length);
+
+    mocktestSchedules.forEach(schedule => {
+      const studentScore = schedule.mocktest.scores.find(
+        score => score.studentId.toString() === studentId.toString()
+      );
+      console.log('Student Score for mocktest:', studentScore);
+      
+      if (studentScore) {
+        const { reading = 0, listening = 0, writing = 0, speaking = 0 } = studentScore;
+        const totalScore = ((reading + listening + writing + speaking) / 4).toFixed(1);
+        
+        let mocktestOrdertemp = 0;
+        if (!schedule.mocktest.order) {
+          mocktestOrdertemp++;
+        } else {
+          mocktestOrdertemp = schedule.mocktest.order;
+        }
+        mocktestScores.push({
+          mocktestNumber: mocktestOrdertemp,
+          sessionOrder: mocktestOrdertemp,
+          title: schedule.mocktest.title || `Mocktest ${mocktestOrdertemp}`,
+          totalScore: parseFloat(totalScore),
+          skillScores: {
+            reading: reading,
+            listening: listening,
+            writing: writing,
+            speaking: speaking
+          },
+          date: schedule.date
+        });
+      }
+    });
+
+    // Sort mocktest scores by order
+    mocktestScores.sort((a, b) => a.mocktestNumber - b.mocktestNumber);
 
     res.status(200).json({
       success: true,
@@ -639,22 +993,22 @@ exports.getClassProgress = async (req, res) => {
         // Attendance
         attendanceStats,
         attendanceRate,
-        weeklyAttendance,
+        absentLessons, // Danh sách buổi nghỉ
         
         // Homework
         homeworkStats,
-        averageScore,
+        incompleteHomework, // Danh sách bài tập chưa nộp
+        lateHomework, // Danh sách bài tập nộp muộn
         
         // Lessons
         totalLessons: schedules.length,
         completedLessons: schedules.filter(s => new Date(s.date) < new Date()).length,
         
-        // Grades
-        gradesHistory
+        // Mocktest scores (array sorted by order)
+        mocktestScores
       }
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy tiến độ học tập:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi lấy tiến độ',
@@ -664,7 +1018,7 @@ exports.getClassProgress = async (req, res) => {
 };
 
 // =========================
-// 📝 NỘP BÀI TẬP
+//  NỘP BÀI TẬP
 // =========================
 exports.submitHomework = async (req, res) => {
   try {
@@ -769,7 +1123,6 @@ exports.submitHomework = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Lỗi khi nộp bài tập:', error);
     res.status(500).json({ 
       success: false,
       message: 'Lỗi server khi nộp bài tập',
@@ -778,14 +1131,66 @@ exports.submitHomework = async (req, res) => {
   }
 };
 
-// =========================
-// 📊 LẤY DỮ LIỆU DASHBOARD CỦA HỌC VIÊN
-// =========================
+exports.getMySubmission = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const { classId, scheduleId, homeworkId } = req.params;
+
+    const studentClass = await Class.findOne({
+      _id: classId,
+      students: studentId
+    }).lean();
+
+    if (!studentClass) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền truy cập lớp học này'
+      });
+    }
+
+    const submission = await HomeworkSubmission.findOne({
+      classSchedule: scheduleId,
+      homeworkId: homeworkId,
+      student: studentId
+    }).lean();
+
+    if (!submission) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bài nộp'
+      });
+    }
+
+    const submissionData = {
+      _id: submission._id,
+      submittedAt: submission.submittedAt,
+      isLate: submission.status === 'late',
+      status: submission.status,
+      files: submission.submittedFiles?.map(f => f.fileUrl) || [],
+      score: submission.score,
+      feedback: submission.feedback,
+      attemptNumber: submission.attemptNumber || 1,
+      gradedAt: submission.gradedAt
+    };
+
+    res.status(200).json({
+      success: true,
+      message: 'Lấy thông tin bài nộp thành công',
+      submission: submissionData
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      message: 'Lỗi server khi lấy thông tin bài nộp',
+      error: error.message 
+    });
+  }
+};
+
 exports.getDashboardData = async (req, res) => {
   try {
     const studentId = req.user._id;
 
-    // 1. Get student basic info
     const student = await User.findById(studentId)
       .select('-password -token')
       .populate('roleId', 'name')
@@ -798,7 +1203,6 @@ exports.getDashboardData = async (req, res) => {
       });
     }
 
-    // 2. Get active classes
     const activeClasses = await Class.find({
       students: studentId,
       status: 'active'
@@ -809,7 +1213,8 @@ exports.getDashboardData = async (req, res) => {
       .select('name course teacher room startDate endDate')
       .lean();
 
-    // 3. Get week schedule (current week)
+    const classIds = activeClasses.map(cls => cls._id);
+
     const startOfWeek = new Date();
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
@@ -818,23 +1223,55 @@ exports.getDashboardData = async (req, res) => {
     endOfWeek.setDate(endOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999);
 
-    const classIds = activeClasses.map(cls => cls._id);
-    
-    const weekSchedules = await ClassSchedule.find({
-      class: { $in: classIds },
-      date: { $gte: startOfWeek, $lte: endOfWeek }
+    // Query từ StudentSchedule để lấy TẤT CẢ buổi học (bao gồm cả học bù)
+    const studentSchedules = await StudentSchedule.find({
+      student: studentId,
+      scheduleStatus: { $nin: ['cancelled'] } // Không lấy buổi đã bị hủy
     })
-      .populate('class', 'name course')
       .populate({
-        path: 'class',
-        populate: { path: 'course', select: 'name' }
+        path: 'classSchedule',
+        match: {
+          date: { $gte: startOfWeek, $lte: endOfWeek }
+        },
+        populate: [
+          {
+            path: 'class',
+            select: 'name course',
+            populate: {
+              path: 'course',
+              select: 'name'
+            }
+          },
+          {
+            path: 'room',
+            select: 'room_name'
+          },
+          {
+            path: 'session',
+            select: 'title order'
+          }
+        ]
       })
-      .populate('room', 'room_name')
-      .populate('session', 'title order')
-      .sort({ date: 1, startTime: 1 })
       .lean();
 
-    // 4. Get pending/overdue homework
+    // Lọc bỏ những StudentSchedule không có classSchedule hoặc classSchedule không match date
+    // Và transform thành format giống ClassSchedule
+    const weekSchedules = studentSchedules
+      .filter(ss => ss.classSchedule && ss.classSchedule.date)
+      .map(ss => ({
+        ...ss.classSchedule,
+        studentScheduleId: ss._id,
+        scheduleStatus: ss.scheduleStatus
+      }))
+      .sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        if (dateA.getTime() !== dateB.getTime()) {
+          return dateA - dateB;
+        }
+        return (a.startTime || '').localeCompare(b.startTime || '');
+      });
+
     const allSchedules = await ClassSchedule.find({
       class: { $in: classIds },
       'homework.assignment': { $exists: true, $ne: null }
@@ -850,7 +1287,6 @@ exports.getDashboardData = async (req, res) => {
     const assignments = [];
     for (const schedule of allSchedules) {
       if (schedule.homework?.assignment) {
-        // Get submission status
         const submission = await HomeworkSubmission.findOne({
           classSchedule: schedule._id,
           homeworkId: schedule.homework._id,
@@ -886,15 +1322,9 @@ exports.getDashboardData = async (req, res) => {
     });
 
     // 5. Get practice test results (from Submission model)
-    console.log('📊 [Dashboard] Bắt đầu lấy dữ liệu luyện đề cho studentId:', studentId);
     
     const Submission = require('../models/submissionModel');
     const Exam = require('../models/examModel');
-    
-    console.log('🔍 [Dashboard] Query Submission model với điều kiện:', {
-      studentId,
-      status: { $in: ['completed', 'graded'] }
-    });
     
     const submissions = await Submission.find({
       studentId,
@@ -908,39 +1338,14 @@ exports.getDashboardData = async (req, res) => {
       .limit(10)
       .lean();
 
-    console.log(`✅ [Dashboard] Tìm thấy ${submissions.length} submissions`);
-    
-    if (submissions.length > 0) {
-      console.log('📋 [Dashboard] Chi tiết submissions:');
-      submissions.forEach((sub, index) => {
-        console.log(`  [${index + 1}] Submission ID: ${sub._id}`);
-        console.log(`      - Exam: ${sub.examId?.title || 'N/A'}`);
-        console.log(`      - Type: ${sub.examId?.type || sub.examId?.examType || 'N/A'}`);
-        console.log(`      - Status: ${sub.status}`);
-        console.log(`      - Total Score: ${sub.totalScore}`);
-        console.log(`      - Band Score: ${sub.bandScore || 'N/A'}`);
-        console.log(`      - Sections: ${sub.sections?.length || 0}`);
-        if (sub.sections && sub.sections.length > 0) {
-          sub.sections.forEach(section => {
-            console.log(`        • ${section.sectionType}: ${section.sectionScore || 0}`);
-          });
-        }
-      });
-    } else {
-      console.log('⚠️ [Dashboard] Không tìm thấy submission nào cho student này');
-    }
 
     const practiceTests = submissions
       .filter(sub => {
         const hasExam = sub.examId && sub.totalScore !== undefined;
-        if (!hasExam) {
-          console.log(`⚠️ [Dashboard] Submission ${sub._id} bị loại: examId=${!!sub.examId}, totalScore=${sub.totalScore}`);
-        }
         return hasExam;
       })
       .map((sub, index) => {
         const exam = sub.examId;
-        console.log(`🔄 [Dashboard] Processing submission ${index + 1}/${submissions.length}: ${sub._id}`);
         
         const result = {
           id: sub._id.toString(),
@@ -948,8 +1353,6 @@ exports.getDashboardData = async (req, res) => {
           date: sub.createdAt,
           type: exam.examType || exam.type || 'toeic'
         };
-
-        console.log(`   Type detected: ${result.type}`);
 
         // Calculate scores by section type
         if (exam.type === 'toeic' || exam.examType === 'toeic') {
@@ -963,8 +1366,6 @@ exports.getDashboardData = async (req, res) => {
           result.writing = writingSection?.sectionScore || 0;
           result.speaking = speakingSection?.sectionScore || 0;
           result.total = sub.totalScore || 0;
-          
-          console.log(`   TOEIC Scores - L:${result.listening} R:${result.reading} W:${result.writing} S:${result.speaking} Total:${result.total}`);
         } else if (exam.type === 'ielts' || exam.examType === 'ielts') {
           const listeningSection = sub.sections?.find(s => s.sectionType === 'listening');
           const readingSection = sub.sections?.find(s => s.sectionType === 'reading');
@@ -976,14 +1377,11 @@ exports.getDashboardData = async (req, res) => {
           result.writing = writingSection?.sectionScore || 0;
           result.speaking = speakingSection?.sectionScore || 0;
           result.overallBand = sub.bandScore || 0;
-          
-          console.log(`   IELTS Scores - L:${result.listening} R:${result.reading} W:${result.writing} S:${result.speaking} Band:${result.overallBand}`);
         }
 
         return result;
       });
 
-    console.log(`✅ [Dashboard] Đã xử lý xong ${practiceTests.length} practice tests`);
 
     // 6. Calculate class details with progress
     const classesWithDetails = await Promise.all(
@@ -1056,7 +1454,7 @@ exports.getDashboardData = async (req, res) => {
           time: `${s.startTime} - ${s.endTime}`,
           subject: s.class?.course?.name || s.session?.title || 'N/A',
           room: s.room?.room_name || 'N/A',
-          className: s.class?.name
+          className: s.class?.name || 'Lớp học bù' // Hiển thị "Lớp học bù" nếu không có class
         }))
       });
     }
@@ -1077,16 +1475,8 @@ exports.getDashboardData = async (req, res) => {
       }
     });
     
-    console.log('🎉 [Dashboard] Response gửi thành công với:');
-    console.log(`   - Student: ${student.username}`);
-    console.log(`   - Week schedule: ${formattedWeekSchedule.length} days`);
-    console.log(`   - Assignments: ${assignments.length} items`);
-    console.log(`   - Practice tests: ${practiceTests.length} items`);
-    console.log(`   - Active classes: ${classesWithDetails.length} classes`);
     
   } catch (error) {
-    console.error('❌ [Dashboard] Lỗi khi lấy dữ liệu dashboard:', error);
-    console.error('   Stack trace:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy dữ liệu dashboard',
@@ -1095,12 +1485,9 @@ exports.getDashboardData = async (req, res) => {
   }
 };
 
-// =========================
-// 📋 LẤY TẤT CẢ HỌC VIÊN (cho Academic Staff/Admin)
-// =========================
 exports.getAllStudents = async (req, res) => {
   try {
-    const { search, status, page = 1, limit = 50 } = req.query;
+    const { search, status, programType, level, page = 1, limit = 50 } = req.query;
     
     // Find Student role
     const studentRole = await Role.findOne({ name: 'Student' });
@@ -1123,6 +1510,58 @@ exports.getAllStudents = async (req, res) => {
       ];
     }
     
+    // Filter by program type and/or level
+    let studentIdsToFilter = null;
+    if (programType || level) {
+      // Build program query
+      const programQuery = {};
+      if (programType) programQuery.type = programType;
+      if (level) programQuery.level = level;
+      
+      // Find programs matching the criteria
+      const programs = await Program.find(programQuery).select('_id');
+      const programIds = programs.map(p => p._id);
+      
+      if (programIds.length > 0) {
+        // Find courses belonging to these programs
+        const courses = await Course.find({ program: { $in: programIds } }).select('_id');
+        const courseIds = courses.map(c => c._id);
+        
+        if (courseIds.length > 0) {
+          // Find classes with these courses
+          const classes = await Class.find({ course: { $in: courseIds } }).select('students');
+          // Get all unique student IDs from these classes
+          const studentIdSet = new Set();
+          classes.forEach(cls => {
+            if (cls.students && Array.isArray(cls.students)) {
+              cls.students.forEach(studentId => {
+                // Keep as ObjectId, not string
+                studentIdSet.add(studentId);
+              });
+            }
+          });
+          studentIdsToFilter = Array.from(studentIdSet);
+        }
+      }
+      
+      // If no students found matching the filter, return empty result
+      if (studentIdsToFilter && studentIdsToFilter.length === 0) {
+        return res.status(200).json({
+          success: true,
+          students: [],
+          total: 0,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: 0
+        });
+      }
+    }
+    
+    // Apply filter to student query if needed
+    if (studentIdsToFilter && studentIdsToFilter.length > 0) {
+      query._id = { $in: studentIdsToFilter };
+    }
+    
     // Pagination
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
@@ -1140,13 +1579,19 @@ exports.getAllStudents = async (req, res) => {
       .limit(limitNum)
       .lean();
     
-    // Get class count for each student
+    // Get class names for each student
     const studentsWithClasses = await Promise.all(
       students.map(async (student) => {
-        const classCount = await Class.countDocuments({ students: student._id });
+        const classes = await Class.find({ students: student._id })
+          .select('name')
+          .lean();
+        const classNames = classes.map(cls => cls.name);
         return {
           ...student,
-          classCount
+          stats: {
+            classCount: classNames.length,
+            classNames: classNames
+          }
         };
       })
     );
@@ -1160,7 +1605,6 @@ exports.getAllStudents = async (req, res) => {
       totalPages: Math.ceil(total / limitNum)
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy danh sách học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy danh sách học viên',
@@ -1170,7 +1614,7 @@ exports.getAllStudents = async (req, res) => {
 };
 
 // =========================
-// 📊 THỐNG KÊ HỌC VIÊN
+//  THỐNG KÊ HỌC VIÊN
 // =========================
 exports.getStudentStats = async (req, res) => {
   try {
@@ -1206,7 +1650,6 @@ exports.getStudentStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy thống kê học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy thống kê học viên',
@@ -1246,18 +1689,48 @@ exports.getStudentById = async (req, res) => {
       });
     }
     
-    // Get class count
-    const classCount = await Class.countDocuments({ students: id });
+    // Get classes that student is enrolled in
+    const classes = await Class.find({ students: id })
+      .populate({
+        path: 'course',
+        select: '_id name',
+        populate: { path: 'program', select: 'level' }
+      })
+      .populate('students', 'username email')
+      .select('_id name course status students')
+      .lean();
+    
+    // Format classes with level from program
+    const formattedClasses = classes.map(cls => ({
+      _id: cls._id,
+      name: cls.name,
+      course: cls.course ? { 
+        _id: cls.course._id,
+        name: cls.course.name 
+      } : null,
+      level: cls.course?.program?.level || 'N/A',
+      status: cls.status,
+      students: cls.students || []
+    }));
+
+    // Get courses that student is enrolled in (from studentEnrollments)
+    const enrolledCourses = await Course.find({
+      studentEnrollments: id
+    })
+      .populate('program', 'program_name name type level')
+      .select('name description program')
+      .lean();
     
     res.status(200).json({
       success: true,
       student: {
         ...student,
-        classCount
+        classes: formattedClasses,
+        classCount: formattedClasses.length,
+        courses: enrolledCourses || [] // Courses from studentEnrollments
       }
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy thông tin học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi lấy thông tin học viên',
@@ -1266,9 +1739,6 @@ exports.getStudentById = async (req, res) => {
   }
 };
 
-// =========================
-// ➕ TẠO HỌC VIÊN MỚI
-// =========================
 exports.createStudent = async (req, res) => {
   try {
     const { email, password, username, phone, address } = req.body;
@@ -1291,19 +1761,32 @@ exports.createStudent = async (req, res) => {
       });
     }
     
-    // Check if username already exists
-    const usernameExists = await User.findOne({ username });
-    if (usernameExists) {
-      return res.status(400).json({
-        success: false,
-        message: 'Username đã tồn tại trong hệ thống'
-      });
+    // Validate phone number length (10-11 digits)
+    if (phone) {
+      const phoneDigits = phone.replace(/\D/g, '');
+      if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+        return res.status(400).json({
+          success: false,
+          message: 'Số điện thoại phải có 10 hoặc 11 chữ số'
+        });
+      }
+    }
+    
+    // Check if phone number already exists
+    if (phone) {
+      const phoneExists = await User.findOne({ phone });
+      if (phoneExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'Số điện thoại đã tồn tại trong hệ thống'
+        });
+      }
     }
     
     // Create student
     const student = await User.create({
       email,
-      password,
+      password: password || '123456', // Default password nếu không có
       username,
       phone,
       address,
@@ -1320,7 +1803,6 @@ exports.createStudent = async (req, res) => {
       student: studentData
     });
   } catch (error) {
-    console.error('❌ Lỗi khi tạo học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi tạo học viên',
@@ -1330,139 +1812,136 @@ exports.createStudent = async (req, res) => {
 };
 
 // =========================
-// ✏️ CẬP NHẬT HỌC VIÊN
+// ✏️ CẬP NHẬT HỌC VIÊN - ĐÃ VÔ HIỆU HÓA
 // =========================
 exports.updateStudent = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { email, password, username, phone, address } = req.body;
-    
-    // Find Student role
-    const studentRole = await Role.findOne({ name: 'Student' });
-    if (!studentRole) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy role học viên'
-      });
-    }
-    
-    const student = await User.findOne({
-      _id: id,
-      roleId: studentRole._id
-    });
-    
-    if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy học viên'
-      });
-    }
-    
-    // Check email uniqueness if changed
-    if (email && email !== student.email) {
-      const emailExists = await User.findOne({ email, _id: { $ne: id } });
-      if (emailExists) {
-        return res.status(400).json({
-          success: false,
-          message: 'Email đã tồn tại trong hệ thống'
-        });
-      }
-      student.email = email;
-    }
-    
-    // Check username uniqueness if changed
-    if (username && username !== student.username) {
-      const usernameExists = await User.findOne({ username, _id: { $ne: id } });
-      if (usernameExists) {
-        return res.status(400).json({
-          success: false,
-          message: 'Username đã tồn tại trong hệ thống'
-        });
-      }
-      student.username = username;
-    }
-    
-    if (phone) student.phone = phone;
-    if (address) student.address = address;
-    if (password) student.password = password; // Will be hashed by pre-save hook
-    
-    await student.save();
-    
-    const updatedStudent = await User.findById(id)
-      .select('-password -token')
-      .populate('roleId', 'name');
-    
-    res.status(200).json({
-      success: true,
-      message: 'Cập nhật học viên thành công',
-      student: updatedStudent
-    });
-  } catch (error) {
-    console.error('❌ Lỗi khi cập nhật học viên:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi server khi cập nhật học viên',
-      error: error.message
-    });
-  }
+  // Không cho phép cập nhật thông tin học viên
+  return res.status(403).json({
+    success: false,
+    message: 'Không được phép cập nhật thông tin học viên'
+  });
 };
 
-// =========================
-// 🗑️ XÓA HỌC VIÊN
-// =========================
 exports.deleteStudent = async (req, res) => {
+  // Không cho phép xóa thông tin học viên
+  return res.status(403).json({
+    success: false,
+    message: 'Không được phép xóa học viên'
+  });
+};
+
+// Helper function to parse levelsToStudy string into array of levels
+// Example: "B1 → B2" → ["B1", "B2"]
+// Example: "A1 → A2 → B1" → ["A1", "A2", "B1"]
+const parseLevelsToStudy = (levelsToStudyStr) => {
+  if (!levelsToStudyStr || typeof levelsToStudyStr !== 'string') {
+    return [];
+  }
+
+  // Remove whitespace and split by various arrow formats
+  const cleaned = levelsToStudyStr.trim();
+  if (!cleaned) {
+    return [];
+  }
+
+  // Split by arrow characters: "→" or "->" (with optional spaces around)
+  // Don't split by single "-" to avoid issues with levels like "Pre-A1"
+  const levels = cleaned
+    .split(/→|->/)
+    .map(level => level.trim())
+    .filter(level => level.length > 0);
+
+  return levels;
+};
+
+// Helper function to find existing student by email or phone
+const findExistingStudent = async (email, phone, studentRole) => {
   try {
-    const { id } = req.params;
-    
-    // Find Student role
-    const studentRole = await Role.findOne({ name: 'Student' });
-    if (!studentRole) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy role học viên'
-      });
+    // Find by email first
+    if (email) {
+      const byEmail = await User.findOne({ email: email.toLowerCase() });
+      if (byEmail && byEmail.roleId && byEmail.roleId.toString() === studentRole._id.toString()) {
+        return byEmail;
+      }
     }
-    
-    const student = await User.findOne({
-      _id: id,
-      roleId: studentRole._id
-    });
-    
-    if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy học viên'
-      });
+    // If not found, find by phone
+    if (phone) {
+      const byPhone = await User.findOne({ phone: phone });
+      if (byPhone && byPhone.roleId && byPhone.roleId.toString() === studentRole._id.toString()) {
+        return byPhone;
+      }
     }
-    
-    // Check if student is enrolled in any classes
-    const classesWithStudent = await Class.find({ students: id });
-    if (classesWithStudent.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `Không thể xóa học viên vì đang tham gia ${classesWithStudent.length} lớp học. Vui lòng xóa học viên khỏi các lớp trước.`
-      });
-    }
-    
-    await User.findByIdAndDelete(id);
-    
-    res.status(200).json({
-      success: true,
-      message: 'Xóa học viên thành công'
-    });
+    return null;
   } catch (error) {
-    console.error('❌ Lỗi khi xóa học viên:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi server khi xóa học viên',
-      error: error.message
-    });
+    return null;
   }
 };
 
-// =========================
-// 📥 IMPORT HỌC VIÊN HÀNG LOẠT
-// =========================
+// Helper function to enroll student into courses based on levelsToStudy
+const enrollStudentInCourses = async (studentId, levelsToStudyStr, type) => {
+  try {
+    if (!levelsToStudyStr || !type) {
+      return { enrolled: 0, courses: [] };
+    }
+
+    // Parse levels from string
+    const levels = parseLevelsToStudy(levelsToStudyStr);
+    if (levels.length === 0) {
+      return { enrolled: 0, courses: [] };
+    }
+
+    const typeStr = type.toString().trim().toLowerCase();
+
+    // Find programs matching type and levels
+    const programs = await Program.find({
+      type: typeStr,
+      level: { $in: levels },
+      status: 'active'
+    }).select('_id level');
+
+    if (programs.length === 0) {
+      return { enrolled: 0, courses: [] };
+    }
+
+    const programIds = programs.map(p => p._id);
+
+    // Find all courses belonging to these programs
+    const courses = await Course.find({
+      program: { $in: programIds },
+      status: 'active'
+    }).select('_id name program');
+
+    if (courses.length === 0) {
+      return { enrolled: 0, courses: [] };
+    }
+
+    // Enroll student in all courses
+    let enrolledCount = 0;
+    const enrolledCourseIds = [];
+
+    for (const course of courses) {
+      try {
+        // Use $addToSet to avoid duplicates
+        const result = await Course.updateOne(
+          { _id: course._id },
+          { $addToSet: { studentEnrollments: studentId } }
+        );
+
+        if (result.modifiedCount > 0 || result.matchedCount > 0) {
+          enrolledCount++;
+          enrolledCourseIds.push(course._id);
+        }
+      } catch (courseError) {
+        // Continue with other courses even if one fails
+      }
+    }
+
+    return { enrolled: enrolledCount, courses: enrolledCourseIds };
+  } catch (error) {
+    return { enrolled: 0, courses: [], error: error.message };
+  }
+};
+
 exports.importStudents = async (req, res) => {
   try {
     const { students } = req.body;
@@ -1484,36 +1963,74 @@ exports.importStudents = async (req, res) => {
     }
     
     const results = {
-      success: [],
+      created: [],
+      enrolled: [],
+      skipped: [],
       failed: []
     };
     
     // Process each student
     for (const studentData of students) {
       try {
-        // Check if email exists
-        const emailExists = await User.findOne({ email: studentData.email });
-        if (emailExists) {
-          results.failed.push({
-            email: studentData.email,
-            username: studentData.username,
-            reason: 'Email đã tồn tại trong hệ thống'
-          });
+        // Check if email or phone exists (existing account)
+        const existingStudent = await findExistingStudent(
+          studentData.email,
+          studentData.phone,
+          studentRole
+        );
+        
+        if (existingStudent) {
+          // Student already exists, try to enroll in courses
+          if (studentData.levelsToStudy && studentData.type) {
+            try {
+              const enrollmentResult = await enrollStudentInCourses(
+                existingStudent._id,
+                studentData.levelsToStudy,
+                studentData.type
+              );
+              results.enrolled.push({
+                _id: existingStudent._id,
+                email: existingStudent.email,
+                username: existingStudent.username,
+                phone: existingStudent.phone || '',
+                enrolledCourses: enrollmentResult.enrolled || 0
+              });
+            } catch (enrollmentError) {
+              // Log error but add to skipped
+              results.skipped.push({
+                email: studentData.email,
+                username: studentData.username,
+                phone: studentData.phone || '',
+                reason: 'Không thể đăng ký khóa học: ' + (enrollmentError.message || 'Lỗi không xác định')
+              });
+            }
+          } else {
+            // No course information, skip
+            results.skipped.push({
+              email: studentData.email,
+              username: studentData.username,
+              phone: studentData.phone || '',
+              reason: 'Học viên đã có tài khoản nhưng không có thông tin lộ trình học'
+            });
+          }
           continue;
         }
         
-        // Check if username exists
-        const usernameExists = await User.findOne({ username: studentData.username });
-        if (usernameExists) {
-          results.failed.push({
-            email: studentData.email,
-            username: studentData.username,
-            reason: 'Username đã tồn tại trong hệ thống'
-          });
-          continue;
+        // Validate phone number length (10-11 digits)
+        if (studentData.phone) {
+          const phoneDigits = studentData.phone.replace(/\D/g, '');
+          if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+            results.failed.push({
+              email: studentData.email,
+              username: studentData.username,
+              phone: studentData.phone || '',
+              reason: 'Số điện thoại phải có 10 hoặc 11 chữ số'
+            });
+            continue;
+          }
         }
         
-        // Create student
+        // Create new student
         const newStudent = await User.create({
           email: studentData.email,
           username: studentData.username,
@@ -1523,7 +2040,22 @@ exports.importStudents = async (req, res) => {
           roleId: studentRole._id
         });
         
-        results.success.push({
+        // Enroll student in courses based on levelsToStudy
+        // Note: We don't save aim, currentLevel, type, levelsToStudy to User model
+        // They are only used to determine which courses to enroll in
+        if (studentData.levelsToStudy && studentData.type) {
+          try {
+            const enrollmentResult = await enrollStudentInCourses(
+              newStudent._id,
+              studentData.levelsToStudy,
+              studentData.type
+            );
+          } catch (enrollmentError) {
+            // Log error but don't fail the import
+          }
+        }
+        
+        results.created.push({
           _id: newStudent._id,
           email: newStudent.email,
           username: newStudent.username
@@ -1532,24 +2064,508 @@ exports.importStudents = async (req, res) => {
         results.failed.push({
           email: studentData.email,
           username: studentData.username,
+          phone: studentData.phone || '',
           reason: error.message || 'Lỗi không xác định'
         });
       }
     }
     
+    const createdCount = results.created.length;
+    const enrolledCount = results.enrolled.length;
+    const skippedCount = results.skipped.length;
+    const failedCount = results.failed.length;
+    
+    let message = '';
+    if (createdCount > 0) {
+      message += `Tạo mới ${createdCount} học viên. `;
+    }
+    if (enrolledCount > 0) {
+      message += `Đăng ký khóa học cho ${enrolledCount} học viên đã có. `;
+    }
+    if (skippedCount > 0) {
+      message += `Bỏ qua ${skippedCount} học viên. `;
+    }
+    if (failedCount > 0) {
+      message += `Thất bại ${failedCount} học viên. `;
+    }
+    if (!message) {
+      message = 'Không có học viên nào được xử lý';
+    }
+    
     res.status(200).json({
       success: true,
-      message: `Import thành công ${results.success.length} học viên, thất bại ${results.failed.length} học viên`,
+      message: message.trim(),
       total: students.length,
-      successCount: results.success.length,
-      failedCount: results.failed.length,
+      createdCount: createdCount,
+      enrolledCount: enrolledCount,
+      skippedCount: skippedCount,
+      failedCount: failedCount,
       results
     });
   } catch (error) {
-    console.error('❌ Lỗi khi import học viên:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi import học viên',
+      error: error.message
+    });
+  }
+};
+
+// =========================
+//  CẬP NHẬT KHÓA HỌC CỦA HỌC VIÊN
+// =========================
+exports.updateStudentCourseEnrollments = async (req, res) => {
+  const session = await require('mongoose').startSession();
+  session.startTransaction();
+  
+  try {
+    const { id: studentId } = req.params;
+    const { courseIds } = req.body;
+
+    if (!Array.isArray(courseIds)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'courseIds phải là một mảng'
+      });
+    }
+
+    // Validate student exists
+    const studentRole = await Role.findOne({ name: 'Student' });
+    if (!studentRole) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy role học viên'
+      });
+    }
+
+    const student = await User.findOne({
+      _id: studentId,
+      roleId: studentRole._id
+    }).session(session);
+
+    if (!student) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy học viên'
+      });
+    }
+
+    // Get courses that student is currently enrolled in
+    const currentlyEnrolledCourses = await Course.find({
+      studentEnrollments: studentId
+    }).session(session).select('_id').lean();
+    
+    const currentCourseIds = currentlyEnrolledCourses.map(c => c._id.toString());
+    const newCourseIds = courseIds.map(id => id.toString());
+    
+    // Find courses to add (in new list but not in current)
+    const coursesToAdd = newCourseIds.filter(id => !currentCourseIds.includes(id));
+    
+    // Find courses to remove (in current but not in new)
+    const coursesToRemove = currentCourseIds.filter(id => !newCourseIds.includes(id));
+    
+    const updatedCourses = [];
+
+    // Add student to new courses using $addToSet to avoid duplicates
+    if (coursesToAdd.length > 0) {
+      const mongoose = require('mongoose');
+      const result = await Course.updateMany(
+        { _id: { $in: coursesToAdd.map(id => new mongoose.Types.ObjectId(id)) } },
+        { $addToSet: { studentEnrollments: new mongoose.Types.ObjectId(studentId) } },
+        { session }
+      );
+      updatedCourses.push(...coursesToAdd);
+    }
+
+    // Remove student from courses using $pull
+    if (coursesToRemove.length > 0) {
+      const mongoose = require('mongoose');
+      const result = await Course.updateMany(
+        { _id: { $in: coursesToRemove.map(id => new mongoose.Types.ObjectId(id)) } },
+        { $pull: { studentEnrollments: new mongoose.Types.ObjectId(studentId) } },
+        { session }
+      );
+      updatedCourses.push(...coursesToRemove);
+    }
+
+    // Commit transaction
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(200).json({
+      success: true,
+      message: 'Cập nhật khóa học của học viên thành công',
+      updatedCourses: updatedCourses.length,
+      courseIds: updatedCourses
+    });
+  } catch (error) {
+    // Rollback transaction on error
+    await session.abortTransaction();
+    session.endSession();
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi cập nhật khóa học của học viên',
+      error: error.message
+    });
+  }
+};
+
+// =========================
+//  ĐỔI LỚP HỌC CỦA HỌC VIÊN
+// =========================
+exports.changeStudentClass = async (req, res) => {
+  const mongoose = require('mongoose');
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
+  try {
+    const { id: studentId } = req.params;
+    const { oldClassId, newClassId } = req.body;
+    
+    // 1. Validate dữ liệu
+    if (!oldClassId || !newClassId) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu thông tin lớp cũ hoặc lớp mới'
+      });
+    }
+    
+    // Validate student exists
+    const studentRole = await Role.findOne({ name: 'Student' });
+    if (!studentRole) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy role học viên'
+      });
+    }
+    
+    const student = await User.findOne({
+      _id: studentId,
+      roleId: studentRole._id
+    }).session(session);
+    
+    if (!student) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy học viên'
+      });
+    }
+    
+    // Kiểm tra lớp cũ và lớp mới có tồn tại
+    const oldClass = await Class.findById(oldClassId).session(session);
+    const newClass = await Class.findById(newClassId).session(session);
+    
+    if (!oldClass) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy lớp cũ'
+      });
+    }
+    
+    if (!newClass) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy lớp mới'
+      });
+    }
+    
+    // Kiểm tra học viên có trong lớp cũ không
+    const studentInOldClass = oldClass.students.some(
+      id => id.toString() === studentId.toString()
+    );
+    
+    if (!studentInOldClass) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'Học viên không có trong lớp cũ'
+      });
+    }
+    
+    // Kiểm tra lớp mới còn chỗ không (nếu có maxStudents)
+    if (newClass.maxStudents) {
+      const currentStudentCount = newClass.students ? newClass.students.length : 0;
+      const studentInNewClass = newClass.students.some(
+        id => id.toString() === studentId.toString()
+      );
+      // Nếu học viên chưa có trong lớp mới và lớp đã đầy
+      if (!studentInNewClass && currentStudentCount >= newClass.maxStudents) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          success: false,
+          message: 'Lớp mới đã đầy'
+        });
+      }
+    }
+    
+    // 2. Lấy session order hiện tại của lớp cũ và lớp mới
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Tìm ClassSchedule gần nhất (date >= today) của lớp cũ
+    const oldClassSchedules = await ClassSchedule.find({
+      class: oldClassId,
+      date: { $gte: today }
+    })
+      .populate('session', 'order')
+      .sort({ date: 1, startTime: 1 })
+      .limit(1)
+      .session(session)
+      .lean();
+    
+    // Tìm ClassSchedule gần nhất (date >= today) của lớp mới
+    const newClassSchedules = await ClassSchedule.find({
+      class: newClassId,
+      date: { $gte: today }
+    })
+      .populate('session', 'order')
+      .sort({ date: 1, startTime: 1 })
+      .limit(1)
+      .session(session)
+      .lean();
+    
+    const oldClassSessionOrder = oldClassSchedules.length > 0 && oldClassSchedules[0].session
+      ? oldClassSchedules[0].session.order
+      : null;
+    const newClassSessionOrder = newClassSchedules.length > 0 && newClassSchedules[0].session
+      ? newClassSchedules[0].session.order
+      : null;
+    
+    
+    // Xác định trường hợp
+    let caseType = 1; // Mặc định là trường hợp 1
+    if (oldClassSessionOrder !== null && newClassSessionOrder !== null) {
+      if (oldClassSessionOrder < newClassSessionOrder) {
+        caseType = 2; // Lớp cũ < lớp mới
+      } else if (oldClassSessionOrder > newClassSessionOrder) {
+        caseType = 3; // Lớp cũ > lớp mới
+      }
+    }
+    
+    
+    // 3. Xử lý Class model
+    // Xóa học viên khỏi lớp cũ
+    oldClass.students = oldClass.students.filter(
+      id => id.toString() !== studentId.toString()
+    );
+    await oldClass.save({ session });
+    
+    // Thêm học viên vào lớp mới (nếu chưa có)
+    const studentInNewClass = newClass.students.some(
+      id => id.toString() === studentId.toString()
+    );
+    if (!studentInNewClass) {
+      newClass.students.push(studentId);
+      await newClass.save({ session });
+    }
+    
+    // 4. Xử lý StudentSchedule
+    // a) Lấy tất cả ClassSchedule của lớp cũ
+    const allOldClassSchedules = await ClassSchedule.find({
+      class: oldClassId
+    })
+      .populate('session', 'order')
+      .session(session)
+      .lean();
+    
+    const oldClassScheduleIds = allOldClassSchedules.map(s => s._id);
+    
+    // b) Lấy tất cả StudentSchedule của học viên ở lớp cũ
+    const studentSchedules = await StudentSchedule.find({
+      student: studentId,
+      classSchedule: { $in: oldClassScheduleIds }
+    })
+      .populate({
+        path: 'classSchedule',
+        populate: {
+          path: 'session',
+          select: 'order'
+        }
+      })
+      .session(session)
+      .lean();
+    
+    // c) Lấy tất cả ClassSchedule của lớp mới để match
+    const allNewClassSchedules = await ClassSchedule.find({
+      class: newClassId
+    })
+      .populate('session', 'order')
+      .session(session)
+      .lean();
+    
+    // Tạo map để tìm ClassSchedule theo session order
+    const newClassScheduleMap = new Map();
+    allNewClassSchedules.forEach(schedule => {
+      if (schedule.session && schedule.session.order !== null && schedule.session.order !== undefined) {
+        const order = schedule.session.order;
+        if (!newClassScheduleMap.has(order)) {
+          newClassScheduleMap.set(order, []);
+        }
+        newClassScheduleMap.get(order).push(schedule);
+      }
+    });
+    
+    // d) Xử lý từng StudentSchedule
+    let updatedCount = 0;
+    let cancelledCount = 0;
+    let unchangedCount = 0;
+    
+    for (const studentSchedule of studentSchedules) {
+      const classSchedule = studentSchedule.classSchedule;
+      if (!classSchedule) continue;
+      
+      const sessionOrder = classSchedule.session?.order;
+      const hasAttendance = studentSchedule.attendance && studentSchedule.attendance.status !== null;
+      const scheduleDate = new Date(classSchedule.date);
+      scheduleDate.setHours(0, 0, 0, 0);
+      const isPastSchedule = scheduleDate < today;
+      
+      // Nếu đã có điểm danh hoặc đã diễn ra, giữ nguyên
+      if (hasAttendance || isPastSchedule) {
+        unchangedCount++;
+        continue;
+      }
+      
+      // Xử lý theo từng trường hợp
+      if (caseType === 1) {
+        // Trường hợp 1: session order bằng nhau
+        if (sessionOrder !== null && sessionOrder !== undefined) {
+          const matchingSchedules = newClassScheduleMap.get(sessionOrder);
+          if (matchingSchedules && matchingSchedules.length > 0) {
+            // Lấy ClassSchedule đầu tiên có cùng session order
+            const newClassScheduleId = matchingSchedules[0]._id;
+            await StudentSchedule.findByIdAndUpdate(
+              studentSchedule._id,
+              { classSchedule: newClassScheduleId },
+              { session }
+            );
+            updatedCount++;
+          }
+        }
+      } else if (caseType === 2) {
+        // Trường hợp 2: lớp cũ < lớp mới
+        if (sessionOrder !== null && sessionOrder !== undefined) {
+          if (sessionOrder < newClassSessionOrder) {
+            // Cancel các buổi có sessionOrder < newClassSessionOrder
+            await StudentSchedule.findByIdAndUpdate(
+              studentSchedule._id,
+              {
+                scheduleStatus: 'cancelled',
+                reason: 'Đã đổi lớp'
+              },
+              { session }
+            );
+            cancelledCount++;
+          } else if (sessionOrder >= newClassSessionOrder) {
+            // Session order >= lớp mới: update classSchedule
+            const matchingSchedules = newClassScheduleMap.get(sessionOrder);
+            if (matchingSchedules && matchingSchedules.length > 0) {
+              const newClassScheduleId = matchingSchedules[0]._id;
+              await StudentSchedule.findByIdAndUpdate(
+                studentSchedule._id,
+                { classSchedule: newClassScheduleId },
+                { session }
+              );
+              updatedCount++;
+              console.log(` Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
+            }
+          }
+        }
+      } else if (caseType === 3) {
+        // Trường hợp 3: lớp cũ > lớp mới
+        if (sessionOrder !== null && sessionOrder !== undefined) {
+          if (sessionOrder < oldClassSessionOrder) {
+            // Session order < lớp cũ: không thay đổi gì
+            unchangedCount++;
+          } else if (sessionOrder >= oldClassSessionOrder) {
+            // Session order >= lớp cũ: update classSchedule
+            const matchingSchedules = newClassScheduleMap.get(sessionOrder);
+            if (matchingSchedules && matchingSchedules.length > 0) {
+              const newClassScheduleId = matchingSchedules[0]._id;
+              await StudentSchedule.findByIdAndUpdate(
+                studentSchedule._id,
+                { classSchedule: newClassScheduleId },
+                { session }
+              );
+              updatedCount++;
+              console.log(` Updated StudentSchedule ${studentSchedule._id} -> ClassSchedule ${newClassScheduleId} (session ${sessionOrder})`);
+            }
+          }
+        }
+      }
+    }
+    
+    // Tạo StudentSchedule mới cho các buổi học tương lai của lớp mới mà học viên chưa có
+    const existingStudentScheduleIds = studentSchedules
+      .map(ss => ss.classSchedule?._id?.toString())
+      .filter(id => id);
+    
+    const futureNewClassSchedules = allNewClassSchedules.filter(schedule => {
+      const scheduleDate = new Date(schedule.date);
+      scheduleDate.setHours(0, 0, 0, 0);
+      return scheduleDate >= today && !existingStudentScheduleIds.includes(schedule._id.toString());
+    });
+    
+    for (const classSchedule of futureNewClassSchedules) {
+      // Chỉ tạo StudentSchedule cho các buổi có session order >= session order hiện tại của lớp mới
+      if (newClassSessionOrder !== null && classSchedule.session?.order !== null) {
+        if (classSchedule.session.order >= newClassSessionOrder) {
+          await StudentSchedule.create([{
+            student: studentId,
+            classSchedule: classSchedule._id,
+            scheduleStatus: 'scheduled'
+          }], { session });
+        }
+      } else {
+        // Nếu không có session order, tạo cho tất cả buổi tương lai
+        await StudentSchedule.create([{
+          student: studentId,
+          classSchedule: classSchedule._id,
+          scheduleStatus: 'scheduled'
+        }], { session });
+      }
+    }
+    
+    
+    // Commit transaction
+    await session.commitTransaction();
+    session.endSession();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Đổi lớp học thành công',
+      data: {
+        oldClassId,
+        newClassId,
+        updatedSchedules: updatedCount,
+        cancelledSchedules: cancelledCount,
+        unchangedSchedules: unchangedCount
+      }
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi đổi lớp học',
       error: error.message
     });
   }

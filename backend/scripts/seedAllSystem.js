@@ -10,6 +10,7 @@ const Session = require('../models/sessionModel');
 const Class = require('../models/classModel');
 const ClassSchedule = require('../models/classScheduleModel');
 const StudentSchedule = require('../models/studentScheduleModel');
+const ChangeRequest = require('../models/changeRequestModel');
 
 // Store created classes for reference
 const seedData = {
@@ -17,11 +18,12 @@ const seedData = {
 };
 
 async function clearDatabase() {
-    console.log('\n🗑️  Clearing existing data for Class, ClassSchedule, StudentSchedule...');
+    console.log('\n🗑️  Clearing existing data for Class, ClassSchedule, StudentSchedule, ChangeRequest...');
     await StudentSchedule.deleteMany({});
     await ClassSchedule.deleteMany({});
     await Class.deleteMany({});
-    console.log('✅ Cleared Class, ClassSchedule, and StudentSchedule tables\n');
+    await ChangeRequest.deleteMany({});
+    console.log('✅ Cleared Class, ClassSchedule, StudentSchedule, and ChangeRequest tables\n');
 }
 
 
@@ -149,27 +151,23 @@ async function seedClasses() {
             status: 'pending'
         },
         {
-            name: 'IELTS Elementary A2 - Lớp Có Conflict',
+            name: 'IELTS Elementary A2 - Lớp 1',
             course: course3._id,
-            teacher: teachers[1]._id, // Teacher 2 (khác teacher để tránh conflict teacher)
-            students: [
-                students[0]._id, // Học viên chung với lớp đang học (sẽ bị conflict)
-                students[1]._id, // Học viên chung với lớp đang học (sẽ bị conflict)
-                students[3]._id  // Học viên mới
-            ],
-            room: rooms[2]._id, // Phòng khác để tránh conflict room
-            startDate: activeClassStartDate, // Cùng thời gian với lớp đang học
-            endDate: activeClassEndDate,
+            teacher: teachers[Math.min(2, teachers.length - 1)]._id || teachers[0]._id, // Teacher khác
+            students: [students[5]._id, students[6]._id, students[7]._id], // Students khác
+            room: rooms[2]._id, // Room khác
+            startDate: class2StartDate, // Thời gian khác (1 tuần trước)
+            endDate: class2EndDate,
             maxStudents: 25,
             status: 'active'
         },
         // 5 lớp mới cùng course với "IELTS Foundation A1 - Lớp Đang Học"
         {
             name: 'IELTS Foundation A1 - Lớp 2',
-            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: teachers[0]._id, // Teacher 1
-            students: [students[5]._id, students[6]._id, students[7]._id, students[8]._id],
-            room: rooms[1]._id, // Phòng 201
+            course: course1._id,
+            teacher: teachers[1]._id, // Teacher 2 (khác với lớp 0)
+            students: [students[8]._id, students[9]._id, students[Math.min(10, students.length - 1)]._id, students[Math.min(11, students.length - 1)]._id], // Students khác
+            room: rooms[2]._id, // Room khác
             startDate: class2StartDate, // 1 tuần trước
             endDate: class2EndDate,
             maxStudents: 25,
@@ -177,10 +175,10 @@ async function seedClasses() {
         },
         {
             name: 'IELTS Foundation A1 - Lớp 3',
-            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: teachers[1]._id, // Teacher 2
-            students: [students[9]._id, students[Math.min(10, students.length - 1)]._id, students[Math.min(11, students.length - 1)]._id, students[Math.min(12, students.length - 1)]._id],
-            room: rooms[2]._id, // Phòng 301
+            course: course1._id,
+            teacher: teachers[Math.min(2, teachers.length - 1)]._id || teachers[0]._id, // Teacher khác
+            students: [students[Math.min(12, students.length - 1)]._id, students[Math.min(13, students.length - 1)]._id, students[Math.min(14, students.length - 1)]._id, students[Math.min(15, students.length - 1)]._id], // Students khác
+            room: rooms[Math.min(3, rooms.length - 1)]._id, // Room khác
             startDate: class3StartDate, // Hôm nay
             endDate: class3EndDate,
             maxStudents: 25,
@@ -188,33 +186,33 @@ async function seedClasses() {
         },
         {
             name: 'IELTS Foundation A1 - Lớp 4',
-            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: teachers[0]._id, // Teacher 1
-            students: [students[Math.min(13, students.length - 1)]._id, students[Math.min(14, students.length - 1)]._id, students[Math.min(15, students.length - 1)]._id, students[Math.min(16, students.length - 1)]._id],
-            room: rooms[Math.min(3, rooms.length - 1)]._id, // Phòng Lab 401
-            startDate: class4StartDate, // 1 tuần sau
+            course: course1._id,
+            teacher: teachers[0]._id, // Teacher 1 (có thể dùng lại nếu lịch khác)
+            students: [students[Math.min(16, students.length - 1)]._id, students[Math.min(17, students.length - 1)]._id, students[Math.min(18, students.length - 1)]._id, students[Math.min(19, students.length - 1)]._id], // Students khác
+            room: rooms[Math.min(4, rooms.length - 1)]._id, // Room khác
+            startDate: class4StartDate, // 1 tuần sau (thời gian khác)
             endDate: class4EndDate,
             maxStudents: 25,
             status: 'pending'
         },
         {
             name: 'IELTS Foundation A1 - Lớp 5',
-            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
+            course: course1._id,
             teacher: teachers[1]._id, // Teacher 2
-            students: [students[Math.min(17, students.length - 1)]._id, students[Math.min(18, students.length - 1)]._id, students[Math.min(19, students.length - 1)]._id, students[Math.min(20, students.length - 1)]._id],
-            room: rooms[Math.min(4, rooms.length - 1)]._id, // Phòng 501
-            startDate: class5StartDate, // 2 tuần sau
+            students: [students[Math.min(20, students.length - 1)]._id, students[Math.min(21, students.length - 1)]._id, students[Math.min(22, students.length - 1)]._id, students[Math.min(23, students.length - 1)]._id], // Students khác
+            room: rooms[0]._id, // Room có thể dùng lại nếu lịch khác
+            startDate: class5StartDate, // 2 tuần sau (thời gian khác)
             endDate: class5EndDate,
             maxStudents: 25,
             status: 'pending'
         },
         {
             name: 'IELTS Foundation A1 - Lớp 6',
-            course: course1._id, // IELTS Foundation A1 - Nghe (cùng course)
-            teacher: teachers[0]._id, // Teacher 1
-            students: [students[5]._id, students[6]._id], // Dùng lại một số students (không conflict vì lịch khác)
-            room: rooms[0]._id, // Phòng 101 (có thể dùng lại nếu lịch khác)
-            startDate: class6StartDate, // 3 tuần sau
+            course: course1._id,
+            teacher: teachers[Math.min(2, teachers.length - 1)]._id || teachers[0]._id, // Teacher khác
+            students: [students[Math.min(24, students.length - 1)]._id, students[Math.min(25, students.length - 1)]._id, students[Math.min(26, students.length - 1)]._id], // Students khác
+            room: rooms[1]._id, // Room khác
+            startDate: class6StartDate, // 3 tuần sau (thời gian khác)
             endDate: class6EndDate,
             maxStudents: 25,
             status: 'pending'
@@ -226,14 +224,14 @@ async function seedClasses() {
     console.log(`✅ Created ${created.length} classes`);
     console.log(`   - Lớp đang học: ${classes[0].name} (${activeClassStartDate.toISOString().split('T')[0]} - ${activeClassEndDate.toISOString().split('T')[0]})`);
     console.log(`   - Lớp chưa học: ${classes[1].name} (${pendingClassStartDate.toISOString().split('T')[0]} - ${pendingClassEndDate.toISOString().split('T')[0]})`);
-    console.log(`   - Lớp có conflict: ${classes[2].name} (${activeClassStartDate.toISOString().split('T')[0]} - ${activeClassEndDate.toISOString().split('T')[0]})`);
-    console.log(`     ⚠️ Lớp này có học viên chung với lớp đang học và sẽ có lịch trùng thời gian`);
-    console.log(`   - 5 lớp cùng course IELTS Foundation A1 - Nghe:`);
+    console.log(`   - Lớp khác: ${classes[2].name} (${class2StartDate.toISOString().split('T')[0]} - ${class2EndDate.toISOString().split('T')[0]})`);
+    console.log(`   - 5 lớp cùng course IELTS Foundation A1:`);
     console.log(`     • ${classes[3].name} (${class2StartDate.toISOString().split('T')[0]} - ${class2EndDate.toISOString().split('T')[0]})`);
     console.log(`     • ${classes[4].name} (${class3StartDate.toISOString().split('T')[0]} - ${class3EndDate.toISOString().split('T')[0]})`);
     console.log(`     • ${classes[5].name} (${class4StartDate.toISOString().split('T')[0]} - ${class4EndDate.toISOString().split('T')[0]})`);
     console.log(`     • ${classes[6].name} (${class5StartDate.toISOString().split('T')[0]} - ${class5EndDate.toISOString().split('T')[0]})`);
-    console.log(`     • ${classes[7].name} (${class6StartDate.toISOString().split('T')[0]} - ${class6EndDate.toISOString().split('T')[0]})\n`);
+    console.log(`     • ${classes[7].name} (${class6StartDate.toISOString().split('T')[0]} - ${class6EndDate.toISOString().split('T')[0]})`);
+    console.log(`   ✅ Tất cả các lớp đã được phân bổ để tránh conflict về teacher, room, students và lịch học\n`);
 }
 
 async function seedClassSchedules() {
@@ -362,15 +360,17 @@ async function seedClassSchedules() {
         // Lấy số buổi học từ course.numberOfSessions
         const numberOfSessions = course.numberOfSessions || sessions.length;
         
-        // Chọn pattern lịch cho lớp này (mỗi lớp có thể khác nhau)
-        // Lớp conflict (index 2) sẽ dùng pattern 5 (index 4, trùng với pattern 0) để tạo conflict
+        // Chọn pattern lịch cho lớp này (mỗi lớp có pattern khác nhau để tránh conflict)
         let selectedPattern;
-        if (classIndex === 2) {
-            // Lớp conflict: dùng pattern 5 (index 4, trùng thời gian với pattern 0 - lớp đang học)
-            selectedPattern = schedulePatterns[4];
-        } else if (classIndex === 0) {
+        if (classIndex === 0) {
             // Lớp 0 (IELTS Foundation A1 - Lớp Đang Học): Pattern 0 (Thứ 2, Thứ 3)
             selectedPattern = schedulePatterns[0];
+        } else if (classIndex === 1) {
+            // Lớp 1 (TOEIC Beginner A1 - Lớp Chưa Học): Pattern 1 (Thứ 2, Thứ 3, Thứ 5)
+            selectedPattern = schedulePatterns[1];
+        } else if (classIndex === 2) {
+            // Lớp 2 (IELTS Elementary A2 - Lớp 1): Pattern 2 (Thứ 2, Thứ 3, Thứ 6)
+            selectedPattern = schedulePatterns[2];
         } else if (classIndex === 3) {
             // Lớp 3 (IELTS Foundation A1 - Lớp 2): Pattern 6 (Thứ 4, Thứ 5)
             selectedPattern = schedulePatterns[6];
@@ -507,12 +507,20 @@ async function seedClassSchedules() {
                     continue;
                 }
                 
+                // Tạo date ở UTC 00:00:00 để tránh timezone issues
+                // Lấy year, month, day từ scheduleDate (local timezone)
+                const year = scheduleDate.getFullYear();
+                const month = scheduleDate.getMonth();
+                const day = scheduleDate.getDate();
+                // Tạo Date object ở UTC 00:00:00
+                const dateInUTC = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+                
                 // Tạo schedule tạm thời (chưa gán session)
                 // Use academicStaffUser if available, otherwise use class teacher
                 const createdByUser = academicStaffUser ? academicStaffUser._id : classItem.teacher;
                 tempSchedules.push({
                     class: classItem._id,
-                    date: new Date(scheduleDate), // Tạo copy để tránh reference issue
+                    date: dateInUTC, // Dùng date ở UTC 00:00:00
                     startTime: patternItem.startTime,
                     endTime: patternItem.endTime,
                     room: classItem.room,
@@ -665,10 +673,205 @@ async function seedStudentSchedules() {
     console.log(`✅ Created ${created.length} student schedules for ${classSchedules.length} class schedules\n`);
 }
 
+async function seedChangeRequests() {
+    console.log('📝 Seeding Change Requests...');
+    const changeRequests = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Query existing data from database
+    const classes = await Class.find().lean();
+    const classSchedules = await ClassSchedule.find().lean();
+    const studentSchedules = await StudentSchedule.find().lean();
+    
+    // Find roles
+    const teacherRole = await Role.findOne({ name: 'Teacher' });
+    const studentRole = await Role.findOne({ name: 'Student' });
+    const academicStaffRole = await Role.findOne({ name: 'Academic Staff' });
+    const centerHeadRole = await Role.findOne({ name: 'Center Head' });
+    
+    if (!teacherRole || !studentRole) {
+        console.log('⚠️  Không tìm thấy Teacher hoặc Student role. Vui lòng seed roles trước.');
+        return;
+    }
+    
+    // Query users by role
+    const teachers = await User.find({ roleId: teacherRole._id }).lean();
+    const students = await User.find({ roleId: studentRole._id }).lean();
+    let academicStaffUsers = [];
+    if (academicStaffRole) {
+        academicStaffUsers = await User.find({ roleId: academicStaffRole._id }).lean();
+    }
+    let centerHeadUsers = [];
+    if (centerHeadRole) {
+        centerHeadUsers = await User.find({ roleId: centerHeadRole._id }).lean();
+    }
+    
+    // Validate data exists
+    if (classes.length === 0) {
+        console.log('⚠️  Không tìm thấy classes trong database. Vui lòng seed classes trước.');
+        return;
+    }
+    if (classSchedules.length === 0) {
+        console.log('⚠️  Không tìm thấy class schedules trong database. Vui lòng seed class schedules trước.');
+        return;
+    }
+    if (studentSchedules.length === 0) {
+        console.log('⚠️  Không tìm thấy student schedules trong database. Vui lòng seed student schedules trước.');
+        return;
+    }
+    if (teachers.length === 0) {
+        console.log('⚠️  Không tìm thấy teachers trong database.');
+        return;
+    }
+    if (students.length === 0) {
+        console.log('⚠️  Không tìm thấy students trong database.');
+        return;
+    }
+    
+    // Get Academic Staff user for approver (if available)
+    const approver = academicStaffUsers.length > 0 ? academicStaffUsers[0] : null;
+    
+    console.log(`   - Found ${classes.length} classes, ${classSchedules.length} class schedules`);
+    console.log(`   - Found ${teachers.length} teachers, ${students.length} students, ${academicStaffUsers.length} academic staff, ${centerHeadUsers.length} center heads`);
+    
+    // Helper function to generate approved date (1-7 days ago)
+    const getApprovedDate = (daysAgo) => {
+        const date = new Date(today);
+        date.setDate(date.getDate() - daysAgo);
+        date.setHours(14, 0, 0, 0); // Set to 2 PM
+        return date;
+    };
+    
+    // ============================================
+    // 1. REPLACE_TEACHER requests (20-25 requests)
+    // ============================================
+    const replaceTeacherContents = [
+        'Yêu cầu thay giáo viên cho buổi học ngày mai do giáo viên hiện tại có việc đột xuất',
+        'Xin thay giáo viên cho buổi học tuần tới vì giáo viên hiện tại bị ốm',
+        'Đề nghị thay giáo viên cho buổi học sắp tới do giáo viên có lịch trùng với hội thảo',
+        'Yêu cầu thay giáo viên do giáo viên hiện tại có việc gia đình quan trọng',
+        'Xin thay giáo viên cho buổi học cuối tuần do giáo viên có lịch đi công tác',
+        'Đề nghị thay giáo viên do giáo viên hiện tại cần nghỉ phép có phép',
+        'Yêu cầu thay giáo viên cho buổi học tới do giáo viên có lịch khám sức khỏe',
+        'Xin thay giáo viên cho buổi học ngày mai do giáo viên có việc đột xuất trong gia đình',
+        'Đề nghị thay giáo viên cho buổi học tuần tới vì giáo viên hiện tại đi công tác nước ngoài',
+        'Yêu cầu thay giáo viên do giáo viên hiện tại tham gia hội thảo quốc tế',
+        'Xin thay giáo viên cho buổi học sắp tới do giáo viên có lịch thi chứng chỉ',
+        'Đề nghị thay giáo viên do giáo viên hiện tại cần nghỉ phép để chăm sóc người thân ốm',
+        'Yêu cầu thay giáo viên cho buổi học cuối tuần do giáo viên có lịch đi du lịch đã đặt trước',
+        'Xin thay giáo viên cho buổi học tới do giáo viên có lịch khám răng định kỳ',
+        'Đề nghị thay giáo viên do giáo viên hiện tại tham gia khóa đào tạo nâng cao',
+        'Yêu cầu thay giáo viên cho buổi học ngày mai do giáo viên có việc đột xuất tại cơ quan',
+        'Xin thay giáo viên cho buổi học tuần tới vì giáo viên hiện tại đi dự đám cưới',
+        'Đề nghị thay giáo viên do giáo viên hiện tại cần nghỉ phép để tham gia sự kiện gia đình',
+        'Yêu cầu thay giáo viên cho buổi học sắp tới do giáo viên có lịch họp phụ huynh',
+        'Xin thay giáo viên cho buổi học cuối tuần do giáo viên có lịch đi khám sức khỏe tổng quát',
+        'Đề nghị thay giáo viên do giáo viên hiện tại tham gia cuộc thi giáo viên giỏi',
+        'Yêu cầu thay giáo viên cho buổi học tới do giáo viên có lịch đi công tác đột xuất',
+        'Xin thay giáo viên cho buổi học ngày mai do giáo viên có việc gia đình cần giải quyết gấp',
+        'Đề nghị thay giáo viên do giáo viên hiện tại cần nghỉ phép để đi thăm người thân',
+        'Yêu cầu thay giáo viên cho buổi học tuần tới do giáo viên có lịch trùng với kỳ thi quan trọng'
+    ];
+    
+    // Tạo mapping giữa teacher và các classSchedules của họ
+    // Chỉ cho phép giáo viên gửi đơn cho buổi dạy của chính họ
+    const teacherClassSchedulesMap = {};
+    
+    // Nhóm các classSchedules theo teacher
+    for (const classSchedule of classSchedules) {
+        const teacherId = classSchedule.teacher?.toString();
+        if (teacherId) {
+            if (!teacherClassSchedulesMap[teacherId]) {
+                teacherClassSchedulesMap[teacherId] = [];
+            }
+            teacherClassSchedulesMap[teacherId].push(classSchedule);
+        }
+    }
+    
+    // Tạo danh sách các cặp (teacher, classSchedule) hợp lệ
+    // Mỗi giáo viên chỉ có thể gửi đơn cho buổi dạy của chính họ
+    const validTeacherSchedulePairs = [];
+    for (const teacher of teachers) {
+        const teacherId = teacher._id.toString();
+        const teacherSchedules = teacherClassSchedulesMap[teacherId] || [];
+        
+        // Thêm tất cả các classSchedules của giáo viên này vào danh sách hợp lệ
+        for (const classSchedule of teacherSchedules) {
+            validTeacherSchedulePairs.push({
+                teacher: teacher,
+                classSchedule: classSchedule
+            });
+        }
+    }
+    
+    console.log(`   - Found ${validTeacherSchedulePairs.length} valid teacher-schedule pairs for replace_teacher requests`);
+    
+    // Tạo đơn replace_teacher từ các cặp hợp lệ
+    // Giới hạn tối đa 25 đơn hoặc số lượng có thể tạo được
+    const replaceTeacherCount = Math.min(25, validTeacherSchedulePairs.length, replaceTeacherContents.length);
+    
+    for (let i = 0; i < replaceTeacherCount; i++) {
+        const pair = validTeacherSchedulePairs[i % validTeacherSchedulePairs.length];
+        const sender = pair.teacher;
+        const classSchedule = pair.classSchedule;
+        
+        let status = 'pending';
+        let approverId = null;
+        let approvedDate = null;
+        let responseContent = null;
+        
+        // Distribute status: ~30% rejected, ~70% pending (no approved)
+        // Reject approximately every 3rd request
+        if (approver && (i % 3 === 2 || i === 5 || i === 8 || i === 11 || i === 14 || i === 17 || i === 20 || i === 23)) {
+            status = 'rejected';
+            approverId = approver._id;
+            approvedDate = getApprovedDate(Math.floor(Math.random() * 7) + 1); // 1-7 days ago
+            const rejectionReasons = [
+                'Đơn bị từ chối do không tìm được giáo viên thay thế phù hợp trong thời gian yêu cầu.',
+                'Đơn bị từ chối do thời gian yêu cầu quá gấp, không đủ thời gian sắp xếp.',
+                'Đơn bị từ chối do không có giáo viên thay thế có trình độ phù hợp với lớp học.',
+                'Đơn bị từ chối do giáo viên thay thế không có lịch trống trong thời gian yêu cầu.',
+                'Đơn bị từ chối do đã có quá nhiều yêu cầu thay giáo viên trong tuần này.'
+            ];
+            responseContent = rejectionReasons[Math.floor(Math.random() * rejectionReasons.length)];
+        }
+        // Rest are pending
+        
+        changeRequests.push({
+            sender: sender._id,
+            type: 'request_replace_teacher',
+            classScheduleId: classSchedule._id,
+            content: replaceTeacherContents[i],
+            status: status,
+            approver: approverId,
+            approvedDate: approvedDate,
+            responseContent: responseContent
+        });
+    }
+    
+    if (changeRequests.length === 0) {
+        console.log('⚠️  No change requests to create!');
+        return;
+    }
+    
+    const created = await ChangeRequest.insertMany(changeRequests);
+    
+    // Log statistics
+    const pendingCount = created.filter(cr => cr.status === 'pending').length;
+    const approvedCount = created.filter(cr => cr.status === 'approved').length;
+    const rejectedCount = created.filter(cr => cr.status === 'rejected').length;
+    
+    const replaceTeacherTypeCount = created.filter(cr => cr.type === 'request_replace_teacher').length;
+    
+    console.log(`✅ Created ${created.length} change requests`);
+    console.log(`   - By type: request_replace_teacher (${replaceTeacherTypeCount})`);
+    console.log(`   - By status: pending (${pendingCount}), approved (${approvedCount}), rejected (${rejectedCount})\n`);
+}
 
 async function seed() {
     try {
-        console.log('🚀 Starting seed for Class, ClassSchedule, StudentSchedule...\n');
+        console.log('🚀 Starting seed for Class, ClassSchedule, StudentSchedule, ChangeRequest...\n');
         
         // Connect to MongoDB
         await mongoose.connect(process.env.MONGODB_URI, {
@@ -685,6 +888,7 @@ async function seed() {
         await seedClasses();
         await seedClassSchedules();
         await seedStudentSchedules();
+        await seedChangeRequests();
 
         console.log('\n✨ Seed completed successfully!');
         console.log('\n📊 Summary:');
@@ -693,10 +897,12 @@ async function seed() {
         const classCount = await Class.countDocuments();
         const classScheduleCount = await ClassSchedule.countDocuments();
         const studentScheduleCount = await StudentSchedule.countDocuments();
+        const changeRequestCount = await ChangeRequest.countDocuments();
         
         console.log(`  - Classes: ${classCount}`);
         console.log(`  - Class Schedules: ${classScheduleCount}`);
         console.log(`  - Student Schedules: ${studentScheduleCount}`);
+        console.log(`  - Change Requests: ${changeRequestCount}`);
 
         process.exit(0);
     } catch (error) {

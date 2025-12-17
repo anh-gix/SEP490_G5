@@ -1,10 +1,13 @@
-import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card, Button, Badge } from 'react-bootstrap';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
 
-const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
+const ScheduleWeekly = ({ schedules, onScheduleClick, selectedWeek, onWeekChange, onLessonClick }) => {
+  // Sử dụng selectedWeek từ props, nếu không có thì dùng current date
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
+    if (selectedWeek) {
+      return selectedWeek;
+    }
     const today = new Date();
     const dayOfWeek = today.getDay();
     const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Start from Monday
@@ -13,6 +16,13 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
     monday.setHours(0, 0, 0, 0);
     return monday;
   });
+
+  // Sync currentWeekStart với selectedWeek prop
+  useEffect(() => {
+    if (selectedWeek) {
+      setCurrentWeekStart(selectedWeek);
+    }
+  }, [selectedWeek]);
 
   // Time slots configuration - each slot is 2 hours from 8:00 to 20:00
   const timeSlots = useMemo(() => {
@@ -80,12 +90,18 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
     const newDate = new Date(currentWeekStart);
     newDate.setDate(currentWeekStart.getDate() - 7);
     setCurrentWeekStart(newDate);
+    if (onWeekChange) {
+      onWeekChange(newDate);
+    }
   };
 
   const goToNextWeek = () => {
     const newDate = new Date(currentWeekStart);
     newDate.setDate(currentWeekStart.getDate() + 7);
     setCurrentWeekStart(newDate);
+    if (onWeekChange) {
+      onWeekChange(newDate);
+    }
   };
 
   const goToCurrentWeek = () => {
@@ -96,6 +112,9 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
     monday.setDate(today.getDate() + diff);
     monday.setHours(0, 0, 0, 0);
     setCurrentWeekStart(monday);
+    if (onWeekChange) {
+      onWeekChange(monday);
+    }
   };
 
   const formatWeekRange = () => {
@@ -108,6 +127,19 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
   const isToday = (date) => {
     const today = new Date();
     return date.toDateString() === today.toDateString();
+  };
+
+  // Get color based on program type
+  const getProgramTypeColor = (programType) => {
+    if (!programType) return null;
+    
+    const colorMap = {
+      'ielts': '#2196F3', // Xanh dương
+      'toeic': '#FF9800', // Cam
+      'cam': '#757575'    // Xám
+    };
+    
+    return colorMap[programType.toLowerCase()] || null;
   };
 
   const getStatusColor = (status, hasAttendance) => {
@@ -238,18 +270,28 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
                     {slotSchedules.length > 0 ? (
                       slotSchedules.map(schedule => {
                         const hasAttendance = schedule.hasAttendance || false;
-                        const statusColor = getStatusColor(schedule.status, hasAttendance);
-                        // Màu nền khác nhau: buổi đã học có nền xanh nhạt, chưa học có nền trắng
-                        const backgroundColor = hasAttendance 
-                          ? 'rgba(25, 118, 210, 0.08)' // Xanh nhạt cho buổi đã học
-                          : 'white'; // Trắng cho buổi chưa học
+                        const programColor = getProgramTypeColor(schedule.programType);
+                        // Sử dụng màu program type, nếu không có thì dùng màu xám mặc định
+                        const borderColor = programColor || '#757575';
+                        
+                        // Màu nền theo program type với opacity
+                        let backgroundColor = 'white';
+                        if (programColor) {
+                          // Convert hex to rgba với opacity 0.2
+                          const r = parseInt(programColor.slice(1, 3), 16);
+                          const g = parseInt(programColor.slice(3, 5), 16);
+                          const b = parseInt(programColor.slice(5, 7), 16);
+                          backgroundColor = `rgba(${r}, ${g}, ${b}, 0.2)`;
+                        } else {
+                          backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt mặc định
+                        }
                         
                         const ScheduleCard = (
                           <Card
                             key={schedule.id}
                             className="mb-0"
                             style={{ 
-                              borderLeft: `4px solid ${statusColor}`,
+                              borderLeft: `4px solid ${borderColor}`,
                               backgroundColor: backgroundColor,
                               cursor: 'pointer',
                               fontSize: '11px',
@@ -266,7 +308,7 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
                               <div className="fw-bold text-primary mb-1 d-flex align-items-center justify-content-between" style={{ fontSize: '9px' }}>
                                 <span>{schedule.startTime} - {schedule.endTime}</span>
                                 {hasAttendance && (
-                                  <i className="fas fa-check-circle" style={{ color: statusColor, fontSize: '8px' }}></i>
+                                  <i className="fas fa-check-circle" style={{ color: borderColor, fontSize: '8px' }}></i>
                                 )}
                               </div>
                               <div className="fw-bold mb-1" style={{ fontSize: '11px', lineHeight: '1.2' }}>
@@ -284,7 +326,21 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
                           </Card>
                         );
 
-                        // If onScheduleClick is provided, use div wrapper, otherwise use Link
+                        // If onLessonClick is provided, use onClick handler, otherwise use onScheduleClick or Link fallback
+                        if (onLessonClick) {
+                          return (
+                            <div 
+                              key={schedule.id} 
+                              className="text-decoration-none"
+                              onClick={() => onLessonClick(schedule.id)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              {ScheduleCard}
+                            </div>
+                          );
+                        }
+
+                        // If onScheduleClick is provided, use div wrapper
                         if (onScheduleClick) {
                           return (
                             <div key={schedule.id} className="text-decoration-none">
@@ -293,14 +349,11 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
                           );
                         }
 
+                        // Fallback: no handler provided, just render card
                         return (
-                          <Link
-                            key={schedule.id}
-                            to={`/academic/lessons/${schedule.id}`}
-                            className="text-decoration-none"
-                          >
+                          <div key={schedule.id} className="text-decoration-none">
                             {ScheduleCard}
-                          </Link>
+                          </div>
                         );
                       })
                     ) : null}
@@ -312,28 +365,44 @@ const ScheduleWeekly = ({ schedules, onScheduleClick }) => {
         </div>
       </Card.Body>
 
-      {/* Legend */}
+      {/* Program Type Color Legend */}
       <Card.Footer className="bg-neutral-25 border-0 p-16">
-        <div className="d-flex justify-content-center gap-16 flex-wrap">
-          <div className="d-flex align-items-center gap-8">
-            <Badge style={{ width: '12px', height: '12px', padding: 0, borderRadius: '2px', backgroundColor: '#1976D2' }}></Badge>
-            <span className="text-13 text-neutral-700">Đã học</span>
+        <div className="d-flex justify-content-center gap-4 flex-wrap">
+          <div className="d-flex align-items-center gap-2">
+            <div 
+              style={{ 
+                width: '20px', 
+                height: '20px', 
+                backgroundColor: '#2196F3', 
+                borderRadius: '4px',
+                border: '1px solid #e0e0e0'
+              }}
+            ></div>
+            <span className="text-13 text-neutral-700">IELTS</span>
           </div>
-          <div className="d-flex align-items-center gap-8">
-            <Badge className="bg-success-600" style={{ width: '12px', height: '12px', padding: 0, borderRadius: '2px' }}></Badge>
-            <span className="text-13 text-neutral-700">Đã lên lịch (chưa học)</span>
+          <div className="d-flex align-items-center gap-2">
+            <div 
+              style={{ 
+                width: '20px', 
+                height: '20px', 
+                backgroundColor: '#FF9800', 
+                borderRadius: '4px',
+                border: '1px solid #e0e0e0'
+              }}
+            ></div>
+            <span className="text-13 text-neutral-700">TOEIC</span>
           </div>
-          <div className="d-flex align-items-center gap-8">
-            <Badge className="bg-main-600" style={{ width: '12px', height: '12px', padding: 0, borderRadius: '2px' }}></Badge>
-            <span className="text-13 text-neutral-700">Đã hoàn thành</span>
-          </div>
-          <div className="d-flex align-items-center gap-8">
-            <Badge className="bg-warning-600" style={{ width: '12px', height: '12px', padding: 0, borderRadius: '2px' }}></Badge>
-            <span className="text-13 text-neutral-700">Học bù</span>
-          </div>
-          <div className="d-flex align-items-center gap-8">
-            <Badge className="bg-danger-600" style={{ width: '12px', height: '12px', padding: 0, borderRadius: '2px' }}></Badge>
-            <span className="text-13 text-neutral-700">Đã hủy</span>
+          <div className="d-flex align-items-center gap-2">
+            <div 
+              style={{ 
+                width: '20px', 
+                height: '20px', 
+                backgroundColor: '#757575', 
+                borderRadius: '4px',
+                border: '1px solid #e0e0e0'
+              }}
+            ></div>
+            <span className="text-13 text-neutral-700">Cambridge</span>
           </div>
         </div>
       </Card.Footer>

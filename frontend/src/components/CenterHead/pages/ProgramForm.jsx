@@ -1,17 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
 import Modal from '../compo/Modal';
 import Badge from '../compo/Badge';
-import Tabs from '../compo/Tabs';
+import ProgramSuccessModal from '../compo/ProgramSuccessModal';
 import programService from '../../../services/programService';
 
-const ProgramFormNew = () => {
+const ProgramFormNew = ({ viewMode = 'center-head' }) => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = Boolean(id);
+
+  // Determine base path
+  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
 
   // Form state
   const [formData, setFormData] = useState({
@@ -27,8 +32,10 @@ const ProgramFormNew = () => {
 
   // UI state
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('info');
   const [showCreatePLOModal, setShowCreatePLOModal] = useState(false);
+  const [bandMapping, setBandMapping] = useState({});
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdProgram, setCreatedProgram] = useState(null);
 
   // New PLO form
   const [newPLO, setNewPLO] = useState({
@@ -39,10 +46,35 @@ const ProgramFormNew = () => {
 
   // Breadcrumb
   const breadcrumbItems = [
-    { label: 'Dashboard', path: '/center-head/dashboard' },
-    { label: 'Quản lý chương trình', path: '/center-head/programs' },
+    { label: 'Dashboard', path: `${basePath}/dashboard` },
+    { label: 'Quản lý chương trình', path: `${basePath}/programs` },
     { label: isEdit ? 'Chỉnh sửa chương trình' : 'Tạo chương trình mới' }
   ];
+
+  // Load band mapping when component mounts or type changes
+  useEffect(() => {
+    const fetchBandMapping = async () => {
+      if (formData.type) {
+        try {
+          const response = await programService.getBandOptions(formData.type);
+          const mapping = response.data || {};
+          setBandMapping(mapping);
+
+          // Auto-fill band based on current level
+          if (formData.level && mapping[formData.level]) {
+            setFormData(prev => ({
+              ...prev,
+              band: mapping[formData.level]
+            }));
+          }
+        } catch (error) {
+          console.error('Error loading band mapping:', error);
+        }
+      }
+    };
+    fetchBandMapping();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.type]);
 
   // Load program data if editing
   useEffect(() => {
@@ -67,8 +99,8 @@ const ProgramFormNew = () => {
           // PLOs are now embedded in program, no need for separate state
         } catch (error) {
           console.error('Error loading program:', error);
-          alert('Không thể tải thông tin chương trình!');
-          navigate('/center-head/programs');
+          toast.error('Không thể tải thông tin chương trình!', { position: 'top-right' });
+          navigate(`${basePath}/programs`);
         } finally {
           setLoading(false);
         }
@@ -76,24 +108,40 @@ const ProgramFormNew = () => {
 
       fetchProgramData();
     }
-  }, [isEdit, id, navigate]);
+  }, [isEdit, id, navigate, basePath]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+
+    // Auto-fill band when level changes
+    if (name === 'level' && bandMapping[value]) {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+        band: bandMapping[value]
+      }));
+    } else if (name === 'type') {
+      // Reset band when type changes (will be auto-filled when mapping loads)
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+        band: ''
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   // ==================== PLO Management ====================
   const handleRemovePLO = (ploId) => {
-    if (window.confirm('Bạn có chắc muốn xóa PLO này khỏi chương trình?')) {
-      setFormData(prev => ({
-        ...prev,
-        plos: prev.plos.filter(plo => plo._id !== ploId)
-      }));
-    }
+    setFormData(prev => ({
+      ...prev,
+      plos: prev.plos.filter(plo => plo._id !== ploId)
+    }));
+    toast.success('Đã xóa PLO khỏi chương trình', { position: 'top-right' });
   };
 
   // Create new PLO
@@ -112,14 +160,14 @@ const ProgramFormNew = () => {
 
   const handleSaveNewPLO = () => {
     if (!newPLO.code || !newPLO.name || !newPLO.detail) {
-      alert('Vui lòng điền đầy đủ thông tin PLO!');
+      toast.warning('Vui lòng điền đầy đủ thông tin PLO!', { position: 'top-right' });
       return;
     }
 
     // Check for duplicate PLO code in current program
     const isDuplicate = formData.plos.some(plo => plo.code === newPLO.code);
     if (isDuplicate) {
-      alert(`Mã PLO "${newPLO.code}" đã tồn tại trong chương trình này!`);
+      toast.error(`Mã PLO "${newPLO.code}" đã tồn tại trong chương trình này!`, { position: 'top-right' });
       return;
     }
 
@@ -135,17 +183,7 @@ const ProgramFormNew = () => {
     }));
 
     setShowCreatePLOModal(false);
-    alert('Thêm PLO mới thành công! Nhấn "Cập nhật" để lưu.');
-  };
-
-  // ==================== Course Management ====================
-  const handleAddCourse = () => {
-    if (formData.plos.length === 0) {
-      alert('Vui lòng thêm ít nhất 1 PLO trước khi thêm học phần!');
-      return;
-    }
-
-    navigate(`/center-head/programs/${id}/courses/create`);
+    toast.success('Thêm PLO mới thành công!', { position: 'top-right' });
   };
 
   // ==================== Form Submission ====================
@@ -153,7 +191,7 @@ const ProgramFormNew = () => {
     e.preventDefault();
 
     if (!formData.code || !formData.program_name || !formData.type || !formData.level) {
-      alert('Vui lòng điền đầy đủ thông tin bắt buộc!');
+      toast.warning('Vui lòng điền đầy đủ thông tin bắt buộc!', { position: 'top-right' });
       return;
     }
 
@@ -165,7 +203,7 @@ const ProgramFormNew = () => {
       const userId = user?._id || user?.id;
 
       if (!userId && !isEdit) {
-        alert('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại!');
+        toast.error('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại!', { position: 'top-right' });
         setLoading(false);
         return;
       }
@@ -191,44 +229,55 @@ const ProgramFormNew = () => {
 
       if (isEdit) {
         await programService.updateProgram(id, programData);
-        alert('Cập nhật chương trình thành công!');
-        navigate('/center-head/programs');
+        toast.success('Cập nhật chương trình thành công!', { position: 'top-right' });
+        navigate(`${basePath}/programs`);
       } else {
         const response = await programService.createProgram(programData);
-        const newProgramId = response.data._id;
+        const newProgram = response.data;
 
-        // Ask user if they want to add courses
-        const addCourse = window.confirm(
-          'Tạo chương trình thành công!\n\nBạn có muốn thêm học phần vào chương trình này không?'
-        );
-
-        if (addCourse) {
-          // Navigate to course wizard
-          navigate(`/center-head/programs/${newProgramId}/courses/create`);
-        } else {
-          // Go back to program list
-          navigate('/center-head/programs');
-        }
-        return;
+        // Show success modal instead of window.confirm
+        setCreatedProgram(newProgram);
+        setShowSuccessModal(true);
       }
     } catch (error) {
       console.error('Error submitting program:', error);
-      alert(error.message || 'Lỗi khi lưu chương trình!');
+      toast.error(error.message || 'Lỗi khi lưu chương trình!', { position: 'top-right' });
     } finally {
       setLoading(false);
     }
   };
 
+  // Success Modal handlers
+  const handleCreateCourse = () => {
+    setShowSuccessModal(false);
+    navigate(`${basePath}/programs/${createdProgram._id}/courses/create`);
+  };
 
-  // Tabs configuration
-  const tabs = [
-    { id: 'info', label: 'Thông tin chung', icon: 'ph ph-info' },
-    { id: 'plo', label: 'Program Learning Outcomes', icon: 'ph ph-target' },
-    { id: 'courses', label: 'Các học phần', icon: 'ph ph-books' }
-  ];
+  const handleViewDetail = () => {
+    setShowSuccessModal(false);
+    navigate(`${basePath}/programs/${createdProgram._id}`);
+  };
+
+  const handleGoToList = () => {
+    setShowSuccessModal(false);
+    navigate(`${basePath}/programs`);
+  };
+
 
   return (
     <div className="program-form-container">
+      {/* Toast Notifications */}
+      <ToastContainer />
+
+      {/* Success Modal */}
+      <ProgramSuccessModal
+        show={showSuccessModal}
+        programData={createdProgram}
+        onCreateCourse={handleCreateCourse}
+        onViewDetail={handleViewDetail}
+        onGoToList={handleGoToList}
+      />
+
       <Breadcrumb items={breadcrumbItems} />
 
       {/* Header */}
@@ -245,7 +294,7 @@ const ProgramFormNew = () => {
           <Button
             variant="outline"
             icon="ph ph-x-circle"
-            onClick={() => navigate('/center-head/programs')}
+            onClick={() => navigate(`${basePath}/programs`)}
           >
             Hủy
           </Button>
@@ -260,14 +309,13 @@ const ProgramFormNew = () => {
         </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
-
-      <form onSubmit={handleSubmit} className="mt-24">
-        {/* Tab 1: Thông tin cơ bản */}
-        {activeTab === 'info' && (
-        <Card>
-          <h5 className="mb-16 fw-semibold">Thông tin cơ bản</h5>
+      <form onSubmit={handleSubmit}>
+        {/* Section 1: Thông tin cơ bản */}
+        <Card className="mb-24">
+          <h5 className="mb-16 fw-semibold">
+            <i className="ph ph-info me-2"></i>
+            Thông tin cơ bản
+          </h5>
           <div className="row g-4">
             <div className="col-md-4">
               <label className="form-label fw-semibold text-neutral-900">
@@ -344,12 +392,16 @@ const ProgramFormNew = () => {
               <input
                 type="text"
                 name="band"
-                className="form-control"
-                placeholder="VD: 5.5-6.5, 600-750"
+                className="form-control bg-light"
+                placeholder="Tự động điền theo level"
                 value={formData.band}
                 onChange={handleInputChange}
+                readOnly
               />
-              <small className="text-muted">Điểm band IELTS hoặc điểm TOEIC</small>
+              <small className="text-muted">
+                <i className="ph ph-info me-1"></i>
+                Tự động ánh xạ theo Type và Level
+              </small>
             </div>
 
             <div className="col-12">
@@ -367,14 +419,15 @@ const ProgramFormNew = () => {
             </div>
           </div>
         </Card>
-        )}
 
-        {/* Tab 2: PLO Management */}
-        {activeTab === 'plo' && (
-        <Card>
+        {/* Section 2: PLO Management */}
+        <Card className="mb-24">
           <div className="d-flex justify-content-between align-items-center mb-4">
             <div>
-              <h5 className="mb-2">Program Learning Outcomes (PLO)</h5>
+              <h5 className="mb-2">
+                <i className="ph ph-target me-2"></i>
+                Program Learning Outcomes (PLO)
+              </h5>
               <p className="text-neutral-600 text-sm mb-0">
                 Chuẩn đầu ra của chương trình
               </p>
@@ -430,109 +483,6 @@ const ProgramFormNew = () => {
             </div>
           )}
         </Card>
-        )}
-
-        {/* Tab 3: Courses Table */}
-        {activeTab === 'courses' && (
-          <>
-          {!isEdit ? (
-            <Card>
-              <div className="text-center py-5">
-                <i className="ph ph-info-circle ph-3x text-neutral-400 mb-3"></i>
-                <p className="text-neutral-600 mb-0">Vui lòng lưu chương trình trước để thêm học phần</p>
-              </div>
-            </Card>
-          ) : (
-          <Card>
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <div>
-                <h5 className="mb-2">Các học phần</h5>
-                <p className="text-neutral-600 text-sm mb-0">
-                  Danh sách các khóa học trong chương trình
-                </p>
-              </div>
-              <Button
-                variant="primary"
-                icon="ph ph-plus"
-                onClick={handleAddCourse}
-                disabled={formData.plos.length === 0}
-              >
-                Thêm học phần
-              </Button>
-            </div>
-
-            {formData.plos.length === 0 && (
-              <div className="alert alert-warning mb-16">
-                <i className="ph ph-warning-circle me-2"></i>
-                Vui lòng thêm ít nhất 1 PLO trước khi thêm học phần!
-              </div>
-            )}
-
-            {formData.courses.length === 0 ? (
-              <div className="text-center py-5 border border-neutral-200 radius-4">
-                <i className="ph ph-books ph-3x text-neutral-400 mb-3"></i>
-                <p className="text-neutral-600 mb-3">Chưa có học phần nào được thêm</p>
-                {formData.plos.length > 0 && (
-                  <Button variant="primary" icon="ph ph-plus" onClick={handleAddCourse}>
-                    Thêm học phần đầu tiên
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="table-responsive">
-                <table className="table table-hover align-middle">
-                  <thead className="border-bottom">
-                    <tr>
-                      <th className="px-16 py-12 fw-semibold text-neutral-700" style={{ width: '120px' }}>Mã môn</th>
-                      <th className="px-16 py-12 fw-semibold text-neutral-700">Tên học phần</th>
-                      <th className="px-16 py-12 fw-semibold text-neutral-700" style={{ width: '150px' }}>Trạng thái</th>
-                      <th className="px-16 py-12 fw-semibold text-neutral-700 text-center" style={{ width: '80px' }}>CLOs</th>
-                      <th className="px-16 py-12 fw-semibold text-neutral-700 text-center" style={{ width: '80px' }}>Sessions</th>
-                      <th className="px-16 py-12 fw-semibold text-neutral-700 text-center" style={{ width: '100px' }}>Materials</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {formData.courses.map(course => (
-                      <tr key={course._id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/center-head/courses/${course._id}/details`)}>
-                        <td className="px-16 py-12">
-                          <Badge variant="primary">{course.courseCode}</Badge>
-                        </td>
-                        <td className="px-16 py-12">
-                          <div className="fw-semibold">{course.name}</div>
-                          <div className="text-neutral-600 text-sm">{course.description}</div>
-                        </td>
-                        <td className="px-16 py-12">
-                          <Badge
-                            variant={
-                              course.status === 'approved' ? 'success' :
-                              course.status === 'pending_approval' ? 'warning' :
-                              'secondary'
-                            }
-                          >
-                            {course.status === 'approved' ? 'Đã duyệt' :
-                             course.status === 'pending_approval' ? 'Chờ duyệt' :
-                             'Bản nháp'}
-                          </Badge>
-                        </td>
-                        <td className="px-16 py-12 text-center">
-                          <Badge variant="info">{course.clos?.length || 0}</Badge>
-                        </td>
-                        <td className="px-16 py-12 text-center">
-                          <Badge variant="info">{course.sessions?.length || 0}</Badge>
-                        </td>
-                        <td className="px-16 py-12 text-center">
-                          <Badge variant="info">{course.materials?.length || 0}</Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Card>
-          )}
-          </>
-        )}
       </form>
 
       {/* Modal: Create new PLO */}

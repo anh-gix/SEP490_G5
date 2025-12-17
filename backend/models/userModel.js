@@ -17,7 +17,6 @@ const userSchema = new mongoose.Schema({
   username: {
     type: String,
     required: true,
-    unique: true,
     trim: true
   },
   token: {
@@ -39,6 +38,7 @@ const userSchema = new mongoose.Schema({
   phone: {
     type: String,
     required: true,
+    unique: true,
     trim: true
   },
   address: {
@@ -46,6 +46,8 @@ const userSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  // Sửa thành array, 1 nhân viên nhiều role 2 đầu lương
+  // Để cuối
   roleId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Role',

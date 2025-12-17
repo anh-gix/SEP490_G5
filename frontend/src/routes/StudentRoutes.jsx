@@ -14,6 +14,13 @@ import StudentTipsPage from "../pages/StudentPages/StudentTipsPage.jsx";
 import StudentOnlineCoursesPage from "../pages/StudentPages/StudentOnlineCoursesPage.jsx";
 import StudentOnlineCourseDetailPage from "../pages/StudentPages/StudentOnlineCourseDetailPage.jsx";
 import StudentSessionLearningPage from "../pages/StudentPages/StudentSessionLearningPage.jsx";
+import StudentApplicationsPage from "../pages/StudentPages/StudentApplicationsPage.jsx";
+import StudentExamPage from "../pages/StudentPages/StudentExamPage.jsx";
+import StudentExamsDetailPage from "../pages/StudentPages/StudentExamsDetailPage.jsx";
+import StudentReadingResultPage from "../pages/StudentPages/StudentReadingResultPage.jsx";
+import StudentListeningResultPage from "../pages/StudentPages/StudentListeningResultPage.jsx";
+import StudentWritingResultPage from "../pages/StudentPages/StudentWritingResultPage.jsx";
+import StudentSpeakingResultPage from "../pages/StudentPages/StudentSpeakingResultPage.jsx";
 
 /**
  * StudentRoutes
@@ -51,6 +58,13 @@ export const studentRoutes = [
   { path: '/student/toeic/test/:testId', element: <ToeicTestTaking /> },
   { path: '/student/toeic/result/:testId', element: <ToeicTestResult /> },
   { path: '/student/toeic/history', element: <ToeicTestHistory /> },
+  // Exams Practice
+  { path: '/student/practice-exams', element: <StudentExamPage /> },
+  { path: '/student/exams/:id', element: <StudentExamsDetailPage /> },
+  { path: '/student/exams/:examId/submissions/:submissionId/reading/result', element: <StudentReadingResultPage /> },
+  { path: '/student/exams/:examId/submissions/:submissionId/listening/result', element: <StudentListeningResultPage /> },
+  { path: '/student/exams/:examId/submissions/:submissionId/writing/result', element: <StudentWritingResultPage /> },
+  { path: '/student/exams/:examId/submissions/:submissionId/speaking/result', element: <StudentSpeakingResultPage /> },
 
   // VII. Materials (future)
   // { path: '/student/materials', element: <StudentMaterialsPage /> },
@@ -61,5 +75,6 @@ export const studentRoutes = [
   // IX. Leave Request (future)
   // { path: '/student/leave-request', element: <StudentLeaveRequestPage /> },
 
- 
+  // X. Applications
+  { path: '/student/applications', element: <StudentApplicationsPage /> },
 ];

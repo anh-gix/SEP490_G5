@@ -1084,8 +1084,8 @@ const RequestDetailPage = ({
 
           {/* Footer với các nút hành động */}
           <div className="d-flex justify-content-end gap-12">
-            {/* Nút Hoàn tác - chỉ hiển thị khi đơn đã được duyệt */}
-            {selectedRequest?.status === 'approved' && (
+            {/* Nút Hoàn tác - tạm ẩn cho đơn đã được duyệt */}
+            {/* {selectedRequest?.status === 'approved' && (
               <Button 
                 variant="warning" 
                 onClick={() => setShowRevertModal(true)}
@@ -1095,7 +1095,7 @@ const RequestDetailPage = ({
                 <i className="fas fa-undo"></i>
                 {reverting ? 'Đang xử lý...' : 'Hoàn tác'}
               </Button>
-            )}
+            )} */}
             
             <Button 
               variant="secondary" 

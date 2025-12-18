@@ -562,6 +562,11 @@ const StudentDetail = ({ studentId, onBack }) => {
     
     return studentSchedule
       .filter(schedule => schedule && schedule.date) // Filter out invalid schedules
+      .filter(schedule => {
+        // Filter out cancelled schedules (buổi nghỉ)
+        const scheduleStatus = schedule.scheduleStatus || 'scheduled';
+        return scheduleStatus !== 'cancelled';
+      })
       .map((schedule, index) => {
         try {
           const scheduleDate = new Date(schedule.date);
@@ -579,7 +584,7 @@ const StudentDetail = ({ studentId, onBack }) => {
           
           // Get schedule status from StudentSchedule
           const scheduleStatus = schedule.scheduleStatus || 'scheduled';
-          const isMakeupSchedule = scheduleStatus === 'rescheduled';
+          const isMakeupSchedule = false; // Không hiển thị riêng biệt học bù ở StudentDetail
           const isCancelled = scheduleStatus === 'cancelled';
           const reason = schedule.reason || null;
           
@@ -594,11 +599,9 @@ const StudentDetail = ({ studentId, onBack }) => {
             className = null;
           }
           
-          // For makeup schedules, show "Lớp học bù" if no className
-          if (isMakeupSchedule && !className) {
-            className = 'Lớp học bù';
-          } else if (!className) {
-            // For non-makeup schedules, use 'N/A' if no className
+          // Buổi học bù hiển thị như buổi bình thường, không đổi className
+          if (!className) {
+            // Use 'N/A' if no className
             className = 'N/A';
           }
           
@@ -612,7 +615,7 @@ const StudentDetail = ({ studentId, onBack }) => {
             roomName: schedule.room?.room_name || schedule.roomName || 'N/A',
             roomId: schedule.room?._id || null,
             topic: schedule.topic || schedule.sessionTitle || '',
-            status: schedule.status === 'fixed' ? 'scheduled' : schedule.status === 'temporary' ? 'makeup' : 'scheduled',
+            status: 'scheduled', // Tất cả đều hiển thị như buổi học bình thường
             attendanceStatus: attendanceStatus, // 'present', 'absent', 'late', 'excused', or null
             hasAttendance: !!attendanceStatus,
             teacherName: schedule.teacher?.username || schedule.teacherName || 'N/A',
@@ -622,7 +625,7 @@ const StudentDetail = ({ studentId, onBack }) => {
             lessonTopic: schedule.topic || schedule.sessionTitle || '',
             scheduleStatus: scheduleStatus,
             reason: reason,
-            isMakeupSchedule: isMakeupSchedule,
+            isMakeupSchedule: isMakeupSchedule, // Luôn false để không hiển thị riêng
             isCancelled: isCancelled,
             cancellationReason: isCancelled ? reason : null,
             programType: programType

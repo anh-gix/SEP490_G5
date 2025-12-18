@@ -6,6 +6,7 @@ import classService from '../../services/classService';
 import ClassOverview from '../student_components/class_detail/ClassOverview';
 import ClassStudents from '../teacher_components/class_detail/ClassStudents';
 import AcademicClassLessons from './AcademicClassLessons';
+import AcademicLessonDetail from './AcademicLessonDetail';
 
 /**
  * Class Detail Component
@@ -23,6 +24,8 @@ const ClassDetail = ({ classId, onBack }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [showLessonDetail, setShowLessonDetail] = useState(false);
+  const [selectedLessonId, setSelectedLessonId] = useState(null);
 
   useEffect(() => {
     if (classId) {
@@ -166,6 +169,11 @@ const ClassDetail = ({ classId, onBack }) => {
     setActiveTab(tab);
   };
 
+  const handleLessonClick = (lessonId) => {
+    setSelectedLessonId(lessonId);
+    setShowLessonDetail(true);
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -222,6 +230,19 @@ const ClassDetail = ({ classId, onBack }) => {
     const lessonDate = new Date(lesson.date);
     return lessonDate > new Date() && lesson.status !== 'completed';
   });
+
+  // Conditional rendering: nếu đang hiển thị lesson detail, render AcademicLessonDetail
+  if (showLessonDetail && selectedLessonId) {
+    return (
+      <AcademicLessonDetail
+        lessonId={selectedLessonId}
+        onBack={() => {
+          setShowLessonDetail(false);
+          setSelectedLessonId(null);
+        }}
+      />
+    );
+  }
 
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
@@ -340,6 +361,7 @@ const ClassDetail = ({ classId, onBack }) => {
                 <AcademicClassLessons 
                   lessons={lessons} 
                   getLessonStatusBadge={getLessonStatusBadge}
+                  onLessonClick={handleLessonClick}
                 />
               </div>
             </Tab>

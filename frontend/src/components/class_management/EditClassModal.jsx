@@ -148,9 +148,27 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         
         setFullClassData(classDataWithSchedules);
         
-        // Debug log to check if schedules are present
+        // Log tất cả schedule IDs trong lớp
         if (classDataWithSchedules && classDataWithSchedules.schedules) {
-          console.log(' Full class data loaded with schedules:', classDataWithSchedules.schedules.length);
+          console.log('=== DANH SÁCH TẤT CẢ BUỔI HỌC TRONG LỚP ===');
+          console.log('Class ID:', classId);
+          console.log('Class Name:', classDataWithSchedules.name || 'N/A');
+          console.log('Tổng số buổi học:', classDataWithSchedules.schedules.length);
+          console.log('Danh sách Schedule IDs:');
+          classDataWithSchedules.schedules.forEach((schedule, index) => {
+            const scheduleId = schedule._id || schedule.id;
+            const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+            const startTime = schedule.startTime || schedule.start_time || 'N/A';
+            const endTime = schedule.endTime || schedule.end_time || 'N/A';
+            const status = schedule.status || 'N/A';
+            
+            console.log(`  ${index + 1}. Schedule ID: ${scheduleId}`);
+            console.log(`     - Date: ${scheduleDate}`);
+            console.log(`     - Time: ${startTime} - ${endTime}`);
+            console.log(`     - Status: ${status}`);
+            console.log(`     - Full object:`, schedule);
+          });
+          console.log('=== END DANH SÁCH ===');
         } else {
           console.log(' Full class data loaded but no schedules found');
         }
@@ -1077,8 +1095,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 return; // Skip schedules that already have attendance
               }
 
-              // Check if same date
-              if (classSchedule.date === teacherSchedule.date) {
+              // Check if same date (use formatDateToYYYYMMDD to handle ISO strings)
+              if (formatDateToYYYYMMDD(classSchedule.date) === formatDateToYYYYMMDD(teacherSchedule.date)) {
                 const classStart = parseTime(classSchedule.startTime);
                 const classEnd = parseTime(classSchedule.endTime);
                 const teacherStart = parseTime(teacherSchedule.startTime);
@@ -1127,7 +1145,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 totalConflicts: conflicts.length,
                 conflicts: conflicts.map(c => {
                   try {
-                    const currentSchedule = currentClassSchedules.find(s => s.date === c.date);
+                    const currentSchedule = currentClassSchedules.find(s => formatDateToYYYYMMDD(s.date) === formatDateToYYYYMMDD(c.date));
                     return {
                       ...c,
                       currentClassSchedule: currentSchedule ? {
@@ -1146,7 +1164,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 }),
                 summary: conflicts.map(c => {
                   try {
-                    const currentSchedule = currentClassSchedules.find(s => s.date === c.date);
+                    const currentSchedule = currentClassSchedules.find(s => formatDateToYYYYMMDD(s.date) === formatDateToYYYYMMDD(c.date));
                     const currentTime = currentSchedule 
                       ? `${currentSchedule.startTime} - ${currentSchedule.endTime}`
                       : c.classTime;
@@ -1464,8 +1482,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 return; // Skip schedules that already have attendance
               }
 
-              // Check if same date
-              if (classSchedule.date === roomSchedule.date) {
+              // Check if same date (use formatDateToYYYYMMDD to handle ISO strings)
+              if (formatDateToYYYYMMDD(classSchedule.date) === formatDateToYYYYMMDD(roomSchedule.date)) {
                 const classStart = parseTime(classSchedule.startTime);
                 const classEnd = parseTime(classSchedule.endTime);
                 const roomStart = parseTime(roomSchedule.startTime);
@@ -1496,7 +1514,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 totalConflicts: conflicts.length,
                 conflicts: conflicts.map(c => {
                   try {
-                    const currentSchedule = currentClassSchedules.find(s => s.date === c.date);
+                    const currentSchedule = currentClassSchedules.find(s => formatDateToYYYYMMDD(s.date) === formatDateToYYYYMMDD(c.date));
                     return {
                       ...c,
                       currentClassSchedule: currentSchedule ? {
@@ -1515,7 +1533,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 }),
                 summary: conflicts.map(c => {
                   try {
-                    const currentSchedule = currentClassSchedules.find(s => s.date === c.date);
+                    const currentSchedule = currentClassSchedules.find(s => formatDateToYYYYMMDD(s.date) === formatDateToYYYYMMDD(c.date));
                     const currentTime = currentSchedule 
                       ? `${currentSchedule.startTime} - ${currentSchedule.endTime}`
                       : c.classTime;
@@ -1948,7 +1966,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
             if (hasTimeConflict) {
               // Check if this conflict is already in the list (avoid duplicates)
               const studentDateStr = formatDateToYYYYMMDD(studentDate);
-              const isDuplicate = studentConflictsList.some(c => c.date === studentDateStr);
+              const isDuplicate = studentConflictsList.some(c => formatDateToYYYYMMDD(c.date) === studentDateStr);
 
               if (!isDuplicate) {
                 const conflictingClassName = 
@@ -2856,11 +2874,16 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     // Transform to ScheduleCalendar format
     const transformedSchedules = schedulesToTransform.map((schedule, index) => {
       const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
-      const date = scheduleDate ? new Date(scheduleDate) : null;
       
-      if (!date || isNaN(date.getTime())) {
+      // Format date string directly, don't convert to Date object first
+      const dateStr = scheduleDate ? formatDateToYYYYMMDD(scheduleDate) : null;
+      
+      if (!dateStr) {
         return null;
       }
+      
+      // Parse date only for time calculations, not for date string
+      const date = scheduleDate ? new Date(scheduleDate) : null;
       
       // Get teacher name
       const teacherName = schedule.teacher?.fullName || 
@@ -2936,7 +2959,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       
       return {
         id: scheduleId,
-        date: formatDateToYYYYMMDD(date), // Format as YYYY-MM-DD (local timezone)
+        date: dateStr, // Use formatted string directly, not from Date object
         startTime: startTime,
         endTime: endTime,
         className: formData.name || 'Chưa có tên lớp',
@@ -3229,8 +3252,66 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     // Apply pending schedule changes before submitting
     if (pendingScheduleChanges.length > 0) {
       try {
+        console.log('==========================================');
+        console.log('📝 CHANGED CLASS SCHEDULES (User Edits)');
+        console.log('==========================================');
+        console.log(`Total changed schedules: ${pendingScheduleChanges.length}`);
+        console.log('');
+        
+        let scheduleIndex = 1;
+        
         // Apply all pending schedule changes
         for (const change of pendingScheduleChanges) {
+          if (change.updateScope === 'single') {
+            // Single schedule change
+            const oldDate = change.oldSchedule.date;
+            const newDate = change.newSchedule.date;
+            console.log(`ClassSchedule ${scheduleIndex}:`);
+            console.log(`  - Schedule ID: ${change.scheduleId}`);
+            console.log(`  - ${oldDate} -> ${newDate}`);
+            scheduleIndex++;
+          } else if (change.updateScope === 'future') {
+            // Future schedules change - log each matching schedule
+            const oldDate = change.oldSchedule.date;
+            const newDate = change.newSchedule.date;
+            
+            // Get matching schedules info
+            const matchingSchedules = change.matchingScheduleIds || [];
+            
+            matchingSchedules.forEach((matchingId, idx) => {
+              // Calculate new date for this matching schedule
+              // (Logic similar to what's done in calendarSchedules useMemo)
+              const firstScheduleDate = new Date(oldDate);
+              firstScheduleDate.setHours(0, 0, 0, 0);
+              
+              // Find original schedule date
+              const originalSchedule = fullClassData?.schedules?.find(s => {
+                const sId = s._id || s.id;
+                return String(sId) === String(matchingId);
+              });
+              
+              if (originalSchedule) {
+                const originalDate = new Date(originalSchedule.date);
+                originalDate.setHours(0, 0, 0, 0);
+                
+                const daysFromFirst = Math.floor((originalDate.getTime() - firstScheduleDate.getTime()) / (24 * 60 * 60 * 1000));
+                const weeksFromFirst = Math.floor(daysFromFirst / 7);
+                
+                const calculatedNewDate = new Date(newDate);
+                calculatedNewDate.setDate(new Date(newDate).getDate() + (weeksFromFirst * 7));
+                calculatedNewDate.setHours(0, 0, 0, 0);
+                
+                const formattedOldDate = formatDateToYYYYMMDD(originalDate);
+                const formattedNewDate = formatDateToYYYYMMDD(calculatedNewDate);
+                
+                console.log(`ClassSchedule ${scheduleIndex}:`);
+                console.log(`  - Schedule ID: ${matchingId}`);
+                console.log(`  - ${formattedOldDate} -> ${formattedNewDate}`);
+                scheduleIndex++;
+              }
+            });
+          }
+          
           const updateData = {
             date: change.newSchedule.date,
             startTime: change.newSchedule.startTime,
@@ -3240,6 +3321,9 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
           
           await scheduleService.updateSchedule(change.scheduleId, updateData);
         }
+        
+        console.log('');
+        console.log('==========================================');
         
         // Refresh class data to get updated schedules
         const classId = formData.id || formData._id;
@@ -3731,7 +3815,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                                     
                                     // Nếu không tìm thấy bằng thời gian chính xác, fallback về tìm theo ngày
                                     if (!currentSchedule) {
-                                      currentSchedule = currentClassSchedulesForRender?.find(s => s?.date === conflict?.date);
+                                      currentSchedule = currentClassSchedulesForRender?.find(s => formatDateToYYYYMMDD(s?.date) === formatDateToYYYYMMDD(conflict?.date));
                                     }
                                     
                                     // Ưu tiên dùng thời gian từ conflict (chính xác nhất), sau đó từ currentSchedule, cuối cùng là fallback
@@ -3748,7 +3832,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                                       console.warn(' [DEBUG] Không tìm thấy thời gian lớp hiện tại cho conflict:', {
                                         conflict,
                                         currentSchedule,
-                                        currentClassSchedulesForRender: currentClassSchedulesForRender?.filter(s => s?.date === conflict?.date)
+                                        currentClassSchedulesForRender: currentClassSchedulesForRender?.filter(s => formatDateToYYYYMMDD(s?.date) === formatDateToYYYYMMDD(conflict?.date))
                                       });
                                       currentClassTime = conflict.originalClassStartTime && conflict.originalClassEndTime
                                         ? `${conflict.originalClassStartTime} - ${conflict.originalClassEndTime}`
@@ -3756,12 +3840,12 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                                     }
                                     
                                     // Log để debug
-                                    if (conflict.date === '2025-12-01') {
+                                    if (formatDateToYYYYMMDD(conflict.date) === '2025-12-01') {
                                       console.log(' [DEBUG] Hiển thị conflict cho ngày 2025-12-01:', {
                                         conflict,
                                         currentSchedule,
                                         currentClassTime,
-                                        currentClassSchedulesForRender: currentClassSchedulesForRender?.filter(s => s?.date === '2025-12-01')
+                                        currentClassSchedulesForRender: currentClassSchedulesForRender?.filter(s => formatDateToYYYYMMDD(s?.date) === '2025-12-01')
                                       });
                                     }
                                     
@@ -4440,6 +4524,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                         ...editedSchedule,
                         date: e.target.value
                       })}
+                      min={new Date().toISOString().split('T')[0]}
                       className="border-neutral-30 radius-8 px-16 py-10"
                       disabled={hasAttendance || checkingAttendance}
                     />

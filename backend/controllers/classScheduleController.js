@@ -596,9 +596,6 @@ async function simulateReassignAndCheckSessionChange(classId, scheduleId, newDat
   };
 }
 
-// =========================
-//  PREVIEW: XEM TRƯỚC KHI THÊM BUỔI HỌC
-// =========================
 exports.previewAddClassSchedule = async (req, res) => {
   try {
     const { classId, date, startTime, endTime, room, repeatWeekly, selectedDay } = req.body;
@@ -973,9 +970,6 @@ exports.previewAddClassSchedule = async (req, res) => {
   }
 };
 
-// =========================
-// 🆕 TẠO BUỔI HỌC MỚI
-// =========================
 exports.createClassSchedule = async (req, res) => {
   try {
     const { classId, sessionNumber, date, startTime, endTime, room, repeatWeekly, selectedDay } = req.body;
@@ -1601,14 +1595,20 @@ exports.getTeacherSchedule = async (req, res) => {
       .populate({
         path: "class",
         select: "name subject teacherId course",
-        populate: {
-          path: "course",
-          select: "name program",
-          populate: {
-            path: "program",
-            select: "type program_name"
+        populate: [
+          {
+            path: "course",
+            select: "name program",
+            populate: {
+              path: "program",
+              select: "type program_name"
+            }
           }
-        }
+        ]
+      })
+      .populate({
+        path: "session",
+        select: "title order content"
       })
       .populate({
         path: "room",
@@ -1636,6 +1636,9 @@ exports.getTeacherSchedule = async (req, res) => {
     const formattedSchedules = classSchedules.map((schedule) => {
       const classInfo = schedule.class;
       const room = schedule.room;
+      
+      // Lấy programType từ nested populate
+      const programType = schedule.class?.course?.program?.type || null;
 
       return {
         _id: schedule._id,
@@ -1654,7 +1657,8 @@ exports.getTeacherSchedule = async (req, res) => {
         date: schedule.date,
         topic: schedule.topic,
         status: schedule.status,
-        programType: schedule.class?.course?.program?.type || null,
+        session: schedule.session,
+        programType: programType,
         class: schedule.class,
       };
     });

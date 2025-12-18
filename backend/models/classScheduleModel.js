@@ -13,6 +13,11 @@ const classScheduleSchema = new Schema({
     startTime: { type: String, required: true },
     endTime: { type: String, required: true },
     room: { type: Schema.Types.ObjectId, ref: 'Room', required: true },
+
+    // Original schedule info (to detect if schedule returns to original state)
+    originalDate: { type: Date },
+    originalStartTime: { type: String },
+    originalEndTime: { type: String },
     
     // Thêm teacher (id)
     teacher: {

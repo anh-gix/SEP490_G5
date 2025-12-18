@@ -730,19 +730,26 @@ exports.updateSchedule = async (req, res) => {
     
     if (scope === 'future') {
       console.log(' Cập nhật "Buổi học này và các buổi học sau":');
-      
-      const currentDate = new Date(schedule.date);
-      currentDate.setHours(0, 0, 0, 0);
-      const currentDayOfWeek = currentDate.getDay();
+
+      // Convert current date to UTC midnight
+      const scheduleDate = new Date(schedule.date);
+      const currentDate = new Date(Date.UTC(
+        scheduleDate.getUTCFullYear(),
+        scheduleDate.getUTCMonth(),
+        scheduleDate.getUTCDate(),
+        0, 0, 0, 0
+      ));
+      const currentDayOfWeek = currentDate.getUTCDay();
       const currentStartTime = schedule.startTime;
       const currentEndTime = schedule.endTime;
-      
+
       console.log('  - Pattern cũ: Thứ', currentDayOfWeek, currentStartTime, '-', currentEndTime);
-      
+
+      // Format date to YYYY-MM-DD using UTC methods
       const formatDateToYYYYMMDD = (dateObj) => {
-        const year = dateObj.getFullYear();
-        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const day = String(dateObj.getDate()).padStart(2, '0');
+        const year = dateObj.getUTCFullYear();
+        const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getUTCDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       };
       
@@ -753,13 +760,14 @@ exports.updateSchedule = async (req, res) => {
           message: 'Định dạng ngày không hợp lệ. Phải là YYYY-MM-DD.'
         });
       }
-      
-      const newDate = new Date(
+
+      // Create date at UTC midnight to avoid timezone issues
+      const newDate = new Date(Date.UTC(
         parseInt(newDateParts[0]),
         parseInt(newDateParts[1]) - 1,
-        parseInt(newDateParts[2])
-      );
-      newDate.setHours(0, 0, 0, 0);
+        parseInt(newDateParts[2]),
+        0, 0, 0, 0
+      ));
       const newDayOfWeek = newDate.getDay();
       const newStartTime = startTime || currentStartTime;
       const newEndTime = endTime || currentEndTime;
@@ -773,8 +781,8 @@ exports.updateSchedule = async (req, res) => {
       
       const matchingSchedules = allSchedules.filter(s => {
         const sDate = new Date(s.date);
-        sDate.setHours(0, 0, 0, 0);
-        return sDate.getDay() === currentDayOfWeek &&
+        // Use UTC day to match pattern
+        return sDate.getUTCDay() === currentDayOfWeek &&
                s.startTime === currentStartTime &&
                s.endTime === currentEndTime;
       });
@@ -788,8 +796,14 @@ exports.updateSchedule = async (req, res) => {
         });
       }
       
-      const firstScheduleDate = new Date(matchingSchedules[0].date);
-      firstScheduleDate.setHours(0, 0, 0, 0);
+      // Convert first schedule date to UTC midnight
+      const firstSchDate = new Date(matchingSchedules[0].date);
+      const firstScheduleDate = new Date(Date.UTC(
+        firstSchDate.getUTCFullYear(),
+        firstSchDate.getUTCMonth(),
+        firstSchDate.getUTCDate(),
+        0, 0, 0, 0
+      ));
       
       const daysDiff = Math.floor((newDate.getTime() - firstScheduleDate.getTime()) / (24 * 60 * 60 * 1000));
       const weeksDiff = Math.floor(daysDiff / 7);
@@ -827,15 +841,25 @@ exports.updateSchedule = async (req, res) => {
       console.log('  - Bắt đầu validate conflict cho', matchingSchedules.length, 'buổi học...');
       
       for (const matchingSchedule of matchingSchedules) {
+        // Convert to UTC midnight for comparison
         const originalDate = new Date(matchingSchedule.date);
-        originalDate.setHours(0, 0, 0, 0);
-        
-        const daysFromFirst = Math.floor((originalDate.getTime() - firstScheduleDate.getTime()) / (24 * 60 * 60 * 1000));
+        const originalDateUTC = new Date(Date.UTC(
+          originalDate.getUTCFullYear(),
+          originalDate.getUTCMonth(),
+          originalDate.getUTCDate(),
+          0, 0, 0, 0
+        ));
+
+        const daysFromFirst = Math.floor((originalDateUTC.getTime() - firstScheduleDate.getTime()) / (24 * 60 * 60 * 1000));
         const weeksFromFirst = Math.floor(daysFromFirst / 7);
-        
-        const newScheduleDate = new Date(newDate);
-        newScheduleDate.setDate(newDate.getDate() + (weeksFromFirst * 7));
-        newScheduleDate.setHours(0, 0, 0, 0);
+
+        // Calculate new date in UTC
+        const newScheduleDate = new Date(Date.UTC(
+          newDate.getUTCFullYear(),
+          newDate.getUTCMonth(),
+          newDate.getUTCDate() + (weeksFromFirst * 7),
+          0, 0, 0, 0
+        ));
         
         const newScheduleDateStr = formatDateToYYYYMMDD(newScheduleDate);
         
@@ -883,16 +907,26 @@ exports.updateSchedule = async (req, res) => {
       console.log(`  ✓ Tất cả ${matchingSchedules.length} buổi học đều không có conflict`);
       
       const updatePromises = matchingSchedules.map(async (matchingSchedule) => {
+        // Convert to UTC midnight for comparison
         const originalDate = new Date(matchingSchedule.date);
-        originalDate.setHours(0, 0, 0, 0);
-        
-        const daysFromFirst = Math.floor((originalDate.getTime() - firstScheduleDate.getTime()) / (24 * 60 * 60 * 1000));
+        const originalDateUTC = new Date(Date.UTC(
+          originalDate.getUTCFullYear(),
+          originalDate.getUTCMonth(),
+          originalDate.getUTCDate(),
+          0, 0, 0, 0
+        ));
+
+        const daysFromFirst = Math.floor((originalDateUTC.getTime() - firstScheduleDate.getTime()) / (24 * 60 * 60 * 1000));
         const weeksFromFirst = Math.floor(daysFromFirst / 7);
-        
-        const newScheduleDate = new Date(newDate);
-        newScheduleDate.setDate(newDate.getDate() + (weeksFromFirst * 7));
-        newScheduleDate.setHours(0, 0, 0, 0);
-        
+
+        // Calculate new date in UTC
+        const newScheduleDate = new Date(Date.UTC(
+          newDate.getUTCFullYear(),
+          newDate.getUTCMonth(),
+          newDate.getUTCDate() + (weeksFromFirst * 7),
+          0, 0, 0, 0
+        ));
+
         const updateData = {
           date: newScheduleDate,
           startTime: newStartTime,
@@ -932,14 +966,51 @@ exports.updateSchedule = async (req, res) => {
       console.log('  - Date cũ:', schedule.date, '-> Date mới:', date);
       console.log('  - StartTime cũ:', schedule.startTime, '-> StartTime mới:', startTime);
       console.log('  - EndTime cũ:', schedule.endTime, '-> EndTime mới:', endTime);
-      console.log('  - Status cũ:', schedule.status, '-> Status mới: temporary');
-      
+      console.log('  - Status cũ:', schedule.status);
+
+      // Save original values ONLY on first change from 'fixed' to 'temporary'
+      if (schedule.status === 'fixed' && !schedule.originalDate) {
+        schedule.originalDate = schedule.date;
+        schedule.originalStartTime = schedule.startTime;
+        schedule.originalEndTime = schedule.endTime;
+        console.log('  - Lưu original values:', {
+          date: schedule.originalDate,
+          startTime: schedule.originalStartTime,
+          endTime: schedule.originalEndTime
+        });
+      }
+
+      // Update schedule values
       if (date) schedule.date = date;
       if (startTime) schedule.startTime = startTime;
       if (endTime) schedule.endTime = endTime;
-      
-      schedule.status = 'temporary';
-      
+
+      // Check if schedule has original values (was changed before)
+      if (schedule.originalDate) {
+        // Compare with original to determine status
+        const returnedToOriginal =
+          schedule.date.toISOString() === schedule.originalDate.toISOString() &&
+          schedule.startTime === schedule.originalStartTime &&
+          schedule.endTime === schedule.originalEndTime;
+
+        if (returnedToOriginal) {
+          // Returned to original → set back to 'fixed' and clear original values
+          schedule.status = 'fixed';
+          schedule.originalDate = null;
+          schedule.originalStartTime = null;
+          schedule.originalEndTime = null;
+          console.log('  - Status: temporary -> fixed (đã về đúng lịch gốc, xóa original values)');
+        } else {
+          // Still different from original → keep as 'temporary'
+          schedule.status = 'temporary';
+          console.log('  - Status: -> temporary (vẫn khác lịch gốc)');
+        }
+      } else {
+        // No original values → this is first change, set to 'temporary'
+        schedule.status = 'temporary';
+        console.log('  - Status: fixed -> temporary');
+      }
+
       await schedule.save();
       
       console.log(' Bắt đầu sắp xếp lại session cho tất cả buổi học trong lớp...');

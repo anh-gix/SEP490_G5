@@ -75,21 +75,18 @@ const ViewRequestModal = ({ show, onClose, request, onRequestUpdated }) => {
   };
 
   return (
-    <Modal show={show} onClose={onClose} size="lg">
-      <div className="modal-header border-bottom">
-        <h5 className="modal-title fw-bold">
+    <Modal
+      show={show}
+      onClose={onClose}
+      size="lg"
+      title={
+        <>
           <i className="ph ph-clipboard-text me-2"></i>
           Chi tiết yêu cầu công việc
-        </h5>
-        <button
-          type="button"
-          className="btn-close"
-          onClick={onClose}
-          aria-label="Close"
-        />
-      </div>
-
-      <div className="modal-body">
+        </>
+      }
+    >
+      <div>
         <div className="row g-4">
           {/* Request Type */}
           <div className="col-12">
@@ -241,47 +238,46 @@ const ViewRequestModal = ({ show, onClose, request, onRequestUpdated }) => {
         </div>
       </div>
 
-      <div className="modal-footer border-top">
-        <Button variant="outline" onClick={onClose} disabled={loading}>
-          Đóng
-        </Button>
-        {request.status === 'pending' && (
-          <Button
-            variant="success"
-            icon="ph ph-play"
-            onClick={handleStartProcessing}
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <span className="spinner-border spinner-border-sm me-2"></span>
-                Đang xử lý...
-              </>
-            ) : (
-              'Bắt đầu xử lý'
-            )}
-          </Button>
-        )}
-        {request.status === 'in_progress' && (
-          <Button
-            variant="primary"
-            icon="ph ph-pencil"
-            onClick={() => {
-              onClose();
-              // Navigate đến program đã được tạo
-              if (request.entityId) {
-                const programId = typeof request.entityId === 'object' ? request.entityId._id : request.entityId;
-                navigate(`/teacher/programs/${programId}/edit`);
-              } else {
-                alert('Chưa có program được tạo cho request này.');
-              }
-            }}
-            disabled={!request.entityId}
-          >
-            Tiếp tục tạo program
-          </Button>
-        )}
-      </div>
+      {(request.status === 'pending' || request.status === 'in_progress') && (
+        <div className="modal-footer border-top">
+          {request.status === 'pending' && (
+            <Button
+              variant="success"
+              icon="ph ph-play"
+              onClick={handleStartProcessing}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2"></span>
+                  Đang xử lý...
+                </>
+              ) : (
+                'Bắt đầu xử lý'
+              )}
+            </Button>
+          )}
+          {request.status === 'in_progress' && (
+            <Button
+              variant="primary"
+              icon="ph ph-pencil"
+              onClick={() => {
+                onClose();
+                // Navigate đến program đã được tạo
+                if (request.entityId) {
+                  const programId = typeof request.entityId === 'object' ? request.entityId._id : request.entityId;
+                  navigate(`/teacher/programs/${programId}/edit`);
+                } else {
+                  alert('Chưa có program được tạo cho request này.');
+                }
+              }}
+              disabled={!request.entityId}
+            >
+              Tiếp tục tạo program
+            </Button>
+          )}
+        </div>
+      )}
     </Modal>
   );
 };

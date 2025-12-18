@@ -315,8 +315,8 @@ const TeacherProgramList = () => {
       field: 'program_name',
       render: (row) => (
         <div>
-          <div className="fw-semibold text-neutral-900 mb-1" style={{ fontSize: '0.875rem' }}>{row.program_name}</div>
-          <div className="text-neutral-600" style={{ fontSize: '0.75rem' }}>Mã: {row.code}</div>
+          <div className="fw-semibold text-neutral-900 mb-1" style={{ fontSize: '0.8125rem' }}>{row.program_name}</div>
+          <div className="text-neutral-600" style={{ fontSize: '0.6875rem' }}>Mã: {row.code}</div>
         </div>
       ),
     },
@@ -330,7 +330,7 @@ const TeacherProgramList = () => {
           'cam': 'Cambridge'
         };
         return (
-          <span className="badge bg-info-600 text-white" style={{ fontSize: '0.75rem' }}>
+          <span className="badge bg-info-600 text-white" style={{ fontSize: '0.6875rem', whiteSpace: 'nowrap' }}>
             {typeLabels[row.type] || row.type?.toUpperCase() || 'N/A'}
           </span>
         );
@@ -340,14 +340,14 @@ const TeacherProgramList = () => {
       header: 'PLOs',
       field: 'plos',
       render: (row) => (
-        <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>{row.plos?.length || 0} PLOs</span>
+        <span className="text-neutral-700" style={{ fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>{row.plos?.length || 0} PLOs</span>
       ),
     },
     {
       header: 'Khóa học',
       field: 'courseCount',
       render: (row) => (
-        <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>{row.courseCount} khóa học</span>
+        <span className="text-neutral-700" style={{ fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>{row.courseCount} khóa học</span>
       ),
     },
     {
@@ -359,14 +359,14 @@ const TeacherProgramList = () => {
       header: 'Cập nhật',
       field: 'updatedAt',
       render: (row) => (
-        <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>{formatDate(row.updatedAt)}</span>
+        <span className="text-neutral-700" style={{ fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>{formatDate(row.updatedAt)}</span>
       ),
     },
     {
       header: 'Hành động',
       field: 'actions',
       render: (row) => (
-        <div className="d-flex gap-2 justify-content-center">
+        <div className="d-flex gap-1 justify-content-center" style={{ whiteSpace: 'nowrap' }}>
           <Button
             variant="outline"
             size="sm"
@@ -375,9 +375,10 @@ const TeacherProgramList = () => {
               e.stopPropagation();
               navigate(`/teacher/programs/${row._id}`);
             }}
+            className="px-2 py-1"
           >
-            <span className="d-none d-md-inline">Xem</span>
-            <span className="d-inline d-md-none">👁</span>
+            <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Xem</span>
+            <span className="d-inline d-lg-none">👁</span>
           </Button>
           {activeTab === 'my-programs' && (
             <>
@@ -389,9 +390,10 @@ const TeacherProgramList = () => {
                   e.stopPropagation();
                   navigate(`/teacher/programs/${row._id}/edit`);
                 }}
+                className="px-2 py-1"
               >
-                <span className="d-none d-md-inline">Sửa</span>
-                <span className="d-inline d-md-none">✏️</span>
+                <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Sửa</span>
+                <span className="d-inline d-lg-none">✏️</span>
               </Button>
               <Button
                 variant="danger"
@@ -401,9 +403,10 @@ const TeacherProgramList = () => {
                   e.stopPropagation();
                   handleDeleteProgram(row._id, row.program_name);
                 }}
+                className="px-2 py-1"
               >
-                <span className="d-none d-md-inline">Xóa</span>
-                <span className="d-inline d-md-none">🗑️</span>
+                <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Xóa</span>
+                <span className="d-inline d-lg-none">🗑️</span>
               </Button>
             </>
           )}

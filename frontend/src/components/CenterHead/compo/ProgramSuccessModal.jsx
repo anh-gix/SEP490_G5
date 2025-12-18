@@ -3,10 +3,11 @@ import Button from './Button';
 import Badge from './Badge';
 
 /**
- * Program Success Modal - Hiển thị sau khi tạo program thành công
+ * Program Success Modal - Hiển thị sau khi tạo/cập nhật program thành công
  *
  * @param {boolean} show - Hiển thị modal
- * @param {object} programData - Dữ liệu program vừa tạo
+ * @param {object} programData - Dữ liệu program vừa tạo/cập nhật
+ * @param {boolean} isEdit - True nếu là chỉnh sửa, false nếu là tạo mới
  * @param {function} onCreateCourse - Callback khi user chọn "Tạo học phần"
  * @param {function} onViewDetail - Callback khi user chọn "Xem chi tiết"
  * @param {function} onGoToList - Callback khi user chọn "Về danh sách"
@@ -14,6 +15,7 @@ import Badge from './Badge';
 const ProgramSuccessModal = ({
   show,
   programData,
+  isEdit = false,
   onCreateCourse,
   onViewDetail,
   onGoToList
@@ -36,7 +38,7 @@ const ProgramSuccessModal = ({
           <i className="ph ph-check-circle text-success" style={{ fontSize: '48px' }}></i>
         </div>
         <h4 className="fw-bold text-neutral-900 mb-2">
-          Tạo chương trình thành công!
+          {isEdit ? 'Cập nhật chương trình thành công!' : 'Tạo chương trình thành công!'}
         </h4>
         <p className="text-neutral-600 mb-0">
           Chương trình đã được lưu vào hệ thống

@@ -124,6 +124,12 @@ router.post(
   workRequestController.startProcessing
 );
 
+// Recreate entity (when entity was deleted)
+router.post(
+  '/:id/recreate-entity',
+  workRequestController.recreateEntity
+);
+
 router.post(
   '/:id/upload-output',
   upload.single('outputFile'),

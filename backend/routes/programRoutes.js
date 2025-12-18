@@ -19,7 +19,8 @@ router.get('/:id/submission-status', programController.getProgramSubmissionStatu
 
 // PROGRAM MANAGEMENT ROUTES
 // NOTE: Submit/Approve/Reject are now handled by /api/approval-requests routes
-router.patch('/:id/activate', programController.activateProgram);
+router.patch('/:id/toggle-active', programController.toggleProgramActive); // Toggle isActive field
+router.patch('/:id/activate', programController.activateProgram); // DEPRECATED
 router.patch('/:id/archive', programController.archiveProgram);
 
 module.exports = router;

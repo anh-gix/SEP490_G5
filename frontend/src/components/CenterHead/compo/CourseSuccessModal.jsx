@@ -146,13 +146,16 @@ const CourseSuccessModal = ({
               <Badge
                 variant={
                   courseData.status === 'completed' ? 'success' :
+                  courseData.status === 'active' ? 'success' :
                   courseData.status === 'draft' ? 'secondary' :
-                  'warning'
+                  courseData.status === 'archived' ? 'neutral' :
+                  'secondary'
                 }
               >
                 {courseData.status === 'completed' && 'Hoàn thành'}
                 {courseData.status === 'draft' && 'Bản nháp'}
-                {courseData.status === 'pending_approval' && 'Chờ duyệt'}
+                {courseData.status === 'active' && 'Đang hoạt động'}
+                {courseData.status === 'archived' && 'Đã lưu trữ'}
               </Badge>
             </div>
           </div>

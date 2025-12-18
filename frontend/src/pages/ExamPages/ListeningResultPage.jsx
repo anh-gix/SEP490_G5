@@ -7,7 +7,7 @@ import { useAuth } from "../../contexts/AuthContext";
 const ListeningResultPage = () => {
   const { examId, submissionId } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [result, setResult] = useState(null);
   const [examData, setExamData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -18,6 +18,11 @@ const ListeningResultPage = () => {
   const [selectedBandScore, setSelectedBandScore] = useState(null);
 
   useEffect(() => {
+    // Đợi auth context hoàn thành việc check authentication
+    if (authLoading) {
+      return;
+    }
+
     if (!isAuthenticated) {
       navigate("/sign-in");
       return;
@@ -41,7 +46,7 @@ const ListeningResultPage = () => {
     };
 
     fetchData();
-  }, [examId, submissionId, isAuthenticated, navigate]);
+  }, [examId, submissionId, isAuthenticated, authLoading, navigate]);
 
   const getScorePercentage = () => {
     if (!result || !result.maxScore) return 0;
@@ -272,7 +277,7 @@ const ListeningResultPage = () => {
     }
   }, [result]);
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <>
    

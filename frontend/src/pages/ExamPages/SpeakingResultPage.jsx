@@ -7,13 +7,18 @@ import { useAuth } from "../../contexts/AuthContext";
 const SpeakingResultPage = () => {
   const { examId, submissionId } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedBandScore, setSelectedBandScore] = useState(null);
 
   useEffect(() => {
+    // Đợi auth context hoàn thành việc check authentication
+    if (authLoading) {
+      return;
+    }
+
     if (!isAuthenticated) {
       navigate("/sign-in");
       return;
@@ -33,7 +38,7 @@ const SpeakingResultPage = () => {
     };
 
     fetchResult();
-  }, [examId, submissionId, isAuthenticated, navigate]);
+  }, [examId, submissionId, isAuthenticated, authLoading, navigate]);
 
   // Initialize selected band score when result changes
   useEffect(() => {
@@ -111,7 +116,7 @@ const SpeakingResultPage = () => {
     return 3;
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <>
       

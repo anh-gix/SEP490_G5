@@ -378,46 +378,71 @@ const ListeningResultPage = () => {
                         Điểm của bạn: {currentBandScore !== null ? <span className="fw-bold text-main-600">{currentBandScore}</span> : "N/A"}
                       </p>
                       <div className="d-flex flex-wrap gap-8 justify-content-center align-items-center">
-                        {bandScores.map((band) => (
-                          <span
-                            key={band}
-                            onClick={() => setSelectedBandScore(band)}
-                            className={`fw-semibold ${
-                              currentBandScore === band 
-                                ? "bg-main-600 text-white border-main-600" 
-                                : "text-main-600 bg-transparent border-neutral-30"
-                            }`}
-                            style={{
-                              fontSize: "18px",
-                              cursor: "pointer",
-                              transition: "all 0.2s ease",
-                              padding: "8px 16px",
-                              borderRadius: "8px",
-                              border: "2px solid",
-                              display: "inline-block"
-                            }}
-                            onMouseEnter={(e) => {
-                              if (currentBandScore !== band) {
-                                e.target.style.backgroundColor = "var(--main-25)";
-                                e.target.style.borderColor = "var(--main-600)";
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (currentBandScore !== band) {
-                                e.target.style.backgroundColor = "transparent";
-                                e.target.style.borderColor = "var(--neutral-30)";
-                              }
-                            }}
-                          >
-                            {band}
-                          </span>
-                        ))}
+                        {bandScores.map((band) => {
+                          const isCurrentBand = currentBandScore === band;
+                          const isSelectedBand = selectedBandScore === band;
+                          const isDisplayBand = displayBandScore === band;
+                          
+                          let className = "fw-semibold text-main-600 bg-transparent border-neutral-30";
+                          if (isCurrentBand && isSelectedBand) {
+                            // Band của người dùng và đang được chọn
+                            className = "bg-success text-white border-success";
+                          } else if (isCurrentBand) {
+                            // Band của người dùng (nhưng không được chọn)
+                            className = "bg-success-25 text-success border-success";
+                          } else if (isSelectedBand || isDisplayBand) {
+                            // Band được chọn (không phải của người dùng)
+                            className = "bg-main-600 text-white border-main-600";
+                          }
+                          
+                          return (
+                            <span
+                              key={band}
+                              onClick={() => setSelectedBandScore(band)}
+                              className={className}
+                              style={{
+                                fontSize: "18px",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                padding: "8px 16px",
+                                borderRadius: "8px",
+                                border: "2px solid",
+                                display: "inline-block"
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isCurrentBand && !isSelectedBand) {
+                                  e.target.style.backgroundColor = "var(--main-25)";
+                                  e.target.style.borderColor = "var(--main-600)";
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isCurrentBand && !isSelectedBand) {
+                                  e.target.style.backgroundColor = "transparent";
+                                  e.target.style.borderColor = "var(--neutral-30)";
+                                }
+                              }}
+                            >
+                              {band}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
 
                     {/* Band Score Details */}
                     {displayBandScore && bandScoreData[displayBandScore] && (
-                      <div className="border-top border-neutral-30 pt-24">
+                      <div className={`border-top border-neutral-30 pt-24 ${
+                        selectedBandScore === displayBandScore 
+                          ? (currentBandScore === displayBandScore 
+                              ? "bg-success-25 border-success-600" 
+                              : "bg-main-25 border-main-600")
+                          : ""
+                      }`} style={{
+                        borderRadius: "8px",
+                        borderWidth: selectedBandScore === displayBandScore ? "2px" : "1px",
+                        borderStyle: "solid",
+                        transition: "all 0.2s ease"
+                      }}>
                         <div className="row gy-3">
                           <div className="col-md-4">
                             <div className="border-bottom border-neutral-30 pb-12">

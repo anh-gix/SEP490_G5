@@ -89,6 +89,20 @@ const SessionLearning = () => {
     }
   };
 
+  const handleResetQuiz = async () => {
+    try {
+      await onlineLearningService.resetQuizCompletion(courseId, sessionId);
+      
+      // Update local state
+      setSession(prev => ({
+        ...prev,
+        progress: { ...prev.progress, quiz: false }
+      }));
+    } catch (err) {
+      console.error('Error resetting quiz:', err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="py-40 px-32">
@@ -284,6 +298,7 @@ const SessionLearning = () => {
                 <CambridgeQuiz
                   quizData={session.quizzes.quiz}
                   onComplete={handleCompleteQuiz}
+                  onReset={handleResetQuiz}
                   isCompleted={session.progress.quiz}
                 />
               )}

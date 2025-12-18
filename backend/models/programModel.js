@@ -74,6 +74,7 @@ const programSchema = new Schema({
             'approved',           // Center Head đã duyệt
             'needs_revision',     // Center Head yêu cầu chỉnh sửa
             'active',             // Đang sử dụng (sau khi approved)
+            'deActive',           // Đang sử dụng (sau khi approved)
             'archived'            // Đã lưu trữ
         ],
         default: 'draft',

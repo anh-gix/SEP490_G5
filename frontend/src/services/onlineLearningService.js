@@ -108,6 +108,13 @@ const onlineLearningService = {
   // ========================
   markVocabularyCompleted: async (courseId, sessionId) => {
     return onlineLearningService.updateProgress(courseId, sessionId, { vocabulary: true });
+  },
+
+  // ========================
+  //  RESET QUIZ COMPLETION
+  // ========================
+  resetQuizCompletion: async (courseId, sessionId) => {
+    return onlineLearningService.updateProgress(courseId, sessionId, { quiz: false });
   }
 };
 

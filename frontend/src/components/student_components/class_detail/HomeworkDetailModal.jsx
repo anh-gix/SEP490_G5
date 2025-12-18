@@ -48,18 +48,33 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
     
+    // Validate file types (only PDF and Word)
+    const allowedExtensions = ['.pdf', '.doc', '.docx'];
+    const invalidFiles = files.filter(f => {
+      const ext = '.' + f.name.split('.').pop().toLowerCase();
+      return !allowedExtensions.includes(ext);
+    });
+    
+    if (invalidFiles.length > 0) {
+      setError(`Chỉ chấp nhận file PDF và Word. File không hợp lệ: ${invalidFiles.map(f => f.name).join(', ')}`);
+      e.target.value = '';
+      return;
+    }
+    
     // Validate file size (max 50MB per file)
     const maxSize = 50 * 1024 * 1024;
     const oversizedFiles = files.filter(f => f.size > maxSize);
     
     if (oversizedFiles.length > 0) {
       setError('Một số file vượt quá 50MB. Vui lòng chọn file nhỏ hơn.');
+      e.target.value = '';
       return;
     }
 
     // Validate total file count (existing + new max 5 files)
     if (selectedFiles.length + files.length > 5) {
       setError('Chỉ được chọn tối đa 5 file.');
+      e.target.value = '';
       return;
     }
 
@@ -448,7 +463,7 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
                             type="file"
                             id="fileInput"
                             multiple
-                            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
+                            accept=".pdf,.doc,.docx"
                             onChange={handleFileChange}
                             disabled={loading || selectedFiles.length >= 5}
                             style={{ display: 'none' }}
@@ -464,7 +479,8 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
                             {selectedFiles.length > 0 ? 'Thêm file bổ sung' : 'Chọn file nộp bài'}
                           </Button>
                           <Form.Text className="text-neutral-500 d-block mb-8 text-11">
-                            PDF, Word, Excel, PowerPoint, TXT, ZIP, RAR (Max 5 files, &lt;50MB/file)
+                            <i className="fas fa-info-circle me-1"></i>
+                            Chỉ chấp nhận file PDF và Word (Max 5 files, &lt;50MB/file)
                           </Form.Text>
 
                           {/* Action Buttons */}

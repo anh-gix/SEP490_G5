@@ -133,14 +133,6 @@ const ExamDetailPage = () => {
     }
   };
 
-  // Calculate total questions
-  const getTotalQuestions = (exam) => {
-    if (!exam || !exam.sections) return 0;
-    return exam.sections.reduce(
-      (total, section) => total + (section.questionCount || 0),
-      0
-    );
-  };
 
   // Calculate progress based on submission
   const progress = useMemo(() => {
@@ -150,7 +142,7 @@ const ExamDetailPage = () => {
     if (totalSections === 0) return 0;
     
     const submittedSections = submission.sections?.filter(
-      (section) => section.submittedAt !== null
+      (section) => section.submittedAt !== null && section.submittedAt !== undefined
     ).length || 0;
     
     return Math.round((submittedSections / totalSections) * 100);
@@ -450,8 +442,7 @@ const ExamDetailPage = () => {
                   const config = getSectionConfig(sectionType);
                   const isCompleted = isSectionCompleted(sectionType);
                   const sectionsOfType = sectionsByType[sectionType];
-                  const totalQuestions = sectionsOfType.reduce((sum, s) => sum + (s.questionCount || 0), 0);
-                  const totalDuration = sectionsOfType.reduce((sum, s) => sum + (s.duration || 0), 0);
+                 
                   
                   return (
                     <div key={index} className="col-lg-3 col-md-6 col-sm-6">

@@ -18,23 +18,43 @@ const StudentExamListPage = () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         // Fetch exams
         const examsData = await examService.getAllExams();
         setExams(examsData || []);
-        
-        // Try to fetch submissions (if endpoint exists)
-        try {
-          const submissionsData = await examService.getStudentSubmissions();
-          setSubmissions(submissionsData || []);
-        } catch (submissionError) {
-          // If endpoint doesn't exist, submissions will remain empty array
-          console.log('Submissions endpoint not available:', submissionError);
+
+        // Fetch submissions for each exam using getExamSubmissions
+        if (examsData && examsData.length > 0) {
+          try {
+            const submissionsResponses = await Promise.all(
+              examsData.map((exam) =>
+                examService
+                  .getExamSubmissions(exam._id)
+                  .catch((err) => {
+                    console.error(
+                      `Error fetching submissions for exam ${exam._id}:`,
+                      err
+                    );
+                    return null;
+                  })
+              )
+            );
+
+            const allSubmissions = submissionsResponses
+              .filter((res) => res)
+              .flatMap((res) => res.submissions || res);
+
+            setSubmissions(allSubmissions || []);
+          } catch (submissionError) {
+            console.error("Error fetching submissions:", submissionError);
+            setSubmissions([]);
+          }
+        } else {
           setSubmissions([]);
         }
       } catch (err) {
-        console.error('Error fetching data:', err);
-        setError(err.message || 'Không thể tải dữ liệu');
+        console.error("Error fetching data:", err);
+        setError(err.message || "Không thể tải dữ liệu");
       } finally {
         setLoading(false);
       }
@@ -63,7 +83,7 @@ const StudentExamListPage = () => {
       const matchesStatus =
         selectedStatusFilter === "all" ||
         (selectedStatusFilter === "completed" && examStatus === "completed") ||
-        (selectedStatusFilter === "in-progress" && (examStatus === "in-progress" || examStatus === "partially-submitted")) ||
+        (selectedStatusFilter === "in-progress" && examStatus === "in-progress") ||
         (selectedStatusFilter === "not-started" && !examStatus);
 
       // Filter by search query (title or description)
@@ -101,7 +121,7 @@ const StudentExamListPage = () => {
         const submission = submissions.find(
           (sub) => String(sub.examId) === String(exam._id)
         );
-        return submission?.status === "in-progress" || submission?.status === "partially-submitted";
+        return submission?.status === "in-progress";
       }).length,
       "not-started": exams.filter((exam) => {
         const submission = submissions.find(
@@ -166,7 +186,6 @@ const StudentExamListPage = () => {
           className: "bg-success"
         };
       case "in-progress":
-      case "partially-submitted":
         return {
           label: "Đang làm bài",
           className: "bg-warning"
@@ -244,7 +263,7 @@ const StudentExamListPage = () => {
 
   return (
     <>
-      <section className="course-grid-view py-120">
+      <section className="course-grid-view pt-40 pb-120">
         <div className="container">
           {/* Header Section */}
           <div className="mb-40">

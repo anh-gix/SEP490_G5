@@ -115,7 +115,7 @@ const WritingResultPage = () => {
   return (
     <>
 
-      <section className="py-120">
+      <section className="pt-40 pb-120">
         <div className="container">
           {error ? (
             <div className="alert alert-danger rounded-12 p-24 mb-40" role="alert">

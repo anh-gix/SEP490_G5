@@ -128,7 +128,7 @@ const SpeakingResultPage = () => {
     <>
     
 
-      <section className="py-120">
+      <section className="pt-40 pb-120">
         <div className="container">
           {error ? (
             <div className="alert alert-danger rounded-12 p-24 mb-40" role="alert">
@@ -333,27 +333,6 @@ const SpeakingResultPage = () => {
                                   </p>
                                   <div className="bg-main-25 rounded-12 p-16 border border-neutral-30">
                                     <audio src={recordingUrl} controls className="w-100" />
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Text Answer (if any) */}
-                              {item.studentAnswer && (
-                                <div className="mb-16">
-                                  <p className="text-neutral-600 text-sm mb-12 fw-semibold">
-                                    <i className="ph ph-note me-8" />
-                                    Ghi chú của bạn:
-                                  </p>
-                                  <div className="bg-main-25 rounded-12 p-16 border border-neutral-30">
-                                    <p
-                                      className="text-neutral-700 mb-0"
-                                      style={{
-                                        whiteSpace: "pre-wrap",
-                                        lineHeight: "1.8",
-                                      }}
-                                    >
-                                      {item.studentAnswer}
-                                    </p>
                                   </div>
                                 </div>
                               )}

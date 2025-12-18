@@ -509,7 +509,7 @@ exports.getAssignedToMe = async (req, res) => {
   try {
     const { userId, status } = req.query;
 
-    console.log('🔍 Get Assigned To Me - Query params:', { userId, status });
+    
 
     if (!userId) {
       return res.status(400).json({
@@ -524,7 +524,7 @@ exports.getAssignedToMe = async (req, res) => {
     };
     if (status) query.status = status;
 
-    console.log('🔎 Searching with query:', query);
+   
 
     const requests = await WorkRequest.find(query)
       .populate('requestedBy', 'name email username')
@@ -533,7 +533,7 @@ exports.getAssignedToMe = async (req, res) => {
       .populate('entityId')
       .sort({ requestedAt: -1 });
 
-    console.log('📦 Found', requests.length, 'work requests for user', userId);
+   
 
     res.status(200).json({
       success: true,
@@ -542,7 +542,7 @@ exports.getAssignedToMe = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error getting assigned requests:', error);
+    console.error('Error getting assigned requests:', error);
     res.status(500).json({
       success: false,
       message: 'Error getting assigned requests'
@@ -692,7 +692,7 @@ exports.rejectRequest = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { userId, reason } = req.body;
+    const { userId, rejectionReason, responseNote } = req.body;
 
     if (!userId) {
       await session.abortTransaction();
@@ -703,8 +703,8 @@ exports.rejectRequest = async (req, res) => {
     }
 
     const centerHeadId = userId;
-
-    if (!reason || reason.trim() === '') {
+    
+    if (!rejectionReason || rejectionReason.trim() === '') {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
@@ -738,23 +738,28 @@ exports.rejectRequest = async (req, res) => {
       status: 'rejected',
       processedBy: centerHeadId,
       processedAt: new Date(),
-      rejectionReason: reason,
+      rejectionReason: rejectionReason,
       $push: {
         history: {
           action: 'rejected',
           performedBy: centerHeadId,
           performedAt: new Date(),
-          note: reason,
+          note: rejectionReason,
           previousStatus: previousStatus
         }
       }
     }, { session });
 
-    // 2. Update entity status → needs_revision
+    // 2. Update entity status → needs_revision and add rejectionReason
     const Model = request.entityType === 'Program' ? Program : Exam;
     await Model.findByIdAndUpdate(
       request.entityId,
-      { status: 'needs_revision' },
+      {
+        status: 'needs_revision',
+        rejectionReason: rejectionReason,
+        rejectedBy: centerHeadId,
+        rejectedAt: new Date()
+      },
       { session }
     );
 

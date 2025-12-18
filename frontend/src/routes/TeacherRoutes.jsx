@@ -21,11 +21,6 @@ import TeacherCourseFormPage from "../pages/TeacherPages/TeacherCourseFormPage.j
 import TeacherCamSessionPage from "../pages/TeacherPages/TeacherCamSessionPage.jsx";
 import TeacherCamSessionEditPage from "../pages/TeacherPages/TeacherCamSessionEditPage.jsx";
 
-// Exam Management
-import TeacherExamListPage from "../pages/TeacherPages/TeacherExamListPage.jsx";
-import TeacherExamCreatePage from "../pages/TeacherPages/TeacherExamCreatePage.jsx";
-import TeacherExamViewPage from "../pages/TeacherPages/TeacherExamViewPage.jsx";
-import TeacherExamEditPage from "../pages/TeacherPages/TeacherExamEditPage.jsx";
 // Tips Management
 import TeacherTipsManagementPage from "../pages/TeacherPages/TeacherTipsManagementPage.jsx";
 import TeacherTipEditorPage from "../pages/TeacherPages/TeacherTipEditorPage.jsx";
@@ -97,13 +92,7 @@ export const teacherRoutes = [
   { path: '/teacher/cam-sessions/create', element: <TeacherCamSessionPage /> },
   { path: '/teacher/cam-sessions/:sessionId/edit', element: <TeacherCamSessionEditPage /> },
 
-  // VIII. Exam Management
-  { path: '/teacher/exams', element: <TeacherExamListPage /> },
-  { path: '/teacher/exams/create', element: <TeacherExamCreatePage /> },
-  { path: '/teacher/exams/:id', element: <TeacherExamViewPage /> },
-  { path: '/teacher/exams/:id/edit', element: <TeacherExamEditPage /> },
-
-  // IX. Tips Management
+  // VIII. Tips Management
   { path: '/teacher/tips', element: <TeacherTipsManagementPage /> },
   { path: '/teacher/tips/edit/:section', element: <TeacherTipEditorPage /> },
 ];

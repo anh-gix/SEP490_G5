@@ -12,7 +12,7 @@ const StatusBadge = ({ status, label, size = "md" }) => {
     // User & General
     active: { variant: "success", icon: "ph-check-circle", text: "Đang hoạt động" },
     inactive: { variant: "danger", icon: "ph-x-circle", text: "Không hoạt động" },
-    pending: { variant: "warning", icon: "ph-clock", text: "Chờ duyệt" },
+    pending: { variant: "warning", icon: "ph-clock", text: "Chờ xử lý" },
 
     // Course & Program
     draft: { variant: "secondary", icon: "ph-file-dashed", text: "Bản nháp" },
@@ -46,6 +46,9 @@ const StatusBadge = ({ status, label, size = "md" }) => {
     absent: { variant: "danger", icon: "ph-x", text: "Vắng" },
     late: { variant: "warning", icon: "ph-clock", text: "Muộn" },
     excused: { variant: "info", icon: "ph-info", text: "Có phép" },
+
+    // Work Request
+    in_progress: { variant: "info", icon: "ph-circle-notch", text: "Đang xử lý" },
   };
 
   const config = statusConfig[status] || {

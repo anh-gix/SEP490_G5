@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Breadcrumb from '../compo/Breadcrumb';
-import Card from '../compo/Card';
-import Table from '../compo/Table';
-import Button from '../compo/Button';
-import SearchBox from '../compo/SearchBox';
-import FilterBar from '../compo/FilterBar';
-import StatusBadge from '../compo/StatusBadge';
-import examService from '../../../services/examService';
-import { formatDate } from '../../../helper/helper';
+import Breadcrumb from '../CenterHead/compo/Breadcrumb';
+import Card from '../CenterHead/compo/Card';
+import Table from '../CenterHead/compo/Table';
+import Button from '../CenterHead/compo/Button';
+import SearchBox from '../CenterHead/compo/SearchBox';
+import FilterBar from '../CenterHead/compo/FilterBar';
+import StatusBadge from '../CenterHead/compo/StatusBadge';
+import examService from '../../services/examService';
+import { formatDate } from '../../helper/helper';
 
-const ExamList = ({ viewMode = 'center-head' }) => {
+const ExamList = ({ viewMode = 'teacher' }) => {
   const navigate = useNavigate();
 
   // Determine base path
@@ -72,8 +72,8 @@ const ExamList = ({ viewMode = 'center-head' }) => {
   };
 
   const breadcrumbItems = [
-    { label: 'Dashboard', path: '/center-head/dashboard' },
-    { label: 'Quản lý đề thi', path: '/center-head/exams' },
+    { label: 'Dashboard', path: `${basePath}/dashboard` },
+    { label: 'Quản lý đề thi', path: `${basePath}/exams` },
   ];
 
   const filters = [

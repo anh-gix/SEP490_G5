@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import Swal from 'sweetalert2';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
@@ -56,7 +59,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
 
     } catch (err) {
       console.error('Error fetching program detail:', err);
-      alert('Không thể tải thông tin chương trình!');
+      toast.error('Không thể tải thông tin chương trình!', { position: 'top-right' });
     } finally {
       setLoading(false);
     }
@@ -65,7 +68,18 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
 
   // ===== COURSE DELETE HANDLER =====
   const handleDeleteCourse = async (courseId, courseName) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa môn học "${courseName}"?\n\nHành động này không thể hoàn tác.`)) {
+    const result = await Swal.fire({
+      title: 'Xác nhận xóa',
+      text: `Bạn có chắc chắn muốn xóa môn học "${courseName}"? Hành động này không thể hoàn tác.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (!result.isConfirmed) {
       return;
     }
 
@@ -74,15 +88,15 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
       const response = await courseService.deleteCourse(courseId);
 
       if (response.success) {
-        alert('Xóa môn học thành công!');
+        toast.success('Xóa môn học thành công!', { position: 'top-right' });
         // Refresh the courses list
         setCourses(courses.filter(c => c._id !== courseId));
       } else {
-        alert(response.message || 'Xóa môn học thất bại!');
+        toast.error(response.message || 'Xóa môn học thất bại!', { position: 'top-right' });
       }
     } catch (error) {
       console.error('Error deleting course:', error);
-      alert(error.message || 'Không thể xóa môn học. Vui lòng thử lại sau.');
+      toast.error(error.message || 'Không thể xóa môn học. Vui lòng thử lại sau.', { position: 'top-right' });
     } finally {
       setActionLoading(false);
     }
@@ -101,21 +115,32 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
       });
 
       if (response.success) {
-        alert('Đã nộp chương trình thành công! Chờ Center Head phê duyệt.');
+        toast.success('Đã nộp chương trình thành công! Chờ Center Head phê duyệt.', { position: 'top-right' });
         setShowSubmitModal(false);
         setSubmissionNote('');
         fetchProgramDetail();
       }
     } catch (err) {
       console.error('Error submitting program:', err);
-      alert(err.message || 'Có lỗi xảy ra khi nộp chương trình');
+      toast.error(err.message || 'Có lỗi xảy ra khi nộp chương trình', { position: 'top-right' });
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleApproveProgram = async () => {
-    if (!window.confirm('Bạn có chắc chắn muốn duyệt chương trình này?\n\nLưu ý: Tất cả các môn học trong chương trình sẽ được duyệt cùng lúc.')) {
+    const result = await Swal.fire({
+      title: 'Xác nhận duyệt chương trình',
+      html: 'Bạn có chắc chắn muốn duyệt chương trình này?<br><br><strong>Lưu ý:</strong> Tất cả các môn học trong chương trình sẽ được duyệt cùng lúc.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#10b981',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Duyệt',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (!result.isConfirmed) {
       return;
     }
 
@@ -124,11 +149,11 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
       await programService.approveProgram(id, {
         approvalNote: 'Đã được phê duyệt bởi Center Head'
       });
-      alert('Đã duyệt chương trình và toàn bộ môn học thành công!');
+      toast.success('Đã duyệt chương trình và toàn bộ môn học thành công!', { position: 'top-right' });
       fetchProgramDetail();
     } catch (err) {
       console.error('Error approving program:', err);
-      alert(err.message || 'Có lỗi xảy ra khi duyệt chương trình');
+      toast.error(err.message || 'Có lỗi xảy ra khi duyệt chương trình', { position: 'top-right' });
     } finally {
       setActionLoading(false);
     }
@@ -140,7 +165,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
 
   const handleConfirmRejectProgram = async () => {
     if (!rejectionReason.trim()) {
-      alert('Vui lòng nhập lý do từ chối');
+      toast.warning('Vui lòng nhập lý do từ chối', { position: 'top-right' });
       return;
     }
 
@@ -149,13 +174,13 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
       await programService.rejectProgram(id, {
         rejectionReason
       });
-      alert('Đã từ chối chương trình thành công!');
+      toast.success('Đã từ chối chương trình thành công!', { position: 'top-right' });
       setShowRejectProgramModal(false);
       setRejectionReason('');
       fetchProgramDetail();
     } catch (err) {
       console.error('Error rejecting program:', err);
-      alert(err.message || 'Có lỗi xảy ra khi từ chối chương trình');
+      toast.error(err.message || 'Có lỗi xảy ra khi từ chối chương trình', { position: 'top-right' });
     } finally {
       setActionLoading(false);
     }
@@ -252,8 +277,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
                 navigate(`${basePath}/programs/${id}/courses/${row._id}/edit`);
               }}
             >
-              <span className="d-none d-md-inline">Tiếp tục</span>
-              <span className="d-inline d-md-none">▶</span>
+              Tiếp tục
             </Button>
           )}
 
@@ -268,8 +292,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
                 navigate(`${basePath}/programs/${id}/courses/${row._id}/edit-form`);
               }}
             >
-              <span className="d-none d-md-inline">Sửa</span>
-              <span className="d-inline d-md-none">✏</span>
+              Sửa
             </Button>
           )}
 
@@ -283,8 +306,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
               navigate(`${basePath}/courses/${row._id}/details`);
             }}
           >
-            <span className="d-none d-md-inline">Xem</span>
-            <span className="d-inline d-md-none">👁</span>
+            Xem
           </Button>
 
           {/* Delete button - only for non-view-only */}
@@ -298,8 +320,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
                 handleDeleteCourse(row._id, row.name);
               }}
             >
-              <span className="d-none d-md-inline">Xóa</span>
-              <span className="d-inline d-md-none">🗑</span>
+              Xóa
             </Button>
           )}
         </div>
@@ -363,80 +384,22 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
           {/* Pending Approval: Center Head can approve/reject */}
           {program.status === 'pending_approval' && userRole === 'Center Head' && (
             <>
-              <button
-                className="btn"
+              <Button
+                variant="success"
+                icon="ph ph-check"
                 onClick={handleApproveProgram}
                 disabled={actionLoading}
-                style={{
-                  borderWidth: '1px',
-                  borderStyle: 'solid',
-                  borderColor: '#10b981',
-                  color: '#10b981',
-                  backgroundColor: 'transparent',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: actionLoading ? 'not-allowed' : 'pointer',
-                  opacity: actionLoading ? 0.6 : 1,
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  if (!actionLoading) {
-                    e.currentTarget.style.backgroundColor = '#10b981';
-                    e.currentTarget.style.color = 'white';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!actionLoading) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = '#10b981';
-                  }
-                }}
               >
-                <i className="ph ph-check"></i>
                 Duyệt Program
-              </button>
-              <button
-                className="btn"
+              </Button>
+              <Button
+                variant="danger"
+                icon="ph ph-x"
                 onClick={handleRejectProgram}
                 disabled={actionLoading}
-                style={{
-                  borderWidth: '1px',
-                  borderStyle: 'solid',
-                  borderColor: '#ef4444',
-                  color: '#ef4444',
-                  backgroundColor: 'transparent',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: actionLoading ? 'not-allowed' : 'pointer',
-                  opacity: actionLoading ? 0.6 : 1,
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  if (!actionLoading) {
-                    e.currentTarget.style.backgroundColor = '#ef4444';
-                    e.currentTarget.style.color = 'white';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!actionLoading) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = '#ef4444';
-                  }
-                }}
               >
-                <i className="ph ph-x"></i>
                 Từ chối Program
-              </button>
+              </Button>
             </>
           )}
 
@@ -671,78 +634,24 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
           </div>
 
           <div style={{ display: 'flex', gap: '12px' }}>
-            <button
-              className="btn"
+            <Button
+              variant="danger"
+              icon="ph ph-x"
               onClick={handleRejectProgram}
               disabled={actionLoading}
-              style={{
-                borderWidth: '1px',
-                borderStyle: 'solid',
-                borderColor: '#ef4444',
-                color: '#ef4444',
-                backgroundColor: 'transparent',
-                padding: '10px 24px',
-                borderRadius: '6px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: actionLoading ? 'not-allowed' : 'pointer',
-                opacity: actionLoading ? 0.6 : 1,
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                if (!actionLoading) {
-                  e.currentTarget.style.backgroundColor = '#ef4444';
-                  e.currentTarget.style.color = 'white';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!actionLoading) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '#ef4444';
-                }
-              }}
+              style={{ padding: '10px 24px' }}
             >
-              <i className="ph ph-x"></i>
               Từ chối
-            </button>
-            <button
-              className="btn"
+            </Button>
+            <Button
+              variant="success"
+              icon="ph ph-check"
               onClick={handleApproveProgram}
               disabled={actionLoading}
-              style={{
-                borderWidth: '1px',
-                borderStyle: 'solid',
-                borderColor: '#10b981',
-                color: 'white',
-                backgroundColor: '#10b981',
-                padding: '10px 24px',
-                borderRadius: '6px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: actionLoading ? 'not-allowed' : 'pointer',
-                opacity: actionLoading ? 0.6 : 1,
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                if (!actionLoading) {
-                  e.currentTarget.style.backgroundColor = '#059669';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!actionLoading) {
-                  e.currentTarget.style.backgroundColor = '#10b981';
-                }
-              }}
+              style={{ padding: '10px 24px' }}
             >
-              <i className="ph ph-check"></i>
               Duyệt chương trình
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -798,6 +707,9 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
           </div>
         </div>
       )}
+
+      {/* Toast Container */}
+      <ToastContainer />
     </div>
   );
 };

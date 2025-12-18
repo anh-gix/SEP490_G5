@@ -39,11 +39,11 @@ const ExamList = ({ viewMode = 'teacher' }) => {
         setExams(response.data || []);
       } else {
         console.error('Failed to fetch exams:', response.message);
-        alert(response.message || 'Không thể tải danh sách đề thi');
+        toast.error(response.message || 'Không thể tải danh sách đề thi', { position: 'top-right' });
       }
     } catch (err) {
       console.error('Error:', err);
-      alert(err.message || 'Không thể tải danh sách đề thi');
+      toast.error(err.message || 'Không thể tải danh sách đề thi', { position: 'top-right' });
     } finally {
       setLoading(false);
     }
@@ -146,16 +146,17 @@ const ExamList = ({ viewMode = 'teacher' }) => {
       render: (row) => (
         <div className="d-flex gap-2 justify-content-center">
           {/* Nút Xem */}
-          <button
-            className="btn btn-sm btn-outline-primary"
+          <Button
+            variant="outline"
+            size="sm"
+            icon="ph ph-eye"
             onClick={(e) => {
               e.stopPropagation();
               navigate(`${basePath}/exams/${row._id}`);
             }}
-            title="Xem chi tiết"
           >
-            <i className="ph ph-eye"></i>
-          </button>
+            Xem
+          </Button>
         </div>
       ),
     },
@@ -231,6 +232,9 @@ const ExamList = ({ viewMode = 'teacher' }) => {
           onRowClick={(row) => navigate(`${basePath}/exams/${row._id}`)}
         />
       </Card>
+
+      {/* Toast Container */}
+      <ToastContainer />
     </div>
   );
 };

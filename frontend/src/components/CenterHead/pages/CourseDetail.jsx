@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import Swal from 'sweetalert2';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
@@ -55,7 +58,18 @@ console.log(response.data);
   };
 
   const handleDeleteCourse = async () => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa môn học "${course.name}"?\n\nHành động này không thể hoàn tác.`)) {
+    const result = await Swal.fire({
+      title: 'Xác nhận xóa',
+      text: `Bạn có chắc chắn muốn xóa môn học "${course.name}"? Hành động này không thể hoàn tác.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (!result.isConfirmed) {
       return;
     }
 
@@ -64,15 +78,15 @@ console.log(response.data);
       const response = await courseService.deleteCourse(id);
 
       if (response.success) {
-        alert('Xóa môn học thành công!');
+        toast.success('Xóa môn học thành công!', { position: 'top-right' });
         // Navigate back to program detail or course list
-        navigate(-1);
+        setTimeout(() => navigate(-1), 1000);
       } else {
-        alert(response.message || 'Xóa môn học thất bại!');
+        toast.error(response.message || 'Xóa môn học thất bại!', { position: 'top-right' });
       }
     } catch (err) {
       console.error('Error deleting course:', err);
-      alert(err.message || 'Không thể xóa môn học. Vui lòng thử lại sau.');
+      toast.error(err.message || 'Không thể xóa môn học. Vui lòng thử lại sau.', { position: 'top-right' });
     } finally {
       setDeleteLoading(false);
     }
@@ -705,6 +719,9 @@ console.log(response.data);
           </div>
         )}
       </Modal>
+
+      {/* Toast Container */}
+      <ToastContainer />
     </div>
   );
 };

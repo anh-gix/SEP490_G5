@@ -6,9 +6,10 @@ import classService from '../../services/classService';
 import ClassOverview from '../student_components/class_detail/ClassOverview';
 import ClassStudents from '../teacher_components/class_detail/ClassStudents';
 import AcademicClassLessons from './AcademicClassLessons';
+import AcademicLessonDetail from './AcademicLessonDetail';
 
 /**
- * Academic Class Detail Layout Component
+ * Class Detail Component
  * Layout cho chi tiết lớp học của Academic Staff với 3 tabs:
  * - Tổng quan (từ student)
  * - Học viên (từ teacher)
@@ -16,13 +17,15 @@ import AcademicClassLessons from './AcademicClassLessons';
  * @param {string} classId - ID của lớp học (từ props thay vì route params)
  * @param {function} onBack - Callback để quay lại danh sách
  */
-const AcademicClassDetailLayout = ({ classId, onBack }) => {
+const ClassDetail = ({ classId, onBack }) => {
   const [classInfo, setClassInfo] = useState(null);
   const [students, setStudents] = useState([]);
   const [lessons, setLessons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [showLessonDetail, setShowLessonDetail] = useState(false);
+  const [selectedLessonId, setSelectedLessonId] = useState(null);
 
   useEffect(() => {
     if (classId) {
@@ -103,7 +106,7 @@ const AcademicClassDetailLayout = ({ classId, onBack }) => {
           
           // Determine status
           let status = 'scheduled';
-          if (schedule.status === 'completed' || (isPast && schedule.hasAttendance)) {
+          if (schedule.status === 'completed' || isPast) {
             status = 'completed';
           } else if (isToday || (scheduleDateOnly > today && scheduleDateOnly <= new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000))) {
             status = 'upcoming';
@@ -166,6 +169,11 @@ const AcademicClassDetailLayout = ({ classId, onBack }) => {
     setActiveTab(tab);
   };
 
+  const handleLessonClick = (lessonId) => {
+    setSelectedLessonId(lessonId);
+    setShowLessonDetail(true);
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -222,6 +230,19 @@ const AcademicClassDetailLayout = ({ classId, onBack }) => {
     const lessonDate = new Date(lesson.date);
     return lessonDate > new Date() && lesson.status !== 'completed';
   });
+
+  // Conditional rendering: nếu đang hiển thị lesson detail, render AcademicLessonDetail
+  if (showLessonDetail && selectedLessonId) {
+    return (
+      <AcademicLessonDetail
+        lessonId={selectedLessonId}
+        onBack={() => {
+          setShowLessonDetail(false);
+          setSelectedLessonId(null);
+        }}
+      />
+    );
+  }
 
   return (
     <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
@@ -322,6 +343,7 @@ const AcademicClassDetailLayout = ({ classId, onBack }) => {
                   students={students}
                   onViewStudentDetail={() => {}} // Disable modal for academic staff
                   hideActions={true} // Hide actions column for academic staff
+                  hideImportMocktest={true} // Hide Import Mocktest button for academic staff
                 />
               </div>
             </Tab>
@@ -339,6 +361,7 @@ const AcademicClassDetailLayout = ({ classId, onBack }) => {
                 <AcademicClassLessons 
                   lessons={lessons} 
                   getLessonStatusBadge={getLessonStatusBadge}
+                  onLessonClick={handleLessonClick}
                 />
               </div>
             </Tab>
@@ -349,5 +372,5 @@ const AcademicClassDetailLayout = ({ classId, onBack }) => {
   );
 };
 
-export default AcademicClassDetailLayout;
+export default ClassDetail;
 

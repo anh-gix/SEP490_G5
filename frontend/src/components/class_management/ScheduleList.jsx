@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Table, Badge, Button, ButtonGroup, Pagination } from 'react-bootstrap';
 
 const ScheduleList = ({ 
-  schedules
-  // Bỏ onCreateMakeup prop
+  schedules,
+  onLessonClick  // Thêm prop này
 }) => {
   const [sortField, setSortField] = useState('date');
   const [sortDirection, setSortDirection] = useState('asc');
@@ -114,6 +114,7 @@ const ScheduleList = ({
                 Phòng học <SortIcon field="roomName" />
               </th>
               <th className="text-neutral-900 fw-semibold" style={{ padding: '16px' }}>Loại</th>
+              <th className="text-neutral-900 fw-semibold" style={{ padding: '16px' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -145,12 +146,24 @@ const ScheduleList = ({
                       {getTypeText(schedule.type)}
                     </Badge>
                   </td>
+                  {/* Thêm cell "Thao tác" */}
+                  <td style={{ padding: '16px' }}>
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      className="px-12 py-6"
+                      onClick={() => onLessonClick && onLessonClick(schedule.id)}
+                    >
+                      <i className="fas fa-eye me-1"></i>
+                      Chi tiết
+                    </Button>
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="7" className="text-center py-40" style={{ padding: '40px' }}>
-                  {/* Đổi colSpan từ 8 thành 7 vì đã bỏ 1 cột */}
+                {/* Dòng 152: Cập nhật colSpan từ 7 thành 8 */}
+                <td colSpan="8" className="text-center py-40" style={{ padding: '40px' }}>
                   <i className="fas fa-inbox fa-3x text-neutral-400 mb-16 d-block"></i>
                   <p className="mb-0 text-neutral-500">Không có lịch học nào</p>
                 </td>

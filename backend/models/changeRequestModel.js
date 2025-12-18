@@ -27,11 +27,21 @@ const changeRequestSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'StudentSchedule'
   },
+
+  makeupStudentScheduleId: {
+    type: Schema.Types.ObjectId,
+    ref: 'StudentSchedule'
+  },
   
   // ID lịch dạy của lớp (dùng cho request_replace_teacher)
   classScheduleId: {
     type: Schema.Types.ObjectId,
     ref: 'ClassSchedule'
+  },
+
+  substituteTeacherId: {
+    type: Schema.Types.ObjectId,
+    ref: 'User'
   },
   
   // Nội dung yêu cầu (có thể là đổi lớp hoặc đổi buổi học)

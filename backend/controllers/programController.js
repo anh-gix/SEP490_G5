@@ -342,6 +342,32 @@ const deleteProgram = async (req, res) => {
       });
     }
 
+    // Check if program is linked to any active work requests
+    const activeWorkRequest = await WorkRequest.findOne({
+      entityType: 'Program',
+      entityId: id,
+      status: { $in: ['pending', 'in_progress', 'pending_approval'] }
+    }).populate('requestedBy', 'username email');
+
+    if (activeWorkRequest) {
+      const statusLabels = {
+        'pending': 'Chờ xử lý',
+        'in_progress': 'Đang xử lý',
+        'pending_approval': 'Chờ phê duyệt'
+      };
+
+      return res.status(400).json({
+        success: false,
+        message: `Không thể xóa chương trình này vì đang có work request liên quan!\n\n` +
+                 `• Loại request: ${activeWorkRequest.requestType === 'create_program' ? 'Tạo chương trình' : activeWorkRequest.requestType}\n` +
+                 `• Trạng thái: ${statusLabels[activeWorkRequest.status] || activeWorkRequest.status}\n` +
+                 `• Người yêu cầu: ${activeWorkRequest.requestedBy?.username || 'N/A'}\n\n` +
+                 `Vui lòng hoàn thành hoặc hủy work request trước khi xóa chương trình.`,
+        workRequestId: activeWorkRequest._id,
+        workRequestStatus: activeWorkRequest.status
+      });
+    }
+
     console.log(`Starting CASCADE deletion for program: ${program.program_name} (${id})`);
 
     // Step 1: Find all courses in this program
@@ -511,7 +537,58 @@ const getProgramSubmissionStatus = async (req, res) => {
 // These functions are DEPRECATED and kept for backward compatibility only
 
 /**
- * Activate approved program
+ * Toggle program active status (isActive field)
+ * PATCH /api/programs/:id/toggle-active
+ *
+ * Center Head can toggle isActive for approved programs
+ * When isActive = true: Program is open for enrollment
+ * When isActive = false: Program is paused/closed
+ */
+const toggleProgramActive = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    const program = await Program.findById(id);
+    if (!program) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy chương trình'
+      });
+    }
+
+    // Only approved programs can have isActive toggled
+    if (program.status !== 'approved') {
+      return res.status(400).json({
+        success: false,
+        message: 'Chỉ có thể kích hoạt/tắt chương trình đã được duyệt',
+        currentStatus: program.status
+      });
+    }
+
+    // Toggle isActive
+    program.isActive = isActive !== undefined ? isActive : !program.isActive;
+    await program.save();
+
+    res.status(200).json({
+      success: true,
+      message: program.isActive
+        ? 'Đã mở chương trình cho đăng ký'
+        : 'Đã tạm dừng chương trình',
+      data: program
+    });
+  } catch (error) {
+    console.error('Error toggling program active status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi thay đổi trạng thái hoạt động của chương trình',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Activate approved program (DEPRECATED - use toggleProgramActive instead)
  * PATCH /api/programs/:id/activate
  */
 const activateProgram = async (req, res) => {
@@ -534,7 +611,8 @@ const activateProgram = async (req, res) => {
       });
     }
 
-    program.status = 'active';
+    // Use isActive instead of status
+    program.isActive = true;
     await program.save();
 
     res.status(200).json({
@@ -629,6 +707,7 @@ module.exports = {
   deleteProgram,
   getProgramPLOs,
   getProgramSubmissionStatus,
+  toggleProgramActive,
   activateProgram,
   archiveProgram,
   getBandOptions

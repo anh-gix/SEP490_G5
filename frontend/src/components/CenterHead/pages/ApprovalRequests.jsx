@@ -37,11 +37,13 @@ const ApprovalRequests = () => {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showRevokeModal, setShowRevokeModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const [createRequestType, setCreateRequestType] = useState('create_program'); // 'create_program' | 'create_exam'
   const [approveNote, setApproveNote] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [reviewNote, setReviewNote] = useState('');
   const [revokeReason, setRevokeReason] = useState('');
+  const [deleteLinkedEntity, setDeleteLinkedEntity] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
   // Assignee list (Subject Leaders for program/exam, Academic Staff for assign_students)
@@ -250,6 +252,41 @@ const ApprovalRequests = () => {
     } catch (error) {
       console.error('Error revoking approval:', error);
       alert(error.message || 'Có lỗi xảy ra khi thu hồi phê duyệt');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancelRequest = async () => {
+    if (!selectedRequest) return;
+
+    try {
+      setActionLoading(true);
+      const response = await workRequestService.cancelRequest(selectedRequest._id, {
+        deleteLinkedEntity: deleteLinkedEntity
+      });
+
+      if (response.success) {
+        const deletedMsg = response.deletedEntity
+          ? ' Program liên quan đã được xóa.'
+          : ' Program liên quan được giữ lại.';
+
+        toast.success(`Đã hủy yêu cầu thành công!${deletedMsg}`, {
+          position: 'top-right'
+        });
+
+        setShowCancelModal(false);
+        setShowDetailModal(false);
+        setDeleteLinkedEntity(false);
+        setSelectedRequest(null);
+        fetchRequests();
+        fetchStats();
+      }
+    } catch (error) {
+      console.error('Error canceling request:', error);
+      toast.error(error.message || 'Có lỗi xảy ra khi hủy yêu cầu!', {
+        position: 'top-right'
+      });
     } finally {
       setActionLoading(false);
     }
@@ -1202,6 +1239,30 @@ const ApprovalRequests = () => {
                   </div>
                 </div>
               )}
+
+              {/* Actions for top-down pending/in_progress requests - Cancel option */}
+              {activeTab === 'top_down' && ['pending', 'in_progress'].includes(selectedRequest.status) && (
+                <div className="modal-footer border-top bg-light">
+                  <div className="w-100">
+                    <div className="alert alert-warning mb-3">
+                      <i className="ph ph-info me-2"></i>
+                      Bạn có thể hủy yêu cầu này nếu không còn cần thiết.
+                    </div>
+                    <div className="d-flex justify-content-end">
+                      <Button
+                        variant="danger"
+                        onClick={() => {
+                          setShowDetailModal(false);
+                          setShowCancelModal(true);
+                        }}
+                      >
+                        <i className="ph ph-x-circle me-2"></i>
+                        Hủy yêu cầu
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1500,6 +1561,178 @@ const ApprovalRequests = () => {
                 >
                   <i className="ph ph-arrow-counter-clockwise me-2"></i>
                   {actionLoading ? 'Đang xử lý...' : 'Xác nhận thu hồi'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Request Modal */}
+      {showCancelModal && selectedRequest && (
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content">
+              <div className="modal-header bg-danger-subtle">
+                <div>
+                  <h5 className="modal-title fw-bold text-danger">
+                    <i className="ph ph-x-circle me-2"></i>
+                    Xác nhận hủy yêu cầu
+                  </h5>
+                  <p className="text-muted small mb-0 mt-1">
+                    Vui lòng xác nhận hành động hủy yêu cầu công việc
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowCancelModal(false);
+                    setShowDetailModal(true);
+                    setDeleteLinkedEntity(false);
+                  }}
+                  disabled={actionLoading}
+                ></button>
+              </div>
+              <div className="modal-body">
+                {/* Request Summary */}
+                <div className="alert alert-warning border-warning mb-4">
+                  <div className="d-flex align-items-start">
+                    <i className="ph ph-info fs-4 me-3 mt-1"></i>
+                    <div className="flex-grow-1">
+                      <h6 className="fw-bold mb-2">Thông tin yêu cầu</h6>
+                      <div className="row g-2">
+                        <div className="col-6">
+                          <small className="text-muted d-block">Loại:</small>
+                          <strong>{getRequestTypeName(selectedRequest.requestType)}</strong>
+                        </div>
+                        <div className="col-6">
+                          <small className="text-muted d-block">Trạng thái:</small>
+                          {getStatusBadge(selectedRequest.status)}
+                        </div>
+                        <div className="col-6">
+                          <small className="text-muted d-block">Người được giao:</small>
+                          <strong>{selectedRequest.assignedTo?.username || selectedRequest.assignedTo?.name || 'N/A'}</strong>
+                        </div>
+                        <div className="col-6">
+                          <small className="text-muted d-block">Ngày giao:</small>
+                          <strong>{formatDate(selectedRequest.requestedAt)}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Warning about cancellation */}
+                <div className="alert alert-danger border-danger mb-4">
+                  <div className="d-flex align-items-start">
+                    <i className="ph ph-warning fs-4 me-3 mt-1"></i>
+                    <div>
+                      <h6 className="fw-bold mb-2 text-danger">Lưu ý khi hủy yêu cầu</h6>
+                      <ul className="mb-0 ps-3">
+                        <li>Yêu cầu sẽ bị xóa hoàn toàn khỏi hệ thống</li>
+                        <li>Người được giao sẽ không thể tiếp tục làm việc với yêu cầu này</li>
+                        <li>Hành động này <strong>KHÔNG THỂ HOÀN TÁC</strong></li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Linked Program/Entity Info */}
+                {selectedRequest.entityId && (
+                  <div className="alert alert-info border-info mb-4">
+                    <div className="d-flex align-items-start">
+                      <i className="ph ph-database fs-4 me-3 mt-1"></i>
+                      <div className="flex-grow-1">
+                        <h6 className="fw-bold mb-2">
+                          {selectedRequest.requestType === 'create_program' ? 'Program' : 'Entity'} đã được tạo
+                        </h6>
+                        <p className="mb-2">
+                          <strong>Tên:</strong> {selectedRequest.entityId?.program_name || selectedRequest.entityId?.name || selectedRequest.entityId?.title}
+                        </p>
+                        <p className="mb-2">
+                          <strong>Mã:</strong> {selectedRequest.entityId?.code || 'N/A'}
+                        </p>
+                        <p className="mb-0">
+                          <strong>Trạng thái:</strong> {selectedRequest.entityId?.status || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Delete Entity Option */}
+                {selectedRequest.entityId && (
+                  <div className="mb-4">
+                    <h6 className="fw-semibold mb-3">
+                      Xử lý {selectedRequest.requestType === 'create_program' ? 'Program' : 'Entity'} liên quan
+                    </h6>
+                    <div className="form-check mb-2">
+                      <input
+                        className="form-check-input"
+                        type="radio"
+                        name="deleteEntityOption"
+                        id="keepEntity"
+                        checked={!deleteLinkedEntity}
+                        onChange={() => setDeleteLinkedEntity(false)}
+                        disabled={actionLoading}
+                      />
+                      <label className="form-check-label" htmlFor="keepEntity">
+                        <strong>Giữ lại {selectedRequest.requestType === 'create_program' ? 'program' : 'entity'}</strong>
+                        <p className="text-muted small mb-0">
+                          {selectedRequest.requestType === 'create_program' ? 'Program' : 'Entity'} sẽ được giữ lại trong hệ thống với trạng thái hiện tại.
+                          Subject Leader có thể tiếp tục chỉnh sửa hoặc xóa nếu cần.
+                        </p>
+                      </label>
+                    </div>
+                    <div className="form-check">
+                      <input
+                        className="form-check-input"
+                        type="radio"
+                        name="deleteEntityOption"
+                        id="deleteEntity"
+                        checked={deleteLinkedEntity}
+                        onChange={() => setDeleteLinkedEntity(true)}
+                        disabled={actionLoading}
+                      />
+                      <label className="form-check-label" htmlFor="deleteEntity">
+                        <strong className="text-danger">Xóa {selectedRequest.requestType === 'create_program' ? 'program' : 'entity'}</strong>
+                        <p className="text-muted small mb-0">
+                          {selectedRequest.requestType === 'create_program' ? 'Program' : 'Entity'} sẽ bị xóa khỏi hệ thống.
+                          <span className="text-danger fw-semibold"> Chỉ áp dụng nếu trạng thái là draft hoặc needs_revision.</span>
+                        </p>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {!selectedRequest.entityId && (
+                  <div className="alert alert-secondary border-secondary">
+                    <i className="ph ph-info me-2"></i>
+                    Yêu cầu này chưa có {selectedRequest.requestType === 'create_program' ? 'program' : 'entity'} được tạo.
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer border-top">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowCancelModal(false);
+                    setShowDetailModal(true);
+                    setDeleteLinkedEntity(false);
+                  }}
+                  disabled={actionLoading}
+                >
+                  <i className="ph ph-arrow-left me-2"></i>
+                  Quay lại
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={handleCancelRequest}
+                  disabled={actionLoading}
+                >
+                  <i className="ph ph-x-circle me-2"></i>
+                  {actionLoading ? 'Đang xử lý...' : 'Xác nhận hủy'}
                 </Button>
               </div>
             </div>

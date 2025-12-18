@@ -59,8 +59,23 @@ const CreateHomeworkModal = ({ show, onHide, onSuccess, classId }) => {
 
   const handleAssignmentFileChange = (e) => {
     const files = Array.from(e.target.files);
+    
+    // Validate file types (only PDF and Word)
+    const allowedExtensions = ['.pdf', '.doc', '.docx'];
+    const invalidFiles = files.filter(f => {
+      const ext = '.' + f.name.split('.').pop().toLowerCase();
+      return !allowedExtensions.includes(ext);
+    });
+    
+    if (invalidFiles.length > 0) {
+      setError(`Chỉ chấp nhận file PDF và Word. File không hợp lệ: ${invalidFiles.map(f => f.name).join(', ')}`);
+      e.target.value = '';
+      return;
+    }
+    
     if (files.length > 5) {
       setError('Chỉ được upload tối đa 5 files đề bài');
+      e.target.value = '';
       return;
     }
     setAssignmentFiles(files);
@@ -69,8 +84,23 @@ const CreateHomeworkModal = ({ show, onHide, onSuccess, classId }) => {
 
   const handleAnswerFileChange = (e) => {
     const files = Array.from(e.target.files);
+    
+    // Validate file types (only PDF and Word)
+    const allowedExtensions = ['.pdf', '.doc', '.docx'];
+    const invalidFiles = files.filter(f => {
+      const ext = '.' + f.name.split('.').pop().toLowerCase();
+      return !allowedExtensions.includes(ext);
+    });
+    
+    if (invalidFiles.length > 0) {
+      setError(`Chỉ chấp nhận file PDF và Word. File không hợp lệ: ${invalidFiles.map(f => f.name).join(', ')}`);
+      e.target.value = '';
+      return;
+    }
+    
     if (files.length > 5) {
       setError('Chỉ được upload tối đa 5 files đáp án');
+      e.target.value = '';
       return;
     }
     setAnswerFiles(files);
@@ -268,12 +298,13 @@ const CreateHomeworkModal = ({ show, onHide, onSuccess, classId }) => {
             <Form.Control
               type="file"
               multiple
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+              accept=".pdf,.doc,.docx"
               onChange={handleAssignmentFileChange}
               className="rounded-8"
             />
             <Form.Text className="text-muted">
-              Chấp nhận: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX (tối đa 50MB/file)
+              <i className="fas fa-info-circle me-1"></i>
+              Chỉ chấp nhận file PDF và Word (tối đa 50MB/file)
             </Form.Text>
             
             {/* File List */}
@@ -309,16 +340,28 @@ const CreateHomeworkModal = ({ show, onHide, onSuccess, classId }) => {
           <Form.Group className="mb-0">
             <Form.Label className="fw-semibold">
               File đáp án <span className="text-muted">(Tùy chọn, tối đa 5 files)</span>
+              <i 
+                className="fas fa-info-circle text-warning ms-2" 
+                title="Chỉ hiển thị cho học viên sau khi qua deadline"
+                style={{ fontSize: '14px', cursor: 'help' }}
+              ></i>
             </Form.Label>
+            <Alert variant="warning" className="py-2 px-3 mb-2">
+              <small>
+                <i className="fas fa-lock me-1"></i>
+                <strong>Lưu ý:</strong> File đáp án chỉ hiển thị cho học viên sau khi bài tập qua deadline
+              </small>
+            </Alert>
             <Form.Control
               type="file"
               multiple
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+              accept=".pdf,.doc,.docx"
               onChange={handleAnswerFileChange}
               className="rounded-8"
             />
             <Form.Text className="text-muted">
-              Chấp nhận: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX (tối đa 50MB/file)
+              <i className="fas fa-info-circle me-1"></i>
+              Chỉ chấp nhận file PDF và Word (tối đa 50MB/file)
             </Form.Text>
             
             {/* File List */}

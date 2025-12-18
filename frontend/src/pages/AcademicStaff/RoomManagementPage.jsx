@@ -1,6 +1,6 @@
 import React from 'react';
 import AcademicNavigation from '../../components/class_management/AcademicNavigation.jsx';
-import RoomManagementFull from '../../components/class_management/RoomManagementFullAPI';
+import RoomManagement from '../../components/class_management/RoomManagement';
 
 /**
  * Room Management Page for Academic Staff - API Integrated
@@ -10,7 +10,7 @@ const RoomManagementPage = () => {
     <div className="d-flex" style={{ minHeight: '100vh' }}>
       <AcademicNavigation />
       <div className="flex-grow-1" style={{ backgroundColor: '#f8f9fa' }}>
-        <RoomManagementFull />
+        <RoomManagement />
       </div>
     </div>
   );

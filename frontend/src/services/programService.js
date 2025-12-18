@@ -135,7 +135,17 @@ export const programService = {
     }
   },
 
-  // Activate program
+  // Toggle program active status (isActive field)
+  toggleProgramActive: async (id, isActive) => {
+    try {
+      const response = await api.patch(`/${id}/toggle-active`, { isActive });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Thay đổi trạng thái hoạt động thất bại' };
+    }
+  },
+
+  // Activate program (DEPRECATED - use toggleProgramActive instead)
   activateProgram: async (id) => {
     try {
       const response = await axios.patch(`${API_BASE_URL}/${id}/activate`);

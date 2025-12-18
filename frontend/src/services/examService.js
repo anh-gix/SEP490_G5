@@ -36,6 +36,16 @@ export const examService = {
     }
   },
 
+  // Lấy exam của tôi (created by current user)
+  getMyExams: async () => {
+    try {
+      const response = await api.get('/management/my-exams');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy danh sách exam của bạn' };
+    }
+  },
+
   // Lấy chi tiết exam cho management
   getExamByIdForManagement: async (examId) => {
     try {
@@ -74,6 +84,11 @@ export const examService = {
     } catch (error) {
       throw error.response?.data || { message: 'Không thể xóa đề thi' };
     }
+  },
+
+  // Alias cho deleteExamForManagement
+  deleteExam: async (examId) => {
+    return examService.deleteExamForManagement(examId);
   },
 
   // Publish exam

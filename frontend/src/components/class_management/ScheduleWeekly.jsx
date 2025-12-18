@@ -58,16 +58,17 @@ const ScheduleWeekly = ({ schedules, onScheduleClick, selectedWeek, onWeekChange
   const getSchedulesForSlot = (date, timeSlot) => {
     // Use helper to format date correctly (avoid timezone issues)
     const dateStr = formatDateToYYYYMMDD(date);
-    
+
     return schedules.filter(schedule => {
-      if (schedule.date !== dateStr) return false;
-      
+      // Format schedule date to handle ISO strings from DB (e.g., "2025-12-26T17:00:00.000Z")
+      if (formatDateToYYYYMMDD(schedule.date) !== dateStr) return false;
+
       // Check if schedule overlaps with this time slot
       const scheduleStart = schedule.startTime;
       const scheduleEnd = schedule.endTime;
       const slotStart = timeSlot.startTime;
       const slotEnd = timeSlot.endTime;
-      
+
       return timeOverlaps(scheduleStart, scheduleEnd, slotStart, slotEnd);
     });
   };

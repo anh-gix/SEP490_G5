@@ -73,11 +73,15 @@ const programSchema = new Schema({
             'pending_approval',   // Đã submit, chờ Center Head duyệt
             'approved',           // Center Head đã duyệt
             'needs_revision',     // Center Head yêu cầu chỉnh sửa
-            'active',             // Đang sử dụng (sau khi approved)
-            'deActive',           // Đang sử dụng (sau khi approved)
             'archived'            // Đã lưu trữ
         ],
         default: 'draft',
+        index: true
+    },
+
+    isActive: {
+        type: Boolean,
+        default: false,
         index: true
     }
 }, { timestamps: true });

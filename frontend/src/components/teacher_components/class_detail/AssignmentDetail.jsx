@@ -86,11 +86,23 @@ const AssignmentDetail = ({ assignmentId, onBack, onDelete }) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = true;
-    input.accept = '.pdf,.doc,.docx,.ppt,.pptx,.txt,.zip,.rar';
+    input.accept = '.pdf,.doc,.docx';
     
     input.onchange = async (e) => {
       const files = Array.from(e.target.files);
       if (files.length === 0) return;
+
+      // Validate file types (only PDF and Word)
+      const allowedExtensions = ['.pdf', '.doc', '.docx'];
+      const invalidFiles = files.filter(f => {
+        const ext = '.' + f.name.split('.').pop().toLowerCase();
+        return !allowedExtensions.includes(ext);
+      });
+      
+      if (invalidFiles.length > 0) {
+        toast.error(`Chỉ chấp nhận file PDF và Word. File không hợp lệ: ${invalidFiles.map(f => f.name).join(', ')}`);
+        return;
+      }
 
       if (files.length > 5) {
         toast.warning('Tối đa 5 files mỗi lần upload');
@@ -568,6 +580,11 @@ const AssignmentDetail = ({ assignmentId, onBack, onDelete }) => {
                 <div className="d-flex justify-content-between align-items-center mb-2">
                   <div className="d-flex align-items-center gap-2">
                     <span className="fw-semibold">File đáp án</span>
+                    <i 
+                      className="fas fa-info-circle text-info" 
+                      title="Chỉ hiển thị cho học viên sau khi qua deadline"
+                      style={{ fontSize: '14px', cursor: 'help' }}
+                    ></i>
                   </div>
                   <Button 
                     variant={editingFiles.answer ? "secondary" : "outline-primary"}
@@ -578,6 +595,10 @@ const AssignmentDetail = ({ assignmentId, onBack, onDelete }) => {
                     <i className={`fas fa-${editingFiles.answer ? 'times' : 'edit'} me-1`}></i>
                     {editingFiles.answer ? 'Đóng' : 'Chỉnh Sửa'}
                   </Button>
+                </div>
+                <div className="text-warning mb-2" style={{ fontSize: '12px' }}>
+                  <i className="fas fa-lock me-1"></i>
+                  Chỉ hiển thị sau deadline
                 </div>
                 <div className="text-neutral-500 mb-4" style={{ fontSize: '12px' }}>Tùy chọn</div>
                 

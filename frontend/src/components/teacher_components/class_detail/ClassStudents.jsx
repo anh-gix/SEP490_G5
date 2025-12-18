@@ -3,7 +3,7 @@ import { Table, Badge, Button, Card, Dropdown } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import ImportMocktestScoresModal from './modals/ImportMocktestScoresModal';
 
-const ClassStudents = ({ students, onViewStudentDetail, hideActions = false, classInfo, lessons = [], onRefreshStudents }) => {
+const ClassStudents = ({ students, onViewStudentDetail, hideActions = false, classInfo, lessons = [], onRefreshStudents, hideImportMocktest = false }) => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedMocktestSchedule, setSelectedMocktestSchedule] = useState(null);
   const [selectedMocktestOrder, setSelectedMocktestOrder] = useState(null);
@@ -69,66 +69,70 @@ const ClassStudents = ({ students, onViewStudentDetail, hideActions = false, cla
               <h6 className="mb-1 fw-semibold">Danh sách học viên</h6>
               <p className="mb-0 text-neutral-600 text-13">Tổng số: {students.length} học viên</p>
             </div>
-            {mocktestSessionOrders.length > 0 ? (
-              <Dropdown>
-                <Dropdown.Toggle variant="primary" size="sm" className="px-16 py-8">
-                  <i className="fas fa-file-import me-2"></i>
-                  Import Điểm Mocktest
-                </Dropdown.Toggle>
-                <Dropdown.Menu>
-                  {mocktestSessionOrders.map((order, idx) => {
-                    // Find lesson to check if it has occurred
-                    const lesson = lessons.find(l => l.sessionOrder === order);
-                    const lessonStatus = lesson?.status?.toLowerCase();
-                    const lessonDate = lesson?.date ? new Date(lesson.date) : null;
-                    const hasNotOccurred = 
-                      lessonStatus === 'scheduled' || 
-                      lessonStatus === 'pending' || 
-                      (lessonDate && lessonDate > new Date());
-                    
-                    return (
-                      <Dropdown.Item 
-                        key={idx}
-                        onClick={() => handleSelectMocktestSession(order)}
-                        className="d-flex align-items-center justify-content-between"
-                        style={{
-                          transition: 'all 0.2s ease',
-                          cursor: 'pointer'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f0f7ff';
-                          e.currentTarget.style.paddingLeft = '20px';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = '';
-                          e.currentTarget.style.paddingLeft = '';
-                        }}
-                      >
-                        <span>
-                          <i className="fas fa-file-alt me-2"></i>
-                          Mocktest {idx + 1} (Buổi {order})
-                        </span>
-                        {hasNotOccurred && (
-                          <Badge bg="warning" className="ms-2 text-10">
-                            Chưa diễn ra
-                          </Badge>
-                        )}
-                      </Dropdown.Item>
-                    );
-                  })}
-                </Dropdown.Menu>
-              </Dropdown>
-            ) : (
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                className="px-16 py-8"
-                disabled
-                title="Lớp học chưa có buổi mocktest"
-              >
-                <i className="fas fa-file-import me-2"></i>
-                Import Điểm Mocktest
-              </Button>
+            {!hideImportMocktest && (
+              <>
+                {mocktestSessionOrders.length > 0 ? (
+                  <Dropdown>
+                    <Dropdown.Toggle variant="primary" size="sm" className="px-16 py-8">
+                      <i className="fas fa-file-import me-2"></i>
+                      Import Điểm Mocktest
+                    </Dropdown.Toggle>
+                    <Dropdown.Menu>
+                      {mocktestSessionOrders.map((order, idx) => {
+                        // Find lesson to check if it has occurred
+                        const lesson = lessons.find(l => l.sessionOrder === order);
+                        const lessonStatus = lesson?.status?.toLowerCase();
+                        const lessonDate = lesson?.date ? new Date(lesson.date) : null;
+                        const hasNotOccurred = 
+                          lessonStatus === 'scheduled' || 
+                          lessonStatus === 'pending' || 
+                          (lessonDate && lessonDate > new Date());
+                        
+                        return (
+                          <Dropdown.Item 
+                            key={idx}
+                            onClick={() => handleSelectMocktestSession(order)}
+                            className="d-flex align-items-center justify-content-between"
+                            style={{
+                              transition: 'all 0.2s ease',
+                              cursor: 'pointer'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f0f7ff';
+                              e.currentTarget.style.paddingLeft = '20px';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '';
+                              e.currentTarget.style.paddingLeft = '';
+                            }}
+                          >
+                            <span>
+                              <i className="fas fa-file-alt me-2"></i>
+                              Mocktest {idx + 1} (Buổi {order})
+                            </span>
+                            {hasNotOccurred && (
+                              <Badge bg="warning" className="ms-2 text-10">
+                                Chưa diễn ra
+                              </Badge>
+                            )}
+                          </Dropdown.Item>
+                        );
+                      })}
+                    </Dropdown.Menu>
+                  </Dropdown>
+                ) : (
+                  <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    className="px-16 py-8"
+                    disabled
+                    title="Lớp học chưa có buổi mocktest"
+                  >
+                    <i className="fas fa-file-import me-2"></i>
+                    Import Điểm Mocktest
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </Card.Body>

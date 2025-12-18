@@ -100,83 +100,138 @@ exports.submitProgram = async (req, res) => {
     // Validate
     await validateProgramBeforeSubmit(programId);
 
-    // Check đã có pending request chưa
-    const existingRequest = await WorkRequest.findOne({
+    // CRITICAL: Check if program is linked to a top-down in_progress request
+    const topDownRequest = await WorkRequest.findOne({
       entityId: programId,
       entityType: 'Program',
-      status: 'pending',
-      direction: 'bottom_up'
-    });
-
-    if (existingRequest) {
-      await session.abortTransaction();
-      return res.status(400).json({
-        success: false,
-        message: 'Program already has a pending approval request'
-      });
-    }
-
-    // 1. Update Program status
-    await Program.findByIdAndUpdate(
-      programId,
-      { status: 'pending_approval' },
-      { session }
-    );
-
-    // 2. Tạo hoặc update WorkRequest
-    const rejectedRequest = await WorkRequest.findOne({
-      entityId: programId,
-      entityType: 'Program',
-      status: 'rejected',
-      direction: 'bottom_up'
+      status: 'in_progress',
+      direction: 'top_down'
     }).session(session);
 
     let workRequest;
 
-    if (rejectedRequest) {
-      // Resubmit - update request cũ
+    if (topDownRequest) {
+      // ========================================
+      // SCENARIO 1: Top-Down Workflow
+      // Program was assigned by Center Head to Subject Leader
+      // Update the existing top-down request to pending_approval
+      // ========================================
+      console.log('✅ Found top-down in_progress request - updating to pending_approval');
+
+      // Update Program status
+      await Program.findByIdAndUpdate(
+        programId,
+        { status: 'pending_approval' },
+        { session }
+      );
+
+      // Update existing top-down request to pending_approval
       workRequest = await WorkRequest.findByIdAndUpdate(
-        rejectedRequest._id,
+        topDownRequest._id,
         {
-          status: 'pending',
-          requestedAt: new Date(),
-          requestNote: note,
-          processedBy: null,
-          processedAt: null,
-          responseNote: null,
-          rejectionReason: null,
+          status: 'pending_approval',
+          processedBy: submitterId,
+          processedAt: new Date(),
+          responseNote: note,
           $push: {
             history: {
-              action: 'submitted',
+              action: 'completed_and_submitted',
               performedBy: submitterId,
               performedAt: new Date(),
               note: note,
-              previousStatus: 'rejected'
+              previousStatus: 'in_progress'
             }
           }
         },
         { session, new: true }
       );
-    } else {
-      // Submit lần đầu - tạo mới
-      const newRequest = await WorkRequest.create([{
-        direction: 'bottom_up',
-        requestType: 'program',
-        entityType: 'Program',
-        entityId: programId,
-        requestedBy: submitterId,
-        requestedAt: new Date(),
-        requestNote: note,
-        status: 'pending',
-        history: [{
-          action: 'submitted',
-          performedBy: submitterId,
-          performedAt: new Date(),
-          note: note
-        }]
-      }], { session });
 
-      workRequest = newRequest[0];
+      console.log('✅ Updated top-down request to pending_approval:', workRequest._id);
+    } else {
+      // ========================================
+      // SCENARIO 2: Bottom-Up Workflow
+      // Subject Leader created program independently and submits for approval
+      // Create new bottom-up request OR update rejected request
+      // ========================================
+
+      // Check đã có pending bottom-up request chưa
+      const existingPendingRequest = await WorkRequest.findOne({
+        entityId: programId,
+        entityType: 'Program',
+        status: 'pending',
+        direction: 'bottom_up'
+      }).session(session);
+
+      if (existingPendingRequest) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Program already has a pending approval request'
+        });
+      }
+
+      // Update Program status
+      await Program.findByIdAndUpdate(
+        programId,
+        { status: 'pending_approval' },
+        { session }
+      );
+
+      // Check if there's a rejected bottom-up request to update
+      const rejectedRequest = await WorkRequest.findOne({
+        entityId: programId,
+        entityType: 'Program',
+        status: 'rejected',
+        direction: 'bottom_up'
+      }).session(session);
+
+      if (rejectedRequest) {
+        // Resubmit - update rejected request
+        console.log('✅ Found rejected bottom-up request - updating to pending');
+        workRequest = await WorkRequest.findByIdAndUpdate(
+          rejectedRequest._id,
+          {
+            status: 'pending',
+            requestedAt: new Date(),
+            requestNote: note,
+            processedBy: null,
+            processedAt: null,
+            responseNote: null,
+            rejectionReason: null,
+            $push: {
+              history: {
+                action: 'submitted',
+                performedBy: submitterId,
+                performedAt: new Date(),
+                note: note,
+                previousStatus: 'rejected'
+              }
+            }
+          },
+          { session, new: true }
+        );
+      } else {
+        // Submit lần đầu - tạo mới bottom-up request
+        console.log('✅ Creating new bottom-up request');
+        const newRequest = await WorkRequest.create([{
+          direction: 'bottom_up',
+          requestType: 'program',
+          entityType: 'Program',
+          entityId: programId,
+          requestedBy: submitterId,
+          requestedAt: new Date(),
+          requestNote: note,
+          status: 'pending',
+          history: [{
+            action: 'submitted',
+            performedBy: submitterId,
+            performedAt: new Date(),
+            note: note
+          }]
+        }], { session });
+
+        workRequest = newRequest[0];
+      }
     }
 
     await session.commitTransaction();
@@ -454,7 +509,7 @@ exports.getAssignedToMe = async (req, res) => {
   try {
     const { userId, status } = req.query;
 
-    console.log('🔍 Get Assigned To Me - Query params:', { userId, status });
+    
 
     if (!userId) {
       return res.status(400).json({
@@ -469,7 +524,7 @@ exports.getAssignedToMe = async (req, res) => {
     };
     if (status) query.status = status;
 
-    console.log('🔎 Searching with query:', query);
+   
 
     const requests = await WorkRequest.find(query)
       .populate('requestedBy', 'name email username')
@@ -478,7 +533,7 @@ exports.getAssignedToMe = async (req, res) => {
       .populate('entityId')
       .sort({ requestedAt: -1 });
 
-    console.log('📦 Found', requests.length, 'work requests for user', userId);
+   
 
     res.status(200).json({
       success: true,
@@ -487,7 +542,7 @@ exports.getAssignedToMe = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error getting assigned requests:', error);
+    console.error('Error getting assigned requests:', error);
     res.status(500).json({
       success: false,
       message: 'Error getting assigned requests'
@@ -567,25 +622,24 @@ exports.approveRequest = async (req, res) => {
       });
     }
 
-    if (request.status !== 'pending') {
+    // Accept both 'pending' (bottom-up) and 'pending_approval' (top-down completed)
+    if (!['pending', 'pending_approval'].includes(request.status)) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: 'Request is not pending'
+        message: `Cannot approve request with status: ${request.status}. Must be 'pending' or 'pending_approval'.`
       });
     }
 
-    if (request.direction !== 'bottom_up') {
-      await session.abortTransaction();
-      return res.status(400).json({
-        success: false,
-        message: 'Only bottom-up requests can be approved'
-      });
-    }
+    // Determine final status based on workflow direction
+    // - Bottom-up (pending): status → approved
+    // - Top-down (pending_approval): status → completed
+    const finalStatus = request.direction === 'top_down' ? 'completed' : 'approved';
+    const previousStatus = request.status;
 
     // 1. Update WorkRequest
     await WorkRequest.findByIdAndUpdate(id, {
-      status: 'approved',
+      status: finalStatus,
       processedBy: centerHeadId,
       processedAt: new Date(),
       responseNote: note,
@@ -595,7 +649,7 @@ exports.approveRequest = async (req, res) => {
           performedBy: centerHeadId,
           performedAt: new Date(),
           note: note,
-          previousStatus: 'pending'
+          previousStatus: previousStatus
         }
       }
     }, { session });
@@ -638,7 +692,7 @@ exports.rejectRequest = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { userId, reason } = req.body;
+    const { userId, rejectionReason, responseNote } = req.body;
 
     if (!userId) {
       await session.abortTransaction();
@@ -649,8 +703,8 @@ exports.rejectRequest = async (req, res) => {
     }
 
     const centerHeadId = userId;
-
-    if (!reason || reason.trim() === '') {
+    
+    if (!rejectionReason || rejectionReason.trim() === '') {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
@@ -668,44 +722,44 @@ exports.rejectRequest = async (req, res) => {
       });
     }
 
-    if (request.status !== 'pending') {
+    // Accept both 'pending' (bottom-up) and 'pending_approval' (top-down completed)
+    if (!['pending', 'pending_approval'].includes(request.status)) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: 'Request is not pending'
+        message: `Cannot reject request with status: ${request.status}. Must be 'pending' or 'pending_approval'.`
       });
     }
 
-    if (request.direction !== 'bottom_up') {
-      await session.abortTransaction();
-      return res.status(400).json({
-        success: false,
-        message: 'Only bottom-up requests can be rejected'
-      });
-    }
+    const previousStatus = request.status;
 
     // 1. Update WorkRequest
     await WorkRequest.findByIdAndUpdate(id, {
       status: 'rejected',
       processedBy: centerHeadId,
       processedAt: new Date(),
-      rejectionReason: reason,
+      rejectionReason: rejectionReason,
       $push: {
         history: {
           action: 'rejected',
           performedBy: centerHeadId,
           performedAt: new Date(),
-          note: reason,
-          previousStatus: 'pending'
+          note: rejectionReason,
+          previousStatus: previousStatus
         }
       }
     }, { session });
 
-    // 2. Update entity status → needs_revision
+    // 2. Update entity status → needs_revision and add rejectionReason
     const Model = request.entityType === 'Program' ? Program : Exam;
     await Model.findByIdAndUpdate(
       request.entityId,
-      { status: 'needs_revision' },
+      {
+        status: 'needs_revision',
+        rejectionReason: rejectionReason,
+        rejectedBy: centerHeadId,
+        rejectedAt: new Date()
+      },
       { session }
     );
 
@@ -861,9 +915,13 @@ exports.revokeApproval = async (req, res) => {
 // =========================
 
 /**
- * Cancel pending request
+ * Cancel request
  * DELETE /api/work-requests/:id/cancel
- * Body: { userId }
+ * Body: { userId, deleteLinkedEntity: boolean }
+ *
+ * Rules:
+ * - Bottom-up: Only requester can cancel, only pending status
+ * - Top-down: Only Center Head (requestedBy) can cancel, can cancel pending/in_progress
  */
 exports.cancelRequest = async (req, res) => {
   const session = await mongoose.startSession();
@@ -871,7 +929,7 @@ exports.cancelRequest = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { userId } = req.body;
+    const { userId, deleteLinkedEntity = false } = req.body;
 
     if (!userId) {
       await session.abortTransaction();
@@ -891,42 +949,79 @@ exports.cancelRequest = async (req, res) => {
       });
     }
 
-    // Chỉ người request mới được cancel
+    // Validation: Chỉ người tạo request mới được cancel
     if (request.requestedBy.toString() !== userId.toString()) {
       await session.abortTransaction();
       return res.status(403).json({
         success: false,
-        message: 'You can only cancel your own requests'
+        message: 'Only the request creator can cancel this request'
       });
     }
 
-    // Chỉ cancel được pending request
-    if (request.status !== 'pending') {
-      await session.abortTransaction();
-      return res.status(400).json({
-        success: false,
-        message: 'Can only cancel pending requests'
-      });
+    // Validation based on direction
+    if (request.direction === 'bottom_up') {
+      // Bottom-up: Chỉ cancel được pending request
+      if (request.status !== 'pending') {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Can only cancel pending requests for bottom-up workflow'
+        });
+      }
+    } else if (request.direction === 'top_down') {
+      // Top-down: Center Head có thể cancel pending hoặc in_progress
+      if (!['pending', 'in_progress'].includes(request.status)) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: `Cannot cancel request with status: ${request.status}. Only pending or in_progress requests can be cancelled.`
+        });
+      }
     }
 
-    // 1. Xóa request
+    // Handle linked entity (Program/Exam)
+    let deletedEntity = false;
+    if (request.entityId) {
+      if (deleteLinkedEntity === true) {
+        // Xóa entity liên kết (Program/Exam)
+        const Model = request.entityType === 'Program' ? Program : Exam;
+        const entity = await Model.findById(request.entityId).session(session);
+
+        if (entity) {
+          // Chỉ xóa nếu entity ở trạng thái draft hoặc needs_revision
+          if (['draft', 'needs_revision'].includes(entity.status)) {
+            await Model.findByIdAndDelete(request.entityId, { session });
+            deletedEntity = true;
+            console.log(`✅ Deleted linked ${request.entityType}:`, request.entityId);
+          } else {
+            // Entity không thể xóa vì status không phù hợp
+            console.warn(`⚠️ Cannot delete ${request.entityType} with status: ${entity.status}`);
+          }
+        }
+      } else {
+        // Không xóa entity, chỉ update status về draft (cho bottom-up)
+        if (request.direction === 'bottom_up') {
+          const Model = request.entityType === 'Program' ? Program : Exam;
+          await Model.findByIdAndUpdate(
+            request.entityId,
+            { status: 'draft' },
+            { session }
+          );
+        }
+      }
+    }
+
+    // Xóa work request
     await WorkRequest.findByIdAndDelete(id, { session });
-
-    // 2. Update entity status về draft (chỉ cho bottom-up)
-    if (request.direction === 'bottom_up' && request.entityId) {
-      const Model = request.entityType === 'Program' ? Program : Exam;
-      await Model.findByIdAndUpdate(
-        request.entityId,
-        { status: 'draft' },
-        { session }
-      );
-    }
 
     await session.commitTransaction();
 
     res.status(200).json({
       success: true,
-      message: 'Request cancelled successfully'
+      message: 'Request cancelled successfully',
+      deletedEntity: deletedEntity,
+      entityType: request.entityType,
+      entityId: request.entityId
     });
 
   } catch (error) {
@@ -934,7 +1029,8 @@ exports.cancelRequest = async (req, res) => {
     console.error('Error cancelling request:', error);
     res.status(500).json({
       success: false,
-      message: 'Error cancelling request'
+      message: 'Error cancelling request',
+      error: error.message
     });
   } finally {
     session.endSession();
@@ -1270,8 +1366,31 @@ exports.startProcessing = async (req, res) => {
       });
     }
 
-    // Update status
-    await WorkRequest.findByIdAndUpdate(id, {
+    let programId = null;
+
+    // Nếu là create_program request, tự động tạo program draft
+    if (request.requestType === 'create_program') {
+      // Tạo program draft từ thông tin trong request
+      const programData = {
+        code: req.body.programCode || 'TEMP-' + Date.now(),
+        program_name: req.body.programName || 'Draft Program',
+        description: request.requestNote || '',
+        type: req.body.programType || 'ielts',
+        level: 'B1',
+        band: '4.0-5.0',
+        status: 'draft',
+        createdBy: userId,
+        plos: []
+      };
+
+      const program = await Program.create([programData], { session });
+      programId = program[0]._id;
+
+      console.log('✅ Created draft program:', programId, 'for request:', id);
+    }
+
+    // Update work request status
+    const updateData = {
       status: 'in_progress',
       $push: {
         history: {
@@ -1281,13 +1400,22 @@ exports.startProcessing = async (req, res) => {
           previousStatus: 'pending'
         }
       }
-    }, { session });
+    };
+
+    // Nếu tạo program draft thành công, link vào request
+    if (programId) {
+      updateData.entityType = 'Program';
+      updateData.entityId = programId;
+    }
+
+    await WorkRequest.findByIdAndUpdate(id, updateData, { session });
 
     await session.commitTransaction();
 
     res.status(200).json({
       success: true,
-      message: 'Started processing request'
+      message: 'Started processing request',
+      programId: programId // Trả về programId để frontend navigate
     });
 
   } catch (error) {
@@ -1295,7 +1423,161 @@ exports.startProcessing = async (req, res) => {
     console.error('Error starting processing:', error);
     res.status(500).json({
       success: false,
-      message: 'Error starting processing'
+      message: 'Error starting processing',
+      error: error.message
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+/**
+ * Recreate entity for work request (when original entity was deleted)
+ * POST /api/work-requests/:id/recreate-entity
+ * Body: { userId, programCode, programName, programType }
+ *
+ * Use case: Subject Teacher accidentally deleted program, wants to recreate
+ */
+exports.recreateEntity = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { userId, programCode, programName, programType } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required'
+      });
+    }
+
+    // Find work request
+    const request = await WorkRequest.findById(id)
+      .populate('assignedTo', 'username email')
+      .session(session);
+
+    if (!request) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Work request not found'
+      });
+    }
+
+    // Validation: Only assignedTo can recreate
+    if (request.assignedTo._id.toString() !== userId.toString()) {
+      await session.abortTransaction();
+      return res.status(403).json({
+        success: false,
+        message: 'Only the assigned person can recreate entity'
+      });
+    }
+
+    // Validation: Request must be in_progress
+    if (request.status !== 'in_progress') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot recreate entity: request status is ${request.status}, must be in_progress`
+      });
+    }
+
+    // Validation: entityId should not exist OR entity was deleted
+    if (request.entityId) {
+      // Check if entity still exists
+      const Model = request.entityType === 'Program' ? Program : Exam;
+      const existingEntity = await Model.findById(request.entityId).session(session);
+
+      if (existingEntity) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Entity already exists and is not deleted. Cannot recreate.',
+          entityId: request.entityId
+        });
+      }
+      // If entity doesn't exist, we can proceed to recreate
+    }
+
+    let newEntityId = null;
+
+    // Recreate entity based on request type
+    if (request.requestType === 'create_program') {
+      const programData = {
+        code: programCode || 'TEMP-' + Date.now(),
+        program_name: programName || 'Draft Program (Recreated)',
+        description: request.requestNote || 'Program recreated after deletion',
+        type: programType || 'ielts',
+        level: 'B1',
+        band: '4.0-5.0',
+        status: 'draft',
+        createdBy: userId,
+        plos: []
+      };
+
+      const program = await Program.create([programData], { session });
+      newEntityId = program[0]._id;
+
+      console.log('✅ Recreated program:', newEntityId, 'for request:', id);
+    } else if (request.requestType === 'create_exam') {
+      // Similar logic for exam if needed
+      const examData = {
+        name: programName || 'Draft Exam (Recreated)',
+        description: request.requestNote || 'Exam recreated after deletion',
+        status: 'draft',
+        createdBy: userId,
+        questions: []
+      };
+
+      const exam = await Exam.create([examData], { session });
+      newEntityId = exam[0]._id;
+
+      console.log('✅ Recreated exam:', newEntityId, 'for request:', id);
+    } else {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot recreate entity for request type: ${request.requestType}`
+      });
+    }
+
+    // Update work request with new entityId
+    await WorkRequest.findByIdAndUpdate(
+      id,
+      {
+        entityType: request.requestType === 'create_program' ? 'Program' : 'Exam',
+        entityId: newEntityId,
+        $push: {
+          history: {
+            action: 'entity_recreated',
+            performedBy: userId,
+            performedAt: new Date(),
+            note: 'Entity recreated after deletion'
+          }
+        }
+      },
+      { session }
+    );
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: 'Entity recreated successfully',
+      entityId: newEntityId,
+      entityType: request.requestType === 'create_program' ? 'Program' : 'Exam'
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error recreating entity:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error recreating entity',
+      error: error.message
     });
   } finally {
     session.endSession();
@@ -1442,15 +1724,15 @@ exports.completeRequest = async (req, res) => {
       });
     }
 
-    // Update to completed
+    // Update work request to pending_approval (waiting for Center Head review)
     await WorkRequest.findByIdAndUpdate(id, {
-      status: 'completed',
+      status: 'pending_approval',
       processedBy: userId,
       processedAt: new Date(),
       responseNote: note,
       $push: {
         history: {
-          action: 'completed',
+          action: 'completed_and_submitted',
           performedBy: userId,
           performedAt: new Date(),
           note: note,
@@ -1458,6 +1740,27 @@ exports.completeRequest = async (req, res) => {
         }
       }
     }, { session });
+
+    // Sync entity (Program/Exam) status based on request type
+    if (request.entityId && request.requestType === 'create_program') {
+      // Khi complete việc tạo program, program nên chuyển sang pending_approval
+      // để Center Head review và duyệt
+      const Program = require('../models/Program');
+      await Program.findByIdAndUpdate(
+        request.entityId,
+        { status: 'pending_approval' },
+        { session }
+      );
+      console.log('✅ Updated program status to pending_approval after completion');
+    } else if (request.entityId && request.requestType === 'create_exam') {
+      const Exam = require('../models/Exam');
+      await Exam.findByIdAndUpdate(
+        request.entityId,
+        { status: 'pending_approval' },
+        { session }
+      );
+      console.log('✅ Updated exam status to pending_approval after completion');
+    }
 
     await session.commitTransaction();
 
@@ -1522,3 +1825,4 @@ exports.getWorkRequestStats = async (req, res) => {
     });
   }
 };
+

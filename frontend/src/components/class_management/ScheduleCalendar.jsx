@@ -76,7 +76,8 @@ const ScheduleCalendar = ({
   const getSchedulesForDate = (date) => {
     // Use helper to format date correctly (avoid timezone issues)
     const dateStr = formatDateToYYYYMMDD(date);
-    return schedules.filter(s => s.date === dateStr);
+    // Also format schedule date to ensure proper comparison (handles ISO strings from DB)
+    return schedules.filter(s => formatDateToYYYYMMDD(s.date) === dateStr);
   };
 
   // Navigation - cập nhật để gọi onMonthChange
@@ -223,10 +224,8 @@ const ScheduleCalendar = ({
       return '#f44336'; // Màu đỏ cho buổi nghỉ
     }
     
-    // Kiểm tra buổi học bù (makeup/rescheduled)
-    if (schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled') {
-      return '#FF9800'; // Màu cam cho buổi học bù
-    }
+    // Buổi học bù hiển thị như buổi bình thường (không có màu riêng)
+    // Kiểm tra buổi học bù đã được bỏ để hiển thị như buổi bình thường
     
     // Ưu tiên kiểm tra timeStatus (cho EditClassModal)
     const timeStatus = schedule.timeStatus;
@@ -329,23 +328,28 @@ const ScheduleCalendar = ({
                         const timeStatus = schedule.timeStatus;
                         const hasAttendance = !!attendanceStatus;
                         const programColor = getProgramTypeColor(schedule.programType);
+                        
                         const borderColor = programColor || getStatusColor(schedule);
                         const statusColor = getStatusColor(schedule); // Giữ để dùng cho icon
                         
                         // Màu nền khác nhau theo trạng thái
                         let backgroundColor = 'rgba(0,0,0,0.02)'; // Xám nhạt mặc định
                         
+                        // Kiểm tra buổi học bù - CHỈ buổi có isMakeupSchedule === true hoặc status === 'makeup'
+                        // (đã được xác định đúng trong RequestDetailPage dựa trên makeupStudentScheduleId)
+                        const isMakeup = schedule.isMakeupSchedule || schedule.status === 'makeup';
+                        
                         // Kiểm tra buổi của lớp cũ và lớp mới trước (khi đổi lớp)
                         if (schedule.isOldClassSchedule) {
                           backgroundColor = 'rgba(156, 39, 176, 0.15)'; // Tím nhạt cho buổi lớp cũ
                         } else if (schedule.isNewClassSchedule) {
                           backgroundColor = 'rgba(33, 150, 243, 0.15)'; // Xanh dương nhạt cho buổi lớp mới
+                        } else if (isMakeup) {
+                          backgroundColor = 'rgba(255, 152, 0, 0.2)'; // Cam nhạt cho buổi học bù
                         } else if (schedule.isCancelled || schedule.scheduleStatus === 'cancelled') {
                           backgroundColor = 'rgba(244, 67, 54, 0.2)'; // Đỏ nhạt cho buổi bị hủy
                         } else if (schedule.isAbsentSchedule || schedule.status === 'absent') {
                           backgroundColor = 'rgba(244, 67, 54, 0.15)'; // Đỏ nhạt cho buổi nghỉ
-                        } else if (schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled') {
-                          backgroundColor = 'rgba(255, 152, 0, 0.15)'; // Cam nhạt cho buổi học bù
                         } else if (timeStatus === 'completed') {
                           backgroundColor = 'rgba(76, 175, 80, 0.1)'; // Xanh lá nhạt cho buổi đã kết thúc
                         } else if (timeStatus === 'upcoming') {
@@ -393,15 +397,13 @@ const ScheduleCalendar = ({
                         
                         // Ưu tiên màu programType nếu không có trạng thái đặc biệt nào (cho Teacher Detail)
                         // Đây là trường hợp phổ biến nhất cho Teacher Detail page
+                        // Buổi học bù hiển thị như buổi bình thường nên không filter ra
                         if (!schedule.isOldClassSchedule && 
                             !schedule.isNewClassSchedule && 
                             !schedule.isCancelled && 
                             schedule.scheduleStatus !== 'cancelled' &&
                             !schedule.isAbsentSchedule && 
                             schedule.status !== 'absent' &&
-                            !schedule.isMakeupSchedule && 
-                            schedule.status !== 'makeup' && 
-                            schedule.scheduleStatus !== 'rescheduled' &&
                             timeStatus !== 'completed' &&
                             timeStatus !== 'ongoing' &&
                             timeStatus !== 'upcoming' &&
@@ -421,6 +423,8 @@ const ScheduleCalendar = ({
                           tooltipText = `Buổi lớp cũ: ${schedule.className}`;
                         } else if (schedule.isNewClassSchedule) {
                           tooltipText = `Buổi lớp mới: ${schedule.className}`;
+                        } else if (isMakeup) {
+                          tooltipText = `Buổi học bù: ${schedule.className}`;
                         } else if (schedule.isCancelled || schedule.scheduleStatus === 'cancelled') {
                           const cancellationReason = schedule.cancellationReason || schedule.reason;
                           tooltipText = cancellationReason 
@@ -428,11 +432,6 @@ const ScheduleCalendar = ({
                             : 'Buổi đã hủy';
                         } else if (schedule.isAbsentSchedule || schedule.status === 'absent') {
                           tooltipText = 'Buổi nghỉ';
-                        } else if (schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled') {
-                          const makeupReason = schedule.reason;
-                          tooltipText = makeupReason 
-                            ? `Buổi học bù: ${makeupReason}` 
-                            : 'Buổi học bù';
                         } else if (timeStatus === 'completed') {
                           tooltipText = 'Buổi đã kết thúc';
                         } else if (timeStatus === 'upcoming') {
@@ -454,7 +453,7 @@ const ScheduleCalendar = ({
                             key={schedule.id}
                             className="p-1 rounded"
                             style={{ 
-                              borderLeft: `3px solid ${borderColor}`, // Sử dụng program type color cho border
+                              borderLeft: `3px solid ${isMakeup ? '#FF9800' : borderColor}`, // Màu cam cho buổi học bù
                               background: backgroundColor, // Background theo attendance/schedule status
                               fontSize: '10px',
                               cursor: 'pointer',
@@ -471,14 +470,14 @@ const ScheduleCalendar = ({
                           >
                             <div className="fw-bold d-flex align-items-center justify-content-between">
                               <span>{schedule.startTime}</span>
-                              {(schedule.isOldClassSchedule || schedule.isNewClassSchedule || schedule.isCancelled || schedule.isAbsentSchedule || schedule.isMakeupSchedule || schedule.status === 'absent' || schedule.status === 'makeup' || schedule.scheduleStatus === 'cancelled' || schedule.scheduleStatus === 'rescheduled' || timeStatus || hasAttendance) && (
+                              {(schedule.isOldClassSchedule || schedule.isNewClassSchedule || schedule.isCancelled || schedule.isAbsentSchedule || schedule.status === 'absent' || schedule.scheduleStatus === 'cancelled' || isMakeup || timeStatus || hasAttendance) && (
                                 <i 
                                   className={`fas ${
                                     schedule.isOldClassSchedule ? 'fa-arrow-left' :
                                     schedule.isNewClassSchedule ? 'fa-arrow-right' :
                                     schedule.isCancelled || schedule.scheduleStatus === 'cancelled' ? 'fa-ban' :
                                     schedule.isAbsentSchedule || schedule.status === 'absent' ? 'fa-times-circle' :
-                                    schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled' ? 'fa-calendar-plus' :
+                                    isMakeup ? 'fa-calendar-check' : // Icon cho buổi học bù
                                     timeStatus === 'completed' ? 'fa-check-circle' :
                                     timeStatus === 'upcoming' ? 'fa-clock' :
                                     timeStatus === 'ongoing' ? 'fa-play-circle' :
@@ -488,7 +487,7 @@ const ScheduleCalendar = ({
                                     attendanceStatus === 'excused' ? 'fa-file-text' :
                                     'fa-clock'
                                   }`} 
-                                  style={{ color: statusColor, fontSize: '8px' }}
+                                  style={{ color: isMakeup ? '#FF9800' : statusColor, fontSize: '8px' }}
                                 ></i>
                               )}
                             </div>
@@ -500,14 +499,14 @@ const ScheduleCalendar = ({
                               {schedule.isNewClassSchedule && (
                                 <Badge bg="primary" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#2196F3' }}>Lớp mới</Badge>
                               )}
+                              {isMakeup && (
+                                <Badge bg="warning" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#FF9800' }}>Học bù</Badge>
+                              )}
                               {(schedule.isCancelled || schedule.scheduleStatus === 'cancelled') && (
-                                <Badge bg="secondary" style={{ fontSize: '8px', padding: '2px 4px' }}>Đã hủy</Badge>
+                                <Badge bg="secondary" style={{ fontSize: '8px', padding: '2px 4px' }}>Buổi nghỉ</Badge>
                               )}
                               {(schedule.isAbsentSchedule || schedule.status === 'absent') && !(schedule.isCancelled || schedule.scheduleStatus === 'cancelled') && (
                                 <Badge bg="danger" style={{ fontSize: '8px', padding: '2px 4px' }}>Buổi nghỉ</Badge>
-                              )}
-                              {(schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled') && (
-                                <Badge bg="warning" text="dark" style={{ fontSize: '8px', padding: '2px 4px' }}>Học bù</Badge>
                               )}
                             </div>
                             <div className="mt-1 d-flex justify-content-end gap-1">
@@ -553,7 +552,7 @@ const ScheduleCalendar = ({
                                 // - Buổi học đã bị hủy
                                 // - Buổi học đã là học bù
                                 const isCancelled = schedule.isCancelled || schedule.scheduleStatus === 'cancelled';
-                                const isMakeup = schedule.isMakeupSchedule || schedule.status === 'makeup' || schedule.scheduleStatus === 'rescheduled';
+                                const isMakeup = schedule.isMakeupSchedule || schedule.status === 'makeup'; // Sửa lại logic này
                                 
                                 if (isPastSchedule || isCancelled || isMakeup) {
                                   return null;
@@ -572,7 +571,7 @@ const ScheduleCalendar = ({
                                     title="Xếp buổi học bù"
                                   >
                                     <i className="fas fa-calendar-plus me-1"></i>
-                                    Học bù
+                                    Buổi học bù
                                   </Button>
                                 );
                               })()}

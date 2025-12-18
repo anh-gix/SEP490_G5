@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table } from 'react-bootstrap';
 import teacherService from '../../services/teacherService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -7,6 +7,7 @@ import changeRequestService from '../../services/changeRequestService';
 
 const TeacherSchedule = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   const getCurrentWeek = () => {
     const today = new Date();
@@ -470,21 +471,20 @@ const TeacherSchedule = () => {
                       {daySchedules.length > 0 ? (
                         <div className="d-flex flex-column gap-6">
                           {daySchedules.map(schedule => (
-                            <Link 
+                            <div
                               key={schedule._id}
-                              to={`/teacher/lessons/${schedule._id}`}
-                              className="text-decoration-none"
+                              onClick={() => navigate(`/teacher/lessons/${schedule._id}`, { 
+                                state: { from: 'schedule' } 
+                              })}
+                              className={`border rounded-8 p-10 cursor-pointer transition-2 ${
+                                schedule.scheduleStatus === 'upcoming'
+                                  ? 'border-main-200 bg-main-50 hover-shadow-sm'
+                                  : schedule.scheduleStatus === 'completed'
+                                  ? 'border-success-200 bg-success-50'
+                                  : 'border-neutral-200 bg-neutral-50'
+                              }`}
+                              style={{ cursor: 'pointer' }}
                             >
-                              <div
-                                className={`border rounded-8 p-10 cursor-pointer transition-2 ${
-                                  schedule.scheduleStatus === 'upcoming'
-                                    ? 'border-main-200 bg-main-50 hover-shadow-sm'
-                                    : schedule.scheduleStatus === 'completed'
-                                    ? 'border-success-200 bg-success-50'
-                                    : 'border-neutral-200 bg-neutral-50'
-                                }`}
-                                style={{ cursor: 'pointer' }}
-                              >
                                 <div className="d-flex align-items-start justify-content-between mb-6">
                                   <div className="text-neutral-900 fw-bold text-11">
                                     {schedule.startTime} - {schedule.endTime}
@@ -531,12 +531,17 @@ const TeacherSchedule = () => {
                                 <Button
                                   className={schedule.scheduleStatus === 'upcoming' ? 'btn-main w-100 py-4 radius-6' : 'btn-outline-success w-100 py-4 radius-6'}
                                   style={{ fontSize: '10px' }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/teacher/lessons/${schedule._id}`, { 
+                                      state: { from: 'schedule' } 
+                                    });
+                                  }}
                                 >
                                   <i className={`fas ${schedule.scheduleStatus === 'upcoming' ? 'fa-chalkboard-teacher' : 'fa-check-circle'} me-1`}></i>
                                   {schedule.scheduleStatus === 'upcoming' ? 'Vào lớp' : 'Đã dạy'}
                                 </Button>
                               </div>
-                            </Link>
                           ))}
                         </div>
                       ) : null}
@@ -676,45 +681,43 @@ const TeacherSchedule = () => {
               <tbody>
                 {filteredSchedules.length > 0 ? (
                   filteredSchedules.map((schedule) => (
-                    <tr key={schedule._id} className="transition-2" style={{ cursor: 'pointer' }}>
+                    <tr 
+                      key={schedule._id} 
+                      className="transition-2" 
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => navigate(`/teacher/lessons/${schedule._id}`, { 
+                        state: { from: 'schedule' } 
+                      })}
+                    >
                       <td className="px-20 py-16 text-neutral-700 text-13">
-                        <Link to={`/teacher/lessons/${schedule._id}`} className="text-decoration-none text-neutral-700">
-                          {schedule.date}
-                        </Link>
+                        {schedule.date}
                       </td>
                       <td className="px-20 py-16 text-neutral-700 text-13">
-                        <Link to={`/teacher/lessons/${schedule._id}`} className="text-decoration-none text-neutral-700">
-                          {schedule.startTime} - {schedule.endTime}
-                        </Link>
+                        {schedule.startTime} - {schedule.endTime}
                       </td>
                       <td className="px-20 py-16 text-main-600 fw-semibold text-13">
-                        <Link to={`/teacher/lessons/${schedule._id}`} className="text-decoration-none text-main-600">
-                          {schedule.className}
-                        </Link>
+                        {schedule.className}
                       </td>
                       <td className="px-20 py-16 text-neutral-700 text-13">
-                        <Link to={`/teacher/lessons/${schedule._id}`} className="text-decoration-none text-neutral-700">
-                          {schedule.courseName}
-                        </Link>
+                        {schedule.courseName}
                       </td>
                       <td className="px-20 py-16 text-neutral-900 fw-medium text-13">
-                        <Link to={`/teacher/lessons/${schedule._id}`} className="text-decoration-none text-neutral-900">
-                          {schedule.sessionTitle || 'Chưa có tiêu đề'}
-                        </Link>
+                        {schedule.sessionTitle || 'Chưa có tiêu đề'}
                       </td>
                       <td className="px-20 py-16 text-neutral-700 text-13">
-                        <Link to={`/teacher/lessons/${schedule._id}`} className="text-decoration-none text-neutral-700">
-                          {schedule.roomName || 'Chưa xác định'}
-                        </Link>
+                        {schedule.roomName || 'Chưa xác định'}
                       </td>
                       <td className="px-20 py-16 text-13">{getStatusBadge(schedule.scheduleStatus)}</td>
-                      <td className="px-20 py-16 text-center">
-                        <Link to={`/teacher/lessons/${schedule._id}`}>
-                          <Button className="btn-outline-main text-13 fw-medium px-12 py-6 radius-6 me-2">
-                            <i className="fas fa-eye me-1"></i>
-                            Chi tiết
-                          </Button>
-                        </Link>
+                      <td className="px-20 py-16 text-center" onClick={(e) => e.stopPropagation()}>
+                        <Button 
+                          className="btn-outline-main text-13 fw-medium px-12 py-6 radius-6 me-2"
+                          onClick={() => navigate(`/teacher/lessons/${schedule._id}`, { 
+                            state: { from: 'schedule' } 
+                          })}
+                        >
+                          <i className="fas fa-eye me-1"></i>
+                          Chi tiết
+                        </Button>
                         {/* {schedule.homework?.length > 0 && (
                           <Badge bg="warning" className="ms-2">
                             {schedule.homework.length} BTVN

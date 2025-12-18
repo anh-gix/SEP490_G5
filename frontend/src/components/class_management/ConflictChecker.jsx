@@ -1,4 +1,5 @@
 // ConflictChecker utility for detecting schedule conflicts
+import { formatDateToYYYYMMDD } from '../../helper/helper';
 
 const ConflictChecker = {
   // Check for conflicts between schedules
@@ -25,7 +26,7 @@ const ConflictChecker = {
   // Check if teacher has overlapping schedules
   checkTeacherConflict: (schedule, existingSchedules) => {
     const conflicts = [];
-    const scheduleDate = schedule.date;
+    const scheduleDate = formatDateToYYYYMMDD(schedule.date);
     const scheduleStart = schedule.startTime;
     const scheduleEnd = schedule.endTime;
     const teacherId = schedule.teacherId;
@@ -35,7 +36,7 @@ const ConflictChecker = {
       if (existing.id === schedule.id) return false;
 
       return (
-        existing.date === scheduleDate &&
+        formatDateToYYYYMMDD(existing.date) === scheduleDate &&
         existing.teacherId === teacherId &&
         ConflictChecker.timeOverlaps(scheduleStart, scheduleEnd, existing.startTime, existing.endTime) &&
         existing.status !== 'cancelled'
@@ -58,7 +59,7 @@ const ConflictChecker = {
   // Check if room is already occupied
   checkRoomConflict: (schedule, existingSchedules) => {
     const conflicts = [];
-    const scheduleDate = schedule.date;
+    const scheduleDate = formatDateToYYYYMMDD(schedule.date);
     const scheduleStart = schedule.startTime;
     const scheduleEnd = schedule.endTime;
     const roomId = schedule.roomId;
@@ -68,7 +69,7 @@ const ConflictChecker = {
       if (existing.id === schedule.id) return false;
 
       return (
-        existing.date === scheduleDate &&
+        formatDateToYYYYMMDD(existing.date) === scheduleDate &&
         existing.roomId === roomId &&
         ConflictChecker.timeOverlaps(scheduleStart, scheduleEnd, existing.startTime, existing.endTime) &&
         existing.status !== 'cancelled'
@@ -91,7 +92,7 @@ const ConflictChecker = {
   // Check if class already has schedule at that time
   checkClassConflict: (schedule, existingSchedules) => {
     const conflicts = [];
-    const scheduleDate = schedule.date;
+    const scheduleDate = formatDateToYYYYMMDD(schedule.date);
     const scheduleStart = schedule.startTime;
     const scheduleEnd = schedule.endTime;
     const classId = schedule.classId;
@@ -101,7 +102,7 @@ const ConflictChecker = {
       if (existing.id === schedule.id) return false;
 
       return (
-        existing.date === scheduleDate &&
+        formatDateToYYYYMMDD(existing.date) === scheduleDate &&
         existing.classId === classId &&
         ConflictChecker.timeOverlaps(scheduleStart, scheduleEnd, existing.startTime, existing.endTime) &&
         existing.status !== 'cancelled'

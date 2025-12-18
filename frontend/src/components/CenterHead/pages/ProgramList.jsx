@@ -98,6 +98,30 @@ const ProgramList = () => {
     setCurrentPage(1); // Reset to first page when items per page changes
   };
 
+  const handleToggleActive = async (programId, currentIsActive, e) => {
+    e.stopPropagation(); // Prevent row click navigation
+
+    try {
+      const newIsActive = !currentIsActive;
+      await programService.toggleProgramActive(programId, newIsActive);
+
+      toast.success(
+        newIsActive
+          ? 'Đã mở chương trình cho đăng ký'
+          : 'Đã tạm dừng chương trình',
+        { position: 'top-right' }
+      );
+
+      // Refresh programs list
+      fetchPrograms();
+    } catch (error) {
+      console.error('Error toggling program active status:', error);
+      toast.error(error.message || 'Không thể thay đổi trạng thái hoạt động', {
+        position: 'top-right'
+      });
+    }
+  };
+
   useEffect(() => {
     fetchPrograms();
   }, []);
@@ -186,6 +210,35 @@ const ProgramList = () => {
       render: (row) => (
         <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>{formatDate(row.updatedAt)}</span>
       ),
+    },
+    {
+      header: 'Hoạt động',
+      field: 'isActive',
+      render: (row) => {
+        // Only show toggle for approved programs
+        if (row.status !== 'approved') {
+          return (
+            <span className="text-neutral-500" style={{ fontSize: '0.75rem' }}>
+              N/A
+            </span>
+          );
+        }
+
+        return (
+          <div className="form-check form-switch d-flex justify-content-center">
+            <input
+              className="form-check-input"
+              type="checkbox"
+              role="switch"
+              checked={row.isActive || false}
+              onChange={(e) => handleToggleActive(row._id, row.isActive, e)}
+              onClick={(e) => e.stopPropagation()}
+              style={{ cursor: 'pointer' }}
+              title={row.isActive ? 'Tạm dừng chương trình' : 'Mở chương trình'}
+            />
+          </div>
+        );
+      },
     },
     {
       header: 'Hành động',

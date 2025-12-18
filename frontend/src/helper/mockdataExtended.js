@@ -20,7 +20,7 @@ export const mockPermissions = [
       "user": ["view", "create", "edit", "delete", "block", "import"],
       "role": ["view", "create", "edit", "delete", "assign"],
       "program": ["view", "create", "edit", "delete", "approve"],
-      "course": ["view", "create", "edit", "delete", "approve"],
+      "course": ["view", "create", "edit", "delete"],  // Course không có approve workflow
       "class": ["view", "create", "edit", "delete", "assign_teacher", "manage_student"],
       "schedule": ["view", "create", "edit", "delete", "approve"],
       "attendance": ["take"],
@@ -37,7 +37,7 @@ export const mockPermissions = [
     permissions: {
       "user": ["view"],
       "program": ["view", "create", "edit"],
-      "course": ["view", "create", "edit", "approve"],
+      "course": ["view", "create", "edit"],  // Course không có approve workflow
       "class": ["view"],
       "schedule": ["view"],
       "exam": ["view", "create", "edit", "publish", "grade", "view_result"],

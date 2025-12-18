@@ -165,6 +165,27 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
   // Course không có workflow phê duyệt riêng, chỉ có draft và completed
   // Workflow phê duyệt chỉ áp dụng cho Program level
 
+  // ===== TOGGLE ACTIVE HANDLER =====
+  const handleToggleActive = async () => {
+    const newIsActive = !program.isActive;
+
+    try {
+      setActionLoading(true);
+      await programService.toggleProgramActive(id, newIsActive);
+      alert(
+        newIsActive
+          ? 'Đã mở chương trình cho đăng ký'
+          : 'Đã tạm dừng chương trình'
+      );
+      fetchProgramDetail();
+    } catch (error) {
+      console.error('Error toggling program active status:', error);
+      alert(error.message || 'Không thể thay đổi trạng thái hoạt động');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
@@ -345,6 +366,27 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
           <div className="d-flex flex-wrap align-items-center gap-3">
             <StatusBadge status={program.status} />
             <span className="text-neutral-600">Mã: <strong>{program.code}</strong></span>
+
+            {/* Toggle Active - Only for Center Head and Approved programs */}
+            {userRole === 'Center Head' && program.status === 'approved' && (
+              <div className="d-flex align-items-center gap-2 ms-auto">
+                <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>
+                  {program.isActive ? 'Đang hoạt động' : 'Tạm dừng'}
+                </span>
+                <div className="form-check form-switch mb-0">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    checked={program.isActive || false}
+                    onChange={handleToggleActive}
+                    disabled={actionLoading}
+                    style={{ cursor: actionLoading ? 'not-allowed' : 'pointer' }}
+                    title={program.isActive ? 'Tạm dừng chương trình' : 'Mở chương trình cho đăng ký'}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <div className="d-flex flex-wrap gap-2">

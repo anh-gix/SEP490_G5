@@ -39,19 +39,19 @@ const StudentNavigation = () => {
       title: 'Lịch học',
       icon: 'fa-calendar-alt',
       path: '/student/schedule',
-      color: 'info'
+      color: 'main'
     },
     {
       title: 'Quản lý đơn đã gửi',
-      icon: 'fa-book-open',
+      icon: 'fa-file-alt',
       path: '/student/applications',
-      color: 'success'
+      color: 'main'
     },
     {
       title: 'Lớp học của tôi',
       icon: 'fa-book-open',
       path: '/student/courses',
-      color: 'success'
+      color: 'main'
     },
     {
       title: 'Luyện Thi',
@@ -68,17 +68,17 @@ const StudentNavigation = () => {
 
     // Tips cho Toeic, Ielts
     {
-      title: 'Tips học tập',
+      title: 'Tips luyện thi',
       icon: 'fa-lightbulb',
       path: '/student/tips',
-      color: 'warning'
+      color: 'main'
     },
     // Online Cam course
     {
-      title: 'Khóa học Online',
-      icon: 'fa-lightbulb',
+      title: 'Khóa bổ trợ online',
+      icon: 'fa-tasks',
       path: '/student/online-courses',
-      color: 'warning'
+      color: 'main'
     },
     // {
     //   title: 'Luyện thi TOEIC',

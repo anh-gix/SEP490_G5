@@ -200,11 +200,11 @@ const StudentDashboard = () => {
               <div className="d-flex justify-content-between align-items-center mb-8">
                 <h6 className="text-neutral-900 fw-bold mb-0 text-16">
                   <i className="fas fa-chart-line text-success-600 me-2"></i>
-                  Kết quả luyện đề
+                  Lịch sử luyện đề
                 </h6>
-                <Link to="/student/toeic">
+                <Link to="/student/practice-exams">
                   <Button className="btn-sm btn-outline-main text-11 px-12 py-6">
-                    Tất cả
+                    Chi tiết
                   </Button>
                 </Link>
               </div>
@@ -237,7 +237,7 @@ const StudentDashboard = () => {
                   className={`flex-fill text-11 px-8 py-6 rounded-6 ${practiceTestFilter === 'cambridge' ? 'btn-main' : 'btn-outline-main'}`}
                   onClick={() => setPracticeTestFilter('cambridge')}
                 >
-                  Cambridge
+                  Cambridge YLE
                 </Button>
               </div>
             </Card.Header>

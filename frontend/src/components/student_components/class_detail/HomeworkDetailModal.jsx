@@ -298,7 +298,7 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
             </Card>
 
             {/* Answer Files */}
-            {homework.answerFiles && homework.answerFiles.length > 0 && (
+            {homework.answerFiles && homework.answerFiles.length >= 0 && (
               <Card className="border-0 shadow-sm mb-16">
                 <Card.Header className="bg-success-50 border-0 py-12">
                   <h6 className="mb-0 text-14 fw-semibold text-neutral-900">

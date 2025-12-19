@@ -1366,9 +1366,10 @@ exports.startProcessing = async (req, res) => {
       });
     }
 
-    let programId = null;
+    let entityId = null;
+    let entityType = null;
 
-    // Nếu là create_program request, tự động tạo program draft
+    // Tự động tạo entity draft based on request type
     if (request.requestType === 'create_program') {
       // Tạo program draft từ thông tin trong request
       const programData = {
@@ -1384,9 +1385,30 @@ exports.startProcessing = async (req, res) => {
       };
 
       const program = await Program.create([programData], { session });
-      programId = program[0]._id;
+      entityId = program[0]._id;
+      entityType = 'Program';
 
-      console.log('✅ Created draft program:', programId, 'for request:', id);
+      console.log('✅ Created draft program:', entityId, 'for request:', id);
+    } else if (request.requestType === 'create_exam') {
+      // Tạo exam draft từ thông tin trong request
+      const examData = {
+        title: req.body.examTitle || 'Draft Exam',
+        description: request.requestNote || '',
+        examType: req.body.examType || 'cambridge',
+        level: req.body.level || 'Academic',
+        totalDuration: parseInt(req.body.totalDuration) || 170,
+        sections: [],
+        status: 'draft',
+        isPublished: false,
+        createdBy: userId,
+        lastCompletedStep: 0
+      };
+
+      const exam = await Exam.create([examData], { session });
+      entityId = exam[0]._id;
+      entityType = 'Exam';
+
+      console.log('✅ Created draft exam:', entityId, 'for request:', id);
     }
 
     // Update work request status
@@ -1402,10 +1424,10 @@ exports.startProcessing = async (req, res) => {
       }
     };
 
-    // Nếu tạo program draft thành công, link vào request
-    if (programId) {
-      updateData.entityType = 'Program';
-      updateData.entityId = programId;
+    // Nếu tạo entity draft thành công, link vào request
+    if (entityId) {
+      updateData.entityType = entityType;
+      updateData.entityId = entityId;
     }
 
     await WorkRequest.findByIdAndUpdate(id, updateData, { session });
@@ -1415,7 +1437,10 @@ exports.startProcessing = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Started processing request',
-      programId: programId // Trả về programId để frontend navigate
+      programId: entityType === 'Program' ? entityId : null, // For backward compatibility
+      examId: entityType === 'Exam' ? entityId : null,
+      entityId: entityId,
+      entityType: entityType
     });
 
   } catch (error) {

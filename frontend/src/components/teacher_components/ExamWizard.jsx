@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import PropTypes from 'prop-types';
+import { examService } from '../../services/examService';
+import { workRequestService } from '../../services/workRequestService';
 
 // Import step components
 import ExamWizardIntro from './ExamWizardIntro';
@@ -18,18 +20,19 @@ const ExamWizard = ({ viewMode = 'teacher' }) => {
   // Determine base path
   const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
 
-  const [showIntro, setShowIntro] = useState(!isEdit); // Show intro for new exams only
+  const [showIntro, setShowIntro] = useState(false); // No intro screen - always directly to wizard
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState('saved'); // 'saved', 'saving', 'error'
+  const [workRequest, setWorkRequest] = useState(null); // Store work request data
 
   // Exam data state
   const [examData, setExamData] = useState({
     _id: null,
     title: '',
     description: '',
-    examType: 'ielts',
+    examType: 'cambridge',
     totalDuration: 170,
     sections: [],
     status: 'draft',
@@ -65,43 +68,67 @@ const ExamWizard = ({ viewMode = 'teacher' }) => {
     }
   ];
 
-  // Load existing exam if editing (mock data for now)
+  // Load existing exam if editing
   useEffect(() => {
-    if (isEdit && examId) {
-      // Mock loading existing exam
-      setLoading(true);
-      setTimeout(() => {
-        // Mock data - replace with actual API call
-        const mockExam = {
-          _id: examId,
-          title: 'IELTS Practice Test 1',
-          description: 'Full IELTS test for intermediate to advanced learners',
-          examType: 'ielts',
-          totalDuration: 170,
-          sections: [
-            {
-              type: 'listening',
-              part: 1,
-              title: 'Social Conversation',
-              instructions: 'You will hear a conversation...',
-              duration: 10,
-              questionCount: 10,
-              answerKey: [],
-              audioUrls: [],
-              fileUrl: ''
-            }
-          ],
-          status: 'draft',
-          lastCompletedStep: 1,
-          createdBy: 'user123'
-        };
+    const loadExamData = async () => {
+      if (!isEdit || !examId) return;
 
-        setExamData(mockExam);
-        setCurrentStep(Math.min(mockExam.lastCompletedStep + 1, 4));
+      try {
+        setLoading(true);
+
+        // Fetch exam data
+        const response = await examService.getExamByIdForManagement(examId);
+        const exam = response.data;
+
+        // Set exam data
+        setExamData({
+          _id: exam._id,
+          title: exam.title || '',
+          description: exam.description || '',
+          examType: exam.examType || 'cambridge',
+          totalDuration: exam.totalDuration || 170,
+          sections: exam.sections || [],
+          status: exam.status || 'draft',
+          lastCompletedStep: exam.lastCompletedStep || 0,
+          createdBy: exam.createdBy,
+        });
+
+        // Set current step based on last completed step
+        setCurrentStep(Math.min((exam.lastCompletedStep || 0) + 1, 4));
+
+        // Try to fetch associated work request
+        try {
+          const user = JSON.parse(localStorage.getItem('user') || '{}');
+          const requestsResponse = await workRequestService.getAssignedToMe({
+            userId: user._id,
+            requestType: 'create_exam',
+            direction: 'top_down'
+          });
+
+          // Find the request linked to this exam
+          const linkedRequest = requestsResponse.data?.find(req =>
+            (typeof req.entityId === 'object' ? req.entityId._id : req.entityId) === examId
+          );
+
+          if (linkedRequest) {
+            setWorkRequest(linkedRequest);
+          }
+        } catch (requestError) {
+          console.warn('Could not fetch work request:', requestError);
+          // Non-critical error - exam can still be edited
+        }
+
+      } catch (error) {
+        console.error('Error loading exam:', error);
+        alert(error.message || 'Không thể tải dữ liệu đề thi!');
+        navigate(`${basePath}/exams`);
+      } finally {
         setLoading(false);
-      }, 500);
-    }
-  }, [isEdit, examId]);
+      }
+    };
+
+    loadExamData();
+  }, [isEdit, examId, navigate, basePath]);
 
   // Intro Screen handlers
   const handleStartWizard = () => {
@@ -130,9 +157,48 @@ const ExamWizard = ({ viewMode = 'teacher' }) => {
     navigate(`${basePath}/exams`);
   };
 
-  // Handle step navigation
-  const handleNext = () => {
+  // Auto-save function
+  const autoSaveExam = async () => {
+    if (!examData._id) return;
+
+    try {
+      setAutoSaveStatus('saving');
+      const formattedData = examService.formatExamData(examData);
+      await examService.updateExamForManagement(examData._id, formattedData);
+      setAutoSaveStatus('saved');
+      console.log('✅ Auto-saved exam');
+    } catch (error) {
+      console.error('Error auto-saving exam:', error);
+      setAutoSaveStatus('error');
+    }
+  };
+
+  // Auto-save when examData changes (debounced)
+  useEffect(() => {
+    if (!examData._id || !isEdit) return;
+
+    // Debounce auto-save - wait 3 seconds after last change
+    const timeoutId = setTimeout(() => {
+      autoSaveExam();
+    }, 3000);
+
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examData]);
+
+  // Handle step navigation with auto-save
+  const handleNext = async () => {
     if (currentStep < steps.length) {
+      // Auto-save before moving to next step
+      await autoSaveExam();
+
+      // Update lastCompletedStep if current step is completed
+      const updatedData = {
+        ...examData,
+        lastCompletedStep: Math.max(examData.lastCompletedStep, currentStep)
+      };
+      setExamData(updatedData);
+
       setCurrentStep(currentStep + 1);
     }
   };
@@ -150,21 +216,48 @@ const ExamWizard = ({ viewMode = 'teacher' }) => {
     }
   };
 
-  // Handle exit
-  const handleExit = () => {
+  // Handle exit with auto-save
+  const handleExit = async () => {
+    // Auto-save before exiting if there's exam data
+    if (examData._id) {
+      if (window.confirm('💾 Bạn có muốn lưu thay đổi trước khi thoát không?')) {
+        await autoSaveExam();
+      }
+    }
     navigate(`${basePath}/exams`);
   };
 
   // Handle submit
-  const handleSubmit = () => {
-    // Mock submit - replace with actual API call
-    console.log('Submitting exam:', examData);
-    setAutoSaveStatus('saving');
+  const handleSubmit = async () => {
+    try {
+      setAutoSaveStatus('saving');
 
-    setTimeout(() => {
-      setAutoSaveStatus('saved');
-      setShowSuccessModal(true);
-    }, 1000);
+      // First, save the current exam state
+      if (examData._id) {
+        const formattedData = examService.formatExamData(examData);
+        await examService.updateExamForManagement(examData._id, formattedData);
+      }
+
+      // Then, complete the work request if it exists
+      if (workRequest && workRequest._id) {
+        await workRequestService.completeRequest(workRequest._id, {
+          note: 'Đã hoàn thành tạo đề thi'
+        });
+
+        setAutoSaveStatus('saved');
+        setShowSuccessModal(true);
+      } else {
+        // Fallback: If no work request found, this shouldn't happen in the new flow
+        console.warn('No work request found - exam may not be linked to a work request');
+        setAutoSaveStatus('saved');
+        alert('⚠️ Đề thi đã được lưu nhưng không tìm thấy yêu cầu công việc liên kết. Vui lòng liên hệ quản trị viên.');
+        navigate(`${basePath}/exams`);
+      }
+    } catch (error) {
+      console.error('Error submitting exam:', error);
+      setAutoSaveStatus('error');
+      alert(error.message || 'Không thể hoàn thành đề thi!');
+    }
   };
 
   // Calculate completion percentage

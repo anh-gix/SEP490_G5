@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 
-const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit }) => {
+const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath, navigate }) => {
   const [expandedSections, setExpandedSections] = useState({});
+  const [saving, setSaving] = useState(false);
 
   const toggleSection = (type) => {
     setExpandedSections(prev => ({
@@ -97,33 +98,60 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit }) => {
     return { checks, allPassed };
   };
 
-  const handleSaveDraft = () => {
-    setExamData(prev => ({
-      ...prev,
-      status: 'draft',
-      lastCompletedStep: 4
-    }));
-    alert('Đề thi đã được lưu dưới dạng Draft!');
+  const handleSaveDraft = async () => {
+    try {
+      setSaving(true);
+
+      // Update exam data status to draft
+      setExamData(prev => ({
+        ...prev,
+        status: 'draft',
+        lastCompletedStep: 4
+      }));
+
+      // Save will be handled by parent component (ExamWizard)
+      // Just navigate back to exam list
+      alert('✅ Đề thi đã được lưu dưới dạng Draft!');
+      navigate(`${basePath}/exams`);
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      alert(error.message || 'Không thể lưu draft!');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleSubmitForApproval = () => {
+  const handleSubmitForApproval = async () => {
     const validation = getValidationStatus();
     if (!validation.allPassed) {
       alert('Vui lòng hoàn thành tất cả các bước trước khi submit!');
       return;
     }
 
-    if (!confirm('Bạn có chắc muốn submit đề thi này để Center Head duyệt?\n\nSau khi submit, bạn sẽ không thể chỉnh sửa cho đến khi Center Head review xong.')) {
+    if (!window.confirm('Bạn có chắc muốn submit đề thi này để Center Head duyệt?\n Sau khi submit, đề thi sẽ chuyển sang trạng thái "Chờ duyệt" và bạn sẽ không thể chỉnh sửa cho đến khi Center Head review xong.\n\nẤn OK để tiếp tục submit.')) {
       return;
     }
 
-    setExamData(prev => ({
-      ...prev,
-      status: 'pending_approval',
-      lastCompletedStep: 4
-    }));
+    try {
+      setSaving(true);
 
-    onSubmit();
+      // Update exam data status
+      setExamData(prev => ({
+        ...prev,
+        status: 'pending_approval',
+        lastCompletedStep: 4
+      }));
+
+      // Call parent submit handler which will:
+      // 1. Save exam data
+      // 2. Complete work request
+      // 3. Show success modal
+      await onSubmit();
+    } catch (error) {
+      console.error('Error submitting exam:', error);
+      alert(error.message || 'Không thể submit đề thi!');
+      setSaving(false);
+    }
   };
 
   const sectionsByType = getSectionsByType();
@@ -327,17 +355,39 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit }) => {
           Quay lại
         </button>
         <div className="d-flex gap-2">
-          <button className="btn btn-outline-primary" onClick={handleSaveDraft}>
-            <i className="ph ph-floppy-disk me-2"></i>
-            Save as Draft
+          <button
+            className="btn btn-outline-primary"
+            onClick={handleSaveDraft}
+            disabled={saving}
+          >
+            {saving ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2"></span>
+                Đang lưu...
+              </>
+            ) : (
+              <>
+                <i className="ph ph-floppy-disk me-2"></i>
+                Lưu Draft
+              </>
+            )}
           </button>
           <button
             className="btn btn-primary"
             onClick={handleSubmitForApproval}
-            disabled={!validation.allPassed}
+            disabled={!validation.allPassed || saving}
           >
-            <i className="ph ph-paper-plane-tilt me-2"></i>
-            Submit for Approval
+            {saving ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2"></span>
+                Đang nộp...
+              </>
+            ) : (
+              <>
+                <i className="ph ph-paper-plane-tilt me-2"></i>
+                Nộp để duyệt
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -356,6 +406,8 @@ ExamStep4Review.propTypes = {
   setExamData: PropTypes.func.isRequired,
   onPrevious: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
+  basePath: PropTypes.string.isRequired,
+  navigate: PropTypes.func.isRequired,
 };
 
 export default ExamStep4Review;

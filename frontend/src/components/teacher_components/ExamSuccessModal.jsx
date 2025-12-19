@@ -26,7 +26,7 @@ const ExamSuccessModal = ({ show, examData, onViewExam, onCreateAnother, onGoToE
             </div>
 
             <h3 className="fw-bold text-neutral-900 mb-3">
-              Đề thi đã được tạo thành công!
+              🎉 Đã nộp đề thi thành công!
             </h3>
 
             {/* Exam Details Card */}
@@ -76,11 +76,11 @@ const ExamSuccessModal = ({ show, examData, onViewExam, onCreateAnother, onGoToE
             <hr className="my-4" />
 
             {/* Status Message */}
-            <div className="alert alert-info text-start mb-4">
-              <i className="ph ph-info fs-5 me-2"></i>
-              <strong>📬 Đề thi đã được gửi đến Center Head để duyệt</strong>
+            <div className="alert alert-success text-start mb-4">
+              <i className="ph ph-check-circle fs-5 me-2"></i>
+              <strong>✅ Yêu cầu công việc đã hoàn thành</strong>
               <p className="mb-0 mt-2 text-sm">
-                Bạn sẽ nhận được thông báo khi Center Head review xong.
+                Đề thi đã được gửi đến Center Head để duyệt. Bạn sẽ nhận được thông báo khi Center Head review xong.
               </p>
             </div>
 
@@ -103,16 +103,7 @@ const ExamSuccessModal = ({ show, examData, onViewExam, onCreateAnother, onGoToE
                 </small>
               </button>
 
-              <button
-                className="btn btn-lg btn-outline-primary text-start"
-                onClick={onCreateAnother}
-              >
-                <i className="ph ph-plus-circle me-2"></i>
-                Tạo đề thi mới
-                <small className="d-block text-muted mt-1">
-                  Create another exam
-                </small>
-              </button>
+              {/* Removed "Create Another" button - teachers can only create exams from work requests */}
 
               <button
                 className="btn btn-lg btn-outline-secondary text-start"

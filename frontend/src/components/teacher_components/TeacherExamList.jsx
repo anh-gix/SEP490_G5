@@ -579,17 +579,9 @@ const TeacherExamList = () => {
       <div className="d-flex justify-content-between align-items-center mb-24">
         <div>
           <h4 className="mb-8 text-neutral-900 fw-bold">Đề thi</h4>
-          <p className="text-neutral-600 mb-0">Quản lý các đề thi</p>
+          <p className="text-neutral-600 mb-0">Quản lý các đề thi - Chỉ có thể tạo đề thi từ yêu cầu của Center Head</p>
         </div>
-        {activeTab === 'my-exams' && (
-          <Button
-            variant="primary"
-            icon="ph ph-plus"
-            onClick={() => navigate('/teacher/exams/create')}
-          >
-            Tạo đề thi mới
-          </Button>
-        )}
+        {/* Removed standalone create exam button - Teachers can only create exams from work requests */}
       </div>
 
       {/* Tabs */}

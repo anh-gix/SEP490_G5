@@ -69,6 +69,10 @@ const TeacherProgramList = () => {
         filtered = filtered.filter(program => program.status === filterValues.status);
       }
 
+      if (filterValues.type && filterValues.type !== "all") {
+        filtered = filtered.filter(program => program.type === filterValues.type);
+      }
+
       setFilteredPrograms(filtered);
     }
     setCurrentPage(1);
@@ -292,6 +296,15 @@ const TeacherProgramList = () => {
         { value: "draft", label: "Bản nháp" },
         { value: "archived", label: "Đã lưu trữ" },
       ]
+    },
+    {
+      key: "type",
+      label: "Loại chương trình",
+      options: [
+        { value: "ielts", label: "IELTS" },
+        { value: "toeic", label: "TOEIC" },
+        { value: "cam", label: "Cambridge" },
+      ]
     }
   ];
 
@@ -381,34 +394,19 @@ const TeacherProgramList = () => {
             <span className="d-inline d-lg-none">👁</span>
           </Button>
           {activeTab === 'my-programs' && (
-            <>
-              <Button
-                variant="secondary"
-                size="sm"
-                icon="ph ph-pencil"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/teacher/programs/${row._id}/edit`);
-                }}
-                className="px-2 py-1"
-              >
-                <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Sửa</span>
-                <span className="d-inline d-lg-none">✏️</span>
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                icon="ph ph-trash"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteProgram(row._id, row.program_name);
-                }}
-                className="px-2 py-1"
-              >
-                <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Xóa</span>
-                <span className="d-inline d-lg-none">🗑️</span>
-              </Button>
-            </>
+            <Button
+              variant="danger"
+              size="sm"
+              icon="ph ph-trash"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteProgram(row._id, row.program_name);
+              }}
+              className="px-2 py-1"
+            >
+              <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Xóa</span>
+              <span className="d-inline d-lg-none">🗑️</span>
+            </Button>
           )}
         </div>
       ),

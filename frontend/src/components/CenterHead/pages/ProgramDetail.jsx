@@ -8,6 +8,7 @@ import Card from '../compo/Card';
 import Button from '../compo/Button';
 import StatusBadge from '../compo/StatusBadge';
 import Table from '../compo/Table';
+import FilterBar from '../compo/FilterBar';
 import programService from '../../../services/programService';
 import { courseService } from '../../../services/courseService';
 import approvalRequestService from '../../../services/approvalRequestService';
@@ -19,6 +20,8 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
   const [program, setProgram] = useState(null);
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState([]);
+  const [filteredCourses, setFilteredCourses] = useState([]);
+  const [courseFilterValues, setCourseFilterValues] = useState({});
   const [actionLoading, setActionLoading] = useState(false);
   const [showRejectProgramModal, setShowRejectProgramModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -39,6 +42,17 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
   useEffect(() => {
     fetchProgramDetail();
   }, [id]);
+
+  // Filter courses based on learningType
+  useEffect(() => {
+    let filtered = [...courses];
+
+    if (courseFilterValues.learningType && courseFilterValues.learningType !== "all") {
+      filtered = filtered.filter(course => course.learningType === courseFilterValues.learningType);
+    }
+
+    setFilteredCourses(filtered);
+  }, [courses, courseFilterValues]);
 
   const fetchProgramDetail = async () => {
     try {
@@ -70,7 +84,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
   const handleDeleteCourse = async (courseId, courseName) => {
     const result = await Swal.fire({
       title: 'Xác nhận xóa',
-      text: `Bạn có chắc chắn muốn xóa môn học "${courseName}"? Hành động này không thể hoàn tác.`,
+      text: `Bạn có chắc chắn muốn xóa khóa học "${courseName}"? Hành động này không thể hoàn tác.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
@@ -88,15 +102,15 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
       const response = await courseService.deleteCourse(courseId);
 
       if (response.success) {
-        toast.success('Xóa môn học thành công!', { position: 'top-right' });
+        toast.success('Xóa khóa học thành công!', { position: 'top-right' });
         // Refresh the courses list
         setCourses(courses.filter(c => c._id !== courseId));
       } else {
-        toast.error(response.message || 'Xóa môn học thất bại!', { position: 'top-right' });
+        toast.error(response.message || 'Xóa khóa học thất bại!', { position: 'top-right' });
       }
     } catch (error) {
       console.error('Error deleting course:', error);
-      toast.error(error.message || 'Không thể xóa môn học. Vui lòng thử lại sau.', { position: 'top-right' });
+      toast.error(error.message || 'Không thể xóa khóa học. Vui lòng thử lại sau.', { position: 'top-right' });
     } finally {
       setActionLoading(false);
     }
@@ -131,7 +145,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
   const handleApproveProgram = async () => {
     const result = await Swal.fire({
       title: 'Xác nhận duyệt chương trình',
-      html: 'Bạn có chắc chắn muốn duyệt chương trình này?<br><br><strong>Lưu ý:</strong> Tất cả các môn học trong chương trình sẽ được duyệt cùng lúc.',
+      html: 'Bạn có chắc chắn muốn duyệt chương trình này?<br><br><strong>Lưu ý:</strong> Tất cả các khóa học trong chương trình sẽ được duyệt cùng lúc.',
       icon: 'question',
       showCancelButton: true,
       confirmButtonColor: '#10b981',
@@ -149,7 +163,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
       await programService.approveProgram(id, {
         approvalNote: 'Đã được phê duyệt bởi Center Head'
       });
-      toast.success('Đã duyệt chương trình và toàn bộ môn học thành công!', { position: 'top-right' });
+      toast.success('Đã duyệt chương trình và toàn bộ khóa học thành công!', { position: 'top-right' });
       fetchProgramDetail();
     } catch (err) {
       console.error('Error approving program:', err);
@@ -244,7 +258,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
 
   const courseColumns = [
     {
-      header: 'Tên môn học',
+      header: 'Tên khóa học',
       field: 'name',
       render: (row) => (
         <div>
@@ -551,9 +565,9 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
       <Card>
         <div className="d-flex justify-content-between align-items-center mb-20">
           <div>
-            <h5 className="mb-4 text-neutral-900 fw-bold">Danh sách Môn học ({courses.length})</h5>
+            <h5 className="mb-4 text-neutral-900 fw-bold">Danh sách Khóa học ({filteredCourses.length}/{courses.length})</h5>
             <p className="text-neutral-600 mb-0 text-sm">
-              Các môn học thuộc chương trình này
+              Các khóa học thuộc chương trình này
             </p>
           </div>
           {/* Show Create Course button only when program is draft or needs_revision and not view-only */}
@@ -563,21 +577,49 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
               onClick={() => navigate(`${basePath}/programs/${id}/courses/create`)}
             >
               <i className="ph ph-plus me-2"></i>
-              Tạo học phần mới
+              Tạo khóa học mới
             </Button>
           )}
         </div>
 
+        {/* Course Filters */}
+        {courses.length > 0 && (
+          <div className="mb-20">
+            <FilterBar
+              filters={[
+                {
+                  key: "learningType",
+                  label: "Loại khóa học",
+                  options: [
+                    { value: "online", label: "Online" },
+                    { value: "offline", label: "Offline" },
+                  ]
+                }
+              ]}
+              values={courseFilterValues}
+              onChange={(key, value) => setCourseFilterValues({ ...courseFilterValues, [key]: value })}
+              onReset={() => setCourseFilterValues({})}
+            />
+          </div>
+        )}
+
         {courses.length > 0 ? (
-          <Table
-            columns={courseColumns}
-            data={courses}
-            onRowClick={(row) => navigate(`${basePath}/programs/${id}/courses/${row._id}/details`)}
-          />
+          filteredCourses.length > 0 ? (
+            <Table
+              columns={courseColumns}
+              data={filteredCourses}
+              onRowClick={(row) => navigate(`${basePath}/programs/${id}/courses/${row._id}/details`)}
+            />
+          ) : (
+            <div className="text-center py-5 text-neutral-600">
+              <i className="ph ph-funnel text-neutral-400" style={{ fontSize: '48px' }}></i>
+              <p className="mt-3 mb-0">Không tìm thấy khóa học nào với bộ lọc đã chọn</p>
+            </div>
+          )
         ) : (
           <div className="text-center py-5 text-neutral-600">
             <i className="ph ph-book text-neutral-400" style={{ fontSize: '48px' }}></i>
-            <p className="mt-3 mb-0">Chưa có môn học nào trong chương trình này</p>
+            <p className="mt-3 mb-0">Chưa có khóa học nào trong chương trình này</p>
           </div>
         )}
       </Card>

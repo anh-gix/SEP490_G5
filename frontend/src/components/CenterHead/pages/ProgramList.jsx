@@ -40,6 +40,10 @@ const ProgramList = () => {
       filtered = filtered.filter(program => program.status === filterValues.status);
     }
 
+    if (filterValues.type && filterValues.type !== "all") {
+      filtered = filtered.filter(program => program.type === filterValues.type);
+    }
+
     setFilteredPrograms(filtered);
     setCurrentPage(1); // Reset to first page when filters change
   }, [programs, searchKeyword, filterValues]);
@@ -147,6 +151,15 @@ const ProgramList = () => {
         { value: "active", label: "Đang hoạt động" },
         { value: "draft", label: "Bản nháp" },
         { value: "archived", label: "Đã lưu trữ" },
+      ]
+    },
+    {
+      key: "type",
+      label: "Loại chương trình",
+      options: [
+        { value: "ielts", label: "IELTS" },
+        { value: "toeic", label: "TOEIC" },
+        { value: "cam", label: "Cambridge" },
       ]
     }
   ];

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Container, Card, Modal, Button, Form, Alert, ButtonGroup } from 'react-bootstrap';
+import { Container, Card, Modal, Button, Form, Alert, ButtonGroup, Badge } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
 import classService from '../../services/classService';
 import teacherService from '../../services/teacherService';
@@ -12,7 +13,7 @@ import courseService from '../../services/courseService';
 import SelectStudentModal from './SelectStudentModal';
 import ScheduleCalendar from './ScheduleCalendar';
 import ScheduleWeekly from './ScheduleWeekly';
-import { formatDateToYYYYMMDD, parseDateString } from '../../helper/helper';
+import { formatDateToYYYYMMDD, parseDateString, formatDate } from '../../helper/helper';
 
 const createEmptyScheduleEntry = () => ({
   id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -91,6 +92,13 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
   const [scheduleValidationResult, setScheduleValidationResult] = useState(null); // Validation result for schedule edit
   const [validatingScheduleEdit, setValidatingScheduleEdit] = useState(false); // Loading state for schedule edit validation
   
+  // Validation states for "Xác nhận chỉnh sửa" modal
+  const [confirmUpdateValidationResult, setConfirmUpdateValidationResult] = useState(null); // Validation result for confirm update modal
+  const [validatingConfirmUpdate, setValidatingConfirmUpdate] = useState(false); // Loading state for confirm update validation
+  
+  // Pending schedule changes (temporary changes not yet saved to database)
+  const [pendingScheduleChanges, setPendingScheduleChanges] = useState([]); // Array<{ scheduleId, oldSchedule: {date, startTime, endTime}, newSchedule: {date, startTime, endTime}, updateScope: 'single'|'future', matchingScheduleIds?: string[] }>
+  
   // Student selection and Excel import states
   const [selectedStudents, setSelectedStudents] = useState([]); // Array of student IDs
   const [showSelectStudentModal, setShowSelectStudentModal] = useState(false);
@@ -140,9 +148,27 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         
         setFullClassData(classDataWithSchedules);
         
-        // Debug log to check if schedules are present
+        // Log tất cả schedule IDs trong lớp
         if (classDataWithSchedules && classDataWithSchedules.schedules) {
-          console.log(' Full class data loaded with schedules:', classDataWithSchedules.schedules.length);
+          console.log('=== DANH SÁCH TẤT CẢ BUỔI HỌC TRONG LỚP ===');
+          console.log('Class ID:', classId);
+          console.log('Class Name:', classDataWithSchedules.name || 'N/A');
+          console.log('Tổng số buổi học:', classDataWithSchedules.schedules.length);
+          console.log('Danh sách Schedule IDs:');
+          classDataWithSchedules.schedules.forEach((schedule, index) => {
+            const scheduleId = schedule._id || schedule.id;
+            const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+            const startTime = schedule.startTime || schedule.start_time || 'N/A';
+            const endTime = schedule.endTime || schedule.end_time || 'N/A';
+            const status = schedule.status || 'N/A';
+            
+            console.log(`  ${index + 1}. Schedule ID: ${scheduleId}`);
+            console.log(`     - Date: ${scheduleDate}`);
+            console.log(`     - Time: ${startTime} - ${endTime}`);
+            console.log(`     - Status: ${status}`);
+            console.log(`     - Full object:`, schedule);
+          });
+          console.log('=== END DANH SÁCH ===');
         } else {
           console.log(' Full class data loaded but no schedules found');
         }
@@ -493,52 +519,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
           excludeScheduleId: excludeScheduleId
         };
         
-        console.log('\n ========== FRONTEND: VALIDATE SCHEDULE EDIT ==========');
-        console.log(' Request data:', JSON.stringify(validationData, null, 2));
-        console.log(' Thông tin buổi học:');
-        console.log('  - ClassId:', classId);
-        console.log('  - Date:', editedSchedule.date);
-        console.log('  - Time:', `${editedSchedule.startTime} - ${editedSchedule.endTime}`);
-        console.log('  - RoomId:', roomId);
-        console.log('  - ExcludeScheduleId:', excludeScheduleId || 'Không có (thêm mới)');
-        console.log('  - ClassName:', formData.name || fullClassData?.name || 'N/A');
-        console.log('  - TeacherId:', formData.teacherId || fullClassData?.teacher?._id || fullClassData?.teacher?.id || 'Chưa có');
-        console.log('  - Số học sinh:', classStudents.length || fullClassData?.students?.length || 0);
-        
         const response = await classScheduleService.validateAddClassSchedule(validationData);
-        
-        console.log(' Response từ server:');
-        console.log('  - Success:', response.success);
-        console.log('  - HasConflict:', response.conflicts?.hasConflict);
-        console.log('  - Room conflicts:', response.conflicts?.room?.length || 0);
-        console.log('  - Teacher conflicts:', response.conflicts?.teacher?.length || 0);
-        console.log('  - Student conflicts:', response.conflicts?.students?.length || 0);
-        
-        if (response.conflicts?.room && response.conflicts.room.length > 0) {
-          console.log('  📍 Chi tiết conflict phòng học:');
-          response.conflicts.room.forEach((conflict, idx) => {
-            console.log(`    [${idx + 1}] ${conflict.className} - ${conflict.date} ${conflict.time}`);
-          });
-        }
-        
-        if (response.conflicts?.teacher && response.conflicts.teacher.length > 0) {
-          console.log('  👨‍🏫 Chi tiết conflict giáo viên:');
-          response.conflicts.teacher.forEach((conflict, idx) => {
-            console.log(`    [${idx + 1}] ${conflict.className} - ${conflict.date} ${conflict.time}`);
-          });
-        }
-        
-        if (response.conflicts?.students && response.conflicts.students.length > 0) {
-          console.log('  👥 Chi tiết conflict học sinh:');
-          response.conflicts.students.forEach((studentConflict, idx) => {
-            console.log(`    [${idx + 1}] ${studentConflict.studentName} (ID: ${studentConflict.studentId}):`);
-            studentConflict.conflicts.forEach((conflict, cIdx) => {
-              console.log(`        - ${conflict.className} - ${conflict.date} ${conflict.time}`);
-            });
-          });
-        }
-        
-        console.log('========== FRONTEND: VALIDATE SCHEDULE EDIT - END ==========\n');
         
         setScheduleValidationResult(response);
       } catch (error) {
@@ -1114,8 +1095,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 return; // Skip schedules that already have attendance
               }
 
-              // Check if same date
-              if (classSchedule.date === teacherSchedule.date) {
+              // Check if same date (use formatDateToYYYYMMDD to handle ISO strings)
+              if (formatDateToYYYYMMDD(classSchedule.date) === formatDateToYYYYMMDD(teacherSchedule.date)) {
                 const classStart = parseTime(classSchedule.startTime);
                 const classEnd = parseTime(classSchedule.endTime);
                 const teacherStart = parseTime(teacherSchedule.startTime);
@@ -1164,7 +1145,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 totalConflicts: conflicts.length,
                 conflicts: conflicts.map(c => {
                   try {
-                    const currentSchedule = currentClassSchedules.find(s => s.date === c.date);
+                    const currentSchedule = currentClassSchedules.find(s => formatDateToYYYYMMDD(s.date) === formatDateToYYYYMMDD(c.date));
                     return {
                       ...c,
                       currentClassSchedule: currentSchedule ? {
@@ -1183,7 +1164,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 }),
                 summary: conflicts.map(c => {
                   try {
-                    const currentSchedule = currentClassSchedules.find(s => s.date === c.date);
+                    const currentSchedule = currentClassSchedules.find(s => formatDateToYYYYMMDD(s.date) === formatDateToYYYYMMDD(c.date));
                     const currentTime = currentSchedule 
                       ? `${currentSchedule.startTime} - ${currentSchedule.endTime}`
                       : c.classTime;
@@ -1501,8 +1482,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 return; // Skip schedules that already have attendance
               }
 
-              // Check if same date
-              if (classSchedule.date === roomSchedule.date) {
+              // Check if same date (use formatDateToYYYYMMDD to handle ISO strings)
+              if (formatDateToYYYYMMDD(classSchedule.date) === formatDateToYYYYMMDD(roomSchedule.date)) {
                 const classStart = parseTime(classSchedule.startTime);
                 const classEnd = parseTime(classSchedule.endTime);
                 const roomStart = parseTime(roomSchedule.startTime);
@@ -1533,7 +1514,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 totalConflicts: conflicts.length,
                 conflicts: conflicts.map(c => {
                   try {
-                    const currentSchedule = currentClassSchedules.find(s => s.date === c.date);
+                    const currentSchedule = currentClassSchedules.find(s => formatDateToYYYYMMDD(s.date) === formatDateToYYYYMMDD(c.date));
                     return {
                       ...c,
                       currentClassSchedule: currentSchedule ? {
@@ -1552,7 +1533,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 }),
                 summary: conflicts.map(c => {
                   try {
-                    const currentSchedule = currentClassSchedules.find(s => s.date === c.date);
+                    const currentSchedule = currentClassSchedules.find(s => formatDateToYYYYMMDD(s.date) === formatDateToYYYYMMDD(c.date));
                     const currentTime = currentSchedule 
                       ? `${currentSchedule.startTime} - ${currentSchedule.endTime}`
                       : c.classTime;
@@ -1985,7 +1966,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
             if (hasTimeConflict) {
               // Check if this conflict is already in the list (avoid duplicates)
               const studentDateStr = formatDateToYYYYMMDD(studentDate);
-              const isDuplicate = studentConflictsList.some(c => c.date === studentDateStr);
+              const isDuplicate = studentConflictsList.some(c => formatDateToYYYYMMDD(c.date) === studentDateStr);
 
               if (!isDuplicate) {
                 const conflictingClassName = 
@@ -2891,13 +2872,18 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     }
     
     // Transform to ScheduleCalendar format
-    return schedulesToTransform.map((schedule, index) => {
+    const transformedSchedules = schedulesToTransform.map((schedule, index) => {
       const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
-      const date = scheduleDate ? new Date(scheduleDate) : null;
       
-      if (!date || isNaN(date.getTime())) {
+      // Format date string directly, don't convert to Date object first
+      const dateStr = scheduleDate ? formatDateToYYYYMMDD(scheduleDate) : null;
+      
+      if (!dateStr) {
         return null;
       }
+      
+      // Parse date only for time calculations, not for date string
+      const date = scheduleDate ? new Date(scheduleDate) : null;
       
       // Get teacher name
       const teacherName = schedule.teacher?.fullName || 
@@ -2963,9 +2949,17 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         timeStatus = 'upcoming'; // Buổi chưa bắt đầu
       }
       
+      // Check if this schedule has pending changes
+      const pendingChange = pendingScheduleChanges.find(change => {
+        if (change.updateScope === 'future' && change.matchingScheduleIds) {
+          return change.matchingScheduleIds.some(id => String(id) === String(scheduleId));
+        }
+        return String(change.scheduleId) === String(scheduleId);
+      });
+      
       return {
         id: scheduleId,
-        date: formatDateToYYYYMMDD(date), // Format as YYYY-MM-DD (local timezone)
+        date: dateStr, // Use formatted string directly, not from Date object
         startTime: startTime,
         endTime: endTime,
         className: formData.name || 'Chưa có tên lớp',
@@ -2975,22 +2969,144 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         lessonNumber: schedule.session?.order || schedule.lessonNumber || null,
         lessonTopic: schedule.session?.title || schedule.lessonTopic || null,
         hasAttendance: hasAttendance, // Thêm property để phân biệt buổi đã học/chưa học
-        timeStatus: timeStatus // 'upcoming', 'ongoing', 'completed'
+        timeStatus: timeStatus, // 'upcoming', 'ongoing', 'completed'
+        isOldClassSchedule: !!pendingChange // Mark as old schedule if has pending change
       };
     }).filter(Boolean); // Remove null entries
-  }, [fullClassData, classData, generatedSessions, formData.name, teachers, rooms, schedulesAttendanceMap]);
+    
+    // Add new schedules from pending changes
+    const newSchedulesFromPending = [];
+    pendingScheduleChanges.forEach(change => {
+      if (change.updateScope === 'single') {
+        // Get teacher and room info from formData or fullClassData
+        const teacherName = teachers.find(t => {
+          const teacherId = t._id || t.id;
+          const formTeacherId = formData.teacherId || fullClassData?.teacher?._id || fullClassData?.teacher?.id || fullClassData?.teacher;
+          return String(teacherId) === String(formTeacherId);
+        })?.fullName || 
+        teachers.find(t => {
+          const teacherId = t._id || t.id;
+          const formTeacherId = formData.teacherId || fullClassData?.teacher?._id || fullClassData?.teacher?.id || fullClassData?.teacher;
+          return String(teacherId) === String(formTeacherId);
+        })?.name ||
+        'Chưa có';
+        
+        const roomName = rooms.find(r => {
+          const roomId = r._id || r.id;
+          const formRoomId = formData.roomId || fullClassData?.room?._id || fullClassData?.room?.id || fullClassData?.room;
+          return String(roomId) === String(formRoomId);
+        })?.room_name ||
+        rooms.find(r => {
+          const roomId = r._id || r.id;
+          const formRoomId = formData.roomId || fullClassData?.room?._id || fullClassData?.room?.id || fullClassData?.room;
+          return String(roomId) === String(formRoomId);
+        })?.name ||
+        'Chưa có';
+        
+        // Add single new schedule
+        newSchedulesFromPending.push({
+          id: `pending-${change.scheduleId}`,
+          date: change.newSchedule.date,
+          startTime: change.newSchedule.startTime,
+          endTime: change.newSchedule.endTime,
+          className: formData.name || 'Chưa có tên lớp',
+          teacherName: teacherName,
+          roomName: roomName,
+          status: 'temporary',
+          isNewClassSchedule: true, // Mark as new schedule (preview)
+          timeStatus: 'upcoming'
+        });
+      } else if (change.updateScope === 'future') {
+        // Calculate and add all future schedules that match the pattern
+        // Get the original schedule to find matching pattern
+        const originalSchedule = schedulesToTransform.find(s => {
+          const sId = s._id || s.id;
+          return String(sId) === String(change.scheduleId);
+        });
+        
+        if (originalSchedule) {
+          const originalDate = new Date(originalSchedule.date || originalSchedule.scheduleDate || originalSchedule.classDate);
+          originalDate.setHours(0, 0, 0, 0);
+          const originalDayOfWeek = originalDate.getDay();
+          const originalStartTime = originalSchedule.startTime || originalSchedule.start_time;
+          const originalEndTime = originalSchedule.endTime || originalSchedule.end_time;
+          
+          // Find all matching schedules
+          const matchingSchedules = schedulesToTransform.filter(s => {
+            const sDate = new Date(s.date || s.scheduleDate || s.classDate);
+            sDate.setHours(0, 0, 0, 0);
+            const sDayOfWeek = sDate.getDay();
+            return sDayOfWeek === originalDayOfWeek &&
+                   (s.startTime || s.start_time) === originalStartTime &&
+                   (s.endTime || s.end_time) === originalEndTime &&
+                   sDate >= originalDate;
+          });
+          
+          // Calculate new dates for each matching schedule
+          const newDate = new Date(change.newSchedule.date);
+          newDate.setHours(0, 0, 0, 0);
+          const firstScheduleDate = new Date(matchingSchedules[0]?.date || matchingSchedules[0]?.scheduleDate || matchingSchedules[0]?.classDate || originalDate);
+          firstScheduleDate.setHours(0, 0, 0, 0);
+          
+          matchingSchedules.forEach(matchingSchedule => {
+            const originalScheduleDate = new Date(matchingSchedule.date || matchingSchedule.scheduleDate || matchingSchedule.classDate);
+            originalScheduleDate.setHours(0, 0, 0, 0);
+            
+            // Calculate new date based on pattern (similar to backend logic)
+            const daysFromFirst = Math.floor((originalScheduleDate.getTime() - firstScheduleDate.getTime()) / (24 * 60 * 60 * 1000));
+            const weeksFromFirst = Math.floor(daysFromFirst / 7);
+            
+            const newScheduleDate = new Date(newDate);
+            newScheduleDate.setDate(newDate.getDate() + (weeksFromFirst * 7));
+            newScheduleDate.setHours(0, 0, 0, 0);
+            
+            newSchedulesFromPending.push({
+              id: `pending-future-${matchingSchedule._id || matchingSchedule.id}`,
+              date: formatDateToYYYYMMDD(newScheduleDate),
+              startTime: change.newSchedule.startTime,
+              endTime: change.newSchedule.endTime,
+              className: formData.name || 'Chưa có tên lớp',
+              teacherName: teachers.find(t => {
+                const teacherId = t._id || t.id;
+                const formTeacherId = formData.teacherId;
+                return String(teacherId) === String(formTeacherId);
+              })?.fullName || 'Chưa có',
+              roomName: rooms.find(r => {
+                const roomId = r._id || r.id;
+                const formRoomId = formData.roomId;
+                return String(roomId) === String(formRoomId);
+              })?.room_name || 'Chưa có',
+              status: 'temporary',
+              isNewClassSchedule: true, // Mark as new schedule (preview)
+              timeStatus: 'upcoming'
+            });
+          });
+        }
+      }
+    });
+    
+    return [...transformedSchedules, ...newSchedulesFromPending];
+  }, [fullClassData, classData, generatedSessions, formData.name, formData.teacherId, formData.roomId, teachers, rooms, schedulesAttendanceMap, pendingScheduleChanges]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!formData.name || !formData.level || !formData.program) {
-      alert('Vui lòng điền đầy đủ thông tin bắt buộc!');
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Thiếu thông tin',
+        text: 'Vui lòng điền đầy đủ thông tin bắt buộc!'
+      });
       return;
     }
 
     // Validate course is selected
     if (!formData.course) {
-      alert('Vui lòng chọn course!');
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Thiếu thông tin',
+        text: 'Vui lòng chọn course!'
+      });
       return;
     }
 
@@ -2998,7 +3114,11 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       formData.scheduleEntries.length === 0 ||
       formData.scheduleEntries.some(entry => !entry.day)
     ) {
-      alert('Vui lòng chọn ít nhất 1 ngày học và điền đủ thời gian!');
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Thiếu thông tin',
+        text: 'Vui lòng chọn ít nhất 1 ngày học và điền đủ thời gian!'
+      });
       return;
     }
 
@@ -3007,7 +3127,11 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         entry => entry.startTime >= entry.endTime
       )
     ) {
-      alert('Giờ bắt đầu phải nhỏ hơn giờ kết thúc!');
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Thông tin không hợp lệ',
+        text: 'Giờ bắt đầu phải nhỏ hơn giờ kết thúc!'
+      });
       return;
     }
 
@@ -3015,7 +3139,11 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     const duplicateIndices = checkDuplicateEntries(formData.scheduleEntries);
     if (duplicateIndices.length > 0) {
       setScheduleEntriesError('Có các buổi học trùng lặp. Vui lòng kiểm tra lại ngày và giờ học.');
-      alert('Có các buổi học trùng lặp. Vui lòng kiểm tra lại ngày và giờ học.');
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Trùng lặp',
+        text: 'Có các buổi học trùng lặp. Vui lòng kiểm tra lại ngày và giờ học.'
+      });
       return;
     }
     setScheduleEntriesError(null);
@@ -3025,7 +3153,11 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     if (formData.status === 'pending') {
       const today = getTodayDate();
       if (formData.startDate && formData.startDate < today) {
-        alert('Ngày khai giảng không được là quá khứ!');
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Ngày không hợp lệ',
+          text: 'Ngày khai giảng không được là quá khứ!'
+        });
         setDateError('Ngày khai giảng không được là quá khứ!');
         return;
       }
@@ -3039,7 +3171,11 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         const studentCount = (selectedStudents || []).length;
         
         if (roomCapacity && studentCount > roomCapacity) {
-          alert(`Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`);
+          await Swal.fire({
+            icon: 'warning',
+            title: 'Vượt quá sức chứa',
+            text: `Số học viên (${studentCount}) vượt quá sức chứa của phòng (${roomCapacity} học viên). Vui lòng chọn phòng lớn hơn hoặc giảm số học viên.`
+          });
           return;
         }
       }
@@ -3048,9 +3184,18 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     // Check for teacher conflicts before submitting
     if (teacherRoomConflicts.teacherConflicts.length > 0) {
       const conflictCount = teacherRoomConflicts.teacherConflicts.length;
-      const confirmMessage = `Cảnh báo: Giáo viên đã chọn có ${conflictCount} xung đột lịch học.\n\nBạn có chắc chắn muốn tiếp tục cập nhật lớp học không?`;
+      const result = await Swal.fire({
+        icon: 'warning',
+        title: 'Cảnh báo xung đột',
+        html: `Giáo viên đã chọn có ${conflictCount} xung đột lịch học.<br/><br/>Bạn có chắc chắn muốn tiếp tục cập nhật lớp học không?`,
+        showCancelButton: true,
+        confirmButtonText: 'Tiếp tục',
+        cancelButtonText: 'Hủy',
+        confirmButtonColor: '#ffc107',
+        cancelButtonColor: '#6c757d'
+      });
       
-      if (!window.confirm(confirmMessage)) {
+      if (!result.isConfirmed) {
         return;
       }
     }
@@ -3058,9 +3203,18 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     // Check for room conflicts before submitting
     if (teacherRoomConflicts.roomConflicts.length > 0) {
       const conflictCount = teacherRoomConflicts.roomConflicts.length;
-      const confirmMessage = `Cảnh báo: Phòng học đã chọn có ${conflictCount} xung đột lịch học.\n\nBạn có chắc chắn muốn tiếp tục cập nhật lớp học không?`;
+      const result = await Swal.fire({
+        icon: 'warning',
+        title: 'Cảnh báo xung đột',
+        html: `Phòng học đã chọn có ${conflictCount} xung đột lịch học.<br/><br/>Bạn có chắc chắn muốn tiếp tục cập nhật lớp học không?`,
+        showCancelButton: true,
+        confirmButtonText: 'Tiếp tục',
+        cancelButtonText: 'Hủy',
+        confirmButtonColor: '#ffc107',
+        cancelButtonColor: '#6c757d'
+      });
       
-      if (!window.confirm(confirmMessage)) {
+      if (!result.isConfirmed) {
         return;
       }
     }
@@ -3069,17 +3223,132 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     if (studentConflicts.size > 0) {
       const conflictCount = Array.from(studentConflicts.values()).reduce((sum, conflicts) => sum + conflicts.length, 0);
       const studentCount = studentConflicts.size;
-      const confirmMessage = `Cảnh báo: Có ${studentCount} học viên với tổng cộng ${conflictCount} xung đột lịch học.\n\nBạn có chắc chắn muốn tiếp tục cập nhật lớp học không?`;
+      const result = await Swal.fire({
+        icon: 'warning',
+        title: 'Cảnh báo xung đột',
+        html: `Có ${studentCount} học viên với tổng cộng ${conflictCount} xung đột lịch học.<br/><br/>Bạn có chắc chắn muốn tiếp tục cập nhật lớp học không?`,
+        showCancelButton: true,
+        confirmButtonText: 'Tiếp tục',
+        cancelButtonText: 'Hủy',
+        confirmButtonColor: '#ffc107',
+        cancelButtonColor: '#6c757d'
+      });
       
-      if (!window.confirm(confirmMessage)) {
+      if (!result.isConfirmed) {
         return;
       }
     }
 
     // Ensure id is present before submitting
     if (!formData.id) {
-      alert('Lỗi: Không tìm thấy ID của lớp học. Vui lòng thử lại.');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: 'Không tìm thấy ID của lớp học. Vui lòng thử lại.'
+      });
       return;
+    }
+
+    // Apply pending schedule changes before submitting
+    if (pendingScheduleChanges.length > 0) {
+      try {
+        console.log('==========================================');
+        console.log('📝 CHANGED CLASS SCHEDULES (User Edits)');
+        console.log('==========================================');
+        console.log(`Total changed schedules: ${pendingScheduleChanges.length}`);
+        console.log('');
+        
+        let scheduleIndex = 1;
+        
+        // Apply all pending schedule changes
+        for (const change of pendingScheduleChanges) {
+          if (change.updateScope === 'single') {
+            // Single schedule change
+            const oldDate = change.oldSchedule.date;
+            const newDate = change.newSchedule.date;
+            console.log(`ClassSchedule ${scheduleIndex}:`);
+            console.log(`  - Schedule ID: ${change.scheduleId}`);
+            console.log(`  - ${oldDate} -> ${newDate}`);
+            scheduleIndex++;
+          } else if (change.updateScope === 'future') {
+            // Future schedules change - log each matching schedule
+            const oldDate = change.oldSchedule.date;
+            const newDate = change.newSchedule.date;
+            
+            // Get matching schedules info
+            const matchingSchedules = change.matchingScheduleIds || [];
+            
+            matchingSchedules.forEach((matchingId, idx) => {
+              // Calculate new date for this matching schedule
+              // (Logic similar to what's done in calendarSchedules useMemo)
+              const firstScheduleDate = new Date(oldDate);
+              firstScheduleDate.setHours(0, 0, 0, 0);
+              
+              // Find original schedule date
+              const originalSchedule = fullClassData?.schedules?.find(s => {
+                const sId = s._id || s.id;
+                return String(sId) === String(matchingId);
+              });
+              
+              if (originalSchedule) {
+                const originalDate = new Date(originalSchedule.date);
+                originalDate.setHours(0, 0, 0, 0);
+                
+                const daysFromFirst = Math.floor((originalDate.getTime() - firstScheduleDate.getTime()) / (24 * 60 * 60 * 1000));
+                const weeksFromFirst = Math.floor(daysFromFirst / 7);
+                
+                const calculatedNewDate = new Date(newDate);
+                calculatedNewDate.setDate(new Date(newDate).getDate() + (weeksFromFirst * 7));
+                calculatedNewDate.setHours(0, 0, 0, 0);
+                
+                const formattedOldDate = formatDateToYYYYMMDD(originalDate);
+                const formattedNewDate = formatDateToYYYYMMDD(calculatedNewDate);
+                
+                console.log(`ClassSchedule ${scheduleIndex}:`);
+                console.log(`  - Schedule ID: ${matchingId}`);
+                console.log(`  - ${formattedOldDate} -> ${formattedNewDate}`);
+                scheduleIndex++;
+              }
+            });
+          }
+          
+          const updateData = {
+            date: change.newSchedule.date,
+            startTime: change.newSchedule.startTime,
+            endTime: change.newSchedule.endTime,
+            updateScope: change.updateScope
+          };
+          
+          await scheduleService.updateSchedule(change.scheduleId, updateData);
+        }
+        
+        console.log('');
+        console.log('==========================================');
+        
+        // Refresh class data to get updated schedules
+        const classId = formData.id || formData._id;
+        if (classId) {
+          try {
+            const response = await classService.getClassById(classId);
+            if (response && response.data) {
+              setFullClassData(response.data);
+            }
+          } catch (error) {
+            console.error('Error refreshing class data:', error);
+          }
+        }
+        
+        // Clear pending changes after successful update
+        setPendingScheduleChanges([]);
+      } catch (error) {
+        console.error('Error applying schedule changes:', error);
+        await Swal.fire({
+          icon: 'error',
+          title: 'Lỗi',
+          text: error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật buổi học. Vui lòng thử lại.'
+        });
+        return; // Don't submit form if schedule update fails
+      }
     }
 
     // Transform formData to match backend API expectations
@@ -3354,6 +3623,31 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
               </h5>
               
               <div className="d-flex align-items-center gap-2">
+                {pendingScheduleChanges.length > 0 && (
+                  <Button
+                    variant="outline-danger"
+                    className="text-14 fw-medium px-16 py-8"
+                    onClick={async () => {
+                      const result = await Swal.fire({
+                        title: 'Xác nhận hủy thay đổi',
+                        text: 'Bạn có chắc chắn muốn hủy tất cả các thay đổi buổi học đã lưu tạm thời?',
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonText: 'Xác nhận',
+                        cancelButtonText: 'Hủy',
+                        confirmButtonColor: '#dc3545',
+                        cancelButtonColor: '#6c757d'
+                      });
+                      
+                      if (result.isConfirmed) {
+                        setPendingScheduleChanges([]);
+                      }
+                    }}
+                  >
+                    <i className="fas fa-times me-2"></i>
+                    Hủy thay đổi
+                  </Button>
+                )}
                 
                 {calendarSchedules.length > 0 && (
                   <ButtonGroup>
@@ -3391,6 +3685,10 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                         s.id === scheduleId || s._id === scheduleId || String(s.id) === String(scheduleId)
                       );
                       if (schedule) {
+                        // Kiểm tra nếu schedule là preview (lớp cũ hoặc lớp mới)
+                        if (schedule.isOldClassSchedule || schedule.isNewClassSchedule) {
+                          return;
+                        }
                         setSelectedScheduleDetail(schedule);
                         setShowScheduleDetailModal(true);
                       }
@@ -3402,6 +3700,10 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <ScheduleWeekly
                     schedules={calendarSchedules}
                     onScheduleClick={(schedule) => {
+                      // Kiểm tra nếu schedule là preview (lớp cũ hoặc lớp mới)
+                      if (schedule.isOldClassSchedule || schedule.isNewClassSchedule) {
+                        return;
+                      }
                       setSelectedScheduleDetail(schedule);
                       setShowScheduleDetailModal(true);
                     }}
@@ -3513,7 +3815,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                                     
                                     // Nếu không tìm thấy bằng thời gian chính xác, fallback về tìm theo ngày
                                     if (!currentSchedule) {
-                                      currentSchedule = currentClassSchedulesForRender?.find(s => s?.date === conflict?.date);
+                                      currentSchedule = currentClassSchedulesForRender?.find(s => formatDateToYYYYMMDD(s?.date) === formatDateToYYYYMMDD(conflict?.date));
                                     }
                                     
                                     // Ưu tiên dùng thời gian từ conflict (chính xác nhất), sau đó từ currentSchedule, cuối cùng là fallback
@@ -3530,7 +3832,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                                       console.warn(' [DEBUG] Không tìm thấy thời gian lớp hiện tại cho conflict:', {
                                         conflict,
                                         currentSchedule,
-                                        currentClassSchedulesForRender: currentClassSchedulesForRender?.filter(s => s?.date === conflict?.date)
+                                        currentClassSchedulesForRender: currentClassSchedulesForRender?.filter(s => formatDateToYYYYMMDD(s?.date) === formatDateToYYYYMMDD(conflict?.date))
                                       });
                                       currentClassTime = conflict.originalClassStartTime && conflict.originalClassEndTime
                                         ? `${conflict.originalClassStartTime} - ${conflict.originalClassEndTime}`
@@ -3538,12 +3840,12 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                                     }
                                     
                                     // Log để debug
-                                    if (conflict.date === '2025-12-01') {
+                                    if (formatDateToYYYYMMDD(conflict.date) === '2025-12-01') {
                                       console.log(' [DEBUG] Hiển thị conflict cho ngày 2025-12-01:', {
                                         conflict,
                                         currentSchedule,
                                         currentClassTime,
-                                        currentClassSchedulesForRender: currentClassSchedulesForRender?.filter(s => s?.date === '2025-12-01')
+                                        currentClassSchedulesForRender: currentClassSchedulesForRender?.filter(s => formatDateToYYYYMMDD(s?.date) === '2025-12-01')
                                       });
                                     }
                                     
@@ -4222,6 +4524,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                         ...editedSchedule,
                         date: e.target.value
                       })}
+                      min={new Date().toISOString().split('T')[0]}
                       className="border-neutral-30 radius-8 px-16 py-10"
                       disabled={hasAttendance || checkingAttendance}
                     />
@@ -4256,7 +4559,13 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                         const newStartTime = e.target.value;
                         // Validate: startTime must be less than endTime
                         if (editedSchedule.endTime && newStartTime >= editedSchedule.endTime) {
-                          alert('Giờ bắt đầu phải nhỏ hơn giờ kết thúc!');
+                          Swal.fire({
+                            icon: 'warning',
+                            title: 'Thông tin không hợp lệ',
+                            text: 'Giờ bắt đầu phải nhỏ hơn giờ kết thúc!',
+                            timer: 2000,
+                            showConfirmButton: false
+                          });
                           return;
                         }
                         setEditedSchedule({
@@ -4288,7 +4597,13 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                         const newEndTime = e.target.value;
                         // Validate: endTime must be greater than startTime
                         if (editedSchedule.startTime && newEndTime <= editedSchedule.startTime) {
-                          alert('Giờ kết thúc phải lớn hơn giờ bắt đầu!');
+                          Swal.fire({
+                            icon: 'warning',
+                            title: 'Thông tin không hợp lệ',
+                            text: 'Giờ kết thúc phải lớn hơn giờ bắt đầu!',
+                            timer: 2000,
+                            showConfirmButton: false
+                          });
                           return;
                         }
                         setEditedSchedule({
@@ -4359,36 +4674,56 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
           <Button 
             className="btn-main text-15 fw-semibold px-24 py-10 radius-8"
             disabled={hasAttendance || checkingAttendance || savingSchedule || validatingScheduleEdit || (scheduleValidationResult?.conflicts?.hasConflict === true)}
-            onClick={() => {
+            onClick={async () => {
               if (!editedSchedule || !selectedScheduleDetail) return;
               
               // Prevent saving if has attendance
               if (hasAttendance) {
-                alert('Buổi học đã diễn ra, không thể chỉnh sửa!');
+                await Swal.fire({
+                  icon: 'warning',
+                  title: 'Không thể chỉnh sửa',
+                  text: 'Buổi học đã diễn ra, không thể chỉnh sửa!'
+                });
                 return;
               }
               
               // Validate
               if (!editedSchedule.date || !editedSchedule.startTime || !editedSchedule.endTime) {
-                alert('Vui lòng điền đầy đủ thông tin!');
+                await Swal.fire({
+                  icon: 'warning',
+                  title: 'Thiếu thông tin',
+                  text: 'Vui lòng điền đầy đủ thông tin!'
+                });
                 return;
               }
               
               if (editedSchedule.startTime >= editedSchedule.endTime) {
-                alert('Giờ bắt đầu phải nhỏ hơn giờ kết thúc!');
+                await Swal.fire({
+                  icon: 'warning',
+                  title: 'Thông tin không hợp lệ',
+                  text: 'Giờ bắt đầu phải nhỏ hơn giờ kết thúc!'
+                });
                 return;
               }
               
               // Check for conflicts
               if (scheduleValidationResult?.conflicts?.hasConflict) {
-                alert('Không thể lưu do có xung đột lịch học. Vui lòng kiểm tra lại!');
+                await Swal.fire({
+                  icon: 'error',
+                  title: 'Xung đột lịch học',
+                  text: 'Không thể lưu do có xung đột lịch học. Vui lòng kiểm tra lại!'
+                });
                 return;
               }
 
               // Check if schedule has real ID (from database)
               const scheduleId = selectedScheduleDetail.id;
               if (!scheduleId || scheduleId.startsWith('generated-') || scheduleId.startsWith('schedule-')) {
-                alert('Buổi học này chưa được lưu vào hệ thống. Vui lòng lưu lớp học trước khi chỉnh sửa buổi học.');
+                await Swal.fire({
+                  icon: 'warning',
+                  title: 'Không thể chỉnh sửa',
+                  text: 'Buổi học này chưa được lưu vào hệ thống. Vui lòng lưu lớp học trước khi chỉnh sửa buổi học.'
+                });
                 return;
               }
 
@@ -4417,9 +4752,10 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         onHide={() => {
           setShowConfirmUpdateModal(false);
           setUpdateScope('single');
+          setConfirmUpdateValidationResult(null);
         }} 
         centered
-        size="md"
+        size="lg"
       >
         <Modal.Header closeButton className="bg-warning-50 border-0 p-24">
           <Modal.Title className="fw-bold text-neutral-900">
@@ -4488,6 +4824,141 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
               </div>
             </div>
           </div>
+
+          {/* Validation Result Display */}
+          {validatingConfirmUpdate && (
+            <div className="mt-20">
+              <div className="d-flex align-items-center text-neutral-600 text-14">
+                <i className="fas fa-spinner fa-spin me-2"></i>
+                Đang kiểm tra xung đột lịch học...
+              </div>
+            </div>
+          )}
+
+          {confirmUpdateValidationResult && !validatingConfirmUpdate && (
+            <div className="mt-20">
+              {confirmUpdateValidationResult.hasConflict ? (
+                <Alert variant="danger" className="mb-0">
+                  <div className="fw-semibold mb-8">
+                    <i className="fas fa-exclamation-triangle me-2"></i>
+                    Có xung đột lịch học được phát hiện:
+                  </div>
+                  
+                  {confirmUpdateValidationResult.conflicts.room && confirmUpdateValidationResult.conflicts.room.length > 0 && (
+                    <div className="mb-8">
+                      <div className="fw-medium mb-4">🔴 Xung đột Phòng học:</div>
+                      <ul className="mb-0 ps-16">
+                        {confirmUpdateValidationResult.conflicts.room.map((conflict, idx) => (
+                          <li key={idx} className="text-13">
+                            {conflict.isCurrentClass ? (
+                              <>
+                                <strong>Lớp này đã có buổi học</strong> vào {conflict.date} từ {conflict.time}. 
+                                Một lớp không thể có 2 buổi học cùng thứ cùng giờ.
+                              </>
+                            ) : (
+                              <>
+                                Lớp <strong>{conflict.className}</strong> vào {conflict.date} từ {conflict.time}
+                              </>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {confirmUpdateValidationResult.conflicts.teacher && confirmUpdateValidationResult.conflicts.teacher.length > 0 && (
+                    <div className="mb-8">
+                      <div className="fw-medium mb-4">🔴 Xung đột Giáo viên:</div>
+                      <ul className="mb-0 ps-16">
+                        {confirmUpdateValidationResult.conflicts.teacher.map((conflict, idx) => (
+                          <li key={idx} className="text-13">
+                            Lớp <strong>{conflict.className}</strong> vào {conflict.date} từ {conflict.time}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {confirmUpdateValidationResult.conflicts.students && confirmUpdateValidationResult.conflicts.students.length > 0 && (
+                    <div className="mb-8">
+                      <div className="fw-medium mb-4">🔴 Xung đột Học sinh:</div>
+                      {confirmUpdateValidationResult.conflicts.students.map((studentConflict, idx) => (
+                        <div key={idx} className="mb-4">
+                          <div className="fw-medium text-13 mb-2">
+                            Học sinh: <strong>{studentConflict.studentName}</strong>
+                          </div>
+                          <ul className="mb-0 ps-16">
+                            {studentConflict.conflicts.map((conflict, cIdx) => (
+                              <li key={cIdx} className="text-13">
+                                Lớp <strong>{conflict.className}</strong> vào {conflict.date} từ {conflict.time}
+                                {conflict.isAuditing && <span className="text-warning-600 ms-2">(Học tạm thời)</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {confirmUpdateValidationResult.conflicts.auditingStudents && confirmUpdateValidationResult.conflicts.auditingStudents.length > 0 && (
+                    <div className="mb-8">
+                      <div className="fw-medium mb-4">⚠️ Vấn đề Session:</div>
+                      {confirmUpdateValidationResult.conflicts.auditingStudents.map((auditConflict, idx) => (
+                        <div key={idx} className="mb-4">
+                          <div className="text-13 mb-2">
+                            {auditConflict.message}
+                          </div>
+                          <div className="text-13 text-neutral-600">
+                            <strong>Buổi học:</strong> {auditConflict.scheduleDate ? formatDate(auditConflict.scheduleDate) : 'N/A'}<br/>
+                            <strong>Session cũ:</strong> {auditConflict.originalSessionOrder}<br/>
+                            <strong>Session mới:</strong> {auditConflict.newSessionOrder}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {confirmUpdateValidationResult.allConflicts && confirmUpdateValidationResult.allConflicts.length > 0 && (
+                    <div className="mb-8">
+                      <div className="fw-medium mb-4">📋 Tổng hợp xung đột cho các buổi học:</div>
+                      {confirmUpdateValidationResult.allConflicts.map((scheduleConflict, idx) => (
+                        <div key={idx} className="mb-4 p-12 bg-neutral-50 rounded-8">
+                          <div className="fw-medium text-13 mb-2">
+                            Buổi học ngày {scheduleConflict.date}:
+                          </div>
+                          {scheduleConflict.conflicts.room && scheduleConflict.conflicts.room.length > 0 && (
+                            <div className="text-13 mb-2">
+                              - Xung đột phòng: {scheduleConflict.conflicts.room.length} xung đột
+                            </div>
+                          )}
+                          {scheduleConflict.conflicts.teacher && scheduleConflict.conflicts.teacher.length > 0 && (
+                            <div className="text-13 mb-2">
+                              - Xung đột giáo viên: {scheduleConflict.conflicts.teacher.length} xung đột
+                            </div>
+                          )}
+                          {scheduleConflict.conflicts.students && scheduleConflict.conflicts.students.length > 0 && (
+                            <div className="text-13 mb-2">
+                              - Xung đột học sinh: {scheduleConflict.conflicts.students.length} học sinh
+                            </div>
+                          )}
+                          {scheduleConflict.conflicts.auditingStudents && scheduleConflict.conflicts.auditingStudents.length > 0 && (
+                            <div className="text-13 mb-2 text-warning-600">
+                              - Vấn đề session: {scheduleConflict.conflicts.auditingStudents.length} vấn đề
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Alert>
+              ) : (
+                <Alert variant="success" className="mb-0">
+                  <i className="fas fa-check-circle me-2"></i>
+                  Không có xung đột lịch học.
+                </Alert>
+              )}
+            </div>
+          )}
         </Modal.Body>
         <Modal.Footer className="bg-neutral-25 border-0 p-20">
           <Button 
@@ -4495,69 +4966,321 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
             onClick={() => {
               setShowConfirmUpdateModal(false);
               setUpdateScope('single');
+              setConfirmUpdateValidationResult(null);
             }}
-            disabled={savingSchedule}
+            disabled={validatingConfirmUpdate || savingSchedule}
           >
             <i className="fas fa-times me-2"></i> Hủy
           </Button>
           <Button 
             className="btn-main text-15 fw-semibold px-24 py-10 radius-8"
-            disabled={savingSchedule}
+            disabled={validatingConfirmUpdate || savingSchedule || (confirmUpdateValidationResult?.hasConflict === true)}
             onClick={async () => {
               if (!editedSchedule || !selectedScheduleDetail) return;
 
               try {
-                setSavingSchedule(true);
-                
-                // Prepare update data
-                const updateData = {
-                  date: editedSchedule.date,
-                  startTime: editedSchedule.startTime,
-                  endTime: editedSchedule.endTime,
-                  updateScope: updateScope // 'single' or 'future'
-                };
-
-                // Check if schedule has real ID (from database)
-                const scheduleId = selectedScheduleDetail.id;
-
-                console.log(' Cập nhật buổi học:');
-                console.log('  - ScheduleId:', scheduleId);
-                console.log('  - UpdateScope:', updateScope);
-                console.log('  - Date:', updateData.date);
-                console.log('  - StartTime:', updateData.startTime);
-                console.log('  - EndTime:', updateData.endTime);
-
-                // Call API to update schedule
-                await scheduleService.updateSchedule(scheduleId, updateData);
-                
-                // Refresh class data to get updated schedules
-                if (formData.id || formData._id) {
-                  const classId = formData.id || formData._id;
+                // Nếu updateScope='future', validate trước
+                if (updateScope === 'future') {
                   try {
-                    const response = await classService.getClassById(classId);
-                    if (response && response.data) {
-                      setFullClassData(response.data);
+                    setValidatingConfirmUpdate(true);
+                    setConfirmUpdateValidationResult(null);
+
+                    const classId = formData.id || formData._id;
+                    if (!classId) {
+                      await Swal.fire({
+                        icon: 'error',
+                        title: 'Lỗi',
+                        text: 'Không tìm thấy ID lớp học'
+                      });
+                      setValidatingConfirmUpdate(false);
+                      return;
+                    }
+
+                    const roomId = formData.roomId || fullClassData?.room?._id || fullClassData?.room?.id;
+                    if (!roomId) {
+                      await Swal.fire({
+                        icon: 'warning',
+                        title: 'Thiếu thông tin',
+                        text: 'Lớp học chưa có phòng học được gán'
+                      });
+                      setValidatingConfirmUpdate(false);
+                      return;
+                    }
+
+                    const scheduleId = selectedScheduleDetail.id;
+                    
+                    // Lấy thông tin schedule hiện tại từ fullClassData
+                    let currentSchedule = null;
+                    if (fullClassData?.schedules) {
+                      currentSchedule = fullClassData.schedules.find(s => {
+                        const sId = s._id || s.id;
+                        return String(sId) === String(scheduleId);
+                      });
+                    }
+
+                    if (!currentSchedule) {
+                      // Fallback: lấy từ selectedScheduleDetail
+                      currentSchedule = {
+                        date: selectedScheduleDetail.date,
+                        startTime: selectedScheduleDetail.startTime,
+                        endTime: selectedScheduleDetail.endTime
+                      };
+                    }
+
+                    const currentDate = new Date(currentSchedule.date);
+                    currentDate.setHours(0, 0, 0, 0);
+                    const currentDayOfWeek = currentDate.getDay();
+                    const currentStartTime = currentSchedule.startTime;
+                    const currentEndTime = currentSchedule.endTime;
+
+                    // Lấy tất cả schedules của lớp từ fullClassData
+                    const allSchedules = fullClassData?.schedules || [];
+                    const matchingSchedules = allSchedules.filter(s => {
+                      const sDate = new Date(s.date);
+                      sDate.setHours(0, 0, 0, 0);
+                      const sDayOfWeek = sDate.getDay();
+                      return sDayOfWeek === currentDayOfWeek &&
+                             s.startTime === currentStartTime &&
+                             s.endTime === currentEndTime &&
+                             sDate >= currentDate;
+                    });
+
+                    if (matchingSchedules.length === 0) {
+                      await Swal.fire({
+                        icon: 'warning',
+                        title: 'Không tìm thấy',
+                        text: 'Không tìm thấy buổi học nào có cùng pattern để cập nhật'
+                      });
+                      setValidatingConfirmUpdate(false);
+                      return;
+                    }
+
+                    console.log(`Tìm thấy ${matchingSchedules.length} buổi học có cùng pattern`);
+
+                    // Validate từng buổi matching
+                    const allConflicts = [];
+                    let hasAnyConflict = false;
+                    const aggregatedConflicts = {
+                      room: [],
+                      teacher: [],
+                      students: [],
+                      auditingStudents: [],
+                      hasConflict: false
+                    };
+
+                    const firstScheduleDate = new Date(matchingSchedules[0]?.date || currentDate);
+                    firstScheduleDate.setHours(0, 0, 0, 0);
+
+                    const newDate = new Date(editedSchedule.date);
+                    newDate.setHours(0, 0, 0, 0);
+
+                    for (const matchingSchedule of matchingSchedules) {
+                      const originalDate = new Date(matchingSchedule.date);
+                      originalDate.setHours(0, 0, 0, 0);
+                      
+                      // Tính toán date mới dựa trên pattern (tương tự backend logic)
+                      const daysFromFirst = Math.floor((originalDate.getTime() - firstScheduleDate.getTime()) / (24 * 60 * 60 * 1000));
+                      const weeksFromFirst = Math.floor(daysFromFirst / 7);
+                      
+                      const newScheduleDate = new Date(newDate);
+                      newScheduleDate.setDate(newDate.getDate() + (weeksFromFirst * 7));
+                      newScheduleDate.setHours(0, 0, 0, 0);
+                      
+                      const newScheduleDateStr = formatDateToYYYYMMDD(newScheduleDate);
+
+                      const scheduleIdToExclude = matchingSchedule._id || matchingSchedule.id;
+
+                      try {
+                        const validationResult = await classScheduleService.validateAddClassSchedule({
+                          classId: classId,
+                          date: newScheduleDateStr,
+                          startTime: editedSchedule.startTime,
+                          endTime: editedSchedule.endTime,
+                          room: roomId,
+                          excludeScheduleId: scheduleIdToExclude
+                        });
+
+                        if (validationResult.conflicts?.hasConflict) {
+                          hasAnyConflict = true;
+                          allConflicts.push({
+                            scheduleId: scheduleIdToExclude,
+                            date: newScheduleDateStr,
+                            conflicts: validationResult.conflicts
+                          });
+
+                          // Aggregate conflicts
+                          if (validationResult.conflicts.room) {
+                            aggregatedConflicts.room.push(...validationResult.conflicts.room);
+                          }
+                          if (validationResult.conflicts.teacher) {
+                            aggregatedConflicts.teacher.push(...validationResult.conflicts.teacher);
+                          }
+                          if (validationResult.conflicts.students) {
+                            aggregatedConflicts.students.push(...validationResult.conflicts.students);
+                          }
+                          if (validationResult.conflicts.auditingStudents) {
+                            // Thêm date vào mỗi auditingStudents conflict
+                            validationResult.conflicts.auditingStudents.forEach(auditConflict => {
+                              aggregatedConflicts.auditingStudents.push({
+                                ...auditConflict,
+                                scheduleDate: newScheduleDateStr, // Date mới sau khi tính toán
+                                originalScheduleDate: formatDateToYYYYMMDD(originalDate) // Date gốc
+                              });
+                            });
+                          }
+                        }
+                      } catch (error) {
+                        console.error(`Error validating schedule ${scheduleIdToExclude}:`, error);
+                        hasAnyConflict = true;
+                        allConflicts.push({
+                          scheduleId: scheduleIdToExclude,
+                          date: newScheduleDateStr,
+                          conflicts: { hasConflict: true, error: error.message }
+                        });
+                      }
+                    }
+
+                    aggregatedConflicts.hasConflict = hasAnyConflict;
+
+                    setConfirmUpdateValidationResult({
+                      hasConflict: hasAnyConflict,
+                      conflicts: aggregatedConflicts,
+                      allConflicts: allConflicts
+                    });
+
+                    setValidatingConfirmUpdate(false);
+
+                    // Nếu có conflict, dừng lại và không update
+                    if (hasAnyConflict) {
+                      return;
                     }
                   } catch (error) {
-                    console.error('Error refreshing class data:', error);
+                    console.error('Error validating future schedules:', error);
+                    await Swal.fire({
+                      icon: 'error',
+                      title: 'Lỗi',
+                      text: 'Có lỗi xảy ra khi kiểm tra xung đột. Vui lòng thử lại.'
+                    });
+                    setValidatingConfirmUpdate(false);
+                    return;
                   }
                 }
 
-                alert('Cập nhật buổi học thành công!');
+                // Nếu không có conflict hoặc updateScope='single', lưu vào pendingScheduleChanges
+                const scheduleId = selectedScheduleDetail.id;
+                
+                // Prepare old schedule data
+                const oldSchedule = {
+                  date: selectedScheduleDetail.date,
+                  startTime: selectedScheduleDetail.startTime,
+                  endTime: selectedScheduleDetail.endTime
+                };
+                
+                // Prepare new schedule data
+                const newSchedule = {
+                  date: editedSchedule.date,
+                  startTime: editedSchedule.startTime,
+                  endTime: editedSchedule.endTime
+                };
+
+                console.log(' Lưu tạm thời thay đổi buổi học:');
+                console.log('  - ScheduleId:', scheduleId);
+                console.log('  - UpdateScope:', updateScope);
+                console.log('  - Old Schedule:', oldSchedule);
+                console.log('  - New Schedule:', newSchedule);
+
+                // Calculate matching schedule IDs if updateScope is 'future'
+                let matchingScheduleIds = [];
+                if (updateScope === 'future') {
+                  // Get current schedule info
+                  let currentSchedule = null;
+                  if (fullClassData?.schedules) {
+                    currentSchedule = fullClassData.schedules.find(s => {
+                      const sId = s._id || s.id;
+                      return String(sId) === String(scheduleId);
+                    });
+                  }
+
+                  if (currentSchedule) {
+                    const currentDate = new Date(currentSchedule.date);
+                    currentDate.setHours(0, 0, 0, 0);
+                    const currentDayOfWeek = currentDate.getDay();
+                    const currentStartTime = currentSchedule.startTime;
+                    const currentEndTime = currentSchedule.endTime;
+
+                    // Get all schedules of the class
+                    const allSchedules = fullClassData?.schedules || [];
+                    const matchingSchedules = allSchedules.filter(s => {
+                      const sDate = new Date(s.date);
+                      sDate.setHours(0, 0, 0, 0);
+                      const sDayOfWeek = sDate.getDay();
+                      return sDayOfWeek === currentDayOfWeek &&
+                             s.startTime === currentStartTime &&
+                             s.endTime === currentEndTime &&
+                             sDate >= currentDate;
+                    });
+
+                    matchingScheduleIds = matchingSchedules.map(s => String(s._id || s.id));
+                  }
+                }
+
+                // Save to pendingScheduleChanges
+                setPendingScheduleChanges(prev => {
+                  // Remove existing changes for this scheduleId or any matching scheduleIds
+                  const scheduleIdsToRemove = updateScope === 'future' && matchingScheduleIds.length > 0
+                    ? [scheduleId, ...matchingScheduleIds]
+                    : [scheduleId];
+                  
+                  const filtered = prev.filter(change => {
+                    // Remove if this change affects any of the schedules we're about to update
+                    if (change.updateScope === 'future' && change.matchingScheduleIds) {
+                      return !scheduleIdsToRemove.some(id => 
+                        String(change.scheduleId) === String(id) || 
+                        change.matchingScheduleIds.some(mid => String(mid) === String(id))
+                      );
+                    }
+                    return !scheduleIdsToRemove.some(id => String(change.scheduleId) === String(id));
+                  });
+                  
+                  // Add new change
+                  return [...filtered, {
+                    scheduleId,
+                    oldSchedule,
+                    newSchedule,
+                    updateScope,
+                    matchingScheduleIds: updateScope === 'future' ? matchingScheduleIds : undefined
+                  }];
+                });
+
+                await Swal.fire({
+                  icon: 'success',
+                  title: 'Đã lưu tạm thời',
+                  text: 'Thay đổi đã được lưu tạm thời. Vui lòng bấm "Lưu thay đổi" ở form chính để áp dụng.'
+                });
                 setShowConfirmUpdateModal(false);
                 setShowScheduleDetailModal(false);
                 setSelectedScheduleDetail(null);
                 setEditedSchedule(null);
                 setUpdateScope('single');
+                setConfirmUpdateValidationResult(null);
               } catch (error) {
-                console.error('Error updating schedule:', error);
-                alert(error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật buổi học. Vui lòng thử lại.');
+                console.error('Error preparing schedule change:', error);
+                await Swal.fire({
+                  icon: 'error',
+                  title: 'Lỗi',
+                  text: 'Có lỗi xảy ra. Vui lòng thử lại.'
+                });
               } finally {
-                setSavingSchedule(false);
+                setValidatingConfirmUpdate(false);
               }
             }}
           >
-            {savingSchedule ? (
+            {validatingConfirmUpdate ? (
+              <>
+                <i className="fas fa-spinner fa-spin me-2"></i>
+                Đang kiểm tra...
+              </>
+            ) : savingSchedule ? (
               <>
                 <i className="fas fa-spinner fa-spin me-2"></i>
                 Đang lưu...
@@ -4762,14 +5485,22 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 // Lấy classId từ formData
                 const classId = formData.id || formData._id;
                 if (!classId) {
-                  alert('Không tìm thấy ID lớp học');
+                  await Swal.fire({
+                    icon: 'error',
+                    title: 'Lỗi',
+                    text: 'Không tìm thấy ID lớp học'
+                  });
                   return;
                 }
 
                 // Lấy room từ formData (hoặc từ fullClassData)
                 const roomId = formData.roomId || fullClassData?.room?._id || fullClassData?.room?.id;
                 if (!roomId) {
-                  alert('Lớp học chưa có phòng học được gán');
+                  await Swal.fire({
+                    icon: 'warning',
+                    title: 'Thiếu thông tin',
+                    text: 'Lớp học chưa có phòng học được gán'
+                  });
                   return;
                 }
 
@@ -4851,9 +5582,17 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 // Hiển thị thông báo thành công
                 const message = response.message || 'Đã tạo buổi học thành công!';
                 if (response.cleanupInfo && response.cleanupInfo.deletedCount > 0) {
-                  alert(`${message}\n\nĐã xóa ${response.cleanupInfo.deletedCount} buổi học thừa để đảm bảo số buổi đúng với numberOfSessions.`);
+                  await Swal.fire({
+                    icon: 'success',
+                    title: 'Thành công',
+                    html: `${message}<br/><br/>Đã xóa ${response.cleanupInfo.deletedCount} buổi học thừa để đảm bảo số buổi đúng với numberOfSessions.`
+                  });
                 } else {
-                  alert(message);
+                  await Swal.fire({
+                    icon: 'success',
+                    title: 'Thành công',
+                    text: message
+                  });
                 }
                 
                 // Đóng modal
@@ -4892,7 +5631,11 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
               } catch (error) {
                 console.error('Error creating schedule:', error);
                 const errorMessage = error.message || error.response?.data?.message || 'Có lỗi xảy ra khi thêm buổi học';
-                alert(errorMessage);
+                await Swal.fire({
+                  icon: 'error',
+                  title: 'Lỗi',
+                  text: errorMessage
+                });
               } finally {
                 setSavingSchedule(false);
               }

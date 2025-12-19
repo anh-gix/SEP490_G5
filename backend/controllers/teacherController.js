@@ -669,8 +669,28 @@ exports.getTeacherSchedule = async (req, res) => {
     
     const classIds = teacherClasses.map(cls => cls._id);
     
-    // Lấy cả temporary và fixed để hiển thị đầy đủ lịch dạy
-    let query = { class: { $in: classIds }, status: { $in: ['temporary', 'fixed'] } };
+    // 🆕 Query logic:
+    // - Buổi có substituteTeacher: CHỈ hiển thị ở bên substituteTeacher, KHÔNG hiển thị ở teacher gốc
+    // - Buổi không có substituteTeacher: hiển thị ở teacher gốc
+    let query = {
+      $or: [
+        // Buổi của teacher gốc (chỉ lấy buổi KHÔNG có substituteTeacher)
+        {
+          class: { $in: classIds },
+          teacher: id,
+          status: { $in: ['temporary', 'fixed'] },
+          $or: [
+            { substituteTeacher: { $exists: false } },
+            { substituteTeacher: null }
+          ]
+        },
+        // Buổi teacher dạy thay
+        {
+          substituteTeacher: id,
+          status: { $in: ['temporary', 'fixed'] }
+        }
+      ]
+    };
     
     // Filter by date range if provided
     if (startDate && endDate) {

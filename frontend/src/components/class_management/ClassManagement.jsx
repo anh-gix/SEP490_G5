@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import ClassList from './ClassList';
 import CreateClassModal from './CreateClassModal';
-import AcademicClassDetailLayout from './AcademicClassDetailLayout';
+import ClassDetail from './ClassDetail';
 import EditClassForm from './EditClassModal';
 import classService from '../../services/classService';
 
@@ -146,8 +146,10 @@ const ClassManagement = () => {
 
   const handleSubmitEdit = async (submitData) => {
     try {
-      await classService.updateClass(submitData.id, submitData);
-      toast.success('Cập nhật lớp học thành công!');
+      const response = await classService.updateClass(submitData.id, submitData);
+      // Hiển thị message từ response, nếu không có thì dùng message mặc định
+      const message = response?.message || 'Cập nhật lớp học thành công!';
+      toast.success(message);
       setShowEditClass(false);
       setSelectedClassIdForEdit(null);
       setEditClassData(null);
@@ -268,10 +270,10 @@ const ClassManagement = () => {
     }
   }
 
-  // If showing class detail, render AcademicClassDetailLayout component
+  // If showing class detail, render ClassDetail component
   if (showClassDetail && selectedClassId) {
     return (
-      <AcademicClassDetailLayout
+      <ClassDetail
         classId={selectedClassId}
         onBack={() => {
           setShowClassDetail(false);

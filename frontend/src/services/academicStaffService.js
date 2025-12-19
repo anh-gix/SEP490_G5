@@ -69,6 +69,22 @@ const academicStaffService = {
     } catch (error) {
       throw error.response?.data || error.message;
     }
+  },
+
+  // Revert change request
+  revertChangeRequest: async (id) => {
+    try {
+      const response = await axios.put(
+        `${API_URL}/academic-staff/change-requests/${id}/revert`,
+        {},
+        {
+          headers: getAuthHeader()
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
   }
 };
 

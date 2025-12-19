@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Alert, Spinner } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, Form, Table, Modal, InputGroup, Alert, Spinner, Pagination } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import roomService from '../../services/roomService';
@@ -7,10 +7,10 @@ import ScheduleCalendar from './ScheduleCalendar';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
 
 /**
- * Room Management Full Component with API Integration
+ * Room Management Component
  * Quản lý phòng học đầy đủ chức năng
  */
-const RoomManagementFull = () => {
+const RoomManagement = () => {
   const [rooms, setRooms] = useState([]);
   const [stats, setStats] = useState({});
   const [todayRoomUsage, setTodayRoomUsage] = useState([]);
@@ -23,6 +23,7 @@ const RoomManagementFull = () => {
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [roomSchedule, setRoomSchedule] = useState([]);
   const [scheduleViewMode, setScheduleViewMode] = useState('calendar'); // table or calendar
+  const [schedulePage, setSchedulePage] = useState(1); // Pagination for schedule table
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [formData, setFormData] = useState({
@@ -150,6 +151,7 @@ const RoomManagementFull = () => {
   const handleViewSchedule = async (room) => {
     setSelectedRoom(room);
     setScheduleViewMode('calendar'); // Reset to calendar view when opening modal
+    setSchedulePage(1); // Reset to first page when opening modal
     try {
       setLoading(true);
       const data = await roomService.getRoomSchedule(room._id);
@@ -568,9 +570,9 @@ const RoomManagementFull = () => {
         </Modal.Header>
         <Modal.Body>
           {selectedRoom && (
-            <div className="mb-3">
+            <div className="mb-3 d-flex gap-5">
               <div className="text-muted">Vị trí: {selectedRoom.location}</div>
-              <div className="text-muted">Sức chứa: {selectedRoom.capacity} người</div>
+              <div className="text-muted" style={{ marginLeft: '4rem' }}>Sức chứa: {selectedRoom.capacity} người</div>
             </div>
           )}
 
@@ -580,7 +582,10 @@ const RoomManagementFull = () => {
               <Button
                 variant={scheduleViewMode === 'calendar' ? 'primary' : 'outline-secondary'}
                 size="sm"
-                onClick={() => setScheduleViewMode('calendar')}
+                onClick={() => {
+                  setScheduleViewMode('calendar');
+                  setSchedulePage(1); // Reset page when switching view
+                }}
               >
                 <i className="fas fa-calendar me-2"></i>
                 Calendar
@@ -588,7 +593,10 @@ const RoomManagementFull = () => {
               <Button
                 variant={scheduleViewMode === 'table' ? 'primary' : 'outline-secondary'}
                 size="sm"
-                onClick={() => setScheduleViewMode('table')}
+                onClick={() => {
+                  setScheduleViewMode('table');
+                  setSchedulePage(1); // Reset page when switching view
+                }}
               >
                 <i className="fas fa-list me-2"></i>
                 Bảng
@@ -597,53 +605,114 @@ const RoomManagementFull = () => {
           </div>
           
           {/* Table View */}
-          {scheduleViewMode === 'table' && (
-            <>
-              {roomSchedule.length > 0 ? (
-                <Table hover>
-                  <thead className="bg-neutral-25">
-                    <tr>
-                      <th className="px-16 py-12 text-13">Thời gian</th>
-                      <th className="px-16 py-12 text-13">Lớp học</th>
-                      <th className="px-16 py-12 text-13">Chủ đề</th>
-                      <th className="px-16 py-12 text-13">Trạng thái</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {roomSchedule.map((schedule, index) => (
-                      <tr key={index}>
-                        <td className="px-16 py-12">
-                          <div className="text-14">
-                            {new Date(schedule.date).toLocaleDateString('vi-VN')}
-                          </div>
-                          <div className="text-13 text-muted">
-                            {schedule.startTime} - {schedule.endTime}
-                          </div>
-                        </td>
-                        <td className="px-16 py-12">
-                          {schedule.status === 'temporary' && !schedule.class?.name 
-                            ? 'Lớp học bù' 
-                            : (schedule.class?.name || 'N/A')}
-                        </td>
-                        <td className="px-16 py-12">
-                          {schedule.session?.title || schedule.topic || 'N/A'}
-                        </td>
-                        <td className="px-16 py-12">
-                          <Badge bg={schedule.status === 'fixed' ? 'success' : schedule.status === 'temporary' ? 'warning' : 'secondary'}>
-                            {schedule.status === 'fixed' ? 'Buổi cố định' : schedule.status === 'temporary' ? 'Buổi tạm' : schedule.status}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              ) : (
-                <div className="text-center py-4 text-muted">
-                  Chưa có lịch sử dụng
-                </div>
-              )}
-            </>
-          )}
+          {scheduleViewMode === 'table' && (() => {
+            const itemsPerPage = 8;
+            const totalPages = Math.ceil(roomSchedule.length / itemsPerPage);
+            const startIndex = (schedulePage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const paginatedSchedules = roomSchedule.slice(startIndex, endIndex);
+
+            return (
+              <>
+                {roomSchedule.length > 0 ? (
+                  <>
+                    <Table hover>
+                      <thead className="bg-neutral-25">
+                        <tr>
+                          <th className="px-16 py-12 text-13">Thời gian</th>
+                          <th className="px-16 py-12 text-13">Lớp học</th>
+                          <th className="px-16 py-12 text-13">Chủ đề</th>
+                          <th className="px-16 py-12 text-13">Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedSchedules.map((schedule, index) => (
+                          <tr key={index}>
+                            <td className="px-16 py-12">
+                              <div className="text-14">
+                                {new Date(schedule.date).toLocaleDateString('vi-VN')}
+                              </div>
+                              <div className="text-13 text-muted">
+                                {schedule.startTime} - {schedule.endTime}
+                              </div>
+                            </td>
+                            <td className="px-16 py-12">
+                              {schedule.status === 'temporary' && !schedule.class?.name 
+                                ? 'Lớp học bù' 
+                                : (schedule.class?.name || 'N/A')}
+                            </td>
+                            <td className="px-16 py-12">
+                              {schedule.session?.title || schedule.topic || 'N/A'}
+                            </td>
+                            <td className="px-16 py-12">
+                              <Badge bg={schedule.status === 'fixed' ? 'success' : schedule.status === 'temporary' ? 'warning' : 'secondary'}>
+                                {schedule.status === 'fixed' ? 'Buổi cố định' : schedule.status === 'temporary' ? 'Buổi tạm' : schedule.status}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                    
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                      <div className="d-flex justify-content-center align-items-center mt-3 gap-3">
+                        <Pagination className="mb-0">
+                          <Pagination.First 
+                            onClick={() => setSchedulePage(1)} 
+                            disabled={schedulePage === 1}
+                          />
+                          <Pagination.Prev 
+                            onClick={() => setSchedulePage(Math.max(1, schedulePage - 1))} 
+                            disabled={schedulePage === 1}
+                          />
+                          {[...Array(totalPages)].map((_, i) => {
+                            const pageNum = i + 1;
+                            if (
+                              pageNum === 1 ||
+                              pageNum === totalPages ||
+                              (pageNum >= schedulePage - 1 && pageNum <= schedulePage + 1)
+                            ) {
+                              return (
+                                <Pagination.Item
+                                  key={pageNum}
+                                  active={pageNum === schedulePage}
+                                  onClick={() => setSchedulePage(pageNum)}
+                                >
+                                  {pageNum}
+                                </Pagination.Item>
+                              );
+                            } else if (
+                              pageNum === schedulePage - 2 ||
+                              pageNum === schedulePage + 2
+                            ) {
+                              return <Pagination.Ellipsis key={pageNum} />;
+                            }
+                            return null;
+                          })}
+                          <Pagination.Next 
+                            onClick={() => setSchedulePage(Math.min(totalPages, schedulePage + 1))} 
+                            disabled={schedulePage === totalPages}
+                          />
+                          <Pagination.Last 
+                            onClick={() => setSchedulePage(totalPages)} 
+                            disabled={schedulePage === totalPages}
+                          />
+                        </Pagination>
+                        <div className="text-neutral-600 text-13">
+                          Trang {schedulePage} / {totalPages} ({roomSchedule.length} buổi)
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-4 text-muted">
+                    Chưa có lịch sử dụng
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
           {/* Calendar View */}
           {scheduleViewMode === 'calendar' && (
@@ -676,4 +745,4 @@ const RoomManagementFull = () => {
   );
 };
 
-export default RoomManagementFull;
+export default RoomManagement;

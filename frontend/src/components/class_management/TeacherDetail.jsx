@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import teacherService from '../../services/teacherService';
 import { classScheduleService } from '../../services/classScheduleService';
 import ScheduleCalendar from './ScheduleCalendar';
+import { toast } from 'react-toastify';
 
 /**
  * Teacher Detail Component
@@ -191,7 +192,8 @@ const TeacherDetail = ({ teacherId, onBack }) => {
       setLoadingSchedule(true);
       const scheduleData = await teacherService.getTeacherSchedule(teacherId);
       
-      setTeacherSchedule(scheduleData.schedules || []);
+      const schedules = scheduleData.schedules || [];
+      setTeacherSchedule(schedules);
       setSchedulePage(1);
       setScheduleLoaded(true);
     } catch (err) {
@@ -305,7 +307,7 @@ const TeacherDetail = ({ teacherId, onBack }) => {
     // Validate date using normalizeDate helper
     const scheduleDate = normalizeDate(schedule.date);
     if (!scheduleDate) {
-      alert('Buổi học không có thông tin ngày hợp lệ');
+      toast.error('Buổi học không có thông tin ngày hợp lệ');
       return;
     }
     
@@ -316,7 +318,7 @@ const TeacherDetail = ({ teacherId, onBack }) => {
     scheduleDate.setHours(0, 0, 0, 0);
     
     if (scheduleDate < today) {
-      alert('Không thể xếp người dạy thay cho buổi học đã qua');
+      toast.error('Không thể xếp người dạy thay cho buổi học đã qua');
       return;
     }
     
@@ -334,9 +336,17 @@ const TeacherDetail = ({ teacherId, onBack }) => {
         
         // Get current teacher ID from schedule
         let currentTeacherId = null;
-        if (schedule.teacherId || schedule.teacher?._id || schedule.teacher?.id) {
+
+        // Ưu tiên 1: Kiểm tra substituteTeacher trước
+        if (schedule.substituteTeacher?._id || schedule.substituteTeacher?.id || schedule.substituteTeacherId) {
+          currentTeacherId = (schedule.substituteTeacher?._id || schedule.substituteTeacher?.id || schedule.substituteTeacherId)?.toString();
+        } 
+        // Ưu tiên 2: Nếu không có substituteTeacher, lấy teacher
+        else if (schedule.teacherId || schedule.teacher?._id || schedule.teacher?.id) {
           currentTeacherId = (schedule.teacherId || schedule.teacher?._id || schedule.teacher?.id)?.toString();
-        } else if (teacher?._id) {
+        } 
+        // Ưu tiên 3: Fallback về teacher state nếu schedule không có thông tin
+        else if (teacher?._id) {
           currentTeacherId = teacher._id.toString();
         }
         
@@ -361,13 +371,13 @@ const TeacherDetail = ({ teacherId, onBack }) => {
   // Handle submit assign substitute teacher
   const handleSubmitAssignSubstitute = async () => {
     if (!selectedSubstituteTeacherId || !selectedScheduleForSubstitute) {
-      alert('Vui lòng chọn giáo viên dạy thay');
+      toast.error('Vui lòng chọn giáo viên dạy thay');
       return;
     }
 
     // Không cho phép xác nhận nếu có xung đột
     if (conflictInfo?.hasConflict) {
-      alert('Không thể xác nhận khi giáo viên dạy thay có xung đột lịch học. Vui lòng chọn giáo viên khác.');
+      toast.error('Không thể xác nhận khi giáo viên dạy thay có xung đột lịch học. Vui lòng chọn giáo viên khác.');
       return;
     }
 
@@ -378,7 +388,7 @@ const TeacherDetail = ({ teacherId, onBack }) => {
       const response = await classScheduleService.assignSubstituteTeacher(scheduleId, selectedSubstituteTeacherId);
       
       if (response.success) {
-        alert('Đã xếp người dạy thay thành công');
+        toast.success('Đã xếp người dạy thay thành công');
         
         // Refresh teacher schedule
         if (teacher?._id) {
@@ -392,11 +402,11 @@ const TeacherDetail = ({ teacherId, onBack }) => {
         setSelectedSubstituteTeacherId(null);
         setConflictInfo(null);
       } else {
-        alert(response.message || 'Không thể xếp người dạy thay');
+        toast.error(response.message || 'Không thể xếp người dạy thay');
       }
     } catch (err) {
       console.error('Error assigning substitute teacher:', err);
-      alert(err.message || err.response?.data?.message || 'Có lỗi xảy ra khi xếp người dạy thay');
+      toast.error(err.message || err.response?.data?.message || 'Có lỗi xảy ra khi xếp người dạy thay');
     } finally {
       setAssigningSubstitute(false);
     }
@@ -458,32 +468,61 @@ const TeacherDetail = ({ teacherId, onBack }) => {
           return null;
         }
       
-      // Extract programType from schedule data
-      const programType = schedule.programType || schedule.class?.course?.program?.type || null;
-      
-      return {
-        id: schedule._id || index,
-        _id: schedule._id,
-        date: dateStr,
-        startTime: schedule.startTime || '',
-        endTime: schedule.endTime || '',
-        className: schedule.class?.name || 'N/A',
-        roomName: schedule.room?.room_name || 'N/A',
-        roomId: schedule.room?._id || schedule.room?.id || schedule.room,
-        room: schedule.room,
-        topic: schedule.topic || '',
-        status: schedule.status === 'fixed' ? 'scheduled' : schedule.status === 'temporary' ? 'makeup' : 'scheduled',
-        attendanceStatus: null, // Teachers don't have attendance status
-        hasAttendance: false,
-        teacherName: teacher?.username || 'N/A',
-        teacherId: schedule.teacher?._id || schedule.teacher?.id || schedule.teacher || teacher?._id,
-        teacher: schedule.teacher || teacher,
-        lessonNumber: schedule.session?.order || '',
-        lessonTopic: schedule.topic || '',
-        class: schedule.class,
-        classId: schedule.class?._id || schedule.class?.id || schedule.class,
-        programType: programType // Add programType for color coding
-      };
+        // Extract programType from schedule data
+        const programType = schedule.programType || schedule.class?.course?.program?.type || null;
+        
+        // Calculate timeStatus
+        const now = new Date();
+        const scheduleDateTime = new Date(schedule.date);
+        const startTime = schedule.startTime || '08:00';
+        const endTime = schedule.endTime || '10:00';
+        
+        // Parse time strings (HH:MM format)
+        const [startHour, startMinute] = startTime.split(':').map(Number);
+        const [endHour, endMinute] = endTime.split(':').map(Number);
+        
+        const sessionStartDateTime = new Date(scheduleDateTime);
+        sessionStartDateTime.setHours(startHour, startMinute, 0, 0);
+        
+        const sessionEndDateTime = new Date(scheduleDateTime);
+        sessionEndDateTime.setHours(endHour, endMinute, 0, 0);
+        
+        // Determine time status
+        let timeStatus = 'upcoming'; // 'upcoming', 'ongoing', 'completed'
+        if (now > sessionEndDateTime) {
+          timeStatus = 'completed'; // Buổi đã kết thúc
+        } else if (now >= sessionStartDateTime && now <= sessionEndDateTime) {
+          timeStatus = 'ongoing'; // Buổi đang diễn ra
+        } else {
+          timeStatus = 'upcoming'; // Buổi chưa bắt đầu
+        }
+        
+        return {
+          id: schedule._id || index,
+          _id: schedule._id,
+          date: dateStr,
+          startTime: schedule.startTime || '',
+          endTime: schedule.endTime || '',
+          className: schedule.class?.name || 'N/A',
+          roomName: schedule.room?.room_name || 'N/A',
+          roomId: schedule.room?._id || schedule.room?.id || schedule.room,
+          room: schedule.room,
+          topic: schedule.topic || '',
+          status: schedule.status === 'fixed' ? 'scheduled' : schedule.status === 'temporary' ? 'makeup' : 'scheduled',
+          attendanceStatus: null, // Teachers don't have attendance status
+          hasAttendance: false,
+          teacherName: teacher?.username || 'N/A',
+          teacherId: schedule.teacher?._id || schedule.teacher?.id || schedule.teacher || teacher?._id,
+          teacher: schedule.teacher || teacher,
+          substituteTeacher: schedule.substituteTeacher || null,
+          substituteTeacherId: schedule.substituteTeacher?._id || schedule.substituteTeacher?.id || schedule.substituteTeacher || null,
+          lessonNumber: schedule.session?.order || '',
+          lessonTopic: schedule.topic || '',
+          class: schedule.class,
+          classId: schedule.class?._id || schedule.class?.id || schedule.class,
+          programType: programType,
+          timeStatus: timeStatus
+        };
       })
       .filter(Boolean); // Remove null entries from invalid dates
     

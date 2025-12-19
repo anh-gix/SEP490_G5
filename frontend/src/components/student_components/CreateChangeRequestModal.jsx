@@ -3,7 +3,7 @@ import { Modal, Button, Form, Alert, Row, Col } from 'react-bootstrap';
 import changeRequestService from '../../services/changeRequestService';
 import studentService from '../../services/studentService';
 
-const CreateChangeRequestModal = ({ show, onHide, onSuccess }) => {
+const CreateChangeRequestModal = ({ show, onHide, onSuccess, preselectedScheduleId }) => {
   const [formData, setFormData] = useState({
     type: 'makeup_class',
     content: '',
@@ -149,6 +149,26 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess }) => {
       setFilteredStudentSchedules(filtered);
     }
   }, [selectedClassFilter, selectedWeekFilter, studentSchedules, formData.type]);
+
+  // Auto-select schedule when preselectedScheduleId is provided
+  useEffect(() => {
+    if (show && preselectedScheduleId && studentSchedules.length > 0) {
+      // Kiểm tra xem studentScheduleId có trong danh sách không
+      const scheduleExists = studentSchedules.some(
+        schedule => {
+          const scheduleId = schedule.studentScheduleId || schedule._id || schedule.id;
+          return scheduleId && scheduleId.toString() === preselectedScheduleId.toString();
+        }
+      );
+      
+      if (scheduleExists) {
+        setFormData(prev => ({
+          ...prev,
+          studentScheduleId: preselectedScheduleId
+        }));
+      }
+    }
+  }, [show, preselectedScheduleId, studentSchedules]);
 
   const fetchClassesForFilter = async () => {
     try {

@@ -213,7 +213,7 @@ const StudentDetailModal = ({
           
           // Get schedule status from StudentSchedule
           const scheduleStatus = schedule.scheduleStatus || 'scheduled';
-          const isMakeupSchedule = scheduleStatus === 'rescheduled';
+          const isMakeupSchedule = false; // Không hiển thị riêng biệt học bù ở StudentDetailModal
           const isCancelled = scheduleStatus === 'cancelled';
           const reason = schedule.reason || null;
           
@@ -225,7 +225,7 @@ const StudentDetailModal = ({
             className: schedule.className || 'N/A',
             roomName: schedule.room?.room_name || schedule.roomName || 'N/A',
             topic: schedule.topic || schedule.sessionTitle || '',
-            status: schedule.status === 'fixed' ? 'scheduled' : schedule.status === 'temporary' ? 'makeup' : 'scheduled',
+            status: 'scheduled', // Tất cả đều hiển thị như buổi học bình thường
             attendanceStatus: attendanceStatus, // 'present', 'absent', 'late', 'excused', or null
             hasAttendance: !!attendanceStatus,
             teacherName: schedule.teacher?.username || schedule.teacherName || 'N/A',
@@ -233,7 +233,7 @@ const StudentDetailModal = ({
             lessonTopic: schedule.topic || schedule.sessionTitle || '',
             scheduleStatus: scheduleStatus,
             reason: reason,
-            isMakeupSchedule: isMakeupSchedule,
+            isMakeupSchedule: isMakeupSchedule, // Luôn false để không hiển thị riêng biệt
             isCancelled: isCancelled,
             cancellationReason: isCancelled ? reason : null
           };

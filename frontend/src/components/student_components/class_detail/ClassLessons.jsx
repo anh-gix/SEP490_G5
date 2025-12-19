@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Table, Badge, Button } from 'react-bootstrap';
-import { Link, useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import studentService from '../../../services/studentService';
 
 /**
@@ -9,6 +9,7 @@ import studentService from '../../../services/studentService';
  */
 const ClassLessons = ({ classInfo }) => {
   const { classId } = useParams();
+  const navigate = useNavigate();
   const [lessons, setLessons] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -143,12 +144,15 @@ const ClassLessons = ({ classInfo }) => {
                       {getAttendanceBadge(lesson.attendance)}
                     </td>
                     <td className="px-20 py-16 text-center">
-                      <Link to={`/student/lessons/${lesson._id}`}>
-                        <Button className="btn-outline-main text-13 fw-medium px-12 py-6 radius-6">
-                          <i className="fas fa-eye me-1"></i>
-                          Chi tiết
-                        </Button>
-                      </Link>
+                      <Button 
+                        className="btn-outline-main text-13 fw-medium px-12 py-6 radius-6"
+                        onClick={() => navigate(`/student/lessons/${lesson._id}`, { 
+                          state: { from: 'class', classId: classId } 
+                        })}
+                      >
+                        <i className="fas fa-eye me-1"></i>
+                        Chi tiết
+                      </Button>
                     </td>
                   </tr>
                 ))}

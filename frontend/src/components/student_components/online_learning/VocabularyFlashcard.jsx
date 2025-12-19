@@ -99,35 +99,35 @@ const VocabularyFlashcard = ({ vocabulary, onComplete, isCompleted }) => {
           {/* Front Side */}
           <div className="flashcard-side flashcard-front">
             <div className="card border-0 shadow-lg rounded-16 overflow-hidden h-100">
-              <div className="card-body p-0 d-flex flex-column">
-                {/* Image */}
+              <div className="card-body p-0 d-flex flex-column position-relative">
+                {/* Image - Full card with padding */}
                 <div 
-                  className="bg-gradient-main d-flex align-items-center justify-content-center"
-                  style={{ height: '300px' }}
+                  className="flex-grow-1 d-flex align-items-center justify-content-center p-20"
+                  style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #e8ecf4 100%)' }}
                 >
-                  {vocabulary.img ? (
-                    <img 
-                      src={vocabulary.img} 
-                      alt={currentWord}
-                      className="img-fluid"
-                      style={{ maxHeight: '280px' }}
-                    />
-                  ) : (
-                    <div className="text-center text-white">
-                      <i className="fas fa-image mb-12" style={{ fontSize: '64px' }}></i>
-                      <p className="mb-0">Image placeholder</p>
-                    </div>
-                  )}
+                  <img 
+                    src={vocabulary.img || 'https://placehold.co/600x400/818cf8/ffffff?text=' + encodeURIComponent('Vocab Img')} 
+                    alt={currentWord}
+                    className="rounded-12"
+                    style={{ 
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      maxHeight: '440px'
+                    }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = 'https://placehold.co/600x400/818cf8/ffffff?text=' + encodeURIComponent('Vocab Img');
+                    }}
+                  />
                 </div>
 
-                {/* Front instruction */}
-                <div className="p-40 flex-grow-1 d-flex flex-column align-items-center justify-content-center bg-white">
-                  <p className="text-sm text-neutral-500 mb-12 text-uppercase">Front</p>
-                  
-                  <div className="text-center">
-                    <i className="fas fa-hand-pointer text-neutral-400 mb-8" style={{ fontSize: '24px' }}></i>
-                    <p className="text-sm text-neutral-500 mb-0">Click để lật thẻ</p>
-                  </div>
+                {/* Front instruction - Compact at bottom */}
+                <div className="position-absolute bottom-0 start-0 end-0 text-center pb-12 pt-8">
+                  <p className="text-xs text-neutral-500 mb-0">
+                    <i className="fas fa-hand-pointer text-neutral-400 me-1" style={{ fontSize: '12px' }}></i>
+                    Click để lật thẻ
+                  </p>
                 </div>
 
                 {/* Learned Badge */}
@@ -145,12 +145,13 @@ const VocabularyFlashcard = ({ vocabulary, onComplete, isCompleted }) => {
 
           {/* Back Side */}
           <div className="flashcard-side flashcard-back">
-            <div className="card border-0 shadow-lg rounded-16 overflow-hidden h-100 bg-main-600 text-white">
+            <div className="card border-0 shadow-lg rounded-16 overflow-hidden h-100 bg-main-600 text-white position-relative">
               <div className="card-body p-40 d-flex flex-column align-items-center justify-content-center">
-                <p className="text-sm text-white-75 mb-12 text-uppercase">Back</p>
-                <h1 className="mb-24 text-white text-capitalize">{currentWord}</h1>
+                <h1 className="mb-24 text-white text-capitalize" style={{ fontSize: '3rem', fontWeight: '700' }}>
+                  {currentWord}
+                </h1>
                 
-                <div className="text-center mb-32">
+                <div className="text-center">
                   <div className="mb-16">
                     <span className="badge bg-white bg-opacity-25 text-white px-20 py-10 rounded-pill">
                       English Word
@@ -158,11 +159,14 @@ const VocabularyFlashcard = ({ vocabulary, onComplete, isCompleted }) => {
                   </div>
                   <p className="text-white-75 text-sm mb-0">Practice pronunciation and spelling</p>
                 </div>
+              </div>
 
-                <div className="text-center">
-                  <i className="fas fa-hand-pointer text-white-50 mb-8" style={{ fontSize: '24px' }}></i>
-                  <p className="text-sm text-white-75 mb-0">Click để lật lại</p>
-                </div>
+              {/* Back instruction - Compact at bottom */}
+              <div className="position-absolute bottom-0 start-0 end-0 text-center pb-12 pt-8">
+                <p className="text-xs text-white-75 mb-0">
+                  <i className="fas fa-hand-pointer text-white-50 me-1" style={{ fontSize: '12px' }}></i>
+                  Click để lật lại
+                </p>
               </div>
             </div>
           </div>

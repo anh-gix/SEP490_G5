@@ -1,11 +1,11 @@
 import React from 'react';
-import { Table, Badge } from 'react-bootstrap';
+import { Table, Badge, Button } from 'react-bootstrap';
 
 /**
  * Academic Class Lessons Component
  * Wrapper for ClassLessons that links to academic lesson detail route instead of teacher route
  */
-const AcademicClassLessons = ({ lessons, getLessonStatusBadge }) => {
+const AcademicClassLessons = ({ lessons, getLessonStatusBadge, onLessonClick }) => {
   return (
     <div className="p-0">
       <Table hover className="mb-0">
@@ -17,12 +17,13 @@ const AcademicClassLessons = ({ lessons, getLessonStatusBadge }) => {
             <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0">Chủ đề</th>
             <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Điểm danh</th>
             <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Trạng thái</th>
+            <th className="px-20 py-16 text-neutral-900 fw-semibold text-13 border-0 text-center">Thao tác</th>
           </tr>
         </thead>
         <tbody>
           {lessons.length === 0 ? (
             <tr>
-              <td colSpan="6" className="text-center py-24 text-neutral-500">
+              <td colSpan="7" className="text-center py-24 text-neutral-500">
                 Chưa có buổi học nào được lên lịch
               </td>
             </tr>
@@ -64,6 +65,17 @@ const AcademicClassLessons = ({ lessons, getLessonStatusBadge }) => {
                 </td>
                 <td className="px-20 py-16 text-center">
                   {getLessonStatusBadge(lesson.status)}
+                </td>
+                <td className="px-20 py-16 text-center">
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    className="px-12 py-6"
+                    onClick={() => onLessonClick && onLessonClick(lesson._id)}
+                  >
+                    <i className="fas fa-eye me-1"></i>
+                    Chi tiết
+                  </Button>
                 </td>
               </tr>
             ))

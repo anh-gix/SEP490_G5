@@ -5,21 +5,33 @@ import roomService from '../../services/roomService';
 import teacherService from '../../services/teacherService';
 import studentScheduleService from '../../services/studentScheduleService';
 
-const MakeupClassModalForAcademicStaff = ({ 
+const MakeupClassRequestModal = ({ 
   show,
+  // AcademicStaff mode props
   studentScheduleId,
   requestType = 'makeup_class', // 'makeup_class' or 'request_replace_teacher'
   senderSchedule = [],
+  // Student mode props
+  originalSchedule,
+  studentId,
+  studentSchedule = [],
+  // Common props
   onClose, 
   onSubmit,
   loading = false
 }) => {
+  // Determine mode
+  const isAcademicStaffMode = !!studentScheduleId;
+  const isStudentMode = !!originalSchedule && !studentScheduleId;
+  const effectiveRequestType = requestType || 'makeup_class';
+
   const [formData, setFormData] = useState({
     date: '',
     startTime: '',
     endTime: '',
     room: '',
-    teacher: ''
+    teacher: '',
+    reason: '' // Only for Student mode
   });
   
   const [rooms, setRooms] = useState([]);
@@ -48,28 +60,42 @@ const MakeupClassModalForAcademicStaff = ({
 
   // Load original schedule info when modal opens
   useEffect(() => {
-    if (show && studentScheduleId) {
-      fetchOriginalSchedule();
-      fetchRooms();
-      fetchTeachers();
-      resetForm();
+    if (show) {
+      if (isAcademicStaffMode && studentScheduleId) {
+        fetchOriginalSchedule();
+        fetchRooms();
+        fetchTeachers();
+        resetForm();
+      } else if (isStudentMode && originalSchedule) {
+        fetchRooms();
+        fetchTeachers();
+        resetForm();
+        // For Student mode, originalSchedule is passed directly
+        // May need to fetch ClassSchedule to get sessionId
+        if (originalSchedule.studentScheduleId) {
+          fetchClassScheduleForSessionId(originalSchedule.studentScheduleId);
+        }
+      }
     }
-  }, [show, studentScheduleId]);
+  }, [show, studentScheduleId, originalSchedule, isAcademicStaffMode, isStudentMode]);
 
   // Fetch available schedules when option is 'existing' and sessionId is available
   useEffect(() => {
-    if (show && requestType === 'makeup_class' && makeupOption === 'existing' && originalScheduleInfo) {
+    if (show && effectiveRequestType === 'makeup_class' && makeupOption === 'existing' && originalScheduleInfo) {
+      fetchAvailableSchedules();
+    } else if (show && effectiveRequestType === 'makeup_class' && makeupOption === 'existing' && isStudentMode && originalSchedule) {
       fetchAvailableSchedules();
     }
-  }, [show, makeupOption, originalScheduleInfo, sessionId, requestType]);
+  }, [show, makeupOption, originalScheduleInfo, originalSchedule, sessionId, effectiveRequestType, isStudentMode]);
 
   const resetForm = () => {
     setFormData({
       date: '',
-      startTime: '',
-      endTime: '',
+      startTime: originalSchedule?.startTime || '',
+      endTime: originalSchedule?.endTime || '',
       room: '',
-      teacher: ''
+      teacher: originalSchedule?.teacherId || '',
+      reason: ''
     });
     setConflicts(null);
     setError(null);
@@ -126,6 +152,18 @@ const MakeupClassModalForAcademicStaff = ({
       setError('Không thể tải thông tin buổi học');
     } finally {
       setLoadingOriginalSchedule(false);
+    }
+  };
+
+  const fetchClassScheduleForSessionId = async (studentScheduleId) => {
+    try {
+      const response = await studentScheduleService.getClassScheduleByStudentScheduleId(studentScheduleId);
+      if (response.success && response.classSchedule?.session?._id) {
+        setSessionId(response.classSchedule.session._id);
+        setCurrentClassScheduleId(response.classSchedule._id);
+      }
+    } catch (err) {
+      console.error('Error fetching ClassSchedule for sessionId:', err);
     }
   };
 
@@ -205,9 +243,9 @@ const MakeupClassModalForAcademicStaff = ({
     return start1Min < end2Min && end1Min > start2Min;
   };
 
-  // Helper function to check if a schedule conflicts with sender's schedule
-  const hasConflictWithSenderSchedule = (schedule) => {
-    if (!senderSchedule || senderSchedule.length === 0) {
+  // Unified conflict checking function
+  const hasConflictWithSchedule = (schedule, scheduleList) => {
+    if (!scheduleList || scheduleList.length === 0) {
       return false;
     }
 
@@ -217,7 +255,7 @@ const MakeupClassModalForAcademicStaff = ({
 
     const scheduleDate = formatDateToYYYYMMDD(schedule.date);
     
-    const senderSchedulesSameDate = senderSchedule.filter(sch => {
+    const schedulesSameDate = scheduleList.filter(sch => {
       if (!sch.date || !sch.startTime || !sch.endTime) {
         return false;
       }
@@ -225,16 +263,16 @@ const MakeupClassModalForAcademicStaff = ({
       return schDate === scheduleDate;
     });
 
-    for (const senderSch of senderSchedulesSameDate) {
-      if (senderSch.scheduleStatus === 'cancelled' || senderSch.scheduleStatus === 'rescheduled') {
+    for (const sch of schedulesSameDate) {
+      if (sch.scheduleStatus === 'cancelled' || sch.scheduleStatus === 'rescheduled') {
         continue;
       }
       
       if (hasTimeOverlap(
         schedule.startTime,
         schedule.endTime,
-        senderSch.startTime,
-        senderSch.endTime
+        sch.startTime,
+        sch.endTime
       )) {
         return true;
       }
@@ -244,7 +282,75 @@ const MakeupClassModalForAcademicStaff = ({
   };
 
   const fetchAvailableSchedules = async () => {
-    if (!originalScheduleInfo || !sessionId) return;
+    let sessionIdToUse = sessionId;
+    let currentScheduleInfo = originalScheduleInfo || originalSchedule;
+    
+    // For Student mode, try to get sessionId if not available
+    if (isStudentMode && !sessionIdToUse && originalSchedule?.studentScheduleId) {
+      try {
+        const response = await studentScheduleService.getClassScheduleByStudentScheduleId(
+          originalSchedule.studentScheduleId
+        );
+        if (response.success && response.classSchedule?.session?._id) {
+          sessionIdToUse = response.classSchedule.session._id;
+          setSessionId(sessionIdToUse);
+          setCurrentClassScheduleId(response.classSchedule._id);
+        }
+      } catch (err) {
+        console.error('Error fetching ClassSchedule for sessionId:', err);
+      }
+    }
+    
+    if (!sessionIdToUse) {
+      // Fallback: try using sessionOrder for Student mode
+      if (isStudentMode && originalSchedule) {
+        const sessionOrder = originalSchedule.lessonNumber || originalSchedule.sessionOrder;
+        if (sessionOrder) {
+          try {
+            setLoadingSchedules(true);
+            const apiPort = import.meta.env.VITE_API_PORT || 8080;
+            const today = new Date().toISOString();
+            const response = await fetch(
+              `http://localhost:${apiPort}/api/class-schedules/by-session?sessionOrder=${sessionOrder}&dateAfter=${today}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+
+            if (response.ok) {
+              const data = await response.json();
+              const filtered = (data.classSchedules || []).filter(schedule => {
+                const scheduleId = (schedule._id || schedule.id)?.toString();
+                if (currentClassScheduleId && scheduleId === currentClassScheduleId.toString()) {
+                  return false;
+                }
+                if (isStudentMode && hasConflictWithSchedule(schedule, studentSchedule)) {
+                  return false;
+                }
+                if (isAcademicStaffMode && hasConflictWithSchedule(schedule, senderSchedule)) {
+                  return false;
+                }
+                return true;
+              });
+              setAvailableSchedules(filtered);
+            } else {
+              setAvailableSchedules([]);
+            }
+          } catch (error) {
+            console.error('Error fetching available schedules:', error);
+            setAvailableSchedules([]);
+          } finally {
+            setLoadingSchedules(false);
+          }
+          return;
+        }
+      }
+      setAvailableSchedules([]);
+      return;
+    }
     
     try {
       setLoadingSchedules(true);
@@ -252,7 +358,7 @@ const MakeupClassModalForAcademicStaff = ({
       const apiPort = import.meta.env.VITE_API_PORT || 8080;
       const today = new Date().toISOString();
       const response = await fetch(
-        `http://localhost:${apiPort}/api/class-schedules/by-session?sessionId=${sessionId}&dateAfter=${today}`,
+        `http://localhost:${apiPort}/api/class-schedules/by-session?sessionId=${sessionIdToUse}&dateAfter=${today}`,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -265,13 +371,18 @@ const MakeupClassModalForAcademicStaff = ({
         const data = await response.json();
         const classSchedules = data.classSchedules || [];
         
-        // Filter to exclude current schedule and conflicts with sender's schedule
+        // Filter to exclude current schedule and conflicts
         const filtered = classSchedules.filter(schedule => {
           const scheduleId = (schedule._id || schedule.id)?.toString();
           if (currentClassScheduleId && scheduleId === currentClassScheduleId.toString()) {
             return false;
           }
-          if (hasConflictWithSenderSchedule(schedule)) {
+          
+          // Check conflicts based on mode
+          if (isStudentMode && hasConflictWithSchedule(schedule, studentSchedule)) {
+            return false;
+          }
+          if (isAcademicStaffMode && hasConflictWithSchedule(schedule, senderSchedule)) {
             return false;
           }
           
@@ -282,12 +393,10 @@ const MakeupClassModalForAcademicStaff = ({
             today.setHours(0, 0, 0, 0);
             const scheduleDateOnly = new Date(scheduleDate.getFullYear(), scheduleDate.getMonth(), scheduleDate.getDate());
             
-            // If schedule is in the past (before today), exclude it
             if (scheduleDateOnly < today) {
               return false;
             }
             
-            // If schedule is today, check if it has already ended
             if (scheduleDateOnly.getTime() === today.getTime()) {
               if (schedule.endTime) {
                 const timeParts = schedule.endTime.split(':');
@@ -298,7 +407,6 @@ const MakeupClassModalForAcademicStaff = ({
                     const now = new Date();
                     const currentTime = now.getHours() * 60 + now.getMinutes();
                     const scheduleEndTime = endHours * 60 + endMinutes;
-                    // Exclude if the session has already ended
                     if (scheduleEndTime < currentTime) {
                       return false;
                     }
@@ -335,15 +443,34 @@ const MakeupClassModalForAcademicStaff = ({
     if (!formData.date || !formData.startTime || !formData.endTime || !formData.room || !formData.teacher) {
       return false;
     }
-
+  
     try {
       setValidating(true);
-      // Get student ID from senderSchedule if available, or skip studentId validation
-      let studentId = null;
-      if (senderSchedule && senderSchedule.length > 0) {
-        // Try to get student ID from first schedule
+      // Get student ID based on mode
+      let studentIdToValidate = null;
+      if (isStudentMode) {
+        studentIdToValidate = studentId;
+      } else if (isAcademicStaffMode && senderSchedule && senderSchedule.length > 0) {
         const firstSchedule = senderSchedule[0];
-        studentId = firstSchedule.student?._id || firstSchedule.student || null;
+        studentIdToValidate = firstSchedule.student?._id || firstSchedule.student || null;
+      }
+      
+      // Get schedule ID to exclude (if editing an existing makeup schedule)
+      let excludeScheduleId = null;
+      if (isStudentMode && originalSchedule?.studentScheduleId) {
+        // For Student mode, we need to get the ClassSchedule ID from StudentSchedule
+        try {
+          const response = await studentScheduleService.getClassScheduleByStudentScheduleId(
+            originalSchedule.studentScheduleId
+          );
+          if (response.success && response.classSchedule?._id) {
+            excludeScheduleId = response.classSchedule._id;
+          }
+        } catch (err) {
+          console.error('Error fetching ClassSchedule for excludeScheduleId:', err);
+        }
+      } else if (isAcademicStaffMode && originalScheduleInfo?.classScheduleId) {
+        excludeScheduleId = originalScheduleInfo.classScheduleId;
       }
       
       const response = await classScheduleService.validateScheduleConflictSimple({
@@ -352,9 +479,10 @@ const MakeupClassModalForAcademicStaff = ({
         endTime: formData.endTime,
         room: formData.room,
         teacher: formData.teacher,
-        studentId: studentId
+        studentId: studentIdToValidate,
+        excludeScheduleId: excludeScheduleId // Exclude current makeup schedule from conflict check
       });
-
+  
       if (response.success) {
         setConflicts(response);
         return !response.hasConflict;
@@ -375,7 +503,6 @@ const MakeupClassModalForAcademicStaff = ({
       return;
     }
 
-    // Validate that we have all required info
     if (!originalScheduleInfo.date || !originalScheduleInfo.startTime || 
         !originalScheduleInfo.endTime || !originalScheduleInfo.room) {
       console.error('Missing schedule info:', originalScheduleInfo);
@@ -420,8 +547,8 @@ const MakeupClassModalForAcademicStaff = ({
     e.preventDefault();
     setError(null);
 
-    if (requestType === 'request_replace_teacher') {
-      // Handle substitute teacher
+    if (effectiveRequestType === 'request_replace_teacher') {
+      // Handle substitute teacher (AcademicStaff only)
       if (!selectedSubstituteTeacherId) {
         setError('Vui lòng chọn giáo viên dạy thay');
         return;
@@ -436,7 +563,7 @@ const MakeupClassModalForAcademicStaff = ({
         return;
       }
 
-      // Submit with substitute teacher data
+      // Submit with substitute teacher data (AcademicStaff format)
       onSubmit({
         absentScheduleId: studentScheduleId,
         substituteTeacherId: selectedSubstituteTeacherId,
@@ -466,30 +593,57 @@ const MakeupClassModalForAcademicStaff = ({
           return;
         }
 
-        // Submit with existing schedule data
-        const makeupScheduleId = selectedSchedule._id || selectedSchedule.id;
-        const makeupClassId = selectedSchedule.class?._id || selectedSchedule.classId;
+        // For Student mode, validate conflict
+        if (isStudentMode) {
+          try {
+            const validateResponse = await classScheduleService.validateMakeupClassSchedule(
+              selectedExistingScheduleId,
+              studentId
+            );
 
-        onSubmit({
-          absentScheduleId: studentScheduleId,
-          makeupScheduleId: makeupScheduleId,
-          makeupClassId: makeupClassId,
-          isSubstituteClass: false,
-          makeupSchedule: {
-            _id: makeupScheduleId,
-            id: makeupScheduleId,
-            date: selectedSchedule.date,
-            startTime: selectedSchedule.startTime,
-            endTime: selectedSchedule.endTime,
-            title: selectedSchedule.session?.title,
-            order: selectedSchedule.session?.order,
-            class: selectedSchedule.class
-          },
-          makeupClassInfo: {
-            className: selectedSchedule.class?.name || 'N/A',
-            classId: makeupClassId
+            if (validateResponse.success && validateResponse.hasConflict) {
+              if (!window.confirm('Có xung đột lịch học. Bạn có chắc chắn muốn tiếp tục?')) {
+                return;
+              }
+            }
+          } catch (err) {
+            console.error('Error validating:', err);
           }
-        });
+        }
+
+        // Submit based on mode
+        if (isAcademicStaffMode) {
+          // AcademicStaff format
+          const makeupScheduleId = selectedSchedule._id || selectedSchedule.id;
+          const makeupClassId = selectedSchedule.class?._id || selectedSchedule.classId;
+
+          onSubmit({
+            absentScheduleId: studentScheduleId,
+            makeupScheduleId: makeupScheduleId,
+            makeupClassId: makeupClassId,
+            isSubstituteClass: false,
+            makeupSchedule: {
+              _id: makeupScheduleId,
+              id: makeupScheduleId,
+              date: selectedSchedule.date,
+              startTime: selectedSchedule.startTime,
+              endTime: selectedSchedule.endTime,
+              title: selectedSchedule.session?.title,
+              order: selectedSchedule.session?.order,
+              class: selectedSchedule.class
+            },
+            makeupClassInfo: {
+              className: selectedSchedule.class?.name || 'N/A',
+              classId: makeupClassId
+            }
+          });
+        } else {
+          // Student format
+          onSubmit({
+            existingScheduleId: selectedExistingScheduleId,
+            originalSchedule: originalSchedule
+          });
+        }
       } else {
         // Create new makeup class
         if (!formData.date || !formData.startTime || !formData.endTime || !formData.room || !formData.teacher) {
@@ -517,41 +671,57 @@ const MakeupClassModalForAcademicStaff = ({
           return;
         }
 
-        // Get sessionId from original schedule for new makeup
-        const newMakeupSessionId = originalScheduleInfo?.sessionId || null;
+        // Submit based on mode
+        if (isAcademicStaffMode) {
+          // AcademicStaff format
+          const newMakeupSessionId = originalScheduleInfo?.sessionId || null;
 
-        // Submit with new makeup class data
-        onSubmit({
-          absentScheduleId: studentScheduleId,
-          isSubstituteClass: false,
-          isNewMakeup: true,
-          newMakeupDate: formData.date,
-          newMakeupStartTime: formData.startTime,
-          newMakeupEndTime: formData.endTime,
-          newMakeupRoomId: formData.room,
-          newMakeupTeacherId: formData.teacher,
-          newMakeupSessionId: newMakeupSessionId,
-          makeupSchedule: {
+          onSubmit({
+            absentScheduleId: studentScheduleId,
+            isSubstituteClass: false,
+            isNewMakeup: true,
+            newMakeupDate: formData.date,
+            newMakeupStartTime: formData.startTime,
+            newMakeupEndTime: formData.endTime,
+            newMakeupRoomId: formData.room,
+            newMakeupTeacherId: formData.teacher,
+            newMakeupSessionId: newMakeupSessionId,
+            makeupSchedule: {
+              date: formData.date,
+              startTime: formData.startTime,
+              endTime: formData.endTime,
+              title: originalScheduleInfo?.sessionTitle || 'Buổi học bù',
+              order: originalScheduleInfo?.sessionOrder || null
+            },
+            makeupClassInfo: {
+              className: originalScheduleInfo?.className || 'Lớp học bù'
+            }
+          });
+        } else {
+          // Student format
+          onSubmit({
             date: formData.date,
             startTime: formData.startTime,
             endTime: formData.endTime,
-            title: originalScheduleInfo?.sessionTitle || 'Buổi học bù',
-            order: originalScheduleInfo?.sessionOrder || null
-          },
-          makeupClassInfo: {
-            className: originalScheduleInfo?.className || 'Lớp học bù'
-          }
-        });
+            room: formData.room,
+            teacher: formData.teacher,
+            reason: formData.reason || 'Buổi học bù',
+            originalSchedule: originalSchedule
+          });
+        }
       }
     }
   };
 
   if (!show) return null;
 
-  const modalTitle = requestType === 'request_replace_teacher' 
+  // Get original schedule info for display
+  const displayScheduleInfo = isAcademicStaffMode ? originalScheduleInfo : originalSchedule;
+
+  const modalTitle = effectiveRequestType === 'request_replace_teacher' 
     ? 'Xếp giáo viên dạy thay' 
     : 'Xếp buổi học bù';
-  const modalHeaderClass = requestType === 'request_replace_teacher' 
+  const modalHeaderClass = effectiveRequestType === 'request_replace_teacher' 
     ? 'bg-info text-white' 
     : 'bg-warning text-white';
 
@@ -567,12 +737,12 @@ const MakeupClassModalForAcademicStaff = ({
       <Form onSubmit={handleSubmit}>
         <Modal.Body className="p-24" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
           {/* Original schedule info */}
-          {loadingOriginalSchedule ? (
+          {isAcademicStaffMode && loadingOriginalSchedule ? (
             <div className="text-center py-3">
               <i className="fas fa-spinner fa-spin me-2"></i>
               Đang tải thông tin buổi học...
             </div>
-          ) : originalScheduleInfo && (
+          ) : displayScheduleInfo && (
             <Card className="mb-20 bg-warning-25 border border-warning-200 rounded-12" style={{ borderLeft: '4px solid #FF9800' }}>
               <Card.Header className="bg-warning-50 border-0 rounded-top-12 p-16">
                 <h5 className="mb-0 text-neutral-900 fw-semibold">Thông tin buổi học gốc</h5>
@@ -582,14 +752,18 @@ const MakeupClassModalForAcademicStaff = ({
                   <div className="col-md-6">
                     <div className="text-14">
                       <strong className="text-neutral-900">Lớp:</strong> 
-                      <span className="text-neutral-700 ms-2">{originalScheduleInfo.className || 'N/A'}</span>
+                      <span className="text-neutral-700 ms-2">
+                        {displayScheduleInfo.className || 'N/A'}
+                      </span>
                     </div>
                   </div>
                   <div className="col-md-6">
                     <div className="text-14">
                       <strong className="text-neutral-900">Ngày học:</strong> 
                       <span className="text-neutral-700 ms-2">
-                        {formatDateForDisplay(originalScheduleInfo.date) || 'N/A'}
+                        {isAcademicStaffMode 
+                          ? formatDateForDisplay(displayScheduleInfo.date) || 'N/A'
+                          : displayScheduleInfo.date ? new Date(displayScheduleInfo.date).toLocaleDateString('vi-VN') : 'N/A'}
                       </span>
                     </div>
                   </div>
@@ -597,14 +771,16 @@ const MakeupClassModalForAcademicStaff = ({
                     <div className="text-14">
                       <strong className="text-neutral-900">Thời gian:</strong> 
                       <span className="text-neutral-700 ms-2">
-                        {originalScheduleInfo.startTime || 'N/A'} - {originalScheduleInfo.endTime || 'N/A'}
+                        {displayScheduleInfo.startTime || 'N/A'} - {displayScheduleInfo.endTime || 'N/A'}
                       </span>
                     </div>
                   </div>
                   <div className="col-md-6">
                     <div className="text-14">
                       <strong className="text-neutral-900">Phòng:</strong> 
-                      <span className="text-neutral-700 ms-2">{originalScheduleInfo.roomName || 'N/A'}</span>
+                      <span className="text-neutral-700 ms-2">
+                        {isAcademicStaffMode ? displayScheduleInfo.roomName : displayScheduleInfo.roomName || 'N/A'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -666,8 +842,8 @@ const MakeupClassModalForAcademicStaff = ({
           )}
 
           {/* Content based on request type */}
-          {requestType === 'request_replace_teacher' ? (
-            // Substitute teacher selection
+          {effectiveRequestType === 'request_replace_teacher' ? (
+            // Substitute teacher selection (AcademicStaff only)
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold">
                 Chọn giáo viên dạy thay <span className="text-danger">*</span>
@@ -701,7 +877,6 @@ const MakeupClassModalForAcademicStaff = ({
                 }
               </Form.Select>
               
-              {/* Loading original schedule indicator */}
               {loadingOriginalSchedule && (
                 <div className="mt-2 text-muted">
                   <i className="fas fa-spinner fa-spin me-2"></i>
@@ -709,7 +884,6 @@ const MakeupClassModalForAcademicStaff = ({
                 </div>
               )}
               
-              {/* Loading conflict check indicator */}
               {checkingTeacherConflict && (
                 <div className="mt-2 text-info">
                   <i className="fas fa-spinner fa-spin me-2"></i>
@@ -717,7 +891,6 @@ const MakeupClassModalForAcademicStaff = ({
                 </div>
               )}
 
-              {/* Conflict warning */}
               {teacherConflict && teacherConflict.hasConflict && (
                 <Alert variant="danger" className="mt-3 mb-0">
                   <Alert.Heading className="h6">
@@ -734,7 +907,6 @@ const MakeupClassModalForAcademicStaff = ({
                 </Alert>
               )}
 
-              {/* Success message */}
               {teacherConflict && !teacherConflict.hasConflict && selectedSubstituteTeacherId && (
                 <Alert variant="success" className="mt-3 mb-0">
                   <i className="fas fa-check-circle me-2"></i>
@@ -774,18 +946,20 @@ const MakeupClassModalForAcademicStaff = ({
               {/* Existing schedule selection */}
               {makeupOption === 'existing' ? (
                 <div className="mb-3">
-                  {/* Class selection dropdown */}
-                  <Form.Group className="mb-3">
-                    <Form.Label>
-                      Chọn lớp học
-                    </Form.Label>
-                    <Form.Select
-                      value={selectedClassId}
-                      onChange={(e) => setSelectedClassId(e.target.value)}
-                    >
-                      <option value="">-- Chọn lớp học (tùy chọn) --</option>
-                    </Form.Select>
-                  </Form.Group>
+                  {/* Class selection dropdown (AcademicStaff only) */}
+                  {isAcademicStaffMode && (
+                    <Form.Group className="mb-3">
+                      <Form.Label>
+                        Chọn lớp học
+                      </Form.Label>
+                      <Form.Select
+                        value={selectedClassId}
+                        onChange={(e) => setSelectedClassId(e.target.value)}
+                      >
+                        <option value="">-- Chọn lớp học (tùy chọn) --</option>
+                      </Form.Select>
+                    </Form.Group>
+                  )}
 
                   <Form.Label>
                     Chọn buổi học bù <span className="text-danger">*</span>
@@ -805,9 +979,10 @@ const MakeupClassModalForAcademicStaff = ({
                         <option value="">-- Chọn buổi học bù --</option>
                         {availableSchedules.map((schedule) => {
                           const scheduleId = (schedule._id || schedule.id)?.toString();
-                          const dateStr = formatDateForDisplay(schedule.date);
+                          const dateStr = isAcademicStaffMode 
+                            ? formatDateForDisplay(schedule.date)
+                            : schedule.date ? new Date(schedule.date).toLocaleDateString('vi-VN') : '';
                           const timeStr = `${schedule.startTime || ''} - ${schedule.endTime || ''}`;
-                          // Thay đổi: Nếu không có class, hiển thị "Lớp học bù" thay vì "N/A"
                           const className = schedule.class?.name || (schedule.class === null || schedule.class === undefined ? 'Lớp học bù' : 'N/A');
                           const sessionTitle = schedule.session?.title || 'N/A';
                           const displayText = `${sessionTitle} - ${className}${dateStr ? ` (${dateStr})` : ''} - ${timeStr}`;
@@ -827,7 +1002,9 @@ const MakeupClassModalForAcademicStaff = ({
                         
                         if (!selectedSchedule) return null;
                         
-                        const scheduleDate = formatDateForDisplay(selectedSchedule.date) || 'N/A';
+                        const scheduleDate = isAcademicStaffMode
+                          ? formatDateForDisplay(selectedSchedule.date) || 'N/A'
+                          : selectedSchedule.date ? new Date(selectedSchedule.date).toLocaleDateString('vi-VN') : 'N/A';
                         
                         return (
                           <Card className="mt-3 bg-success-25 border border-success-200 rounded-12" style={{ borderLeft: '4px solid #4CAF50' }}>
@@ -994,6 +1171,21 @@ const MakeupClassModalForAcademicStaff = ({
                     </div>
                   </div>
 
+                  {/* Reason field (Student mode only) */}
+                  {isStudentMode && (
+                    <Form.Group className="mb-3">
+                      <Form.Label>Lý do (tùy chọn)</Form.Label>
+                      <Form.Control
+                        as="textarea"
+                        rows={3}
+                        name="reason"
+                        value={formData.reason}
+                        onChange={handleInputChange}
+                        placeholder="Nhập lý do học bù..."
+                      />
+                    </Form.Group>
+                  )}
+
                   {validating && (
                     <Alert variant="info" className="mb-0">
                       <i className="fas fa-spinner fa-spin me-2"></i>
@@ -1011,16 +1203,16 @@ const MakeupClassModalForAcademicStaff = ({
             Hủy
           </Button>
           <Button 
-            variant={requestType === 'request_replace_teacher' ? 'info' : 'warning'}
+            variant={effectiveRequestType === 'request_replace_teacher' ? 'info' : 'warning'}
             type="submit" 
             disabled={
               loading || 
               validating || 
               checkingTeacherConflict ||
-              (requestType === 'request_replace_teacher' && !selectedSubstituteTeacherId) ||
-              (requestType === 'request_replace_teacher' && teacherConflict?.hasConflict) ||
-              (requestType === 'makeup_class' && makeupOption === 'new' && conflicts && conflicts.hasConflict) ||
-              (requestType === 'makeup_class' && makeupOption === 'existing' && !selectedExistingScheduleId)
+              (effectiveRequestType === 'request_replace_teacher' && !selectedSubstituteTeacherId) ||
+              (effectiveRequestType === 'request_replace_teacher' && teacherConflict?.hasConflict) ||
+              (effectiveRequestType === 'makeup_class' && makeupOption === 'new' && conflicts && conflicts.hasConflict) ||
+              (effectiveRequestType === 'makeup_class' && makeupOption === 'existing' && !selectedExistingScheduleId)
             }
           >
             {loading ? (
@@ -1031,7 +1223,7 @@ const MakeupClassModalForAcademicStaff = ({
             ) : (
               <>
                 <i className="fas fa-save me-2"></i>
-                {requestType === 'request_replace_teacher' 
+                {effectiveRequestType === 'request_replace_teacher' 
                   ? 'Xác nhận chọn giáo viên dạy thay'
                   : makeupOption === 'existing' 
                     ? 'Xác nhận chọn buổi học bù' 
@@ -1045,5 +1237,5 @@ const MakeupClassModalForAcademicStaff = ({
   );
 };
 
-export default MakeupClassModalForAcademicStaff;
+export default MakeupClassRequestModal;
 

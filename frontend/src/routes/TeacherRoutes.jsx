@@ -1,6 +1,3 @@
-import Attendance from "../pages/Attendance.jsx";
-import ClassSchedulePage from "../pages/ClassSchedulePage.jsx";
-import AttendanceDetailPage from "../pages/AttendanceDetailPage.jsx";
 import TeacherDashboardPage from "../pages/TeacherPages/TeacherDashboardPage.jsx";
 import TeacherSchedulePage from "../pages/TeacherPages/TeacherSchedulePage.jsx";
 import TeacherClassesPage from "../pages/TeacherPages/TeacherClassesPage.jsx";
@@ -44,9 +41,6 @@ import TeacherTipEditorPage from "../pages/TeacherPages/TeacherTipEditorPage.jsx
 //  * Tất cả routes cho Giảng viên (Teacher)
 //  */
 export const teacherRoutes = [
-  { path: '/attendance', element: <Attendance /> },
-     { path: '/attendance/class/:classId', element: <ClassSchedulePage /> },
-     { path: '/attendance/schedule/:scheduleId', element: <AttendanceDetailPage /> },
   // Dashboard
   
   { path: '/teacher/dashboard', element: <TeacherDashboardPage /> },

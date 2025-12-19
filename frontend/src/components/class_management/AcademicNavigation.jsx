@@ -20,25 +20,25 @@ const AcademicNavigation = () => {
       title: 'Quản lý Lịch học',
       icon: 'fa-calendar-alt',
       path: '/academic/schedule-management',
-      color: 'info'
+      color: 'main'
     },
     {
       title: 'Quản lý Lớp học',
       icon: 'fa-chalkboard-teacher',
       path: '/academic/class-management',
-      color: 'success'
+      color: 'main'
     },
     {
       title: 'Quản lý Phòng học',
       icon: 'fa-door-open',
       path: '/academic/room-management',
-      color: 'warning'
+      color: 'main'
     },
     {
       title: 'Quản lý đơn',
       icon: 'fa-file-alt',
       path: '/academic/request-management',
-      color: 'info'
+      color: 'main'
     },
     {
       title: 'Quản lý giảng viên',
@@ -50,7 +50,7 @@ const AcademicNavigation = () => {
       title: 'Quản lý học viên',
       icon: 'fa-user-graduate',
       path: '/academic/student-management',
-      color: 'success'
+      color: 'main'
     }
   ];
 

@@ -532,14 +532,16 @@ exports.getMySubmittedExams = async (req, res) => {
     const exams = await Exam.find(examQuery)
       .sort({ updatedAt: -1 });
 
-    // Get work requests for these exams
+    // Get work requests for these exams (top_down: Center Head → Teacher)
     const examIds = exams.map(e => e._id);
     const workRequests = await WorkRequest.find({
       entityType: 'Exam',
       entityId: { $in: examIds },
-      direction: 'bottom_up'
+      direction: 'top_down', // Changed from bottom_up - exams are created from top-down requests
+      requestType: 'create_exam'
     })
-      .populate('processedBy', 'username email')
+      .populate('requestedBy', 'username email') // Changed from processedBy to requestedBy (Center Head)
+      .populate('assignedTo', 'username email')
       .sort({ requestedAt: -1 });
 
     // Map work requests to exams

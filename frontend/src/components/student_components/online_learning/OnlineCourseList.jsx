@@ -128,9 +128,9 @@ const OnlineCourseList = () => {
       <div className="mb-40">
         <div className="d-flex align-items-center justify-content-between mb-16">
           <div>
-            <h3 className="mb-8">Khóa học Online của tôi</h3>
+            <h3 className="mb-8">Khóa học bổ trợ online</h3>
             <p className="text-neutral-500">
-              Bạn đang học {courses.length} khóa học Cambridge Online
+              Khóa học online bổ trợ kiến thức cho học viên
             </p>
           </div>
           <div className="d-flex gap-12 align-items-center">

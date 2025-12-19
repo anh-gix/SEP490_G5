@@ -7,28 +7,28 @@ import SearchBox from '../CenterHead/compo/SearchBox';
 import FilterBar from '../CenterHead/compo/FilterBar';
 import StatusBadge from '../CenterHead/compo/StatusBadge';
 import { formatDate } from '../../helper/helper';
-import programService from '../../services/programService';
+import examService from '../../services/examService';
 import workRequestService from '../../services/workRequestService';
 import ViewRequestModal from './ViewRequestModal';
 
-const TeacherProgramList = () => {
+const TeacherExamList = () => {
   const navigate = useNavigate();
-  const [programs, setPrograms] = useState([]);
-  const [myPrograms, setMyPrograms] = useState([]);
+  const [exams, setExams] = useState([]);
+  const [myExams, setMyExams] = useState([]);
   const [workRequests, setWorkRequests] = useState([]);
-  const [filteredPrograms, setFilteredPrograms] = useState([]);
+  const [filteredExams, setFilteredExams] = useState([]);
   const [filteredRequests, setFilteredRequests] = useState([]);
-  const [paginatedPrograms, setPaginatedPrograms] = useState([]);
+  const [paginatedExams, setPaginatedExams] = useState([]);
   const [paginatedRequests, setPaginatedRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [filterValues, setFilterValues] = useState({});
-  const [stats, setStats] = useState({ total: 0, active: 0, draft: 0, archived: 0 });
+  const [stats, setStats] = useState({ total: 0, draft: 0, pending: 0, approved: 0, published: 0 });
   const [requestStats, setRequestStats] = useState({ total: 0, pending: 0, in_progress: 0, completed: 0 });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
-  const [activeTab, setActiveTab] = useState('my-programs'); // 'my-programs', 'all-programs', 'work-requests'
+  const [activeTab, setActiveTab] = useState('my-exams'); // 'my-exams', 'all-exams', 'work-requests'
 
   // View Request Modal
   const [showViewRequestModal, setShowViewRequestModal] = useState(false);
@@ -53,30 +53,31 @@ const TeacherProgramList = () => {
 
       setFilteredRequests(filtered);
     } else {
-      // Filter programs
-      const sourceData = activeTab === 'my-programs' ? myPrograms : programs;
+      // Filter exams
+      const sourceData = activeTab === 'my-exams' ? myExams : exams;
       let filtered = [...sourceData];
 
       if (searchKeyword) {
         const keyword = searchKeyword.toLowerCase();
-        filtered = filtered.filter(program =>
-          program.program_name?.toLowerCase().includes(keyword) ||
-          program.code?.toLowerCase().includes(keyword)
+        filtered = filtered.filter(exam =>
+          exam.title?.toLowerCase().includes(keyword) ||
+          exam.description?.toLowerCase().includes(keyword)
         );
       }
 
       if (filterValues.status && filterValues.status !== "all") {
-        filtered = filtered.filter(program => program.status === filterValues.status);
+        filtered = filtered.filter(exam => exam.status === filterValues.status);
       }
 
-      if (filterValues.type && filterValues.type !== "all") {
-        filtered = filtered.filter(program => program.type === filterValues.type);
+      if (filterValues.isPublished && filterValues.isPublished !== "all") {
+        const isPublished = filterValues.isPublished === "true";
+        filtered = filtered.filter(exam => exam.isPublished === isPublished);
       }
 
-      setFilteredPrograms(filtered);
+      setFilteredExams(filtered);
     }
     setCurrentPage(1);
-  }, [programs, myPrograms, workRequests, searchKeyword, filterValues, activeTab]);
+  }, [exams, myExams, workRequests, searchKeyword, filterValues, activeTab]);
 
   const applyPagination = useCallback(() => {
     if (activeTab === 'work-requests') {
@@ -90,54 +91,54 @@ const TeacherProgramList = () => {
 
       setPaginatedRequests(paginatedData);
     } else {
-      const totalItems = filteredPrograms.length;
+      const totalItems = filteredExams.length;
       const totalPagesCount = Math.ceil(totalItems / itemsPerPage);
       setTotalPages(totalPagesCount);
 
       const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
-      const paginatedData = filteredPrograms.slice(startIndex, endIndex);
+      const paginatedData = filteredExams.slice(startIndex, endIndex);
 
-      setPaginatedPrograms(paginatedData);
+      setPaginatedExams(paginatedData);
     }
-  }, [filteredPrograms, filteredRequests, currentPage, itemsPerPage, activeTab]);
+  }, [filteredExams, filteredRequests, currentPage, itemsPerPage, activeTab]);
 
-  const fetchPrograms = async () => {
+  const fetchExams = async () => {
     try {
       setLoading(true);
 
-      // Fetch all programs
-      const allResponse = await programService.getAllPrograms();
-      const allProgramsData = allResponse.data || [];
-      setPrograms(allProgramsData);
+      // Fetch all exams
+      const allResponse = await examService.getAllExamsForManagement();
+      const allExamsData = allResponse.data || [];
+      setExams(allExamsData);
 
-      // Fetch my programs (created by current teacher)
-      let myProgramsData = [];
+      // Fetch my exams (created by current teacher)
+      let myExamsData = [];
       try {
-        const myResponse = await programService.getMyPrograms();
-        myProgramsData = myResponse.data || [];
-        setMyPrograms(myProgramsData);
+        const myResponse = await examService.getMyExams();
+        myExamsData = myResponse.data || [];
+        setMyExams(myExamsData);
       } catch (myError) {
-        console.error('Error fetching my programs:', myError);
-        // If getMyPrograms fails, set empty array
-        setMyPrograms([]);
+        console.error('Error fetching my exams:', myError);
+        setMyExams([]);
       }
 
       // Calculate stats based on active tab
-      const sourceData = activeTab === 'my-programs' ? myProgramsData : allProgramsData;
+      const sourceData = activeTab === 'my-exams' ? myExamsData : allExamsData;
       const calculatedStats = {
         total: sourceData.length,
-        active: sourceData.filter(p => p.status === 'active').length,
-        draft: sourceData.filter(p => p.status === 'draft').length,
-        archived: sourceData.filter(p => p.status === 'archived').length
+        draft: sourceData.filter(e => e.status === 'draft').length,
+        pending: sourceData.filter(e => e.status === 'pending_approval').length,
+        approved: sourceData.filter(e => e.status === 'approved').length,
+        published: sourceData.filter(e => e.isPublished === true).length
       };
       setStats(calculatedStats);
 
-      console.log('Programs loaded from API:', allProgramsData);
-      console.log('My Programs loaded from API:', myProgramsData);
+      console.log('Exams loaded from API:', allExamsData);
+      console.log('My Exams loaded from API:', myExamsData);
     } catch (err) {
-      console.error('Error fetching programs:', err);
-      alert('Không thể tải danh sách chương trình!');
+      console.error('Error fetching exams:', err);
+      alert('Không thể tải danh sách đề thi!');
     } finally {
       setLoading(false);
     }
@@ -147,23 +148,28 @@ const TeacherProgramList = () => {
     try {
       setLoading(true);
 
-      // Fetch work requests assigned to current user (Subject Leader)
+      // Fetch work requests assigned to current user (Teacher/Subject Leader)
+      // Only get top-down requests (từ Center Head giao xuống) with type create_exam
       const response = await workRequestService.getAssignedToMe({
-        requestType: 'create_program' // Only get create_program requests
+        requestType: 'create_exam', // Only get create_exam requests
+        direction: 'top_down' // Only top-down requests (Center Head -> Teacher)
       });
       const requestsData = response.data || [];
-      setWorkRequests(requestsData);
+
+      // Filter again on client side to ensure only top_down requests
+      const topDownRequests = requestsData.filter(req => req.direction === 'top_down');
+      setWorkRequests(topDownRequests);
 
       // Calculate request stats
       const calculatedRequestStats = {
-        total: requestsData.length,
-        pending: requestsData.filter(r => r.status === 'pending').length,
-        in_progress: requestsData.filter(r => r.status === 'in_progress').length,
-        completed: requestsData.filter(r => r.status === 'completed').length
+        total: topDownRequests.length,
+        pending: topDownRequests.filter(r => r.status === 'pending').length,
+        in_progress: topDownRequests.filter(r => r.status === 'in_progress').length,
+        completed: topDownRequests.filter(r => r.status === 'completed').length
       };
       setRequestStats(calculatedRequestStats);
 
-      console.log('Work Requests loaded from API:', requestsData);
+      console.log('Work Requests loaded from API:', topDownRequests);
     } catch (err) {
       console.error('Error fetching work requests:', err);
       alert('Không thể tải danh sách yêu cầu công việc!');
@@ -182,14 +188,8 @@ const TeacherProgramList = () => {
     setCurrentPage(1);
   };
 
-  const handleDeleteProgram = async (programId, programName) => {
-    const confirmMessage = `⚠️ CẢNH BÁO: Bạn có chắc muốn xóa chương trình "${programName}"?\n\n` +
-      `Hành động này sẽ XÓA TOÀN BỘ:\n` +
-      `• Tất cả PLO trong chương trình\n` +
-      `• Tất cả Course (học phần)\n` +
-      `• Tất cả CLO trong các course\n` +
-      `• Tất cả Session trong các course\n` +
-      `• Tất cả Materials trong các course\n\n` +
+  const handleDeleteExam = async (examId, examTitle) => {
+    const confirmMessage = `⚠️ CẢNH BÁO: Bạn có chắc muốn xóa đề thi "${examTitle}"?\n\n` +
       `Hành động này KHÔNG THỂ HOÀN TÁC!\n\n` +
       `Nhấn OK để xác nhận xóa.`;
 
@@ -198,12 +198,12 @@ const TeacherProgramList = () => {
     }
 
     try {
-      await programService.deleteProgram(programId);
-      await fetchPrograms();
-      alert('Đã xóa chương trình và toàn bộ dữ liệu liên quan thành công!');
+      await examService.deleteExam(examId);
+      await fetchExams();
+      alert('Đã xóa đề thi thành công!');
     } catch (err) {
-      console.error('Error deleting program:', err);
-      alert(err.message || 'Có lỗi xảy ra khi xóa chương trình.');
+      console.error('Error deleting exam:', err);
+      alert(err.message || 'Có lỗi xảy ra khi xóa đề thi.');
     }
   };
 
@@ -226,7 +226,7 @@ const TeacherProgramList = () => {
 
   const handleStartProcessing = async (request) => {
     try {
-      // Call API to start processing - sẽ tự động tạo program draft
+      // Call API to start processing - sẽ tự động tạo exam draft
       const response = await workRequestService.startProcessing(request._id);
 
       console.log('Start processing response:', response);
@@ -234,13 +234,14 @@ const TeacherProgramList = () => {
       // Refresh work requests
       await fetchWorkRequests();
 
-      // Nếu API trả về programId, navigate đến trang edit program đó
-      if (response.programId) {
-        navigate(`/teacher/programs/${response.programId}/edit`);
+      // Nếu API trả về examId, navigate đến trang edit exam đó
+      if (response.examId || response.entityId) {
+        const examId = response.examId || response.entityId;
+        navigate(`/teacher/exams/${examId}/edit`);
       } else {
-        // Fallback: navigate to create page (không nên xảy ra)
-        console.warn('No programId returned, navigating to create page');
-        navigate('/teacher/programs/create');
+        // Fallback: navigate to create page
+        console.warn('No examId returned, navigating to create page');
+        navigate('/teacher/exams/create');
       }
     } catch (error) {
       console.error('Error starting processing:', error);
@@ -254,16 +255,16 @@ const TeacherProgramList = () => {
   };
 
   useEffect(() => {
-    fetchPrograms();
+    fetchExams();
   }, []);
 
   useEffect(() => {
     applyFilters();
-  }, [searchKeyword, filterValues, programs, myPrograms, workRequests, activeTab, applyFilters]);
+  }, [searchKeyword, filterValues, exams, myExams, workRequests, activeTab, applyFilters]);
 
   useEffect(() => {
     applyPagination();
-  }, [filteredPrograms, filteredRequests, currentPage, itemsPerPage, applyPagination]);
+  }, [filteredExams, filteredRequests, currentPage, itemsPerPage, applyPagination]);
 
   useEffect(() => {
     // Recalculate stats when tab changes
@@ -276,34 +277,35 @@ const TeacherProgramList = () => {
       };
       setRequestStats(calculatedRequestStats);
     } else {
-      const sourceData = activeTab === 'my-programs' ? myPrograms : programs;
+      const sourceData = activeTab === 'my-exams' ? myExams : exams;
       const calculatedStats = {
         total: sourceData.length,
-        active: sourceData.filter(p => p.status === 'active').length,
-        draft: sourceData.filter(p => p.status === 'draft').length,
-        archived: sourceData.filter(p => p.status === 'archived').length
+        draft: sourceData.filter(e => e.status === 'draft').length,
+        pending: sourceData.filter(e => e.status === 'pending_approval').length,
+        approved: sourceData.filter(e => e.status === 'approved').length,
+        published: sourceData.filter(e => e.isPublished === true).length
       };
       setStats(calculatedStats);
     }
-  }, [activeTab, programs, myPrograms, workRequests]);
+  }, [activeTab, exams, myExams, workRequests]);
 
-  const programFilters = [
+  const examFilters = [
     {
       key: "status",
       label: "Trạng thái",
       options: [
-        { value: "active", label: "Đang hoạt động" },
         { value: "draft", label: "Bản nháp" },
-        { value: "archived", label: "Đã lưu trữ" },
+        { value: "pending_approval", label: "Chờ duyệt" },
+        { value: "approved", label: "Đã duyệt" },
+        { value: "needs_revision", label: "Cần chỉnh sửa" },
       ]
     },
     {
-      key: "type",
-      label: "Loại chương trình",
+      key: "isPublished",
+      label: "Public",
       options: [
-        { value: "ielts", label: "IELTS" },
-        { value: "toeic", label: "TOEIC" },
-        { value: "cam", label: "Cambridge" },
+        { value: "true", label: "Đã mở cho học viên" },
+        { value: "false", label: "Chưa mở cho học viên" },
       ]
     }
   ];
@@ -320,53 +322,64 @@ const TeacherProgramList = () => {
     }
   ];
 
-  const filters = activeTab === 'work-requests' ? requestFilters : programFilters;
+  const filters = activeTab === 'work-requests' ? requestFilters : examFilters;
 
   const columns = [
     {
-      header: 'Chương trình',
-      field: 'program_name',
+      header: 'Đề thi',
+      field: 'title',
       render: (row) => (
         <div>
-          <div className="fw-semibold text-neutral-900 mb-1" style={{ fontSize: '0.8125rem' }}>{row.program_name}</div>
-          <div className="text-neutral-600" style={{ fontSize: '0.6875rem' }}>Mã: {row.code}</div>
+          <div className="fw-semibold text-neutral-900 mb-1" style={{ fontSize: '0.8125rem' }}>{row.title}</div>
+          <div className="text-neutral-600" style={{ fontSize: '0.6875rem' }}>
+            {row.description ? (row.description.length > 50 ? row.description.substring(0, 50) + '...' : row.description) : 'Không có mô tả'}
+          </div>
         </div>
       ),
     },
     {
-      header: 'Loại chương trình',
-      field: 'type',
+      header: 'Loại đề thi',
+      field: 'examType',
       render: (row) => {
         const typeLabels = {
           'ielts': 'IELTS',
           'toeic': 'TOEIC',
-          'cam': 'Cambridge'
+          'cambridge': 'Cambridge'
         };
         return (
           <span className="badge bg-info-600 text-white" style={{ fontSize: '0.6875rem', whiteSpace: 'nowrap' }}>
-            {typeLabels[row.type] || row.type?.toUpperCase() || 'N/A'}
+            {typeLabels[row.examType] || row.examType?.toUpperCase() || 'N/A'}
           </span>
         );
       },
     },
     {
-      header: 'PLOs',
-      field: 'plos',
+      header: 'Level',
+      field: 'level',
       render: (row) => (
-        <span className="text-neutral-700" style={{ fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>{row.plos?.length || 0} PLOs</span>
+        <span className="text-neutral-700" style={{ fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>{row.level || 'N/A'}</span>
       ),
     },
     {
-      header: 'Khóa học',
-      field: 'courseCount',
+      header: 'Sections',
+      field: 'sections',
       render: (row) => (
-        <span className="text-neutral-700" style={{ fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>{row.courseCount} khóa học</span>
+        <span className="text-neutral-700" style={{ fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>{row.sections?.length || 0} sections</span>
       ),
     },
     {
       header: 'Trạng thái',
       field: 'status',
       render: (row) => <StatusBadge status={row.status} size="sm" />,
+    },
+    {
+      header: 'Public',
+      field: 'isPublished',
+      render: (row) => (
+        <span className={`badge ${row.isPublished ? 'bg-success-600' : 'bg-secondary-600'} text-white`} style={{ fontSize: '0.6875rem', whiteSpace: 'nowrap' }}>
+          {row.isPublished ? 'Đã mở' : 'Chưa mở'}
+        </span>
+      ),
     },
     {
       header: 'Cập nhật',
@@ -386,27 +399,42 @@ const TeacherProgramList = () => {
             icon="ph ph-eye"
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/teacher/programs/${row._id}`);
+              navigate(`/teacher/exams/${row._id}`);
             }}
             className="px-2 py-1"
           >
             <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Xem</span>
             <span className="d-inline d-lg-none">👁</span>
           </Button>
-          {activeTab === 'my-programs' && (
-            <Button
-              variant="danger"
-              size="sm"
-              icon="ph ph-trash"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDeleteProgram(row._id, row.program_name);
-              }}
-              className="px-2 py-1"
-            >
-              <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Xóa</span>
-              <span className="d-inline d-lg-none">🗑️</span>
-            </Button>
+          {activeTab === 'my-exams' && (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="ph ph-pencil"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/teacher/exams/${row._id}/edit`);
+                }}
+                className="px-2 py-1"
+              >
+                <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Sửa</span>
+                <span className="d-inline d-lg-none">✏️</span>
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                icon="ph ph-trash"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteExam(row._id, row.title);
+                }}
+                className="px-2 py-1"
+              >
+                <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Xóa</span>
+                <span className="d-inline d-lg-none">🗑️</span>
+              </Button>
+            </>
           )}
         </div>
       ),
@@ -419,7 +447,7 @@ const TeacherProgramList = () => {
       field: 'requestNote',
       render: (row) => (
         <div>
-          <div className="fw-semibold text-neutral-900 mb-1">Tạo chương trình mới</div>
+          <div className="fw-semibold text-neutral-900 mb-1">Tạo đề thi mới</div>
           <div className="text-sm text-neutral-600" style={{ maxWidth: '300px' }}>
             {row.requestNote || 'Không có ghi chú'}
           </div>
@@ -482,48 +510,48 @@ const TeacherProgramList = () => {
               className="btn btn-sm btn-info d-flex align-items-center gap-1"
               onClick={async (e) => {
                 e.stopPropagation();
-                // Navigate đến program đã được tạo
+                // Navigate đến exam đã được tạo
                 if (row.entityId) {
-                  const programId = typeof row.entityId === 'object' ? row.entityId._id : row.entityId;
+                  const examId = typeof row.entityId === 'object' ? row.entityId._id : row.entityId;
 
-                  // Kiểm tra program có tồn tại không trước khi navigate
+                  // Kiểm tra exam có tồn tại không trước khi navigate
                   try {
-                    await programService.getProgramById(programId);
-                    navigate(`/teacher/programs/${programId}/edit`);
+                    await examService.getExamByIdForManagement(examId);
+                    navigate(`/teacher/exams/${examId}/edit`);
                   } catch (error) {
-                    // Program đã bị xóa - hỏi user có muốn tạo lại không
+                    // Exam đã bị xóa - hỏi user có muốn tạo lại không
                     const recreate = window.confirm(
-                      '⚠️ Program liên kết với request này đã bị xóa.\n\n' +
-                      'Bạn có muốn tạo lại program để tiếp tục không?\n\n' +
-                      'Ấn OK để tạo lại program mới, hoặc Cancel để hủy.'
+                      '⚠️ Exam liên kết với request này đã bị xóa.\n\n' +
+                      'Bạn có muốn tạo lại exam để tiếp tục không?\n\n' +
+                      'Ấn OK để tạo lại exam mới, hoặc Cancel để hủy.'
                     );
 
                     if (recreate) {
-                      // Gọi API recreateEntity để tạo program mới cho request in_progress
                       try {
                         const response = await workRequestService.recreateEntity(row._id, {
-                          programName: `Program for ${row.requestType}`,
-                          programType: 'ielts'
+                          title: `Exam for ${row.requestType}`,
+                          examType: 'cambridge',
+                          level: 'Academic'
                         });
 
-                        console.log('Recreated program:', response);
+                        console.log('Recreated exam:', response);
 
                         // Refresh work requests
                         await fetchWorkRequests();
 
-                        // Navigate to new program
+                        // Navigate to new exam
                         if (response.entityId) {
-                          alert('✅ Đã tạo lại program thành công!');
-                          navigate(`/teacher/programs/${response.entityId}/edit`);
+                          alert('✅ Đã tạo lại exam thành công!');
+                          navigate(`/teacher/exams/${response.entityId}/edit`);
                         }
                       } catch (recreateError) {
-                        console.error('Error recreating program:', recreateError);
-                        alert(recreateError.message || 'Không thể tạo lại program. Vui lòng thử lại sau.');
+                        console.error('Error recreating exam:', recreateError);
+                        alert(recreateError.message || 'Không thể tạo lại exam. Vui lòng thử lại sau.');
                       }
                     }
                   }
                 } else {
-                  alert('Chưa có program được tạo cho request này. Vui lòng ấn "Bắt đầu" trước.');
+                  alert('Chưa có exam được tạo cho request này. Vui lòng ấn "Bắt đầu" trước.');
                 }
               }}
               title="Tiếp tục tạo"
@@ -547,21 +575,13 @@ const TeacherProgramList = () => {
   }
 
   return (
-    <div className="program-list-container p-4">
+    <div className="exam-list-container p-4">
       <div className="d-flex justify-content-between align-items-center mb-24">
         <div>
-          <h4 className="mb-8 text-neutral-900 fw-bold">Chương trình đào tạo</h4>
-          <p className="text-neutral-600 mb-0">Quản lý các chương trình và PLOs</p>
+          <h4 className="mb-8 text-neutral-900 fw-bold">Đề thi</h4>
+          <p className="text-neutral-600 mb-0">Quản lý các đề thi - Chỉ có thể tạo đề thi từ yêu cầu của Center Head</p>
         </div>
-        {activeTab === 'my-programs' && (
-          <Button
-            variant="primary"
-            icon="ph ph-plus"
-            onClick={() => navigate('/teacher/programs/create')}
-          >
-            Tạo chương trình mới
-          </Button>
-        )}
+        {/* Removed standalone create exam button - Teachers can only create exams from work requests */}
       </div>
 
       {/* Tabs */}
@@ -569,20 +589,20 @@ const TeacherProgramList = () => {
         <ul className="nav nav-tabs">
           <li className="nav-item">
             <button
-              className={`nav-link ${activeTab === 'my-programs' ? 'active' : ''}`}
-              onClick={() => handleTabChange('my-programs')}
+              className={`nav-link ${activeTab === 'my-exams' ? 'active' : ''}`}
+              onClick={() => handleTabChange('my-exams')}
             >
               <i className="ph ph-user me-2"></i>
-              Chương trình của tôi ({myPrograms.length})
+              Đề thi của tôi ({myExams.length})
             </button>
           </li>
           <li className="nav-item">
             <button
-              className={`nav-link ${activeTab === 'all-programs' ? 'active' : ''}`}
-              onClick={() => handleTabChange('all-programs')}
+              className={`nav-link ${activeTab === 'all-exams' ? 'active' : ''}`}
+              onClick={() => handleTabChange('all-exams')}
             >
               <i className="ph ph-list me-2"></i>
-              Tất cả chương trình ({programs.length})
+              Tất cả đề thi ({exams.length})
             </button>
           </li>
           <li className="nav-item">
@@ -629,14 +649,8 @@ const TeacherProgramList = () => {
         <div className="row g-4 mb-24">
           <div className="col-md-3">
             <Card>
-              <h6 className="text-neutral-600 mb-8">Tổng Programs</h6>
+              <h6 className="text-neutral-600 mb-8">Tổng đề thi</h6>
               <h4 className="text-neutral-900 fw-bold mb-0">{stats.total}</h4>
-            </Card>
-          </div>
-          <div className="col-md-3">
-            <Card>
-              <h6 className="text-neutral-600 mb-8">Đang hoạt động</h6>
-              <h4 className="text-success-600 fw-bold mb-0">{stats.active}</h4>
             </Card>
           </div>
           <div className="col-md-3">
@@ -647,8 +661,14 @@ const TeacherProgramList = () => {
           </div>
           <div className="col-md-3">
             <Card>
-              <h6 className="text-neutral-600 mb-8">Đã lưu trữ</h6>
-              <h4 className="text-neutral-600 fw-bold mb-0">{stats.archived}</h4>
+              <h6 className="text-neutral-600 mb-8">Đã duyệt</h6>
+              <h4 className="text-success-600 fw-bold mb-0">{stats.approved}</h4>
+            </Card>
+          </div>
+          <div className="col-md-3">
+            <Card>
+              <h6 className="text-neutral-600 mb-8">Đã mở cho học viên</h6>
+              <h4 className="text-info-600 fw-bold mb-0">{stats.published}</h4>
             </Card>
           </div>
         </div>
@@ -658,7 +678,7 @@ const TeacherProgramList = () => {
       <Card className="mb-24">
         <div className="d-flex gap-3 align-items-center justify-content-between">
           <SearchBox
-            placeholder={activeTab === 'work-requests' ? "Tìm kiếm yêu cầu..." : "Tìm kiếm chương trình..."}
+            placeholder={activeTab === 'work-requests' ? "Tìm kiếm yêu cầu..." : "Tìm kiếm đề thi..."}
             value={searchKeyword}
             onChange={setSearchKeyword}
           />
@@ -675,10 +695,10 @@ const TeacherProgramList = () => {
       <Card>
         <Table
           columns={activeTab === 'work-requests' ? requestColumns : columns}
-          data={activeTab === 'work-requests' ? paginatedRequests : paginatedPrograms}
+          data={activeTab === 'work-requests' ? paginatedRequests : paginatedExams}
           onRowClick={activeTab === 'work-requests'
             ? null
-            : (row) => navigate(`/teacher/programs/${row._id}`)
+            : (row) => navigate(`/teacher/exams/${row._id}`)
           }
         />
       </Card>
@@ -706,7 +726,7 @@ const TeacherProgramList = () => {
 
           <div className="d-flex align-items-center gap-2">
             <span className="text-sm text-neutral-600">
-              Trang {currentPage} / {totalPages} ({activeTab === 'work-requests' ? filteredRequests.length : filteredPrograms.length} bản ghi)
+              Trang {currentPage} / {totalPages} ({activeTab === 'work-requests' ? filteredRequests.length : filteredExams.length} bản ghi)
             </span>
 
             <div className="d-flex gap-1">
@@ -774,4 +794,4 @@ const TeacherProgramList = () => {
   );
 };
 
-export default TeacherProgramList;
+export default TeacherExamList;

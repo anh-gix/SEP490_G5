@@ -449,18 +449,20 @@ const CambridgeQuiz = ({ quizData = null, onComplete = null, onReset = null, isC
       >
         <div className='row align-items-center'>
           {/* Image on the right - larger for kids */}
-          {quiz?.Img && (
-            <div className='col-lg-6 mb-3 mb-lg-0 order-lg-2'>
-              <div className='rounded-12 overflow-hidden border border-neutral-30 bg-main-25 p-2'>
-                <img
-                  src={quiz.Img}
-                  alt={`Quiz ${index + 1}`}
-                  className='w-100 rounded-8'
-                  style={{ objectFit: 'cover', minHeight: '400px', maxHeight: '600px' }}
-                />
-              </div>
+          <div className='col-lg-6 mb-3 mb-lg-0 order-lg-2'>
+            <div className='rounded-12 overflow-hidden border border-neutral-30 bg-main-25 p-2'>
+              <img
+                src={quiz?.Img || 'https://placehold.co/600x400/e0e7ff/6366f1?text=Quiz+Image'}
+                alt={`Quiz ${index + 1}`}
+                className='w-100 rounded-8'
+                style={{ objectFit: 'cover', minHeight: '400px', maxHeight: '600px' }}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = 'https://placehold.co/600x400/e0e7ff/6366f1?text=Quiz+Image';
+                }}
+              />
             </div>
-          )}
+          </div>
           
           {/* Question content on the left */}
           <div className={quiz?.Img ? 'col-lg-6 order-lg-1' : 'col-12'}>

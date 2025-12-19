@@ -107,7 +107,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
       label: "Chi tiết chương trình",
       path: `${basePath}/programs/${programId}`,
     },
-    { label: "Chỉnh sửa học phần" },
+    { label: "Chỉnh sửa khóa học" },
   ];
 
   // Load program data để lấy PLOs

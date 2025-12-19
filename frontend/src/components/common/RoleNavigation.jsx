@@ -103,7 +103,7 @@ const RoleNavigation = ({
                   <i className={`fas ${roleIcon} text-white fa-lg`} />
                 </div>
 
-                {/* ✅ CONDITIONAL RENDER TEXT */}
+                {/* CONDITIONAL RENDER TEXT */}
                 <div>
                   <h6 className="fw-bold mb-0">{roleTitle}</h6>
                   <p className="text-neutral-500 mb-0 text-13">
@@ -114,12 +114,7 @@ const RoleNavigation = ({
 
               <button
                 className="d-none d-lg-flex btn btn-sm btn-light position-absolute rounded-3 align-items-center justify-content-center"
-                style={{
-                  top: 24,
-                  right: 24,
-                  width: 32,
-                  height: 32
-                }}
+                style={{top: 34, right: 8, width: 32, height: 32}}
                 onClick={() => setIsCollapsed(true)}
                 title="Thu gọn"
               >
@@ -230,7 +225,7 @@ const RoleNavigation = ({
                 )}
               </div>
 
-              {/* ✅ CHỈ RENDER KHI EXPAND */}
+              {/* CHỈ RENDER KHI EXPAND */}
               {!isCollapsed && (
                 <>
                   <div className="flex-grow-1 ms-12">

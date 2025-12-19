@@ -21,8 +21,8 @@ router.get("/management/:id/submission-status", examController.getExamSubmission
 // Nộp exam chờ duyệt
 router.post("/management/:id/submit-for-approval", examController.submitExamForApproval);
 
-// Lấy danh sách exam đã nộp của teacher
-router.get("/my-exams", examController.getMySubmittedExams);
+// Lấy danh sách exam đã nộp của teacher (protected)
+router.get("/my-exams", verifyToken, examController.getMySubmittedExams);
 
 // Rút lại exam đang chờ duyệt
 router.post("/management/:id/withdraw", examController.withdrawExamSubmission);

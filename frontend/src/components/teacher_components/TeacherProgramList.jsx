@@ -350,13 +350,6 @@ const TeacherProgramList = () => {
       },
     },
     {
-      header: 'PLOs',
-      field: 'plos',
-      render: (row) => (
-        <span className="text-neutral-700" style={{ fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>{row.plos?.length || 0} PLOs</span>
-      ),
-    },
-    {
       header: 'Khóa học',
       field: 'courseCount',
       render: (row) => (

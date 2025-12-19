@@ -1778,7 +1778,6 @@ exports.completeRequest = async (req, res) => {
       );
       console.log('✅ Updated program status to pending_approval after completion');
     } else if (request.entityId && request.requestType === 'create_exam') {
-      const Exam = require('../models/Exam');
       await Exam.findByIdAndUpdate(
         request.entityId,
         { status: 'pending_approval' },

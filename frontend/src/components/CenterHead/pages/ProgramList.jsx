@@ -192,13 +192,6 @@ const ProgramList = () => {
       },
     },
     {
-      header: 'PLOs',
-      field: 'plos',
-      render: (row) => (
-        <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>{row.plos?.length || 0} PLOs</span>
-      ),
-    },
-    {
       header: 'Khóa học',
       field: 'courseCount',
       render: (row) => (

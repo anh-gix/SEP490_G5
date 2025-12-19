@@ -186,14 +186,14 @@ exports.getExamByIdForManagement = async (req, res) => {
 // ================== 5. TẠO ĐỀ THI MỚI ==================
 exports.createExamForManagement = async (req, res) => {
   try {
-    const { title, description, examType, level, totalDuration, sections } = req.body;
+    const { title, description, examType, totalDuration, sections } = req.body;
     const createdBy = req.user?._id || req.body.createdBy;
 
-    // Validation - only require title and level
-    if (!title || !level) {
+    // Validation - only require title
+    if (!title) {
       return res.status(400).json({
         success: false,
-        message: 'Tiêu đề và cấp độ là bắt buộc'
+        message: 'Tiêu đề là bắt buộc'
       });
     }
 
@@ -214,7 +214,6 @@ exports.createExamForManagement = async (req, res) => {
       description,
       createdBy,
       examType: examType || 'practice',
-      level,
       totalDuration: totalDuration || 0,
       sections: sections || [],
       isPublished: false

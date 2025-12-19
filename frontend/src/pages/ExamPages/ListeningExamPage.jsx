@@ -44,12 +44,6 @@ const ListeningExamPage = () => {
     [sectionData]
   );
   
-  const getQuestionType = useCallback(
-    (questionNumber) => {
-      return getQuestionData(questionNumber).questionType;
-    },
-    [getQuestionData]
-  );
   
   const isMultipleChoiceType = (questionType) => {
     return questionType === "multiple_choice";
@@ -445,8 +439,6 @@ const ListeningExamPage = () => {
   if (authLoading || loading) {
     return (
       <>
-        <Preloader />
-        <Animation />
         <div className="text-center py-80">
           <div className="spinner-border text-main-600" role="status">
             <span className="visually-hidden">Loading...</span>
@@ -458,9 +450,6 @@ const ListeningExamPage = () => {
 
   return (
     <>
-      <Preloader />
-      <Animation />
-      
       <div className="listening-exam-container" style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
         <style>{`
           .hide-scrollbar::-webkit-scrollbar {
@@ -476,12 +465,13 @@ const ListeningExamPage = () => {
           .listening-exam-header {
             background: white;
             border-bottom: 1px solid hsl(var(--border-color));
-            padding: 16px 24px;
+            padding: 12px 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             flex-shrink: 0;
             z-index: 10;
+            gap: 16px;
           }
           .listening-exam-header .logo img {
             height: 40px;
@@ -573,7 +563,7 @@ const ListeningExamPage = () => {
           }
         `}</style>
 
-        {/* Header: Logo, Timer, Submit Button */}
+        {/* Header: Logo, Timer, Audio Player, Submit Button */}
         <div className="listening-exam-header">
           <div className="logo">
             <Link to="/" className="link">
@@ -581,12 +571,48 @@ const ListeningExamPage = () => {
             </Link>
           </div>
           
-          {timeRemaining !== null && (
-            <div className={`listening-exam-timer ${timeRemaining < 300 ? "danger" : ""}`}>
-              <i className="ph ph-clock" style={{ fontSize: "20px" }}></i>
-              <span>{formatTime(timeRemaining)}</span>
-            </div>
-          )}
+          <div className="flex-align gap-16" style={{ flex: 1, justifyContent: "center" }}>
+            {timeRemaining !== null && (
+              <div className={`listening-exam-timer ${timeRemaining < 300 ? "danger" : ""}`}>
+                <i className="ph ph-clock" style={{ fontSize: "20px" }}></i>
+                <span>{formatTime(timeRemaining)}</span>
+              </div>
+            )}
+            
+            {/* Audio Player in Header */}
+            {audioUrls.length > 0 && (
+              <div className="flex-align gap-8">
+                {audioUrls.length > 1 && (
+                  <div className="d-flex gap-6 align-items-center">
+                    {audioUrls.map((url, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleAudioChange(index)}
+                        className={`btn ${
+                          currentAudioIndex === index ? "btn-main" : "btn-outline-main"
+                        } px-8 py-4 rounded-8 text-xs`}
+                        style={{ minWidth: "30px" }}
+                      >
+                        Audio {index + 1}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="bg-main-25 rounded-8 p-8 border border-neutral-30" style={{ minWidth: "400px", maxWidth: "500px" }}>
+                  <audio
+                    ref={audioRef}
+                    src={getAudioUrl(currentPart, currentAudioUrl)}
+                    onEnded={handleAudioEnded}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    className="w-100"
+                    controls
+                    style={{ height: "40px", width: "100%" }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
           
           <div className="flex-align gap-16">
             <button
@@ -623,69 +649,26 @@ const ListeningExamPage = () => {
           </div>
         </div>
 
-        {/* Part Selector and Audio Player Section */}
+        {/* Part Selector Section */}
         {sectionData?.parts && sectionData.parts.length > 1 && (
           <div className="bg-white border-bottom border-neutral-30 px-24 py-16 flex-shrink-0">
-            <div className="mb-12">
-              <div className="d-flex flex-wrap gap-8 align-items-center">
-                <span className="fw-semibold text-neutral-700 text-sm mb-0">Chọn phần:</span>
-                {sectionData.parts.map((partData) => (
-                  <button
-                    key={partData.part}
-                    onClick={() => {
-                      setCurrentPart(partData.part);
-                      setCurrentAudioIndex(0);
-                      setCurrentQuestion(1);
-                    }}
-                    className={`btn ${
-                      currentPart === partData.part ? "btn-main" : "btn-outline-main"
-                    } px-12 py-4 rounded-pill text-sm`}
-                  >
-                    Part {partData.part}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Audio Player Section */}
-        {audioUrls.length > 0 && (
-          <div className="bg-white border-bottom border-neutral-30 px-24 py-16 flex-shrink-0">
-            {audioUrls.length > 1 && (
-              <div className="mb-12">
-                <div className="d-flex flex-wrap gap-8 align-items-center">
-                  <span className="fw-semibold text-neutral-700 text-sm mb-0">Chọn audio:</span>
-                  {audioUrls.map((url, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleAudioChange(index)}
-                      className={`btn ${
-                        currentAudioIndex === index ? "btn-main" : "btn-outline-main"
-                      } px-12 py-4 rounded-pill text-sm`}
-                    >
-                      Audio {index + 1}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="bg-main-25 rounded-12 p-12 border border-neutral-30">
-              <div className="text-center mb-6">
-                <h6 className="mb-0 text-sm fw-semibold">
-                  {audioUrls.length > 1 ? `Audio ${currentAudioIndex + 1}` : "Audio"}
-                </h6>
-              </div>
-              <audio
-                ref={audioRef}
-                src={getAudioUrl(currentPart, currentAudioUrl)}
-                onEnded={handleAudioEnded}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                className="w-100"
-                controls
-                style={{ height: "40px" }}
-              />
+            <div className="d-flex flex-wrap gap-8 align-items-center">
+              <span className="fw-semibold text-neutral-700 text-sm mb-0">Chọn phần:</span>
+              {sectionData.parts.map((partData) => (
+                <button
+                  key={partData.part}
+                  onClick={() => {
+                    setCurrentPart(partData.part);
+                    setCurrentAudioIndex(0);
+                    setCurrentQuestion(1);
+                  }}
+                  className={`btn ${
+                    currentPart === partData.part ? "btn-main" : "btn-outline-main"
+                  } px-12 py-4 rounded-pill text-sm`}
+                >
+                  Part {partData.part}
+                </button>
+              ))}
             </div>
           </div>
         )}

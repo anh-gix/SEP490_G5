@@ -298,62 +298,62 @@ const ListeningResultPage = () => {
       <section className='pt-40 pb-120'>
         <div className='container'>
           {error ? (
-            <div className='alert alert-danger rounded-12 p-24 mb-40' role='alert'>
-              <i className='ph ph-warning me-8' />
+            <div className='alert alert-danger rounded-12 p-16 mb-24 text-13' role='alert'>
+              <i className='ph ph-warning me-6' />
               {error}
             </div>
           ) : result ? (
             <>
               {/* Section Heading */}
-              <div className='section-heading text-center mb-40'>
-                <div className='flex-align d-inline-flex gap-8 mb-16'>
-                  <span className='text-main-600 text-2xl d-flex'>
+              <div className='section-heading text-center mb-24'>
+                <div className='flex-align d-inline-flex gap-8 mb-12'>
+                  <span className='text-main-600 text-16 d-flex'>
                     <i className='ph-bold ph-headphones' />
                   </span>
-                  <h5 className='text-main-600 mb-0'>Kết quả thi</h5>
+                  <h6 className='text-main-600 mb-0 text-14'>Kết quả thi</h6>
                 </div>
-                <h2 className='mb-16'>Kết quả phần Listening</h2>
+                <h4 className='mb-12 text-20'>Kết quả phần Listening</h4>
                 {result.submittedAt && (
-                  <p className='text-neutral-600 mb-0'>
-                    <i className='ph ph-clock me-8' />
+                  <p className='text-neutral-600 mb-0 text-13'>
+                    <i className='ph ph-clock me-6' />
                     Nộp bài lúc: {new Date(result.submittedAt).toLocaleString("vi-VN")}
                   </p>
                 )}
               </div>
 
               {/* Score Summary */}
-              <div className='row gy-4 mb-40'>
+              <div className='row gy-3 mb-24'>
                 <div className='col-md-4'>
-                  <div className='bg-white box-shadow-md rounded-16 p-32 border border-neutral-30 text-center h-100'>
-                    <div className='w-60 h-60 flex-center bg-main-25 text-main-600 text-28 rounded-circle mx-auto mb-16'>
+                  <div className='bg-white box-shadow-md rounded-12 p-20 border border-neutral-30 text-center h-100'>
+                    <div className='w-48 h-48 flex-center bg-main-25 text-main-600 text-20 rounded-circle mx-auto mb-12'>
                       <i className='ph-bold ph-check-circle' />
                     </div>
-                    <p className='text-neutral-600 text-sm mb-8 fw-medium'>Điểm số</p>
-                    <h3 className={`text-${getScoreColor()}-600 mb-0 fw-bold`}>
+                    <p className='text-neutral-600 text-13 mb-6 fw-medium'>Điểm số</p>
+                    <h5 className={`text-${getScoreColor()}-600 mb-0 fw-bold text-18`}>
                       {result.sectionScore} / {result.maxScore}
-                    </h3>
+                    </h5>
                   </div>
                 </div>
                 <div className='col-md-4'>
-                  <div className='bg-white box-shadow-md rounded-16 p-32 border border-neutral-30 text-center h-100'>
-                    <div className='w-60 h-60 flex-center bg-main-25 text-main-600 text-28 rounded-circle mx-auto mb-16'>
+                  <div className='bg-white box-shadow-md rounded-12 p-20 border border-neutral-30 text-center h-100'>
+                    <div className='w-48 h-48 flex-center bg-main-25 text-main-600 text-20 rounded-circle mx-auto mb-12'>
                       <i className='ph-bold ph-percent' />
                     </div>
-                    <p className='text-neutral-600 text-sm mb-8 fw-medium'>Tỷ lệ đúng</p>
-                    <h3 className={`text-${getScoreColor()}-600 mb-0 fw-bold`}>
+                    <p className='text-neutral-600 text-13 mb-6 fw-medium'>Tỷ lệ đúng</p>
+                    <h5 className={`text-${getScoreColor()}-600 mb-0 fw-bold text-18`}>
                       {getScorePercentage()}%
-                    </h3>
+                    </h5>
                   </div>
                 </div>
                 <div className='col-md-4'>
-                  <div className='bg-white box-shadow-md rounded-16 p-32 border border-neutral-30 text-center h-100'>
-                    <div className='w-60 h-60 flex-center bg-main-25 text-main-600 text-28 rounded-circle mx-auto mb-16'>
+                  <div className='bg-white box-shadow-md rounded-12 p-20 border border-neutral-30 text-center h-100'>
+                    <div className='w-48 h-48 flex-center bg-main-25 text-main-600 text-20 rounded-circle mx-auto mb-12'>
                       <i className='ph-bold ph-check-circle' />
                     </div>
-                    <p className='text-neutral-600 text-sm mb-8 fw-medium'>Số câu đúng</p>
-                    <h3 className='text-main-600 mb-0 fw-bold'>
+                    <p className='text-neutral-600 text-13 mb-6 fw-medium'>Số câu đúng</p>
+                    <h5 className='text-main-600 mb-0 fw-bold text-18'>
                       {getCorrectAnswersCount()} / {getTotalQuestionsCount()}
-                    </h3>
+                    </h5>
                   </div>
                 </div>
               </div>
@@ -364,20 +364,20 @@ const ListeningResultPage = () => {
                 const bandScores = [9, 8.5, 8, 7.5, 7, 6.5, 6, 5.5, 5, 4.5, 4, 3.5, 3];
                 const displayBandScore = selectedBandScore !== null ? selectedBandScore : currentBandScore;
                 return (
-                  <div className="bg-white rounded-16 p-32 mb-40 border border-neutral-30 box-shadow-sm">
-                    <div className="flex-align gap-12 mb-24">
-                      <span className="text-main-600 text-xl">
+                  <div className="bg-white rounded-12 p-20 mb-24 border border-neutral-30 box-shadow-sm">
+                    <div className="flex-align gap-8 mb-16">
+                      <span className="text-main-600 text-16">
                         <i className="ph-bold ph-medal" />
                       </span>
-                      <h3 className="mb-0">Band Score</h3>
+                      <h5 className="mb-0 text-16">Band Score</h5>
                     </div>
                     
                     {/* Band Score Scale */}
-                    <div className="mb-24">
-                      <p className="text-neutral-600 text-sm mb-12 text-center fw-medium">
+                    <div className="mb-16">
+                      <p className="text-neutral-600 text-13 mb-8 text-center fw-medium">
                         Điểm của bạn: {currentBandScore !== null ? <span className="fw-bold text-main-600">{currentBandScore}</span> : "N/A"}
                       </p>
-                      <div className="d-flex flex-wrap gap-8 justify-content-center align-items-center">
+                      <div className="d-flex flex-wrap gap-6 justify-content-center align-items-center">
                         {bandScores.map((band) => {
                           const isCurrentBand = currentBandScore === band;
                           const isSelectedBand = selectedBandScore === band;
@@ -401,11 +401,11 @@ const ListeningResultPage = () => {
                               onClick={() => setSelectedBandScore(band)}
                               className={className}
                               style={{
-                                fontSize: "18px",
+                                fontSize: "14px",
                                 cursor: "pointer",
                                 transition: "all 0.2s ease",
-                                padding: "8px 16px",
-                                borderRadius: "8px",
+                                padding: "6px 12px",
+                                borderRadius: "6px",
                                 border: "2px solid",
                                 display: "inline-block"
                               }}
@@ -431,7 +431,7 @@ const ListeningResultPage = () => {
 
                     {/* Band Score Details */}
                     {displayBandScore && bandScoreData[displayBandScore] && (
-                      <div className={`border-top border-neutral-30 pt-24 ${
+                      <div className={`border-top border-neutral-30 pt-16 ${
                         selectedBandScore === displayBandScore 
                           ? (currentBandScore === displayBandScore 
                               ? "bg-success-25 border-success-600" 
@@ -443,23 +443,23 @@ const ListeningResultPage = () => {
                         borderStyle: "solid",
                         transition: "all 0.2s ease"
                       }}>
-                        <div className="row gy-3">
+                        <div className="row gy-2">
                           <div className="col-md-4">
-                            <div className="border-bottom border-neutral-30 pb-12">
-                              <p className="text-neutral-600 text-sm mb-4 fw-semibold">Correct Answers:</p>
-                              <p className="text-neutral-700 mb-0 fw-medium">{bandScoreData[displayBandScore].correctAnswers}</p>
+                            <div className="border-bottom border-neutral-30 pb-8">
+                              <p className="text-neutral-600 text-12 mb-2 fw-semibold">Correct Answers:</p>
+                              <p className="text-neutral-700 mb-0 fw-medium text-13">{bandScoreData[displayBandScore].correctAnswers}</p>
                             </div>
                           </div>
                           <div className="col-md-4">
-                            <div className="border-bottom border-neutral-30 pb-12">
-                              <p className="text-neutral-600 text-sm mb-4 fw-semibold">Skill Level:</p>
-                              <p className="text-neutral-700 mb-0 fw-medium">{bandScoreData[displayBandScore].skillLevel}</p>
+                            <div className="border-bottom border-neutral-30 pb-8">
+                              <p className="text-neutral-600 text-12 mb-2 fw-semibold">Skill Level:</p>
+                              <p className="text-neutral-700 mb-0 fw-medium text-13">{bandScoreData[displayBandScore].skillLevel}</p>
                             </div>
                           </div>
                           <div className="col-md-12">
-                            <div className="pt-12">
-                              <p className="text-neutral-600 text-sm mb-4 fw-semibold">Description:</p>
-                              <p className="text-neutral-700 mb-0" style={{ lineHeight: "1.8" }}>
+                            <div className="pt-8">
+                              <p className="text-neutral-600 text-12 mb-2 fw-semibold">Description:</p>
+                              <p className="text-neutral-700 mb-0 text-13" style={{ lineHeight: "1.6" }}>
                                 {bandScoreData[displayBandScore].description}
                               </p>
                             </div>
@@ -515,11 +515,11 @@ const ListeningResultPage = () => {
                       className="resizable-panel bg-white border-end border-neutral-30"
                       style={{ width: `${leftWidth}%` }}
                     >
-                      <div className="p-24 border-bottom border-neutral-30">
-                        <h4 className="mb-0">Đề thi Listening</h4>
+                      <div className="p-16 border-bottom border-neutral-30">
+                        <h5 className="mb-0 text-16">Đề thi Listening</h5>
                       </div>
                       <div 
-                        className="p-24" 
+                        className="p-16" 
                         style={{ 
                           height: "calc(100vh - 400px)", 
                           overflow: "hidden",
@@ -551,22 +551,22 @@ const ListeningResultPage = () => {
                       className="resizable-panel bg-main-25"
                       style={{ width: `${100 - leftWidth}%` }}
                     >
-                      <div className="p-24 border-bottom border-neutral-30 bg-white">
-                        <div className='flex-align gap-12'>
-                          <span className='text-main-600 text-xl'>
+                      <div className="p-16 border-bottom border-neutral-30 bg-white">
+                        <div className='flex-align gap-8'>
+                          <span className='text-main-600 text-16'>
                             <i className='ph-bold ph-list-bullets' />
                           </span>
-                          <h4 className="mb-0">Chi tiết đáp án</h4>
+                          <h5 className="mb-0 text-16">Chi tiết đáp án</h5>
                         </div>
                       </div>
-                      <div className="p-16" style={{ height: "calc(100vh - 400px)", overflow: "auto" }}>
+                      <div className="p-12" style={{ height: "calc(100vh - 400px)", overflow: "auto" }}>
                         {result.parts?.map((partData, partIndex) => {
                           const allQuestions = getAllQuestionsForPart(partData.part);
                           return (
-                            <div key={partIndex} className="mb-24">
+                            <div key={partIndex} className="mb-16">
                               {result.parts.length > 1 && (
-                                <div className="mb-16">
-                                  <h5 className="text-main-600 fw-semibold">Part {partData.part}</h5>
+                                <div className="mb-12">
+                                  <h6 className="text-main-600 fw-semibold text-14">Part {partData.part}</h6>
                                 </div>
                               )}
                               <div className='row gy-2'>
@@ -576,7 +576,7 @@ const ListeningResultPage = () => {
                                   return (
                                     <div key={index} className='col-12'>
                                       <div
-                                        className={`rounded-8 p-12 border ${
+                                        className={`rounded-8 p-10 border ${
                                           isUnanswered
                                             ? "border-warning bg-warning-25"
                                             : item.isCorrect
@@ -584,35 +584,35 @@ const ListeningResultPage = () => {
                                             : "border-danger bg-danger-25"
                                         }`}
                                       >
-                                        <div className='flex-between gap-8 mb-8 flex-wrap'>
-                                          <div className='flex-align gap-8'>
-                                            <span className='fw-semibold text-neutral-700 text-sm'>
+                                        <div className='flex-between gap-6 mb-6 flex-wrap'>
+                                          <div className='flex-align gap-6'>
+                                            <span className='fw-semibold text-neutral-700 text-13'>
                                               Câu {item.questionNumber}: {item.questionTitle && (
-                                                <div className='mb-8'>
-                                                  <p className='text-neutral-700 fw-semibold mb-0 text-sm'>{item.questionTitle}</p>
+                                                <div className='mb-6'>
+                                                  <p className='text-neutral-700 fw-semibold mb-0 text-13'>{item.questionTitle}</p>
                                                 </div>
                                               )}
                                             </span>
                                           </div>
                                           {isUnanswered ? (
-                                            <span className='badge bg-warning text-white px-8 py-2 rounded-pill text-xs'>
+                                            <span className='badge bg-warning text-white px-8 py-2 rounded-8 text-11'>
                                               <i className='ph ph-clock me-2' />
                                               Chưa làm
                                             </span>
                                           ) : item.isCorrect ? (
-                                            <span className='badge bg-success text-white px-8 py-2 rounded-pill text-xs'>
+                                            <span className='badge bg-success text-white px-8 py-2 rounded-8 text-11'>
                                               <i className='ph ph-check-circle me-2' />
                                               Đúng
                                             </span>
                                           ) : (
-                                            <span className='badge bg-danger text-white px-8 py-2 rounded-pill text-xs'>
+                                            <span className='badge bg-danger text-white px-8 py-2 rounded-8 text-11'>
                                               <i className='ph ph-x-circle me-2' />
                                               Sai
                                             </span>
                                           )}
                                         </div>
                                         <div className='mb-0'>
-                                          <p className='text-neutral-600 text-xs mb-4'>
+                                          <p className='text-neutral-600 text-12 mb-3'>
                                             <span className='fw-semibold'>Đáp án của bạn:</span>
                                           </p>
                                           <div className={`bg-white rounded-6 p-8 border ${
@@ -622,7 +622,7 @@ const ListeningResultPage = () => {
                                               ? "border-success" 
                                               : "border-danger"
                                           }`}>
-                                            <p className={`mb-0 fw-medium text-sm ${
+                                            <p className={`mb-0 fw-medium text-13 ${
                                               isUnanswered
                                                 ? "text-warning"
                                                 : item.isCorrect 
@@ -635,12 +635,12 @@ const ListeningResultPage = () => {
                                             </p>
                                           </div>
                                           {(isUnanswered || !item.isCorrect) && item.correctAnswer && (
-                                            <div className='mt-6'>
-                                              <p className='text-neutral-600 text-xs mb-4'>
+                                            <div className='mt-4'>
+                                              <p className='text-neutral-600 text-12 mb-3'>
                                                 <span className='fw-semibold'>Đáp án đúng:</span>
                                               </p>
                                               <div className='bg-success-25 rounded-6 p-8 border border-success'>
-                                                <p className='mb-0 fw-medium text-success text-sm'>
+                                                <p className='mb-0 fw-medium text-success text-13'>
                                                   {getAnswerText(item.correctAnswer, item.questionAnswer)}
                                                 </p>
                                               </div>
@@ -663,22 +663,22 @@ const ListeningResultPage = () => {
                 {/* If no PDF, show results in full width */}
                 {(!result.parts || result.parts.length === 0 || !getPDFUrl(result.parts[0]?.part)) && (
                   <div className="resizable-panel bg-white" style={{ width: "100%" }}>
-                    <div className="p-24 border-bottom border-neutral-30">
-                      <div className='flex-align gap-12'>
-                        <span className='text-main-600 text-xl'>
+                    <div className="p-16 border-bottom border-neutral-30">
+                      <div className='flex-align gap-8'>
+                        <span className='text-main-600 text-16'>
                           <i className='ph-bold ph-list-bullets' />
                         </span>
-                        <h4 className="mb-0">Chi tiết đáp án</h4>
+                        <h5 className="mb-0 text-16">Chi tiết đáp án</h5>
                       </div>
                     </div>
-                    <div className="p-16" style={{ minHeight: "400px", overflow: "auto" }}>
+                    <div className="p-12" style={{ minHeight: "400px", overflow: "auto" }}>
                       {result.parts?.map((partData, partIndex) => {
                         const allQuestions = getAllQuestionsForPart(partData.part);
                         return (
-                          <div key={partIndex} className="mb-24">
+                          <div key={partIndex} className="mb-16">
                             {result.parts.length > 1 && (
-                              <div className="mb-16">
-                                <h5 className="text-main-600 fw-semibold">Part {partData.part}</h5>
+                              <div className="mb-12">
+                                <h6 className="text-main-600 fw-semibold text-14">Part {partData.part}</h6>
                               </div>
                             )}
                             <div className='row gy-2'>
@@ -696,22 +696,22 @@ const ListeningResultPage = () => {
                                           : "border-danger bg-danger-25"
                                       }`}
                                     >
-                                      <div className='flex-between gap-8 mb-6'>
-                                        <span className='fw-semibold text-neutral-700 text-sm'>
+                                      <div className='flex-between gap-6 mb-6'>
+                                        <span className='fw-semibold text-neutral-700 text-13'>
                                           Câu {item.questionNumber}
                                         </span>
                                         {isUnanswered ? (
-                                          <span className='badge bg-warning text-white px-8 py-2 rounded-pill text-xs'>
+                                          <span className='badge bg-warning text-white px-8 py-2 rounded-8 text-11'>
                                             <i className='ph ph-clock me-2' />
                                             Chưa làm
                                           </span>
                                         ) : item.isCorrect ? (
-                                          <span className='badge bg-success text-white px-8 py-2 rounded-pill text-xs'>
+                                          <span className='badge bg-success text-white px-8 py-2 rounded-8 text-11'>
                                             <i className='ph ph-check me-2' />
                                             Đúng
                                           </span>
                                         ) : (
-                                          <span className='badge bg-danger text-white px-8 py-2 rounded-pill text-xs'>
+                                          <span className='badge bg-danger text-white px-8 py-2 rounded-8 text-11'>
                                             <i className='ph ph-x me-2' />
                                             Sai
                                           </span>
@@ -720,12 +720,12 @@ const ListeningResultPage = () => {
                                       {/* Question Title */}
                                       {item.questionTitle && (
                                         <div className='mb-6'>
-                                          <p className='text-neutral-700 fw-semibold mb-0 text-xs'>{item.questionTitle}</p>
+                                          <p className='text-neutral-700 fw-semibold mb-0 text-12'>{item.questionTitle}</p>
                                         </div>
                                       )}
 
                                       <div className='mb-0'>
-                                        <p className='text-neutral-600 text-xs mb-3'>
+                                        <p className='text-neutral-600 text-12 mb-3'>
                                           <span className='fw-semibold'>Đáp án của bạn:</span>{" "}
                                           <span
                                             className={`fw-medium ${
@@ -742,7 +742,7 @@ const ListeningResultPage = () => {
                                           </span>
                                         </p>
                                         {(isUnanswered || !item.isCorrect) && item.correctAnswer && (
-                                          <p className='text-neutral-600 text-xs mb-0'>
+                                          <p className='text-neutral-600 text-12 mb-0'>
                                             <span className='fw-semibold'>Đáp án đúng:</span>{" "}
                                             <span className='fw-medium text-success'>
                                               {getAnswerText(item.correctAnswer, item.questionAnswer)}
@@ -765,20 +765,20 @@ const ListeningResultPage = () => {
 
               {/* Feedback - Show feedback from all parts */}
               {result.parts?.some((part) => part.feedback) && (
-                <div className='bg-warning-25 rounded-16 p-32 mb-40 border border-warning box-shadow-sm'>
-                  <div className='flex-align gap-12 mb-16'>
-                    <span className='text-warning-600 text-xl'>
+                <div className='bg-warning-25 rounded-12 p-20 mb-24 border border-warning box-shadow-sm'>
+                  <div className='flex-align gap-8 mb-12'>
+                    <span className='text-warning-600 text-16'>
                       <i className='ph-bold ph-chat-circle-text' />
                     </span>
-                    <h4 className='mb-0'>Nhận xét từ giáo viên</h4>
+                    <h5 className='mb-0 text-16'>Nhận xét từ giáo viên</h5>
                   </div>
                   {result.parts.map((partData, index) => (
                     partData.feedback && (
-                      <div key={index} className={index > 0 ? "mt-16 pt-16 border-top border-warning" : ""}>
+                      <div key={index} className={index > 0 ? "mt-12 pt-12 border-top border-warning" : ""}>
                         {result.parts.length > 1 && (
-                          <p className='fw-semibold text-warning-600 mb-8'>Part {partData.part}:</p>
+                          <p className='fw-semibold text-warning-600 mb-6 text-13'>Part {partData.part}:</p>
                         )}
-                        <p className='text-neutral-700 mb-0' style={{ whiteSpace: "pre-wrap", lineHeight: "1.8" }}>
+                        <p className='text-neutral-700 mb-0 text-13' style={{ whiteSpace: "pre-wrap", lineHeight: "1.6" }}>
                           {partData.feedback}
                         </p>
                       </div>
@@ -791,16 +791,16 @@ const ListeningResultPage = () => {
               <div className='text-center'>
                 <Link
                   to={`/student/exams/${examId}`}
-                  className='btn btn-main px-40 py-16 rounded-pill me-16'
+                  className='btn btn-main px-24 py-10 rounded-8 me-12 text-13'
                 >
-                  <i className='ph ph-arrow-left me-8' />
+                  <i className='ph ph-arrow-left me-6' />
                   Quay lại bài thi
                 </Link>
                 <Link
                   to={'/student/practice-exams'}
-                  className='btn btn-outline-main px-40 py-16 rounded-pill'
+                  className='btn btn-outline-main px-24 py-10 rounded-8 text-13'
                 >
-                  <i className='ph ph-list me-8' />
+                  <i className='ph ph-list me-6' />
                   Danh sách bài thi
                 </Link>
               </div>

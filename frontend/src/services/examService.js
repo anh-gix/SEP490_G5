@@ -36,10 +36,10 @@ export const examService = {
     }
   },
 
-  // Lấy exam của tôi (created by current user)
-  getMyExams: async () => {
+  // Lấy exam của tôi (created by current user) - dùng cho teacher exam list
+  getMyExams: async (params = {}) => {
     try {
-      const response = await api.get('/management/my-exams');
+      const response = await api.get('/my-exams', { params });
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy danh sách exam của bạn' };

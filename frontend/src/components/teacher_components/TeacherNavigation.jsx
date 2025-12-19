@@ -74,21 +74,21 @@ const TeacherNavigation = () => {
     // }
     {
       title: 'Chương trình đào tạo',
-      icon: 'fa-user-check',
+      icon: 'fa-book',
       path: '/teacher/programs',
       color: 'main'
     },
     {
       title: 'Đề thi',
-      icon: 'fa-user-check',
+      icon: 'fa-file-alt',
       path: '/teacher/exams',
-      color: 'main'
+      color: 'warning'
     },
     {
-      title: 'Đề Quản lý tips',
-      icon: 'fa-user-check',
+      title: 'Quản lý tips',
+      icon: 'fa-lightbulb',
       path: '/teacher/tips',
-      color: 'main'
+      color: 'info'
     }
     
   ];

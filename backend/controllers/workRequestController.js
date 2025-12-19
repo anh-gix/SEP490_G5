@@ -507,9 +507,8 @@ exports.getMyRequests = async (req, res) => {
  */
 exports.getAssignedToMe = async (req, res) => {
   try {
-    const { userId, status } = req.query;
+    const { userId, status, requestType, direction } = req.query;
 
-    
 
     if (!userId) {
       return res.status(400).json({
@@ -520,11 +519,14 @@ exports.getAssignedToMe = async (req, res) => {
 
     const query = {
       assignedTo: userId,
-      direction: 'top_down'
+      direction: direction || 'top_down' // Allow override, default to top_down
     };
+
+    // Filter by status if provided
     if (status) query.status = status;
 
-   
+    // Filter by requestType if provided (e.g., 'create_exam', 'create_program')
+    if (requestType) query.requestType = requestType;
 
     const requests = await WorkRequest.find(query)
       .populate('requestedBy', 'name email username')
@@ -532,8 +534,6 @@ exports.getAssignedToMe = async (req, res) => {
       .populate('processedBy', 'name email username')
       .populate('entityId')
       .sort({ requestedAt: -1 });
-
-   
 
     res.status(200).json({
       success: true,

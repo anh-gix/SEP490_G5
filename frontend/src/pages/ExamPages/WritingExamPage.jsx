@@ -4,6 +4,7 @@ import Animation from "../../helper/Animation";
 import Preloader from "../../helper/Preloader";
 import { examService } from "../../services/examService";
 import { useAuth } from "../../contexts/AuthContext";
+import Swal from "sweetalert2";
 
 const WritingExamPage = () => {
   const { examId, submissionId } = useParams();
@@ -71,6 +72,23 @@ const WritingExamPage = () => {
     },
     [submitting, answers, examId, submissionId, navigate, sectionData]
   );
+
+  const handleSubmitWithConfirmation = useCallback(async () => {
+    const result = await Swal.fire({
+      title: "Xác nhận nộp bài",
+      text: "Bạn có chắc chắn muốn nộp bài? Sau khi nộp bài, bạn sẽ không thể chỉnh sửa lại.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Có, nộp bài",
+      cancelButtonText: "Hủy",
+    });
+
+    if (result.isConfirmed) {
+      handleSubmit();
+    }
+  }, [handleSubmit]);
 
   // Fetch section + initialize state
   useEffect(() => {
@@ -471,7 +489,7 @@ const WritingExamPage = () => {
               {isFullscreen ? "Thoát" : "Toàn màn hình"}
             </button>
             <button
-              onClick={() => handleSubmit()}
+              onClick={handleSubmitWithConfirmation}
               disabled={submitting || (() => {
                 // Check if at least one part has answers
                 return !sectionData?.parts?.some((partData) => {

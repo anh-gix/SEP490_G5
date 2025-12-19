@@ -159,10 +159,13 @@ const ExamDetailPage = () => {
 
   const handleSectionClick = async (sectionType) => {
     try {
-      setStartingExam(true);
-      
       // Check if section is completed (user clicked "Làm lại")
       const isCompleted = isSectionCompleted(sectionType);
+      
+      // Only show loading spinner when NOT retrying (first time or continuing)
+      if (!isCompleted) {
+        setStartingExam(true);
+      }
       
       // If no submission exists, create one by starting the exam
       if (!submission) {

@@ -82,13 +82,13 @@ const TeacherNavigation = () => {
       title: 'Quản lý đề luyện thi',
       icon: 'fa-file-alt',
       path: '/teacher/exams',
-      color: 'main'
+      color: 'warning'
     },
     {
       title: 'Quản lý tips luyện thi',
       icon: 'fa-lightbulb',
       path: '/teacher/tips',
-      color: 'main'
+      color: 'info'
     }
     
   ];

@@ -544,10 +544,23 @@ const getProgramSubmissionStatus = async (req, res) => {
  * When isActive = true: Program is open for enrollment
  * When isActive = false: Program is paused/closed
  */
-const toggleProgramActive = async (req, res) => {
+/**
+ * Update program active status (set isActive = true/false)
+ * PATCH /api/programs/:id/active
+ * Body: { isActive: boolean }
+ */
+const updateProgramActiveStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { isActive } = req.body;
+
+    // Validate isActive parameter
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: 'isActive phải là true hoặc false'
+      });
+    }
 
     const program = await Program.findById(id);
     if (!program) {
@@ -557,74 +570,31 @@ const toggleProgramActive = async (req, res) => {
       });
     }
 
-    // Only approved programs can have isActive toggled
+    // Only approved programs can have isActive changed
     if (program.status !== 'approved') {
       return res.status(400).json({
         success: false,
-        message: 'Chỉ có thể kích hoạt/tắt chương trình đã được duyệt',
+        message: 'Chỉ có thể thay đổi trạng thái hoạt động của chương trình đã được duyệt',
         currentStatus: program.status
       });
     }
 
-    // Toggle isActive
-    program.isActive = isActive !== undefined ? isActive : !program.isActive;
+    // Update isActive
+    program.isActive = isActive;
     await program.save();
 
     res.status(200).json({
       success: true,
-      message: program.isActive
+      message: isActive
         ? 'Đã mở chương trình cho đăng ký'
         : 'Đã tạm dừng chương trình',
       data: program
     });
   } catch (error) {
-    console.error('Error toggling program active status:', error);
+    console.error('Error updating program active status:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi khi thay đổi trạng thái hoạt động của chương trình',
-      error: error.message
-    });
-  }
-};
-
-/**
- * Activate approved program (DEPRECATED - use toggleProgramActive instead)
- * PATCH /api/programs/:id/activate
- */
-const activateProgram = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const program = await Program.findById(id);
-    if (!program) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy chương trình'
-      });
-    }
-
-    // Only approved programs can be activated
-    if (program.status !== 'approved') {
-      return res.status(400).json({
-        success: false,
-        message: 'Chỉ có thể kích hoạt chương trình đã được duyệt'
-      });
-    }
-
-    // Use isActive instead of status
-    program.isActive = true;
-    await program.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Kích hoạt chương trình thành công',
-      data: program
-    });
-  } catch (error) {
-    console.error('Error activating program:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi kích hoạt chương trình',
       error: error.message
     });
   }
@@ -707,8 +677,7 @@ module.exports = {
   deleteProgram,
   getProgramPLOs,
   getProgramSubmissionStatus,
-  toggleProgramActive,
-  activateProgram,
+  updateProgramActiveStatus,
   archiveProgram,
   getBandOptions
 };

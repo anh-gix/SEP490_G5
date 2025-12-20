@@ -381,30 +381,28 @@ const regenerateAllSchedules = async (classId, newCourseId, classData, session) 
  */
 const recalculateScheduleDates = async (classId, newStartDate, session) => {
   try {
-    // Load class to get scheduleEntries pattern
+    // Load class data to get necessary info
     const classData = await Class.findById(classId)
-      .select('scheduleEntries')
+      .select('course teacher room students')
       .session(session)
       .lean();
 
-    if (!classData || !classData.scheduleEntries || classData.scheduleEntries.length === 0) {
-      // No pattern, just update startDate
-      await Class.findByIdAndUpdate(classId, { startDate: newStartDate }, { session });
+    if (!classData) {
       return {
-        success: true,
-        message: 'Cập nhật ngày khai giảng thành công (không có pattern lịch học)',
-        recalculatedScheduleCount: 0
+        success: false,
+        message: 'Không tìm thấy lớp học'
       };
     }
 
-    // Load all schedules sorted by date
-    const allSchedules = await ClassSchedule.find({ class: classId })
+    // Load existing schedules to extract pattern
+    const existingSchedules = await ClassSchedule.find({ class: classId })
       .sort({ date: 1 })
-      .select('_id date')
+      .select('date startTime endTime room teacher session')
       .session(session)
       .lean();
 
-    if (allSchedules.length === 0) {
+    if (existingSchedules.length === 0) {
+      // No schedules to recalculate, just update startDate
       await Class.findByIdAndUpdate(classId, { startDate: newStartDate }, { session });
       return {
         success: true,
@@ -413,48 +411,175 @@ const recalculateScheduleDates = async (classId, newStartDate, session) => {
       };
     }
 
-    // Calculate interval between schedules
-    // This logic depends on how schedules were originally created
-    // For simplicity, we'll shift all dates by the same offset
-    const oldStartDate = new Date(allSchedules[0].date);
-    oldStartDate.setHours(0, 0, 0, 0);
+    // Extract schedule pattern from existing schedules
+    const dayNames = ['CN', '2', '3', '4', '5', '6', '7'];
+    const scheduleMap = new Map();
 
-    // Convert newStartDate to UTC midnight
-    const newStart = toUTCMidnight(newStartDate);
+    existingSchedules.forEach(schedule => {
+      if (!schedule.date || !schedule.startTime || !schedule.endTime) return;
 
-    const daysDiff = Math.floor((newStart.getTime() - oldStartDate.getTime()) / (24 * 60 * 60 * 1000));
+      const date = new Date(schedule.date);
+      if (isNaN(date.getTime())) return;
 
-    // Bulk update: shift all dates by daysDiff (keep as UTC)
-    const bulkOps = allSchedules.map(schedule => {
-      const oldDate = new Date(schedule.date);
+      const dayOfWeek = date.getDay();
+      const day = dayNames[dayOfWeek];
+      const startTime = schedule.startTime.trim();
+      const endTime = schedule.endTime.trim();
 
-      // Calculate new date in UTC
-      const newDate = new Date(Date.UTC(
-        oldDate.getUTCFullYear(),
-        oldDate.getUTCMonth(),
-        oldDate.getUTCDate() + daysDiff,
-        0, 0, 0, 0
-      ));
-
-      return {
-        updateOne: {
-          filter: { _id: schedule._id },
-          update: { $set: { date: newDate } }
-        }
-      };
+      const key = `${day}-${startTime}-${endTime}`;
+      if (!scheduleMap.has(key)) {
+        scheduleMap.set(key, { day, startTime, endTime });
+      }
     });
 
-    await ClassSchedule.bulkWrite(bulkOps, { session });
+    const scheduleEntries = Array.from(scheduleMap.values()).sort((a, b) => {
+      const dayOrder = { 'CN': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6 };
+      return dayOrder[a.day] - dayOrder[b.day];
+    });
+
+    if (scheduleEntries.length === 0) {
+      return {
+        success: false,
+        message: 'Không thể trích xuất pattern từ schedules hiện có'
+      };
+    }
+
+    console.log('📋 Extracted schedule pattern:', scheduleEntries);
+
+    // Get course info
+    const Course = require('../models/courseModel');
+    const courseData = await Course.findById(classData.course)
+      .populate('sessions', 'order _id')
+      .select('numberOfSessions sessions')
+      .session(session)
+      .lean();
+
+    if (!courseData) {
+      return {
+        success: false,
+        message: 'Không tìm thấy khóa học'
+      };
+    }
+
+    const numberOfSessions = courseData.numberOfSessions || existingSchedules.length;
+    const courseSessions = (courseData.sessions || []).sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    // Delete old schedules and related data
+    const oldScheduleIds = existingSchedules.map(s => s._id);
+    const HomeworkSubmission = require('../models/homeworkSubmissionModel');
+    const StudentSchedule = require('../models/studentScheduleModel');
+
+    if (oldScheduleIds.length > 0) {
+      await HomeworkSubmission.deleteMany({ classSchedule: { $in: oldScheduleIds } }).session(session);
+      await StudentSchedule.deleteMany({ classSchedule: { $in: oldScheduleIds } }).session(session);
+      await ClassSchedule.deleteMany({ class: classId }).session(session);
+      console.log(`🗑️ Deleted ${oldScheduleIds.length} old schedules and related data`);
+    }
+
+    // Generate new schedules using the same logic as createClass
+    const getDayOfWeekNumber = (dayStr) => {
+      const dayMap = {
+        'CN': 0,
+        '2': 1,
+        '3': 2,
+        '4': 3,
+        '5': 4,
+        '6': 5,
+        '7': 6
+      };
+      return dayMap[dayStr] !== undefined ? dayMap[dayStr] : null;
+    };
+
+    const findNextDayOfWeek = (startDate, targetDayOfWeek) => {
+      const start = new Date(startDate);
+      const currentDay = start.getDay();
+      let daysToAdd = (targetDayOfWeek - currentDay + 7) % 7;
+      if (daysToAdd === 0 && start.getTime() < new Date().getTime()) {
+        daysToAdd = 7;
+      }
+      const result = new Date(start);
+      result.setDate(start.getDate() + daysToAdd);
+      return result;
+    };
+
+    // Find first occurrence of each day of week
+    const firstOccurrences = {};
+    scheduleEntries.forEach(entry => {
+      const dayOfWeek = getDayOfWeekNumber(entry.day);
+      if (dayOfWeek !== null && !firstOccurrences[dayOfWeek]) {
+        firstOccurrences[dayOfWeek] = findNextDayOfWeek(newStartDate, dayOfWeek);
+      }
+    });
+
+    // Generate new ClassSchedule entries
+    const newSchedules = [];
+    let entryIndex = 0;
+    let weekOffset = 0;
+
+    for (let i = 0; i < numberOfSessions; i++) {
+      const entry = scheduleEntries[entryIndex % scheduleEntries.length];
+      const dayOfWeek = getDayOfWeekNumber(entry.day);
+
+      if (dayOfWeek === null) {
+        entryIndex++;
+        continue;
+      }
+
+      const firstOccurrence = firstOccurrences[dayOfWeek];
+      const sessionDate = new Date(firstOccurrence);
+      sessionDate.setDate(firstOccurrence.getDate() + (weekOffset * 7));
+
+      const sessionIndex = i < courseSessions.length ? i : i % courseSessions.length;
+      const sessionId = courseSessions[sessionIndex]?._id || null;
+
+      newSchedules.push({
+        class: classId,
+        session: sessionId,
+        date: sessionDate,
+        startTime: entry.startTime,
+        endTime: entry.endTime,
+        room: classData.room,
+        teacher: classData.teacher,
+        createdBy: classData.teacher,
+        status: 'fixed'
+      });
+
+      entryIndex++;
+      if (entryIndex % scheduleEntries.length === 0) {
+        weekOffset++;
+      }
+    }
+
+    // Create new schedules
+    const createdSchedules = await ClassSchedule.insertMany(newSchedules, { session });
+    console.log(`✅ Created ${createdSchedules.length} new schedules`);
+
+    // Create StudentSchedule entries
+    if (classData.students && classData.students.length > 0) {
+      const studentSchedules = [];
+      createdSchedules.forEach(schedule => {
+        classData.students.forEach(studentId => {
+          studentSchedules.push({
+            student: studentId,
+            classSchedule: schedule._id
+          });
+        });
+      });
+
+      if (studentSchedules.length > 0) {
+        await StudentSchedule.insertMany(studentSchedules, { session });
+        console.log(`✅ Created ${studentSchedules.length} student schedule entries`);
+      }
+    }
 
     // Update class startDate
     await Class.findByIdAndUpdate(classId, { startDate: newStartDate }, { session });
 
-    console.log(`✅ Recalculated ${allSchedules.length} schedule dates`);
-
     return {
       success: true,
-      message: 'Cập nhật ngày khai giảng thành công',
-      recalculatedScheduleCount: allSchedules.length
+      message: 'Đã tạo lại toàn bộ lịch học với ngày khai giảng mới',
+      recalculatedScheduleCount: createdSchedules.length,
+      deletedScheduleCount: oldScheduleIds.length
     };
   } catch (error) {
     console.error('Error in recalculateScheduleDates:', error);

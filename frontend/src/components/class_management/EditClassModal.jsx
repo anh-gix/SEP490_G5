@@ -147,30 +147,20 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         }
         
         setFullClassData(classDataWithSchedules);
-        
-        // Log tất cả schedule IDs trong lớp
-        if (classDataWithSchedules && classDataWithSchedules.schedules) {
-          console.log('=== DANH SÁCH TẤT CẢ BUỔI HỌC TRONG LỚP ===');
+
+        // Log pattern của lớp pending
+        if (classDataWithSchedules && classDataWithSchedules.status === 'pending') {
+          console.log('=== PATTERN CỦA LỚP PENDING (EDIT MODE) ===');
           console.log('Class ID:', classId);
           console.log('Class Name:', classDataWithSchedules.name || 'N/A');
-          console.log('Tổng số buổi học:', classDataWithSchedules.schedules.length);
-          console.log('Danh sách Schedule IDs:');
-          classDataWithSchedules.schedules.forEach((schedule, index) => {
-            const scheduleId = schedule._id || schedule.id;
-            const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
-            const startTime = schedule.startTime || schedule.start_time || 'N/A';
-            const endTime = schedule.endTime || schedule.end_time || 'N/A';
-            const status = schedule.status || 'N/A';
-            
-            console.log(`  ${index + 1}. Schedule ID: ${scheduleId}`);
-            console.log(`     - Date: ${scheduleDate}`);
-            console.log(`     - Time: ${startTime} - ${endTime}`);
-            console.log(`     - Status: ${status}`);
-            console.log(`     - Full object:`, schedule);
-          });
-          console.log('=== END DANH SÁCH ===');
-        } else {
-          console.log(' Full class data loaded but no schedules found');
+          console.log('Status:', classDataWithSchedules.status);
+          console.log('Schedule Pattern (from backend):', classDataWithSchedules.schedule);
+          console.log('Start Date:', classDataWithSchedules.startDate);
+          console.log('End Date:', classDataWithSchedules.endDate);
+          console.log('Total Schedules:', classDataWithSchedules.schedules?.length || 0);
+          console.log('================================');
+        } else if (classDataWithSchedules) {
+          console.log(' Class loaded but status is not pending:', classDataWithSchedules.status);
         }
       } catch (error) {
         console.error('Error fetching full class data:', error);

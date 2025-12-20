@@ -865,14 +865,32 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     const submitData = {
       ...formData,
       students: formData.selectedStudents || [], // Map selectedStudents to students for backend
-      teacher: formData.teacherId, // Map teacherId to teacher for backend
-      room: formData.roomId // Map roomId to room for backend
     };
 
-    // Remove selectedStudents, teacherId, roomId from submitData as they're now mapped
+    // Only add teacher, room, teacherId if they have valid values
+    if (formData.teacherId && formData.teacherId !== '') {
+      submitData.teacher = formData.teacherId;
+      submitData.teacherId = formData.teacherId;
+    }
+
+    if (formData.roomId && formData.roomId !== '') {
+      submitData.room = formData.roomId;
+    }
+
+    // Remove fields that shouldn't be sent to backend
     delete submitData.selectedStudents;
-    delete submitData.teacherId;
-    delete submitData.roomId;
+    if (!submitData.teacher) {
+      delete submitData.teacher;
+    }
+    if (!submitData.teacherId) {
+      delete submitData.teacherId;
+    }
+    if (!submitData.room) {
+      delete submitData.roomId;
+      delete submitData.room;
+    } else {
+      delete submitData.roomId;
+    }
 
     onSubmit(submitData);
   };

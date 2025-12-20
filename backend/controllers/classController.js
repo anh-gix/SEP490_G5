@@ -1117,8 +1117,9 @@ exports.createClass = async (req, res) => {
     
     await newClass.save({ session });
     
-    // Generate ClassSchedule entries if scheduleEntries and course are provided
-    if (scheduleEntries && scheduleEntries.length > 0 && course && startDate) {
+    // Generate ClassSchedule entries only if all required fields are available
+    // ClassSchedule requires: teacher, room, createdBy (from req.user or teacher)
+    if (scheduleEntries && scheduleEntries.length > 0 && course && startDate && teacher && room) {
       // Get course details including numberOfSessions and sessions
       const courseData = await Course.findById(course)
         .populate('sessions', 'order')

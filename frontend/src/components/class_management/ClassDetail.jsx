@@ -40,10 +40,10 @@ const ClassDetail = ({ classId, onBack }) => {
       setError(null);
       
       const response = await classService.getClassById(classId);
-      
+
       if (response.success && response.class) {
         const classData = response.class;
-        
+
         // Transform class info for ClassOverview (student format)
         const transformedClassInfo = {
           _id: classData._id,

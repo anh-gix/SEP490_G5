@@ -211,7 +211,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    
+
     // Auto-update maxStudents when room is selected/deselected
     if (name === 'roomId') {
       if (value) {
@@ -231,11 +231,11 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         return; // Don't process further
       }
     }
-    
+
     // Validate start date when it changes
     if (name === 'startDate') {
       const today = getTodayDate();
-      
+
       // Validate start date is not in the past
       if (value && value < today) {
         setDateError('Ngày khai giảng không được là quá khứ!');
@@ -243,7 +243,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         setDateError('');
       }
     }
-    
+
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -1388,7 +1388,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       const sessionDates = generatedSessions.map(s => s.date).sort();
       const minDate = sessionDates[0];
       const maxDate = sessionDates[sessionDates.length - 1];
-      
+
       await Promise.all(
         teachers.map(async (teacher) => {
           const teacherId = teacher._id || teacher.id;
@@ -1399,7 +1399,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               startDate: minDate,
               endDate: maxDate
             });
-            
+
             if (response && response.schedules) {
               schedulesMap[String(teacherId)] = response.schedules;
             }
@@ -1476,8 +1476,17 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
           if (!scheduleDate) return;
 
-          // Validate date before creating Date object
-          const dateObj = new Date(scheduleDate);
+          // Parse date - handle both ISO format and DD/MM/YYYY format
+          let dateObj;
+          if (scheduleDate.includes('/')) {
+            // DD/MM/YYYY format
+            const [day, month, year] = scheduleDate.split('/');
+            dateObj = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+          } else {
+            // ISO format or other
+            dateObj = new Date(scheduleDate);
+          }
+
           if (isNaN(dateObj.getTime())) {
             return; // Invalid date, skip this schedule
           }
@@ -1842,7 +1851,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
             <Form.Group className="mb-12">
               <Form.Label className="text-neutral-700 fw-medium mb-8">
-                Thời khóa biểu <span className="text-danger-600">*</span>
+                Thời khóa biểu trong 1 tuần<span className="text-danger-600">*</span>
               </Form.Label>
               <p className="text-neutral-500 text-13 mb-0">
                 Thêm nhiều buổi học với ngày và giờ khác nhau (ví dụ: Thứ 2: 08:00-10:00, Thứ 4: 18:00-20:00).
@@ -1857,7 +1866,10 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                   key={entry.id}
                   className={`border rounded-12 p-16 ${isDuplicate ? 'border-danger border-2' : 'border-neutral-100'}`}
                 >
-                  <div className="d-flex justify-content-end align-items-center mb-12">
+                  <div className="d-flex justify-content-between align-items-center mb-12">
+                    <span className="text-neutral-700 fw-semibold text-14">
+                      Buổi {index + 1}
+                    </span>
                     {formData.scheduleEntries.length > 1 && (
                       <Button
                         type="button"
@@ -1961,9 +1973,18 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     value={formData.teacherId}
                     onChange={handleInputChange}
                     className="border-neutral-30 radius-8 px-16 py-10"
-                    disabled={teachers.length === 0}
+                    disabled={
+                      teachers.length === 0 ||
+                      !formData.course ||
+                      !formData.startDate ||
+                      !filledScheduleEntries.length
+                    }
                   >
-                    <option value="">-- Chọn giáo viên --</option>
+                    <option value="">
+                      {!formData.course || !formData.startDate || !filledScheduleEntries.length
+                        ? '-- Vui lòng chọn course, ngày khai giảng và thời khóa biểu trước --'
+                        : '-- Chọn giáo viên --'}
+                    </option>
                     {teachers.length === 0 ? (
                       <option value="" disabled>
                         Đang tải danh sách giáo viên...
@@ -1992,13 +2013,15 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     })}
                   </Form.Select>
                   <Form.Text className="text-neutral-500 text-12">
-                    {teachers.length === 0
+                    {!formData.course || !formData.startDate || !filledScheduleEntries.length
+                      ? 'Vui lòng chọn course, ngày khai giảng và thời khóa biểu để có thể chọn giáo viên phù hợp.'
+                      : teachers.length === 0
                       ? 'Đang tải danh sách giáo viên...'
                       : filteredTeachers.length === 0 && generatedSessions.length > 0
                       ? 'Không còn giáo viên phù hợp (tất cả đều bị trùng lịch)'
                       : generatedSessions.length > 0
                       ? `Có ${filteredTeachers.length} giáo viên phù hợp (chưa bị trùng lịch)`
-                      : `Có ${teachers.length} giáo viên. Chọn course và lịch học để lọc giáo viên phù hợp.`}
+                      : `Có ${teachers.length} giáo viên.`}
                   </Form.Text>
                   {checkingConflicts && formData.teacherId && (
                     <div className="mt-8">
@@ -2037,10 +2060,19 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     value={formData.roomId}
                     onChange={handleInputChange}
                     className="border-neutral-30 radius-8 px-16 py-10"
-                    disabled={roomLoading}
+                    disabled={
+                      roomLoading ||
+                      !formData.course ||
+                      !formData.startDate ||
+                      !filledScheduleEntries.length
+                    }
                   >
                     <option value="">
-                      {roomLoading ? 'Đang kiểm tra phòng trống...' : '-- Chọn phòng học --'}
+                      {!formData.course || !formData.startDate || !filledScheduleEntries.length
+                        ? '-- Vui lòng chọn course, ngày khai giảng và thời khóa biểu trước --'
+                        : roomLoading
+                        ? 'Đang kiểm tra phòng trống...'
+                        : '-- Chọn phòng học --'}
                     </option>
                     {!roomLoading && filteredRooms.length === 0 && (
                       <option value="" disabled>
@@ -2059,7 +2091,9 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     })}
                   </Form.Select>
                   <Form.Text className="text-neutral-500 text-12">
-                    Chỉ hiển thị phòng chưa bị trùng với lịch đã chọn.
+                    {!formData.course || !formData.startDate || !filledScheduleEntries.length
+                      ? 'Vui lòng chọn course, ngày khai giảng và thời khóa biểu để có thể chọn phòng học phù hợp.'
+                      : 'Chỉ hiển thị phòng chưa bị trùng với lịch đã chọn.'}
                   </Form.Text>
                   {checkingConflicts && formData.roomId && (
                     <div className="mt-8">

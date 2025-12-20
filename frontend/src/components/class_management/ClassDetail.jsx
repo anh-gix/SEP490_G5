@@ -339,11 +339,12 @@ const ClassDetail = ({ classId, onBack }) => {
               }
             >
               <div className="p-24">
-                <ClassStudents 
+                <ClassStudents
                   students={students}
                   onViewStudentDetail={() => {}} // Disable modal for academic staff
                   hideActions={true} // Hide actions column for academic staff
                   hideImportMocktest={true} // Hide Import Mocktest button for academic staff
+                  hideMocktestColumn={true} // Hide Mocktest column for academic staff
                 />
               </div>
             </Tab>

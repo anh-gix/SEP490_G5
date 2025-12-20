@@ -300,14 +300,51 @@ const removeStudentsFromPendingClass = async (classId, studentIdsToRemove, sessi
 /**
  * Regenerate all schedules when course changes
  */
-const regenerateAllSchedules = async (classId, newCourseId, classData, session) => {
+const regenerateAllSchedules = async (classId, newCourseId, classData, userId, session) => {
   try {
-    // Get all old ClassSchedule IDs
-    const oldSchedules = await ClassSchedule.find({ class: classId })
+    // Get all old schedules (with full data) BEFORE deleting to extract pattern
+    const oldSchedules = await ClassSchedule.find({ class: classId, status: 'fixed' })
+      .sort({ date: 1 })
+      .session(session)
+      .lean();
+
+    // Extract schedule pattern from old schedules
+    let scheduleEntries = [];
+    if (oldSchedules.length > 0) {
+      const dayNames = ['CN', '2', '3', '4', '5', '6', '7'];
+      const scheduleMap = new Map();
+
+      oldSchedules.forEach(schedule => {
+        if (!schedule.date || !schedule.startTime || !schedule.endTime) return;
+
+        const date = new Date(schedule.date);
+        if (isNaN(date.getTime())) return;
+
+        const dayOfWeek = date.getDay();
+        const day = dayNames[dayOfWeek];
+        const startTime = schedule.startTime.trim();
+        const endTime = schedule.endTime.trim();
+
+        const key = `${day}-${startTime}-${endTime}`;
+        if (!scheduleMap.has(key)) {
+          scheduleMap.set(key, { day, startTime, endTime });
+        }
+      });
+
+      scheduleEntries = Array.from(scheduleMap.values()).sort((a, b) => {
+        const dayOrder = { 'CN': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6 };
+        return dayOrder[a.day] - dayOrder[b.day];
+      });
+
+      console.log('📋 Extracted schedule pattern from old schedules:', scheduleEntries);
+    }
+
+    // Get all old ClassSchedule IDs for deletion
+    const allOldSchedules = await ClassSchedule.find({ class: classId })
       .select('_id')
       .session(session)
       .lean();
-    const oldScheduleIds = oldSchedules.map(s => s._id);
+    const oldScheduleIds = allOldSchedules.map(s => s._id);
 
     // Delete CASCADE
     if (oldScheduleIds.length > 0) {
@@ -342,8 +379,8 @@ const regenerateAllSchedules = async (classId, newCourseId, classData, session) 
       };
     }
 
-    // Need scheduleEntries and startDate from classData to generate new schedules
-    if (!classData.scheduleEntries || classData.scheduleEntries.length === 0 || !classData.startDate) {
+    // Need scheduleEntries (from old schedules or classData) and startDate to generate new schedules
+    if (scheduleEntries.length === 0 || !classData.startDate) {
       return {
         success: true,
         message: 'Cập nhật khóa học thành công. Vui lòng thêm lịch học và ngày khai giảng để tạo schedules.',
@@ -353,19 +390,90 @@ const regenerateAllSchedules = async (classId, newCourseId, classData, session) 
     }
 
     // Generate new schedules using existing pattern
-    // (Reuse logic from createClass - generate dates based on scheduleEntries)
     const courseSessions = (courseData.sessions || []).sort((a, b) => (a.order || 0) - (b.order || 0));
+    const startDate = new Date(classData.startDate);
 
-    // This would require importing the schedule generation logic
-    // For now, return success and let user manually create schedules
-    // TODO: Implement full schedule generation here
+    // Helper: Map day names to day of week numbers
+    const getDayOfWeekNumber = (dayName) => {
+      const dayMap = { 'CN': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6 };
+      return dayMap[dayName] ?? null;
+    };
+
+    // Helper: Find next occurrence of a day of week
+    const findNextDayOfWeek = (start, targetDay) => {
+      const startDay = start.getDay();
+      let daysToAdd = (targetDay - startDay + 7) % 7;
+      if (daysToAdd === 0) daysToAdd = 0; // Same day
+      const result = new Date(start);
+      result.setDate(start.getDate() + daysToAdd);
+      return result;
+    };
+
+    // Find first occurrence of each day of week
+    const firstOccurrences = {};
+    scheduleEntries.forEach(entry => {
+      const dayOfWeek = getDayOfWeekNumber(entry.day);
+      if (dayOfWeek !== null && !firstOccurrences[dayOfWeek]) {
+        firstOccurrences[dayOfWeek] = findNextDayOfWeek(startDate, dayOfWeek);
+      }
+    });
+
+    // Generate ClassSchedule entries
+    const classSchedules = [];
+    let entryIndex = 0;
+    let weekOffset = 0;
+
+    for (let i = 0; i < numberOfSessions; i++) {
+      const entry = scheduleEntries[entryIndex % scheduleEntries.length];
+      const dayOfWeek = getDayOfWeekNumber(entry.day);
+
+      if (dayOfWeek === null) {
+        entryIndex++;
+        continue;
+      }
+
+      // Get the first occurrence of this day
+      const firstOccurrence = firstOccurrences[dayOfWeek];
+
+      // Calculate the date for this session
+      const sessionDate = new Date(firstOccurrence);
+      sessionDate.setDate(firstOccurrence.getDate() + (weekOffset * 7));
+
+      // Get corresponding session from course (by order)
+      const sessionIndex = i < courseSessions.length ? i : i % courseSessions.length;
+      const sessionId = courseSessions[sessionIndex]?._id || null;
+
+      classSchedules.push({
+        class: classId,
+        session: sessionId,
+        date: sessionDate,
+        startTime: entry.startTime,
+        endTime: entry.endTime,
+        room: classData.room,
+        teacher: classData.teacher,
+        createdBy: userId || classData.teacher, // Use userId or fallback to teacher
+        status: 'fixed'
+      });
+
+      // Move to next entry (round-robin)
+      entryIndex++;
+      // If we've gone through all entries, move to next week
+      if (entryIndex % scheduleEntries.length === 0) {
+        weekOffset++;
+      }
+    }
+
+    // Create new schedules
+    if (classSchedules.length > 0) {
+      await ClassSchedule.insertMany(classSchedules, { session });
+      console.log(`✅ Created ${classSchedules.length} new schedules`);
+    }
 
     return {
       success: true,
-      message: 'Cập nhật khóa học thành công. Vui lòng kiểm tra lại lịch học.',
+      message: 'Cập nhật khóa học và tạo lại lịch học thành công.',
       deletedScheduleCount: oldScheduleIds.length,
-      createdScheduleCount: 0,
-      warning: 'Cần tạo lại lịch học thủ công hoặc sử dụng tính năng generate schedules'
+      createdScheduleCount: classSchedules.length
     };
   } catch (error) {
     console.error('Error in regenerateAllSchedules:', error);
@@ -395,9 +503,13 @@ const recalculateScheduleDates = async (classId, newStartDate, session) => {
     }
 
     // Load existing schedules to extract pattern
-    const existingSchedules = await ClassSchedule.find({ class: classId })
+    // CHỈ LẤY SCHEDULES VỚI STATUS = 'fixed' (bỏ qua 'temporary')
+    const existingSchedules = await ClassSchedule.find({
+      class: classId,
+      status: 'fixed' // Chỉ lấy buổi cố định, bỏ qua buổi tạm thời
+    })
       .sort({ date: 1 })
-      .select('date startTime endTime room teacher session')
+      .select('date startTime endTime room teacher session status')
       .session(session)
       .lean();
 
@@ -464,8 +576,14 @@ const recalculateScheduleDates = async (classId, newStartDate, session) => {
     const numberOfSessions = courseData.numberOfSessions || existingSchedules.length;
     const courseSessions = (courseData.sessions || []).sort((a, b) => (a.order || 0) - (b.order || 0));
 
-    // Delete old schedules and related data
-    const oldScheduleIds = existingSchedules.map(s => s._id);
+    // Delete ALL old schedules (both 'fixed' and 'temporary') and related data
+    // Get ALL schedules for deletion (not just 'fixed' ones)
+    const allOldSchedules = await ClassSchedule.find({ class: classId })
+      .select('_id')
+      .session(session)
+      .lean();
+    const oldScheduleIds = allOldSchedules.map(s => s._id);
+
     const HomeworkSubmission = require('../models/homeworkSubmissionModel');
     const StudentSchedule = require('../models/studentScheduleModel');
 
@@ -473,7 +591,7 @@ const recalculateScheduleDates = async (classId, newStartDate, session) => {
       await HomeworkSubmission.deleteMany({ classSchedule: { $in: oldScheduleIds } }).session(session);
       await StudentSchedule.deleteMany({ classSchedule: { $in: oldScheduleIds } }).session(session);
       await ClassSchedule.deleteMany({ class: classId }).session(session);
-      console.log(`🗑️ Deleted ${oldScheduleIds.length} old schedules and related data`);
+      console.log(`🗑️ Deleted ${oldScheduleIds.length} schedules (${existingSchedules.length} fixed + ${oldScheduleIds.length - existingSchedules.length} temporary) and related data`);
     }
 
     // Generate new schedules using the same logic as createClass

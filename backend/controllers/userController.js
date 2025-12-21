@@ -42,20 +42,13 @@ const createUser = async (req, res) => {
     }
 
     // Validate phone number length (10-11 digits)
+    // Allow duplicate phone numbers
     if (phone) {
       const phoneDigits = phone.replace(/\D/g, '');
       if (phoneDigits.length < 10 || phoneDigits.length > 11) {
         return res.status(400).json({ 
           message: 'Số điện thoại phải có 10 hoặc 11 chữ số' 
         });
-      }
-    }
-
-    // Check if phone number already exists
-    if (phone) {
-      const phoneExists = await User.findOne({ phone });
-      if (phoneExists) {
-        return res.status(400).json({ message: 'Số điện thoại đã tồn tại trong hệ thống' });
       }
     }
 

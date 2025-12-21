@@ -535,20 +535,54 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
       // Parse dates carefully to avoid timezone issues
       // Expecting YYYY-MM-DD format from frontend
       const parseDate = (dateStr) => {
-        const [year, month, day] = dateStr.split('-').map(Number);
-        return new Date(Date.UTC(year, month - 1, day));
+        // Validate input
+        if (!dateStr || typeof dateStr !== 'string') {
+          return null;
+        }
+        
+        const parts = dateStr.split('-');
+        if (parts.length !== 3) {
+          return null;
+        }
+        
+        const [year, month, day] = parts.map(Number);
+        
+        // Validate parsed values
+        if (isNaN(year) || isNaN(month) || isNaN(day)) {
+          return null;
+        }
+        
+        // Validate date range
+        if (month < 1 || month > 12 || day < 1 || day > 31) {
+          return null;
+        }
+        
+        const date = new Date(Date.UTC(year, month - 1, day));
+        
+        // Check if date is valid
+        if (isNaN(date.getTime())) {
+          return null;
+        }
+        
+        return date;
       };
       
       const start = parseDate(startDate);
-      start.setUTCHours(0, 0, 0, 0);
-      
       const end = parseDate(endDate);
-      end.setUTCHours(23, 59, 59, 999);
       
-      query.date = {
-        $gte: start,
-        $lte: end
-      };
+      // Only add date filter if both dates are valid
+      if (start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        start.setUTCHours(0, 0, 0, 0);
+        end.setUTCHours(23, 59, 59, 999);
+        
+        query.date = {
+          $gte: start,
+          $lte: end
+        };
+      } else {
+        // Log error but don't throw - just skip date filter
+        console.warn('Invalid date range provided:', { startDate, endDate });
+      }
     }
     
     const schedules = await ClassSchedule.find(query)

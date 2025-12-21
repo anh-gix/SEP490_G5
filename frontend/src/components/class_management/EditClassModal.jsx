@@ -304,6 +304,14 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         (typeof dataToUse.room === 'string' ? String(dataToUse.room) : '') ||
         '';
 
+      // Extract programId - handle both object and ID formats
+      const programId = 
+        dataToUse.programId ||
+        (dataToUse.course?.program?._id ? String(dataToUse.course.program._id) : '') ||
+        (dataToUse.course?.program?.id ? String(dataToUse.course.program.id) : '') ||
+        (typeof dataToUse.course?.program === 'string' ? String(dataToUse.course.program) : '') ||
+        '';
+
       // Extract program TYPE (ielts, toeic, cam) - NOT program name
       // IMPORTANT: We store TYPE in formData, not program name
       // Type should come from course.program.type
@@ -349,6 +357,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         id: classId, // Explicitly set id to ensure it's available
         course: courseIdStr,
         program: programType || '', // Store TYPE (ielts, toeic, cam), not program name
+        programId: programId, // Set programId from course.program or dataToUse.programId
         band: dataToUse.band || dataToUse.course?.program?.band || '', // Get band from dataToUse or course.program.band
         startDate: startDateValue,
         endDate: formattedEndDate || dataToUse.endDate || '',
@@ -2573,10 +2582,24 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         }
         setAvailableLevels(allLevels);
 
-        // Store all programs from DB
+        // Store all programs from DB - only approved programs
+        // But include current program even if not approved (to preserve existing data)
         if (programsResponse?.success && programsResponse.data) {
-          setAllProgramsFromDB(programsResponse.data);
-          setFilteredProgramsFromDB(programsResponse.data); // Initially show all programs
+          const approvedPrograms = programsResponse.data.filter(p => p.status === 'approved');
+          
+          // If current class has a programId, check if it's in the approved list
+          // If not, add it to preserve existing data
+          let programsToUse = [...approvedPrograms];
+          if (formData.programId) {
+            const currentProgram = programsResponse.data.find(p => String(p._id) === String(formData.programId));
+            if (currentProgram && currentProgram.status !== 'approved') {
+              // Add current program even if not approved
+              programsToUse.push(currentProgram);
+            }
+          }
+          
+          setAllProgramsFromDB(programsToUse);
+          setFilteredProgramsFromDB(programsToUse); // Initially show approved programs + current program
         }
       } catch (error) {
         // Even on error, ensure current values are in the lists
@@ -2681,8 +2704,27 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         const response = await courseService.getAllCourses();
 
         if (response && response.success && response.data) {
-          setAllCourses(response.data);
-          setCourses(response.data); // Initially show all courses
+          // Filter to only show courses with status 'completed' or 'active'
+          // But include current course even if not completed/active (to preserve existing data)
+          const validCourses = response.data.filter(course => 
+            course.status === 'completed' || course.status === 'active'
+          );
+          
+          // If current class has a course, check if it's in the valid list
+          // If not, add it to preserve existing data
+          let coursesToUse = [...validCourses];
+          if (formData.course) {
+            const currentCourse = response.data.find(c => 
+              String(c._id) === String(formData.course) || String(c.id) === String(formData.course)
+            );
+            if (currentCourse && currentCourse.status !== 'completed' && currentCourse.status !== 'active') {
+              // Add current course even if not completed/active
+              coursesToUse.push(currentCourse);
+            }
+          }
+          
+          setAllCourses(coursesToUse);
+          setCourses(coursesToUse); // Initially show completed/active courses + current course
         }
       } catch (error) {
         console.error('Error fetching courses:', error);
@@ -2693,6 +2735,39 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
 
     fetchAllCourses();
   }, []);
+
+  // Ensure current course is included in allCourses even if not completed/active
+  useEffect(() => {
+    if (!formData.course || !allCourses.length) return;
+
+    // Check if current course is already in allCourses
+    const currentCourseExists = allCourses.some(c => 
+      String(c._id) === String(formData.course) || String(c.id) === String(formData.course)
+    );
+
+    if (!currentCourseExists) {
+      // Current course is not in the list, need to fetch it and add
+      const fetchCurrentCourse = async () => {
+        try {
+          const response = await courseService.getCourseDetails(formData.course);
+          if (response?.success && response.data) {
+            const currentCourse = response.data;
+            // Add current course to allCourses even if not completed/active
+            setAllCourses(prev => {
+              const exists = prev.some(c => 
+                String(c._id) === String(currentCourse._id) || String(c.id) === String(currentCourse._id)
+              );
+              if (exists) return prev;
+              return [...prev, currentCourse];
+            });
+          }
+        } catch (error) {
+          // If can't fetch course details, ignore
+        }
+      };
+      fetchCurrentCourse();
+    }
+  }, [formData.course, allCourses]);
 
   // Filter courses based on selected filters (program type, level, or programId) and status
   useEffect(() => {

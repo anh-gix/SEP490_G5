@@ -235,12 +235,33 @@ exports.getMyClassDetail = async (req, res) => {
       });
     }
 
-    // Check if student is enrolled in this class
+    // Check if student is enrolled in this class OR has makeup schedules in this class
     const isEnrolled = classData.students.some(
       s => s.toString() === studentId.toString()
     );
 
-    if (!isEnrolled) {
+    // If not enrolled, check if student has any StudentSchedule for this class (makeup/audit)
+    let hasAccess = isEnrolled;
+    if (!hasAccess) {
+      // Get all ClassSchedules for this class
+      const classSchedules = await ClassSchedule.find({ class: classId })
+        .select('_id')
+        .lean();
+      
+      const classScheduleIds = classSchedules.map(cs => cs._id);
+      
+      // Check if student has any StudentSchedule for these ClassSchedules
+      if (classScheduleIds.length > 0) {
+        const studentSchedule = await StudentSchedule.findOne({
+          student: studentId,
+          classSchedule: { $in: classScheduleIds }
+        }).lean();
+        
+        hasAccess = !!studentSchedule;
+      }
+    }
+
+    if (!hasAccess) {
       return res.status(403).json({
         success: false,
         message: 'Bạn không có quyền truy cập lớp học này'
@@ -545,8 +566,7 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       });
     }
 
-    // Check if student is enrolled in this class
-    // For makeup classes (no class), check via StudentSchedule instead
+    // Check if student is enrolled in this class OR has StudentSchedule for this schedule (makeup/audit)
     let isEnrolled = false;
     
     if (classSchedule.class) {
@@ -554,6 +574,16 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       isEnrolled = classSchedule.class.students.some(
         s => s.toString() === studentId.toString()
       );
+      
+      // If not enrolled, check if student has StudentSchedule for this schedule (makeup/audit)
+      if (!isEnrolled) {
+        const studentSchedule = await StudentSchedule.findOne({
+          student: studentId,
+          classSchedule: scheduleId
+        }).lean();
+        
+        isEnrolled = !!studentSchedule;
+      }
     } else {
       // Makeup class (no class): check if student has StudentSchedule for this schedule
       const studentSchedule = await StudentSchedule.findOne({
@@ -1762,23 +1792,13 @@ exports.createStudent = async (req, res) => {
     }
     
     // Validate phone number length (10-11 digits)
+    // Allow duplicate phone numbers
     if (phone) {
       const phoneDigits = phone.replace(/\D/g, '');
       if (phoneDigits.length < 10 || phoneDigits.length > 11) {
         return res.status(400).json({
           success: false,
           message: 'Số điện thoại phải có 10 hoặc 11 chữ số'
-        });
-      }
-    }
-    
-    // Check if phone number already exists
-    if (phone) {
-      const phoneExists = await User.findOne({ phone });
-      if (phoneExists) {
-        return res.status(400).json({
-          success: false,
-          message: 'Số điện thoại đã tồn tại trong hệ thống'
         });
       }
     }
@@ -1857,18 +1877,11 @@ const parseLevelsToStudy = (levelsToStudyStr) => {
 // Helper function to find existing student by email or phone
 const findExistingStudent = async (email, phone, studentRole) => {
   try {
-    // Find by email first
+    // Only check by email, allow duplicate phone numbers
     if (email) {
       const byEmail = await User.findOne({ email: email.toLowerCase() });
       if (byEmail && byEmail.roleId && byEmail.roleId.toString() === studentRole._id.toString()) {
         return byEmail;
-      }
-    }
-    // If not found, find by phone
-    if (phone) {
-      const byPhone = await User.findOne({ phone: phone });
-      if (byPhone && byPhone.roleId && byPhone.roleId.toString() === studentRole._id.toString()) {
-        return byPhone;
       }
     }
     return null;

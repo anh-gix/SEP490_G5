@@ -42,7 +42,41 @@ export const mockDashboardStats = {
 //   ]
 // }).populate('requestedBy assignedTo entityId')
 
+// Đã sắp xếp theo requestedAt tăng dần (cũ nhất trước)
 export const mockPendingWorkRequests = [
+  {
+    _id: "wr004",
+    direction: "top_down",
+    requestType: "create_program",
+    entityType: "Program",
+    entityId: {
+      _id: "prog003",
+      code: "CAM_C1",
+      program_name: "Chương trình Cambridge C1 Advanced",
+      type: "cam",
+      level: "C1",
+      status: "pending_approval",
+    },
+    status: "pending_approval",
+    requestedBy: {
+      _id: "centerhead001",
+      name: "Trần Văn Quản Lý",
+      email: "quanly@example.com",
+    },
+    assignedTo: {
+      _id: "sl001",
+      name: "Nguyễn Văn An",
+      email: "nguyenvanan@example.com",
+    },
+    processedBy: {
+      _id: "sl001",
+      name: "Nguyễn Văn An",
+    },
+    requestNote: "Tạo chương trình Cambridge C1 cho học viên nâng cao",
+    responseNote: "Đã hoàn thành với 6 khóa học chuyên sâu",
+    requestedAt: "2025-12-08T10:00:00Z",
+    processedAt: "2025-12-16T16:45:00Z",
+  },
   {
     _id: "wr001",
     direction: "top_down",
@@ -56,21 +90,18 @@ export const mockPendingWorkRequests = [
       level: "B2",
       status: "pending_approval",
     },
-    status: "pending_approval", // Cấp dưới đã hoàn thành, chờ Center Head duyệt
+    status: "pending_approval",
     requestedBy: {
-      // Center Head - người giao việc
       _id: "centerhead001",
       name: "Trần Văn Quản Lý",
       email: "quanly@example.com",
     },
     assignedTo: {
-      // Subject Leader - người được giao
       _id: "sl001",
       name: "Nguyễn Văn An",
       email: "nguyenvanan@example.com",
     },
     processedBy: {
-      // Subject Leader - người hoàn thành
       _id: "sl001",
       name: "Nguyễn Văn An",
     },
@@ -124,48 +155,14 @@ export const mockPendingWorkRequests = [
       level: "B2",
       status: "pending_approval",
     },
-    status: "pending", // Bottom-up: Subject Leader tự tạo và submit
+    status: "pending",
     requestedBy: {
-      // Subject Leader - người tạo và submit
       _id: "sl003",
       name: "Phạm Thị Dung",
       email: "phamthidung@example.com",
     },
     requestNote: "Đề xuất chương trình TOEIC mới cho học viên mục tiêu 700+",
     requestedAt: "2025-12-17T11:00:00Z",
-  },
-  {
-    _id: "wr004",
-    direction: "top_down",
-    requestType: "create_program",
-    entityType: "Program",
-    entityId: {
-      _id: "prog003",
-      code: "CAM_C1",
-      program_name: "Chương trình Cambridge C1 Advanced",
-      type: "cam",
-      level: "C1",
-      status: "pending_approval",
-    },
-    status: "pending_approval",
-    requestedBy: {
-      _id: "centerhead001",
-      name: "Trần Văn Quản Lý",
-      email: "quanly@example.com",
-    },
-    assignedTo: {
-      _id: "sl001",
-      name: "Nguyễn Văn An",
-      email: "nguyenvanan@example.com",
-    },
-    processedBy: {
-      _id: "sl001",
-      name: "Nguyễn Văn An",
-    },
-    requestNote: "Tạo chương trình Cambridge C1 cho học viên nâng cao",
-    responseNote: "Đã hoàn thành với 6 khóa học chuyên sâu",
-    requestedAt: "2025-12-08T10:00:00Z",
-    processedAt: "2025-12-16T16:45:00Z",
   },
   {
     _id: "wr005",

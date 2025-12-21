@@ -1850,3 +1850,294 @@ exports.getWorkRequestStats = async (req, res) => {
   }
 };
 
+// =========================
+// WITHDRAW SUBMISSION (Subject Leader)
+// Rút lại yêu cầu phê duyệt khi program/exam đang pending_approval
+// =========================
+
+/**
+ * Withdraw program submission (Hủy nộp)
+ * POST /api/work-requests/withdraw/program/:programId
+ * Body: { userId, note }
+ *
+ * Use case: Subject Leader muốn rút lại yêu cầu phê duyệt để sửa đổi program/courses
+ * trước khi Center Head duyệt
+ */
+exports.withdrawProgramSubmission = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { programId } = req.params;
+    const { userId, note } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    // Tìm program
+    const program = await Program.findById(programId).session(session);
+
+    if (!program) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Program not found'
+      });
+    }
+
+    // Kiểm tra program phải đang pending_approval
+    if (program.status !== 'pending_approval') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot withdraw: Program is not pending approval (current status: ${program.status})`
+      });
+    }
+
+    // Tìm work request liên quan (có thể là bottom_up hoặc top_down)
+    const workRequest = await WorkRequest.findOne({
+      entityId: programId,
+      entityType: 'Program',
+      status: { $in: ['pending', 'pending_approval'] }
+    }).session(session);
+
+    if (!workRequest) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'No pending work request found for this program'
+      });
+    }
+
+    // Kiểm tra quyền: Chỉ người nộp (requestedBy cho bottom-up) hoặc assignedTo (cho top-down) mới được rút
+    const isBottomUp = workRequest.direction === 'bottom_up';
+    const canWithdraw = isBottomUp
+      ? workRequest.requestedBy.toString() === userId.toString()
+      : workRequest.assignedTo?.toString() === userId.toString();
+
+    if (!canWithdraw) {
+      await session.abortTransaction();
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to withdraw this submission'
+      });
+    }
+
+    // Xác định status mới cho work request và program
+    let newWorkRequestStatus;
+    let newProgramStatus;
+
+    if (isBottomUp) {
+      // Bottom-up: Xóa work request, program về draft/needs_revision
+      // Nếu có rejectionReason trước đó thì giữ nguyên needs_revision
+      newProgramStatus = program.rejectionReason ? 'needs_revision' : 'draft';
+
+      // Thêm history trước khi xóa
+      await WorkRequest.findByIdAndUpdate(workRequest._id, {
+        $push: {
+          history: {
+            action: 'withdrawn',
+            performedBy: userId,
+            performedAt: new Date(),
+            note: note || 'Submission withdrawn by requester',
+            previousStatus: workRequest.status
+          }
+        }
+      }, { session });
+
+      // Xóa work request (bottom-up có thể xóa vì chưa được xử lý)
+      await WorkRequest.findByIdAndDelete(workRequest._id, { session });
+
+    } else {
+      // Top-down: Chuyển work request về in_progress, program về draft
+      newWorkRequestStatus = 'in_progress';
+      newProgramStatus = 'draft';
+
+      await WorkRequest.findByIdAndUpdate(workRequest._id, {
+        status: newWorkRequestStatus,
+        $push: {
+          history: {
+            action: 'withdrawn',
+            performedBy: userId,
+            performedAt: new Date(),
+            note: note || 'Submission withdrawn for revision',
+            previousStatus: workRequest.status
+          }
+        }
+      }, { session });
+    }
+
+    // Cập nhật program status
+    await Program.findByIdAndUpdate(programId, {
+      status: newProgramStatus
+    }, { session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: 'Đã hủy nộp thành công. Bạn có thể chỉnh sửa và nộp lại sau.',
+      data: {
+        programId,
+        newProgramStatus,
+        workRequestDeleted: isBottomUp,
+        newWorkRequestStatus: isBottomUp ? null : newWorkRequestStatus
+      }
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error withdrawing program submission:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error withdrawing submission'
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+/**
+ * Withdraw exam submission (Hủy nộp đề thi)
+ * POST /api/work-requests/withdraw/exam/:examId
+ * Body: { userId, note }
+ */
+exports.withdrawExamSubmission = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { examId } = req.params;
+    const { userId, note } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    // Tìm exam
+    const exam = await Exam.findById(examId).session(session);
+
+    if (!exam) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Exam not found'
+      });
+    }
+
+    // Kiểm tra exam phải đang pending_approval
+    if (exam.status !== 'pending_approval') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot withdraw: Exam is not pending approval (current status: ${exam.status})`
+      });
+    }
+
+    // Tìm work request liên quan
+    const workRequest = await WorkRequest.findOne({
+      entityId: examId,
+      entityType: 'Exam',
+      status: { $in: ['pending', 'pending_approval'] }
+    }).session(session);
+
+    if (!workRequest) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'No pending work request found for this exam'
+      });
+    }
+
+    // Kiểm tra quyền
+    const isBottomUp = workRequest.direction === 'bottom_up';
+    const canWithdraw = isBottomUp
+      ? workRequest.requestedBy.toString() === userId.toString()
+      : workRequest.assignedTo?.toString() === userId.toString();
+
+    if (!canWithdraw) {
+      await session.abortTransaction();
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to withdraw this submission'
+      });
+    }
+
+    // Xác định status mới
+    let newWorkRequestStatus;
+    let newExamStatus;
+
+    if (isBottomUp) {
+      newExamStatus = exam.rejectionReason ? 'needs_revision' : 'draft';
+
+      await WorkRequest.findByIdAndUpdate(workRequest._id, {
+        $push: {
+          history: {
+            action: 'withdrawn',
+            performedBy: userId,
+            performedAt: new Date(),
+            note: note || 'Submission withdrawn by requester',
+            previousStatus: workRequest.status
+          }
+        }
+      }, { session });
+
+      await WorkRequest.findByIdAndDelete(workRequest._id, { session });
+
+    } else {
+      newWorkRequestStatus = 'in_progress';
+      newExamStatus = 'draft';
+
+      await WorkRequest.findByIdAndUpdate(workRequest._id, {
+        status: newWorkRequestStatus,
+        $push: {
+          history: {
+            action: 'withdrawn',
+            performedBy: userId,
+            performedAt: new Date(),
+            note: note || 'Submission withdrawn for revision',
+            previousStatus: workRequest.status
+          }
+        }
+      }, { session });
+    }
+
+    // Cập nhật exam status
+    await Exam.findByIdAndUpdate(examId, {
+      status: newExamStatus
+    }, { session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: 'Đã hủy nộp đề thi thành công. Bạn có thể chỉnh sửa và nộp lại sau.',
+      data: {
+        examId,
+        newExamStatus,
+        workRequestDeleted: isBottomUp,
+        newWorkRequestStatus: isBottomUp ? null : newWorkRequestStatus
+      }
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error withdrawing exam submission:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error withdrawing submission'
+    });
+  } finally {
+    session.endSession();
+  }
+};
+

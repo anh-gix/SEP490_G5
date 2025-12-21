@@ -257,6 +257,50 @@ export const workRequestService = {
   },
 
   // =========================
+  // WITHDRAW SUBMISSION (Subject Leader)
+  // =========================
+
+  /**
+   * Withdraw program submission (Hủy nộp program)
+   * Dùng khi program đang pending_approval và Subject Leader muốn rút lại để chỉnh sửa
+   * @param {string} programId - Program ID
+   * @param {object} data - { userId: string, note: string }
+   */
+  withdrawProgramSubmission: async (programId, data = {}) => {
+    try {
+      if (!data.userId) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        data.userId = user._id;
+      }
+
+      const response = await api.post(`/work-requests/withdraw/program/${programId}`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể hủy nộp chương trình' };
+    }
+  },
+
+  /**
+   * Withdraw exam submission (Hủy nộp đề thi)
+   * Dùng khi exam đang pending_approval và Subject Leader muốn rút lại để chỉnh sửa
+   * @param {string} examId - Exam ID
+   * @param {object} data - { userId: string, note: string }
+   */
+  withdrawExamSubmission: async (examId, data = {}) => {
+    try {
+      if (!data.userId) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        data.userId = user._id;
+      }
+
+      const response = await api.post(`/work-requests/withdraw/exam/${examId}`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể hủy nộp đề thi' };
+    }
+  },
+
+  // =========================
   // START PROCESSING (TOP-DOWN)
   // =========================
 

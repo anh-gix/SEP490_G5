@@ -10,12 +10,15 @@ import StatusBadge from '../compo/StatusBadge';
 import Table from '../compo/Table';
 import FilterBar from '../compo/FilterBar';
 import programService from '../../../services/programService';
-import { courseService } from '../../../services/courseService';
-import approvalRequestService from '../../../services/approvalRequestService';
 import centerHeadService from '../../../services/centerHeadService';
 import { formatDate } from '../../../helper/helper';
 
-const ProgramDetail = ({ viewMode = 'center-head' }) => {
+/**
+ * CenterHeadProgramDetail - Trang chi tiết Program cho Center Head
+ * Chỉ có quyền xem, duyệt/từ chối, toggle active
+ * Không có quyền edit/create/delete
+ */
+const CenterHeadProgramDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [program, setProgram] = useState(null);
@@ -27,19 +30,9 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
   const [showRejectProgramModal, setShowRejectProgramModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [showFullDescription, setShowFullDescription] = useState(false);
-  const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const [submissionNote, setSubmissionNote] = useState('');
   const [togglingCourseId, setTogglingCourseId] = useState(null);
 
-  // Get user role from localStorage
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const userRole = user.roleId?.name || user.role;
-
-  // Determine base path based on viewMode
-  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
-
-  // Center Head should not see edit/delete buttons
-  const isViewOnly = viewMode === 'center-head' || userRole === 'Center Head';
+  const basePath = '/center-head';
 
   useEffect(() => {
     fetchProgramDetail();
@@ -65,12 +58,8 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
 
       if (programData) {
         setProgram(programData);
-
-        // Courses are included in the program response
         const programCourses = programData.courses || [];
         setCourses(programCourses);
-
-        console.log('Program detail loaded from API:', programData);
       }
 
     } catch (err) {
@@ -81,69 +70,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
     }
   };
 
-
-  // ===== COURSE DELETE HANDLER =====
-  const handleDeleteCourse = async (courseId, courseName) => {
-    const result = await Swal.fire({
-      title: 'Xác nhận xóa',
-      text: `Bạn có chắc chắn muốn xóa khóa học "${courseName}"? Hành động này không thể hoàn tác.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Xóa',
-      cancelButtonText: 'Hủy',
-    });
-
-    if (!result.isConfirmed) {
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      const response = await courseService.deleteCourse(courseId);
-
-      if (response.success) {
-        toast.success('Xóa khóa học thành công!', { position: 'top-right' });
-        // Refresh the courses list
-        setCourses(courses.filter(c => c._id !== courseId));
-      } else {
-        toast.error(response.message || 'Xóa khóa học thất bại!', { position: 'top-right' });
-      }
-    } catch (error) {
-      console.error('Error deleting course:', error);
-      toast.error(error.message || 'Không thể xóa khóa học. Vui lòng thử lại sau.', { position: 'top-right' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   // ===== PROGRAM WORKFLOW HANDLERS =====
-  const handleSubmitProgram = () => {
-    setShowSubmitModal(true);
-  };
-
-  const handleConfirmSubmitProgram = async () => {
-    try {
-      setActionLoading(true);
-      const response = await approvalRequestService.submitProgram(id, {
-        note: submissionNote.trim() || undefined
-      });
-
-      if (response.success) {
-        toast.success('Đã nộp chương trình thành công! Chờ Center Head phê duyệt.', { position: 'top-right' });
-        setShowSubmitModal(false);
-        setSubmissionNote('');
-        fetchProgramDetail();
-      }
-    } catch (err) {
-      console.error('Error submitting program:', err);
-      toast.error(err.message || 'Có lỗi xảy ra khi nộp chương trình', { position: 'top-right' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const handleApproveProgram = async () => {
     const result = await Swal.fire({
       title: 'Xác nhận duyệt chương trình',
@@ -201,10 +128,6 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
       setActionLoading(false);
     }
   };
-
-  // ===== COURSE WORKFLOW HANDLERS =====
-  // Course không có workflow phê duyệt riêng, chỉ có draft và completed
-  // Workflow phê duyệt chỉ áp dụng cho Program level
 
   // Helper function để format ngày
   const formatDateShort = (dateString) => {
@@ -264,7 +187,6 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
         await centerHeadService.activateProgram(id);
       }
 
-      // Cập nhật state trực tiếp
       setProgram(prev => ({ ...prev, isActive: newIsActive }));
 
       toast.success(
@@ -347,7 +269,6 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
         await centerHeadService.activateCourse(courseId);
       }
 
-      // Cập nhật state trực tiếp
       setCourses(prevCourses =>
         prevCourses.map(course =>
           course._id === courseId
@@ -436,8 +357,8 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
         <span className="text-neutral-700">{formatDate(row.updatedAt)}</span>
       ),
     },
-    // Cột Hoạt động - chỉ hiển thị cho Center Head
-    ...(userRole === 'Center Head' ? [{
+    // Cột Hoạt động
+    {
       header: 'Hoạt động',
       field: 'isActive',
       render: (row) => {
@@ -473,28 +394,13 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
           </div>
         );
       },
-    }] : []),
+    },
     {
       header: 'Hành động',
       field: 'actions',
       render: (row) => (
         <div className="d-flex flex-wrap gap-2">
-          {/* Draft: Show "Continue" button to continue wizard - only for non-Center Head */}
-          {row.status === 'draft' && userRole !== 'Center Head' && (
-            <Button
-              variant="primary"
-              size="sm"
-              icon="ph ph-play-circle"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`${basePath}/programs/${id}/courses/${row._id}/edit`);
-              }}
-            >
-              Tiếp tục
-            </Button>
-          )}
-
-          {/* View button for all statuses */}
+          {/* View button only */}
           <Button
             variant="outline"
             size="sm"
@@ -506,21 +412,6 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
           >
             Xem
           </Button>
-
-          {/* Delete button - only for non-view-only */}
-          {!isViewOnly && (
-            <Button
-              variant="danger"
-              size="sm"
-              icon="ph ph-trash"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDeleteCourse(row._id, row.name);
-              }}
-            >
-              Xóa
-            </Button>
-          )}
         </div>
       ),
     },
@@ -565,8 +456,8 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
             <StatusBadge status={program.status} />
             <span className="text-neutral-600">Mã: <strong>{program.code}</strong></span>
 
-            {/* Toggle Active - Only for Center Head and Approved programs */}
-            {userRole === 'Center Head' && program.status === 'approved' && (
+            {/* Toggle Active - Only for Approved programs */}
+            {program.status === 'approved' && (
               <div className="d-flex align-items-center gap-2 ms-auto">
                 <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>
                   {program.isActive ? 'Đang hoạt động' : 'Tạm dừng'}
@@ -588,20 +479,8 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
           </div>
         </div>
         <div className="d-flex flex-wrap gap-2">
-          {/* Draft or Needs Revision: Subject Leader can submit */}
-          {(program.status === 'draft' || program.status === 'needs_revision') && userRole !== 'Center Head' && (
-            <Button
-              variant="primary"
-              icon="ph ph-paper-plane-tilt"
-              onClick={handleSubmitProgram}
-              disabled={actionLoading}
-            >
-              {program.status === 'needs_revision' ? 'Nộp lại Program' : 'Nộp Program'}
-            </Button>
-          )}
-
           {/* Pending Approval: Center Head can approve/reject */}
-          {program.status === 'pending_approval' && userRole === 'Center Head' && (
+          {program.status === 'pending_approval' && (
             <>
               <Button
                 variant="success"
@@ -620,17 +499,6 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
                 Từ chối Program
               </Button>
             </>
-          )}
-
-          {/* Edit button - only for non-view-only */}
-          {!isViewOnly && (
-            <Button
-              variant="outline"
-              icon="ph ph-pencil-simple"
-              onClick={() => navigate(`${basePath}/programs/${id}/edit`)}
-            >
-              Chỉnh sửa
-            </Button>
           )}
         </div>
       </div>
@@ -733,16 +601,6 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
               Các khóa học thuộc chương trình này
             </p>
           </div>
-          {/* Show Create Course button only when program is draft or needs_revision and not view-only */}
-          {!isViewOnly && (program?.status === 'draft' || program?.status === 'needs_revision') && (
-            <Button
-              variant="primary"
-              onClick={() => navigate(`${basePath}/programs/${id}/courses/create`)}
-            >
-              <i className="ph ph-plus me-2"></i>
-              Tạo khóa học mới
-            </Button>
-          )}
         </div>
 
         {/* Course Filters */}
@@ -787,68 +645,13 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
         )}
       </Card>
 
-      {/* Submit Program Modal */}
-      {showSubmitModal && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Nộp chương trình để phê duyệt</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => {
-                    setShowSubmitModal(false);
-                    setSubmissionNote('');
-                  }}
-                  disabled={actionLoading}
-                ></button>
-              </div>
-              <div className="modal-body">
-                <p className="text-neutral-600 mb-3">
-                  Bạn đang nộp chương trình <strong>{program?.program_name}</strong> để chờ phê duyệt.
-                </p>
-                <label className="form-label">Ghi chú (tùy chọn)</label>
-                <textarea
-                  className="form-control"
-                  rows="4"
-                  placeholder="Nhập ghi chú khi nộp chương trình (nếu có)..."
-                  value={submissionNote}
-                  onChange={(e) => setSubmissionNote(e.target.value)}
-                  disabled={actionLoading}
-                ></textarea>
-              </div>
-              <div className="modal-footer">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowSubmitModal(false);
-                    setSubmissionNote('');
-                  }}
-                  disabled={actionLoading}
-                >
-                  Hủy
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={handleConfirmSubmitProgram}
-                  disabled={actionLoading}
-                >
-                  {actionLoading ? 'Đang xử lý...' : 'Xác nhận nộp'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Sticky Action Bar - Only for Center Head with Pending Approval */}
-      {program.status === 'pending_approval' && userRole === 'Center Head' && (
+      {/* Sticky Action Bar - Only for Pending Approval */}
+      {program.status === 'pending_approval' && (
         <div
           style={{
             position: 'fixed',
             bottom: 0,
-            left: '280px', // Sidebar width
+            left: '280px',
             right: 0,
             backgroundColor: 'white',
             borderTop: '2px solid #e5e7eb',
@@ -961,4 +764,4 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
   );
 };
 
-export default ProgramDetail;
+export default CenterHeadProgramDetail;

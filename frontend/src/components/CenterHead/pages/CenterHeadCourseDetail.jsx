@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import Swal from 'sweetalert2';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Breadcrumb from '../compo/Breadcrumb';
@@ -12,36 +11,30 @@ import Modal from '../compo/Modal';
 import { courseService } from '../../../services/courseService';
 import { formatDate } from '../../../helper/helper';
 
-const CourseDetails = ({ viewMode = 'center-head' }) => {
+/**
+ * CenterHeadCourseDetail - Trang chi tiết Course cho Center Head
+ * Chỉ có quyền xem
+ * Không có quyền edit/delete
+ */
+const CenterHeadCourseDetail = () => {
   const { id, programId } = useParams();
   const navigate = useNavigate();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
   const [selectedCamSession, setSelectedCamSession] = useState(null);
   const [showCamSessionModal, setShowCamSessionModal] = useState(false);
 
-  // Determine base path
-  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
-
-  // Get user role from localStorage
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const userRole = user.roleId?.name || user.role;
-
-  // Center Head should not see edit/delete buttons
-  const isViewOnly = viewMode === 'center-head' || userRole === 'Center Head';
+  const basePath = '/center-head';
 
   useEffect(() => {
     fetchCourseDetails();
-    
   }, [id]);
 
   const fetchCourseDetails = async () => {
     try {
       setLoading(true);
       const response = await courseService.getCourseDetails(id);
-console.log(response.data);
 
       if (response.success) {
         setCourse(response.data);
@@ -54,41 +47,6 @@ console.log(response.data);
       setError('Không thể tải chi tiết giáo trình. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDeleteCourse = async () => {
-    const result = await Swal.fire({
-      title: 'Xác nhận xóa',
-      text: `Bạn có chắc chắn muốn xóa môn học "${course.name}"? Hành động này không thể hoàn tác.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Xóa',
-      cancelButtonText: 'Hủy',
-    });
-
-    if (!result.isConfirmed) {
-      return;
-    }
-
-    try {
-      setDeleteLoading(true);
-      const response = await courseService.deleteCourse(id);
-
-      if (response.success) {
-        toast.success('Xóa môn học thành công!', { position: 'top-right' });
-        // Navigate back to program detail or course list
-        setTimeout(() => navigate(-1), 1000);
-      } else {
-        toast.error(response.message || 'Xóa môn học thất bại!', { position: 'top-right' });
-      }
-    } catch (err) {
-      console.error('Error deleting course:', err);
-      toast.error(err.message || 'Không thể xóa môn học. Vui lòng thử lại sau.', { position: 'top-right' });
-    } finally {
-      setDeleteLoading(false);
     }
   };
 
@@ -120,7 +78,7 @@ console.log(response.data);
         <div className="alert alert-danger" role="alert">
           {error || 'Không tìm thấy giáo trình'}
         </div>
-        <Button onClick={() => navigate('/courses/pending')}>
+        <Button onClick={() => navigate(`${basePath}/programs`)}>
           Quay lại danh sách
         </Button>
       </div>
@@ -281,7 +239,6 @@ console.log(response.data);
   const syllabusTab = (
     <div className="syllabus">
       {isCamOnlineCourse ? (
-        // CAM online course → hiển thị Cam Sessions
         course.camSessions && course.camSessions.length > 0 ? (
           <div className="table-responsive">
             <table className="table table-hover border border-neutral-40">
@@ -367,7 +324,6 @@ console.log(response.data);
           </div>
         )
       ) : course.sessions && course.sessions.length > 0 ? (
-        // Course thường → hiển thị Sessions
         <div className="table-responsive">
           <table className="table table-hover border border-neutral-40">
             <thead className="bg-neutral-20">
@@ -550,7 +506,6 @@ console.log(response.data);
             variant="outline"
             icon="ph ph-arrow-left"
             onClick={() => {
-              // Navigate back to program detail if programId exists, otherwise go back
               if (programId) {
                 navigate(`${basePath}/programs/${programId}`);
               } else {
@@ -560,32 +515,6 @@ console.log(response.data);
           >
             Quay lại
           </Button>
-          {/* Edit button - only when program is draft/needs_revision AND course is not active */}
-          {!isViewOnly &&
-            (course.program?.status === 'draft' || course.program?.status === 'needs_revision') &&
-            !course.isActive && (
-              <Button
-                variant="primary"
-                icon="ph ph-pencil"
-                onClick={() => {
-                  const programIdToUse = programId || course.program?._id || course.program;
-                  navigate(`${basePath}/programs/${programIdToUse}/courses/${id}/edit-form`);
-                }}
-              >
-                Sửa
-              </Button>
-          )}
-          {/* Delete button - only for non-Center Head */}
-          {!isViewOnly && (
-            <Button
-              variant="danger"
-              icon="ph ph-trash"
-              onClick={handleDeleteCourse}
-              disabled={deleteLoading}
-            >
-              {deleteLoading ? 'Đang xóa...' : 'Xóa'}
-            </Button>
-          )}
         </div>
       </div>
 
@@ -729,4 +658,4 @@ console.log(response.data);
   );
 };
 
-export default CourseDetails;
+export default CenterHeadCourseDetail;

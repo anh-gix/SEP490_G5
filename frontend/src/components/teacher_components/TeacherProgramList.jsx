@@ -149,7 +149,7 @@ const TeacherProgramList = () => {
 
       // Fetch work requests assigned to current user (Subject Leader)
       const response = await workRequestService.getAssignedToMe({
-        requestType: 'create_program' // Only get create_program requests
+        requestType: 'create_program' 
       });
       const requestsData = response.data || [];
       setWorkRequests(requestsData);
@@ -183,7 +183,7 @@ const TeacherProgramList = () => {
   };
 
   const handleDeleteProgram = async (programId, programName) => {
-    const confirmMessage = `⚠️ CẢNH BÁO: Bạn có chắc muốn xóa chương trình "${programName}"?\n\n` +
+    const confirmMessage = `CẢNH BÁO: Bạn có chắc muốn xóa chương trình "${programName}"?\n\n` +
       `Hành động này sẽ XÓA TOÀN BỘ:\n` +
       `• Tất cả PLO trong chương trình\n` +
       `• Tất cả Course (học phần)\n` +
@@ -386,7 +386,7 @@ const TeacherProgramList = () => {
             <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Xem</span>
             <span className="d-inline d-lg-none">👁</span>
           </Button>
-          {activeTab === 'my-programs' && (
+          {activeTab === 'my-programs' && row.status === 'draft' && (
             <Button
               variant="danger"
               size="sm"
@@ -396,6 +396,7 @@ const TeacherProgramList = () => {
                 handleDeleteProgram(row._id, row.program_name);
               }}
               className="px-2 py-1"
+              title="Chỉ có thể xóa chương trình ở trạng thái Bản nháp"
             >
               <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Xóa</span>
               <span className="d-inline d-lg-none">🗑️</span>
@@ -470,60 +471,68 @@ const TeacherProgramList = () => {
               <span className="d-none d-md-inline">Bắt đầu</span>
             </button>
           )}
-          {row.status === 'in_progress' && (
+          {row.status === 'in_progress' && row.entityId && (
             <button
               className="btn btn-sm btn-info d-flex align-items-center gap-1"
               onClick={async (e) => {
                 e.stopPropagation();
-                // Navigate đến program đã được tạo
-                if (row.entityId) {
-                  const programId = typeof row.entityId === 'object' ? row.entityId._id : row.entityId;
+                const programId = typeof row.entityId === 'object' ? row.entityId._id : row.entityId;
 
-                  // Kiểm tra program có tồn tại không trước khi navigate
-                  try {
-                    await programService.getProgramById(programId);
-                    navigate(`/teacher/programs/${programId}/edit`);
-                  } catch (error) {
-                    // Program đã bị xóa - hỏi user có muốn tạo lại không
-                    const recreate = window.confirm(
-                      '⚠️ Program liên kết với request này đã bị xóa.\n\n' +
-                      'Bạn có muốn tạo lại program để tiếp tục không?\n\n' +
-                      'Ấn OK để tạo lại program mới, hoặc Cancel để hủy.'
-                    );
-
-                    if (recreate) {
-                      // Gọi API recreateEntity để tạo program mới cho request in_progress
-                      try {
-                        const response = await workRequestService.recreateEntity(row._id, {
-                          programName: `Program for ${row.requestType}`,
-                          programType: 'ielts'
-                        });
-
-                        console.log('Recreated program:', response);
-
-                        // Refresh work requests
-                        await fetchWorkRequests();
-
-                        // Navigate to new program
-                        if (response.entityId) {
-                          alert('✅ Đã tạo lại program thành công!');
-                          navigate(`/teacher/programs/${response.entityId}/edit`);
-                        }
-                      } catch (recreateError) {
-                        console.error('Error recreating program:', recreateError);
-                        alert(recreateError.message || 'Không thể tạo lại program. Vui lòng thử lại sau.');
-                      }
-                    }
-                  }
-                } else {
-                  alert('Chưa có program được tạo cho request này. Vui lòng ấn "Bắt đầu" trước.');
+                // Kiểm tra program có tồn tại không trước khi navigate
+                try {
+                  await programService.getProgramById(programId);
+                  navigate(`/teacher/programs/${programId}/edit`);
+                } catch {
+                  // Program đã bị xóa - refresh để cập nhật UI
+                  alert('Chương trình đã bị xóa. Vui lòng ấn "Tạo lại" để tạo chương trình mới.');
+                  await fetchWorkRequests();
                 }
               }}
-              title="Tiếp tục tạo"
-              disabled={!row.entityId}
+              title="Tiếp tục tạo chương trình"
             >
               <i className="ph ph-pencil"></i>
               <span className="d-none d-md-inline">Tiếp tục</span>
+            </button>
+          )}
+          {row.status === 'in_progress' && !row.entityId && (
+            <button
+              className="btn btn-sm btn-warning d-flex align-items-center gap-1"
+              onClick={async (e) => {
+                e.stopPropagation();
+
+                const confirmRecreate = window.confirm(
+                  'Lưu ý: Chương trình liên kết với yêu cầu này đã bị xóa.\n\n' +
+                  'Bạn có muốn tạo chương trình mới để tiếp tục?\n\n' +
+                  'Ấn OK để tạo chương trình mới.'
+                );
+
+                if (confirmRecreate) {
+                  try {
+                    const response = await workRequestService.recreateEntity(row._id, {
+                      programName: `Program for ${row.requestType}`,
+                      programType: 'ielts'
+                    });
+
+                    console.log('Recreated program:', response);
+
+                    // Refresh work requests
+                    await fetchWorkRequests();
+
+                    // Navigate to new program
+                    if (response.entityId) {
+                      alert('Đã tạo lại chương trình thành công!');
+                      navigate(`/teacher/programs/${response.entityId}/edit`);
+                    }
+                  } catch (recreateError) {
+                    console.error('Error recreating program:', recreateError);
+                    alert(recreateError.message || 'Không thể tạo lại chương trình. Vui lòng thử lại sau.');
+                  }
+                }
+              }}
+              title="Tạo lại chương trình đã bị xóa"
+            >
+              <i className="ph ph-plus-circle"></i>
+              <span className="d-none d-md-inline">Tạo lại</span>
             </button>
           )}
         </div>
@@ -546,15 +555,6 @@ const TeacherProgramList = () => {
           <h4 className="mb-8 text-neutral-900 fw-bold">Chương trình đào tạo</h4>
           <p className="text-neutral-600 mb-0">Quản lý các chương trình và PLOs</p>
         </div>
-        {activeTab === 'my-programs' && (
-          <Button
-            variant="primary"
-            icon="ph ph-plus"
-            onClick={() => navigate('/teacher/programs/create')}
-          >
-            Tạo chương trình mới
-          </Button>
-        )}
       </div>
 
       {/* Tabs */}
@@ -594,25 +594,25 @@ const TeacherProgramList = () => {
       {activeTab === 'work-requests' ? (
         <div className="row g-4 mb-24">
           <div className="col-md-3">
-            <Card>
+            <Card variant="shadow">
               <h6 className="text-neutral-600 mb-8">Tổng yêu cầu</h6>
               <h4 className="text-neutral-900 fw-bold mb-0">{requestStats.total}</h4>
             </Card>
           </div>
           <div className="col-md-3">
-            <Card>
+            <Card variant="shadow">
               <h6 className="text-neutral-600 mb-8">Chờ xử lý</h6>
               <h4 className="text-warning-600 fw-bold mb-0">{requestStats.pending}</h4>
             </Card>
           </div>
           <div className="col-md-3">
-            <Card>
+            <Card variant="shadow">
               <h6 className="text-neutral-600 mb-8">Đang xử lý</h6>
               <h4 className="text-info-600 fw-bold mb-0">{requestStats.in_progress}</h4>
             </Card>
           </div>
           <div className="col-md-3">
-            <Card>
+            <Card variant="shadow">
               <h6 className="text-neutral-600 mb-8">Hoàn thành</h6>
               <h4 className="text-success-600 fw-bold mb-0">{requestStats.completed}</h4>
             </Card>
@@ -621,25 +621,25 @@ const TeacherProgramList = () => {
       ) : (
         <div className="row g-4 mb-24">
           <div className="col-md-3">
-            <Card>
+            <Card variant="shadow">
               <h6 className="text-neutral-600 mb-8">Tổng Programs</h6>
               <h4 className="text-neutral-900 fw-bold mb-0">{stats.total}</h4>
             </Card>
           </div>
           <div className="col-md-3">
-            <Card>
+            <Card variant="shadow">
               <h6 className="text-neutral-600 mb-8">Đang hoạt động</h6>
               <h4 className="text-success-600 fw-bold mb-0">{stats.active}</h4>
             </Card>
           </div>
           <div className="col-md-3">
-            <Card>
+            <Card variant="shadow">
               <h6 className="text-neutral-600 mb-8">Bản nháp</h6>
               <h4 className="text-warning-600 fw-bold mb-0">{stats.draft}</h4>
             </Card>
           </div>
           <div className="col-md-3">
-            <Card>
+            <Card variant="shadow">
               <h6 className="text-neutral-600 mb-8">Đã lưu trữ</h6>
               <h4 className="text-neutral-600 fw-bold mb-0">{stats.archived}</h4>
             </Card>
@@ -648,7 +648,7 @@ const TeacherProgramList = () => {
       )}
 
       {/* Search & Filter */}
-      <Card className="mb-24">
+      <Card variant="shadow" className="mb-24">
         <div className="d-flex gap-3 align-items-center justify-content-between">
           <SearchBox
             placeholder={activeTab === 'work-requests' ? "Tìm kiếm yêu cầu..." : "Tìm kiếm chương trình..."}
@@ -665,7 +665,7 @@ const TeacherProgramList = () => {
       </Card>
 
       {/* Table */}
-      <Card>
+      <Card variant="shadow">
         <Table
           columns={activeTab === 'work-requests' ? requestColumns : columns}
           data={activeTab === 'work-requests' ? paginatedRequests : paginatedPrograms}

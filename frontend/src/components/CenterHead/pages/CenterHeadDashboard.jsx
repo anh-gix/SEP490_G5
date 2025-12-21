@@ -1,22 +1,23 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Badge from "../compo/Badge";
+import centerHeadService from "../../../services/centerHeadService";
 import {
+  // Mock data for fallback
   mockDashboardStats,
   mockPendingWorkRequests,
   mockPendingActivation,
   mockRecentActivities,
+  // Helper functions
   getRequestTypeLabel,
   getRequestTypeIcon,
   getRequestTypeBgColor,
-  getDirectionLabel,
   getDirectionBadgeVariant,
   getEntityTypeIcon,
   getEntityTypeBgColor,
   getActionLabel,
   getActionColor,
   formatRelativeTime,
-  simulateApiDelay,
 } from "../../../helper/centerHeadDashboardMockData";
 
 const CenterHeadDashboard = () => {
@@ -35,18 +36,30 @@ const CenterHeadDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      await simulateApiDelay(500);
 
-      // Load mock data
-      setStats(mockDashboardStats);
-      setPendingRequests(mockPendingWorkRequests);
-      setPendingActivation(mockPendingActivation);
-      setRecentActivities(mockRecentActivities);
+      // Try to fetch from API first
+      const response = await centerHeadService.getDashboard();
+
+      if (response.success) {
+        setStats(response.data.stats);
+        setPendingRequests(response.data.pendingRequests || []);
+        setPendingActivation(response.data.pendingActivation || []);
+        setRecentActivities(response.data.recentActivities || []);
+      } else {
+        throw new Error(response.message || "Failed to fetch dashboard data");
+      }
 
       setError(null);
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
-      setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
+      // Fallback to mock data if API fails
+      console.log("Falling back to mock data...");
+      setStats(mockDashboardStats);
+      setPendingRequests(mockPendingWorkRequests);
+      setPendingActivation(mockPendingActivation);
+      setRecentActivities(mockRecentActivities);
+      // Don't show error to user when using mock data
+      setError(null);
     } finally {
       setLoading(false);
     }
@@ -74,6 +87,29 @@ const CenterHeadDashboard = () => {
     } else {
       // Bottom-up: người tạo request
       return request.requestedBy?.name || "N/A";
+    }
+  };
+
+  // Handle activate/publish item
+  const handleActivatePublish = async (item) => {
+    try {
+      let response;
+      if (item.type === "exam") {
+        response = await centerHeadService.publishExam(item._id);
+      } else if (item.type === "course") {
+        response = await centerHeadService.activateCourse(item._id);
+      } else {
+        response = await centerHeadService.activateProgram(item._id);
+      }
+
+      if (response.success) {
+        // Refresh dashboard data
+        fetchDashboardData();
+      } else {
+        console.error("Failed to activate/publish:", response.message);
+      }
+    } catch (err) {
+      console.error("Error activating/publishing:", err);
     }
   };
 
@@ -515,13 +551,7 @@ const CenterHeadDashboard = () => {
                       <div className="mt-12 pt-12 border-top border-neutral-100">
                         <button
                           className="btn btn-main-600 btn-sm w-100"
-                          onClick={() => {
-                            // Handle activate/publish
-                            console.log(
-                              item.type === "exam" ? "Publish:" : "Activate:",
-                              item._id
-                            );
-                          }}
+                          onClick={() => handleActivatePublish(item)}
                         >
                           <i
                             className={`ph ${

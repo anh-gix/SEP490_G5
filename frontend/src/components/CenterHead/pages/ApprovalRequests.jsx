@@ -12,17 +12,13 @@ import userService from '../../../services/userService';
 
 const ApprovalRequests = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('bottom_up'); // 'bottom_up' or 'top_down'
+  const [activeTab, setActiveTab] = useState('top_down'); // Only 'top_down' - Công việc đã giao
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filter states
   const [statusFilter, setStatusFilter] = useState('all');
-  const [typeFilter, setTypeFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
-  const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -64,7 +60,7 @@ const ApprovalRequests = () => {
 
   useEffect(() => {
     fetchRequests();
-  }, [activeTab, statusFilter, typeFilter, fromDate, toDate, currentPage, itemsPerPage]);
+  }, [activeTab, statusFilter, currentPage, itemsPerPage]);
 
   useEffect(() => {
     fetchStats();
@@ -111,15 +107,6 @@ const ApprovalRequests = () => {
       // Add filters only if they have values
       if (statusFilter && statusFilter !== 'all') {
         params.status = statusFilter;
-      }
-      if (typeFilter && typeFilter !== 'all') {
-        params.requestType = typeFilter;
-      }
-      if (fromDate) {
-        params.fromDate = fromDate;
-      }
-      if (toDate) {
-        params.toDate = toDate;
       }
 
       const response = await workRequestService.getAllRequests(params);
@@ -370,15 +357,6 @@ const ApprovalRequests = () => {
     }
   };
 
-  const handleResetFilters = () => {
-    setStatusFilter('all');
-    setTypeFilter('all');
-    setFromDate('');
-    setToDate('');
-    setSearchQuery('');
-    setCurrentPage(1);
-  };
-
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
@@ -457,160 +435,68 @@ const ApprovalRequests = () => {
       {/* Header Section */}
       <div className="mb-4 pb-3 border-bottom d-flex justify-content-between align-items-center">
         <div>
-          <h2 className="fw-bold mb-2">Quản lý yêu cầu</h2>
-          <p className="text-muted mb-0">Phê duyệt và theo dõi tiến độ công việc</p>
+          <h2 className="fw-bold mb-2">Công việc đã giao</h2>
+          <p className="text-muted mb-0">Theo dõi tiến độ công việc đã giao</p>
         </div>
-        {activeTab === 'top_down' && (
-          <div className="dropdown">
-            <button
-              className="btn btn-primary dropdown-toggle"
-              type="button"
-              id="createRequestDropdown"
-              data-bs-toggle="dropdown"
-              aria-expanded="false"
-            >
-              <i className="ph ph-plus me-2"></i>
-              Tạo yêu cầu mới
-            </button>
-            <ul className="dropdown-menu" aria-labelledby="createRequestDropdown">
-              <li>
-                <button
-                  className="dropdown-item"
-                  onClick={async () => {
-                    setCreateRequestType('create_program');
-                    await fetchAssignees('create_program');
-                    setShowCreateModal(true);
-                  }}
-                >
-                  <i className="ph ph-book me-2"></i>
-                  Tạo chương trình mới
-                </button>
-              </li>
-              <li>
-                <button
-                  className="dropdown-item"
-                  onClick={async () => {
-                    setCreateRequestType('create_exam');
-                    await fetchAssignees('create_exam');
-                    setShowCreateModal(true);
-                  }}
-                >
-                  <i className="ph ph-file-text me-2"></i>
-                  Tạo đề thi mới
-                </button>
-              </li>
-              <li><hr className="dropdown-divider" /></li>
-              <li>
-                <button
-                  className="dropdown-item"
-                  onClick={async () => {
-                    setCreateRequestType('assign_students');
-                    await fetchAssignees('assign_students');
-                    setShowCreateModal(true);
-                  }}
-                >
-                  <i className="ph ph-users me-2"></i>
-                  Cấp tài khoản
-                </button>
-              </li>
-            </ul>
-          </div>
-        )}
+        <div className="dropdown">
+          <button
+            className="btn btn-primary dropdown-toggle"
+            type="button"
+            id="createRequestDropdown"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+          >
+            <i className="ph ph-plus me-2"></i>
+            Tạo yêu cầu mới
+          </button>
+          <ul className="dropdown-menu" aria-labelledby="createRequestDropdown">
+            <li>
+              <button
+                className="dropdown-item"
+                onClick={async () => {
+                  setCreateRequestType('create_program');
+                  await fetchAssignees('create_program');
+                  setShowCreateModal(true);
+                }}
+              >
+                <i className="ph ph-book me-2"></i>
+                Tạo chương trình mới
+              </button>
+            </li>
+            <li>
+              <button
+                className="dropdown-item"
+                onClick={async () => {
+                  setCreateRequestType('create_exam');
+                  await fetchAssignees('create_exam');
+                  setShowCreateModal(true);
+                }}
+              >
+                <i className="ph ph-file-text me-2"></i>
+                Tạo đề thi mới
+              </button>
+            </li>
+            <li><hr className="dropdown-divider" /></li>
+            <li>
+              <button
+                className="dropdown-item"
+                onClick={async () => {
+                  setCreateRequestType('assign_students');
+                  await fetchAssignees('assign_students');
+                  setShowCreateModal(true);
+                }}
+              >
+                <i className="ph ph-users me-2"></i>
+                Cấp tài khoản
+              </button>
+            </li>
+          </ul>
+        </div>
       </div>
 
-      {/* Tabs Navigation */}
-      <div className="mb-4">
-        <ul className="nav nav-tabs nav-tabs-custom">
-          <li className="nav-item">
-            <button
-              className={`nav-link ${activeTab === 'bottom_up' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('bottom_up');
-                setCurrentPage(1);
-                setStatusFilter('all');
-              }}
-            >
-              <i className="ph ph-arrow-circle-up me-2"></i>
-              Yêu cầu phê duyệt
-              {stats.pendingApprovals > 0 && (
-                <span className="badge bg-warning text-dark ms-2 rounded-pill">
-                  {stats.pendingApprovals}
-                </span>
-              )}
-            </button>
-          </li>
-          <li className="nav-item">
-            <button
-              className={`nav-link ${activeTab === 'top_down' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('top_down');
-                setCurrentPage(1);
-                setStatusFilter('all');
-              }}
-            >
-              <i className="ph ph-arrow-circle-down me-2"></i>
-              Công việc đã giao
-              {(stats.pendingTasks + stats.inProgressTasks + stats.pendingApprovalTasks) > 0 && (
-                <span className="badge bg-info text-dark ms-2 rounded-pill">
-                  {stats.pendingTasks + stats.inProgressTasks + stats.pendingApprovalTasks}
-                </span>
-              )}
-            </button>
-          </li>
-        </ul>
-      </div>
 
       {/* Stats Cards Section */}
-      {activeTab === 'bottom_up' ? (
-        <div className="row g-4 mb-5">
-          <div className="col-md-4">
-            <Card>
-              <div className="p-4">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div>
-                    <div className="text-muted small mb-1">Chờ duyệt</div>
-                    <div className="h3 fw-bold text-warning mb-0">{stats.pendingApprovals}</div>
-                  </div>
-                  <div className="text-warning" style={{ fontSize: '2.5rem', opacity: 0.2 }}>
-                    <i className="ph ph-clock"></i>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-          <div className="col-md-4">
-            <Card>
-              <div className="p-4">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div>
-                    <div className="text-muted small mb-1">Đã duyệt</div>
-                    <div className="h3 fw-bold text-success mb-0">{stats.approved}</div>
-                  </div>
-                  <div className="text-success" style={{ fontSize: '2.5rem', opacity: 0.2 }}>
-                    <i className="ph ph-check-circle"></i>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-          <div className="col-md-4">
-            <Card>
-              <div className="p-4">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div>
-                    <div className="text-muted small mb-1">Từ chối</div>
-                    <div className="h3 fw-bold text-danger mb-0">{stats.rejected}</div>
-                  </div>
-                  <div className="text-danger" style={{ fontSize: '2.5rem', opacity: 0.2 }}>
-                    <i className="ph ph-x-circle"></i>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </div>
-      ) : (
-        <div className="row g-4 mb-5">
+      <div className="row g-4 mb-5">
           <div className="col-md-3">
             <Card>
               <div className="p-4">
@@ -672,12 +558,11 @@ const ApprovalRequests = () => {
             </Card>
           </div>
         </div>
-      )}
 
       {/* Filters Section */}
       <Card className="mb-4">
         <div className="p-3">
-          {/* Basic Filters - Always visible */}
+          {/* Basic Filters */}
           <div className="row g-3">
             {/* Search */}
             <div className="col-md-6">
@@ -685,7 +570,7 @@ const ApprovalRequests = () => {
               <input
                 type="text"
                 className="form-control"
-                placeholder={activeTab === 'bottom_up' ? "Tìm theo tên, người nộp..." : "Tìm theo tên, người được giao..."}
+                placeholder="Tìm theo tên, người được giao..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -703,109 +588,14 @@ const ApprovalRequests = () => {
                 }}
               >
                 <option value="all">Tất cả</option>
-                {activeTab === 'bottom_up' ? (
-                  <>
-                    <option value="pending">Chờ duyệt</option>
-                    <option value="approved">Đã duyệt</option>
-                    <option value="rejected">Từ chối</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="pending">Chưa nhận</option>
-                    <option value="in_progress">Đang làm</option>
-                    <option value="pending_approval">Chờ duyệt lại</option>
-                    <option value="approved">Đã duyệt</option>
-                    <option value="completed">Hoàn thành</option>
-                  </>
-                )}
+                <option value="pending">Chưa nhận</option>
+                <option value="in_progress">Đang làm</option>
+                <option value="pending_approval">Chờ duyệt lại</option>
+                <option value="approved">Đã duyệt</option>
+                <option value="completed">Hoàn thành</option>
               </select>
             </div>
           </div>
-
-          {/* Advanced Filter Toggle Button */}
-          <div className="mt-3">
-            <button
-              className="btn btn-sm btn-outline-primary"
-              onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
-            >
-              <i className={`ph ${showAdvancedFilter ? 'ph-caret-up' : 'ph-caret-down'} me-2`}></i>
-              {showAdvancedFilter ? 'Ẩn bộ lọc nâng cao' : 'Bộ lọc nâng cao'}
-            </button>
-          </div>
-
-          {/* Advanced Filters - Collapsible */}
-          {showAdvancedFilter && (
-            <div className="mt-3 pt-3 border-top">
-              <div className="row g-3">
-                {/* Type Filter */}
-                <div className="col-md-4">
-                  <label className="form-label fw-medium">Loại</label>
-                  <select
-                    className="form-select"
-                    value={typeFilter}
-                    onChange={(e) => {
-                      setTypeFilter(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value="all">Tất cả</option>
-                    {activeTab === 'bottom_up' ? (
-                      <>
-                        <option value="program">Chương trình</option>
-                        <option value="exam">Đề thi</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="create_program">Tạo chương trình</option>
-                        <option value="edit_course">Chỉnh sửa khóa học</option>
-                        <option value="create_exam">Tạo đề thi</option>
-                        <option value="assign_students">Sắp xếp học viên</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-
-                {/* Date Range */}
-                <div className="col-md-4">
-                  <label className="form-label fw-medium">Từ ngày</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    value={fromDate}
-                    onChange={(e) => {
-                      setFromDate(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  />
-                </div>
-
-                <div className="col-md-4">
-                  <label className="form-label fw-medium">Đến ngày</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    value={toDate}
-                    onChange={(e) => {
-                      setToDate(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    min={fromDate}
-                  />
-                </div>
-
-                {/* Reset Button */}
-                <div className="col-12">
-                  <button
-                    className="btn btn-outline-secondary"
-                    onClick={handleResetFilters}
-                  >
-                    <i className="ph ph-arrow-clockwise me-2"></i>
-                    Đặt lại bộ lọc
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </Card>
 
@@ -846,7 +636,7 @@ const ApprovalRequests = () => {
                 <tr>
                   <th className="fw-semibold">Loại</th>
                   <th className="fw-semibold">Tên</th>
-                  <th className="fw-semibold">{activeTab === 'bottom_up' ? 'Người nộp' : 'Người được giao'}</th>
+                  <th className="fw-semibold">Người được giao</th>
                   <th className="fw-semibold">Trạng thái</th>
                   <th className="fw-semibold">Ngày tạo</th>
                   <th className="fw-semibold"></th>
@@ -871,17 +661,8 @@ const ApprovalRequests = () => {
                       <small className="text-muted">{request.entityType || 'N/A'}</small>
                     </td>
                     <td>
-                      {activeTab === 'bottom_up' ? (
-                        <>
-                          <div className="fw-medium">{request.requestedBy?.username || request.requestedBy?.name || 'N/A'}</div>
-                          <small className="text-muted">{request.requestedBy?.email || ''}</small>
-                        </>
-                      ) : (
-                        <>
-                          <div className="fw-medium">{request.assignedTo?.username || request.assignedTo?.name || 'Chưa giao'}</div>
-                          <small className="text-muted">{request.assignedTo?.email || ''}</small>
-                        </>
-                      )}
+                      <div className="fw-medium">{request.assignedTo?.username || request.assignedTo?.name || 'Chưa giao'}</div>
+                      <small className="text-muted">{request.assignedTo?.email || ''}</small>
                     </td>
                     <td>{getStatusBadge(request.status)}</td>
                     <td className="text-muted">{formatDate(request.requestedAt)}</td>
@@ -1189,9 +970,8 @@ const ApprovalRequests = () => {
               </div>
 
               {/* Modal Footer - Actions */}
-              {/* Actions for pending requests */}
-              {((activeTab === 'bottom_up' && selectedRequest.status === 'pending') ||
-                (activeTab === 'top_down' && selectedRequest.status === 'pending_approval')) && (
+              {/* Actions for pending_approval requests */}
+              {selectedRequest.status === 'pending_approval' && (
                 <div className="modal-footer border-top">
                   <Button
                     variant="success"
@@ -1216,32 +996,8 @@ const ApprovalRequests = () => {
                 </div>
               )}
 
-              {/* Actions for approved requests - Revoke option */}
-              {activeTab === 'bottom_up' && selectedRequest.status === 'approved' && (
-                <div className="modal-footer border-top bg-light">
-                  <div className="w-100">
-                    <div className="alert alert-info mb-3">
-                      <i className="ph ph-info me-2"></i>
-                      Yêu cầu này đã được duyệt. Bạn có thể thu hồi phê duyệt nếu phát hiện sai sót.
-                    </div>
-                    <div className="d-flex justify-content-end">
-                      <Button
-                        variant="warning"
-                        onClick={() => {
-                          setShowDetailModal(false);
-                          setShowRevokeModal(true);
-                        }}
-                      >
-                        <i className="ph ph-arrow-counter-clockwise me-2"></i>
-                        Thu hồi phê duyệt
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Actions for top-down pending/in_progress requests - Cancel option */}
-              {activeTab === 'top_down' && ['pending', 'in_progress'].includes(selectedRequest.status) && (
+              {/* Actions for pending/in_progress requests - Cancel option */}
+              {['pending', 'in_progress'].includes(selectedRequest.status) && (
                 <div className="modal-footer border-top bg-light">
                   <div className="w-100">
                     <div className="alert alert-warning mb-3">
@@ -1752,31 +1508,6 @@ const ApprovalRequests = () => {
       {/* Toast Container */}
       <ToastContainer />
 
-      <style jsx>{`
-        .nav-tabs-custom {
-          border-bottom: 2px solid #dee2e6;
-        }
-        .nav-tabs-custom .nav-link {
-          border: none;
-          color: #6c757d;
-          padding: 1rem 1.5rem;
-          font-weight: 500;
-          border-bottom: 3px solid transparent;
-          transition: all 0.2s;
-        }
-        .nav-tabs-custom .nav-link:hover {
-          color: #0d6efd;
-          background-color: #f8f9fa;
-        }
-        .nav-tabs-custom .nav-link.active {
-          color: #0d6efd;
-          border-bottom-color: #0d6efd;
-          background-color: transparent;
-        }
-        .bg-purple {
-          background-color: #6f42c1;
-        }
-      `}</style>
     </div>
   );
 };

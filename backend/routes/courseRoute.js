@@ -38,6 +38,11 @@ router.put('/:id/map-plos', courseController.updateCoursePLOMapping);
 // MATERIALS ROUTES - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
 router.get('/:courseId/materials', courseController.getCourseMaterials);
 
+// ACTIVATION/DEACTIVATION ROUTES - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
+router.get('/:id/can-deactivate', courseController.canDeactivateCourse);
+router.patch('/:id/deactivate', courseController.deactivateCourse);
+router.patch('/:id/activate', courseController.activateCourse);
+
 //lấy chi tiết giáo trình
 router.get('/:id/details', courseController.getCourseById);
 

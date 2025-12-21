@@ -85,6 +85,7 @@ export const teacherRoutes = [
   { path: '/teacher/programs/:programId/courses/create', element: <TeacherCourseWizardPage /> },
   { path: '/teacher/programs/:programId/courses/:courseId/edit', element: <TeacherCourseWizardPage /> },
   { path: '/teacher/programs/:programId/courses/:courseId/edit-form', element: <TeacherCourseFormPage /> },
+  { path: '/teacher/programs/:programId/courses/:id/details', element: <TeacherCourseDetailPage /> },
   { path: '/teacher/courses/:id/details', element: <TeacherCourseDetailPage /> },
 
   // CAM Session Management

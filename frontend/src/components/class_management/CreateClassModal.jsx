@@ -571,8 +571,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         const response = await courseService.getAllCourses();
 
         if (response && response.success && response.data) {
-          setAllCourses(response.data);
-          setCourses(response.data); // Initially show all courses
+          // Filter to only show courses with status 'completed' or 'active'
+          const validCourses = response.data.filter(course => 
+            course.status === 'completed' || course.status === 'active'
+          );
+          setAllCourses(validCourses);
+          setCourses(validCourses); // Initially show only completed/active courses
         }
       } catch (error) {
         console.error('Error fetching courses:', error);
@@ -1048,10 +1052,11 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           setAvailableLevels(allLevels);
         }
 
-        // Store all programs from DB
+        // Store all programs from DB - only approved programs
         if (programsResponse?.success && programsResponse.data) {
-          setAllProgramsFromDB(programsResponse.data);
-          setFilteredProgramsFromDB(programsResponse.data); // Initially show all programs
+          const approvedPrograms = programsResponse.data.filter(p => p.status === 'approved');
+          setAllProgramsFromDB(approvedPrograms);
+          setFilteredProgramsFromDB(approvedPrograms); // Initially show all approved programs
         }
 
         // Also fetch mappings for band lookup (still needed for band display)

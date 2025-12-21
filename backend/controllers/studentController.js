@@ -1792,23 +1792,13 @@ exports.createStudent = async (req, res) => {
     }
     
     // Validate phone number length (10-11 digits)
+    // Allow duplicate phone numbers
     if (phone) {
       const phoneDigits = phone.replace(/\D/g, '');
       if (phoneDigits.length < 10 || phoneDigits.length > 11) {
         return res.status(400).json({
           success: false,
           message: 'Số điện thoại phải có 10 hoặc 11 chữ số'
-        });
-      }
-    }
-    
-    // Check if phone number already exists
-    if (phone) {
-      const phoneExists = await User.findOne({ phone });
-      if (phoneExists) {
-        return res.status(400).json({
-          success: false,
-          message: 'Số điện thoại đã tồn tại trong hệ thống'
         });
       }
     }
@@ -1887,18 +1877,11 @@ const parseLevelsToStudy = (levelsToStudyStr) => {
 // Helper function to find existing student by email or phone
 const findExistingStudent = async (email, phone, studentRole) => {
   try {
-    // Find by email first
+    // Only check by email, allow duplicate phone numbers
     if (email) {
       const byEmail = await User.findOne({ email: email.toLowerCase() });
       if (byEmail && byEmail.roleId && byEmail.roleId.toString() === studentRole._id.toString()) {
         return byEmail;
-      }
-    }
-    // If not found, find by phone
-    if (phone) {
-      const byPhone = await User.findOne({ phone: phone });
-      if (byPhone && byPhone.roleId && byPhone.roleId.toString() === studentRole._id.toString()) {
-        return byPhone;
       }
     }
     return null;

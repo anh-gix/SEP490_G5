@@ -603,14 +603,11 @@ const ImportStudentFromExcel = ({ onBack }) => {
         return phoneStr;
       };
 
-      // Check for duplicates within the Excel file
+      // Check for duplicates within the Excel file (only email)
       const emailMap = new Map();
-      const phoneMap = new Map();
       
       previewData.forEach((item, index) => {
         const email = item.email.toLowerCase();
-        // Normalize phone before checking duplicates
-        const phone = normalizePhone(item.phone);
         
         // Check duplicate email in file
         if (email && emailMap.has(email)) {
@@ -625,21 +622,6 @@ const ImportStudentFromExcel = ({ onBack }) => {
           }
         } else if (email) {
           emailMap.set(email, index);
-        }
-        
-        // Check duplicate phone in file
-        if (phone && phoneMap.has(phone)) {
-          const firstIndex = phoneMap.get(phone);
-          if (!previewData[firstIndex].errors.includes('Số điện thoại trùng lặp trong file Excel')) {
-            previewData[firstIndex].errors.push('Số điện thoại trùng lặp trong file Excel');
-            previewData[firstIndex].hasError = true;
-          }
-          if (!item.errors.includes('Số điện thoại trùng lặp trong file Excel')) {
-            item.errors.push('Số điện thoại trùng lặp trong file Excel');
-            item.hasError = true;
-          }
-        } else if (phone) {
-          phoneMap.set(phone, index);
         }
       });
 
@@ -657,12 +639,6 @@ const ImportStudentFromExcel = ({ onBack }) => {
 
         const existingEmails = new Set(allUsers.map(u => u.email?.toLowerCase()).filter(Boolean));
 
-        const existingPhones = new Set(
-          allUsers
-            .map(u => normalizePhone(u.phone))
-            .filter(Boolean)
-        );
-
         // Get all approved program codes from database (only approved programs can be used)
         const approvedProgramCodes = new Set(
           programs
@@ -673,16 +649,9 @@ const ImportStudentFromExcel = ({ onBack }) => {
 
         previewData.forEach((item) => {
           const email = item.email.toLowerCase();
-          const phone = normalizePhone(item.phone);
 
+          // Only check duplicate email, allow duplicate phone
           if (email && existingEmails.has(email)) {
-            if (!item.warnings.includes('Học viên đã có tài khoản trong hệ thống')) {
-              item.warnings.push('Học viên đã có tài khoản trong hệ thống');
-              item.isExistingAccount = true;
-            }
-          }
-
-          if (phone && existingPhones.has(phone)) {
             if (!item.warnings.includes('Học viên đã có tài khoản trong hệ thống')) {
               item.warnings.push('Học viên đã có tài khoản trong hệ thống');
               item.isExistingAccount = true;

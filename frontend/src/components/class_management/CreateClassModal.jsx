@@ -629,10 +629,10 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     fetchCourseDetails();
   }, [formData.course, courses]);
 
-  // Populate band when course is selected
+  // Populate band when course is selected (only if band not already set from program)
   useEffect(() => {
     if (!selectedCourse) {
-      setFormData(prev => ({ ...prev, band: '' }));
+      // Don't clear band if we already have it from program selection
       return;
     }
 
@@ -642,27 +642,21 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       return;
     }
 
-    let programType, programLevel;
+    // Get band directly from program object
+    let programBand;
     if (typeof courseProgram === 'object' && courseProgram._id) {
-      programType = courseProgram.type;
-      programLevel = courseProgram.level;
+      programBand = courseProgram.band;
     } else if (typeof courseProgram === 'string') {
       const programObj = allProgramsFromDB.find(p => String(p._id) === String(courseProgram));
       if (programObj) {
-        programType = programObj.type;
-        programLevel = programObj.level;
+        programBand = programObj.band;
       }
     }
 
-    if (programType && programLevel) {
-      const foundMapping = mappings.find(
-        m => m.type === programType && m.level === programLevel
-      );
-      if (foundMapping) {
-        setFormData(prev => ({ ...prev, band: foundMapping.band || '' }));
-      }
+    if (programBand) {
+      setFormData(prev => ({ ...prev, band: programBand }));
     }
-  }, [formData.course, selectedCourse, allProgramsFromDB, mappings]);
+  }, [formData.course, selectedCourse, allProgramsFromDB]);
 
   // Real-time capacity validation
   useEffect(() => {
@@ -1937,6 +1931,68 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     </Form.Text>
                   )}
                 </Form.Group>
+              </div>
+              <div className="col-md-6">
+                {formData.startDate && filledScheduleEntries.length > 0 && (() => {
+                  // Calculate first class session
+                  // Use local timezone to avoid date shifting issues
+                  const [year, month, day] = formData.startDate.split('-').map(Number);
+                  const startDate = new Date(year, month - 1, day);
+
+                  const daysOfWeek = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+                  const dayMap = {
+                    '1': 1, // Monday
+                    '2': 2, // Tuesday
+                    '3': 3, // Wednesday
+                    '4': 4, // Thursday
+                    '5': 5, // Friday
+                    '6': 6, // Saturday
+                    '0': 0  // Sunday
+                  };
+
+                  // Find the earliest schedule entry
+                  let firstSession = null;
+                  let minDaysToAdd = Infinity;
+
+                  filledScheduleEntries.forEach(entry => {
+                    const targetDay = dayMap[entry.day];
+                    const currentDay = startDate.getDay();
+                    let daysToAdd = targetDay - currentDay;
+                    if (daysToAdd < 0) daysToAdd += 7;
+
+                    if (daysToAdd < minDaysToAdd) {
+                      minDaysToAdd = daysToAdd;
+                      const sessionDate = new Date(startDate);
+                      sessionDate.setDate(sessionDate.getDate() + daysToAdd);
+                      firstSession = {
+                        ...entry,
+                        date: sessionDate,
+                        dayName: daysOfWeek[targetDay]
+                      };
+                    }
+                  });
+
+                  if (firstSession) {
+                    const dateStr = firstSession.date.toLocaleDateString('vi-VN', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric'
+                    });
+
+                    return (
+                      <div className="border border-info bg-info-subtle rounded-8 p-12">
+                        <div className="text-info-700 fw-medium text-14 mb-4">
+                          <i className="fas fa-info-circle me-2"></i>
+                          Buổi học đầu tiên của lớp:
+                        </div>
+                        <div className="text-neutral-900 fw-semibold text-15">
+                          {firstSession.dayName}, {dateStr} ({firstSession.startTime} - {firstSession.endTime})
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             </div>
 

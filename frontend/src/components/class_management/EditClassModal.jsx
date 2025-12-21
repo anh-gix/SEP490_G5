@@ -3174,7 +3174,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       return null;
     }
 
-    // Get first schedule's day of week and time
+    // Get all unique days of week from schedules to find the earliest session
     const sortedSchedules = [...dataSource.schedules]
       .filter(s => s.status === 'fixed')
       .sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -3183,28 +3183,55 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       return null;
     }
 
-    const firstSchedule = sortedSchedules[0];
-    const firstScheduleDate = new Date(firstSchedule.date);
-    const targetDayOfWeek = firstScheduleDate.getDay();
+    // Get unique days of week from all schedules
+    const daysOfWeekMap = new Map();
+    sortedSchedules.forEach(schedule => {
+      const scheduleDate = new Date(schedule.date);
+      const dayOfWeek = scheduleDate.getDay();
+      if (!daysOfWeekMap.has(dayOfWeek)) {
+        daysOfWeekMap.set(dayOfWeek, {
+          dayOfWeek,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime
+        });
+      }
+    });
 
-    // Calculate next occurrence of that day from new startDate
-    const newStartDate = new Date(formData.startDate);
+    // Find the earliest session from new start date
+    const [year, month, day] = formData.startDate.split('-').map(Number);
+    const newStartDate = new Date(year, month - 1, day);
     const newStartDayOfWeek = newStartDate.getDay();
 
-    let daysToAdd = (targetDayOfWeek - newStartDayOfWeek + 7) % 7;
-    if (daysToAdd === 0) {
-      daysToAdd = 0; // Same day, use startDate
+    let earliestSession = null;
+    let minDaysToAdd = Infinity;
+
+    daysOfWeekMap.forEach((sessionInfo) => {
+      const targetDayOfWeek = sessionInfo.dayOfWeek;
+      let daysToAdd = (targetDayOfWeek - newStartDayOfWeek + 7) % 7;
+
+      if (daysToAdd < minDaysToAdd) {
+        minDaysToAdd = daysToAdd;
+        earliestSession = {
+          dayOfWeek: targetDayOfWeek,
+          daysToAdd,
+          ...sessionInfo
+        };
+      }
+    });
+
+    if (!earliestSession) {
+      return null;
     }
 
     const newFirstSessionDate = new Date(newStartDate);
-    newFirstSessionDate.setDate(newStartDate.getDate() + daysToAdd);
+    newFirstSessionDate.setDate(newStartDate.getDate() + earliestSession.daysToAdd);
 
     const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
     return {
       date: newFirstSessionDate.toLocaleDateString('vi-VN'),
-      dayName: dayNames[targetDayOfWeek],
-      time: `${firstSchedule.startTime} - ${firstSchedule.endTime}`
+      dayName: dayNames[earliestSession.dayOfWeek],
+      time: `${earliestSession.startTime} - ${earliestSession.endTime}`
     };
   }, [formData.startDate, initialStartDate, fullClassData, classData]);
 
@@ -3829,19 +3856,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                           {dateError}
                         </Form.Text>
                       )}
-                      {firstSessionInfo && (
-                        <Alert variant="danger" className="mt-12 mb-0">
-                          <div className="d-flex align-items-start">
-                            <i className="fas fa-info-circle me-2 mt-1"></i>
-                            <div>
-                              <strong>Buổi học đầu tiên của lớp:</strong>
-                              <div className="mt-1">
-                                {firstSessionInfo.dayName}, {firstSessionInfo.date} ({firstSessionInfo.time})
-                              </div>
-                            </div>
-                          </div>
-                        </Alert>
-                      )}
                     </>
                   ) : (
                     <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
@@ -3849,6 +3863,19 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                     </div>
                   )}
                 </Form.Group>
+              </div>
+              <div className="col-md-6">
+                {firstSessionInfo && (
+                  <div className="border border-danger bg-danger-subtle rounded-8 p-12">
+                    <div className="text-danger-700 fw-medium text-14 mb-4">
+                      <i className="fas fa-info-circle me-2"></i>
+                      Ngày khai giảng đã thay đổi nên buổi học đầu tiên của lớp bắt đầu vào ngày:
+                    </div>
+                    <div className="text-neutral-900 fw-semibold text-15">
+                      {firstSessionInfo.dayName}, {firstSessionInfo.date} ({firstSessionInfo.time})
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

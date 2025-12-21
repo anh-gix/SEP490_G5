@@ -70,9 +70,9 @@ const ProgramSuccessModal = ({
             <div className="col-md-4">
               <small className="text-neutral-600 d-block mb-1">Loại chương trình</small>
               <div className="fw-semibold text-neutral-900">
-                {programData.type === 'ielts' && '🎯 IELTS'}
-                {programData.type === 'toeic' && '📊 TOEIC'}
-                {programData.type === 'cam' && '🎓 Cambridge'}
+                {programData.type === 'ielts' && ' IELTS'}
+                {programData.type === 'toeic' && ' TOEIC'}
+                {programData.type === 'cam' && ' Cambridge'}
               </div>
             </div>
 
@@ -115,8 +115,9 @@ const ProgramSuccessModal = ({
           Bước tiếp theo
         </h6>
         <p className="text-neutral-600 text-sm mb-0">
-          Bạn có thể tạo học phần ngay bây giờ hoặc quay lại sau để tiếp tục.
-          Mỗi học phần sẽ được gắn với các PLO và bao gồm các sessions giảng dạy.
+          Bạn có thể tạo khóa học ngay bây giờ hoặc quay lại sau để tiếp tục.
+          Mỗi khóa học sẽ được gắn với các PLO.
+          
         </p>
       </div>
 

@@ -15,31 +15,26 @@ const CourseWizardIntro = ({ program, onStart, onCancel }) => {
     {
       number: 1,
       title: 'Thông tin cơ bản',
-      icon: 'ph ph-info',
       description: 'Mã môn, tên, mô tả, số buổi học, prerequisites'
     },
     {
       number: 2,
       title: 'PLO Mapping',
-      icon: 'ph ph-git-merge',
       description: 'Chọn các PLO mà học phần này sẽ đạt được'
     },
     {
       number: 3,
       title: 'Tài liệu khóa học',
-      icon: 'ph ph-books',
       description: 'Thêm giáo trình, tài liệu tham khảo cho học phần'
     },
     {
       number: 4,
       title: 'CLO & Mapping',
-      icon: 'ph ph-git-branch',
       description: 'Tạo Course Learning Outcomes và map với PLO'
     },
     {
       number: 5,
       title: 'Sessions',
-      icon: 'ph ph-calendar-blank',
       description: 'Tạo kế hoạch giảng dạy cho từng buổi học'
     }
   ];
@@ -118,7 +113,6 @@ const CourseWizardIntro = ({ program, onStart, onCancel }) => {
                   </div>
                   <div className="flex-grow-1">
                     <h6 className="fw-semibold text-neutral-900 mb-1">
-                      <i className={`${step.icon} me-2`}></i>
                       {step.title}
                     </h6>
                     <p className="text-neutral-600 text-sm mb-0">

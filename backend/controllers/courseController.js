@@ -77,14 +77,9 @@ exports.getCourseById = async (req, res) => {
                 path: 'camSessions',
                 options: { sort: { Order: 1 } }
             })
-            // CLOs cùng mapped PLOs (nếu cần hiển thị chi tiết)
-            .populate({
-                path: 'clos',
-                populate: {
-                    path: 'mappedPLOs',
-                    select: 'code name'
-                }
-            });
+            // CLOs - mappedPLOs là embedded ObjectIds trong cloSchema, không cần populate
+            // vì PLO là embedded trong Program, không phải model riêng
+            ;
 
         if (!course) {
             return res.status(404).json({

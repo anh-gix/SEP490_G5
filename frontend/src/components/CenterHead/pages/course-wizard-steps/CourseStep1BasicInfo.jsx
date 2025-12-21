@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'react-toastify';
 import Button from '../../compo/Button';
 import courseService from '../../../../services/courseService';
 
@@ -47,7 +48,7 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
       // Get user ID
       const userStr = localStorage.getItem('user');
       if (!userStr) {
-        alert('Không tìm thấy thông tin user!');
+        toast.error('Không tìm thấy thông tin user!');
         return;
       }
       const user = JSON.parse(userStr);
@@ -101,7 +102,7 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
 
       // Show appropriate message based on whether we created or updated
       const isUpdate = courseData._id !== null;
-      alert(isUpdate ? 'Cập nhật thông tin học phần thành công!' : 'Tạo học phần thành công!');
+      toast.success(isUpdate ? 'Cập nhật thông tin học phần thành công!' : 'Tạo học phần thành công!');
       onNext();
     } catch (error) {
       console.error('Error saving course:', error);
@@ -109,9 +110,9 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
 
       // Show more detailed error for duplicate courseCode
       if (errorMsg.includes('Mã môn học đã tồn tại')) {
-        alert(` Lỗi: Mã môn học "${courseData.courseCode}" đã tồn tại trong hệ thống!\n\nVui lòng sử dụng mã môn học khác.`);
+        toast.error(`Mã môn học "${courseData.courseCode}" đã tồn tại trong hệ thống! Vui lòng sử dụng mã môn học khác.`);
       } else {
-        alert(errorMsg);
+        toast.error(errorMsg);
       }
     } finally {
       setLoading(false);
@@ -122,10 +123,6 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
     <div>
       {/* Section 1: Basic Information */}
       <div className="mb-32">
-        <h6 className="text-lg fw-bold text-neutral-900 mb-16 pb-8 border-bottom">
-          <i className="ph ph-info-circle me-2"></i>
-          Thông tin cơ bản
-        </h6>
         <div className="row gy-3">
           {/* Mã học phần */}
           <div className="col-md-6">
@@ -164,7 +161,7 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
           </div>
 
           {/* Số lượng buổi học */}
-          <div className="col-md-4">
+          <div className={program?.type === 'cam' ? 'col-md-4' : 'col-md-6'}>
             <label className="form-label fw-semibold text-neutral-900 mb-2">
               Số lượng buổi học <span className="text-danger-600">*</span>
             </label>
@@ -182,22 +179,24 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
             <small className="text-muted">Tổng số buổi học trong học phần</small>
           </div>
 
-          {/* Loại hình học */}
-          <div className="col-md-4">
-            <label className="form-label fw-semibold text-neutral-900 mb-2">
-              Loại hình học <span className="text-danger-600">*</span>
-            </label>
-            <select
-              name="learningType"
-              value={courseData.learningType}
-              onChange={handleInputChange}
-              className="form-select radius-8"
-              style={{ height: '44px' }}
-            >
-              <option value="offline">Offline (Học trực tiếp)</option>
-              <option value="online">Online (Học trực tuyến)</option>
-            </select>
-          </div>
+          {/* Loại hình học - Chỉ hiển thị khi program.type = 'cam' */}
+          {program?.type === 'cam' && (
+            <div className="col-md-4">
+              <label className="form-label fw-semibold text-neutral-900 mb-2">
+                Loại hình học <span className="text-danger-600">*</span>
+              </label>
+              <select
+                name="learningType"
+                value={courseData.learningType}
+                onChange={handleInputChange}
+                className="form-select radius-8"
+                style={{ height: '44px' }}
+              >
+                <option value="offline">Offline (Học trực tiếp)</option>
+                <option value="online">Online (Học trực tuyến)</option>
+              </select>
+            </div>
+          )}
 
           {/* Phân bổ thời gian */}
           <div className="col-12">

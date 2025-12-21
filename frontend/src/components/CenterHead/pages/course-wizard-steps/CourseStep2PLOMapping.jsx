@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import Button from '../../compo/Button';
 import Badge from '../../compo/Badge';
 import courseService from '../../../../services/courseService';
@@ -27,7 +28,7 @@ const CourseStep2PLOMapping = ({ courseData, setCourseData, program, onNext, onP
       setProgramPLOs(response.data.plos || []);
     } catch (error) {
       console.error('Error loading program PLOs:', error);
-      alert(error.message || 'Không thể tải danh sách PLO của chương trình!');
+      toast.error(error.message || 'Không thể tải danh sách PLO của chương trình!');
     } finally {
       setLoading(false);
     }
@@ -53,7 +54,7 @@ const CourseStep2PLOMapping = ({ courseData, setCourseData, program, onNext, onP
 
   const handleSaveAndNext = async () => {
     if (selectedPLOs.length === 0) {
-      alert('Vui lòng chọn ít nhất 1 PLO để mapping!');
+      toast.error('Vui lòng chọn ít nhất 1 PLO để mapping!');
       return;
     }
 
@@ -73,11 +74,11 @@ const CourseStep2PLOMapping = ({ courseData, setCourseData, program, onNext, onP
         lastCompletedStep: 2
       }));
 
-      alert('Cập nhật PLO mapping thành công!');
+      toast.success('Cập nhật PLO mapping thành công!');
       onNext();
     } catch (error) {
       console.error('Error saving PLO mapping:', error);
-      alert(error.message || 'Lỗi khi lưu PLO mapping!');
+      toast.error(error.message || 'Lỗi khi lưu PLO mapping!');
     } finally {
       setLoading(false);
     }

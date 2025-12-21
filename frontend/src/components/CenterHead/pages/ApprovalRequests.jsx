@@ -12,7 +12,7 @@ import userService from '../../../services/userService';
 
 const ApprovalRequests = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('top_down'); // Only 'top_down' - Công việc đã giao
+  const [activeTab] = useState('top_down'); // Only 'top_down' - Công việc đã giao
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -65,9 +65,31 @@ const ApprovalRequests = () => {
     fetchRequests();
   }, [activeTab, statusFilter, currentPage, itemsPerPage]);
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
+  // Calculate stats from current requests list
+  const calculateStatsFromRequests = (requestsList) => {
+    const statsCount = {
+      pending: 0,
+      in_progress: 0,
+      pending_approval: 0,
+      completed: 0
+    };
+
+    requestsList.forEach(request => {
+      if (statsCount[request.status] !== undefined) {
+        statsCount[request.status]++;
+      }
+    });
+
+    setStats({
+      pendingApprovals: 0, // Not used for center head view
+      approved: 0, // Not used for center head view
+      rejected: 0, // Not used for center head view
+      pendingTasks: statsCount.pending,
+      inProgressTasks: statsCount.in_progress,
+      pendingApprovalTasks: statsCount.pending_approval,
+      completedTasks: statsCount.completed
+    });
+  };
 
   // Handle modal transitions
   useEffect(() => {
@@ -151,6 +173,26 @@ const ApprovalRequests = () => {
           setTotalItems(response.pagination.total);
           setTotalPages(response.pagination.totalPages);
         }
+
+        // Calculate stats from all requests (fetch without pagination for accurate stats)
+        const allRequestsParams = {
+          direction: activeTab,
+          limit: 1000 // Large limit to get all records for stats calculation
+        };
+        if (statusFilter && statusFilter !== 'all') {
+          allRequestsParams.status = statusFilter;
+        }
+
+        try {
+          const allRequestsResponse = await workRequestService.getAllRequests(allRequestsParams);
+          if (allRequestsResponse.success) {
+            calculateStatsFromRequests(allRequestsResponse.data);
+          }
+        } catch (statsError) {
+          console.error('Error fetching stats:', statsError);
+          // Fallback to current page stats if all requests fetch fails
+          calculateStatsFromRequests(response.data);
+        }
       }
     } catch (error) {
       console.error('Error fetching requests:', error);
@@ -159,33 +201,6 @@ const ApprovalRequests = () => {
     }
   };
 
-  const fetchStats = async () => {
-    try {
-      const response = await workRequestService.getStats();
-      if (response.success) {
-        const data = response.data;
-
-        // Bottom-up stats
-        const bottomUpStats = data.byDirection?.bottom_up || {};
-        // Top-down stats
-        const topDownStats = data.byDirection?.top_down || {};
-
-        setStats({
-          // Bottom-up
-          pendingApprovals: bottomUpStats.pending || 0,
-          approved: bottomUpStats.approved || 0,
-          rejected: bottomUpStats.rejected || 0,
-          // Top-down
-          pendingTasks: topDownStats.pending || 0,
-          inProgressTasks: topDownStats.in_progress || 0,
-          pendingApprovalTasks: topDownStats.pending_approval || 0,
-          completedTasks: topDownStats.completed || 0
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  };
 
   const handleViewDetail = (request) => {
     setSelectedRequest(request);
@@ -208,7 +223,6 @@ const ApprovalRequests = () => {
         setApproveNote('');
         setSelectedRequest(null);
         fetchRequests();
-        fetchStats();
       }
     } catch (error) {
       console.error('Error approving request:', error);
@@ -239,7 +253,6 @@ const ApprovalRequests = () => {
         setReviewNote('');
         setSelectedRequest(null);
         fetchRequests();
-        fetchStats();
       }
     } catch (error) {
       console.error('Error rejecting request:', error);
@@ -268,7 +281,6 @@ const ApprovalRequests = () => {
         setRevokeReason('');
         setSelectedRequest(null);
         fetchRequests();
-        fetchStats();
       }
     } catch (error) {
       console.error('Error revoking approval:', error);
@@ -301,7 +313,6 @@ const ApprovalRequests = () => {
         setDeleteLinkedEntity(false);
         setSelectedRequest(null);
         fetchRequests();
-        fetchStats();
       }
     } catch (error) {
       console.error('Error canceling request:', error);
@@ -369,7 +380,6 @@ const ApprovalRequests = () => {
         });
         setShowCreateModal(false);
         fetchRequests();
-        fetchStats();
       }
     } catch (error) {
       console.error('Error creating work request:', error);

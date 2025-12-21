@@ -1862,28 +1862,56 @@ exports.getWorkRequestStats = async (req, res) => {
       });
     }
 
-    const query = {
-      assignedTo: userId,
+    // Query for top-down requests created by this center head
+    const baseQuery = {
+      requestedBy: userId,
       direction: 'top_down'
     };
 
     // Add status filter if provided and not 'all'
     if (status && status !== 'all') {
-      query.status = status;
+      baseQuery.status = status;
     }
 
-    const stats = {
-      assign_students: await WorkRequest.countDocuments({ ...query, requestType: 'assign_students' }),
-      create_program: await WorkRequest.countDocuments({ ...query, requestType: 'create_program' }),
-      edit_course: await WorkRequest.countDocuments({ ...query, requestType: 'edit_course' }),
-      create_exam: await WorkRequest.countDocuments({ ...query, requestType: 'create_exam' }),
-      total: await WorkRequest.countDocuments(query)
+    // Get stats by status
+    const stats = await WorkRequest.aggregate([
+      { $match: baseQuery },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Transform to expected format
+    const result = {
+      pending: 0,
+      in_progress: 0,
+      pending_approval: 0,
+      approved: 0,
+      rejected: 0,
+      completed: 0,
+      need_revision: 0,
+      total: 0
     };
 
+    stats.forEach(item => {
+      const statusKey = item._id;
+      if (result[statusKey] !== undefined) {
+        result[statusKey] = item.count;
+        result.total += item.count;
+      }
+    });
 
+    // Return data in the format expected by frontend
     res.status(200).json({
       success: true,
-      stats
+      data: {
+        byDirection: {
+          top_down: result
+        }
+      }
     });
 
   } catch (error) {

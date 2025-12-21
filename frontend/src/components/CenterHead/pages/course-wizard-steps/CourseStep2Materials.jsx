@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { toast } from 'react-toastify';
 import Button from '../../compo/Button';
 import Badge from '../../compo/Badge';
 import Modal from '../../compo/Modal';
@@ -72,7 +73,7 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
 
   const handleSaveMaterial = async () => {
     if (!materialForm.description) {
-      alert('Vui lòng nhập mô tả tài liệu!');
+      toast.error('Vui lòng nhập mô tả tài liệu!');
       return;
     }
 
@@ -106,7 +107,7 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
       setSelectedFile(null);
     } catch (error) {
       console.error('Error saving material:', error);
-      alert('Lỗi khi lưu tài liệu!');
+      toast.error('Lỗi khi lưu tài liệu!');
     }
   };
 
@@ -127,7 +128,7 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
       }));
     } catch (error) {
       console.error('Error deleting material:', error);
-      alert('Lỗi khi xóa tài liệu!');
+      toast.error('Lỗi khi xóa tài liệu!');
     }
   };
 
@@ -145,11 +146,11 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
         lastCompletedStep: 3
       }));
 
-      alert('Lưu tài liệu thành công!');
+      toast.success('Lưu tài liệu thành công!');
       onNext();
     } catch (error) {
       console.error('Error saving materials:', error);
-      alert('Lỗi khi lưu tài liệu!');
+      toast.error('Lỗi khi lưu tài liệu!');
     } finally {
       setLoading(false);
     }

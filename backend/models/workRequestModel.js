@@ -23,6 +23,7 @@ const workRequestSchema = new Schema({
 
       // Top-down (task assignment)
       'create_program',    // Yêu cầu tạo program mới
+      'edit_program',      // Yêu cầu chỉnh sửa program (thêm course mới)
       'edit_course',       // Yêu cầu chỉnh sửa course
       'create_exam',       // Yêu cầu tạo exam mới
       'assign_students',   // Yêu cầu sắp xếp học viên vào lớp từ file Excel

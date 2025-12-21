@@ -362,6 +362,126 @@ export const workRequestService = {
   },
 
   // =========================
+  // EDIT PROGRAM WORKFLOW
+  // =========================
+
+  /**
+   * Check if program has active edit request
+   * @param {string} programId - Program ID
+   */
+  checkProgramEditStatus: async (programId) => {
+    try {
+      const response = await api.get(`/work-requests/program/${programId}/edit-status`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể kiểm tra trạng thái yêu cầu chỉnh sửa' };
+    }
+  },
+
+  /**
+   * Create edit_program request (Center Head assigns to Subject Leader)
+   * @param {object} data - { entityId: programId, assignedTo: userId, requestNote: string }
+   */
+  createEditProgramRequest: async (data) => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const formData = new FormData();
+      formData.append('requestType', 'edit_program');
+      formData.append('entityId', data.entityId);
+      formData.append('assignedTo', data.assignedTo);
+      formData.append('requestedBy', user._id);
+      if (data.requestNote) {
+        formData.append('requestNote', data.requestNote);
+      }
+
+      const response = await api.post('/work-requests/create', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể tạo yêu cầu chỉnh sửa chương trình' };
+    }
+  },
+
+  /**
+   * Start processing edit_program request (Subject Leader accepts)
+   * @param {string} id - Request ID
+   * @param {object} data - { userId: string }
+   */
+  startEditProgram: async (id, data = {}) => {
+    try {
+      if (!data.userId) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        data.userId = user._id;
+      }
+
+      const response = await api.post(`/work-requests/${id}/start-edit-program`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể bắt đầu xử lý yêu cầu' };
+    }
+  },
+
+  /**
+   * Submit edit_program for approval (Subject Leader completes)
+   * @param {string} id - Request ID
+   * @param {object} data - { userId: string, note: string }
+   */
+  submitEditProgram: async (id, data = {}) => {
+    try {
+      if (!data.userId) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        data.userId = user._id;
+      }
+
+      const response = await api.post(`/work-requests/${id}/submit-edit-program`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể gửi yêu cầu phê duyệt' };
+    }
+  },
+
+  /**
+   * Approve edit_program request (Center Head approves)
+   * @param {string} id - Request ID
+   * @param {object} data - { userId: string, note: string }
+   */
+  approveEditProgram: async (id, data = {}) => {
+    try {
+      if (!data.userId) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        data.userId = user._id;
+      }
+
+      const response = await api.post(`/work-requests/${id}/approve-edit-program`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể duyệt yêu cầu chỉnh sửa' };
+    }
+  },
+
+  /**
+   * Reject edit_program request (Center Head rejects)
+   * @param {string} id - Request ID
+   * @param {object} data - { userId: string, rejectionReason: string }
+   */
+  rejectEditProgram: async (id, data) => {
+    try {
+      if (!data.userId) {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        data.userId = user._id;
+      }
+
+      const response = await api.post(`/work-requests/${id}/reject-edit-program`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể từ chối yêu cầu chỉnh sửa' };
+    }
+  },
+
+  // =========================
   // HELPERS - BACKWARD COMPATIBILITY
   // =========================
 

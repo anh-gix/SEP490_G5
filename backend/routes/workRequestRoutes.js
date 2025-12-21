@@ -78,6 +78,40 @@ router.post(
   workRequestController.withdrawExamSubmission
 );
 
+// =========================
+// EDIT PROGRAM WORKFLOW
+// =========================
+
+// Check if program has active edit request
+router.get(
+  '/program/:programId/edit-status',
+  workRequestController.checkProgramEditStatus
+);
+
+// Start processing edit_program request (Subject Leader accepts)
+router.post(
+  '/:id/start-edit-program',
+  workRequestController.startEditProgram
+);
+
+// Submit edit_program for approval (Subject Leader completes)
+router.post(
+  '/:id/submit-edit-program',
+  workRequestController.submitEditProgram
+);
+
+// Approve edit_program request (Center Head approves)
+router.post(
+  '/:id/approve-edit-program',
+  workRequestController.approveEditProgram
+);
+
+// Reject edit_program request (Center Head rejects)
+router.post(
+  '/:id/reject-edit-program',
+  workRequestController.rejectEditProgram
+);
+
 // Get all work requests with filters
 router.get(
   '/',

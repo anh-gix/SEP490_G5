@@ -1807,19 +1807,6 @@ exports.validateScheduleConflictSimple = async (req, res) => {
           .select('date startTime endTime class')
           .lean();
 
-        console.log(' Kiểm tra conflict giáo viên:', {
-          teacherId: teacher,
-          date: date,
-          excludeScheduleId: excludeScheduleId,
-          foundSchedules: teacherSchedules.length,
-          schedules: teacherSchedules.map(s => ({
-            id: s._id,
-            className: s.class?.name,
-            date: formatDateLocal(s.date),
-            time: `${s.startTime} - ${s.endTime}`
-          }))
-        });
-
         teacherSchedules.forEach((schedule) => {
           if (hasTimeOverlap(startTime, endTime, schedule.startTime, schedule.endTime)) {
             conflicts.teacher.push({

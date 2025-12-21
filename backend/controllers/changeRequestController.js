@@ -234,7 +234,6 @@ exports.getAllChangeRequests = async (req, res) => {
           console.log('  Found reverted request:', revertedRequest ? revertedRequest._id : 'None');
 
           if (revertedRequest) {
-            console.log('  ✅ Setting wasDeletedByRevert = true');
             request.studentScheduleId.wasDeletedByRevert = true;
           }
         } catch (error) {
@@ -247,10 +246,6 @@ exports.getAllChangeRequests = async (req, res) => {
       // và check xem makeupStudentScheduleId đó có còn tồn tại không
       else if (!request.studentScheduleId && request.type === 'makeup_class') {
         try {
-          console.log('🔍 Case 2: studentScheduleId is null, checking for deleted StudentSchedule...');
-          console.log('  Current request ID:', request._id);
-          console.log('  Sender:', request.sender._id || request.sender);
-
           // Tìm các đơn rejected cùng sender, type makeup_class, có makeupStudentScheduleId
           const rejectedRequests = await ChangeRequest.find({
             sender: request.sender._id || request.sender,
@@ -262,8 +257,6 @@ exports.getAllChangeRequests = async (req, res) => {
             .select('makeupStudentScheduleId')
             .lean();
 
-          console.log('  Found rejected requests with makeupStudentScheduleId:', rejectedRequests.length);
-
           // Với mỗi đơn rejected, kiểm tra xem makeupStudentScheduleId có còn tồn tại không
           for (const rejectedReq of rejectedRequests) {
             const makeupSchedule = await StudentSchedule.findById(rejectedReq.makeupStudentScheduleId).lean();
@@ -271,8 +264,6 @@ exports.getAllChangeRequests = async (req, res) => {
             // Nếu makeupStudentScheduleId không tồn tại (đã bị xóa)
             // → Đây chính là buổi nghỉ của đơn hiện tại (B->C)
             if (!makeupSchedule) {
-              console.log('  ✅ Found deleted makeupStudentScheduleId:', rejectedReq.makeupStudentScheduleId);
-              console.log('  Setting wasDeletedByRevert = true on request object');
               request.wasDeletedByRevert = true;
               break;
             }

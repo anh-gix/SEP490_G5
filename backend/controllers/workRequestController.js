@@ -1835,8 +1835,6 @@ exports.getWorkRequestStats = async (req, res) => {
       total: await WorkRequest.countDocuments(query)
     };
 
-    console.log('📊 WorkRequest stats for user', userId, ':', stats);
-
     res.status(200).json({
       success: true,
       stats

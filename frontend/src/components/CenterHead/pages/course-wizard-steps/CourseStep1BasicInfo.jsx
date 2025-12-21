@@ -196,25 +196,7 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
             >
               <option value="offline">Offline (Học trực tiếp)</option>
               <option value="online">Online (Học trực tuyến)</option>
-              <option value="hybrid">Hybrid (Kết hợp)</option>
             </select>
-          </div>
-
-          {/* Điều kiện tiên quyết */}
-          <div className="col-md-4">
-            <label className="form-label fw-semibold text-neutral-900 mb-2">
-              Điều kiện tiên quyết
-            </label>
-            <input
-              type="text"
-              name="preRequisite"
-              value={courseData.preRequisite}
-              onChange={handleInputChange}
-              className="form-control radius-8"
-              placeholder="Ví dụ: Hoàn thành IELTS A2"
-              style={{ height: '44px' }}
-            />
-            <small className="text-muted">Để trống hoặc nhập "None" nếu không có</small>
           </div>
 
           {/* Phân bổ thời gian */}
@@ -257,7 +239,6 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
               placeholder="Nhập mô tả chi tiết về học phần: mục tiêu, nội dung chính, phương pháp giảng dạy..."
               style={{ resize: 'vertical' }}
             />
-            <small className="text-muted">Mô tả tổng quan về học phần</small>
           </div>
 
           {/* Nhiệm vụ sinh viên */}
@@ -274,7 +255,6 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
               placeholder="Nhập nhiệm vụ của sinh viên: bài tập, dự án, thuyết trình, bài kiểm tra..."
               style={{ resize: 'vertical' }}
             />
-            <small className="text-muted">Các yêu cầu và nhiệm vụ sinh viên cần hoàn thành</small>
           </div>
         </div>
       </div>

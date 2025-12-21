@@ -427,6 +427,8 @@ exports.getAllRequests = async (req, res) => {
         .populate('assignedTo', 'name email username')
         .populate('processedBy', 'name email username')
         .populate('entityId')
+        .populate('history.performedBy', 'name email username')
+        .populate('revocation.revokedBy', 'name email username')
         .sort({ requestedAt: -1 })
         .skip(skip)
         .limit(limitNum),
@@ -480,6 +482,8 @@ exports.getMyRequests = async (req, res) => {
       .populate('processedBy', 'name email username')
       .populate('assignedTo', 'name email username')
       .populate('entityId')
+      .populate('history.performedBy', 'name email username')
+      .populate('revocation.revokedBy', 'name email username')
       .sort({ requestedAt: -1 });
 
     res.status(200).json({
@@ -529,6 +533,8 @@ exports.getAssignedToMe = async (req, res) => {
       .populate('assignedTo', 'name email username')
       .populate('processedBy', 'name email username')
       .populate('entityId')
+      .populate('history.performedBy', 'name email username')
+      .populate('revocation.revokedBy', 'name email username')
       .sort({ requestedAt: -1 });
 
     res.status(200).json({
@@ -558,7 +564,9 @@ exports.getRequestById = async (req, res) => {
       .populate('requestedBy', 'name email username')
       .populate('assignedTo', 'name email username')
       .populate('processedBy', 'name email username')
-      .populate('entityId');
+      .populate('entityId')
+      .populate('history.performedBy', 'name email username')
+      .populate('revocation.revokedBy', 'name email username');
 
     if (!request) {
       return res.status(404).json({
@@ -1292,8 +1300,16 @@ exports.createTopDownRequest = async (req, res) => {
         });
       }
 
+      // Get current course IDs to store as original courses
+      const existingCourses = await Course.find({ program: entityId }).select('_id').session(session);
+      const originalCourseIds = existingCourses.map(c => c._id.toString());
+
       workRequestData.entityType = 'Program';
       workRequestData.entityId = entityId;
+      workRequestData.changeDetails = {
+        ...workRequestData.changeDetails,
+        originalCourseIds: originalCourseIds
+      };
     }
 
     // Handle file uploads (if using multer)

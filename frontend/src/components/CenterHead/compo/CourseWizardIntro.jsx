@@ -16,40 +16,33 @@ const CourseWizardIntro = ({ program, onStart, onCancel }) => {
       number: 1,
       title: 'Thông tin cơ bản',
       icon: 'ph ph-info',
-      description: 'Mã môn, tên, mô tả, số buổi học, prerequisites',
-      duration: '2-3 phút'
+      description: 'Mã môn, tên, mô tả, số buổi học, prerequisites'
     },
     {
       number: 2,
       title: 'PLO Mapping',
       icon: 'ph ph-git-merge',
-      description: 'Chọn các PLO mà học phần này sẽ đạt được',
-      duration: '1-2 phút'
+      description: 'Chọn các PLO mà học phần này sẽ đạt được'
     },
     {
       number: 3,
       title: 'Tài liệu khóa học',
       icon: 'ph ph-books',
-      description: 'Thêm giáo trình, tài liệu tham khảo cho học phần',
-      duration: '2-3 phút'
+      description: 'Thêm giáo trình, tài liệu tham khảo cho học phần'
     },
     {
       number: 4,
       title: 'CLO & Mapping',
       icon: 'ph ph-git-branch',
-      description: 'Tạo Course Learning Outcomes và map với PLO',
-      duration: '3-5 phút'
+      description: 'Tạo Course Learning Outcomes và map với PLO'
     },
     {
       number: 5,
       title: 'Sessions',
       icon: 'ph ph-calendar-blank',
-      description: 'Tạo kế hoạch giảng dạy cho từng buổi học',
-      duration: '5-10 phút'
+      description: 'Tạo kế hoạch giảng dạy cho từng buổi học'
     }
   ];
-
-  const totalTime = '15-20 phút';
 
   return (
     <div className="course-wizard-intro">
@@ -124,15 +117,10 @@ const CourseWizardIntro = ({ program, onStart, onCancel }) => {
                     <strong>{step.number}</strong>
                   </div>
                   <div className="flex-grow-1">
-                    <div className="d-flex justify-content-between align-items-start mb-1">
-                      <h6 className="fw-semibold text-neutral-900 mb-0">
-                        <i className={`${step.icon} me-2`}></i>
-                        {step.title}
-                      </h6>
-                      <Badge variant="secondary" className="text-xs">
-                        {step.duration}
-                      </Badge>
-                    </div>
+                    <h6 className="fw-semibold text-neutral-900 mb-1">
+                      <i className={`${step.icon} me-2`}></i>
+                      {step.title}
+                    </h6>
                     <p className="text-neutral-600 text-sm mb-0">
                       {step.description}
                     </p>
@@ -178,17 +166,6 @@ const CourseWizardIntro = ({ program, onStart, onCancel }) => {
               </div>
             </div>
           </Card>
-
-          {/* Time Estimate */}
-          <div className="alert alert-info d-flex align-items-center gap-2 mb-4">
-            <i className="ph ph-clock fs-4"></i>
-            <div>
-              <strong>Thời gian dự kiến:</strong> {totalTime}
-              <div className="text-sm">
-                Bạn có thể tạm dừng và quay lại tiếp tục bất kỳ lúc nào
-              </div>
-            </div>
-          </div>
 
           {/* Action Buttons */}
           <div className="d-flex gap-3 justify-content-center">

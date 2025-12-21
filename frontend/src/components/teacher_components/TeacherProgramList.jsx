@@ -517,53 +517,64 @@ const TeacherProgramList = () => {
       header: 'Hành động',
       field: 'actions',
       render: (row) => (
-        <div className="d-flex gap-2 justify-content-center flex-wrap">
-          <button
-            className="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
+        <div className="d-flex gap-1 justify-content-center flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            icon="ph ph-eye"
             onClick={(e) => {
               e.stopPropagation();
               handleViewRequest(row);
             }}
+            className="px-2 py-1"
             title="Xem chi tiết"
           >
-            <i className="ph ph-eye"></i>
-            <span className="d-none d-md-inline">Xem</span>
-          </button>
+            <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Xem</span>
+            <span className="d-inline d-lg-none">👁</span>
+          </Button>
 
           {/* Pending: Bắt đầu xử lý */}
           {row.status === 'pending' && row.requestType === 'create_program' && (
-            <button
-              className="btn btn-sm btn-success d-flex align-items-center gap-1"
+            <Button
+              variant="success"
+              size="sm"
+              icon="ph ph-play"
               onClick={(e) => {
                 e.stopPropagation();
                 handleStartProcessing(row);
               }}
+              className="px-2 py-1"
               title="Bắt đầu xử lý"
             >
-              <i className="ph ph-play"></i>
-              <span className="d-none d-md-inline">Bắt đầu</span>
-            </button>
+              <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Bắt đầu</span>
+              <span className="d-inline d-lg-none">▶</span>
+            </Button>
           )}
 
           {/* Pending edit_program: Nhận việc */}
           {row.status === 'pending' && row.requestType === 'edit_program' && (
-            <button
-              className="btn btn-sm btn-success d-flex align-items-center gap-1"
+            <Button
+              variant="success"
+              size="sm"
+              icon="ph ph-play"
               onClick={(e) => {
                 e.stopPropagation();
                 handleStartEditProgram(row);
               }}
+              className="px-2 py-1"
               title="Nhận việc chỉnh sửa"
             >
-              <i className="ph ph-play"></i>
-              <span className="d-none d-md-inline">Nhận việc</span>
-            </button>
+              <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Nhận việc</span>
+              <span className="d-inline d-lg-none">▶</span>
+            </Button>
           )}
 
           {/* In progress create_program: Tiếp tục */}
           {row.status === 'in_progress' && row.requestType === 'create_program' && row.entityId && (
-            <button
-              className="btn btn-sm btn-info d-flex align-items-center gap-1"
+            <Button
+              variant="info"
+              size="sm"
+              icon="ph ph-pencil"
               onClick={async (e) => {
                 e.stopPropagation();
                 const programId = typeof row.entityId === 'object' ? row.entityId._id : row.entityId;
@@ -578,40 +589,31 @@ const TeacherProgramList = () => {
                   await fetchWorkRequests();
                 }
               }}
+              className="px-2 py-1"
               title="Tiếp tục tạo chương trình"
             >
-              <i className="ph ph-pencil"></i>
-              <span className="d-none d-md-inline">Tiếp tục</span>
-            </button>
+              <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Tiếp tục</span>
+              <span className="d-inline d-lg-none">✏</span>
+            </Button>
           )}
 
-          {/* In progress edit_program: Chỉnh sửa và Nộp */}
+          {/* In progress edit_program: Chỉnh sửa */}
           {row.status === 'in_progress' && row.requestType === 'edit_program' && row.entityId && (
-            <>
-              <button
-                className="btn btn-sm btn-info d-flex align-items-center gap-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const programId = typeof row.entityId === 'object' ? row.entityId._id : row.entityId;
-                  navigate(`/teacher/programs/${programId}`);
-                }}
-                title="Xem và chỉnh sửa chương trình"
-              >
-                <i className="ph ph-pencil"></i>
-                <span className="d-none d-md-inline">Chỉnh sửa</span>
-              </button>
-              <button
-                className="btn btn-sm btn-primary d-flex align-items-center gap-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSubmitEditProgram(row);
-                }}
-                title="Nộp để Center Head duyệt"
-              >
-                <i className="ph ph-paper-plane-tilt"></i>
-                <span className="d-none d-md-inline">Nộp duyệt</span>
-              </button>
-            </>
+            <Button
+              variant="primary"
+              size="sm"
+              icon="ph ph-pencil"
+              onClick={(e) => {
+                e.stopPropagation();
+                const programId = typeof row.entityId === 'object' ? row.entityId._id : row.entityId;
+                navigate(`/teacher/programs/${programId}`);
+              }}
+              className="px-2 py-1"
+              title="Xem và chỉnh sửa chương trình"
+            >
+              <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Chỉnh sửa</span>
+              <span className="d-inline d-lg-none">✏</span>
+            </Button>
           )}
 
           {/* Pending approval: Đang chờ duyệt */}
@@ -621,8 +623,10 @@ const TeacherProgramList = () => {
             </span>
           )}
           {row.status === 'in_progress' && !row.entityId && (
-            <button
-              className="btn btn-sm btn-warning d-flex align-items-center gap-1"
+            <Button
+              variant="warning"
+              size="sm"
+              icon="ph ph-plus-circle"
               onClick={async (e) => {
                 e.stopPropagation();
 
@@ -655,11 +659,12 @@ const TeacherProgramList = () => {
                   }
                 }
               }}
+              className="px-2 py-1"
               title="Tạo lại chương trình đã bị xóa"
             >
-              <i className="ph ph-plus-circle"></i>
-              <span className="d-none d-md-inline">Tạo lại</span>
-            </button>
+              <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Tạo lại</span>
+              <span className="d-inline d-lg-none">➕</span>
+            </Button>
           )}
         </div>
       ),

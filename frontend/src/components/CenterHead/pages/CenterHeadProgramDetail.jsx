@@ -157,76 +157,6 @@ const CenterHeadProgramDetail = () => {
     return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
-  // ===== TOGGLE ACTIVE HANDLER =====
-  const handleToggleActive = async () => {
-    const newIsActive = !program.isActive;
-
-    try {
-      setActionLoading(true);
-
-      // Nếu đang tắt (deactivate), kiểm tra trước
-      if (!newIsActive) {
-        const checkResult = await centerHeadService.canDeactivateProgram(id);
-
-        if (!checkResult.canDeactivate) {
-          // Hiển thị cảnh báo chi tiết về các course đang active
-          const activeCourses = checkResult.activeCourses || [];
-
-          let warningMessage = `Không thể tạm dừng chương trình!\n\n`;
-          warningMessage += `Còn ${activeCourses.length} khóa học đang hoạt động:\n`;
-
-          activeCourses.forEach((course, index) => {
-            if (index < 3) {
-              warningMessage += `• ${course.name || course.courseCode}`;
-              if (course.activeClassCount > 0) {
-                warningMessage += ` (${course.activeClassCount} lớp`;
-                if (course.estimatedEndDate) {
-                  warningMessage += ` - đến ${formatDateShort(course.estimatedEndDate)}`;
-                }
-                warningMessage += `)`;
-              }
-              warningMessage += `\n`;
-            }
-          });
-
-          if (activeCourses.length > 3) {
-            warningMessage += `... và ${activeCourses.length - 3} khóa học khác`;
-          }
-
-          toast.warning(warningMessage, {
-            position: 'top-right',
-            autoClose: 8000,
-            style: { whiteSpace: 'pre-line' }
-          });
-
-          setActionLoading(false);
-          return;
-        }
-
-        await centerHeadService.deactivateProgram(id);
-      } else {
-        await centerHeadService.activateProgram(id);
-      }
-
-      setProgram(prev => ({ ...prev, isActive: newIsActive }));
-
-      toast.success(
-        newIsActive
-          ? 'Đã kích hoạt chương trình thành công'
-          : 'Đã vô hiệu hóa chương trình thành công',
-        { position: 'top-right' }
-      );
-    } catch (error) {
-      console.error('Error toggling program active status:', error);
-      toast.error(
-        error.response?.data?.message || error.message || 'Không thể thay đổi trạng thái hoạt động',
-        { position: 'top-right' }
-      );
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   // ===== TOGGLE COURSE ACTIVE HANDLER =====
   const handleToggleCourseActive = async (courseId, currentIsActive, e) => {
     e.stopPropagation();
@@ -636,27 +566,6 @@ const CenterHeadProgramDetail = () => {
           <div className="d-flex flex-wrap align-items-center gap-3">
             <StatusBadge status={program.status} />
             <span className="text-neutral-600">Mã: <strong>{program.code}</strong></span>
-
-            {/* Toggle Active - Only for Approved programs */}
-            {program.status === 'approved' && (
-              <div className="d-flex align-items-center gap-2 ms-auto">
-                <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>
-                  {program.isActive ? 'Đang hoạt động' : 'Tạm dừng'}
-                </span>
-                <div className="form-check form-switch mb-0">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    checked={program.isActive || false}
-                    onChange={handleToggleActive}
-                    disabled={actionLoading}
-                    style={{ cursor: actionLoading ? 'not-allowed' : 'pointer' }}
-                    title={program.isActive ? 'Tạm dừng chương trình' : 'Mở chương trình cho đăng ký'}
-                  />
-                </div>
-              </div>
-            )}
           </div>
         </div>
         <div className="d-flex flex-wrap gap-2">

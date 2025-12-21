@@ -188,25 +188,6 @@ const TeacherExamList = () => {
     setCurrentPage(1);
   };
 
-  const handleDeleteExam = async (examId, examTitle) => {
-    const confirmMessage = `⚠️ CẢNH BÁO: Bạn có chắc muốn xóa đề thi "${examTitle}"?\n\n` +
-      `Hành động này KHÔNG THỂ HOÀN TÁC!\n\n` +
-      `Nhấn OK để xác nhận xóa.`;
-
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
-
-    try {
-      await examService.deleteExam(examId);
-      await fetchExams();
-      alert('Đã xóa đề thi thành công!');
-    } catch (err) {
-      console.error('Error deleting exam:', err);
-      alert(err.message || 'Có lỗi xảy ra khi xóa đề thi.');
-    }
-  };
-
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setSearchKeyword('');
@@ -400,36 +381,6 @@ const TeacherExamList = () => {
             <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Xem</span>
             <span className="d-inline d-lg-none">👁</span>
           </Button>
-          {activeTab === 'my-exams' && (
-            <>
-              <Button
-                variant="secondary"
-                size="sm"
-                icon="ph ph-pencil"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/teacher/exams/${row._id}/edit`);
-                }}
-                className="px-2 py-1"
-              >
-                <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Sửa</span>
-                <span className="d-inline d-lg-none">✏️</span>
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                icon="ph ph-trash"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteExam(row._id, row.title);
-                }}
-                className="px-2 py-1"
-              >
-                <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Xóa</span>
-                <span className="d-inline d-lg-none">🗑️</span>
-              </Button>
-            </>
-          )}
         </div>
       ),
     },

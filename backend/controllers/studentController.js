@@ -1913,9 +1913,10 @@ const enrollStudentInCourses = async (studentId, levelsToStudyStr, type, program
     }
 
     // Find programs by codes - ONLY use program codes, no fallback to type+level
+    // Only use approved programs (programs that have been approved by Center Head)
     const programs = await Program.find({
       code: { $in: programCodes },
-      status: 'active'
+      status: 'approved'
     }).select('_id level code');
 
     if (programs.length === 0) {

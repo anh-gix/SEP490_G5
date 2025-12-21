@@ -23,7 +23,9 @@ const RequestDetailPage = ({
   formatDate
 }) => {
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showRevertModal, setShowRevertModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [reverting, setReverting] = useState(false);
   const [loadingStudentScheduleIds, setLoadingStudentScheduleIds] = useState({}); // Map session index -> loading state
   const [resolvedStudentScheduleIds, setResolvedStudentScheduleIds] = useState({}); // Map session index -> studentScheduleId
   const [replaceTeacherStudentScheduleId, setReplaceTeacherStudentScheduleId] = useState(null); // studentScheduleId cho đơn request_replace_teacher
@@ -1150,7 +1152,18 @@ const RequestDetailPage = ({
           </Card>
           
           <div className="d-flex justify-content-end gap-12">
-            {/* Nút Hoàn tác đã bị ẩn - hệ thống tự động revert khi từ chối đơn pending liên quan */}
+            {/* Nút Hoàn tác - hiển thị cho đơn đã được duyệt */}
+            {selectedRequest?.status === 'approved' && (
+              <Button 
+                variant="warning" 
+                onClick={() => setShowRevertModal(true)}
+                disabled={reverting}
+                className="d-flex align-items-center gap-2"
+              >
+                <i className="fas fa-undo"></i>
+                {reverting ? 'Đang xử lý...' : 'Hoàn tác'}
+              </Button>
+            )}
 
             <Button 
               variant="secondary" 
@@ -1255,7 +1268,48 @@ const RequestDetailPage = ({
         </Modal.Footer>
       </Modal>
 
-      {/* Modal hoàn tác đã bị xóa - hệ thống tự động revert khi từ chối đơn pending liên quan */}
+      {/* Modal xác nhận hoàn tác */}
+      <Modal show={showRevertModal} onHide={() => setShowRevertModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Xác nhận hoàn tác đơn</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Alert variant="warning" className="mb-3">
+            <i className="fas fa-exclamation-triangle me-2"></i>
+            Bạn có chắc chắn muốn hoàn tác đơn này không?
+          </Alert>
+          <p className="text-neutral-700 mb-2">
+            <strong>Hành động sẽ thực hiện:</strong>
+          </p>
+          <ul className="text-neutral-700">
+            <li>Khôi phục buổi nghỉ về trạng thái ban đầu</li>
+            <li>Xóa buổi học bù đã được tạo</li>
+            <li>Chuyển đơn sang trạng thái "Từ chối"</li>
+          </ul>
+          {selectedRequest && (
+            <div className="mt-3 p-3 bg-light rounded">
+              <p className="mb-1"><strong>Người gửi:</strong> {selectedRequest.sender?.username}</p>
+              <p className="mb-1"><strong>Nội dung:</strong> {selectedRequest.content}</p>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button 
+            variant="secondary" 
+            onClick={() => setShowRevertModal(false)}
+            disabled={reverting}
+          >
+            Hủy
+          </Button>
+          <Button 
+            variant="warning" 
+            onClick={handleRevert}
+            disabled={reverting}
+          >
+            {reverting ? 'Đang xử lý...' : 'Xác nhận hoàn tác'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </>
   );
 };

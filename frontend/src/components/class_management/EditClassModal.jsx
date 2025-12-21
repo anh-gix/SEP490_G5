@@ -57,6 +57,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     conflictingRoomIds: []
   });
   const [checkingTeacherRoomConflicts, setCheckingTeacherRoomConflicts] = useState(false);
+  const [teacherSchedules, setTeacherSchedules] = useState({}); // Map teacherId -> schedules
+  const [roomSchedules, setRoomSchedules] = useState({}); // Map roomId -> schedules
   const [roomLoading, setRoomLoading] = useState(false);
   const [roomError, setRoomError] = useState(null);
   const [scheduleEntriesError, setScheduleEntriesError] = useState(null);
@@ -289,10 +291,11 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
 
 
       // Extract teacherId - handle both object and ID formats
+      // Priority: teacher._id (from populated data, most accurate) > teacherId field > teacher string
       const teacherId = 
-        dataToUse.teacherId ||
         (dataToUse.teacher?._id ? String(dataToUse.teacher._id) : '') ||
         (dataToUse.teacher?.id ? String(dataToUse.teacher.id) : '') ||
+        dataToUse.teacherId ||
         (typeof dataToUse.teacher === 'string' ? String(dataToUse.teacher) : '') ||
         '';
 
@@ -884,6 +887,377 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     return [];
   }, [formData.startDate, filledScheduleEntries, selectedCourse?.numberOfSessions, fullClassData?.schedules, classData?.schedules]);
 
+  // Merge generatedSessions with pendingScheduleChanges to get effective sessions
+  const effectiveGeneratedSessions = useMemo(() => {
+    if (!pendingScheduleChanges || pendingScheduleChanges.length === 0) {
+      return generatedSessions;
+    }
+
+    // Create a copy of generatedSessions
+    const updatedSessions = [...generatedSessions];
+
+    // Process each pending change
+    pendingScheduleChanges.forEach(change => {
+      if (change.updateScope === 'single') {
+        // For single update, find and replace the matching session
+        const oldDate = change.oldSchedule.date;
+        const oldStartTime = change.oldSchedule.startTime;
+        const oldEndTime = change.oldSchedule.endTime;
+
+        // Find the session to replace
+        const sessionIndex = updatedSessions.findIndex(session => 
+          session.date === oldDate &&
+          session.startTime === oldStartTime &&
+          session.endTime === oldEndTime
+        );
+
+        if (sessionIndex !== -1) {
+          // Replace with new schedule
+          updatedSessions[sessionIndex] = {
+            ...updatedSessions[sessionIndex],
+            date: change.newSchedule.date,
+            startTime: change.newSchedule.startTime,
+            endTime: change.newSchedule.endTime
+          };
+        }
+      } else if (change.updateScope === 'future') {
+        // For future updates, we need to replace all matching sessions
+        // Match by oldSchedule date, startTime, and endTime
+        const oldDate = change.oldSchedule.date;
+        const oldStartTime = change.oldSchedule.startTime;
+        const oldEndTime = change.oldSchedule.endTime;
+        const newStartTime = change.newSchedule.startTime;
+        const newEndTime = change.newSchedule.endTime;
+
+        // Parse dates
+        const oldDateObj = new Date(oldDate);
+        oldDateObj.setHours(0, 0, 0, 0);
+        const newDateObj = new Date(change.newSchedule.date);
+        newDateObj.setHours(0, 0, 0, 0);
+
+        // Find all sessions that match the pattern (same day of week, time, and date >= oldDate)
+        updatedSessions.forEach((session, index) => {
+          // Check if this session matches the pattern
+          const sessionDate = new Date(session.date);
+          sessionDate.setHours(0, 0, 0, 0);
+          
+          // Match by day of week, time, and date >= oldDate
+          if (sessionDate.getDay() === oldDateObj.getDay() &&
+              session.startTime === oldStartTime &&
+              session.endTime === oldEndTime &&
+              sessionDate >= oldDateObj) {
+            
+            // Calculate number of weeks between this session and the first session
+            const diffMs = sessionDate - oldDateObj;
+            const diffWeeks = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
+            
+            // Create new date: new date of first session + (number of weeks × 7 days)
+            const targetDate = new Date(newDateObj);
+            targetDate.setDate(targetDate.getDate() + (diffWeeks * 7));
+            
+            // Format date to YYYY-MM-DD
+            const year = targetDate.getFullYear();
+            const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+            const day = String(targetDate.getDate()).padStart(2, '0');
+            const newDateStr = `${year}-${month}-${day}`;
+
+            // Replace with new schedule
+            updatedSessions[index] = {
+              ...updatedSessions[index],
+              date: newDateStr,
+              startTime: newStartTime,
+              endTime: newEndTime
+            };
+          }
+        });
+      }
+    });
+
+    return updatedSessions;
+  }, [generatedSessions, pendingScheduleChanges]);
+
+  // Fetch teacher schedules for all teachers to check conflicts
+  useEffect(() => {
+    const fetchTeacherSchedules = async () => {
+      if (!effectiveGeneratedSessions.length || !teachers.length) {
+        setTeacherSchedules({});
+        return;
+      }
+
+      const schedulesMap = {};
+      
+      const sessionDates = effectiveGeneratedSessions.map(s => s.date).sort();
+      const minDate = sessionDates[0];
+      const maxDate = sessionDates[sessionDates.length - 1];
+
+      await Promise.all(
+        teachers.map(async (teacher) => {
+          const teacherId = teacher._id || teacher.id;
+          if (!teacherId) return;
+
+          try {
+            const response = await teacherService.getTeacherSchedule(teacherId, {
+              startDate: minDate,
+              endDate: maxDate
+            });
+
+            if (response && response.schedules) {
+              schedulesMap[String(teacherId)] = response.schedules;
+            }
+          } catch (error) {
+            schedulesMap[String(teacherId)] = [];
+          }
+        })
+      );
+
+      setTeacherSchedules(schedulesMap);
+    };
+
+    fetchTeacherSchedules();
+  }, [teachers, effectiveGeneratedSessions]);
+
+  // Fetch room schedules for all rooms to check conflicts
+  useEffect(() => {
+    const fetchRoomSchedules = async () => {
+      if (!effectiveGeneratedSessions.length || !rooms.length) {
+        setRoomSchedules({});
+        return;
+      }
+
+      const schedulesMap = {};
+      
+      const sessionDates = effectiveGeneratedSessions.map(s => s.date).sort();
+      const minDate = sessionDates[0];
+      const maxDate = sessionDates[sessionDates.length - 1];
+
+      await Promise.all(
+        rooms.map(async (room) => {
+          const roomId = room._id || room.id;
+          if (!roomId) return;
+
+          try {
+            const response = await roomService.getRoomSchedule(roomId, {
+              startDate: minDate,
+              endDate: maxDate
+            });
+
+            if (response && response.schedules) {
+              schedulesMap[String(roomId)] = response.schedules;
+            }
+          } catch (error) {
+            schedulesMap[String(roomId)] = [];
+          }
+        })
+      );
+
+      setRoomSchedules(schedulesMap);
+    };
+
+    fetchRoomSchedules();
+  }, [rooms, effectiveGeneratedSessions]);
+
+  // Calculate conflicting teacher IDs for all teachers based on effectiveGeneratedSessions
+  const conflictingTeacherIds = useMemo(() => {
+    if (!effectiveGeneratedSessions.length || Object.keys(teacherSchedules).length === 0) {
+      return new Set();
+    }
+
+    const conflicts = new Set();
+
+    const parseTime = (time) => {
+      if (!time) return null;
+      return time.length === 5 ? time : time.slice(0, 5);
+    };
+
+    const hasTimeOverlap = (startA, endA, startB, endB) => {
+      if (!startA || !endA || !startB || !endB) return false;
+      
+      const timeToMinutes = (timeStr) => {
+        if (!timeStr) return 0;
+        const parts = timeStr.split(':');
+        if (parts.length !== 2) return 0;
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
+        return hours * 60 + minutes;
+      };
+      
+      const startAMin = timeToMinutes(startA);
+      const endAMin = timeToMinutes(endA);
+      const startBMin = timeToMinutes(startB);
+      const endBMin = timeToMinutes(endB);
+      
+      return startAMin < endBMin && endAMin > startBMin;
+    };
+
+    // Helper function to format date to YYYY-MM-DD
+    const formatDateToYYYYMMDD = (dateInput) => {
+      if (!dateInput) return null;
+      
+      // If already in YYYY-MM-DD format, return as is
+      if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+        return dateInput;
+      }
+      
+      // If in DD/MM/YYYY format, convert to YYYY-MM-DD
+      if (typeof dateInput === 'string' && dateInput.includes('/')) {
+        const [day, month, year] = dateInput.split('/');
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+      
+      // Try parsing as Date object
+      const date = new Date(dateInput);
+      if (isNaN(date.getTime())) return null;
+      
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    // Get current class ID as string for comparison
+    const currentClassIdStr = String(formData.id || formData._id || '');
+
+    Object.entries(teacherSchedules).forEach(([teacherId, schedules]) => {
+      if (!schedules || schedules.length === 0) return;
+
+      effectiveGeneratedSessions.forEach((session) => {
+        const sessionDate = session.date;
+        const sessionStart = parseTime(session.startTime);
+        const sessionEnd = parseTime(session.endTime);
+
+        schedules.forEach((schedule) => {
+          const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+          if (!scheduleDate) return;
+
+          // Skip if it's from the current class
+          const scheduleClassId = schedule.class?._id?.toString() || 
+                                 schedule.classId?.toString() || 
+                                 schedule.class?.id?.toString();
+          if (scheduleClassId && scheduleClassId === currentClassIdStr) {
+            return;
+          }
+
+          // Parse and normalize date to YYYY-MM-DD format
+          const normalizedScheduleDate = formatDateToYYYYMMDD(scheduleDate);
+          if (!normalizedScheduleDate || normalizedScheduleDate !== sessionDate) {
+            return;
+          }
+
+          const scheduleStart = parseTime(schedule.startTime);
+          const scheduleEnd = parseTime(schedule.endTime);
+          const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
+
+          if (hasTimeConflict) {
+            conflicts.add(teacherId);
+          }
+        });
+      });
+    });
+
+    return conflicts;
+  }, [effectiveGeneratedSessions, teacherSchedules, formData.id, formData._id]);
+
+  // Calculate conflicting room IDs for all rooms based on effectiveGeneratedSessions
+  const conflictingRoomIds = useMemo(() => {
+    if (!effectiveGeneratedSessions.length || Object.keys(roomSchedules).length === 0) {
+      return new Set();
+    }
+
+    const conflicts = new Set();
+
+    const parseTime = (time) => {
+      if (!time) return null;
+      return time.length === 5 ? time : time.slice(0, 5);
+    };
+
+    const hasTimeOverlap = (startA, endA, startB, endB) => {
+      if (!startA || !endA || !startB || !endB) return false;
+      
+      const timeToMinutes = (timeStr) => {
+        if (!timeStr) return 0;
+        const parts = timeStr.split(':');
+        if (parts.length !== 2) return 0;
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
+        return hours * 60 + minutes;
+      };
+      
+      const startAMin = timeToMinutes(startA);
+      const endAMin = timeToMinutes(endA);
+      const startBMin = timeToMinutes(startB);
+      const endBMin = timeToMinutes(endB);
+      
+      return startAMin < endBMin && endAMin > startBMin;
+    };
+
+    // Helper function to format date to YYYY-MM-DD
+    const formatDateToYYYYMMDD = (dateInput) => {
+      if (!dateInput) return null;
+      
+      // If already in YYYY-MM-DD format, return as is
+      if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+        return dateInput;
+      }
+      
+      // If in DD/MM/YYYY format, convert to YYYY-MM-DD
+      if (typeof dateInput === 'string' && dateInput.includes('/')) {
+        const [day, month, year] = dateInput.split('/');
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+      
+      // Try parsing as Date object
+      const date = new Date(dateInput);
+      if (isNaN(date.getTime())) return null;
+      
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    // Get current class ID as string for comparison
+    const currentClassIdStr = String(formData.id || formData._id || '');
+
+    Object.entries(roomSchedules).forEach(([roomId, schedules]) => {
+      if (!schedules || schedules.length === 0) return;
+
+      effectiveGeneratedSessions.forEach((session) => {
+        const sessionDate = session.date;
+        const sessionStart = parseTime(session.startTime);
+        const sessionEnd = parseTime(session.endTime);
+
+        schedules.forEach((schedule) => {
+          const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+          if (!scheduleDate) return;
+
+          // Skip if it's from the current class
+          const scheduleClassId = schedule.class?._id?.toString() || 
+                                 schedule.classId?.toString() || 
+                                 schedule.class?.id?.toString();
+          if (scheduleClassId && scheduleClassId === currentClassIdStr) {
+            return;
+          }
+
+          // Parse and normalize date to YYYY-MM-DD format
+          const normalizedScheduleDate = formatDateToYYYYMMDD(scheduleDate);
+          if (!normalizedScheduleDate || normalizedScheduleDate !== sessionDate) {
+            return;
+          }
+
+          const scheduleStart = parseTime(schedule.startTime);
+          const scheduleEnd = parseTime(schedule.endTime);
+          const hasTimeConflict = hasTimeOverlap(sessionStart, sessionEnd, scheduleStart, scheduleEnd);
+
+          if (hasTimeConflict) {
+            conflicts.add(roomId);
+          }
+        });
+      });
+    });
+
+    return conflicts;
+  }, [effectiveGeneratedSessions, roomSchedules, formData.id, formData._id]);
+
   // Log teacher schedule and compare with current class schedule when teacher is selected
   useEffect(() => {
     const logAndCompareSchedules = async () => {
@@ -1048,7 +1422,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
 
           const hasTimeOverlap = (startA, endA, startB, endB) => {
             if (!startA || !endA || !startB || !endB) return false;
-            
+
             // Chuyển đổi thời gian từ string "HH:MM" sang phút để so sánh chính xác
             const timeToMinutes = (timeStr) => {
               if (!timeStr) return 0;
@@ -1058,12 +1432,12 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
               const minutes = parseInt(parts[1], 10);
               return hours * 60 + minutes;
             };
-            
+
             const startAMin = timeToMinutes(startA);
             const endAMin = timeToMinutes(endA);
             const startBMin = timeToMinutes(startB);
             const endBMin = timeToMinutes(endB);
-            
+
             // Hai khoảng thời gian overlap nếu: startA < endB VÀ endA > startB
             // Lưu ý: Nếu một lớp kết thúc đúng lúc lớp kia bắt đầu (ví dụ: 08:00-10:00 và 10:00-12:00)
             // thì KHÔNG có overlap vì sử dụng > và < (không có =)
@@ -1073,67 +1447,85 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
           // Get current class ID as string for comparison
           const currentClassIdStr = String(classId);
 
-          currentClassSchedules.forEach(classSchedule => {
-            teacherSchedules.forEach(teacherSchedule => {
-              // Skip if it's from the same class (compare by classId)
-              const teacherClassIdStr = teacherSchedule.classId ? String(teacherSchedule.classId) : null;
-              
-              // Also check by className as fallback
-              const isSameClass = teacherClassIdStr && teacherClassIdStr === currentClassIdStr;
-              const isSameClassByName = teacherSchedule.className === (fullClassData?.name || 'Lớp hiện tại');
-              
-              if (isSameClass || isSameClassByName) {
-                return; // Skip schedules from the same class
-              }
+          // Helper function to check conflicts between class schedules and teacher schedules
+          const checkConflictsBetweenSchedules = (classSchedules, scheduleSource) => {
+            classSchedules.forEach(classSchedule => {
+              teacherSchedules.forEach(teacherSchedule => {
+                // Skip if it's from the same class (compare by classId)
+                const teacherClassIdStr = teacherSchedule.classId ? String(teacherSchedule.classId) : null;
 
-              // Skip if this schedule already has attendance (already taught)
-              const scheduleIdStr = teacherSchedule._id?.toString();
-              if (scheduleIdStr && scheduleIdsWithAttendance.has(scheduleIdStr)) {
-                return; // Skip schedules that already have attendance
-              }
+                // Also check by className as fallback
+                const isSameClass = teacherClassIdStr && teacherClassIdStr === currentClassIdStr;
+                const isSameClassByName = teacherSchedule.className === (fullClassData?.name || 'Lớp hiện tại');
 
-              // Check if same date (use formatDateToYYYYMMDD to handle ISO strings)
-              if (formatDateToYYYYMMDD(classSchedule.date) === formatDateToYYYYMMDD(teacherSchedule.date)) {
-                const classStart = parseTime(classSchedule.startTime);
-                const classEnd = parseTime(classSchedule.endTime);
-                const teacherStart = parseTime(teacherSchedule.startTime);
-                const teacherEnd = parseTime(teacherSchedule.endTime);
-
-                // Check time overlap
-                if (hasTimeOverlap(classStart, classEnd, teacherStart, teacherEnd)) {
-                  console.log(' [DEBUG] Phát hiện xung đột:', {
-                    date: classSchedule.date,
-                    currentClass: {
-                      startTime: classSchedule.startTime,
-                      endTime: classSchedule.endTime,
-                      parsed: `${classStart} - ${classEnd}`
-                    },
-                    teacherClass: {
-                      className: teacherSchedule.className,
-                      startTime: teacherSchedule.startTime,
-                      endTime: teacherSchedule.endTime,
-                      parsed: `${teacherStart} - ${teacherEnd}`
-                    }
-                  });
-                  
-                  conflicts.push({
-                    date: classSchedule.date,
-                    classTime: `${classStart} - ${classEnd}`,
-                    teacherTime: `${teacherStart} - ${teacherEnd}`,
-                    conflictingClass: teacherSchedule.className || 'N/A',
-                    conflictingClassId: teacherSchedule.classId || 'N/A',
-                    conflictingRoom: teacherSchedule.room,
-                    currentClassTime: `${classStart} - ${classEnd}`, // Thông tin lịch lớp hiện tại có xung đột
-                    currentClassStartTime: classStart, // Lưu startTime để so khớp chính xác
-                    currentClassEndTime: classEnd, // Lưu endTime để so khớp chính xác
-                    // Lưu thêm thông tin gốc để debug
-                    originalClassStartTime: classSchedule.startTime,
-                    originalClassEndTime: classSchedule.endTime
-                  });
+                if (isSameClass || isSameClassByName) {
+                  return; // Skip schedules from the same class
                 }
-              }
+
+                // Skip if this schedule already has attendance (already taught)
+                const scheduleIdStr = teacherSchedule._id?.toString();
+                if (scheduleIdStr && scheduleIdsWithAttendance.has(scheduleIdStr)) {
+                  return; // Skip schedules that already have attendance
+                }
+
+                // Check if same date (use formatDateToYYYYMMDD to handle ISO strings)
+                if (formatDateToYYYYMMDD(classSchedule.date) === formatDateToYYYYMMDD(teacherSchedule.date)) {
+                  const classStart = parseTime(classSchedule.startTime);
+                  const classEnd = parseTime(classSchedule.endTime);
+                  const teacherStart = parseTime(teacherSchedule.startTime);
+                  const teacherEnd = parseTime(teacherSchedule.endTime);
+
+                  // Check time overlap
+                  if (hasTimeOverlap(classStart, classEnd, teacherStart, teacherEnd)) {
+                    console.log(` [DEBUG] Phát hiện xung đột (${scheduleSource}):`, {
+                      date: classSchedule.date,
+                      currentClass: {
+                        startTime: classSchedule.startTime,
+                        endTime: classSchedule.endTime,
+                        parsed: `${classStart} - ${classEnd}`
+                      },
+                      teacherClass: {
+                        className: teacherSchedule.className,
+                        startTime: teacherSchedule.startTime,
+                        endTime: teacherSchedule.endTime,
+                        parsed: `${teacherStart} - ${teacherEnd}`
+                      }
+                    });
+
+                    conflicts.push({
+                      date: classSchedule.date,
+                      classTime: `${classStart} - ${classEnd}`,
+                      teacherTime: `${teacherStart} - ${teacherEnd}`,
+                      conflictingClass: teacherSchedule.className || 'N/A',
+                      conflictingClassId: teacherSchedule.classId || 'N/A',
+                      conflictingRoom: teacherSchedule.room,
+                      currentClassTime: `${classStart} - ${classEnd}`, // Thông tin lịch lớp hiện tại có xung đột
+                      currentClassStartTime: classStart, // Lưu startTime để so khớp chính xác
+                      currentClassEndTime: classEnd, // Lưu endTime để so khớp chính xác
+                      // Lưu thêm thông tin gốc để debug
+                      originalClassStartTime: classSchedule.startTime,
+                      originalClassEndTime: classSchedule.endTime,
+                      scheduleSource: scheduleSource // Thêm thông tin nguồn lịch để debug
+                    });
+                  }
+                }
+              });
             });
-          });
+          };
+
+          // Check conflicts with current class schedules from database
+          checkConflictsBetweenSchedules(currentClassSchedules, 'current_db_schedules');
+
+          // Also check conflicts with generated sessions (new schedules being edited)
+          if (generatedSessions.length > 0) {
+            const generatedSchedules = generatedSessions.map(session => ({
+              date: session.date,
+              startTime: session.startTime,
+              endTime: session.endTime,
+              className: fullClassData?.name || 'Lớp hiện tại (đang chỉnh sửa)'
+            }));
+            checkConflictsBetweenSchedules(generatedSchedules, 'generated_sessions');
+          }
 
           // Log comparison results and update state for filtering
           try {
@@ -1697,7 +2089,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     checkSchedulesAttendance();
   }, [fullClassData, classData]);
 
-  // Filter rooms - only show available rooms (status = 'available')
+  // Filter rooms - only show available rooms (status = 'available') and exclude those with conflicts
   // Rooms with status 'in_use' or 'maintenance' will not be shown
   const filteredRooms = useMemo(() => {
     // Only show rooms with status 'available', BUT also include the current room even if it's not available
@@ -1705,7 +2097,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     const currentClassRoomId = fullClassData?.room?._id || fullClassData?.room?.id;
     const currentScheduleRoomId = selectedScheduleDetail?.roomId || selectedScheduleDetail?.room?._id || selectedScheduleDetail?.room?.id;
 
-    return rooms.filter(room => {
+    // First filter by status
+    const availableRooms = rooms.filter(room => {
       const roomId = room._id || room.id;
       const roomIdStr = String(roomId);
       // Include if room is available OR if it's the current class room OR current schedule room
@@ -1713,14 +2106,41 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
              roomIdStr === String(currentClassRoomId) ||
              roomIdStr === String(currentScheduleRoomId);
     });
-  }, [rooms, fullClassData, selectedScheduleDetail]);
 
-  // Don't filter teachers - show all but mark conflicts
-  // This allows users to see and select conflicted teachers with warnings
+    // Then filter by conflicts
+    if (!effectiveGeneratedSessions.length || conflictingRoomIds.size === 0) {
+      return availableRooms;
+    }
+
+    const filtered = availableRooms.filter((room) => {
+      const roomId = room._id || room.id;
+      const roomIdStr = String(roomId);
+      
+      const hasIdConflict = conflictingRoomIds.has(roomIdStr) || conflictingRoomIds.has(String(room.id));
+      
+      return !hasIdConflict;
+    });
+
+    return filtered;
+  }, [rooms, fullClassData, selectedScheduleDetail, effectiveGeneratedSessions, conflictingRoomIds]);
+
+  // Filter teachers to exclude those with conflicts
   const filteredTeachers = useMemo(() => {
-    // Return all teachers (no filtering)
-    return teachers;
-  }, [teachers]);
+    if (!effectiveGeneratedSessions.length || conflictingTeacherIds.size === 0) {
+      return teachers;
+    }
+
+    const filtered = teachers.filter((teacher) => {
+      const teacherId = teacher._id || teacher.id;
+      const teacherIdStr = String(teacherId);
+      
+      const hasIdConflict = conflictingTeacherIds.has(teacherIdStr) || conflictingTeacherIds.has(String(teacher.id));
+      
+      return !hasIdConflict;
+    });
+
+    return filtered;
+  }, [teachers, effectiveGeneratedSessions, conflictingTeacherIds]);
 
   // Get current class schedules for use in render
   const currentClassSchedulesForRender = useMemo(() => {
@@ -2593,18 +3013,18 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         }
         setAvailableLevels(allLevels);
 
-        // Store all programs from DB - only approved programs
-        // But include current program even if not approved (to preserve existing data)
+        // Store all programs from DB - only approved and active programs
+        // But include current program even if not approved/active (to preserve existing data)
         if (programsResponse?.success && programsResponse.data) {
-          const approvedPrograms = programsResponse.data.filter(p => p.status === 'approved');
+          const approvedPrograms = programsResponse.data.filter(p => p.status === 'approved' && p.isActive === true);
           
-          // If current class has a programId, check if it's in the approved list
+          // If current class has a programId, check if it's in the approved and active list
           // If not, add it to preserve existing data
           let programsToUse = [...approvedPrograms];
           if (formData.programId) {
             const currentProgram = programsResponse.data.find(p => String(p._id) === String(formData.programId));
-            if (currentProgram && currentProgram.status !== 'approved') {
-              // Add current program even if not approved
+            if (currentProgram && (currentProgram.status !== 'approved' || currentProgram.isActive !== true)) {
+              // Add current program even if not approved or not active
               programsToUse.push(currentProgram);
             }
           }
@@ -2715,21 +3135,21 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         const response = await courseService.getAllCourses();
 
         if (response && response.success && response.data) {
-          // Filter to only show courses with status 'completed' or 'active'
-          // But include current course even if not completed/active (to preserve existing data)
-          const validCourses = response.data.filter(course => 
-            course.status === 'completed' || course.status === 'active'
+          // Filter to only show courses with status 'completed' or 'active' and isActive = true
+          // But include current course even if not completed/active or not active (to preserve existing data)
+          const validCourses = response.data.filter(course =>
+            (course.status === 'completed' || course.status === 'active') && course.isActive === true
           );
           
           // If current class has a course, check if it's in the valid list
           // If not, add it to preserve existing data
           let coursesToUse = [...validCourses];
           if (formData.course) {
-            const currentCourse = response.data.find(c => 
+            const currentCourse = response.data.find(c =>
               String(c._id) === String(formData.course) || String(c.id) === String(formData.course)
             );
-            if (currentCourse && currentCourse.status !== 'completed' && currentCourse.status !== 'active') {
-              // Add current course even if not completed/active
+            if (currentCourse && ((currentCourse.status !== 'completed' && currentCourse.status !== 'active') || currentCourse.isActive !== true)) {
+              // Add current course even if not completed/active or not active
               coursesToUse.push(currentCourse);
             }
           }
@@ -4122,7 +4542,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       ? 'Đang kiểm tra xung đột...'
                       : teachers.length === 0
                       ? 'Đang tải danh sách giáo viên...'
-                      : `Có ${teachers.length} giáo viên. ${generatedSessions.length > 0 ? 'Chọn giáo viên để kiểm tra xung đột lịch học.' : 'Chọn lịch học để kiểm tra xung đột.'}`}
+                      : `Có ${filteredTeachers.length} giáo viên. ${effectiveGeneratedSessions.length > 0 ? 'Chọn giáo viên để kiểm tra xung đột lịch học.' : 'Chọn lịch học để kiểm tra xung đột.'}`}
                   </Form.Text>
                   {teacherRoomConflicts.teacherConflicts.length > 0 && formData.teacherId && 
                    teacherRoomConflicts.teacherConflicts.some(c => c.teacherId === (formData.teacherId?.toString() || String(formData.teacherId))) && (
@@ -4271,7 +4691,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                           ? 'Đang kiểm tra xung đột...'
                           : rooms.length === 0
                           ? 'Đang tải danh sách phòng học...'
-                          : `Có ${rooms.length} phòng học. ${generatedSessions.length > 0 ? 'Chọn phòng học để kiểm tra xung đột lịch học.' : 'Chọn lịch học để kiểm tra xung đột.'}`}
+                          : `Có ${filteredRooms.length} phòng học. ${effectiveGeneratedSessions.length > 0 ? 'Chọn phòng học để kiểm tra xung đột lịch học.' : 'Chọn lịch học để kiểm tra xung đột.'}`}
                       </Form.Text>
                     </>
                   )}
@@ -4597,6 +5017,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         initialSelectedStudents={selectedStudents}
         generatedSessions={generatedSessions}
         courseId={formData.course || fullClassData?.course?._id || fullClassData?.course?.id || fullClassData?.course || null}
+        currentClassId={formData.id || fullClassData?._id || classId || null}
+        currentClassName={fullClassData?.name || formData.name || null}
       />
 
       {/* Import Result Modal */}
@@ -5624,6 +6046,90 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 console.log('  - UpdateScope:', updateScope);
                 console.log('  - Old Schedule:', oldSchedule);
                 console.log('  - New Schedule:', newSchedule);
+
+                // Log all teacher schedules on the new schedule date
+                console.log('🔍 DEBUG: Bắt đầu lấy lịch giáo viên cho ngày', newSchedule.date);
+                (async () => {
+                  try {
+                    console.log('🔍 DEBUG: Gọi teacherService.getAllTeachers()');
+                    const teachersResponse = await teacherService.getAllTeachers();
+                    console.log('🔍 DEBUG: teachersResponse:', teachersResponse);
+
+                    if (teachersResponse && teachersResponse.teachers && teachersResponse.teachers.length > 0) {
+                      console.log(`📅 Lịch dạy của tất cả giáo viên vào ngày ${newSchedule.date}:`);
+                      console.log('🔍 DEBUG: Tổng số giáo viên:', teachersResponse.teachers.length);
+
+                      const teacherSchedulesPromises = teachersResponse.teachers.map(async (teacher, index) => {
+                        try {
+                          console.log(`🔍 DEBUG: Lấy lịch cho giáo viên ${index + 1}/${teachersResponse.length}:`, teacher.name || teacher._id);
+                          const scheduleResponse = await teacherService.getTeacherSchedule(teacher._id || teacher.id, {
+                            startDate: newSchedule.date,
+                            endDate: newSchedule.date
+                          });
+                          console.log(`🔍 DEBUG: Response cho ${teacher.name}:`, scheduleResponse);
+
+                          if (scheduleResponse && scheduleResponse.schedules && scheduleResponse.schedules.length > 0) {
+                            const schedulesOnDate = scheduleResponse.schedules.filter(s => {
+                              const scheduleDate = s.date || s.scheduleDate || s.classDate;
+
+                              // Chuẩn hóa format date để so sánh
+                              let normalizedScheduleDate = scheduleDate;
+                              if (scheduleDate && scheduleDate.includes('/')) {
+                                // Convert DD/MM/YYYY to YYYY-MM-DD
+                                const [day, month, year] = scheduleDate.split('/');
+                                normalizedScheduleDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                              }
+
+                              const matches = normalizedScheduleDate === newSchedule.date;
+                              console.log(`🔍 DEBUG: Kiểm tra schedule date ${scheduleDate} -> ${normalizedScheduleDate} === ${newSchedule.date}:`, matches);
+                              return matches;
+                            });
+
+                            console.log(`🔍 DEBUG: Số lịch trong ngày cho ${teacher.name}:`, schedulesOnDate.length);
+
+                            if (schedulesOnDate.length > 0) {
+                              return {
+                                teacherName: teacher.name || teacher.fullName || 'N/A',
+                                teacherId: teacher._id || teacher.id,
+                                schedules: schedulesOnDate.map(s => ({
+                                  className: s.className || s.class?.name || 'N/A',
+                                  startTime: s.startTime,
+                                  endTime: s.endTime,
+                                  room: s.room?.room_name || s.room?.name || 'N/A'
+                                }))
+                              };
+                            }
+                          }
+                        } catch (error) {
+                          console.log(`🔍 DEBUG: Lỗi lấy lịch cho ${teacher.name}:`, error.message);
+                          // Ignore individual teacher errors
+                        }
+                        return null;
+                      });
+
+                      console.log('🔍 DEBUG: Chờ Promise.all hoàn thành');
+                      const teacherSchedules = await Promise.all(teacherSchedulesPromises);
+                      const validSchedules = teacherSchedules.filter(s => s !== null);
+                      console.log('🔍 DEBUG: Số giáo viên có lịch:', validSchedules.length);
+
+                      if (validSchedules.length > 0) {
+                        validSchedules.forEach(teacherSchedule => {
+                          console.log(`  👨‍🏫 ${teacherSchedule.teacherName} (${teacherSchedule.teacherId}):`);
+                          teacherSchedule.schedules.forEach(schedule => {
+                            console.log(`    - ${schedule.className}: ${schedule.startTime}-${schedule.endTime} tại ${schedule.room}`);
+                          });
+                        });
+                      } else {
+                        console.log('  Không có lịch dạy nào vào ngày này');
+                      }
+                    } else {
+                      console.log('  Không có danh sách giáo viên');
+                    }
+                  } catch (error) {
+                    console.log('  Lỗi khi lấy lịch giáo viên:', error.message);
+                    console.log('  Chi tiết lỗi:', error);
+                  }
+                })();
 
                 // Calculate matching schedule IDs if updateScope is 'future'
                 let matchingScheduleIds = [];

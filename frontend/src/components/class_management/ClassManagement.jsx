@@ -122,6 +122,23 @@ const ClassManagement = () => {
       }
 
       if (fetchedClassData) {
+        // Log teacher information
+        console.log('=== EDIT CLASS: TEACHER INFORMATION ===');
+        console.log('Class ID:', fetchedClassData._id || fetchedClassData.id || classId);
+        console.log('Class Name:', fetchedClassData.name);
+
+        if (fetchedClassData.teacherId) {
+          console.log('Teacher ID:', fetchedClassData.teacherId._id || fetchedClassData.teacherId);
+          console.log('Teacher Name:', fetchedClassData.teacherId.fullname || fetchedClassData.teacherId.name || 'N/A');
+          console.log('Teacher Email:', fetchedClassData.teacherId.email || 'N/A');
+        } else if (fetchedClassData.teacher) {
+          console.log('Teacher ID:', fetchedClassData.teacher._id || fetchedClassData.teacher);
+          console.log('Teacher Name:', fetchedClassData.teacher.fullname || fetchedClassData.teacher.name || 'N/A');
+          console.log('Teacher Email:', fetchedClassData.teacher.email || 'N/A');
+        } else {
+          console.log('No teacher information found');
+        }
+
         // Transform to match EditClassForm expected format
         setEditClassData({
           ...fetchedClassData,

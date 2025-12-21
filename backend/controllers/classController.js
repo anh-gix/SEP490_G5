@@ -497,7 +497,12 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
       const teacherSchedules = await ClassSchedule.find({
         class: { $in: teacherClassIds },
         date: { $in: uniqueDates },
-        status: { $in: ['temporary', 'fixed'] }
+        status: { $in: ['temporary', 'fixed'] },
+        // FIX: Chỉ lấy các buổi mà giáo viên này thực sự dạy
+        $or: [
+          { teacher: teacherId },
+          { substituteTeacher: teacherId }
+        ]
       })
         .populate('class', 'name')
         .select('date startTime endTime class')
@@ -2449,7 +2454,12 @@ const checkTeacherConflictsWithSchedules = async (teacherId, schedules, excludeC
     const teacherSchedules = await ClassSchedule.find({
       class: { $in: teacherClassIds },
       date: { $in: uniqueDates },
-      status: { $in: ['temporary', 'fixed'] }
+      status: { $in: ['temporary', 'fixed'] },
+      // FIX: Chỉ lấy các buổi mà giáo viên này thực sự dạy
+      $or: [
+        { teacher: teacherId },
+        { substituteTeacher: teacherId }
+      ]
     })
       .populate('class', 'name')
       .select('date startTime endTime class')

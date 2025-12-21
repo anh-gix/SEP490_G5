@@ -1954,7 +1954,7 @@ const enrollStudentInCourses = async (studentId, levelsToStudyStr, type, program
     const courses = await Course.find({
       program: { $in: programIds },
       status: { $in: ['completed', 'active'] }
-    }).select('_id name program');
+    }).select('_id name program status');
 
     if (courses.length === 0) {
       return {
@@ -1979,6 +1979,19 @@ const enrollStudentInCourses = async (studentId, levelsToStudyStr, type, program
         if (result.modifiedCount > 0 || result.matchedCount > 0) {
           enrolledCount++;
           enrolledCourseIds.push(course._id);
+
+          // If course status was 'completed' and now has students, change to 'active'
+          if (course.status === 'completed') {
+            try {
+              await Course.updateOne(
+                { _id: course._id },
+                { $set: { status: 'active' } }
+              );
+              console.log(`Course ${course._id} status changed from 'completed' to 'active'`);
+            } catch (statusError) {
+              console.error(`Error updating course status for ${course._id}:`, statusError.message);
+            }
+          }
         }
       } catch (courseError) {
         // Continue with other courses even if one fails
@@ -2259,6 +2272,21 @@ exports.updateStudentCourseEnrollments = async (req, res) => {
         { session }
       );
       updatedCourses.push(...coursesToAdd);
+
+      // Update course status from 'completed' to 'active' for courses that now have students
+      const coursesToActivate = await Course.find({
+        _id: { $in: coursesToAdd.map(id => new mongoose.Types.ObjectId(id)) },
+        status: 'completed'
+      }).session(session).select('_id name');
+
+      if (coursesToActivate.length > 0) {
+        await Course.updateMany(
+          { _id: { $in: coursesToActivate.map(c => c._id) } },
+          { $set: { status: 'active' } },
+          { session }
+        );
+        console.log(`Updated ${coursesToActivate.length} courses from 'completed' to 'active' when enrolling student ${studentId}`);
+      }
     }
 
     // Remove student from courses using $pull
@@ -2270,6 +2298,23 @@ exports.updateStudentCourseEnrollments = async (req, res) => {
         { session }
       );
       updatedCourses.push(...coursesToRemove);
+
+      // Check if courses now have no students, if so change from 'active' to 'completed'
+      const coursesAfterRemoval = await Course.find({
+        _id: { $in: coursesToRemove.map(id => new mongoose.Types.ObjectId(id)) },
+        status: 'active'
+      }).session(session).select('_id name studentEnrollments');
+
+      for (const course of coursesAfterRemoval) {
+        if (course.studentEnrollments.length === 0) {
+          await Course.updateOne(
+            { _id: course._id },
+            { $set: { status: 'completed' } },
+            { session }
+          );
+          console.log(`Course ${course._id} status changed from 'active' to 'completed' (no more students)`);
+        }
+      }
     }
 
     // Commit transaction

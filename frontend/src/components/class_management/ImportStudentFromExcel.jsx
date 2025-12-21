@@ -639,10 +639,10 @@ const ImportStudentFromExcel = ({ onBack }) => {
 
         const existingEmails = new Set(allUsers.map(u => u.email?.toLowerCase()).filter(Boolean));
 
-        // Get all approved program codes from database (only approved programs can be used)
+        // Get all approved and active program codes from database (only approved and active programs can be used)
         const approvedProgramCodes = new Set(
           programs
-            .filter(p => p.status === 'approved')
+            .filter(p => p.status === 'approved' && p.isActive === true)
             .map(p => p.code)
             .filter(Boolean)
         );
@@ -668,6 +668,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
 
             const invalidCodes = []; // Programs that don't exist at all
             const notApprovedCodes = []; // Programs that exist but are not approved
+            const inactiveCodes = []; // Programs that are approved but not active
             const validCodes = [];
             const mismatchedTypeCodes = [];
             const mismatchedLevelCodes = [];
@@ -682,49 +683,58 @@ const ImportStudentFromExcel = ({ onBack }) => {
               if (!programExists) {
                 // Program doesn't exist at all
                 invalidCodes.push(code);
-              } else if (approvedProgramCodes.has(code)) {
-                // Program exists and is approved
-                validCodes.push(code);
+              } else {
+                // Program exists, check its status and isActive
+                const program = allPrograms.find(p => p.code === code);
 
-                // Check if program type matches the student's type
-                const program = programs.find(p => p.code === code && p.status === 'approved');
-                if (program && item.type) {
-                  const itemTypeStr = item.type.toString().trim().toLowerCase();
-                  const programTypeStr = program.type?.toString().trim().toLowerCase() || '';
+                if (program.status !== 'approved') {
+                  // Program exists but is not approved
+                  notApprovedCodes.push({ code, status: program.status || 'unknown' });
+                } else if (program.isActive !== true) {
+                  // Program is approved but not active
+                  inactiveCodes.push(code);
+                } else {
+                  // Program exists, is approved and active
+                  validCodes.push(code);
+                }
+              }
+            });
 
-                  // Normalize type names for comparison
-                  const normalizeType = (type) => {
-                    if (type === 'cam') return 'cambridge';
-                    return type;
-                  };
+            // Check type and level validation for valid programs only
+            validCodes.forEach(code => {
+              const program = programs.find(p => p.code === code && p.status === 'approved' && p.isActive === true);
+              if (program && item.type) {
+                const itemTypeStr = item.type.toString().trim().toLowerCase();
+                const programTypeStr = program.type?.toString().trim().toLowerCase() || '';
 
-                  const normalizedItemType = normalizeType(itemTypeStr);
-                  const normalizedProgramType = normalizeType(programTypeStr);
+                // Normalize type names for comparison
+                const normalizeType = (type) => {
+                  if (type === 'cam') return 'cambridge';
+                  return type;
+                };
 
-                  if (normalizedItemType && normalizedProgramType && normalizedItemType !== normalizedProgramType) {
-                    mismatchedTypeCodes.push({
+                const normalizedItemType = normalizeType(itemTypeStr);
+                const normalizedProgramType = normalizeType(programTypeStr);
+
+                if (normalizedItemType && normalizedProgramType && normalizedItemType !== normalizedProgramType) {
+                  mismatchedTypeCodes.push({
+                    code: code,
+                    expected: itemTypeStr.toUpperCase(),
+                    actual: programTypeStr.toUpperCase()
+                  });
+                }
+
+                // Check if program level matches the levelsToStudy
+                if (requiredLevels.length > 0 && program.level) {
+                  const programLevel = program.level.toString().trim();
+                  if (!requiredLevels.includes(programLevel)) {
+                    mismatchedLevelCodes.push({
                       code: code,
-                      expected: itemTypeStr.toUpperCase(),
-                      actual: programTypeStr.toUpperCase()
+                      programLevel: programLevel,
+                      requiredLevels: requiredLevels.join(', ')
                     });
                   }
-
-                  // Check if program level matches the levelsToStudy
-                  if (requiredLevels.length > 0 && program.level) {
-                    const programLevel = program.level.toString().trim();
-                    if (!requiredLevels.includes(programLevel)) {
-                      mismatchedLevelCodes.push({
-                        code: code,
-                        programLevel: programLevel,
-                        requiredLevels: requiredLevels.join(', ')
-                      });
-                    }
-                  }
                 }
-              } else {
-                // Program exists but is not approved
-                const program = allPrograms.find(p => p.code === code);
-                notApprovedCodes.push({ code, status: program?.status || 'unknown' });
               }
             });
 
@@ -745,6 +755,17 @@ const ImportStudentFromExcel = ({ onBack }) => {
                                    status === 'needs_revision' ? 'cần chỉnh sửa' :
                                    status === 'archived' ? 'đã lưu trữ' : status;
                 const errorMsg = `Mã chương trình "${code}" chưa được phê duyệt (trạng thái: ${statusText})`;
+                if (!item.errors.includes(errorMsg)) {
+                  item.errors.push(errorMsg);
+                  item.hasError = true;
+                }
+              });
+            }
+
+            // Add error if program is approved but not active
+            if (inactiveCodes.length > 0) {
+              inactiveCodes.forEach(code => {
+                const errorMsg = `Mã chương trình "${code}" đã được phê duyệt nhưng chưa được kích hoạt (isActive = false)`;
                 if (!item.errors.includes(errorMsg)) {
                   item.errors.push(errorMsg);
                   item.hasError = true;

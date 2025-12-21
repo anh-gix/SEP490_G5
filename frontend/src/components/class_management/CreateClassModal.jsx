@@ -915,7 +915,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       try {
         const programsResponse = await programService.getAllPrograms();
         if (programsResponse?.success && programsResponse.data) {
-          const approvedPrograms = programsResponse.data.filter(p => p.status === 'approved');
+          const approvedPrograms = programsResponse.data.filter(p => p.status === 'approved' && p.isActive === true);
           setAllProgramsFromDB(approvedPrograms);
         }
 
@@ -1048,7 +1048,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       try {
         const response = await courseService.getCoursesByProgramId(formData.programId);
         if (response?.success && response.courses) {
-          setCourses(response.courses);
+          const activeCourses = response.courses.filter(course => course.isActive === true);
+          setCourses(activeCourses);
         }
       } catch (error) {
         console.error('Error fetching courses by program:', error);

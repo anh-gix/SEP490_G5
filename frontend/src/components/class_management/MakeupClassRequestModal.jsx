@@ -58,6 +58,15 @@ const MakeupClassRequestModal = ({
   const [originalScheduleInfo, setOriginalScheduleInfo] = useState(null);
   const [loadingOriginalSchedule, setLoadingOriginalSchedule] = useState(false);
 
+  // State to track if date and time are selected (for sequential form)
+  const [isDateTimeSelected, setIsDateTimeSelected] = useState(false);
+  
+  // State to track conflicted rooms (rooms that have schedule conflicts with selected time)
+  const [conflictedRoomIds, setConflictedRoomIds] = useState(new Set());
+  
+  // State to track conflicted teachers (teachers that have schedule conflicts with selected time)
+  const [conflictedTeacherIds, setConflictedTeacherIds] = useState(new Set());
+
   // Load original schedule info when modal opens
   useEffect(() => {
     if (show) {
@@ -88,6 +97,187 @@ const MakeupClassRequestModal = ({
     }
   }, [show, makeupOption, originalScheduleInfo, originalSchedule, sessionId, effectiveRequestType, isStudentMode]);
 
+  // Check if date and time are selected (for sequential form when creating new makeup class)
+  useEffect(() => {
+    if (makeupOption === 'new') {
+      const hasDate = !!formData.date;
+      const hasStartTime = !!formData.startTime;
+      const hasEndTime = !!formData.endTime;
+      const allDateTimeSelected = hasDate && hasStartTime && hasEndTime;
+      
+      setIsDateTimeSelected(allDateTimeSelected);
+      
+      // Clear room and teacher if date/time changes (user needs to reselect)
+      if (!allDateTimeSelected && (formData.room || formData.teacher)) {
+        setFormData(prev => ({
+          ...prev,
+          room: '',
+          teacher: ''
+        }));
+        setConflicts(null);
+      }
+    } else {
+      // Reset when switching to 'existing' option
+      setIsDateTimeSelected(false);
+    }
+  }, [formData.date, formData.startTime, formData.endTime, makeupOption]);
+
+  // Check room conflicts for the selected date when date/time is selected
+  useEffect(() => {
+    const checkRoomConflicts = async () => {
+      if (makeupOption === 'new' && isDateTimeSelected && formData.date && formData.startTime && formData.endTime && rooms.length > 0) {
+        try {
+          const conflictedRooms = new Set();
+          
+          // Fetch schedules for all rooms in parallel
+          const schedulePromises = rooms.map(async (room) => {
+            try {
+              const roomId = room._id || room.id;
+              const response = await roomService.getRoomSchedule(roomId, { date: formData.date });
+              
+              return {
+                roomId: roomId,
+                schedules: response.schedules || []
+              };
+            } catch (error) {
+              return {
+                roomId: room._id || room.id,
+                schedules: []
+              };
+            }
+          });
+          
+          const results = await Promise.all(schedulePromises);
+          
+          // Check for conflicts
+          results.forEach((roomData) => {
+            let hasConflict = false;
+            
+            roomData.schedules.forEach((schedule) => {
+              // Check if this schedule conflicts with selected time
+              if (schedule.startTime && schedule.endTime) {
+                const conflict = hasTimeOverlap(
+                    formData.startTime,
+                    formData.endTime,
+                    schedule.startTime,
+                    schedule.endTime
+                  );
+                
+                if (conflict) {
+                  hasConflict = true;
+                }
+              }
+            });
+            
+            if (hasConflict) {
+              conflictedRooms.add(String(roomData.roomId));
+            }
+          });
+          
+          // Update conflicted rooms state
+          setConflictedRoomIds(conflictedRooms);
+          
+          // Clear selected room if it becomes conflicted
+          if (formData.room && conflictedRooms.has(String(formData.room))) {
+            setFormData(prev => ({
+              ...prev,
+              room: ''
+            }));
+            setConflicts(null);
+          }
+          
+        } catch (error) {
+          // Silent error handling
+        }
+      } else {
+        // Clear conflicted rooms when date/time is not selected
+        setConflictedRoomIds(new Set());
+      }
+    };
+    
+    checkRoomConflicts();
+  }, [isDateTimeSelected, formData.date, formData.startTime, formData.endTime, makeupOption, rooms]);
+
+  // Check teacher conflicts for the selected date when date/time is selected
+  useEffect(() => {
+    const checkTeacherConflicts = async () => {
+      if (makeupOption === 'new' && isDateTimeSelected && formData.date && formData.startTime && formData.endTime && teachers.length > 0) {
+        try {
+          const conflictedTeachers = new Set();
+          
+          // Fetch schedules for all teachers in parallel
+          const schedulePromises = teachers.map(async (teacher) => {
+            try {
+              const teacherId = teacher._id || teacher.id;
+              // Use the same date for startDate and endDate to get schedules for that specific day
+              const response = await teacherService.getTeacherSchedule(teacherId, { 
+                startDate: formData.date, 
+                endDate: formData.date 
+              });
+              
+              return {
+                teacherId: teacherId,
+                schedules: response.schedules || []
+              };
+            } catch (error) {
+              return {
+                teacherId: teacher._id || teacher.id,
+                schedules: []
+              };
+            }
+          });
+          
+          const results = await Promise.all(schedulePromises);
+          
+          // Check for conflicts
+          results.forEach((teacherData) => {
+            let hasConflict = false;
+            
+            teacherData.schedules.forEach((schedule) => {
+              // Check if this schedule conflicts with selected time
+              if (schedule.startTime && schedule.endTime) {
+                const conflict = hasTimeOverlap(
+                    formData.startTime,
+                    formData.endTime,
+                    schedule.startTime,
+                    schedule.endTime
+                  );
+                
+                if (conflict) {
+                  hasConflict = true;
+                }
+              }
+            });
+            
+            if (hasConflict) {
+              conflictedTeachers.add(String(teacherData.teacherId));
+            }
+          });
+          
+          // Update conflicted teachers state
+          setConflictedTeacherIds(conflictedTeachers);
+          
+          // Clear selected teacher if it becomes conflicted
+          if (formData.teacher && conflictedTeachers.has(String(formData.teacher))) {
+            setFormData(prev => ({
+              ...prev,
+              teacher: ''
+            }));
+            setConflicts(null);
+          }
+          
+        } catch (error) {
+          // Silent error handling
+        }
+      } else {
+        // Clear conflicted teachers when date/time is not selected
+        setConflictedTeacherIds(new Set());
+      }
+    };
+    
+    checkTeacherConflicts();
+  }, [isDateTimeSelected, formData.date, formData.startTime, formData.endTime, makeupOption, teachers]);
+
   const resetForm = () => {
     setFormData({
       date: '',
@@ -106,6 +296,9 @@ const MakeupClassRequestModal = ({
     setAvailableSchedules([]);
     setSessionId(null);
     setCurrentClassScheduleId(null);
+    setIsDateTimeSelected(false);
+    setConflictedRoomIds(new Set());
+    setConflictedTeacherIds(new Set());
   };
 
   const fetchOriginalSchedule = async () => {
@@ -1113,6 +1306,14 @@ const MakeupClassRequestModal = ({
                     </div>
                   </div>
 
+                  {/* Hint message when date/time not selected */}
+                  {!isDateTimeSelected && (
+                    <Alert variant="info" className="mb-3">
+                      <i className="fas fa-info-circle me-2"></i>
+                      Vui lòng chọn ngày và giờ trước khi chọn phòng và giáo viên.
+                    </Alert>
+                  )}
+
                   <div className="row g-3 mb-3">
                     <div className="col-md-6">
                       <Form.Group>
@@ -1123,14 +1324,28 @@ const MakeupClassRequestModal = ({
                           name="room"
                           value={formData.room}
                           onChange={handleInputChange}
+                          disabled={!isDateTimeSelected}
                           required
                         >
                           <option value="">Chọn phòng học</option>
-                          {rooms.map(room => (
-                            <option key={room._id || room.id} value={room._id || room.id}>
-                              {room.room_name || room.name} {room.location ? `(${room.location})` : ''}
-                            </option>
-                          ))}
+                          {rooms
+                            .filter(room => {
+                              const roomId = String(room._id || room.id);
+                              return !conflictedRoomIds.has(roomId);
+                            })
+                            .map(room => {
+                              const roomName = room.room_name || room.name;
+                              const location = room.location ? `(${room.location})` : '';
+                              
+                              return (
+                                <option 
+                                  key={room._id || room.id} 
+                                  value={room._id || room.id}
+                                >
+                                  {roomName} {location}
+                                </option>
+                              );
+                            })}
                         </Form.Select>
                       </Form.Group>
                     </div>
@@ -1144,14 +1359,20 @@ const MakeupClassRequestModal = ({
                           name="teacher"
                           value={formData.teacher}
                           onChange={handleInputChange}
+                          disabled={!isDateTimeSelected}
                           required
                         >
                           <option value="">Chọn giáo viên</option>
-                          {teachers.map(teacher => (
-                            <option key={teacher._id || teacher.id} value={teacher._id || teacher.id}>
-                              {teacher.username || teacher.fullName || teacher.name || 'N/A'}
-                            </option>
-                          ))}
+                          {teachers
+                            .filter(teacher => {
+                              const teacherId = String(teacher._id || teacher.id);
+                              return !conflictedTeacherIds.has(teacherId);
+                            })
+                            .map(teacher => (
+                              <option key={teacher._id || teacher.id} value={teacher._id || teacher.id}>
+                                {teacher.username || teacher.fullName || teacher.name || 'N/A'}
+                              </option>
+                            ))}
                         </Form.Select>
                       </Form.Group>
                     </div>

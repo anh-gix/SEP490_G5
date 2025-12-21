@@ -3131,6 +3131,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
               roomId: futureRoomId, // Add roomId for modal initialization
               status: 'temporary',
               isNewClassSchedule: true, // Mark as new schedule (preview)
+              isRoomChangeOnly: change.isRoomChangeOnly, // Mark if only room changed
               timeStatus: 'upcoming'
             });
           });
@@ -3529,6 +3530,19 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
             room: change.newSchedule.roomId,
             updateScope: change.updateScope
           };
+
+          console.log(`\n📝 Đang cập nhật buổi học ID: ${change.scheduleId}`);
+          console.log(`   Scope: ${change.updateScope}`);
+          console.log(`   Old: ${change.oldSchedule.date} ${change.oldSchedule.startTime}-${change.oldSchedule.endTime} (Phòng: ${change.oldSchedule.roomId})`);
+          console.log(`   New: ${change.newSchedule.date} ${change.newSchedule.startTime}-${change.newSchedule.endTime} (Phòng: ${change.newSchedule.roomId})`);
+
+          try {
+            await classScheduleService.updateClassSchedule(change.scheduleId, updateData);
+            console.log(`   ✅ Cập nhật thành công`);
+          } catch (error) {
+            console.error(`   ❌ Cập nhật thất bại:`, error);
+            throw error;
+          }
         }
 
         console.log('\n─────────────────────────────────');

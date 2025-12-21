@@ -724,11 +724,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     }
   }, [formData.scheduleEntries]);
 
-  // Real-time conflict checking: Check conflicts when relevant fields change
+  // Real-time conflict checking: Only check for student conflicts
+  // Teacher and room conflicts are already filtered in dropdowns
   useEffect(() => {
     const checkConflicts = async () => {
-      // Only check if we have minimum required fields
-      if (!formData.teacherId || !formData.startDate || !formData.course || 
+      // Only check if we have selected students and minimum required fields
+      if (!formData.selectedStudents || formData.selectedStudents.length === 0 ||
+          !formData.startDate || !formData.course ||
           !formData.scheduleEntries || formData.scheduleEntries.length === 0 ||
           formData.scheduleEntries.some(entry => !entry.day || !entry.startTime || !entry.endTime)) {
         setConflicts({
@@ -744,9 +746,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       try {
         const conflictData = {
           course: formData.course,
-          teacher: formData.teacherId,
           students: formData.selectedStudents || [],
-          room: formData.roomId || null,
           startDate: formData.startDate,
           scheduleEntries: formData.scheduleEntries.map(entry => ({
             day: entry.day,
@@ -756,12 +756,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         };
 
         const response = await classService.validateConflicts(conflictData);
-        
+
         if (response.success) {
+          // Only show student conflicts (teacher/room already filtered in dropdowns)
           setConflicts({
-            hasConflict: response.hasConflict,
-            teacher: response.conflicts?.teacher || [],
-            room: response.conflicts?.room || [],
+            hasConflict: response.conflicts?.students?.length > 0,
+            teacher: [],
+            room: [],
             students: response.conflicts?.students || []
           });
         }
@@ -784,8 +785,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     }, 500); // Wait 500ms after user stops typing
 
     return () => clearTimeout(timeoutId);
-  }, [formData.teacherId, formData.startDate, formData.course, formData.roomId, 
-      formData.selectedStudents, formData.scheduleEntries]);
+  }, [formData.startDate, formData.course, formData.selectedStudents, formData.scheduleEntries]);
 
   const addScheduleEntry = () => {
     setFormData(prev => ({
@@ -1940,22 +1940,15 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                   const startDate = new Date(year, month - 1, day);
 
                   const daysOfWeek = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-                  const dayMap = {
-                    '1': 1, // Monday
-                    '2': 2, // Tuesday
-                    '3': 3, // Wednesday
-                    '4': 4, // Thursday
-                    '5': 5, // Friday
-                    '6': 6, // Saturday
-                    '0': 0  // Sunday
-                  };
 
                   // Find the earliest schedule entry
                   let firstSession = null;
                   let minDaysToAdd = Infinity;
 
                   filledScheduleEntries.forEach(entry => {
-                    const targetDay = dayMap[entry.day];
+                    const targetDay = getDayOfWeekNumber(entry.day);
+                    if (targetDay === null) return;
+
                     const currentDay = startDate.getDay();
                     let daysToAdd = targetDay - currentDay;
                     if (daysToAdd < 0) daysToAdd += 7;
@@ -2022,7 +2015,26 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                         type="button"
                         className="btn-outline-danger text-13 fw-medium px-14 py-6 radius-8"
                         onClick={() => removeScheduleEntry(entry.id)}
+                        style={{
+                          backgroundColor: 'transparent',
+                          color: '#dc3545',
+                          borderColor: '#dc3545',
+                          transition: 'all 0.2s ease-in-out'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#dc3545';
+                          e.currentTarget.style.color = '#fff';
+                          e.currentTarget.style.borderColor = '#dc3545';
+                          e.currentTarget.style.transform = 'scale(1.05)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                          e.currentTarget.style.color = '#dc3545';
+                          e.currentTarget.style.borderColor = '#dc3545';
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }}
                       >
+                        <i className="fas fa-trash-alt me-1"></i>
                         Xóa
                       </Button>
                     )}
@@ -2170,15 +2182,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                       ? `Có ${filteredTeachers.length} giáo viên phù hợp (chưa bị trùng lịch)`
                       : `Có ${teachers.length} giáo viên.`}
                   </Form.Text>
-                  {checkingConflicts && formData.teacherId && (
-                    <div className="mt-8">
-                      <Form.Text className="text-info text-12">
-                        <i className="fas fa-spinner fa-spin me-1"></i>
-                        Đang kiểm tra xung đột...
-                      </Form.Text>
-                    </div>
-                  )}
-                  {!checkingConflicts && conflicts.teacher && conflicts.teacher.length > 0 && (
+                  {conflicts.teacher && conflicts.teacher.length > 0 && (
                     <Alert variant="warning" className="mt-12 mb-0">
                       <div className="d-flex align-items-start">
                         <i className="fas fa-exclamation-triangle me-2 mt-1 text-warning"></i>
@@ -2242,15 +2246,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                       ? 'Vui lòng chọn course, ngày khai giảng và thời khóa biểu để có thể chọn phòng học phù hợp.'
                       : 'Chỉ hiển thị phòng chưa bị trùng với lịch đã chọn.'}
                   </Form.Text>
-                  {checkingConflicts && formData.roomId && (
-                    <div className="mt-8">
-                      <Form.Text className="text-info text-12">
-                        <i className="fas fa-spinner fa-spin me-1"></i>
-                        Đang kiểm tra xung đột...
-                      </Form.Text>
-                    </div>
-                  )}
-                  {!checkingConflicts && conflicts.room && conflicts.room.length > 0 && (
+                  {conflicts.room && conflicts.room.length > 0 && (
                     <Alert variant="warning" className="mt-12 mb-0">
                       <div className="d-flex align-items-start">
                         <i className="fas fa-exclamation-triangle me-2 mt-1 text-warning"></i>
@@ -2474,15 +2470,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                   Tải file mẫu Excel
                 </Button>
               </div>
-              {checkingConflicts && formData.selectedStudents && formData.selectedStudents.length > 0 && (
-                <div className="mt-12">
-                  <Form.Text className="text-info text-12">
-                    <i className="fas fa-spinner fa-spin me-1"></i>
-                    Đang kiểm tra xung đột lịch học viên...
-                  </Form.Text>
-                </div>
-              )}
-              {!checkingConflicts && conflicts.students && conflicts.students.length > 0 && (
+              {conflicts.students && conflicts.students.length > 0 && (
                 <Alert variant="warning" className="mt-12 mb-0">
                   <div className="d-flex align-items-start">
                     <i className="fas fa-exclamation-triangle me-2 mt-1 text-warning"></i>

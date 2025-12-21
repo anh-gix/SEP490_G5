@@ -156,6 +156,26 @@ export const classScheduleService = {
     } catch (error) {
       throw error.response?.data || { message: 'Không thể xếp người dạy thay' };
     }
+  },
+
+  // Cập nhật buổi học (date, time, room, scope)
+  updateClassSchedule: async (scheduleId, updateData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.put(
+        `http://localhost:${API_PORT}/api/schedules/${scheduleId}`,
+        updateData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể cập nhật buổi học' };
+    }
   }
 };
 

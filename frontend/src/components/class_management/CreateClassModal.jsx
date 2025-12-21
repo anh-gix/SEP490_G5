@@ -7,6 +7,7 @@ import teacherService from '../../services/teacherService';
 import studentService from '../../services/studentService';
 import classService from '../../services/classService';
 import courseService from '../../services/courseService';
+import programService from '../../services/programService';
 import SelectStudentModal from './SelectStudentModal';
 
 const createEmptyScheduleEntry = () => ({
@@ -25,6 +26,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     name: '',
     level: '',
     program: '',
+    programId: '', // ID của program được chọn từ dropdown
     band: '',
     course: '',
     teacherId: '',
@@ -161,8 +163,10 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   const [roomError, setRoomError] = useState(null);
   const [dateError, setDateError] = useState('');
   const [mappings, setMappings] = useState([]); // Store all mappings from database
-  const [availablePrograms, setAvailablePrograms] = useState([]); // Programs filtered by selected level
+  const [availablePrograms, setAvailablePrograms] = useState([]); // Programs filtered by selected level (type: IELTS, TOEIC, Cambridge)
   const [availableLevels, setAvailableLevels] = useState([]); // Levels filtered by selected program
+  const [allProgramsFromDB, setAllProgramsFromDB] = useState([]); // Tất cả programs từ bảng Program (program_name)
+  const [filteredProgramsFromDB, setFilteredProgramsFromDB] = useState([]); // Programs được filter theo type và level
 
   // Program name to type mapping
   const programTypeMap = {
@@ -900,22 +904,29 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     const fetchCourseData = async () => {
       try {
         // Fetch all types and levels from program table
-        const [typesResponse, levelsResponse] = await Promise.all([
+        const [typesResponse, levelsResponse, programsResponse] = await Promise.all([
           courseService.getAllTypes(),
-          courseService.getAllLevels()
+          courseService.getAllLevels(),
+          programService.getAllPrograms() // Fetch all programs from Program table
         ]);
-        
+
         if (typesResponse?.success && typesResponse.types) {
           const allTypes = typesResponse.types;
           const allPrograms = allTypes.map(type => getProgramFromType(type)).filter(Boolean);
           setAvailablePrograms(allPrograms);
         }
-        
+
         if (levelsResponse?.success && levelsResponse.levels) {
           const allLevels = levelsResponse.levels;
           setAvailableLevels(allLevels);
         }
-        
+
+        // Store all programs from DB
+        if (programsResponse?.success && programsResponse.data) {
+          setAllProgramsFromDB(programsResponse.data);
+          setFilteredProgramsFromDB(programsResponse.data); // Initially show all programs
+        }
+
         // Also fetch mappings for band lookup (still needed for band display)
         try {
           const mappingsResponse = await courseService.getCourseMappings();
@@ -1009,9 +1020,38 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         // Error fetching types by level
       }
     };
-    
+
     filterPrograms();
   }, [formData.level]);
+
+  // Filter programs from DB based on selected type and level
+  useEffect(() => {
+    if (!allProgramsFromDB || allProgramsFromDB.length === 0) {
+      return;
+    }
+
+    let filtered = allProgramsFromDB;
+
+    // Filter by type (program type)
+    if (formData.program) {
+      const type = getTypeFromProgram(formData.program);
+      if (type) {
+        filtered = filtered.filter(prog => prog.type === type);
+      }
+    }
+
+    // Filter by level
+    if (formData.level) {
+      filtered = filtered.filter(prog => prog.level === formData.level);
+    }
+
+    setFilteredProgramsFromDB(filtered);
+
+    // If current programId is not in filtered list, clear it
+    if (formData.programId && !filtered.find(p => p._id === formData.programId)) {
+      setFormData(prev => ({ ...prev, programId: '' }));
+    }
+  }, [formData.program, formData.level, allProgramsFromDB]);
 
   useEffect(() => {
     const fetchExistingSchedules = async () => {
@@ -1599,27 +1639,30 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   }, [generatedSessions, studentSchedules]);
 
   const filteredRooms = useMemo(() => {
+    // First filter by status - only show available rooms
+    const availableRooms = rooms.filter(room => room.status === 'available');
+
     if (!generatedSessions.length || !existingSchedules.length) {
-      return rooms;
+      return availableRooms;
     }
 
-    const filtered = rooms.filter(
+    const filtered = availableRooms.filter(
       (room) => {
         const roomId = room._id || room.id;
         const roomIdStr = String(roomId);
-        
+
         const roomName = room.name || room.roomName || room.room_name || room.title || `Phòng ${roomId}`;
-        
+
         const hasIdConflict = conflictingRoomIds.has(roomIdStr) || conflictingRoomIds.has(String(room.id));
-        const hasNameConflict = conflictingRoomIds.has(roomName) || 
-                                conflictingRoomIds.has(room.name) || 
-                                conflictingRoomIds.has(room.roomName) || 
+        const hasNameConflict = conflictingRoomIds.has(roomName) ||
+                                conflictingRoomIds.has(room.name) ||
+                                conflictingRoomIds.has(room.roomName) ||
                                 conflictingRoomIds.has(room.room_name);
-        
+
         return !hasIdConflict && !hasNameConflict;
       }
     );
-    
+
     return filtered;
   }, [generatedSessions, existingSchedules, rooms, conflictingRoomIds]);
 
@@ -1770,13 +1813,37 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               </div>
 
               <div className="col-md-6">
-  <Form.Group>
-    <Form.Label className="text-neutral-700 fw-medium mb-8">Band</Form.Label>
-    <div className="border border-neutral-30 rounded-8 px-16 py-10 bg-neutral-25 text-neutral-700" style={{ minHeight: '38px', display: 'flex', alignItems: 'center' }}>
-      {formData.band || <span className="text-neutral-400">Chưa có band</span>}
-    </div>
-  </Form.Group>
-</div>
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">
+                    Program
+                  </Form.Label>
+                  <Form.Select
+                    name="programId"
+                    value={formData.programId}
+                    onChange={handleInputChange}
+                    disabled={!formData.program || !formData.level}
+                    className="border-neutral-30 radius-8 px-16 py-10"
+                  >
+                    <option value="">-- Chọn program --</option>
+                    {filteredProgramsFromDB.map(prog => (
+                      <option key={prog._id} value={prog._id}>
+                        {prog.program_name} ({prog.code})
+                      </option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              </div>
+            </div>
+
+            <div className="row g-3 mb-16">
+              <div className="col-md-6">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">Band</Form.Label>
+                  <div className="border border-neutral-30 rounded-8 px-16 py-10 bg-neutral-25 text-neutral-700" style={{ minHeight: '38px', display: 'flex', alignItems: 'center' }}>
+                    {formData.band || <span className="text-neutral-400">Chưa có band</span>}
+                  </div>
+                </Form.Group>
+              </div>
             </div>
 
             <div className="row g-3 mb-16">

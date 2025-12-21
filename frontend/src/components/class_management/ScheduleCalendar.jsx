@@ -520,6 +520,12 @@ const ScheduleCalendar = ({
                               {(schedule.isAbsentSchedule || schedule.status === 'absent') && !(schedule.isCancelled || schedule.scheduleStatus === 'cancelled') && (
                                 <Badge bg="danger" style={{ fontSize: '8px', padding: '2px 4px' }}>Buổi nghỉ</Badge>
                               )}
+                              {schedule.roomStatus === 'maintenance' && (
+                                <Badge bg="danger" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#DC3545' }}>
+                                  <i className="fas fa-exclamation-triangle me-1"></i>
+                                  Phòng bảo trì
+                                </Badge>
+                              )}
                             </div>
                             <div className="mt-1 d-flex justify-content-end gap-1">
                               {onAssignSubstitute && !readOnly && (() => {

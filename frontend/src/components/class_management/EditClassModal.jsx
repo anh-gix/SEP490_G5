@@ -10,6 +10,7 @@ import scheduleService from '../../services/scheduleService';
 import studentService from '../../services/studentService';
 import classScheduleService from '../../services/classScheduleService';
 import courseService from '../../services/courseService';
+import programService from '../../services/programService';
 import SelectStudentModal from './SelectStudentModal';
 import ScheduleCalendar from './ScheduleCalendar';
 import ScheduleWeekly from './ScheduleWeekly';
@@ -29,6 +30,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     name: '',
     level: '',
     program: '',
+    programId: '', // ID của program được chọn từ dropdown
     band: '',
     course: '',
     teacherId: '',
@@ -61,10 +63,12 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
   const [duplicateEntryIndices, setDuplicateEntryIndices] = useState([]);
   const [fullClassData, setFullClassData] = useState(null); // Store full class data with schedules
   const [loadingClassData, setLoadingClassData] = useState(false); // Loading state for class data
-  const [availablePrograms, setAvailablePrograms] = useState([]); // Programs for dropdown
+  const [availablePrograms, setAvailablePrograms] = useState([]); // Programs for dropdown (type: IELTS, TOEIC, Cambridge)
   const [availableLevels, setAvailableLevels] = useState([]); // Levels for dropdown
   const [courses, setCourses] = useState([]); // Courses for dropdown
   const [coursesLoading, setCoursesLoading] = useState(false); // Loading state for courses
+  const [allProgramsFromDB, setAllProgramsFromDB] = useState([]); // Tất cả programs từ bảng Program (program_name)
+  const [filteredProgramsFromDB, setFilteredProgramsFromDB] = useState([]); // Programs được filter theo type và level
   const [calendarViewMode, setCalendarViewMode] = useState('month'); // 'month' or 'week'
   const [selectedScheduleDetail, setSelectedScheduleDetail] = useState(null); // Selected schedule for detail modal
   const [showScheduleDetailModal, setShowScheduleDetailModal] = useState(false); // Show/hide schedule detail modal
@@ -1681,12 +1685,23 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     checkSchedulesAttendance();
   }, [fullClassData, classData]);
 
-  // Don't filter rooms - show all but mark conflicts
-  // This allows users to see and select conflicted rooms with warnings
+  // Filter rooms - only show available rooms (status = 'available')
+  // Rooms with status 'in_use' or 'maintenance' will not be shown
   const filteredRooms = useMemo(() => {
-    // Return all rooms (no filtering)
-    return rooms;
-  }, [rooms]);
+    // Only show rooms with status 'available', BUT also include the current room even if it's not available
+    // This allows users to see the current room status and change it if needed
+    const currentClassRoomId = fullClassData?.room?._id || fullClassData?.room?.id;
+    const currentScheduleRoomId = selectedScheduleDetail?.roomId || selectedScheduleDetail?.room?._id || selectedScheduleDetail?.room?.id;
+
+    return rooms.filter(room => {
+      const roomId = room._id || room.id;
+      const roomIdStr = String(roomId);
+      // Include if room is available OR if it's the current class room OR current schedule room
+      return room.status === 'available' ||
+             roomIdStr === String(currentClassRoomId) ||
+             roomIdStr === String(currentScheduleRoomId);
+    });
+  }, [rooms, fullClassData, selectedScheduleDetail]);
 
   // Don't filter teachers - show all but mark conflicts
   // This allows users to see and select conflicted teachers with warnings
@@ -2524,18 +2539,19 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       }
 
       try {
-        const [typesResponse, levelsResponse] = await Promise.all([
+        const [typesResponse, levelsResponse, programsResponse] = await Promise.all([
           courseService.getAllTypes(),
-          courseService.getAllLevels()
+          courseService.getAllLevels(),
+          programService.getAllPrograms() // Fetch all programs from Program table
         ]);
-        
+
         let allPrograms = [];
         if (typesResponse?.success && typesResponse.types) {
           const allTypes = typesResponse.types;
           // Map type to program name using reverse map
           allPrograms = allTypes.map(type => typeToProgramMap[type]).filter(Boolean);
         }
-        
+
         // Ensure current program (type) is in the list - convert type to program name
         if (formData.program) {
           const currentProgramName = typeToProgramMap[formData.program];
@@ -2544,17 +2560,23 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
           }
         }
         setAvailablePrograms(allPrograms);
-        
+
         let allLevels = [];
         if (levelsResponse?.success && levelsResponse.levels) {
           allLevels = levelsResponse.levels;
         }
-        
+
         // Ensure current level is in the list
         if (formData.level && !allLevels.includes(formData.level)) {
           allLevels.push(formData.level);
         }
         setAvailableLevels(allLevels);
+
+        // Store all programs from DB
+        if (programsResponse?.success && programsResponse.data) {
+          setAllProgramsFromDB(programsResponse.data);
+          setFilteredProgramsFromDB(programsResponse.data); // Initially show all programs
+        }
       } catch (error) {
         // Even on error, ensure current values are in the lists
         if (formData.program) {
@@ -2639,6 +2661,33 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       filterLevels();
     }
   }, [formData.program, formData.status, formData.level]);
+
+  // Filter programs from DB based on selected type and level
+  useEffect(() => {
+    if (!allProgramsFromDB || allProgramsFromDB.length === 0) {
+      return;
+    }
+
+    let filtered = allProgramsFromDB;
+
+    // Filter by type (program type)
+    if (formData.program) {
+      // formData.program is type (ielts, toeic, cam)
+      filtered = filtered.filter(prog => prog.type === formData.program);
+    }
+
+    // Filter by level
+    if (formData.level) {
+      filtered = filtered.filter(prog => prog.level === formData.level);
+    }
+
+    setFilteredProgramsFromDB(filtered);
+
+    // If current programId is not in filtered list, clear it
+    if (formData.programId && !filtered.find(p => p._id === formData.programId)) {
+      setFormData(prev => ({ ...prev, programId: '' }));
+    }
+  }, [formData.program, formData.level, allProgramsFromDB, formData.programId]);
 
   // Fetch courses when program and level are selected (when status is pending or disable)
   useEffect(() => {
@@ -2884,6 +2933,13 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       // Get roomId from schedule
       const scheduleRoomId = schedule.room?._id || schedule.room?.id || schedule.room;
 
+      // Get room status
+      const roomData = rooms.find(r => {
+        const roomId = r._id || r.id;
+        return String(roomId) === String(scheduleRoomId);
+      });
+      const roomStatus = roomData?.status || schedule.room?.status || 'available';
+
       return {
         id: scheduleId,
         date: dateStr, // Use formatted string directly, not from Date object
@@ -2893,6 +2949,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         teacherName: teacherName,
         roomName: roomName,
         roomId: scheduleRoomId, // Add roomId for modal initialization
+        roomStatus: roomStatus, // Add room status
         status: schedule.status || 'scheduled',
         lessonNumber: schedule.session?.order || schedule.lessonNumber || null,
         lessonTopic: schedule.session?.title || schedule.lessonTopic || null,
@@ -3144,8 +3201,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
           excludeScheduleId: scheduleId
         });
 
-        console.log('📋 Kết quả validate conflict real-time:', validationResult);
-
         setScheduleValidationResult(validationResult);
         setValidatingScheduleEdit(false);
       } catch (error) {
@@ -3162,6 +3217,51 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     return () => clearTimeout(timeoutId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editedSchedule?.date, editedSchedule?.startTime, editedSchedule?.endTime, editedSchedule?.roomId, showScheduleDetailModal]);
+
+  // Log room status when opening schedule detail modal
+  useEffect(() => {
+    if (!selectedScheduleDetail || !showScheduleDetailModal) {
+      return;
+    }
+
+    const logRoomStatus = async () => {
+      const roomId = selectedScheduleDetail.roomId || fullClassData?.room?._id || fullClassData?.room?.id;
+      const roomName = selectedScheduleDetail.roomName || fullClassData?.room?.room_name;
+
+      if (!roomId) {
+        console.log('⚠️ Không tìm thấy thông tin phòng học');
+        return;
+      }
+
+      try {
+        // Get room details including status
+        const roomData = await roomService.getRoomById(roomId);
+
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('🏫 TRẠNG THÁI PHÒNG HỌC');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log(`Phòng: ${roomData.room?.room_name || roomName}`);
+        console.log(`ID: ${roomId}`);
+        console.log(`Vị trí: ${roomData.room?.location || 'N/A'}`);
+        console.log(`Sức chứa: ${roomData.room?.capacity || 'N/A'} người`);
+
+        // Display status with icon
+        const statusMap = {
+          'available': '✅ Sẵn sàng',
+          'in_use': '🔴 Đang sử dụng',
+          'maintenance': '🔧 Bảo trì'
+        };
+        const status = roomData.room?.status || 'available';
+        console.log(`Trạng thái: ${statusMap[status] || status}`);
+
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      } catch (error) {
+        console.log('⚠️ Không thể lấy thông tin phòng học:', error.message);
+      }
+    };
+
+    logRoomStatus();
+  }, [selectedScheduleDetail, showScheduleDetailModal, fullClassData]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -3562,6 +3662,36 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
             </div>
 
             <div className="row g-3 mb-16">
+              <div className="col-md-6">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">
+                    Program
+                  </Form.Label>
+                  {(formData.status === 'pending' || formData.status === 'disable') ? (
+                    <Form.Select
+                      name="programId"
+                      value={formData.programId}
+                      onChange={handleInputChange}
+                      disabled={!formData.program || !formData.level}
+                      className="border-neutral-30 radius-8 px-16 py-10"
+                    >
+                      <option value="">-- Chọn program --</option>
+                      {filteredProgramsFromDB.map(prog => (
+                        <option key={prog._id} value={prog._id}>
+                          {prog.program_name} ({prog.code})
+                        </option>
+                      ))}
+                    </Form.Select>
+                  ) : (
+                    <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
+                      {formData.programId
+                        ? (allProgramsFromDB.find(p => p._id === formData.programId)?.program_name || formData.programId)
+                        : '--'}
+                    </div>
+                  )}
+                </Form.Group>
+              </div>
+
               <div className="col-md-6">
                 <Form.Group>
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
@@ -3974,13 +4104,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       </div>
                     </Alert>
                   )}
-                  {!checkingTeacherRoomConflicts && formData.teacherId && 
-                   teacherRoomConflicts.teacherConflicts.filter(c => c.teacherId === (formData.teacherId?.toString() || String(formData.teacherId))).length === 0 && 
-                   generatedSessions.length > 0 && (
-                    <Alert variant="success" className="mt-12 mb-0">
-                      <strong>Không có xung đột:</strong> Giáo viên đã chọn không có lịch trùng với lớp hiện tại.
-                    </Alert>
-                  )}
                 </Form.Group>
               </div>
 
@@ -4071,13 +4194,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                           </div>
                         </details>
                       </div>
-                    </Alert>
-                  )}
-                  {!checkingTeacherRoomConflicts && formData.roomId && 
-                   teacherRoomConflicts.roomConflicts.filter(c => c.roomId === (formData.roomId?.toString() || String(formData.roomId))).length === 0 && 
-                   generatedSessions.length > 0 && (
-                    <Alert variant="success" className="mt-12 mb-0">
-                      <strong>Không có xung đột:</strong> Phòng học đã chọn không có lịch trùng với lớp hiện tại.
                     </Alert>
                   )}
                   {roomError && (
@@ -4627,12 +4743,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 </Alert>
               )}
               
-              {!validatingScheduleEdit && scheduleValidationResult && !scheduleValidationResult.conflicts?.hasConflict && editedSchedule.date && editedSchedule.startTime && editedSchedule.endTime && (
-                <Alert variant="success" className="mb-0">
-                  <i className="fas fa-check-circle me-2"></i>
-                  Không có xung đột lịch học.
-                </Alert>
-              )}
               <div className="row g-3">
                 <div className="col-md-6">
                   <Form.Group>
@@ -4815,7 +4925,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       disabled={hasAttendance}
                     >
                       <option value="">-- Chọn phòng học --</option>
-                      {rooms.map(room => {
+                      {filteredRooms.map(room => {
                         const roomId = room._id || room.id;
                         const roomName = room.name || room.roomName || room.room_name || `Phòng ${roomId}`;
                         const capacity = room.capacity || room.maxCapacity || room.maxStudents || 'N/A';
@@ -5023,7 +5133,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                     <i className="fas fa-exclamation-triangle me-2"></i>
                     Có xung đột lịch học được phát hiện:
                   </div>
-                  
+
                   {confirmUpdateValidationResult.conflicts.room && confirmUpdateValidationResult.conflicts.room.length > 0 && (
                     <div className="mb-8">
                       <div className="fw-medium mb-4">🔴 Xung đột Phòng học:</div>
@@ -5032,7 +5142,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                           <li key={idx} className="text-13">
                             {conflict.isCurrentClass ? (
                               <>
-                                <strong>Lớp này đã có buổi học</strong> vào {conflict.date} từ {conflict.time}. 
+                                <strong>Lớp này đã có buổi học</strong> vào {conflict.date} từ {conflict.time}.
                                 Một lớp không thể có 2 buổi học cùng thứ cùng giờ.
                               </>
                             ) : (
@@ -5134,7 +5244,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
               ) : (
                 <Alert variant="success" className="mb-0">
                   <i className="fas fa-check-circle me-2"></i>
-                  Không có xung đột lịch học.
+                  Không có xung đột lịch học
                 </Alert>
               )}
             </div>
@@ -5576,76 +5686,69 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
             </div>
           )}
 
-          {validationResult && !validatingSchedule && (
+          {validationResult && !validatingSchedule && validationResult.conflicts?.hasConflict && (
             <div className="mt-16">
-              {validationResult.conflicts?.hasConflict ? (
-                <Alert variant="danger" className="mb-0">
-                  <div className="fw-semibold mb-8">
-                    <i className="fas fa-exclamation-triangle me-2"></i>
-                    Có xung đột lịch học được phát hiện:
+              <Alert variant="danger" className="mb-0">
+                <div className="fw-semibold mb-8">
+                  <i className="fas fa-exclamation-triangle me-2"></i>
+                  Có xung đột lịch học được phát hiện:
+                </div>
+
+                {validationResult.conflicts.teacher && validationResult.conflicts.teacher.length > 0 && (
+                  <div className="mb-8">
+                    <div className="fw-medium mb-4">🔴 Xung đột Giáo viên:</div>
+                    <ul className="mb-0 ps-16">
+                      {validationResult.conflicts.teacher.map((conflict, idx) => (
+                        <li key={idx} className="text-13">
+                          Lớp <strong>{conflict.className}</strong> vào {conflict.date} từ {conflict.time}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  
-                  {validationResult.conflicts.teacher && validationResult.conflicts.teacher.length > 0 && (
-                    <div className="mb-8">
-                      <div className="fw-medium mb-4">🔴 Xung đột Giáo viên:</div>
-                      <ul className="mb-0 ps-16">
-                        {validationResult.conflicts.teacher.map((conflict, idx) => (
-                          <li key={idx} className="text-13">
-                            Lớp <strong>{conflict.className}</strong> vào {conflict.date} từ {conflict.time}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                )}
 
-                  {validationResult.conflicts.room && validationResult.conflicts.room.length > 0 && (
-                    <div className="mb-8">
-                      <div className="fw-medium mb-4">🔴 Xung đột Phòng học:</div>
-                      <ul className="mb-0 ps-16">
-                        {validationResult.conflicts.room.map((conflict, idx) => (
-                          <li key={idx} className="text-13">
-                            {conflict.isCurrentClass ? (
-                              <>
-                                <strong>Lớp này đã có buổi học</strong> vào {conflict.date} từ {conflict.time}. 
-                                Một lớp không thể có 2 buổi học cùng thứ cùng giờ.
-                              </>
-                            ) : (
-                              <>
+                {validationResult.conflicts.room && validationResult.conflicts.room.length > 0 && (
+                  <div className="mb-8">
+                    <div className="fw-medium mb-4">🔴 Xung đột Phòng học:</div>
+                    <ul className="mb-0 ps-16">
+                      {validationResult.conflicts.room.map((conflict, idx) => (
+                        <li key={idx} className="text-13">
+                          {conflict.isCurrentClass ? (
+                            <>
+                              <strong>Lớp này đã có buổi học</strong> vào {conflict.date} từ {conflict.time}.
+                              Một lớp không thể có 2 buổi học cùng thứ cùng giờ.
+                            </>
+                          ) : (
+                            <>
+                              Lớp <strong>{conflict.className}</strong> vào {conflict.date} từ {conflict.time}
+                            </>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {validationResult.conflicts.students && validationResult.conflicts.students.length > 0 && (
+                  <div className="mb-8">
+                    <div className="fw-medium mb-4">🔴 Xung đột Sinh viên:</div>
+                    <ul className="mb-0 ps-16">
+                      {validationResult.conflicts.students.map((studentConflict, idx) => (
+                        <li key={idx} className="text-13 mb-4">
+                          <strong>{studentConflict.studentName || `Sinh viên ${studentConflict.studentId}`}</strong>
+                          <ul className="ps-16 mt-2 mb-0">
+                            {studentConflict.conflicts.map((conflict, cIdx) => (
+                              <li key={cIdx} className="text-12">
                                 Lớp <strong>{conflict.className}</strong> vào {conflict.date} từ {conflict.time}
-                              </>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {validationResult.conflicts.students && validationResult.conflicts.students.length > 0 && (
-                    <div className="mb-8">
-                      <div className="fw-medium mb-4">🔴 Xung đột Sinh viên:</div>
-                      <ul className="mb-0 ps-16">
-                        {validationResult.conflicts.students.map((studentConflict, idx) => (
-                          <li key={idx} className="text-13 mb-4">
-                            <strong>{studentConflict.studentName || `Sinh viên ${studentConflict.studentId}`}</strong>
-                            <ul className="ps-16 mt-2 mb-0">
-                              {studentConflict.conflicts.map((conflict, cIdx) => (
-                                <li key={cIdx} className="text-12">
-                                  Lớp <strong>{conflict.className}</strong> vào {conflict.date} từ {conflict.time}
-                                </li>
-                              ))}
-                            </ul>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </Alert>
-              ) : (
-                <Alert variant="success" className="mb-0">
-                  <i className="fas fa-check-circle me-2"></i>
-                  Không có xung đột lịch học. Có thể thêm buổi học.
-                </Alert>
-              )}
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </Alert>
             </div>
           )}
         </Modal.Body>

@@ -208,6 +208,7 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
   const isDeadlinePassed = new Date() > new Date(homework.deadline);
   const canSubmit = homework.status === 'not_submitted' || homework.status === 'submitted' || homework.status === 'late';
   const hasSubmitted = homework.status === 'submitted' || homework.status === 'late' || homework.status === 'graded';
+  const shouldShowAnswerFiles = isDeadlinePassed && homework.answerFiles && homework.answerFiles.length > 0;
 
   return (
     <Modal show={show} onHide={handleClose} size="xl" centered>
@@ -238,6 +239,19 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
             </Col>
           </Row>
 
+          {/* Description */}
+          {homework.description && (
+            <div className="mt-12 pt-12 border-top">
+              <div className="text-neutral-700 text-13 fw-semibold mb-8">
+                <i className="fas fa-align-left me-2"></i>
+                Mô tả bài tập:
+              </div>
+              <div className="text-neutral-600 text-13" style={{ whiteSpace: 'pre-wrap' }}>
+                {homework.description}
+              </div>
+            </div>
+          )}
+
           {isDeadlinePassed && homework.status === 'not_submitted' && (
             <Alert variant="danger" className="mb-0 mt-12 py-8 px-12">
               <i className="fas fa-exclamation-triangle me-2"></i>
@@ -253,8 +267,8 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
         )}
 
         <Row>
-          {/* Left Column: Assignment & Answer Files */}
-          <Col md={hasSubmitted ? 6 : 12}>
+          {/* Left Column: Assignment Files */}
+          <Col md={shouldShowAnswerFiles ? 4 : 6}>
             {/* Assignment Files */}
             <Card className="border-0 shadow-sm mb-16">
               <Card.Header className="bg-primary-50 border-0 py-12">
@@ -271,14 +285,14 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
                       const fileIconData = getFileIcon(fileName);
                       return (
                         <div key={idx} className="d-flex justify-content-between align-items-center p-8 border border-neutral-200 rounded-8">
-                          <div className="d-flex align-items-center gap-2 flex-grow-1">
+                          <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ minWidth: 0 }}>
                             <i className={`fas ${fileIconData.icon} ${fileIconData.color}`}></i>
-                            <span className="text-13 text-neutral-900">File đề bài {idx + 1}</span>
+                            <span className="text-13 text-neutral-900 text-truncate">Đề bài {idx + 1}</span>
                           </div>
                           <Button
                             variant="link"
                             size="sm"
-                            className="text-primary-600 p-0 text-12"
+                            className="text-primary-600 p-0 text-12 flex-shrink-0"
                             onClick={() => window.open(`${API_URL}${file}`, '_blank')}
                           >
                             <i className="fas fa-download me-1"></i>
@@ -296,9 +310,11 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
                 )}
               </Card.Body>
             </Card>
+          </Col>
 
-            {/* Answer Files */}
-            {homework.answerFiles && homework.answerFiles.length >= 0 && (
+          {/* Middle Column: Answer Files (Only after deadline) */}
+          {shouldShowAnswerFiles && (
+            <Col md={4}>
               <Card className="border-0 shadow-sm mb-16">
                 <Card.Header className="bg-success-50 border-0 py-12">
                   <h6 className="mb-0 text-14 fw-semibold text-neutral-900">
@@ -307,20 +323,24 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
                   </h6>
                 </Card.Header>
                 <Card.Body className="p-12">
+                  <Alert variant="info" className="mb-12 py-8 px-12 text-12">
+                    <i className="fas fa-info-circle me-2"></i>
+                    File đáp án chỉ hiển thị sau khi hết hạn nộp bài
+                  </Alert>
                   <div className="d-flex flex-column gap-2">
                     {homework.answerFiles.map((file, idx) => {
                       const fileName = file.split('/').pop();
                       const fileIconData = getFileIcon(fileName);
                       return (
                         <div key={idx} className="d-flex justify-content-between align-items-center p-8 border border-neutral-200 rounded-8">
-                          <div className="d-flex align-items-center gap-2 flex-grow-1">
+                          <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ minWidth: 0 }}>
                             <i className={`fas ${fileIconData.icon} ${fileIconData.color}`}></i>
-                            <span className="text-13 text-neutral-900">File đáp án {idx + 1}</span>
+                            <span className="text-13 text-neutral-900 text-truncate">Đáp án {idx + 1}</span>
                           </div>
                           <Button
                             variant="link"
                             size="sm"
-                            className="text-success-600 p-0 text-12"
+                            className="text-success-600 p-0 text-12 flex-shrink-0"
                             onClick={() => window.open(`${API_URL}${file}`, '_blank')}
                           >
                             <i className="fas fa-download me-1"></i>
@@ -332,45 +352,46 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
                   </div>
                 </Card.Body>
               </Card>
-            )}
-          </Col>
+            </Col>
+          )}
 
           {/* Right Column: Student Submission */}
-          {hasSubmitted && (
-            <Col md={6}>
-              <Card className="border-0 shadow-sm mb-16">
-                <Card.Header className="bg-info-50 border-0 py-12">
-                  <div className="d-flex justify-content-between align-items-start">
-                    <h6 className="mb-0 text-14 fw-semibold text-neutral-900">
-                      <i className="fas fa-file-upload me-2 text-info-600"></i>
-                      Bài nộp của bạn
-                    </h6>
+          <Col md={shouldShowAnswerFiles ? 4 : 6}>
+            <Card className="border-0 shadow-sm mb-16">
+              <Card.Header className="bg-info-50 border-0 py-12">
+                <div className="d-flex justify-content-between align-items-start">
+                  <h6 className="mb-0 text-14 fw-semibold text-neutral-900">
+                    <i className="fas fa-file-upload me-2 text-info-600"></i>
+                    Bài nộp của bạn
+                  </h6>
+                  {hasSubmitted && submissionData && (
                     <div className="d-flex flex-column align-items-end gap-1">
                       <div className="d-flex gap-2 align-items-center">
-                        {submissionData && (
-                          <Badge bg={submissionData.isLate ? 'danger' : 'success'} className="px-8 py-4 text-11">
-                            <i className={`fas ${submissionData.isLate ? 'fa-exclamation-circle' : 'fa-check-circle'} me-1`}></i>
-                            {submissionData.isLate ? 'Nộp muộn' : 'Nộp đúng hạn'}
-                          </Badge>
-                        )}
-                        {submissionData && submissionData.score !== null && submissionData.score !== undefined && (
+                        <Badge bg={submissionData.isLate ? 'danger' : 'success'} className="px-8 py-4 text-11">
+                          <i className={`fas ${submissionData.isLate ? 'fa-exclamation-circle' : 'fa-check-circle'} me-1`}></i>
+                          {submissionData.isLate ? 'Nộp muộn' : 'Nộp đúng hạn'}
+                        </Badge>
+                        {submissionData.score !== null && submissionData.score !== undefined && (
                           <Badge bg="warning" className="px-8 py-4 text-11">
                             <i className="fas fa-star me-1"></i>
                             {submissionData.score}/10
                           </Badge>
                         )}
                       </div>
-                      {submissionData && submissionData.submittedAt && (
+                      {submissionData.submittedAt && (
                         <div className="text-neutral-600 text-11">
                           <i className="fas fa-clock me-1"></i>
                           {new Date(submissionData.submittedAt).toLocaleDateString('vi-VN')} {new Date(submissionData.submittedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       )}
                     </div>
-                  </div>
-                </Card.Header>
-                <Card.Body className="p-12">
-                  {loadingSubmission ? (
+                  )}
+                </div>
+              </Card.Header>
+              <Card.Body className="p-12">
+                {hasSubmitted ? (
+                  // Already submitted - show submission details
+                  loadingSubmission ? (
                     <div className="text-center py-20">
                       <div className="spinner-border spinner-border-sm text-primary mb-8" role="status">
                         <span className="visually-hidden">Đang tải...</span>
@@ -414,10 +435,10 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
                                         isExistingFile ? 'bg-info-50 border border-info-200' : 'border border-neutral-200'
                                       }`}
                                     >
-                                      <div className="d-flex align-items-center gap-2 flex-grow-1">
-                                        <i className={`fas ${fileIconData.icon} ${fileIconData.color}`}></i>
-                                        <div className="flex-grow-1">
-                                          <div className="text-neutral-900 text-12">
+                                      <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ minWidth: 0 }}>
+                                        <i className={`fas ${fileIconData.icon} ${fileIconData.color} flex-shrink-0`}></i>
+                                        <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                                          <div className="text-neutral-900 text-12 text-truncate">
                                             {file.name}
                                             {isExistingFile && (
                                               <Badge bg="info" className="ms-2 px-6 py-2 text-10">
@@ -428,7 +449,7 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
                                           <div className="text-neutral-500 text-11">{formatFileSize(file.size)}</div>
                                         </div>
                                       </div>
-                                      <div className="d-flex gap-2 align-items-center">
+                                      <div className="d-flex gap-2 align-items-center flex-shrink-0">
                                         {isExistingFile && (
                                           <Button
                                             variant="link"
@@ -508,7 +529,6 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
                                 </>
                               ) : (
                                 <>
-                                  
                                   Nộp lại ({selectedFiles.filter(f => !f.isExisting).length} file mới)
                                 </>
                               )}
@@ -541,14 +561,14 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
                                 const fileIconData = getFileIcon(fileName);
                                 return (
                                   <div key={idx} className="d-flex justify-content-between align-items-center p-8 border border-neutral-200 rounded-8">
-                                    <div className="d-flex align-items-center gap-2 flex-grow-1">
-                                      <i className={`fas ${fileIconData.icon} ${fileIconData.color}`}></i>
+                                    <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ minWidth: 0 }}>
+                                      <i className={`fas ${fileIconData.icon} ${fileIconData.color} flex-shrink-0`}></i>
                                       <span className="text-13 text-neutral-900 text-truncate">{fileName}</span>
                                     </div>
                                     <Button
                                       variant="link"
                                       size="sm"
-                                      className="text-primary-600 p-0 text-12"
+                                      className="text-primary-600 p-0 text-12 flex-shrink-0"
                                       onClick={() => window.open(`${API_URL}${file}`, '_blank')}
                                     >
                                       <i className="fas fa-download me-1"></i>
@@ -572,119 +592,111 @@ const HomeworkDetailModal = ({ show, onHide, homework, classId, onSubmitSuccess 
                       <i className="fas fa-inbox fa-2x text-neutral-300 mb-8"></i>
                       <p className="text-neutral-500 mb-0 text-13">Chưa có bài nộp</p>
                     </div>
-                  )}
-                </Card.Body>
-              </Card>
-            </Col>
-          )}
-        </Row>
-
-        {/* Submission Form - Only for not submitted */}
-        {!hasSubmitted && canSubmit && (
-          <Card className="border-0 shadow-sm mt-16">
-            <Card.Header className="bg-main-50 border-0 py-12">
-              <h6 className="mb-0 text-14 fw-semibold text-neutral-900">
-                <i className="fas fa-upload me-2 text-main-600"></i>
-                Nộp bài tập
-              </h6>
-            </Card.Header>
-            <Card.Body className="p-16">
-              <Form onSubmit={handleSubmit}>
-                {/* Selected Files List */}
-                {selectedFiles.length > 0 && (
-                  <div className="mb-16">
-                    <div className="text-neutral-700 fw-semibold mb-8 text-13">
-                      File đã chọn ({selectedFiles.length}/5)
-                    </div>
-                    <div className="d-flex flex-column gap-2">
-                      {selectedFiles.map((file, index) => {
-                        const fileIconData = getFileIcon(file.name);
-                        return (
-                          <div
-                            key={index}
-                            className="d-flex justify-content-between align-items-center p-10 border border-neutral-200 rounded-8"
-                          >
-                            <div className="d-flex align-items-center gap-2 flex-grow-1">
-                              <i className={`fas ${fileIconData.icon} ${fileIconData.color}`}></i>
-                              <div className="flex-grow-1">
-                                <div className="text-neutral-900 text-13">{file.name}</div>
-                                <div className="text-neutral-500 text-11">{formatFileSize(file.size)}</div>
+                  )
+                ) : (
+                  // Not submitted yet - show submission form
+                  <Form onSubmit={handleSubmit}>
+                    {/* Selected Files List */}
+                    {selectedFiles.length > 0 && (
+                      <div className="mb-12">
+                        <div className="text-neutral-700 fw-semibold mb-8 text-13">
+                          File đã chọn ({selectedFiles.length}/5)
+                        </div>
+                        <div className="d-flex flex-column gap-2">
+                          {selectedFiles.map((file, index) => {
+                            const fileIconData = getFileIcon(file.name);
+                            return (
+                              <div
+                                key={index}
+                                className="d-flex justify-content-between align-items-center p-8 border border-neutral-200 rounded-8"
+                              >
+                                <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ minWidth: 0 }}>
+                                  <i className={`fas ${fileIconData.icon} ${fileIconData.color} flex-shrink-0`}></i>
+                                  <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                                    <div className="text-neutral-900 text-13 text-truncate">{file.name}</div>
+                                    <div className="text-neutral-500 text-11">{formatFileSize(file.size)}</div>
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="text-danger-600 p-0 flex-shrink-0"
+                                  onClick={() => removeFile(index)}
+                                  disabled={loading}
+                                  title="Xóa file"
+                                >
+                                  <i className="fas fa-times"></i>
+                                </Button>
                               </div>
-                            </div>
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="text-danger-600 p-0"
-                              onClick={() => removeFile(index)}
-                              disabled={loading}
-                              title="Xóa file"
-                            >
-                              <i className="fas fa-times"></i>
-                            </Button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* File Upload Button */}
-                <div className="mb-16">
-                  <input
-                    type="file"
-                    id="fileInputFirst"
-                    multiple
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
-                    onChange={handleFileChange}
-                    disabled={loading || selectedFiles.length >= 5}
-                    style={{ display: 'none' }}
-                  />
-                  <Button
-                    variant="outline-primary"
-                    className="w-100"
-                    onClick={() => document.getElementById('fileInputFirst').click()}
-                    disabled={loading || selectedFiles.length >= 5}
-                  >
-                    <i className="fas fa-plus me-2"></i>
-                    {selectedFiles.length > 0 ? 'Thêm file bổ sung' : 'Chọn file nộp bài'}
-                  </Button>
-                  <Form.Text className="text-neutral-500 d-block mt-2 text-12">
-                    Chấp nhận: PDF, Word, Excel, PowerPoint, TXT, ZIP, RAR (Tối đa 5 file, mỗi file &lt;50MB)
-                  </Form.Text>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="d-flex gap-2">
-                  <Button
-                    variant="outline-secondary"
-                    onClick={handleClose}
-                    disabled={loading}
-                    className="flex-grow-1"
-                  >
-                    Đóng
-                  </Button>
-                  <Button
-                    className="btn-main flex-grow-1"
-                    type="submit"
-                    disabled={loading || selectedFiles.length === 0}
-                  >
-                    {loading ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm me-2"></span>
-                        Đang nộp...
-                      </>
-                    ) : (
-                      <>
-                        
-                        Nộp bài
-                      </>
+                            );
+                          })}
+                        </div>
+                      </div>
                     )}
-                  </Button>
-                </div>
-              </Form>
-            </Card.Body>
-          </Card>
-        )}
+
+                    {/* File Upload Button */}
+                    <div className="mb-12">
+                      <input
+                        type="file"
+                        id="fileInputFirst"
+                        multiple
+                        accept=".pdf,.doc,.docx"
+                        onChange={handleFileChange}
+                        disabled={loading || selectedFiles.length >= 5}
+                        style={{ display: 'none' }}
+                      />
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        className="w-100"
+                        onClick={() => document.getElementById('fileInputFirst').click()}
+                        disabled={loading || selectedFiles.length >= 5}
+                      >
+                        <i className="fas fa-plus me-2"></i>
+                        {selectedFiles.length > 0 ? 'Thêm file bổ sung' : 'Chọn file nộp bài'}
+                      </Button>
+                      <Form.Text className="text-neutral-500 d-block mt-2 text-11">
+                        <i className="fas fa-info-circle me-1"></i>
+                        Chỉ chấp nhận file PDF và Word (Max 5 files, &lt;50MB/file)
+                      </Form.Text>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="d-flex gap-2">
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        onClick={handleClose}
+                        disabled={loading}
+                        className="flex-grow-1"
+                      >
+                        Đóng
+                      </Button>
+                      <Button
+                        className="btn-main flex-grow-1"
+                        size="sm"
+                        type="submit"
+                        disabled={loading || selectedFiles.length === 0}
+                      >
+                        {loading ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-2"></span>
+                            Đang nộp...
+                          </>
+                        ) : (
+                          <>
+                            <i className="fas fa-paper-plane me-2"></i>
+                            Nộp bài
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </Form>
+                )}
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
       </Modal.Body>
     </Modal>
   );

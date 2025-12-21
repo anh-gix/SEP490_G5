@@ -946,20 +946,6 @@ const MakeupClassRequestModal = ({
               {/* Existing schedule selection */}
               {makeupOption === 'existing' ? (
                 <div className="mb-3">
-                  {/* Class selection dropdown (AcademicStaff only) */}
-                  {isAcademicStaffMode && (
-                    <Form.Group className="mb-3">
-                      <Form.Label>
-                        Chọn lớp học
-                      </Form.Label>
-                      <Form.Select
-                        value={selectedClassId}
-                        onChange={(e) => setSelectedClassId(e.target.value)}
-                      >
-                        <option value="">-- Chọn lớp học (tùy chọn) --</option>
-                      </Form.Select>
-                    </Form.Group>
-                  )}
 
                   <Form.Label>
                     Chọn buổi học bù <span className="text-danger">*</span>

@@ -19,7 +19,8 @@ const ImportStudentFromExcel = ({ onBack }) => {
   const [previewStudents, setPreviewStudents] = useState([]);
   const [importing, setImporting] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [programs, setPrograms] = useState([]);
+  const [programs, setPrograms] = useState([]); // Only approved programs
+  const [allPrograms, setAllPrograms] = useState([]); // All programs (for validation)
   const fileInputRef = useRef(null);
 
   // Helper function to parse levelsToStudy string into array of levels
@@ -52,8 +53,9 @@ const ImportStudentFromExcel = ({ onBack }) => {
       if (programCodes.length === 0) return [];
 
       // Find programs matching the codes
+      // Only use approved programs (programs that have been approved by Center Head)
       const matchingPrograms = programs.filter(p =>
-        programCodes.includes(p.code) && p.status === 'active'
+        programCodes.includes(p.code) && p.status === 'approved'
       );
 
       if (matchingPrograms.length === 0) return [];
@@ -79,18 +81,21 @@ const ImportStudentFromExcel = ({ onBack }) => {
     }
   };
 
-  // Fetch active programs from database on component mount
+  // Fetch programs from database on component mount
   useEffect(() => {
     const fetchPrograms = async () => {
       try {
         const response = await programService.getAllPrograms();
-        const allPrograms = response.data || [];
-        // Filter only active programs
-        const activePrograms = allPrograms.filter(p => p.status === 'active');
-        setPrograms(activePrograms);
+        const allProgramsData = response.data || [];
+        // Store all programs for validation
+        setAllPrograms(allProgramsData);
+        // Filter only approved programs for enrollment
+        const approvedPrograms = allProgramsData.filter(p => p.status === 'approved');
+        setPrograms(approvedPrograms);
       } catch (error) {
         // Continue with empty array if fetch fails
         setPrograms([]);
+        setAllPrograms([]);
       }
     };
     fetchPrograms();
@@ -658,10 +663,10 @@ const ImportStudentFromExcel = ({ onBack }) => {
             .filter(Boolean)
         );
 
-        // Get all active program codes from database
-        const activeProgramCodes = new Set(
+        // Get all approved program codes from database (only approved programs can be used)
+        const approvedProgramCodes = new Set(
           programs
-            .filter(p => p.status === 'active')
+            .filter(p => p.status === 'approved')
             .map(p => p.code)
             .filter(Boolean)
         );
@@ -692,7 +697,8 @@ const ImportStudentFromExcel = ({ onBack }) => {
               .map(code => code.trim())
               .filter(code => code.length > 0);
 
-            const invalidCodes = [];
+            const invalidCodes = []; // Programs that don't exist at all
+            const notApprovedCodes = []; // Programs that exist but are not approved
             const validCodes = [];
             const mismatchedTypeCodes = [];
             const mismatchedLevelCodes = [];
@@ -701,11 +707,18 @@ const ImportStudentFromExcel = ({ onBack }) => {
             const requiredLevels = item.levelsToStudy ? parseLevelsToStudy(item.levelsToStudy) : [];
 
             programCodes.forEach(code => {
-              if (activeProgramCodes.has(code)) {
+              // Check if program exists in all programs
+              const programExists = allPrograms.some(p => p.code === code);
+
+              if (!programExists) {
+                // Program doesn't exist at all
+                invalidCodes.push(code);
+              } else if (approvedProgramCodes.has(code)) {
+                // Program exists and is approved
                 validCodes.push(code);
 
                 // Check if program type matches the student's type
-                const program = programs.find(p => p.code === code && p.status === 'active');
+                const program = programs.find(p => p.code === code && p.status === 'approved');
                 if (program && item.type) {
                   const itemTypeStr = item.type.toString().trim().toLowerCase();
                   const programTypeStr = program.type?.toString().trim().toLowerCase() || '';
@@ -740,17 +753,34 @@ const ImportStudentFromExcel = ({ onBack }) => {
                   }
                 }
               } else {
-                invalidCodes.push(code);
+                // Program exists but is not approved
+                const program = allPrograms.find(p => p.code === code);
+                notApprovedCodes.push({ code, status: program?.status || 'unknown' });
               }
             });
 
-            // Add error if any program code is invalid
+            // Add error if any program code doesn't exist
             if (invalidCodes.length > 0) {
               const errorMsg = `Mã chương trình không tồn tại: ${invalidCodes.join(', ')}`;
               if (!item.errors.includes(errorMsg)) {
                 item.errors.push(errorMsg);
                 item.hasError = true;
               }
+            }
+
+            // Add error if program exists but is not approved
+            if (notApprovedCodes.length > 0) {
+              notApprovedCodes.forEach(({ code, status }) => {
+                const statusText = status === 'draft' ? 'đang soạn thảo' :
+                                   status === 'pending_approval' ? 'chờ phê duyệt' :
+                                   status === 'needs_revision' ? 'cần chỉnh sửa' :
+                                   status === 'archived' ? 'đã lưu trữ' : status;
+                const errorMsg = `Mã chương trình "${code}" chưa được phê duyệt (trạng thái: ${statusText})`;
+                if (!item.errors.includes(errorMsg)) {
+                  item.errors.push(errorMsg);
+                  item.hasError = true;
+                }
+              });
             }
 
             // Add error if program type doesn't match student type

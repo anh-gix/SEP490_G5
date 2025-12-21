@@ -390,24 +390,30 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         return;
       }
 
-      // Extract emails/phones from first column (skip header row)
-      const emailsOrPhones = [];
+      // Extract emails from first column (skip header row)
+      const emails = [];
       for (let i = 1; i < jsonData.length; i++) {
         const row = jsonData[i];
         if (row && row[0]) {
           const value = String(row[0]).trim();
           if (value) {
-            emailsOrPhones.push(value);
+            // Validate if it's an email format
+            if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+              emails.push(value);
+            } else {
+              // If not a valid email, skip it and add to notFound
+              // We'll handle this in the error message
+            }
           }
         }
       }
 
-      if (emailsOrPhones.length === 0) {
+      if (emails.length === 0) {
         setImportResult({
           success: 0,
           notFound: [],
           total: 0,
-          error: 'Không tìm thấy email hoặc số điện thoại nào trong file Excel'
+          error: 'Không tìm thấy email hợp lệ nào trong file Excel. Vui lòng đảm bảo cột đầu tiên chứa email của học viên.'
         });
         setShowImportResultModal(true);
         e.target.value = '';
@@ -432,20 +438,16 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         }
       }
 
-      // Match students by email or phone
+      // Match students by email only
       const matchedStudentIds = [];
       const notFound = [];
 
-      emailsOrPhones.forEach((value) => {
-        const normalizedValue = value.toLowerCase().trim();
-        const normalizedPhone = normalizePhone(value);
+      emails.forEach((email) => {
+        const normalizedEmail = email.toLowerCase().trim();
 
         const foundStudent = students.find((student) => {
           const studentEmail = (student.email || '').toLowerCase().trim();
-          const studentPhone = normalizePhone(student.phone || '');
-
-          return studentEmail === normalizedValue || 
-                 studentPhone === normalizedPhone;
+          return studentEmail === normalizedEmail;
         });
 
         if (foundStudent) {
@@ -460,11 +462,11 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             }
           } else {
             // Student found but not enrolled in course
-            notFound.push(`${value} (chưa enroll vào course này)`);
+            notFound.push(`${email} (chưa enroll vào course này)`);
           }
         } else {
           // Student not found in database
-          notFound.push(value);
+          notFound.push(email);
         }
       });
 
@@ -484,7 +486,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       setImportResult({
         success: matchedStudentIds.length,
         notFound: notFound,
-        total: emailsOrPhones.length
+        total: emails.length
       });
       setShowImportResultModal(true);
 
@@ -504,12 +506,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
   // Handle download Excel template
   const handleDownloadTemplate = () => {
-    // Create sample data - only first column with Email or Phone
+    // Create sample data - only first column with Email
     const sampleData = [
-      ['Email hoặc Số điện thoại'], // Header row
+      ['Email'], // Header row
       ['student1@email.com'], // Example email
-      ['0123456789'], // Example phone
-      ['student2@email.com'] // Another example email
+      ['student2@email.com'], // Another example email
+      ['student3@email.com'] // Another example email
     ];
 
     // Create worksheet from array

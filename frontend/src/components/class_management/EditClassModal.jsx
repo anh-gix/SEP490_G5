@@ -2548,45 +2548,47 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         return;
       }
 
-      // Extract emails/phones from first column (skip header row)
-      const emailsOrPhones = [];
+      // Extract emails from first column (skip header row)
+      const emails = [];
       for (let i = 1; i < jsonData.length; i++) {
         const row = jsonData[i];
         if (row && row[0]) {
           const value = String(row[0]).trim();
           if (value) {
-            emailsOrPhones.push(value);
+            // Validate if it's an email format
+            if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+              emails.push(value);
+            } else {
+              // If not a valid email, skip it and add to notFound
+              // We'll handle this in the error message
+            }
           }
         }
       }
 
-      if (emailsOrPhones.length === 0) {
+      if (emails.length === 0) {
         setImportResult({
           success: 0,
           notFound: [],
           total: 0,
-          error: 'Không tìm thấy email hoặc số điện thoại nào trong file Excel'
+          error: 'Không tìm thấy email hợp lệ nào trong file Excel. Vui lòng đảm bảo cột đầu tiên chứa email của học viên.'
         });
         setShowImportResultModal(true);
         e.target.value = '';
         return;
       }
 
-      // Match students by email or phone
+      // Match students by email only
       const matchedStudentIds = [];
       const notFound = [];
       const matchedStudentMap = new Map(); // Map<studentId, studentObject> for later use
 
-      emailsOrPhones.forEach((value) => {
-        const normalizedValue = value.toLowerCase().trim();
-        const normalizedPhone = normalizePhone(value);
+      emails.forEach((email) => {
+        const normalizedEmail = email.toLowerCase().trim();
 
         const foundStudent = students.find((student) => {
           const studentEmail = (student.email || '').toLowerCase().trim();
-          const studentPhone = normalizePhone(student.phone || '');
-
-          return studentEmail === normalizedValue || 
-                 studentPhone === normalizedPhone;
+          return studentEmail === normalizedEmail;
         });
 
         if (foundStudent) {
@@ -2596,7 +2598,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
             matchedStudentMap.set(String(studentId), foundStudent);
           }
         } else {
-          notFound.push(value);
+          notFound.push(email);
         }
       });
 
@@ -2653,7 +2655,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       setImportResult({
         success: validStudentIds.length,
         notFound: notFound,
-        total: emailsOrPhones.length,
+        total: emails.length,
         invalidStudents: invalidStudents.length > 0 ? invalidStudents : undefined,
         courseName: formData.course && selectedCourse ? (selectedCourse.name || 'N/A') : undefined
       });
@@ -2691,6 +2693,10 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       const selectedProgram = allProgramsFromDB.find(p => String(p._id) === String(value));
       if (selectedProgram && selectedProgram.band) {
         setFormData(prev => ({ ...prev, programId: value, band: selectedProgram.band }));
+        return;
+      } else if (selectedProgram) {
+        // If program doesn't have band, clear band
+        setFormData(prev => ({ ...prev, programId: value, band: '' }));
         return;
       }
     }
@@ -2830,16 +2836,31 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         return;
       }
 
+      // Priority: band from programId > band from API (type + level)
+      // If programId exists and has band, don't fetch from API
+      if (formData.programId && formData.band) {
+        const selectedProgram = allProgramsFromDB.find(p => String(p._id) === String(formData.programId));
+        if (selectedProgram && selectedProgram.band && selectedProgram.band === formData.band) {
+          // Band already set from programId, don't fetch
+          return;
+        }
+      }
+
       if (!formData.program || !formData.level) {
-        // Clear band if program (type) or level is missing
-        setFormData(prev => ({ ...prev, band: '' }));
+        // Clear band if program (type) or level is missing, but keep band from programId if exists
+        if (!formData.programId) {
+          setFormData(prev => ({ ...prev, band: '' }));
+        }
         return;
       }
 
       // formData.program is now TYPE (ielts, toeic, cam), use it directly
       const type = formData.program;
       if (!type || !['ielts', 'toeic', 'cam'].includes(type)) {
-        setFormData(prev => ({ ...prev, band: '' }));
+        // Only clear band if no programId
+        if (!formData.programId) {
+          setFormData(prev => ({ ...prev, band: '' }));
+        }
         return;
       }
 
@@ -2849,15 +2870,21 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         if (response && response.success && response.band) {
           setFormData(prev => ({ ...prev, band: response.band }));
         } else {
-          setFormData(prev => ({ ...prev, band: '' }));
+          // Only clear band if no programId
+          if (!formData.programId) {
+            setFormData(prev => ({ ...prev, band: '' }));
+          }
         }
       } catch (error) {
-        setFormData(prev => ({ ...prev, band: '' }));
+        // Only clear band if no programId
+        if (!formData.programId) {
+          setFormData(prev => ({ ...prev, band: '' }));
+        }
       }
     };
 
     fetchBand();
-  }, [formData.program, formData.level, formData.status]);
+  }, [formData.program, formData.level, formData.status, formData.programId, formData.band, allProgramsFromDB]);
 
   // Real-time capacity validation
   useEffect(() => {
@@ -4967,7 +4994,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
 
               <Form.Text className="text-neutral-500 text-12 mt-8">
                 <i className="fas fa-info-circle me-1"></i>
-                Có thể thêm học viên sau khi chỉnh sửa lớp. File Excel cần có cột đầu tiên chứa Email hoặc Số điện thoại của học viên.
+                Có thể thêm học viên sau khi chỉnh sửa lớp. File Excel cần có cột đầu tiên chứa Email của học viên.
               </Form.Text>
             </div>
           </div>

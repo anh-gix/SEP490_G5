@@ -1791,16 +1791,40 @@ exports.createStudent = async (req, res) => {
       });
     }
     
-    // Validate phone number length (10-11 digits)
+    // Validate phone number length (10 digits only)
     // Allow duplicate phone numbers
     if (phone) {
       const phoneDigits = phone.replace(/\D/g, '');
-      if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+      // Validate BEFORE adding leading zero
+      if (phoneDigits.length === 0) {
         return res.status(400).json({
           success: false,
-          message: 'Số điện thoại phải có 10 hoặc 11 chữ số'
+          message: 'Số điện thoại không được để trống'
         });
       }
+      
+      let normalizedPhone = phoneDigits;
+      if (phoneDigits[0] === '0') {
+        // Has leading zero: must be exactly 10 digits
+        if (phoneDigits.length !== 10) {
+          return res.status(400).json({
+            success: false,
+            message: 'Số điện thoại phải có 10 chữ số'
+          });
+        }
+      } else {
+        // No leading zero (Excel removed it): must be exactly 9 digits
+        if (phoneDigits.length !== 9) {
+          return res.status(400).json({
+            success: false,
+            message: 'Số điện thoại phải có 9 chữ số (thiếu số 0 ở đầu do Excel)'
+          });
+        }
+        // Add leading zero to normalize to 10 digits
+        normalizedPhone = '0' + phoneDigits;
+      }
+      // Update phone with normalized value
+      phone = normalizedPhone;
     }
     
     // Create student
@@ -2100,17 +2124,46 @@ exports.importStudents = async (req, res) => {
           continue;
         }
         
-        // Validate phone number length (10-11 digits)
+        // Validate phone number length (10 digits only)
+        let normalizedPhone = studentData.phone || '';
         if (studentData.phone) {
           const phoneDigits = studentData.phone.replace(/\D/g, '');
-          if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+          // Validate BEFORE adding leading zero
+          if (phoneDigits.length === 0) {
             results.failed.push({
               email: studentData.email,
               username: studentData.username,
               phone: studentData.phone || '',
-              reason: 'Số điện thoại phải có 10 hoặc 11 chữ số'
+              reason: 'Số điện thoại không được để trống'
             });
             continue;
+          }
+          
+          if (phoneDigits[0] === '0') {
+            // Has leading zero: must be exactly 10 digits
+            if (phoneDigits.length !== 10) {
+              results.failed.push({
+                email: studentData.email,
+                username: studentData.username,
+                phone: studentData.phone || '',
+                reason: 'Số điện thoại phải có 10 chữ số'
+              });
+              continue;
+            }
+            normalizedPhone = phoneDigits;
+          } else {
+            // No leading zero (Excel removed it): must be exactly 9 digits
+            if (phoneDigits.length !== 9) {
+              results.failed.push({
+                email: studentData.email,
+                username: studentData.username,
+                phone: studentData.phone || '',
+                reason: 'Số điện thoại phải có 9 chữ số (thiếu số 0 ở đầu do Excel)'
+              });
+              continue;
+            }
+            // Add leading zero to normalize to 10 digits
+            normalizedPhone = '0' + phoneDigits;
           }
         }
         
@@ -2118,7 +2171,7 @@ exports.importStudents = async (req, res) => {
         const newStudent = await User.create({
           email: studentData.email,
           username: studentData.username,
-          phone: studentData.phone || '',
+          phone: normalizedPhone,
           address: studentData.address || '',
           password: studentData.password || '123456', // Default password
           roleId: studentRole._id

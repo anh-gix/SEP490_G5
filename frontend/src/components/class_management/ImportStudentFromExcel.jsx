@@ -440,12 +440,6 @@ const ImportStudentFromExcel = ({ onBack }) => {
         // Remove any non-digit characters (spaces, dashes, etc.)
         phone = phone.replace(/\D/g, '');
         
-        // Always add leading zero if phone doesn't start with 0
-        // This handles the case where Excel removes leading zeros from phone numbers
-        if (phone && phone.length > 0 && phone[0] !== '0') {
-          phone = '0' + phone;
-        }
-        
         const address = row.address || row.Address || row['Địa chỉ'] || '';
         
         // Parse new columns (support both Vietnamese and English)
@@ -465,13 +459,23 @@ const ImportStudentFromExcel = ({ onBack }) => {
           errors.push('Email không hợp lệ');
         }
 
-        if (!phone || !phone.toString().trim()) {
+        // Validate phone BEFORE adding leading zero
+        if (!phone || phone.length === 0) {
           errors.push('Số điện thoại không được để trống');
         } else {
-          // Validate phone length (10-11 digits after normalization)
-          const phoneDigits = phone.replace(/\D/g, '');
-          if (phoneDigits.length < 10 || phoneDigits.length > 11) {
-            errors.push('Số điện thoại phải có 10 hoặc 11 chữ số');
+          if (phone[0] === '0') {
+            // Has leading zero: must be exactly 10 digits
+            if (phone.length !== 10) {
+              errors.push('Số điện thoại phải có 10 chữ số');
+            }
+          } else {
+            // No leading zero (Excel removed it): must be exactly 9 digits
+            if (phone.length !== 9) {
+              errors.push('Số điện thoại phải có 9 chữ số (thiếu số 0 ở đầu do Excel)');
+            } else {
+              // Add leading zero to normalize to 10 digits
+              phone = '0' + phone;
+            }
           }
         }
 
@@ -905,6 +909,34 @@ const ImportStudentFromExcel = ({ onBack }) => {
 
     // Create worksheet
     const ws = XLSX.utils.json_to_sheet(sampleData);
+    
+    // Find phone column index
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    let phoneColIndex = -1;
+    
+    // Find phone column (check header row)
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+      const cell = ws[cellAddress];
+      if (cell && (cell.v === 'phone' || cell.v === 'Phone' || cell.v === 'Số điện thoại')) {
+        phoneColIndex = col;
+        break;
+      }
+    }
+    
+    // Format phone column as text
+    if (phoneColIndex >= 0) {
+      for (let row = range.s.r + 1; row <= range.e.r; row++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: row, c: phoneColIndex });
+        if (ws[cellAddress]) {
+          // Set cell type to string and ensure value is string
+          ws[cellAddress].t = 's'; // 's' = string type
+          ws[cellAddress].v = String(ws[cellAddress].v);
+          // Set cell style to text format
+          ws[cellAddress].z = '@'; // '@' = text format in Excel
+        }
+      }
+    }
     
     // Create workbook
     const wb = XLSX.utils.book_new();

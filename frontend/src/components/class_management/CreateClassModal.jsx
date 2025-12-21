@@ -1009,18 +1009,45 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     filterPrograms();
   }, [formData.level, formData.program, allProgramsFromDB]);
 
-  // CASCADE 3: When programId changes → fetch courses and reset downstream fields
+  // CASCADE 3: When programId changes → fetch courses, populate band, and reset course
   useEffect(() => {
-    const fetchCourses = async () => {
-      // Reset downstream fields
+    const fetchCoursesAndBand = async () => {
+      console.log('=== CASCADE 3: programId changed ===');
+      console.log('formData.programId:', formData.programId);
+
+      // Reset course (but not band yet, will populate below)
       setFormData(prev => ({
         ...prev,
-        course: '',
-        band: ''
+        course: ''
       }));
 
       if (!formData.programId) {
+        console.log('No programId, clearing band');
+        setFormData(prev => ({ ...prev, band: '' }));
         return;
+      }
+
+      // Find selected program to get type and level
+      const selectedProgram = allProgramsFromDB.find(p => String(p._id) === String(formData.programId));
+      console.log('Selected program:', selectedProgram);
+
+      if (!selectedProgram) {
+        console.log('Program not found in allProgramsFromDB');
+        setFormData(prev => ({ ...prev, band: '' }));
+        return;
+      }
+
+      console.log('Program type:', selectedProgram.type);
+      console.log('Program level:', selectedProgram.level);
+      console.log('Program band:', selectedProgram.band);
+
+      // Get band directly from selected program (no need to fetch)
+      if (selectedProgram.band) {
+        console.log('Setting band to:', selectedProgram.band);
+        setFormData(prev => ({ ...prev, band: selectedProgram.band }));
+      } else {
+        console.log('No band in program, clearing');
+        setFormData(prev => ({ ...prev, band: '' }));
       }
 
       // Fetch courses for this program
@@ -1034,8 +1061,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       }
     };
 
-    fetchCourses();
-  }, [formData.programId]);
+    fetchCoursesAndBand();
+  }, [formData.programId, allProgramsFromDB]);
 
 
   useEffect(() => {

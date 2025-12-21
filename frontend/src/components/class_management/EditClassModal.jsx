@@ -66,6 +66,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
   const [availablePrograms, setAvailablePrograms] = useState([]); // Programs for dropdown (type: IELTS, TOEIC, Cambridge)
   const [availableLevels, setAvailableLevels] = useState([]); // Levels for dropdown
   const [courses, setCourses] = useState([]); // Courses for dropdown
+  const [allCourses, setAllCourses] = useState([]); // Tất cả courses
   const [coursesLoading, setCoursesLoading] = useState(false); // Loading state for courses
   const [allProgramsFromDB, setAllProgramsFromDB] = useState([]); // Tất cả programs từ bảng Program (program_name)
   const [filteredProgramsFromDB, setFilteredProgramsFromDB] = useState([]); // Programs được filter theo type và level
@@ -2606,18 +2607,10 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         try {
           const response = await courseService.getAllLevels();
           if (response?.success && response.levels) {
-            let levels = response.levels;
-            // Ensure current level is in the list
-            if (formData.level && !levels.includes(formData.level)) {
-              levels.push(formData.level);
-            }
-            setAvailableLevels(levels);
+            setAvailableLevels(response.levels);
           }
         } catch (error) {
-          // Keep current level in list even on error
-          if (formData.level) {
-            setAvailableLevels([formData.level]);
-          }
+          setAvailableLevels([]);
         }
         return;
       }
@@ -2625,42 +2618,33 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       // formData.program is now TYPE (ielts, toeic, cam), use it directly
       const type = formData.program;
       if (!type || !['ielts', 'toeic', 'cam'].includes(type)) {
-        // If type is invalid, keep current level in list
-        if (formData.level) {
-          setAvailableLevels([formData.level]);
-        } else {
-          setAvailableLevels([]);
-        }
+        setAvailableLevels([]);
         return;
       }
 
       try {
         const response = await courseService.getLevelsByType(type);
         if (response?.success && response.levels) {
-          let levels = response.levels;
-          // Ensure current level is in the list even if not in filtered results
-          if (formData.level && !levels.includes(formData.level)) {
-            levels.push(formData.level);
-          }
+          const levels = response.levels;
           setAvailableLevels(levels);
-        } else {
-          // Keep current level in list if no response
-          if (formData.level) {
-            setAvailableLevels([formData.level]);
+
+          // If current level is not available for this type, clear it
+          if (formData.level && !levels.includes(formData.level)) {
+            setFormData(prev => ({ ...prev, level: '', band: '' }));
           }
+        } else {
+          setAvailableLevels([]);
         }
       } catch (error) {
-        // Keep current level in list even on error
-        if (formData.level) {
-          setAvailableLevels([formData.level]);
-        }
+        setAvailableLevels([]);
       }
     };
 
     if (formData.status === 'pending' || formData.status === 'disable') {
       filterLevels();
     }
-  }, [formData.program, formData.status, formData.level]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.program, formData.status]);
 
   // Filter programs from DB based on selected type and level
   useEffect(() => {
@@ -2689,103 +2673,98 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     }
   }, [formData.program, formData.level, allProgramsFromDB, formData.programId]);
 
-  // Fetch courses when program and level are selected (when status is pending or disable)
+  // Fetch all courses on mount
   useEffect(() => {
-    const fetchCourses = async () => {
-      if (formData.status !== 'pending' && formData.status !== 'disable') {
-        setCourses([]);
-        return;
-      }
-
-      if (!formData.program || !formData.level) {
-        // If we have a current course, keep it in the list
-        if (formData.course && selectedCourse) {
-          setCourses([selectedCourse]);
-        } else {
-          setCourses([]);
-        }
-        return;
-      }
-
-      // formData.program is TYPE (ielts, toeic, cam), convert to programName for API
-      const type = formData.program;
-      const programName = typeToProgramMap[type];
-      
-      if (!programName) {
-        setCourses([]);
-        setCoursesLoading(false);
-        return;
-      }
-
+    const fetchAllCourses = async () => {
       try {
         setCoursesLoading(true);
-        const response = await courseService.getCoursesByProgram(programName, formData.level);
+        const response = await courseService.getAllCourses();
 
-        if (response && response.success && response.courses) {
-          let coursesList = response.courses;
-          
-          // Check if program/level actually changed (not just initial load)
-          const programChanged = prevProgramRef.current !== null && prevProgramRef.current !== formData.program;
-          const levelChanged = prevLevelRef.current !== null && prevLevelRef.current !== formData.level;
-          const isInitialLoad = prevProgramRef.current === null && prevLevelRef.current === null;
-          
-          // Update refs for next comparison
-          prevProgramRef.current = formData.program;
-          prevLevelRef.current = formData.level;
-          
-          // Check if current course exists in the new list
-          if (formData.course) {
-            const courseExists = coursesList.some(c => {
-              const courseId = c._id || c.id;
-              return String(courseId) === String(formData.course);
-            });
-            
-            // Only clear course if:
-            // 1. Program or level actually changed (not initial load)
-            // 2. AND course doesn't exist in the new list
-            if ((programChanged || levelChanged) && !courseExists) {
-              setFormData(prev => ({ ...prev, course: '' }));
-              setSelectedCourse(null);
-            } else if (!isInitialLoad && (programChanged || levelChanged) && selectedCourse) {
-              // Verify selectedCourse matches the new program/level only if program/level changed
-              const courseProgramType = selectedCourse.program?.type;
-              const courseLevel = selectedCourse.program?.level;
-              
-              if (courseProgramType !== formData.program || courseLevel !== formData.level) {
-                setFormData(prev => ({ ...prev, course: '' }));
-                setSelectedCourse(null);
-              }
-            } else if (!courseExists && !isInitialLoad) {
-              // If course doesn't exist and it's not initial load, try to add it to list
-              if (selectedCourse) {
-                coursesList.push(selectedCourse);
-              }
-            }
-          }
-          
-          setCourses(coursesList);
-        } else {
-          // If no courses found but we have a current course, keep it in the list
-          if (formData.course && selectedCourse) {
-            setCourses([selectedCourse]);
-          } else {
-            setCourses([]);
-          }
+        if (response && response.success && response.data) {
+          setAllCourses(response.data);
+          setCourses(response.data); // Initially show all courses
         }
       } catch (error) {
-        // On error, keep current course in list if available
-        if (formData.course && selectedCourse) {
-          setCourses([selectedCourse]);
-        } else {
-          setCourses([]);
-        }
+        console.error('Error fetching courses:', error);
       } finally {
         setCoursesLoading(false);
       }
     };
 
-    fetchCourses();
-  }, [formData.program, formData.level, formData.status, formData.course]);
+    fetchAllCourses();
+  }, []);
+
+  // Filter courses based on selected filters (program type, level, or programId) and status
+  useEffect(() => {
+    if (formData.status !== 'pending' && formData.status !== 'disable') {
+      // For non-editable status, show only current course if exists
+      if (formData.course && selectedCourse) {
+        setCourses([selectedCourse]);
+      } else {
+        setCourses([]);
+      }
+      return;
+    }
+
+    if (!allCourses || allCourses.length === 0) {
+      return;
+    }
+
+    let filtered = allCourses;
+
+    // Filter by programId (from Program dropdown) if selected
+    if (formData.programId) {
+      filtered = filtered.filter(course => {
+        if (!course.program) return false;
+        // course.program can be ObjectId string or populated object
+        const programId = typeof course.program === 'object' ? course.program._id : course.program;
+        return String(programId) === String(formData.programId);
+      });
+    } else {
+      // Filter by type (formData.program is type: ielts, toeic, cam)
+      if (formData.program) {
+        filtered = filtered.filter(course => {
+          if (!course.program) return false;
+          // If program is populated object
+          if (typeof course.program === 'object' && course.program.type) {
+            return course.program.type === formData.program;
+          }
+          // If program is just ObjectId, we need to match from allProgramsFromDB
+          const programId = course.program;
+          const programObj = allProgramsFromDB.find(p => String(p._id) === String(programId));
+          return programObj && programObj.type === formData.program;
+        });
+      }
+
+      // Filter by level
+      if (formData.level) {
+        filtered = filtered.filter(course => {
+          if (!course.program) return false;
+          // If program is populated object
+          if (typeof course.program === 'object' && course.program.level) {
+            return course.program.level === formData.level;
+          }
+          // If program is just ObjectId, we need to match from allProgramsFromDB
+          const programId = course.program;
+          const programObj = allProgramsFromDB.find(p => String(p._id) === String(programId));
+          return programObj && programObj.level === formData.level;
+        });
+      }
+    }
+
+    // Always include current course if it exists, even if not in filtered list
+    if (formData.course && selectedCourse) {
+      const courseExists = filtered.some(c => {
+        const courseId = c._id || c.id;
+        return String(courseId) === String(formData.course);
+      });
+      if (!courseExists) {
+        filtered = [...filtered, selectedCourse];
+      }
+    }
+
+    setCourses(filtered);
+  }, [formData.program, formData.level, formData.programId, formData.status, formData.course, selectedCourse, allCourses, allProgramsFromDB]);
 
   // Update selectedCourse when course changes (either from dropdown or initial load)
   useEffect(() => {
@@ -3672,11 +3651,10 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       name="programId"
                       value={formData.programId}
                       onChange={handleInputChange}
-                      disabled={!formData.program || !formData.level}
                       className="border-neutral-30 radius-8 px-16 py-10"
                     >
-                      <option value="">-- Chọn program --</option>
-                      {filteredProgramsFromDB.map(prog => (
+                      <option value="">-- Tất cả programs --</option>
+                      {(formData.program || formData.level ? filteredProgramsFromDB : allProgramsFromDB).map(prog => (
                         <option key={prog._id} value={prog._id}>
                           {prog.program_name} ({prog.code})
                         </option>
@@ -3691,7 +3669,9 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   )}
                 </Form.Group>
               </div>
+            </div>
 
+            <div className="row g-3 mb-16">
               <div className="col-md-6">
                 <Form.Group>
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
@@ -3704,29 +3684,21 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       onChange={handleInputChange}
                       required
                       className="border-neutral-30 radius-8 px-16 py-10"
-                      disabled={!formData.program || !formData.level || coursesLoading}
+                      disabled={coursesLoading}
                     >
                       <option value="">
-                        {coursesLoading ? 'Đang tải...' : !formData.program || !formData.level ? '-- Chọn chương trình và cấp độ trước --' : '-- Chọn course --'}
+                        {coursesLoading ? 'Đang tải...' : '-- Chọn course --'}
                       </option>
-                      {(() => {
-                        return courses.length > 0 ? (
-                          courses.map(course => {
-                            const courseId = course._id || course.id;
-                            const courseName = course.name || '';
-                            const sessions = course.numberOfSessions ? ` (${course.numberOfSessions} buổi)` : '';
-                            return (
-                              <option key={courseId} value={courseId}>
-                                {courseName}{sessions}
-                              </option>
-                            );
-                          })
-                        ) : (
-                          !coursesLoading && formData.program && formData.level && (
-                            <option value="" disabled>Không có course nào</option>
-                          )
+                      {courses.map(course => {
+                        const courseId = course._id || course.id;
+                        const courseName = course.name || '';
+                        const sessions = course.numberOfSessions ? ` (${course.numberOfSessions} buổi)` : '';
+                        return (
+                          <option key={courseId} value={courseId}>
+                            {courseName}{sessions}
+                          </option>
                         );
-                      })()}
+                      })}
                     </Form.Select>
                   ) : (
                     <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>

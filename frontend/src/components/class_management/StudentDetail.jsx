@@ -44,6 +44,10 @@ const StudentDetail = ({ studentId, onBack }) => {
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [savingCourses, setSavingCourses] = useState(false);
 
+  // Filter state for courses
+  const [filterType, setFilterType] = useState('');
+  const [filterLevel, setFilterLevel] = useState('');
+
   // Makeup class modal state
   const [showMakeupModal, setShowMakeupModal] = useState(false);
   const [selectedScheduleForMakeup, setSelectedScheduleForMakeup] = useState(null);
@@ -180,14 +184,18 @@ const StudentDetail = ({ studentId, onBack }) => {
       const coursesResponse = await courseService.getAllCourses();
       const allCoursesList = coursesResponse?.data || coursesResponse || [];
       setAllCourses(allCoursesList);
-      
+
       // Set currently enrolled courses as selected
       const currentCourseIds = selectedStudent?.courses?.map(course => {
         const id = course._id || course.id;
         return id ? String(id) : null;
       }).filter(id => id !== null) || [];
       setSelectedCourseIds(currentCourseIds);
-      
+
+      // Reset filters when opening modal
+      setFilterType('');
+      setFilterLevel('');
+
       setShowEditCoursesModal(true);
     } catch (err) {
       console.error('Error loading courses:', err);
@@ -553,6 +561,47 @@ const StudentDetail = ({ studentId, onBack }) => {
     };
     return colorMap[status] || 'secondary';
   };
+
+  // Filter courses based on selected filters
+  const filteredCourses = useMemo(() => {
+    if (!allCourses || allCourses.length === 0) return [];
+
+    return allCourses.filter(course => {
+      // Filter by type
+      if (filterType && course.program?.type !== filterType) {
+        return false;
+      }
+
+      // Filter by level
+      if (filterLevel && course.program?.level !== filterLevel) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [allCourses, filterType, filterLevel]);
+
+  // Get unique program types from all courses
+  const programTypes = useMemo(() => {
+    const types = new Set();
+    allCourses.forEach(course => {
+      if (course.program?.type) {
+        types.add(course.program.type);
+      }
+    });
+    return Array.from(types).sort();
+  }, [allCourses]);
+
+  // Get unique program levels from all courses
+  const programLevels = useMemo(() => {
+    const levels = new Set();
+    allCourses.forEach(course => {
+      if (course.program?.level) {
+        levels.add(course.program.level);
+      }
+    });
+    return Array.from(levels).sort();
+  }, [allCourses]);
 
   // Transform schedule data for calendar view
   const calendarSchedules = useMemo(() => {
@@ -1026,11 +1075,77 @@ const StudentDetail = ({ studentId, onBack }) => {
             </div>
           ) : (
             <>
+              {/* Filter Section */}
+              <div className="mb-3 p-3 bg-light rounded">
+                <div className="d-flex align-items-center mb-2">
+                  <i className="fas fa-filter me-2 text-primary"></i>
+                  <span className="fw-semibold">Lọc khóa học:</span>
+                </div>
+                <Row className="g-2">
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label className="text-13 mb-1">Loại chương trình</Form.Label>
+                      <Form.Select
+                        size="sm"
+                        value={filterType}
+                        onChange={(e) => setFilterType(e.target.value)}
+                      >
+                        <option value="">Tất cả</option>
+                        {programTypes.map((type) => (
+                          <option key={type} value={type}>
+                            {type.toUpperCase()}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label className="text-13 mb-1">Trình độ</Form.Label>
+                      <Form.Select
+                        size="sm"
+                        value={filterLevel}
+                        onChange={(e) => setFilterLevel(e.target.value)}
+                      >
+                        <option value="">Tất cả</option>
+                        {programLevels.map((level) => (
+                          <option key={level} value={level}>
+                            {level}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                </Row>
+                {(filterType || filterLevel) && (
+                  <div className="mt-2">
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="p-0 text-decoration-none"
+                      onClick={() => {
+                        setFilterType('');
+                        setFilterLevel('');
+                      }}
+                    >
+                      <i className="fas fa-times me-1"></i>
+                      Xóa tất cả bộ lọc
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Course List Section */}
               <div className="mb-3">
-                <Form.Label className="fw-semibold">Chọn khóa học:</Form.Label>
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <Form.Label className="fw-semibold mb-0">Chọn khóa học:</Form.Label>
+                  <Badge bg="secondary" className="text-12">
+                    {filteredCourses.length} / {allCourses.length} khóa học
+                  </Badge>
+                </div>
                 <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid #dee2e6', borderRadius: '8px', padding: '12px' }}>
-                  {allCourses.length > 0 ? (
-                    allCourses.map((course) => {
+                  {filteredCourses.length > 0 ? (
+                    filteredCourses.map((course) => {
                       const courseId = course._id || course.id;
                       const courseIdStr = courseId ? String(courseId) : null;
                       if (!courseIdStr) return null;
@@ -1042,11 +1157,15 @@ const StudentDetail = ({ studentId, onBack }) => {
                           id={`course-${courseIdStr}`}
                           label={
                             <div>
-                              <span className="fw-semibold">{course.name || course.courseCode || 'N/A'}</span>
+                              <div>
+                                <span className="fw-semibold">{course.name || course.courseCode || 'N/A'}</span>
+                              </div>
                               {course.program && (
-                                <span className="text-muted ms-2 text-13">
-                                  ({course.program.program_name || course.program.name || course.program.type || 'N/A'})
-                                </span>
+                                <div className="text-muted text-12 mt-1">
+                                  <Badge bg="info" className="me-1">{course.program.type?.toUpperCase() || 'N/A'}</Badge>
+                                  <Badge bg="secondary" className="me-1">{course.program.level || 'N/A'}</Badge>
+                                  <span>{course.program.program_name || course.program.name || 'N/A'}</span>
+                                </div>
                               )}
                             </div>
                           }
@@ -1064,7 +1183,9 @@ const StudentDetail = ({ studentId, onBack }) => {
                     })
                   ) : (
                     <div className="text-center py-3 text-muted">
-                      Không có khóa học nào trong hệ thống
+                      {allCourses.length === 0
+                        ? 'Không có khóa học nào trong hệ thống'
+                        : 'Không tìm thấy khóa học phù hợp với bộ lọc'}
                     </div>
                   )}
                 </div>

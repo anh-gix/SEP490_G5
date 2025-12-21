@@ -39,6 +39,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   });
 
   const [courses, setCourses] = useState([]);
+  const [allCourses, setAllCourses] = useState([]); // Tất cả courses
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null); // Store course details including numberOfSessions
 
@@ -562,52 +563,80 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     fetchBand();
   }, [formData.program, formData.level]);
 
-  // Fetch courses when program is selected
+  // Fetch all courses on mount
   useEffect(() => {
-    const fetchCourses = async () => {
-      if (!formData.program) {
-        setCourses([]);
-        setSelectedCourse(null);
-        setFormData(prev => ({ ...prev, course: '' }));
-        return;
-      }
-
-      // Don't fetch if level is not selected (backend requires both programName and level)
-      if (!formData.level) {
-        setCourses([]);
-        setSelectedCourse(null);
-        setFormData(prev => ({ ...prev, course: '' }));
-        return;
-      }
-
+    const fetchAllCourses = async () => {
       try {
         setCoursesLoading(true);
-        const response = await courseService.getCoursesByProgram(formData.program, formData.level);
+        const response = await courseService.getAllCourses();
 
-        if (response && response.success && response.courses) {
-          setCourses(response.courses);
-          // Clear course selection if current course is not in the new list
-          if (formData.course) {
-            const courseExists = response.courses.some(c => 
-              (c._id || c.id) === formData.course
-            );
-            if (!courseExists) {
-              setFormData(prev => ({ ...prev, course: '' }));
-              setSelectedCourse(null);
-            }
-          }
-        } else {
-          setCourses([]);
+        if (response && response.success && response.data) {
+          setAllCourses(response.data);
+          setCourses(response.data); // Initially show all courses
         }
       } catch (error) {
-        setCourses([]);
+        console.error('Error fetching courses:', error);
       } finally {
         setCoursesLoading(false);
       }
     };
 
-    fetchCourses();
-  }, [formData.program, formData.level]);
+    fetchAllCourses();
+  }, []);
+
+  // Filter courses based on selected filters (program type, level, or programId)
+  useEffect(() => {
+    if (!allCourses || allCourses.length === 0) {
+      return;
+    }
+
+    let filtered = allCourses;
+
+    // Filter by programId (from Program dropdown) if selected
+    if (formData.programId) {
+      filtered = filtered.filter(course => {
+        if (!course.program) return false;
+        // course.program can be ObjectId string or populated object
+        const programId = typeof course.program === 'object' ? course.program._id : course.program;
+        return String(programId) === String(formData.programId);
+      });
+    } else {
+      // Filter by type (from Loại Chương trình dropdown)
+      if (formData.program) {
+        const type = getTypeFromProgram(formData.program); // Convert IELTS -> ielts, etc.
+        if (type) {
+          filtered = filtered.filter(course => {
+            if (!course.program) return false;
+            // If program is populated object
+            if (typeof course.program === 'object' && course.program.type) {
+              return course.program.type === type;
+            }
+            // If program is just ObjectId, we need to match from allProgramsFromDB
+            const programId = course.program;
+            const programObj = allProgramsFromDB.find(p => String(p._id) === String(programId));
+            return programObj && programObj.type === type;
+          });
+        }
+      }
+
+      // Filter by level (from Cấp độ dropdown)
+      if (formData.level) {
+        filtered = filtered.filter(course => {
+          if (!course.program) return false;
+          // If program is populated object
+          if (typeof course.program === 'object' && course.program.level) {
+            return course.program.level === formData.level;
+          }
+          // If program is just ObjectId, we need to match from allProgramsFromDB
+          const programId = course.program;
+          const programObj = allProgramsFromDB.find(p => String(p._id) === String(programId));
+          return programObj && programObj.level === formData.level;
+        });
+      }
+    }
+
+    setCourses(filtered);
+  }, [formData.program, formData.level, formData.programId, allCourses, allProgramsFromDB]);
 
   // Fetch course details when course is selected
   useEffect(() => {
@@ -1821,11 +1850,10 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     name="programId"
                     value={formData.programId}
                     onChange={handleInputChange}
-                    disabled={!formData.program || !formData.level}
                     className="border-neutral-30 radius-8 px-16 py-10"
                   >
-                    <option value="">-- Chọn program --</option>
-                    {filteredProgramsFromDB.map(prog => (
+                    <option value="">-- Tất cả programs --</option>
+                    {(formData.program || formData.level ? filteredProgramsFromDB : allProgramsFromDB).map(prog => (
                       <option key={prog._id} value={prog._id}>
                         {prog.program_name} ({prog.code})
                       </option>
@@ -1838,17 +1866,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             <div className="row g-3 mb-16">
               <div className="col-md-6">
                 <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">Band</Form.Label>
-                  <div className="border border-neutral-30 rounded-8 px-16 py-10 bg-neutral-25 text-neutral-700" style={{ minHeight: '38px', display: 'flex', alignItems: 'center' }}>
-                    {formData.band || <span className="text-neutral-400">Chưa có band</span>}
-                  </div>
-                </Form.Group>
-              </div>
-            </div>
-
-            <div className="row g-3 mb-16">
-              <div className="col-md-12">
-                <Form.Group>
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Course <span className="text-danger-600">*</span>
                   </Form.Label>
@@ -1857,13 +1874,11 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     value={formData.course}
                     onChange={handleInputChange}
                     required
-                    disabled={!formData.program || coursesLoading}
+                    disabled={coursesLoading}
                     className="border-neutral-30 radius-8 px-16 py-10"
                   >
                     <option value="">
-                      {!formData.program 
-                        ? '-- Chọn loại chương trình trước --'
-                        : coursesLoading 
+                      {coursesLoading
                         ? 'Đang tải danh sách course...'
                         : '-- Chọn course --'}
                     </option>
@@ -1881,6 +1896,15 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                       Course này có {selectedCourse.numberOfSessions} buổi học
                     </Form.Text>
                   )}
+                </Form.Group>
+              </div>
+
+              <div className="col-md-6">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">Band</Form.Label>
+                  <div className="border border-neutral-30 rounded-8 px-16 py-10 bg-neutral-25 text-neutral-700" style={{ minHeight: '38px', display: 'flex', alignItems: 'center' }}>
+                    {formData.band || <span className="text-neutral-400">Chưa có band</span>}
+                  </div>
                 </Form.Group>
               </div>
             </div>

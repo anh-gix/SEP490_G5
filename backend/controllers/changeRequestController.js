@@ -744,7 +744,7 @@ exports.getSenderSchedule = async (req, res) => {
 exports.approveChangeRequest = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
-  
+
   try {
     const { id } = req.params;
     const { pendingMakeupClasses, pendingClassChange, responseContent } = req.body;
@@ -762,6 +762,44 @@ exports.approveChangeRequest = async (req, res) => {
         success: false,
         message: 'Không tìm thấy đơn'
       });
+    }
+
+    // Validate: Đơn học bù phải có buổi học bù được xếp
+    if (changeRequest.type === 'makeup_class') {
+      if (!pendingMakeupClasses || !Array.isArray(pendingMakeupClasses) || pendingMakeupClasses.length === 0) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng xếp buổi học bù trước khi chấp nhận đơn'
+        });
+      }
+    }
+
+    // Validate: Đơn thay giáo viên phải có giáo viên dạy thay được chỉ định
+    if (changeRequest.type === 'request_replace_teacher') {
+      if (!pendingMakeupClasses || !Array.isArray(pendingMakeupClasses) || pendingMakeupClasses.length === 0) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng chỉ định giáo viên dạy thay trước khi chấp nhận đơn'
+        });
+      }
+
+      // Kiểm tra xem có substituteTeacherId không
+      const hasSubstituteTeacher = pendingMakeupClasses.some(makeup =>
+        makeup.isSubstituteClass && makeup.substituteTeacherId
+      );
+
+      if (!hasSubstituteTeacher) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng chỉ định giáo viên dạy thay trước khi chấp nhận đơn'
+        });
+      }
     }
 
     const studentId = changeRequest.sender._id || changeRequest.sender;

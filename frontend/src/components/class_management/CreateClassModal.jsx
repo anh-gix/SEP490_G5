@@ -636,18 +636,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     }
 
     setCourses(filtered);
-
-    // Clear course selection if current course is not in the filtered list
-    if (formData.course) {
-      const courseExists = filtered.some(c => {
-        const courseId = c._id || c.id;
-        return String(courseId) === String(formData.course);
-      });
-      if (!courseExists) {
-        setFormData(prev => ({ ...prev, course: '' }));
-        setSelectedCourse(null);
-      }
-    }
   }, [formData.program, formData.level, formData.programId, allCourses, allProgramsFromDB, formData.course]);
 
   // Fetch course details when course is selected
@@ -780,21 +768,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         if (matchingProgram) {
           setFilteredProgramsFromDB([matchingProgram]);
         }
-      }
-      
-      // Update formData if current values don't match course's program/level/programId
-      const needsUpdate = 
-        formData.program !== programName || 
-        formData.level !== programLevel ||
-        (formData.programId && String(formData.programId) !== String(programId));
-      
-      if (needsUpdate) {
-        setFormData(prev => ({ 
-          ...prev, 
-          program: programName, 
-          level: programLevel,
-          programId: programId ? String(programId) : ''
-        }));
       }
     };
 
@@ -1106,6 +1079,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         return;
       }
 
+      // If programId is selected, don't override the programId-based filter
+      // The programId filter useEffect will handle setting availableLevels
+      if (formData.programId) {
+        return;
+      }
+
       if (!formData.program) {
         // If no program selected, show all levels from program table
         try {
@@ -1130,11 +1109,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         const response = await courseService.getLevelsByType(type);
         if (response?.success && response.levels) {
           setAvailableLevels(response.levels);
-          
-          // If current level is not available for selected program, clear it
-          if (formData.level && !response.levels.includes(formData.level)) {
-            setFormData(prev => ({ ...prev, level: '', band: '' }));
-          }
         }
       } catch (error) {
         // Error fetching levels by type
@@ -1142,7 +1116,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     };
     
     filterLevels();
-  }, [formData.program, formData.course]);
+  }, [formData.program, formData.course, formData.programId]);
 
   // Filter programs based on selected level
   useEffect(() => {
@@ -1150,6 +1124,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       // If a course is selected, don't override the course-based filter
       // The course filter useEffect will handle setting availablePrograms
       if (formData.course) {
+        return;
+      }
+
+      // If programId is selected, don't override the programId-based filter
+      // The programId filter useEffect will handle setting availablePrograms
+      if (formData.programId) {
         return;
       }
 
@@ -1176,11 +1156,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             .map(type => getProgramFromType(type))
             .filter(Boolean);
           setAvailablePrograms(programsForLevel);
-
-          // If current program is not available for selected level, clear it
-          if (formData.program && !programsForLevel.includes(formData.program)) {
-            setFormData(prev => ({ ...prev, program: '', band: '' }));
-          }
         }
       } catch (error) {
         // Error fetching types by level
@@ -1188,7 +1163,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     };
 
     filterPrograms();
-  }, [formData.level, formData.course]);
+  }, [formData.level, formData.course, formData.programId]);
 
   // Filter programs from DB based on selected type and level
   useEffect(() => {
@@ -1204,6 +1179,13 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
     let filtered = allProgramsFromDB;
 
+    // If programId is selected, filter to only that program
+    if (formData.programId) {
+      filtered = filtered.filter(prog => String(prog._id) === String(formData.programId));
+      setFilteredProgramsFromDB(filtered);
+      return;
+    }
+
     // Filter by type (program type)
     if (formData.program) {
       const type = getTypeFromProgram(formData.program);
@@ -1218,12 +1200,42 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     }
 
     setFilteredProgramsFromDB(filtered);
+  }, [formData.program, formData.level, formData.programId, formData.course, allProgramsFromDB]);
 
-    // If current programId is not in filtered list, clear it
-    if (formData.programId && !filtered.find(p => String(p._id) === String(formData.programId))) {
-      setFormData(prev => ({ ...prev, programId: '' }));
+  // Filter program type and level based on selected programId
+  useEffect(() => {
+    // If a course is selected, don't override the course-based filter
+    if (formData.course) {
+      return;
     }
-  }, [formData.program, formData.level, formData.course, allProgramsFromDB]);
+
+    if (!formData.programId) {
+      // If no programId selected, let existing useEffects handle showing all options
+      return;
+    }
+
+    if (!allProgramsFromDB || allProgramsFromDB.length === 0) {
+      return;
+    }
+
+    // Find the selected program from DB
+    const selectedProgram = allProgramsFromDB.find(p => String(p._id) === String(formData.programId));
+    
+    if (!selectedProgram) {
+      return;
+    }
+
+    // Filter availablePrograms to only show the program type
+    const programName = getProgramFromType(selectedProgram.type);
+    if (programName) {
+      setAvailablePrograms([programName]);
+    }
+
+    // Filter availableLevels to only show the level
+    if (selectedProgram.level) {
+      setAvailableLevels([selectedProgram.level]);
+    }
+  }, [formData.programId, formData.course, allProgramsFromDB]);
 
   useEffect(() => {
     const fetchExistingSchedules = async () => {

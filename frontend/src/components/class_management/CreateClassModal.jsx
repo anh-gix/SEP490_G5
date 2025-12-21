@@ -168,6 +168,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   const [availableLevels, setAvailableLevels] = useState([]); // Levels filtered by selected program
   const [allProgramsFromDB, setAllProgramsFromDB] = useState([]); // Tất cả programs từ bảng Program (program_name)
   const [filteredProgramsFromDB, setFilteredProgramsFromDB] = useState([]); // Programs được filter theo type và level
+  const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false); // Flag to prevent race condition
 
   // Program name to type mapping
   const programTypeMap = {
@@ -1068,8 +1069,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         } catch (mappingsError) {
           // Error fetching mappings
         }
+
+        // Mark initial data as loaded to prevent race condition with filter useEffects
+        setIsInitialDataLoaded(true);
       } catch (error) {
         // Error fetching course data
+        setIsInitialDataLoaded(true); // Still set to true to allow filters to run
       }
     };
     fetchCourseData();
@@ -1078,6 +1083,11 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   // Filter levels based on selected program
   useEffect(() => {
     const filterLevels = async () => {
+      // Wait for initial data to be loaded to prevent race condition
+      if (!isInitialDataLoaded) {
+        return;
+      }
+
       // If a course is selected, don't override the course-based filter
       // The course filter useEffect will handle setting availableLevels
       if (formData.course) {
@@ -1090,8 +1100,15 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         return;
       }
 
-      if (!formData.program) {
+      if (!formData.program || formData.program === '') {
         // If no program selected, show all levels from program table
+        // Only fetch if initial data is loaded (to prevent overriding initial fetch)
+        return;
+      }
+
+      const type = getTypeFromProgram(formData.program);
+      if (!type) {
+        // If type not found, show all levels
         try {
           const response = await courseService.getAllLevels();
           if (response?.success && response.levels) {
@@ -1103,12 +1120,6 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         return;
       }
 
-      const type = getTypeFromProgram(formData.program);
-      if (!type) {
-        setAvailableLevels([]);
-        return;
-      }
-
       // Fetch levels for this type from program table
       try {
         const response = await courseService.getLevelsByType(type);
@@ -1116,16 +1127,29 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           setAvailableLevels(response.levels);
         }
       } catch (error) {
-        // Error fetching levels by type
+        // Error fetching levels by type - fallback to all levels
+        try {
+          const response = await courseService.getAllLevels();
+          if (response?.success && response.levels) {
+            setAvailableLevels(response.levels);
+          }
+        } catch (fallbackError) {
+          // Error fetching all levels
+        }
       }
     };
-    
+
     filterLevels();
-  }, [formData.program, formData.course, formData.programId]);
+  }, [formData.program, formData.course, formData.programId, isInitialDataLoaded]);
 
   // Filter programs based on selected level
   useEffect(() => {
     const filterPrograms = async () => {
+      // Wait for initial data to be loaded to prevent race condition
+      if (!isInitialDataLoaded) {
+        return;
+      }
+
       // If a course is selected, don't override the course-based filter
       // The course filter useEffect will handle setting availablePrograms
       if (formData.course) {
@@ -1138,18 +1162,9 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         return;
       }
 
-      if (!formData.level) {
+      if (!formData.level || formData.level === '') {
         // If no level selected, show all types from program table
-        try {
-          const response = await courseService.getAllTypes();
-          if (response?.success && response.types) {
-            const allTypes = response.types;
-            const allPrograms = allTypes.map(type => getProgramFromType(type)).filter(Boolean);
-            setAvailablePrograms(allPrograms);
-          }
-        } catch (error) {
-          // Error fetching all types
-        }
+        // Only fetch if initial data is loaded (to prevent overriding initial fetch)
         return;
       }
 
@@ -1163,12 +1178,22 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           setAvailablePrograms(programsForLevel);
         }
       } catch (error) {
-        // Error fetching types by level
+        // Error fetching types by level - fallback to all types
+        try {
+          const response = await courseService.getAllTypes();
+          if (response?.success && response.types) {
+            const allTypes = response.types;
+            const allPrograms = allTypes.map(type => getProgramFromType(type)).filter(Boolean);
+            setAvailablePrograms(allPrograms);
+          }
+        } catch (fallbackError) {
+          // Error fetching all types
+        }
       }
     };
 
     filterPrograms();
-  }, [formData.level, formData.course, formData.programId]);
+  }, [formData.level, formData.course, formData.programId, isInitialDataLoaded]);
 
   // Filter programs from DB based on selected type and level
   useEffect(() => {
@@ -1209,37 +1234,85 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
   // Filter program type and level based on selected programId
   useEffect(() => {
-    // If a course is selected, don't override the course-based filter
-    if (formData.course) {
-      return;
-    }
+    const filterByProgramId = async () => {
+      // If a course is selected, don't override the course-based filter
+      if (formData.course) {
+        return;
+      }
 
-    if (!formData.programId) {
-      // If no programId selected, let existing useEffects handle showing all options
-      return;
-    }
+      if (!formData.programId || formData.programId === '') {
+        // If no programId selected, restore all options
+        // Only restore if we have data to avoid unnecessary API calls
+        if (allProgramsFromDB && allProgramsFromDB.length > 0) {
+          // Restore all types
+          try {
+            const response = await courseService.getAllTypes();
+            if (response?.success && response.types) {
+              const allTypes = response.types;
+              const allPrograms = allTypes.map(type => getProgramFromType(type)).filter(Boolean);
+              setAvailablePrograms(allPrograms);
+            }
+          } catch (error) {
+            // Error fetching all types
+          }
+          
+          // Restore all levels
+          try {
+            const response = await courseService.getAllLevels();
+            if (response?.success && response.levels) {
+              setAvailableLevels(response.levels);
+            }
+          } catch (error) {
+            // Error fetching all levels
+          }
+        }
+        return;
+      }
 
-    if (!allProgramsFromDB || allProgramsFromDB.length === 0) {
-      return;
-    }
+      if (!allProgramsFromDB || allProgramsFromDB.length === 0) {
+        return;
+      }
 
-    // Find the selected program from DB
-    const selectedProgram = allProgramsFromDB.find(p => String(p._id) === String(formData.programId));
-    
-    if (!selectedProgram) {
-      return;
-    }
+      // Find the selected program from DB
+      const selectedProgram = allProgramsFromDB.find(p => String(p._id) === String(formData.programId));
+      
+      if (!selectedProgram) {
+        // Program not found, restore all options
+        try {
+          const response = await courseService.getAllTypes();
+          if (response?.success && response.types) {
+            const allTypes = response.types;
+            const allPrograms = allTypes.map(type => getProgramFromType(type)).filter(Boolean);
+            setAvailablePrograms(allPrograms);
+          }
+        } catch (error) {
+          // Error fetching all types
+        }
+        
+        try {
+          const response = await courseService.getAllLevels();
+          if (response?.success && response.levels) {
+            setAvailableLevels(response.levels);
+          }
+        } catch (error) {
+          // Error fetching all levels
+        }
+        return;
+      }
 
-    // Filter availablePrograms to only show the program type
-    const programName = getProgramFromType(selectedProgram.type);
-    if (programName) {
-      setAvailablePrograms([programName]);
-    }
+      // Filter availablePrograms to only show the program type
+      const programName = getProgramFromType(selectedProgram.type);
+      if (programName) {
+        setAvailablePrograms([programName]);
+      }
 
-    // Filter availableLevels to only show the level
-    if (selectedProgram.level) {
-      setAvailableLevels([selectedProgram.level]);
-    }
+      // Filter availableLevels to only show the level
+      if (selectedProgram.level) {
+        setAvailableLevels([selectedProgram.level]);
+      }
+    };
+
+    filterByProgramId();
   }, [formData.programId, formData.course, allProgramsFromDB]);
 
   useEffect(() => {

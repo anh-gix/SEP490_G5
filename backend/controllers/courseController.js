@@ -446,8 +446,8 @@ exports.archiveCourse = async (req, res) => {
  */
 exports.getAllTypes = async (req, res) => {
     try {
-        const types = await Program.distinct('type', { status: 'active' });
-        
+        const types = await Program.distinct('type', { status: 'approved' });
+
         res.status(200).json({
             success: true,
             types: types.sort()
@@ -467,8 +467,8 @@ exports.getAllTypes = async (req, res) => {
  */
 exports.getAllLevels = async (req, res) => {
     try {
-        const levels = await Program.distinct('level', { status: 'active' });
-        
+        const levels = await Program.distinct('level', { status: 'approved' });
+
         // Sort levels in order: Pre-A1, A1, A2, B1, B2, C1, C2
         const levelOrder = ['Pre-A1', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
         const sortedLevels = levels.sort((a, b) => {
@@ -476,7 +476,7 @@ exports.getAllLevels = async (req, res) => {
             const indexB = levelOrder.indexOf(b);
             return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
         });
-        
+
         res.status(200).json({
             success: true,
             levels: sortedLevels
@@ -507,15 +507,15 @@ exports.getLevelsByType = async (req, res) => {
 
         const levels = await Program.distinct('level', {
             type: type,
-            status: 'active'
+            status: 'approved'
         });
 
         // Debug logging
         console.log(`[getLevelsByType] Type: ${type}, Found levels:`, levels);
 
         // Also log the programs for this type to verify
-        const programsCount = await Program.countDocuments({ type: type, status: 'active' });
-        console.log(`[getLevelsByType] Total active programs for ${type}:`, programsCount);
+        const programsCount = await Program.countDocuments({ type: type, status: 'approved' });
+        console.log(`[getLevelsByType] Total approved programs for ${type}:`, programsCount);
 
         // Sort levels in order
         const levelOrder = ['Pre-A1', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
@@ -753,7 +753,7 @@ exports.getTypesByLevel = async (req, res) => {
 
         const programs = await Program.find({
             level: level,
-            status: 'active'
+            status: 'approved'
         }).distinct('type');
 
         res.status(200).json({

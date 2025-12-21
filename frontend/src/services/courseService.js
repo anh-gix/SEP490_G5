@@ -192,6 +192,21 @@ export const courseService = {
     }
   },
 
+  // Get courses by program ID(s)
+  getCoursesByProgramId: async (programIds) => {
+    try {
+      // programIds can be a single ID or array of IDs
+      const idsParam = Array.isArray(programIds) ? programIds.join(',') : programIds;
+      const response = await api.get('/by-program-id', {
+        params: { programIds: idsParam }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching courses by program ID:', error);
+      throw error.response?.data || { message: 'Không thể lấy danh sách khóa học theo program ID' };
+    }
+  },
+
   // Get PLOs of a Course's Program
   getProgramPLOs: async (courseId) => {
     try {

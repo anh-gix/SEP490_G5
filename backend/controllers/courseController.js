@@ -39,7 +39,7 @@ exports.getAllCourses = async (req, res) => {
         }
         
         const courses = await Course.find(query)
-            .populate('program', 'program_name code')
+            .populate('program', 'program_name code type level band')
             .populate('createdBy', 'fullname email')
             .sort({ createdAt: -1 });
 
@@ -499,19 +499,26 @@ exports.getAllLevels = async (req, res) => {
 exports.getLevelsByType = async (req, res) => {
     try {
         const { type } = req.query;
-        
+
         if (!type) {
             return res.status(400).json({
                 success: false,
                 message: 'Thiếu tham số type'
             });
         }
-        
-        const levels = await Program.distinct('level', { 
+
+        const levels = await Program.distinct('level', {
             type: type,
-            status: 'active' 
+            status: 'active'
         });
-        
+
+        // Debug logging
+        console.log(`[getLevelsByType] Type: ${type}, Found levels:`, levels);
+
+        // Also log the programs for this type to verify
+        const programsCount = await Program.countDocuments({ type: type, status: 'active' });
+        console.log(`[getLevelsByType] Total active programs for ${type}:`, programsCount);
+
         // Sort levels in order
         const levelOrder = ['Pre-A1', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
         const sortedLevels = levels.sort((a, b) => {
@@ -519,7 +526,7 @@ exports.getLevelsByType = async (req, res) => {
             const indexB = levelOrder.indexOf(b);
             return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
         });
-        
+
         res.status(200).json({
             success: true,
             levels: sortedLevels
@@ -593,6 +600,55 @@ exports.getCoursesByProgram = async (req, res) => {
         .select('name description program')
         .sort({ name: 1 });
         
+        res.status(200).json({
+            success: true,
+            courses: courses
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Get courses by program ID(s)
+ * GET /api/courses/by-program-id?programIds=id1,id2,id3
+ * Supports single or multiple program IDs (comma-separated)
+ */
+exports.getCoursesByProgramId = async (req, res) => {
+    try {
+        const { programIds } = req.query;
+
+        if (!programIds) {
+            return res.status(400).json({
+                success: false,
+                message: 'Thiếu tham số programIds'
+            });
+        }
+
+        // Parse program IDs (can be comma-separated)
+        const programIdArray = programIds.split(',').map(id => id.trim()).filter(id => id.length > 0);
+
+        if (programIdArray.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Không có program ID hợp lệ'
+            });
+        }
+
+        // Find courses that belong to these programs
+        // Get courses with status 'completed' or 'active' (courses ready to use)
+        const courses = await Course.find({
+            program: { $in: programIdArray },
+            status: { $in: ['completed', 'active'] }
+        })
+        .populate('program', 'program_name code type level')
+        .select('name description program status')
+        .sort({ name: 1 });
+
         res.status(200).json({
             success: true,
             courses: courses

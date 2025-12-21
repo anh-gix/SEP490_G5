@@ -1877,42 +1877,77 @@ const findExistingStudent = async (email, phone, studentRole) => {
   }
 };
 
-// Helper function to enroll student into courses based on levelsToStudy
-const enrollStudentInCourses = async (studentId, levelsToStudyStr, type) => {
+// Helper function to enroll student into courses based on levelsToStudy and programCode (REQUIRED)
+const enrollStudentInCourses = async (studentId, levelsToStudyStr, type, programCode) => {
   try {
-    if (!levelsToStudyStr || !type) {
-      return { enrolled: 0, courses: [] };
+    // Validate required parameters
+    if (!levelsToStudyStr || !type || !programCode) {
+      return {
+        enrolled: 0,
+        courses: [],
+        error: 'Missing required parameters: levelsToStudy, type, and programCode are all required'
+      };
     }
 
     // Parse levels from string
     const levels = parseLevelsToStudy(levelsToStudyStr);
     if (levels.length === 0) {
-      return { enrolled: 0, courses: [] };
+      return { enrolled: 0, courses: [], error: 'Invalid levelsToStudy format' };
     }
 
     const typeStr = type.toString().trim().toLowerCase();
+    const programCodeStr = programCode.toString().trim();
 
-    // Find programs matching type and levels
+    if (!programCodeStr) {
+      return { enrolled: 0, courses: [], error: 'Program code is required and cannot be empty' };
+    }
+
+    // Parse multiple program codes (split by comma, semicolon, or pipe)
+    const programCodes = programCodeStr
+      .split(/[,;|]/)
+      .map(code => code.trim())
+      .filter(code => code.length > 0);
+
+    if (programCodes.length === 0) {
+      return { enrolled: 0, courses: [], error: 'No valid program codes found' };
+    }
+
+    // Find programs by codes - ONLY use program codes, no fallback to type+level
     const programs = await Program.find({
-      type: typeStr,
-      level: { $in: levels },
+      code: { $in: programCodes },
       status: 'active'
-    }).select('_id level');
+    }).select('_id level code');
 
     if (programs.length === 0) {
-      return { enrolled: 0, courses: [] };
+      return {
+        enrolled: 0,
+        courses: [],
+        error: `None of the program codes [${programCodes.join(', ')}] found in the system`
+      };
+    }
+
+    // Log warning if some codes were not found
+    const foundCodes = programs.map(p => p.code);
+    const notFoundCodes = programCodes.filter(code => !foundCodes.includes(code));
+    if (notFoundCodes.length > 0) {
+      console.log(`Warning: Programs with codes [${notFoundCodes.join(', ')}] not found.`);
     }
 
     const programIds = programs.map(p => p._id);
 
     // Find all courses belonging to these programs
+    // Get courses with status 'completed' or 'active' (courses ready to use)
     const courses = await Course.find({
       program: { $in: programIds },
-      status: 'active'
+      status: { $in: ['completed', 'active'] }
     }).select('_id name program');
 
     if (courses.length === 0) {
-      return { enrolled: 0, courses: [] };
+      return {
+        enrolled: 0,
+        courses: [],
+        error: `No active courses found for programs [${foundCodes.join(', ')}]`
+      };
     }
 
     // Enroll student in all courses
@@ -1933,10 +1968,15 @@ const enrollStudentInCourses = async (studentId, levelsToStudyStr, type) => {
         }
       } catch (courseError) {
         // Continue with other courses even if one fails
+        console.error(`Error enrolling in course ${course._id}:`, courseError.message);
       }
     }
 
-    return { enrolled: enrolledCount, courses: enrolledCourseIds };
+    return {
+      enrolled: enrolledCount,
+      courses: enrolledCourseIds,
+      programsFound: foundCodes
+    };
   } catch (error) {
     return { enrolled: 0, courses: [], error: error.message };
   }
@@ -1981,20 +2021,32 @@ exports.importStudents = async (req, res) => {
         
         if (existingStudent) {
           // Student already exists, try to enroll in courses
-          if (studentData.levelsToStudy && studentData.type) {
+          if (studentData.levelsToStudy && studentData.type && studentData.programCode) {
             try {
               const enrollmentResult = await enrollStudentInCourses(
                 existingStudent._id,
                 studentData.levelsToStudy,
-                studentData.type
+                studentData.type,
+                studentData.programCode
               );
-              results.enrolled.push({
-                _id: existingStudent._id,
-                email: existingStudent.email,
-                username: existingStudent.username,
-                phone: existingStudent.phone || '',
-                enrolledCourses: enrollmentResult.enrolled || 0
-              });
+
+              // Check if enrollment returned an error
+              if (enrollmentResult.error) {
+                results.skipped.push({
+                  email: studentData.email,
+                  username: studentData.username,
+                  phone: studentData.phone || '',
+                  reason: enrollmentResult.error
+                });
+              } else {
+                results.enrolled.push({
+                  _id: existingStudent._id,
+                  email: existingStudent.email,
+                  username: existingStudent.username,
+                  phone: existingStudent.phone || '',
+                  enrolledCourses: enrollmentResult.enrolled || 0
+                });
+              }
             } catch (enrollmentError) {
               // Log error but add to skipped
               results.skipped.push({
@@ -2006,11 +2058,16 @@ exports.importStudents = async (req, res) => {
             }
           } else {
             // No course information, skip
+            const missingFields = [];
+            if (!studentData.levelsToStudy) missingFields.push('lộ trình học');
+            if (!studentData.type) missingFields.push('loại chương trình');
+            if (!studentData.programCode) missingFields.push('mã chương trình');
+
             results.skipped.push({
               email: studentData.email,
               username: studentData.username,
               phone: studentData.phone || '',
-              reason: 'Học viên đã có tài khoản nhưng không có thông tin lộ trình học'
+              reason: `Học viên đã có tài khoản nhưng thiếu thông tin: ${missingFields.join(', ')}`
             });
           }
           continue;
@@ -2041,20 +2098,27 @@ exports.importStudents = async (req, res) => {
         });
         
         // Enroll student in courses based on levelsToStudy
-        // Note: We don't save aim, currentLevel, type, levelsToStudy to User model
+        // Note: We don't save aim, currentLevel, type, levelsToStudy, programCode to User model
         // They are only used to determine which courses to enroll in
-        if (studentData.levelsToStudy && studentData.type) {
+        if (studentData.levelsToStudy && studentData.type && studentData.programCode) {
           try {
             const enrollmentResult = await enrollStudentInCourses(
               newStudent._id,
               studentData.levelsToStudy,
-              studentData.type
+              studentData.type,
+              studentData.programCode
             );
+
+            // Log if enrollment returned an error (but don't fail the student creation)
+            if (enrollmentResult.error) {
+              console.error(`Enrollment error for ${studentData.email}:`, enrollmentResult.error);
+            }
           } catch (enrollmentError) {
             // Log error but don't fail the import
+            console.error(`Enrollment exception for ${studentData.email}:`, enrollmentError.message);
           }
         }
-        
+
         results.created.push({
           _id: newStudent._id,
           email: newStudent.email,

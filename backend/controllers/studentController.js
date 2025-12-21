@@ -2099,7 +2099,6 @@ exports.importStudents = async (req, res) => {
                 });
               }
             } catch (enrollmentError) {
-              // Log error but add to skipped
               results.skipped.push({
                 email: studentData.email,
                 username: studentData.username,
@@ -2108,7 +2107,6 @@ exports.importStudents = async (req, res) => {
               });
             }
           } else {
-            // No course information, skip
             const missingFields = [];
             if (!studentData.levelsToStudy) missingFields.push('lộ trình học');
             if (!studentData.type) missingFields.push('loại chương trình');

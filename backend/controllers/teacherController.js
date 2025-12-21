@@ -384,13 +384,7 @@ exports.createTeacher = async (req, res) => {
       });
     }
     
-    // Check if phone number already exists
-    const phoneExists = await User.findOne({ phone });
-    if (phoneExists) {
-      return res.status(400).json({ 
-        message: "Số điện thoại đã tồn tại trong hệ thống" 
-      });
-    }
+    // Phone can be duplicate, no need to check
     
     // Find teacher role
     const teacherRole = await Role.findOne({ name: 'Teacher' });
@@ -2221,19 +2215,7 @@ exports.importTeachers = async (req, res) => {
           }
         }
         
-        // Check if phone number exists
-        if (normalizedPhone) {
-          const phoneExists = await User.findOne({ phone: normalizedPhone });
-          if (phoneExists) {
-            results.failed.push({
-              email: teacherData.email,
-              username: teacherData.username,
-              phone: teacherData.phone,
-              reason: 'Số điện thoại đã tồn tại trong hệ thống'
-            });
-            continue;
-          }
-        }
+        // Phone can be duplicate, no need to check
         
         // Create teacher
         const newTeacher = await User.create({

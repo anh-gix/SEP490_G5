@@ -652,7 +652,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
         previewData.forEach((item) => {
           const email = item.email.toLowerCase();
 
-          // Only check duplicate email, allow duplicate phone
+          // Check duplicate email with existing users (allow duplicate phone)
           if (email && existingEmails.has(email)) {
             if (!item.warnings.includes('Học viên đã có tài khoản trong hệ thống')) {
               item.warnings.push('Học viên đã có tài khoản trong hệ thống');

@@ -59,21 +59,7 @@ const TeacherSchedule = () => {
         params.endDate = endDate.toISOString();
       }
 
-      console.log('[TeacherSchedule] Fetching schedules:', {
-        viewMode,
-        params,
-        hasDateRange: !!(startDate && endDate),
-        startDate: startDate ? startDate.toISOString() : null,
-        endDate: endDate ? endDate.toISOString() : null
-      });
-
       const response = await teacherService.getCurrentTeacherSchedule(params);
-      
-      console.log('[TeacherSchedule] Response received:', {
-        success: response.success,
-        total: response.total,
-        schedulesCount: response.schedules?.length || 0
-      });
 
       if (response.success) {
         // Transform schedules to match frontend format
@@ -219,25 +205,42 @@ const TeacherSchedule = () => {
     // Parse date string to avoid timezone conversion issues
     // If date is already a Date object
     if (dateString instanceof Date) {
+      // Check if date is valid
+      if (isNaN(dateString.getTime())) return 'N/A';
       const year = dateString.getUTCFullYear();
       const month = String(dateString.getUTCMonth() + 1).padStart(2, '0');
       const day = String(dateString.getUTCDate()).padStart(2, '0');
       return `${day}/${month}/${year}`;
     }
     
-    // If date is a string, extract YYYY-MM-DD part
+    // If date is a string
     const dateStr = typeof dateString === 'string' ? dateString : dateString.toString();
-    const dateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
     
-    if (dateMatch) {
-      const year = dateMatch[1];
-      const month = dateMatch[2];
-      const day = dateMatch[3];
+    // Check if already in DD/MM/YYYY format
+    const ddMMyyyyMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (ddMMyyyyMatch) {
+      // Already in correct format, return as is
+      const day = ddMMyyyyMatch[1].padStart(2, '0');
+      const month = ddMMyyyyMatch[2].padStart(2, '0');
+      const year = ddMMyyyyMatch[3];
       return `${day}/${month}/${year}`;
     }
     
-    // Fallback: use UTC methods to avoid timezone conversion
+    // Check if in YYYY-MM-DD format
+    const yyyyMMddMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (yyyyMMddMatch) {
+      const year = yyyyMMddMatch[1];
+      const month = yyyyMMddMatch[2];
+      const day = yyyyMMddMatch[3];
+      return `${day}/${month}/${year}`;
+    }
+    
+    // Fallback: try to parse as Date
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      console.warn('[formatDate] Invalid date string:', dateString);
+      return 'N/A';
+    }
     const year = date.getUTCFullYear();
     const month = String(date.getUTCMonth() + 1).padStart(2, '0');
     const day = String(date.getUTCDate()).padStart(2, '0');
@@ -416,22 +419,34 @@ const TeacherSchedule = () => {
                     // Extract date components from schedule date (use UTC to avoid timezone issues)
                     let scheduleYear, scheduleMonth, scheduleDay;
                     if (dateStr instanceof Date) {
+                      if (isNaN(dateStr.getTime())) return false;
                       scheduleYear = dateStr.getUTCFullYear();
                       scheduleMonth = dateStr.getUTCMonth();
                       scheduleDay = dateStr.getUTCDate();
                     } else {
-                      // If date is a string, extract YYYY-MM-DD directly
-                      const dateMatch = dateStr.toString().match(/^(\d{4})-(\d{2})-(\d{2})/);
-                      if (dateMatch) {
-                        scheduleYear = parseInt(dateMatch[1], 10);
-                        scheduleMonth = parseInt(dateMatch[2], 10) - 1; // Month is 0-indexed
-                        scheduleDay = parseInt(dateMatch[3], 10);
+                      const dateStrValue = dateStr.toString();
+                      
+                      // Check if in DD/MM/YYYY format
+                      const ddMMyyyyMatch = dateStrValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                      if (ddMMyyyyMatch) {
+                        scheduleDay = parseInt(ddMMyyyyMatch[1], 10);
+                        scheduleMonth = parseInt(ddMMyyyyMatch[2], 10) - 1; // Month is 0-indexed
+                        scheduleYear = parseInt(ddMMyyyyMatch[3], 10);
                       } else {
-                        // Fallback: parse as Date and use UTC
-                        const date = new Date(dateStr);
-                        scheduleYear = date.getUTCFullYear();
-                        scheduleMonth = date.getUTCMonth();
-                        scheduleDay = date.getUTCDate();
+                        // Check if in YYYY-MM-DD format
+                        const yyyyMMddMatch = dateStrValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                        if (yyyyMMddMatch) {
+                          scheduleYear = parseInt(yyyyMMddMatch[1], 10);
+                          scheduleMonth = parseInt(yyyyMMddMatch[2], 10) - 1; // Month is 0-indexed
+                          scheduleDay = parseInt(yyyyMMddMatch[3], 10);
+                        } else {
+                          // Fallback: parse as Date and use UTC
+                          const date = new Date(dateStr);
+                          if (isNaN(date.getTime())) return false;
+                          scheduleYear = date.getUTCFullYear();
+                          scheduleMonth = date.getUTCMonth();
+                          scheduleDay = date.getUTCDate();
+                        }
                       }
                     }
                     
@@ -583,22 +598,34 @@ const TeacherSchedule = () => {
                 // Extract date components from schedule date (use UTC to avoid timezone issues)
                 let scheduleYear, scheduleMonth, scheduleDay;
                 if (dateStr instanceof Date) {
+                  if (isNaN(dateStr.getTime())) return false;
                   scheduleYear = dateStr.getUTCFullYear();
                   scheduleMonth = dateStr.getUTCMonth();
                   scheduleDay = dateStr.getUTCDate();
                 } else {
-                  // If date is a string, extract YYYY-MM-DD directly
-                  const dateMatch = dateStr.toString().match(/^(\d{4})-(\d{2})-(\d{2})/);
-                  if (dateMatch) {
-                    scheduleYear = parseInt(dateMatch[1], 10);
-                    scheduleMonth = parseInt(dateMatch[2], 10) - 1; // Month is 0-indexed
-                    scheduleDay = parseInt(dateMatch[3], 10);
+                  const dateStrValue = dateStr.toString();
+                  
+                  // Check if in DD/MM/YYYY format
+                  const ddMMyyyyMatch = dateStrValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                  if (ddMMyyyyMatch) {
+                    scheduleDay = parseInt(ddMMyyyyMatch[1], 10);
+                    scheduleMonth = parseInt(ddMMyyyyMatch[2], 10) - 1; // Month is 0-indexed
+                    scheduleYear = parseInt(ddMMyyyyMatch[3], 10);
                   } else {
-                    // Fallback: parse as Date and use UTC
-                    const date = new Date(dateStr);
-                    scheduleYear = date.getUTCFullYear();
-                    scheduleMonth = date.getUTCMonth();
-                    scheduleDay = date.getUTCDate();
+                    // Check if in YYYY-MM-DD format
+                    const yyyyMMddMatch = dateStrValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                    if (yyyyMMddMatch) {
+                      scheduleYear = parseInt(yyyyMMddMatch[1], 10);
+                      scheduleMonth = parseInt(yyyyMMddMatch[2], 10) - 1; // Month is 0-indexed
+                      scheduleDay = parseInt(yyyyMMddMatch[3], 10);
+                    } else {
+                      // Fallback: parse as Date and use UTC
+                      const date = new Date(dateStr);
+                      if (isNaN(date.getTime())) return false;
+                      scheduleYear = date.getUTCFullYear();
+                      scheduleMonth = date.getUTCMonth();
+                      scheduleDay = date.getUTCDate();
+                    }
                   }
                 }
                 

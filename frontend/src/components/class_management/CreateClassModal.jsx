@@ -241,8 +241,11 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     if (name === 'startDate') {
       const today = getTodayDate();
 
-      // Validate start date is not in the past
-      if (value && value < today) {
+      // Validate start date is required
+      if (!value || value.trim() === '') {
+        setDateError('Ngày khai giảng là bắt buộc!');
+      } else if (value < today) {
+        // Validate start date is not in the past
         setDateError('Ngày khai giảng không được là quá khứ!');
       } else {
         setDateError('');
@@ -845,9 +848,17 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     }
     setScheduleEntriesError(null);
 
+    // Validate start date is required
+    if (!formData.startDate || formData.startDate.trim() === '') {
+      setDateError('Ngày khai giảng là bắt buộc!');
+      setErrorMessage('Vui lòng chọn ngày khai giảng!');
+      setShowErrorModal(true);
+      return;
+    }
+
     // Validate start date is not in the past
     const today = getTodayDate();
-    if (formData.startDate && formData.startDate < today) {
+    if (formData.startDate < today) {
       setDateError('Ngày khai giảng không được là quá khứ!');
       setErrorMessage('Ngày khai giảng không được là quá khứ!');
       setShowErrorModal(true);
@@ -1908,7 +1919,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               <div className="col-md-6">
                 <Form.Group>
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
-                    Ngày khai giảng
+                    Ngày khai giảng <span className="text-danger-600">*</span>
                   </Form.Label>
                   <Form.Control
                     type="date"
@@ -1916,9 +1927,10 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     value={formData.startDate}
                     onChange={handleInputChange}
                     min={getTodayDate()}
+                    required
                     className={`border-neutral-30 radius-8 px-16 py-10 ${dateError ? 'border-danger' : ''}`}
                   />
-                  {dateError && dateError.includes('quá khứ') && (
+                  {dateError && (
                     <Form.Text className="text-danger-600 text-12 d-block mt-4">
                       {dateError}
                     </Form.Text>

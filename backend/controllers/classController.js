@@ -24,6 +24,20 @@ exports.getAllClasses = async (req, res) => {
     if (courseId) query.course = courseId;
     if (search) query.name = { $regex: search, $options: 'i' };
     
+    //update pending → active
+    if (status !== 'pending') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      await Class.updateMany(
+        {
+          status: 'pending',
+          startDate: { $exists: true, $lte: today }
+        },
+        { $set: { status: 'active' } }
+      );
+    }
+    
     const classes = await Class.find(query)
       // user model uses 'username' rather than firstName/lastName/fullName
       .populate('teacher', 'username email phone')

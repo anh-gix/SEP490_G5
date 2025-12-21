@@ -436,15 +436,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       const day = String(scheduleDate.getDate()).padStart(2, '0');
       const dateString = `${year}-${month}-${day}`;
 
-      console.log(' [VALIDATE] Convert thứ sang date:');
-      console.log('  - Thứ được chọn:', newScheduleData.day);
-      console.log('  - targetDay (0=CN, 1=T2, ..., 6=T7):', targetDay);
-      console.log('  - Hôm nay là thứ:', today.getDay(), `(${['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][today.getDay()]})`);
-      console.log('  - Số ngày cần cộng:', daysToAdd);
-      console.log('  - Ngày được tính (local):', scheduleDate.toLocaleDateString('vi-VN'), `(${['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][scheduleDate.getDay()]})`);
-      console.log('  - Date string (local, tránh timezone):', dateString);
-      console.log('  - Date string (UTC - SAI):', scheduleDate.toISOString().split('T')[0]);
-
       try {
         setValidatingSchedule(true);
         const response = await classScheduleService.validateAddClassSchedule({
@@ -1477,21 +1468,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
 
                   // Check time overlap
                   if (hasTimeOverlap(classStart, classEnd, teacherStart, teacherEnd)) {
-                    console.log(` [DEBUG] Phát hiện xung đột (${scheduleSource}):`, {
-                      date: classSchedule.date,
-                      currentClass: {
-                        startTime: classSchedule.startTime,
-                        endTime: classSchedule.endTime,
-                        parsed: `${classStart} - ${classEnd}`
-                      },
-                      teacherClass: {
-                        className: teacherSchedule.className,
-                        startTime: teacherSchedule.startTime,
-                        endTime: teacherSchedule.endTime,
-                        parsed: `${teacherStart} - ${teacherEnd}`
-                      }
-                    });
-
                     conflicts.push({
                       date: classSchedule.date,
                       classTime: `${classStart} - ${classEnd}`,
@@ -1527,43 +1503,9 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
             checkConflictsBetweenSchedules(generatedSchedules, 'generated_sessions');
           }
 
-          // Log comparison results and update state for filtering
+          // Update state for filtering
           try {
             if (conflicts.length > 0) {
-              console.warn(' PHÁT HIỆN XUNG ĐỘT LỊCH:', {
-                totalConflicts: conflicts.length,
-                conflicts: conflicts.map(c => {
-                  try {
-                    const currentSchedule = currentClassSchedules.find(s => formatDateToYYYYMMDD(s.date) === formatDateToYYYYMMDD(c.date));
-                    return {
-                      ...c,
-                      currentClassSchedule: currentSchedule ? {
-                        date: currentSchedule.date,
-                        time: `${currentSchedule.startTime} - ${currentSchedule.endTime}`,
-                        room: currentSchedule.room
-                      } : null,
-                      explanation: currentSchedule 
-                        ? `Lớp hiện tại "${fullClassData?.name || 'N/A'}" học vào ${currentSchedule.date} (${currentSchedule.startTime} - ${currentSchedule.endTime}) trùng với lớp "${c.conflictingClass}" (${c.teacherTime})`
-                        : `Không tìm thấy lịch lớp hiện tại vào ngày ${c.date} - có thể là lỗi logic`
-                    };
-                  } catch (err) {
-                    console.error('Error processing conflict:', err, c);
-                    return c;
-                  }
-                }),
-                summary: conflicts.map(c => {
-                  try {
-                    const currentSchedule = currentClassSchedules.find(s => formatDateToYYYYMMDD(s.date) === formatDateToYYYYMMDD(c.date));
-                    const currentTime = currentSchedule 
-                      ? `${currentSchedule.startTime} - ${currentSchedule.endTime}`
-                      : c.classTime;
-                    return `Ngày ${c.date}: Lớp hiện tại "${fullClassData?.name || 'N/A'}" (${currentTime}) trùng với lớp "${c.conflictingClass}" (${c.teacherTime}) tại ${c.conflictingRoom}`;
-                  } catch (err) {
-                    return `Ngày ${c.date}: Conflict với lớp "${c.conflictingClass}"`;
-                  }
-                }),
-                note: 'Các buổi học của chính lớp hiện tại đã được loại trừ khỏi danh sách xung đột'
-              });
 
               // Update teacherRoomConflicts state to filter out this teacher
               setTeacherRoomConflicts(prev => ({

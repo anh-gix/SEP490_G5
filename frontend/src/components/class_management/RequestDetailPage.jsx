@@ -229,8 +229,6 @@ const RequestDetailPage = ({
               ...prev,
               [idx]: foundStudentScheduleId
             }));
-          } else {
-            console.log(` Không tìm thấy studentSchedule cho học sinh ${studentId} trong kết quả API`);
           }
         }
       } catch (error) {
@@ -293,8 +291,6 @@ const RequestDetailPage = ({
           const firstStudentSchedule = response.studentSchedules[0];
           const foundStudentScheduleId = firstStudentSchedule._id || firstStudentSchedule.id;
           setReplaceTeacherStudentScheduleId(foundStudentScheduleId);
-        } else {
-          console.log(' Không tìm thấy studentSchedule cho classScheduleId:', classScheduleId);
         }
       } catch (error) {
         console.error(' Lỗi khi gọi API lấy studentSchedule cho đơn request_replace_teacher:', error);

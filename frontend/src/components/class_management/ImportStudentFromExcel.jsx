@@ -584,9 +584,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
         // Fetch courses if programCode exists (ignore other validation errors)
         if (item.programCode && item.programCode.trim()) {
           try {
-            console.log(`Fetching courses for program code: ${item.programCode}`);
             const courses = await getCoursesByProgramCodes(item.programCode);
-            console.log(`Courses fetched for ${item.email}:`, courses);
             item.courses = courses;
           } catch (error) {
             console.error(`Error fetching courses for ${item.email}:`, error);

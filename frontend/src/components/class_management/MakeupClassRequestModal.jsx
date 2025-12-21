@@ -350,29 +350,20 @@ const MakeupClassRequestModal = ({
           // Determine student ID based on mode
           if (isStudentMode && studentId) {
             targetStudentId = studentId;
-            console.log('[DEBUG] Student mode - Student ID:', targetStudentId);
           } else if (isAcademicStaffMode && studentScheduleId) {
             // For AcademicStaff mode, need to get studentId from studentScheduleId
-            console.log('[DEBUG] AcademicStaff mode - Fetching studentId from studentScheduleId:', studentScheduleId);
             try {
               const response = await studentScheduleService.getClassScheduleByStudentScheduleId(studentScheduleId);
-              console.log('[DEBUG] Response from getClassScheduleByStudentScheduleId:', response);
               if (response.success && response.studentSchedule?.student) {
                 targetStudentId = response.studentSchedule.student._id || response.studentSchedule.student;
-                console.log('[DEBUG] Found studentId:', targetStudentId);
-              } else {
-                console.log('[DEBUG] No student found in response');
               }
             } catch (error) {
               console.error('[DEBUG] Error fetching studentId:', error);
               return;
             }
-          } else {
-            console.log('[DEBUG] Cannot determine studentId - isStudentMode:', isStudentMode, 'isAcademicStaffMode:', isAcademicStaffMode, 'studentId:', studentId, 'studentScheduleId:', studentScheduleId);
           }
-          
+
           if (!targetStudentId) {
-            console.log('[DEBUG] No targetStudentId, skipping log');
             return;
           }
           
@@ -380,58 +371,29 @@ const MakeupClassRequestModal = ({
           // Use the same date for startDate and endDate to get schedules for that specific day
           const apiPort = import.meta.env.VITE_API_PORT || 8080;
           const apiUrl = `http://localhost:${apiPort}/api/student-schedules/student/${targetStudentId}/schedule?startDate=${formData.date}&endDate=${formData.date}`;
-          console.log('[DEBUG] Fetching student schedule from:', apiUrl);
-          
+
           const response = await fetch(apiUrl, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`,
               'Content-Type': 'application/json'
             }
           });
-          
-          console.log('[DEBUG] Response status:', response.status, response.ok);
-          
+
           if (response.ok) {
             const data = await response.json();
-            console.log('[DEBUG] Response data:', data);
             
             // API returns schedules array directly, not wrapped in success field
             if (data.schedules && Array.isArray(data.schedules)) {
               const schedulesOnDate = data.schedules;
-              
-              console.log('=== LỊCH HỌC VIÊN TRONG NGÀY:', formData.date, '===');
-              console.log(`Student ID: ${targetStudentId}`);
-              
+
               if (schedulesOnDate.length === 0) {
-                console.log('⏰ Học viên không có lịch học trong ngày này');
                 // Clear conflict when no schedules
                 setStudentScheduleConflict(null);
               } else {
-                console.log(`⏰ Học viên có ${schedulesOnDate.length} buổi học:`);
-                
                 let hasStudentConflict = false;
                 let conflictSchedule = null;
-                
+
                 schedulesOnDate.forEach((schedule, index) => {
-                  // Response format: schedule has direct fields, not nested in classSchedule
-                  const className = schedule.className || 'N/A';
-                  const roomName = schedule.room?.room_name || 'N/A';
-                  const teacherName = schedule.teacher?.username || 'N/A';
-                  const sessionTitle = schedule.sessionTitle || 'N/A';
-                  const timeRange = `${schedule.startTime || 'N/A'} - ${schedule.endTime || 'N/A'}`;
-                  const status = schedule.scheduleStatus || 'N/A';
-                  
-                  console.log(`\n${index + 1}. ${timeRange}`);
-                  console.log(`   Lớp: ${className}`);
-                  console.log(`   Phòng: ${roomName}`);
-                  console.log(`   Giáo viên: ${teacherName}`);
-                  console.log(`   Buổi: ${sessionTitle}`);
-                  console.log(`   Trạng thái: ${status}`);
-                  
-                  if (schedule.programType) {
-                    console.log(`   Loại chương trình: ${schedule.programType}`);
-                  }
-                  
                   // Check if this schedule conflicts with selected time
                   if (schedule.startTime && schedule.endTime) {
                     const conflict = hasTimeOverlap(
@@ -440,12 +402,10 @@ const MakeupClassRequestModal = ({
                       schedule.startTime,
                       schedule.endTime
                     );
-                    
+
                     if (conflict) {
                       hasStudentConflict = true;
                       conflictSchedule = schedule;
-                      console.log(`   ⚠️⚠️⚠️ CONFLICT với thời gian đã chọn (${formData.startTime} - ${formData.endTime}) ⚠️⚠️⚠️`);
-                      console.log(`   → Học viên đã có buổi học "${className}" vào thời gian này!`);
                     }
                   }
                 });
@@ -463,10 +423,6 @@ const MakeupClassRequestModal = ({
                   setStudentScheduleConflict(null);
                 }
               }
-              
-              console.log('================================\n');
-            } else {
-              console.log('[DEBUG] No schedules array in response');
             }
           } else {
             const errorText = await response.text();

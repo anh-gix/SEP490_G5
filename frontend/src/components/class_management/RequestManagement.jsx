@@ -230,7 +230,6 @@ const RequestManagement = () => {
         }
       } catch (err) {
         // Not a WorkRequest or not found, continue to try ChangeRequest
-        console.log('Not a WorkRequest, trying ChangeRequest...');
       }
 
       // Step 3: Try to fetch as ChangeRequest (slower, requires fetching all)

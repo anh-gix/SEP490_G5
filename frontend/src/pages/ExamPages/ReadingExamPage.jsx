@@ -210,8 +210,35 @@ const ReadingExamPage = () => {
       }
       // Auto submit if not already submitting
       if (!submitting) {
-        // call handleSubmit but allow submission even if submitting flag is stale
-        handleSubmit(true);
+        // Check if there are any answers (with actual values, not empty arrays or empty strings)
+        const hasAnyAnswer = sectionData?.parts?.some((partData) => {
+          const partAnswers = answers[`part_${partData.part}`] || {};
+          return Object.keys(partAnswers).some((qNum) => {
+            const answerValue = partAnswers[qNum];
+            // Check if answer has actual value: not empty array, not empty string, not null/undefined
+            if (Array.isArray(answerValue)) {
+              return answerValue.length > 0;
+            }
+            return answerValue && answerValue !== "";
+          });
+        });
+
+        if (hasAnyAnswer) {
+          // call handleSubmit but allow submission even if submitting flag is stale
+          handleSubmit(true);
+        } else {
+          // Show alert if no answers
+          Swal.fire({
+            title: "Đã hết thời gian!!",
+            text: "chúng tôi vẫn chưa ghi nhận được bất cứ câu trả lời nào của bạn",
+            icon: "warning",
+            confirmButtonText: "Đã hiểu",
+            confirmButtonColor: "#3085d6",
+          }).then(() => {
+            // Navigate to result page even without answers
+            navigate(`/student/exams/${examId}`);
+          });
+        }
       }
       return;
     }
@@ -227,7 +254,7 @@ const ReadingExamPage = () => {
     // Cleanup on unmount is handled in the separate effect below.
 
     // No cleanup here to avoid clearing interval each second (which would stop the timer)
-  }, [timeRemaining, submitting, handleSubmit]);
+  }, [timeRemaining, submitting, handleSubmit, answers, sectionData, examId, navigate]);
 
   // Clear interval on unmount to avoid leaks
   useEffect(() => {
@@ -553,10 +580,17 @@ const ReadingExamPage = () => {
             <button
               onClick={handleSubmitWithConfirmation}
               disabled={submitting || (() => {
-                // Check if at least one part has answers
+                // Check if at least one part has answers (with actual values, not empty arrays or empty strings)
                 return !sectionData?.parts?.some((partData) => {
                   const partAnswers = answers[`part_${partData.part}`] || {};
-                  return Object.keys(partAnswers).length > 0;
+                  return Object.keys(partAnswers).some((qNum) => {
+                    const answerValue = partAnswers[qNum];
+                    // Check if answer has actual value: not empty array, not empty string, not null/undefined
+                    if (Array.isArray(answerValue)) {
+                      return answerValue.length > 0;
+                    }
+                    return answerValue && answerValue !== "";
+                  });
                 });
               })()}
               className="btn btn-main rounded-pill px-32 py-12 flex-align gap-8"

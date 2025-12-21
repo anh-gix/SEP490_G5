@@ -147,7 +147,7 @@ const WritingResultPage = () => {
               </div>
 
               {/* Score Summary */}
-              <div className="row gy-3 mb-24">
+              <div className="row gy-3 mb-24 justify-content-center">
                 <div className="col-md-4">
                   <div className="bg-white box-shadow-md rounded-12 p-20 border border-neutral-30 text-center h-100">
                     <div className="w-48 h-48 flex-center bg-main-25 text-main-600 text-20 rounded-circle mx-auto mb-12">
@@ -157,6 +157,9 @@ const WritingResultPage = () => {
                     <h5 className={`text-${getScoreColor()}-600 mb-0 fw-bold text-18`}>
                       {result.sectionScore} / {result.maxScore || "Chưa chấm"}
                     </h5>
+                    <p className="text-neutral-600 text-12 mb-0 mt-8">
+                        Bài Writing sẽ được chấm sau
+                      </p>
                   </div>
                 </div>
               </div>
@@ -197,10 +200,10 @@ const WritingResultPage = () => {
                           let className = "fw-semibold text-main-600 bg-transparent border-neutral-30";
                           if (isCurrentBand && isSelectedBand) {
                             // Band của người dùng và đang được chọn
-                            className = "bg-success text-white border-success";
+                            className = "bg-main-600 text-white border-main-600";
                           } else if (isCurrentBand) {
                             // Band của người dùng (nhưng không được chọn)
-                            className = "bg-success-25 text-success border-success";
+                            className = "bg-main-25 text-main-600 border-main-600";
                           } else if (isSelectedBand || isDisplayBand) {
                             // Band được chọn (không phải của người dùng)
                             className = "bg-main-600 text-white border-main-600";
@@ -242,11 +245,11 @@ const WritingResultPage = () => {
 
                     {/* Band Score Details */}
                     {displayBandScore && bandScoreData[displayBandScore] && (
-                      <div className={`border-top border-neutral-30 pt-16 ${
+                      <div className={`border-top border-neutral-30 pt-16 px-16 pb-16 ${
                         selectedBandScore === displayBandScore 
                           ? (currentBandScore === displayBandScore 
-                              ? "bg-success-25 border-success-600" 
-                              : "bg-main-25 border-main-600")
+                              ? "bg-main-25 border-main-600" 
+                              : "bg-success-25 border-main-600")
                           : ""
                       }`} style={{
                         borderRadius: "8px",
@@ -256,19 +259,19 @@ const WritingResultPage = () => {
                       }}>
                         <div className="row gy-2">
                           <div className="col-md-4">
-                            <div className="border-bottom border-neutral-30 pb-8">
+                            <div className="border-bottom border-neutral-30 pb-8 px-4">
                               <p className="text-neutral-600 text-12 mb-2 fw-semibold">Correct Answers:</p>
                               <p className="text-neutral-700 mb-0 fw-medium text-13">{bandScoreData[displayBandScore].correctAnswers}</p>
                             </div>
                           </div>
                           <div className="col-md-4">
-                            <div className="border-bottom border-neutral-30 pb-8">
+                            <div className="border-bottom border-neutral-30 pb-8 px-4">
                               <p className="text-neutral-600 text-12 mb-2 fw-semibold">Skill Level:</p>
                               <p className="text-neutral-700 mb-0 fw-medium text-13">{bandScoreData[displayBandScore].skillLevel}</p>
                             </div>
                           </div>
                           <div className="col-md-12">
-                            <div className="pt-8">
+                            <div className="pt-8 px-4">
                               <p className="text-neutral-600 text-12 mb-2 fw-semibold">Description:</p>
                               <p className="text-neutral-700 mb-0 text-13" style={{ lineHeight: "1.6" }}>
                                 {bandScoreData[displayBandScore].description}
@@ -292,11 +295,9 @@ const WritingResultPage = () => {
                 </div>
                 {result.parts?.map((partData, partIndex) => (
                   <div key={partIndex} className={partIndex > 0 ? "mt-20 pt-20 border-top border-neutral-30" : ""}>
-                    {result.parts.length > 1 && (
-                      <div className="mb-16">
-                        <h6 className="text-main-600 fw-semibold text-14">Part {partData.part}</h6>
-                      </div>
-                    )}
+                    <div className="mb-16">
+                      <h6 className="text-main-600 fw-semibold text-14">Part {partData.part}</h6>
+                    </div>
                     <div className="row gy-3">
                       {partData.results?.map((item, index) => {
                         const wordCount = getWordCount(item.studentAnswer);

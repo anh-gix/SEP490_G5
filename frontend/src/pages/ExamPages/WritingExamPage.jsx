@@ -163,8 +163,32 @@ const WritingExamPage = () => {
       }
       // Auto submit if not already submitting
       if (!submitting) {
-        // call handleSubmit but allow submission even if submitting flag is stale
-        handleSubmit(true);
+        // Check if there are any answers (with actual values, not empty strings)
+        const hasAnyAnswer = sectionData?.parts?.some((partData) => {
+          const partAnswers = answers[`part_${partData.part}`] || {};
+          return Object.keys(partAnswers).some((qNum) => {
+            const answerValue = partAnswers[qNum];
+            // Check if answer has actual value: not empty string, not null/undefined
+            return answerValue && answerValue.trim() !== "";
+          });
+        });
+
+        if (hasAnyAnswer) {
+          // call handleSubmit but allow submission even if submitting flag is stale
+          handleSubmit(true);
+        } else {
+          // Show alert if no answers
+          Swal.fire({
+            title: "Đã hết thời gian!!",
+            text: "chúng tôi vẫn chưa ghi nhận được bất cứ câu trả lời nào của bạn",
+            icon: "warning",
+            confirmButtonText: "Đã hiểu",
+            confirmButtonColor: "#3085d6",
+          }).then(() => {
+            // Navigate to result page even without answers
+            navigate(`/student/exams/${examId}`);
+          });
+        }
       }
       return;
     }
@@ -180,7 +204,7 @@ const WritingExamPage = () => {
     // Cleanup on unmount is handled in the separate effect below.
 
     // No cleanup here to avoid clearing interval each second (which would stop the timer)
-  }, [timeRemaining, submitting, handleSubmit]);
+  }, [timeRemaining, submitting, handleSubmit, answers, sectionData, examId, navigate]);
 
   // Clear interval on unmount to avoid leaks
   useEffect(() => {

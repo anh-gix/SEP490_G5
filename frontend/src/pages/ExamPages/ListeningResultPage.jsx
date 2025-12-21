@@ -74,6 +74,18 @@ const ListeningResultPage = () => {
     return listeningSections.reduce((sum, s) => sum + (s.questionCount || 0), 0);
   };
 
+  const getTotalMaxScore = () => {
+    if (!examData || !examData.sections) return result?.maxScore || 0;
+    const listeningSections = examData.sections.filter(s => s.type === "listening");
+    return listeningSections.reduce((sum, section) => {
+      if (!section.answerKey || !Array.isArray(section.answerKey)) return sum;
+      const sectionMaxScore = section.answerKey.reduce((sectionSum, item) => {
+        return sectionSum + (item.maxScore || 1);
+      }, 0);
+      return sum + sectionMaxScore;
+    }, 0);
+  };
+
   const getScoreColor = () => {
     const percentage = getScorePercentage();
     if (percentage >= 80) return "success";
@@ -99,9 +111,19 @@ const ListeningResultPage = () => {
     return option ? `${option.key}. ${option.text}` : answerKey;
   };
 
+  // Hàm lấy tất cả các listening part numbers từ examData
+  const getAllListeningParts = () => {
+    if (!examData?.sections) return [];
+    const listeningSections = examData.sections.filter(s => s.type === "listening");
+    return listeningSections
+      .map(s => s.part || 1)
+      .filter((part, index, self) => self.indexOf(part) === index) // Remove duplicates
+      .sort((a, b) => a - b);
+  };
+
   // Hàm merge tất cả câu hỏi từ examData với kết quả từ result
   const getAllQuestionsForPart = (partNumber) => {
-    if (!examData?.sections || !result?.parts) return [];
+    if (!examData?.sections) return [];
     
     // Lấy section tương ứng với part
     const section = examData.sections.find(
@@ -110,8 +132,8 @@ const ListeningResultPage = () => {
     
     if (!section || !section.answerKey) return [];
     
-    // Lấy kết quả đã làm cho part này
-    const partResult = result.parts.find(p => p.part === partNumber);
+    // Lấy kết quả đã làm cho part này (nếu có)
+    const partResult = result?.parts?.find(p => p.part === partNumber);
     const answeredQuestions = partResult?.results || [];
     
     // Tạo map để tra cứu nhanh câu đã trả lời
@@ -164,10 +186,9 @@ const ListeningResultPage = () => {
 
   const getBandScore = () => {
     if (!result || !result.maxScore || result.maxScore === 0) return null;
-    const percentage = getScorePercentage();
-    const correctAnswers = Math.round((result.sectionScore / result.maxScore) * 40); // Assuming max 40 questions
+    const correctAnswers = getCorrectAnswersCount();
     
-    // Map percentage/score to band score
+    // Map correct answers to band score
     if (correctAnswers >= 39) return 9;
     if (correctAnswers >= 37) return 8.5;
     if (correctAnswers >= 35) return 8;
@@ -330,7 +351,7 @@ const ListeningResultPage = () => {
                     </div>
                     <p className='text-neutral-600 text-13 mb-6 fw-medium'>Điểm số</p>
                     <h5 className={`text-${getScoreColor()}-600 mb-0 fw-bold text-18`}>
-                      {result.sectionScore} / {result.maxScore}
+                      {result.sectionScore} / {getTotalMaxScore()}
                     </h5>
                   </div>
                 </div>
@@ -375,7 +396,7 @@ const ListeningResultPage = () => {
                     {/* Band Score Scale */}
                     <div className="mb-16">
                       <p className="text-neutral-600 text-13 mb-8 text-center fw-medium">
-                        Điểm của bạn: {currentBandScore !== null ? <span className="fw-bold text-main-600">{currentBandScore}</span> : "N/A"}
+                        Band Score của bạn: {currentBandScore !== null ? <span className="fw-bold text-main-600">{currentBandScore}</span> : "N/A"}
                       </p>
                       <div className="d-flex flex-wrap gap-6 justify-content-center align-items-center">
                         {bandScores.map((band) => {
@@ -386,10 +407,10 @@ const ListeningResultPage = () => {
                           let className = "fw-semibold text-main-600 bg-transparent border-neutral-30";
                           if (isCurrentBand && isSelectedBand) {
                             // Band của người dùng và đang được chọn
-                            className = "bg-success text-white border-success";
+                            className = "bg-main-600 text-white border-main-600";
                           } else if (isCurrentBand) {
                             // Band của người dùng (nhưng không được chọn)
-                            className = "bg-success-25 text-success border-success";
+                            className = "bg-main-25 text-main-600 border-main-600";
                           } else if (isSelectedBand || isDisplayBand) {
                             // Band được chọn (không phải của người dùng)
                             className = "bg-main-600 text-white border-main-600";
@@ -431,11 +452,11 @@ const ListeningResultPage = () => {
 
                     {/* Band Score Details */}
                     {displayBandScore && bandScoreData[displayBandScore] && (
-                      <div className={`border-top border-neutral-30 pt-16 ${
+                      <div className={`border-top border-neutral-30 pt-16 px-16 pb-16 ${
                         selectedBandScore === displayBandScore 
                           ? (currentBandScore === displayBandScore 
-                              ? "bg-success-25 border-success-600" 
-                              : "bg-main-25 border-main-600")
+                              ? "bg-main-25 border-main-600" 
+                              : "bg-success-25 border-main-600")
                           : ""
                       }`} style={{
                         borderRadius: "8px",
@@ -445,19 +466,19 @@ const ListeningResultPage = () => {
                       }}>
                         <div className="row gy-2">
                           <div className="col-md-4">
-                            <div className="border-bottom border-neutral-30 pb-8">
+                            <div className="border-bottom border-neutral-30 pb-8 px-4">
                               <p className="text-neutral-600 text-12 mb-2 fw-semibold">Correct Answers:</p>
                               <p className="text-neutral-700 mb-0 fw-medium text-13">{bandScoreData[displayBandScore].correctAnswers}</p>
                             </div>
                           </div>
                           <div className="col-md-4">
-                            <div className="border-bottom border-neutral-30 pb-8">
+                            <div className="border-bottom border-neutral-30 pb-8 px-4">
                               <p className="text-neutral-600 text-12 mb-2 fw-semibold">Skill Level:</p>
                               <p className="text-neutral-700 mb-0 fw-medium text-13">{bandScoreData[displayBandScore].skillLevel}</p>
                             </div>
                           </div>
                           <div className="col-md-12">
-                            <div className="pt-8">
+                            <div className="pt-8 px-4">
                               <p className="text-neutral-600 text-12 mb-2 fw-semibold">Description:</p>
                               <p className="text-neutral-700 mb-0 text-13" style={{ lineHeight: "1.6" }}>
                                 {bandScoreData[displayBandScore].description}
@@ -477,7 +498,9 @@ const ListeningResultPage = () => {
                   display: flex;
                   position: relative;
                   width: 100%;
-                  min-height: 600px;
+                  height: calc(100vh - 350px);
+                  min-height: 700px;
+                  max-height: 900px;
                   border: 1px solid var(--neutral-30);
                   border-radius: 12px;
                   overflow: hidden;
@@ -487,6 +510,13 @@ const ListeningResultPage = () => {
                   overflow: hidden;
                   display: flex;
                   flex-direction: column;
+                  height: 100%;
+                }
+                .resizable-panel-content {
+                  flex: 1;
+                  overflow: auto;
+                  display: flex;
+                  flex-direction: column;
                 }
                 .resizer {
                   width: 4px;
@@ -494,6 +524,7 @@ const ListeningResultPage = () => {
                   cursor: col-resize;
                   flex-shrink: 0;
                   position: relative;
+                  height: 100%;
                 }
                 .resizer:hover {
                   background: var(--main-600);
@@ -515,23 +546,18 @@ const ListeningResultPage = () => {
                       className="resizable-panel bg-white border-end border-neutral-30"
                       style={{ width: `${leftWidth}%` }}
                     >
-                      <div className="p-16 border-bottom border-neutral-30">
+                      <div className="p-16 border-bottom border-neutral-30 flex-shrink-0">
                         <h5 className="mb-0 text-16">Đề thi Listening</h5>
                       </div>
-                      <div 
-                        className="p-16" 
-                        style={{ 
-                          height: "calc(100vh - 400px)", 
-                          overflow: "hidden",
-                        }}
-                      >
+                      <div className="resizable-panel-content p-16">
                         <iframe
                           src={getPDFUrl(result.parts[0].part)}
                           className="w-100 h-100 border-0 rounded-8"
                           title="Listening PDF"
                           style={{ 
-                            minHeight: "600px",
-                            display: "block"
+                            minHeight: "100%",
+                            display: "block",
+                            width: "100%"
                           }}
                         />
                       </div>
@@ -551,7 +577,7 @@ const ListeningResultPage = () => {
                       className="resizable-panel bg-main-25"
                       style={{ width: `${100 - leftWidth}%` }}
                     >
-                      <div className="p-16 border-bottom border-neutral-30 bg-white">
+                      <div className="p-16 border-bottom border-neutral-30 bg-white flex-shrink-0">
                         <div className='flex-align gap-8'>
                           <span className='text-main-600 text-16'>
                             <i className='ph-bold ph-list-bullets' />
@@ -559,16 +585,17 @@ const ListeningResultPage = () => {
                           <h5 className="mb-0 text-16">Chi tiết đáp án</h5>
                         </div>
                       </div>
-                      <div className="p-12" style={{ height: "calc(100vh - 400px)", overflow: "auto" }}>
-                        {result.parts?.map((partData, partIndex) => {
-                          const allQuestions = getAllQuestionsForPart(partData.part);
-                          return (
-                            <div key={partIndex} className="mb-16">
-                              {result.parts.length > 1 && (
+                      <div className="resizable-panel-content p-12">
+                        {(() => {
+                          const allParts = getAllListeningParts();
+                          return allParts.map((partNumber, partIndex) => {
+                            const allQuestions = getAllQuestionsForPart(partNumber);
+                            if (allQuestions.length === 0) return null;
+                            return (
+                              <div key={partIndex} className="mb-16">
                                 <div className="mb-12">
-                                  <h6 className="text-main-600 fw-semibold text-14">Part {partData.part}</h6>
+                                  <h6 className="text-main-600 fw-semibold text-14">Part {partNumber}</h6>
                                 </div>
-                              )}
                               <div className='row gy-2'>
                                 {allQuestions.map((item, index) => {
                                   const isAnswered = item.studentAnswer !== null && item.studentAnswer !== undefined;
@@ -653,8 +680,9 @@ const ListeningResultPage = () => {
                                 })}
                               </div>
                             </div>
-                          );
-                        })}
+                            );
+                          });
+                        })()}
                       </div>
                     </div>
                   </>
@@ -663,7 +691,7 @@ const ListeningResultPage = () => {
                 {/* If no PDF, show results in full width */}
                 {(!result.parts || result.parts.length === 0 || !getPDFUrl(result.parts[0]?.part)) && (
                   <div className="resizable-panel bg-white" style={{ width: "100%" }}>
-                    <div className="p-16 border-bottom border-neutral-30">
+                    <div className="p-16 border-bottom border-neutral-30 flex-shrink-0">
                       <div className='flex-align gap-8'>
                         <span className='text-main-600 text-16'>
                           <i className='ph-bold ph-list-bullets' />
@@ -671,16 +699,17 @@ const ListeningResultPage = () => {
                         <h5 className="mb-0 text-16">Chi tiết đáp án</h5>
                       </div>
                     </div>
-                    <div className="p-12" style={{ minHeight: "400px", overflow: "auto" }}>
-                      {result.parts?.map((partData, partIndex) => {
-                        const allQuestions = getAllQuestionsForPart(partData.part);
-                        return (
-                          <div key={partIndex} className="mb-16">
-                            {result.parts.length > 1 && (
+                    <div className="resizable-panel-content p-12">
+                      {(() => {
+                        const allParts = getAllListeningParts();
+                        return allParts.map((partNumber, partIndex) => {
+                          const allQuestions = getAllQuestionsForPart(partNumber);
+                          if (allQuestions.length === 0) return null;
+                          return (
+                            <div key={partIndex} className="mb-16">
                               <div className="mb-12">
-                                <h6 className="text-main-600 fw-semibold text-14">Part {partData.part}</h6>
+                                <h6 className="text-main-600 fw-semibold text-14">Part {partNumber}</h6>
                               </div>
-                            )}
                             <div className='row gy-2'>
                               {allQuestions.map((item, index) => {
                                 const isAnswered = item.studentAnswer !== null && item.studentAnswer !== undefined;
@@ -756,8 +785,9 @@ const ListeningResultPage = () => {
                               })}
                             </div>
                           </div>
-                        );
-                      })}
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
                 )}

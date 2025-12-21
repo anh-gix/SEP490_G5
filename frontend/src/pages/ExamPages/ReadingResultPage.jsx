@@ -175,14 +175,10 @@ const ReadingResultPage = () => {
   };
 
   const getBandScore = () => {
-    const totalMaxScore = getTotalMaxScore();
-    const totalQuestions = getTotalQuestionsCount();
-    if (!result || !result.sectionScore || totalMaxScore === 0 || totalQuestions === 0) return null;
+    if (!result) return null;
+    const correctAnswers = getCorrectAnswersCount();
     
-    // Calculate correct answers based on score ratio and total questions
-    const correctAnswers = Math.round((result.sectionScore / totalMaxScore) * totalQuestions);
-    
-    // Map percentage/score to band score
+    // Map correct answers to band score
     if (correctAnswers >= 39) return 9;
     if (correctAnswers >= 37) return 8.5;
     if (correctAnswers >= 35) return 8;
@@ -366,7 +362,7 @@ const ReadingResultPage = () => {
                     {/* Band Score Scale */}
                     <div className="mb-16">
                       <p className="text-neutral-600 text-13 mb-8 text-center fw-medium">
-                        Điểm của bạn: {currentBandScore !== null ? <span className="fw-bold text-main-600">{currentBandScore}</span> : "N/A"}
+                        Band Score của bạn: {currentBandScore !== null ? <span className="fw-bold text-main-600">{currentBandScore}</span> : "N/A"}
                       </p>
                       <div className="d-flex flex-wrap gap-6 justify-content-center align-items-center">
                         {bandScores.map((band) => {
@@ -377,10 +373,10 @@ const ReadingResultPage = () => {
                           let className = "fw-semibold text-main-600 bg-transparent border-neutral-30";
                           if (isCurrentBand && isSelectedBand) {
                             // Band của người dùng và đang được chọn
-                            className = "bg-success text-white border-success";
+                            className = "bg-main-600 text-white border-main-600";
                           } else if (isCurrentBand) {
                             // Band của người dùng (nhưng không được chọn)
-                            className = "bg-success-25 text-success border-success";
+                            className = "bg-main-25 text-main-600 border-main-600";
                           } else if (isSelectedBand || isDisplayBand) {
                             // Band được chọn (không phải của người dùng)
                             className = "bg-main-600 text-white border-main-600";
@@ -422,11 +418,11 @@ const ReadingResultPage = () => {
 
                     {/* Band Score Details */}
                     {displayBandScore && bandScoreData[displayBandScore] && (
-                      <div className={`border-top border-neutral-30 pt-16 ${
+                      <div className={`border-top border-neutral-30 pt-16 px-16 pb-16 ${
                         selectedBandScore === displayBandScore 
                           ? (currentBandScore === displayBandScore 
-                              ? "bg-success-25 border-success-600" 
-                              : "bg-main-25 border-main-600")
+                              ? "bg-main-25 border-main-600" 
+                              : "bg-success-25 border-main-600")
                           : ""
                       }`} style={{
                         borderRadius: "8px",
@@ -436,19 +432,19 @@ const ReadingResultPage = () => {
                       }}>
                         <div className="row gy-2">
                           <div className="col-md-4">
-                            <div className="border-bottom border-neutral-30 pb-8">
+                            <div className="border-bottom border-neutral-30 pb-8 px-4">
                               <p className="text-neutral-600 text-12 mb-2 fw-semibold">Correct Answers:</p>
                               <p className="text-neutral-700 mb-0 fw-medium text-13">{bandScoreData[displayBandScore].correctAnswers}</p>
                             </div>
                           </div>
                           <div className="col-md-4">
-                            <div className="border-bottom border-neutral-30 pb-8">
+                            <div className="border-bottom border-neutral-30 pb-8 px-4">
                               <p className="text-neutral-600 text-12 mb-2 fw-semibold">Skill Level:</p>
                               <p className="text-neutral-700 mb-0 fw-medium text-13">{bandScoreData[displayBandScore].skillLevel}</p>
                             </div>
                           </div>
                           <div className="col-md-12">
-                            <div className="pt-8">
+                            <div className="pt-8 px-4">
                               <p className="text-neutral-600 text-12 mb-2 fw-semibold">Description:</p>
                               <p className="text-neutral-700 mb-0 text-13" style={{ lineHeight: "1.6" }}>
                                 {bandScoreData[displayBandScore].description}
@@ -468,7 +464,9 @@ const ReadingResultPage = () => {
                   display: flex;
                   position: relative;
                   width: 100%;
-                  min-height: 600px;
+                  height: calc(100vh - 350px);
+                  min-height: 700px;
+                  max-height: 900px;
                   border: 1px solid var(--neutral-30);
                   border-radius: 12px;
                   overflow: hidden;
@@ -478,6 +476,13 @@ const ReadingResultPage = () => {
                   overflow: hidden;
                   display: flex;
                   flex-direction: column;
+                  height: 100%;
+                }
+                .resizable-panel-content {
+                  flex: 1;
+                  overflow: auto;
+                  display: flex;
+                  flex-direction: column;
                 }
                 .resizer {
                   width: 4px;
@@ -485,6 +490,7 @@ const ReadingResultPage = () => {
                   cursor: col-resize;
                   flex-shrink: 0;
                   position: relative;
+                  height: 100%;
                 }
                 .resizer:hover {
                   background: var(--main-600);
@@ -506,23 +512,18 @@ const ReadingResultPage = () => {
                       className="resizable-panel bg-white border-end border-neutral-30"
                       style={{ width: `${leftWidth}%` }}
                     >
-                      <div className="p-16 border-bottom border-neutral-30">
+                      <div className="p-16 border-bottom border-neutral-30 flex-shrink-0">
                         <h5 className="mb-0 text-16">Đề thi Reading</h5>
                       </div>
-                      <div 
-                        className="p-16" 
-                        style={{ 
-                          height: "calc(100vh - 400px)", 
-                          overflow: "hidden",
-                        }}
-                      >
+                      <div className="resizable-panel-content p-16">
                         <iframe
                           src={getPDFUrl(result.parts[0].part)}
                           className="w-100 h-100 border-0 rounded-8"
                           title="Reading PDF"
                           style={{ 
-                            minHeight: "600px",
-                            display: "block"
+                            minHeight: "100%",
+                            display: "block",
+                            width: "100%"
                           }}
                         />
                       </div>
@@ -542,7 +543,7 @@ const ReadingResultPage = () => {
                       className="resizable-panel bg-main-25"
                       style={{ width: `${100 - leftWidth}%` }}
                     >
-                      <div className="p-16 border-bottom border-neutral-30 bg-white">
+                      <div className="p-16 border-bottom border-neutral-30 bg-white flex-shrink-0">
                         <div className='flex-align gap-8'>
                           <span className='text-main-600 text-16'>
                             <i className='ph-bold ph-list-bullets' />
@@ -550,16 +551,14 @@ const ReadingResultPage = () => {
                           <h5 className="mb-0 text-16">Chi tiết đáp án</h5>
                         </div>
                       </div>
-                      <div className="p-12" style={{ height: "calc(100vh - 400px)", overflow: "auto" }}>
+                      <div className="resizable-panel-content p-12">
                         {result.parts?.map((partData, partIndex) => {
                           const allQuestions = getAllQuestionsForPart(partData.part);
                           return (
                             <div key={partIndex} className="mb-16">
-                              {result.parts.length > 1 && (
-                                <div className="mb-12">
-                                  <h6 className="text-main-600 fw-semibold text-14">Part {partData.part}</h6>
-                                </div>
-                              )}
+                              <div className="mb-12">
+                                <h6 className="text-main-600 fw-semibold text-14">Part {partData.part}</h6>
+                              </div>
                               <div className='row gy-2'>
                                 {allQuestions.map((item, index) => {
                                   const isAnswered = item.studentAnswer !== null && item.studentAnswer !== undefined;
@@ -668,11 +667,9 @@ const ReadingResultPage = () => {
                         const allQuestions = getAllQuestionsForPart(partData.part);
                         return (
                           <div key={partIndex} className="mb-24">
-                            {result.parts.length > 1 && (
-                              <div className="mb-16">
-                                <h5 className="text-main-600 fw-semibold">Part {partData.part}</h5>
-                              </div>
-                            )}
+                            <div className="mb-16">
+                              <h5 className="text-main-600 fw-semibold">Part {partData.part}</h5>
+                            </div>
                             <div className='row gy-2'>
                               {allQuestions.map((item, index) => {
                                 const isAnswered = item.studentAnswer !== null && item.studentAnswer !== undefined;

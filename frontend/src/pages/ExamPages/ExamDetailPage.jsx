@@ -148,13 +148,18 @@ const ExamDetailPage = () => {
     return Math.round((submittedSections / totalSections) * 100);
   }, [submission, exam]);
 
-  // Check if a section is completed (has submittedAt)
+  // Check if a section is completed (at least one section of this type has submittedAt)
   const isSectionCompleted = (sectionType) => {
     if (!submission || !submission.sections) return false;
-    const sectionSubmission = submission.sections.find(
-      (s) => s.sectionType === sectionType
+    
+    // Check if at least one section of this type has been submitted
+    const hasSubmittedSection = submission.sections.some(
+      (s) => s.sectionType === sectionType && 
+             s.submittedAt !== null && 
+             s.submittedAt !== undefined
     );
-    return sectionSubmission?.submittedAt !== null && sectionSubmission?.submittedAt !== undefined;
+    
+    return hasSubmittedSection;
   };
 
   const handleSectionClick = async (sectionType) => {

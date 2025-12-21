@@ -37,6 +37,7 @@ const studentScheduleSchema = new mongoose.Schema({
   reason: {
     type: String,
   },
+
 }, { timestamps: true });
 
 module.exports = mongoose.model("StudentSchedule", studentScheduleSchema);

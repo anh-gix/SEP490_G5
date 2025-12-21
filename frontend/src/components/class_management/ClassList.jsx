@@ -7,7 +7,7 @@ const ClassList = ({ classes, onEdit, onViewDetails }) => {
       pending: 'Chờ khai giảng',
       active: 'Đang học',
       completed: 'Đã hoàn thành',
-      cancelled: 'Đã hủy'
+      disable: 'Vô hiệu hóa'
     };
     return statusMap[status] || status;
   };

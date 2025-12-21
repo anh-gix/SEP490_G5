@@ -557,7 +557,11 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
         path: 'class',
         populate: {
           path: 'course',
-          select: 'name'
+          select: 'name program',
+          populate: {
+            path: 'program',
+            select: 'type'
+          }
         }
       })
       .populate('room', 'room_name location')
@@ -734,7 +738,11 @@ exports.getTeacherSchedule = async (req, res) => {
         path: 'class',
         populate: {
           path: 'course',
-          select: 'name'
+          select: 'name program',
+          populate: {
+            path: 'program',
+            select: 'type'
+          }
         }
       })
       .populate('room', 'room_name location')

@@ -7,6 +7,7 @@ import teacherService from '../../services/teacherService';
 import studentService from '../../services/studentService';
 import classService from '../../services/classService';
 import courseService from '../../services/courseService';
+import programService from '../../services/programService';
 import SelectStudentModal from './SelectStudentModal';
 
 const createEmptyScheduleEntry = () => ({
@@ -25,6 +26,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     name: '',
     level: '',
     program: '',
+    programId: '', // ID của program được chọn từ dropdown
     band: '',
     course: '',
     teacherId: '',
@@ -161,8 +163,10 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   const [roomError, setRoomError] = useState(null);
   const [dateError, setDateError] = useState('');
   const [mappings, setMappings] = useState([]); // Store all mappings from database
-  const [availablePrograms, setAvailablePrograms] = useState([]); // Programs filtered by selected level
+  const [availablePrograms, setAvailablePrograms] = useState([]); // Programs filtered by selected level (type: IELTS, TOEIC, Cambridge)
   const [availableLevels, setAvailableLevels] = useState([]); // Levels filtered by selected program
+  const [allProgramsFromDB, setAllProgramsFromDB] = useState([]); // Tất cả programs từ bảng Program (program_name)
+  const [filteredProgramsFromDB, setFilteredProgramsFromDB] = useState([]); // Programs được filter theo type và level
 
   // Program name to type mapping
   const programTypeMap = {
@@ -211,7 +215,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    
+
     // Auto-update maxStudents when room is selected/deselected
     if (name === 'roomId') {
       if (value) {
@@ -231,11 +235,11 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         return; // Don't process further
       }
     }
-    
+
     // Validate start date when it changes
     if (name === 'startDate') {
       const today = getTodayDate();
-      
+
       // Validate start date is not in the past
       if (value && value < today) {
         setDateError('Ngày khai giảng không được là quá khứ!');
@@ -243,7 +247,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         setDateError('');
       }
     }
-    
+
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -865,14 +869,32 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     const submitData = {
       ...formData,
       students: formData.selectedStudents || [], // Map selectedStudents to students for backend
-      teacher: formData.teacherId, // Map teacherId to teacher for backend
-      room: formData.roomId // Map roomId to room for backend
     };
 
-    // Remove selectedStudents, teacherId, roomId from submitData as they're now mapped
+    // Only add teacher, room, teacherId if they have valid values
+    if (formData.teacherId && formData.teacherId !== '') {
+      submitData.teacher = formData.teacherId;
+      submitData.teacherId = formData.teacherId;
+    }
+
+    if (formData.roomId && formData.roomId !== '') {
+      submitData.room = formData.roomId;
+    }
+
+    // Remove fields that shouldn't be sent to backend
     delete submitData.selectedStudents;
-    delete submitData.teacherId;
-    delete submitData.roomId;
+    if (!submitData.teacher) {
+      delete submitData.teacher;
+    }
+    if (!submitData.teacherId) {
+      delete submitData.teacherId;
+    }
+    if (!submitData.room) {
+      delete submitData.roomId;
+      delete submitData.room;
+    } else {
+      delete submitData.roomId;
+    }
 
     onSubmit(submitData);
   };
@@ -882,22 +904,29 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     const fetchCourseData = async () => {
       try {
         // Fetch all types and levels from program table
-        const [typesResponse, levelsResponse] = await Promise.all([
+        const [typesResponse, levelsResponse, programsResponse] = await Promise.all([
           courseService.getAllTypes(),
-          courseService.getAllLevels()
+          courseService.getAllLevels(),
+          programService.getAllPrograms() // Fetch all programs from Program table
         ]);
-        
+
         if (typesResponse?.success && typesResponse.types) {
           const allTypes = typesResponse.types;
           const allPrograms = allTypes.map(type => getProgramFromType(type)).filter(Boolean);
           setAvailablePrograms(allPrograms);
         }
-        
+
         if (levelsResponse?.success && levelsResponse.levels) {
           const allLevels = levelsResponse.levels;
           setAvailableLevels(allLevels);
         }
-        
+
+        // Store all programs from DB
+        if (programsResponse?.success && programsResponse.data) {
+          setAllProgramsFromDB(programsResponse.data);
+          setFilteredProgramsFromDB(programsResponse.data); // Initially show all programs
+        }
+
         // Also fetch mappings for band lookup (still needed for band display)
         try {
           const mappingsResponse = await courseService.getCourseMappings();
@@ -991,9 +1020,38 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
         // Error fetching types by level
       }
     };
-    
+
     filterPrograms();
   }, [formData.level]);
+
+  // Filter programs from DB based on selected type and level
+  useEffect(() => {
+    if (!allProgramsFromDB || allProgramsFromDB.length === 0) {
+      return;
+    }
+
+    let filtered = allProgramsFromDB;
+
+    // Filter by type (program type)
+    if (formData.program) {
+      const type = getTypeFromProgram(formData.program);
+      if (type) {
+        filtered = filtered.filter(prog => prog.type === type);
+      }
+    }
+
+    // Filter by level
+    if (formData.level) {
+      filtered = filtered.filter(prog => prog.level === formData.level);
+    }
+
+    setFilteredProgramsFromDB(filtered);
+
+    // If current programId is not in filtered list, clear it
+    if (formData.programId && !filtered.find(p => p._id === formData.programId)) {
+      setFormData(prev => ({ ...prev, programId: '' }));
+    }
+  }, [formData.program, formData.level, allProgramsFromDB]);
 
   useEffect(() => {
     const fetchExistingSchedules = async () => {
@@ -1370,7 +1428,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       const sessionDates = generatedSessions.map(s => s.date).sort();
       const minDate = sessionDates[0];
       const maxDate = sessionDates[sessionDates.length - 1];
-      
+
       await Promise.all(
         teachers.map(async (teacher) => {
           const teacherId = teacher._id || teacher.id;
@@ -1381,7 +1439,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               startDate: minDate,
               endDate: maxDate
             });
-            
+
             if (response && response.schedules) {
               schedulesMap[String(teacherId)] = response.schedules;
             }
@@ -1458,8 +1516,17 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
           const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
           if (!scheduleDate) return;
 
-          // Validate date before creating Date object
-          const dateObj = new Date(scheduleDate);
+          // Parse date - handle both ISO format and DD/MM/YYYY format
+          let dateObj;
+          if (scheduleDate.includes('/')) {
+            // DD/MM/YYYY format
+            const [day, month, year] = scheduleDate.split('/');
+            dateObj = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+          } else {
+            // ISO format or other
+            dateObj = new Date(scheduleDate);
+          }
+
           if (isNaN(dateObj.getTime())) {
             return; // Invalid date, skip this schedule
           }
@@ -1572,27 +1639,30 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
   }, [generatedSessions, studentSchedules]);
 
   const filteredRooms = useMemo(() => {
+    // First filter by status - only show available rooms
+    const availableRooms = rooms.filter(room => room.status === 'available');
+
     if (!generatedSessions.length || !existingSchedules.length) {
-      return rooms;
+      return availableRooms;
     }
 
-    const filtered = rooms.filter(
+    const filtered = availableRooms.filter(
       (room) => {
         const roomId = room._id || room.id;
         const roomIdStr = String(roomId);
-        
+
         const roomName = room.name || room.roomName || room.room_name || room.title || `Phòng ${roomId}`;
-        
+
         const hasIdConflict = conflictingRoomIds.has(roomIdStr) || conflictingRoomIds.has(String(room.id));
-        const hasNameConflict = conflictingRoomIds.has(roomName) || 
-                                conflictingRoomIds.has(room.name) || 
-                                conflictingRoomIds.has(room.roomName) || 
+        const hasNameConflict = conflictingRoomIds.has(roomName) ||
+                                conflictingRoomIds.has(room.name) ||
+                                conflictingRoomIds.has(room.roomName) ||
                                 conflictingRoomIds.has(room.room_name);
-        
+
         return !hasIdConflict && !hasNameConflict;
       }
     );
-    
+
     return filtered;
   }, [generatedSessions, existingSchedules, rooms, conflictingRoomIds]);
 
@@ -1743,13 +1813,37 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
               </div>
 
               <div className="col-md-6">
-  <Form.Group>
-    <Form.Label className="text-neutral-700 fw-medium mb-8">Band</Form.Label>
-    <div className="border border-neutral-30 rounded-8 px-16 py-10 bg-neutral-25 text-neutral-700" style={{ minHeight: '38px', display: 'flex', alignItems: 'center' }}>
-      {formData.band || <span className="text-neutral-400">Chưa có band</span>}
-    </div>
-  </Form.Group>
-</div>
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">
+                    Program
+                  </Form.Label>
+                  <Form.Select
+                    name="programId"
+                    value={formData.programId}
+                    onChange={handleInputChange}
+                    disabled={!formData.program || !formData.level}
+                    className="border-neutral-30 radius-8 px-16 py-10"
+                  >
+                    <option value="">-- Chọn program --</option>
+                    {filteredProgramsFromDB.map(prog => (
+                      <option key={prog._id} value={prog._id}>
+                        {prog.program_name} ({prog.code})
+                      </option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              </div>
+            </div>
+
+            <div className="row g-3 mb-16">
+              <div className="col-md-6">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">Band</Form.Label>
+                  <div className="border border-neutral-30 rounded-8 px-16 py-10 bg-neutral-25 text-neutral-700" style={{ minHeight: '38px', display: 'flex', alignItems: 'center' }}>
+                    {formData.band || <span className="text-neutral-400">Chưa có band</span>}
+                  </div>
+                </Form.Group>
+              </div>
             </div>
 
             <div className="row g-3 mb-16">
@@ -1824,7 +1918,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
             <Form.Group className="mb-12">
               <Form.Label className="text-neutral-700 fw-medium mb-8">
-                Thời khóa biểu <span className="text-danger-600">*</span>
+                Thời khóa biểu trong 1 tuần<span className="text-danger-600">*</span>
               </Form.Label>
               <p className="text-neutral-500 text-13 mb-0">
                 Thêm nhiều buổi học với ngày và giờ khác nhau (ví dụ: Thứ 2: 08:00-10:00, Thứ 4: 18:00-20:00).
@@ -1839,7 +1933,10 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                   key={entry.id}
                   className={`border rounded-12 p-16 ${isDuplicate ? 'border-danger border-2' : 'border-neutral-100'}`}
                 >
-                  <div className="d-flex justify-content-end align-items-center mb-12">
+                  <div className="d-flex justify-content-between align-items-center mb-12">
+                    <span className="text-neutral-700 fw-semibold text-14">
+                      Buổi {index + 1}
+                    </span>
                     {formData.scheduleEntries.length > 1 && (
                       <Button
                         type="button"
@@ -1943,9 +2040,18 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     value={formData.teacherId}
                     onChange={handleInputChange}
                     className="border-neutral-30 radius-8 px-16 py-10"
-                    disabled={teachers.length === 0}
+                    disabled={
+                      teachers.length === 0 ||
+                      !formData.course ||
+                      !formData.startDate ||
+                      !filledScheduleEntries.length
+                    }
                   >
-                    <option value="">-- Chọn giáo viên --</option>
+                    <option value="">
+                      {!formData.course || !formData.startDate || !filledScheduleEntries.length
+                        ? '-- Vui lòng chọn course, ngày khai giảng và thời khóa biểu trước --'
+                        : '-- Chọn giáo viên --'}
+                    </option>
                     {teachers.length === 0 ? (
                       <option value="" disabled>
                         Đang tải danh sách giáo viên...
@@ -1974,13 +2080,15 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     })}
                   </Form.Select>
                   <Form.Text className="text-neutral-500 text-12">
-                    {teachers.length === 0
+                    {!formData.course || !formData.startDate || !filledScheduleEntries.length
+                      ? 'Vui lòng chọn course, ngày khai giảng và thời khóa biểu để có thể chọn giáo viên phù hợp.'
+                      : teachers.length === 0
                       ? 'Đang tải danh sách giáo viên...'
                       : filteredTeachers.length === 0 && generatedSessions.length > 0
                       ? 'Không còn giáo viên phù hợp (tất cả đều bị trùng lịch)'
                       : generatedSessions.length > 0
                       ? `Có ${filteredTeachers.length} giáo viên phù hợp (chưa bị trùng lịch)`
-                      : `Có ${teachers.length} giáo viên. Chọn course và lịch học để lọc giáo viên phù hợp.`}
+                      : `Có ${teachers.length} giáo viên.`}
                   </Form.Text>
                   {checkingConflicts && formData.teacherId && (
                     <div className="mt-8">
@@ -2019,10 +2127,19 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     value={formData.roomId}
                     onChange={handleInputChange}
                     className="border-neutral-30 radius-8 px-16 py-10"
-                    disabled={roomLoading}
+                    disabled={
+                      roomLoading ||
+                      !formData.course ||
+                      !formData.startDate ||
+                      !filledScheduleEntries.length
+                    }
                   >
                     <option value="">
-                      {roomLoading ? 'Đang kiểm tra phòng trống...' : '-- Chọn phòng học --'}
+                      {!formData.course || !formData.startDate || !filledScheduleEntries.length
+                        ? '-- Vui lòng chọn course, ngày khai giảng và thời khóa biểu trước --'
+                        : roomLoading
+                        ? 'Đang kiểm tra phòng trống...'
+                        : '-- Chọn phòng học --'}
                     </option>
                     {!roomLoading && filteredRooms.length === 0 && (
                       <option value="" disabled>
@@ -2041,7 +2158,9 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
                     })}
                   </Form.Select>
                   <Form.Text className="text-neutral-500 text-12">
-                    Chỉ hiển thị phòng chưa bị trùng với lịch đã chọn.
+                    {!formData.course || !formData.startDate || !filledScheduleEntries.length
+                      ? 'Vui lòng chọn course, ngày khai giảng và thời khóa biểu để có thể chọn phòng học phù hợp.'
+                      : 'Chỉ hiển thị phòng chưa bị trùng với lịch đã chọn.'}
                   </Form.Text>
                   {checkingConflicts && formData.roomId && (
                     <div className="mt-8">

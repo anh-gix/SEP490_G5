@@ -40,10 +40,10 @@ const ClassDetail = ({ classId, onBack }) => {
       setError(null);
       
       const response = await classService.getClassById(classId);
-      
+
       if (response.success && response.class) {
         const classData = response.class;
-        
+
         // Transform class info for ClassOverview (student format)
         const transformedClassInfo = {
           _id: classData._id,
@@ -339,11 +339,12 @@ const ClassDetail = ({ classId, onBack }) => {
               }
             >
               <div className="p-24">
-                <ClassStudents 
+                <ClassStudents
                   students={students}
                   onViewStudentDetail={() => {}} // Disable modal for academic staff
                   hideActions={true} // Hide actions column for academic staff
                   hideImportMocktest={true} // Hide Import Mocktest button for academic staff
+                  hideMocktestColumn={true} // Hide Mocktest column for academic staff
                 />
               </div>
             </Tab>

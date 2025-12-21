@@ -2263,7 +2263,16 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    
+
+    // Auto-update band when programId is selected
+    if (name === 'programId' && value) {
+      const selectedProgram = allProgramsFromDB.find(p => String(p._id) === String(value));
+      if (selectedProgram && selectedProgram.band) {
+        setFormData(prev => ({ ...prev, programId: value, band: selectedProgram.band }));
+        return;
+      }
+    }
+
     // Auto-update maxStudents when room is selected/deselected
     if (name === 'roomId') {
       if (value) {

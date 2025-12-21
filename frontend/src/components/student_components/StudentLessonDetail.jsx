@@ -37,7 +37,9 @@ const StudentLessonDetail = () => {
       }
     } catch (error) {
       console.error('Error fetching lesson detail:', error);
-      setError(error.message || 'Đã có lỗi xảy ra khi tải thông tin buổi học');
+      // Lấy message từ error response
+      const errorMessage = error?.response?.data?.message || error?.message || 'Đã có lỗi xảy ra khi tải thông tin buổi học';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

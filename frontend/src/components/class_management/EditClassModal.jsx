@@ -304,6 +304,14 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         (typeof dataToUse.room === 'string' ? String(dataToUse.room) : '') ||
         '';
 
+      // Extract programId - handle both object and ID formats
+      const programId = 
+        dataToUse.programId ||
+        (dataToUse.course?.program?._id ? String(dataToUse.course.program._id) : '') ||
+        (dataToUse.course?.program?.id ? String(dataToUse.course.program.id) : '') ||
+        (typeof dataToUse.course?.program === 'string' ? String(dataToUse.course.program) : '') ||
+        '';
+
       // Extract program TYPE (ielts, toeic, cam) - NOT program name
       // IMPORTANT: We store TYPE in formData, not program name
       // Type should come from course.program.type
@@ -349,6 +357,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         id: classId, // Explicitly set id to ensure it's available
         course: courseIdStr,
         program: programType || '', // Store TYPE (ielts, toeic, cam), not program name
+        programId: programId, // Set programId from course.program or dataToUse.programId
         band: dataToUse.band || dataToUse.course?.program?.band || '', // Get band from dataToUse or course.program.band
         startDate: startDateValue,
         endDate: formattedEndDate || dataToUse.endDate || '',

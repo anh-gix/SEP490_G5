@@ -144,12 +144,25 @@ const updateRoomForActiveClass = async (classId, newRoomId, checkRoomConflicts, 
       }
     }
 
-    // Update only class.room (not schedule.room)
+    // Update class.room
     await Class.findByIdAndUpdate(classId, { room: newRoomId }, { session });
+
+    // Update room for all future schedules
+    const updateResult = await ClassSchedule.updateMany(
+      {
+        class: classId,
+        date: { $gte: today }
+      },
+      { $set: { room: newRoomId } },
+      { session }
+    );
+
+    console.log(`✓ Đã cập nhật phòng học cho ${updateResult.modifiedCount} buổi học tương lai`);
 
     return {
       success: true,
-      message: 'Cập nhật phòng học thành công'
+      message: `Cập nhật phòng học thành công cho lớp và ${updateResult.modifiedCount} buổi học tương lai`,
+      updatedSchedulesCount: updateResult.modifiedCount
     };
   } catch (error) {
     console.error('Error in updateRoomForActiveClass:', error);

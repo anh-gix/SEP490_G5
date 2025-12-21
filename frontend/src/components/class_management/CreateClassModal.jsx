@@ -1097,10 +1097,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
     const fetchRooms = async () => {
       try {
         const response = await roomService.getAllRooms();
-        
+
         if (response && (response.rooms || response.data)) {
           const fetchedRooms = response.rooms || response.data || [];
-          setRooms(fetchedRooms);
+          // Only show rooms with status 'available'
+          const availableRooms = fetchedRooms.filter(room => room.status === 'available');
+          setRooms(availableRooms);
         }
       } catch (error) {
       }

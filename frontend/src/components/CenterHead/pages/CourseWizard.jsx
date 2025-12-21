@@ -421,55 +421,7 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
                   </>
                 )}
               </div>
-
-              {/* Progress percentage */}
-              <div className="d-flex align-items-center gap-2">
-                <div className="text-end">
-                  <div className="fw-bold text-sm text-neutral-900">{getProgressPercentage()}%</div>
-                  <div className="text-xxs text-neutral-600">Hoàn thành</div>
-                </div>
-                <div className="position-relative" style={{ width: '60px', height: '60px' }}>
-                  <svg width="60" height="60" className="progress-ring">
-                    <circle
-                      cx="30"
-                      cy="30"
-                      r="26"
-                      fill="none"
-                      stroke="#e5e7eb"
-                      strokeWidth="4"
-                    />
-                    <circle
-                      cx="30"
-                      cy="30"
-                      r="26"
-                      fill="none"
-                      stroke="#3b82f6"
-                      strokeWidth="4"
-                      strokeDasharray={`${2 * Math.PI * 26}`}
-                      strokeDashoffset={`${2 * Math.PI * 26 * (1 - getProgressPercentage() / 100)}`}
-                      strokeLinecap="round"
-                      transform="rotate(-90 30 30)"
-                      style={{ transition: 'stroke-dashoffset 0.5s ease' }}
-                    />
-                  </svg>
-                  <div className="position-absolute top-50 start-50 translate-middle">
-                    <span className="fw-bold text-xs text-primary-600">{currentStep}/5</span>
-                  </div>
-                </div>
-              </div>
             </div>
-          </div>
-
-          {/* Progress bar */}
-          <div className="progress" style={{ height: '6px' }}>
-            <div
-              className="progress-bar bg-success-600"
-              role="progressbar"
-              style={{ width: `${getProgressPercentage()}%`, transition: 'width 0.5s ease' }}
-              aria-valuenow={getProgressPercentage()}
-              aria-valuemin="0"
-              aria-valuemax="100"
-            ></div>
           </div>
         </div>
       </div>

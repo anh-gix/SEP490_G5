@@ -3,16 +3,20 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import Breadcrumb from '../compo/Breadcrumb';
-import Card from '../compo/Card';
-import Button from '../compo/Button';
-import Badge from '../compo/Badge';
-import Tabs from '../compo/Tabs';
-import Modal from '../compo/Modal';
-import { courseService } from '../../../services/courseService';
-import { formatDate } from '../../../helper/helper';
+import Breadcrumb from '../CenterHead/compo/Breadcrumb';
+import Card from '../CenterHead/compo/Card';
+import Button from '../CenterHead/compo/Button';
+import Badge from '../CenterHead/compo/Badge';
+import Tabs from '../CenterHead/compo/Tabs';
+import Modal from '../CenterHead/compo/Modal';
+import { courseService } from '../../services/courseService';
+import { formatDate } from '../../helper/helper';
 
-const CourseDetails = ({ viewMode = 'center-head' }) => {
+/**
+ * TeacherCourseDetail - Trang chi tiết Course cho Teacher/Subject Leader
+ * Có đầy đủ quyền: view, edit, delete (khi program đang draft/needs_revision và course không active)
+ */
+const TeacherCourseDetail = () => {
   const { id, programId } = useParams();
   const navigate = useNavigate();
   const [course, setCourse] = useState(null);
@@ -22,26 +26,16 @@ const CourseDetails = ({ viewMode = 'center-head' }) => {
   const [selectedCamSession, setSelectedCamSession] = useState(null);
   const [showCamSessionModal, setShowCamSessionModal] = useState(false);
 
-  // Determine base path
-  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
-
-  // Get user role from localStorage
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const userRole = user.roleId?.name || user.role;
-
-  // Center Head should not see edit/delete buttons
-  const isViewOnly = viewMode === 'center-head' || userRole === 'Center Head';
+  const basePath = '/teacher';
 
   useEffect(() => {
     fetchCourseDetails();
-    
   }, [id]);
 
   const fetchCourseDetails = async () => {
     try {
       setLoading(true);
       const response = await courseService.getCourseDetails(id);
-console.log(response.data);
 
       if (response.success) {
         setCourse(response.data);
@@ -79,8 +73,13 @@ console.log(response.data);
 
       if (response.success) {
         toast.success('Xóa môn học thành công!', { position: 'top-right' });
-        // Navigate back to program detail or course list
-        setTimeout(() => navigate(-1), 1000);
+        setTimeout(() => {
+          if (programId) {
+            navigate(`${basePath}/programs/${programId}`);
+          } else {
+            navigate(-1);
+          }
+        }, 1000);
       } else {
         toast.error(response.message || 'Xóa môn học thất bại!', { position: 'top-right' });
       }
@@ -120,12 +119,15 @@ console.log(response.data);
         <div className="alert alert-danger" role="alert">
           {error || 'Không tìm thấy giáo trình'}
         </div>
-        <Button onClick={() => navigate('/courses/pending')}>
+        <Button onClick={() => navigate(`${basePath}/programs`)}>
           Quay lại danh sách
         </Button>
       </div>
     );
   }
+
+  // Điều kiện có thể edit: program đang draft/needs_revision VÀ course không active
+  const canEdit = (course.program?.status === 'draft' || course.program?.status === 'needs_revision') && !course.isActive;
 
   // Tab 1: General Information
   const generalInfoTab = (
@@ -281,7 +283,6 @@ console.log(response.data);
   const syllabusTab = (
     <div className="syllabus">
       {isCamOnlineCourse ? (
-        // CAM online course → hiển thị Cam Sessions
         course.camSessions && course.camSessions.length > 0 ? (
           <div className="table-responsive">
             <table className="table table-hover border border-neutral-40">
@@ -367,7 +368,6 @@ console.log(response.data);
           </div>
         )
       ) : course.sessions && course.sessions.length > 0 ? (
-        // Course thường → hiển thị Sessions
         <div className="table-responsive">
           <table className="table table-hover border border-neutral-40">
             <thead className="bg-neutral-20">
@@ -550,7 +550,6 @@ console.log(response.data);
             variant="outline"
             icon="ph ph-arrow-left"
             onClick={() => {
-              // Navigate back to program detail if programId exists, otherwise go back
               if (programId) {
                 navigate(`${basePath}/programs/${programId}`);
               } else {
@@ -561,22 +560,20 @@ console.log(response.data);
             Quay lại
           </Button>
           {/* Edit button - only when program is draft/needs_revision AND course is not active */}
-          {!isViewOnly &&
-            (course.program?.status === 'draft' || course.program?.status === 'needs_revision') &&
-            !course.isActive && (
-              <Button
-                variant="primary"
-                icon="ph ph-pencil"
-                onClick={() => {
-                  const programIdToUse = programId || course.program?._id || course.program;
-                  navigate(`${basePath}/programs/${programIdToUse}/courses/${id}/edit-form`);
-                }}
-              >
-                Sửa
-              </Button>
+          {canEdit && (
+            <Button
+              variant="primary"
+              icon="ph ph-pencil"
+              onClick={() => {
+                const programIdToUse = programId || course.program?._id || course.program;
+                navigate(`${basePath}/programs/${programIdToUse}/courses/${id}/edit-form`);
+              }}
+            >
+              Sửa
+            </Button>
           )}
-          {/* Delete button - only for non-Center Head */}
-          {!isViewOnly && (
+          {/* Delete button - only when program is editable */}
+          {canEdit && (
             <Button
               variant="danger"
               icon="ph ph-trash"
@@ -729,4 +726,4 @@ console.log(response.data);
   );
 };
 
-export default CourseDetails;
+export default TeacherCourseDetail;

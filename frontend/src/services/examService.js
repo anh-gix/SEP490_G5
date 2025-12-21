@@ -168,10 +168,6 @@ export const examService = {
       errors.push('Tiêu đề đề thi không được để trống');
     }
 
-    if (!examData.level) {
-      errors.push('Cấp độ đề thi không được để trống');
-    }
-
     if (examData.sections && examData.sections.length > 0) {
       examData.sections.forEach((section, index) => {
         if (!section.type) {
@@ -198,7 +194,6 @@ export const examService = {
       title: examData.title?.trim(),
       description: examData.description?.trim() || '',
       examType: examData.examType || 'cambridge', // Default to cambridge
-      level: examData.level,
       totalDuration: parseInt(examData.totalDuration) || 0,
       sections: formattedSections,
       isPublished: examData.isPublished || false,

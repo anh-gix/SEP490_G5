@@ -73,7 +73,6 @@ const programSchema = new Schema({
             'pending_approval',   // Đã submit, chờ Center Head duyệt
             'approved',           // Center Head đã duyệt
             'needs_revision',     // Center Head yêu cầu chỉnh sửa
-            'archived'            // Đã lưu trữ
         ],
         default: 'draft',
         index: true

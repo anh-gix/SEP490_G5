@@ -66,6 +66,18 @@ router.post(
   workRequestController.submitExam
 );
 
+// Withdraw program submission (Hủy nộp program)
+router.post(
+  '/withdraw/program/:programId',
+  workRequestController.withdrawProgramSubmission
+);
+
+// Withdraw exam submission (Hủy nộp exam)
+router.post(
+  '/withdraw/exam/:examId',
+  workRequestController.withdrawExamSubmission
+);
+
 // Get all work requests with filters
 router.get(
   '/',

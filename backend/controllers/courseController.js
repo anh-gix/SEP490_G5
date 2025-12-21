@@ -1,6 +1,8 @@
 
 const Course = require('../models/courseModel');
 const Program = require('../models/programModel');
+const Class = require('../models/classModel');
+const ClassSchedule = require('../models/classScheduleModel');
 
 // =========================
 // COURSE CRUD OPERATIONS
@@ -872,6 +874,276 @@ exports.getCourseMaterials = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Lỗi server khi lấy tài liệu khóa học',
+            error: err.message
+        });
+    }
+};
+
+// =========================
+// COURSE ACTIVATION/DEACTIVATION
+// =========================
+
+/**
+ * Check if a course can be deactivated
+ * GET /api/courses/:id/can-deactivate
+ *
+ * Logic: Course chỉ có thể deactivate khi:
+ * - Không có class nào đang active/pending sử dụng course
+ * - HOẶC tất cả class đang dùng course không còn schedule tương lai
+ */
+exports.canDeactivateCourse = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const course = await Course.findById(id);
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy khóa học'
+            });
+        }
+
+        // Nếu course đã inactive rồi
+        if (!course.isActive) {
+            return res.status(200).json({
+                success: true,
+                canDeactivate: true,
+                message: 'Khóa học đã ở trạng thái inactive'
+            });
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Tìm các class đang active hoặc pending sử dụng course này
+        const activeClasses = await Class.find({
+            course: id,
+            status: { $in: ['pending', 'active'] }
+        }).select('_id name status');
+
+        if (activeClasses.length === 0) {
+            return res.status(200).json({
+                success: true,
+                canDeactivate: true,
+                message: 'Không có lớp học nào đang sử dụng khóa học này'
+            });
+        }
+
+        // Check xem các class này còn schedule tương lai không
+        const classIds = activeClasses.map(c => c._id);
+        const futureSchedules = await ClassSchedule.find({
+            class: { $in: classIds },
+            date: { $gte: today },
+            status: { $in: ['temporary', 'fixed'] }
+        })
+        .populate('class', 'name')
+        .select('class date startTime endTime')
+        .sort({ date: 1 })
+        .limit(10);
+
+        if (futureSchedules.length > 0) {
+            // Tìm ngày kết thúc cuối cùng
+            const lastSchedule = await ClassSchedule.findOne({
+                class: { $in: classIds },
+                status: { $in: ['temporary', 'fixed'] }
+            })
+            .sort({ date: -1 })
+            .select('date');
+
+            return res.status(200).json({
+                success: true,
+                canDeactivate: false,
+                message: 'Còn lớp học đang sử dụng khóa học này với lịch học trong tương lai',
+                activeClasses: activeClasses.map(c => ({
+                    _id: c._id,
+                    name: c.name,
+                    status: c.status
+                })),
+                upcomingSchedules: futureSchedules.map(s => ({
+                    className: s.class?.name,
+                    date: s.date,
+                    startTime: s.startTime,
+                    endTime: s.endTime
+                })),
+                estimatedEndDate: lastSchedule?.date,
+                totalFutureSchedules: await ClassSchedule.countDocuments({
+                    class: { $in: classIds },
+                    date: { $gte: today },
+                    status: { $in: ['temporary', 'fixed'] }
+                })
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            canDeactivate: true,
+            message: 'Có thể deactivate khóa học - các lớp đã hết lịch học'
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server khi kiểm tra trạng thái khóa học',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Deactivate a course
+ * PATCH /api/courses/:id/deactivate
+ *
+ * Logic:
+ * - Check canDeactivate trước
+ * - Nếu OK thì set isActive = false, status = 'available'
+ * - Update các class liên quan thành 'completed' nếu cần
+ */
+exports.deactivateCourse = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { force = false } = req.body; // force = true để bỏ qua check
+
+        const course = await Course.findById(id);
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy khóa học'
+            });
+        }
+
+        // Nếu course đã inactive rồi
+        if (!course.isActive) {
+            return res.status(400).json({
+                success: false,
+                message: 'Khóa học đã ở trạng thái inactive'
+            });
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Tìm các class đang active/pending
+        const activeClasses = await Class.find({
+            course: id,
+            status: { $in: ['pending', 'active'] }
+        }).select('_id name');
+
+        if (activeClasses.length > 0 && !force) {
+            const classIds = activeClasses.map(c => c._id);
+
+            // Check schedule tương lai
+            const futureScheduleCount = await ClassSchedule.countDocuments({
+                class: { $in: classIds },
+                date: { $gte: today },
+                status: { $in: ['temporary', 'fixed'] }
+            });
+
+            if (futureScheduleCount > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Không thể deactivate - còn ${futureScheduleCount} buổi học trong tương lai`,
+                    hint: 'Sử dụng force=true để bỏ qua kiểm tra này'
+                });
+            }
+
+            // Cập nhật các class thành 'completed'
+            await Class.updateMany(
+                { _id: { $in: classIds } },
+                { status: 'completed' }
+            );
+        }
+
+        // Deactivate course
+        const updatedCourse = await Course.findByIdAndUpdate(
+            id,
+            {
+                isActive: false,
+                status: 'available'
+            },
+            { new: true }
+        ).populate('program', 'program_name isActive');
+
+        res.status(200).json({
+            success: true,
+            message: 'Đã deactivate khóa học thành công',
+            course: {
+                _id: updatedCourse._id,
+                courseCode: updatedCourse.courseCode,
+                name: updatedCourse.name,
+                status: updatedCourse.status,
+                isActive: updatedCourse.isActive,
+                program: updatedCourse.program
+            },
+            classesUpdated: activeClasses.length
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server khi deactivate khóa học',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Activate a course
+ * PATCH /api/courses/:id/activate
+ *
+ * Logic: Chỉ cho phép activate nếu course status là 'completed' hoặc 'available'
+ */
+exports.activateCourse = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const course = await Course.findById(id);
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy khóa học'
+            });
+        }
+
+        // Chỉ cho phép activate nếu course đã completed hoặc available
+        if (!['completed', 'available'].includes(course.status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Không thể activate khóa học ở trạng thái "${course.status}". Chỉ có thể activate khóa học đã hoàn thiện.`
+            });
+        }
+
+        // Activate course
+        const updatedCourse = await Course.findByIdAndUpdate(
+            id,
+            { isActive: true },
+            { new: true }
+        ).populate('program', 'program_name isActive');
+
+        // Activate program nếu chưa active
+        if (updatedCourse.program && !updatedCourse.program.isActive) {
+            await Program.findByIdAndUpdate(
+                updatedCourse.program._id,
+                { isActive: true }
+            );
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Đã activate khóa học thành công',
+            course: {
+                _id: updatedCourse._id,
+                courseCode: updatedCourse.courseCode,
+                name: updatedCourse.name,
+                status: updatedCourse.status,
+                isActive: updatedCourse.isActive,
+                program: updatedCourse.program
+            }
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server khi activate khóa học',
             error: err.message
         });
     }

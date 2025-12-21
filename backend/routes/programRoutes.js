@@ -22,4 +22,9 @@ router.get('/:id/submission-status', programController.getProgramSubmissionStatu
 router.patch('/:id/active', programController.updateProgramActiveStatus); // Set isActive (body: { isActive: boolean })
 router.patch('/:id/archive', programController.archiveProgram);
 
+// PROGRAM ACTIVATION/DEACTIVATION ROUTES (với check logic)
+router.get('/:id/can-deactivate', programController.canDeactivateProgram);
+router.patch('/:id/deactivate', programController.deactivateProgram);
+router.patch('/:id/activate', programController.activateProgram);
+
 module.exports = router;

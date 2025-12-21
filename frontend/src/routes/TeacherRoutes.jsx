@@ -21,6 +21,7 @@ import TeacherCamSessionEditPage from "../pages/TeacherPages/TeacherCamSessionEd
 // Exam Management
 import TeacherExamListPage from "../pages/TeacherPages/TeacherExamListPage.jsx";
 import TeacherExamWizardPage from "../pages/TeacherPages/TeacherExamWizardPage.jsx";
+import TeacherExamDetailPage from "../pages/TeacherPages/TeacherExamDetailPage.jsx";
 
 // Tips Management
 import TeacherTipsManagementPage from "../pages/TeacherPages/TeacherTipsManagementPage.jsx";
@@ -84,6 +85,7 @@ export const teacherRoutes = [
   { path: '/teacher/programs/:programId/courses/create', element: <TeacherCourseWizardPage /> },
   { path: '/teacher/programs/:programId/courses/:courseId/edit', element: <TeacherCourseWizardPage /> },
   { path: '/teacher/programs/:programId/courses/:courseId/edit-form', element: <TeacherCourseFormPage /> },
+  { path: '/teacher/programs/:programId/courses/:id/details', element: <TeacherCourseDetailPage /> },
   { path: '/teacher/courses/:id/details', element: <TeacherCourseDetailPage /> },
 
   // CAM Session Management
@@ -94,7 +96,7 @@ export const teacherRoutes = [
   { path: '/teacher/exams', element: <TeacherExamListPage /> },
   { path: '/teacher/exams/create', element: <TeacherExamWizardPage /> },
   { path: '/teacher/exams/:examId/edit', element: <TeacherExamWizardPage /> },
-  // { path: '/teacher/exams/:id', element: <TeacherExamDetailPage /> },
+  { path: '/teacher/exams/:id/details', element: <TeacherExamDetailPage /> },
 
   // IX. Tips Management
   { path: '/teacher/tips', element: <TeacherTipsManagementPage /> },

@@ -354,13 +354,6 @@ const TeacherExamList = () => {
       },
     },
     {
-      header: 'Level',
-      field: 'level',
-      render: (row) => (
-        <span className="text-neutral-700" style={{ fontSize: '0.8125rem', whiteSpace: 'nowrap' }}>{row.level || 'N/A'}</span>
-      ),
-    },
-    {
       header: 'Sections',
       field: 'sections',
       render: (row) => (
@@ -376,7 +369,7 @@ const TeacherExamList = () => {
       header: 'Public',
       field: 'isPublished',
       render: (row) => (
-        <span className={`badge ${row.isPublished ? 'bg-success-600' : 'bg-secondary-600'} text-white`} style={{ fontSize: '0.6875rem', whiteSpace: 'nowrap' }}>
+        <span className={`badge ${row.isPublished ? 'bg-success-600' : 'bg-secondary'} text-white`} style={{ fontSize: '0.6875rem', whiteSpace: 'nowrap' }}>
           {row.isPublished ? 'Đã mở' : 'Chưa mở'}
         </span>
       ),
@@ -399,9 +392,10 @@ const TeacherExamList = () => {
             icon="ph ph-eye"
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/teacher/exams/${row._id}`);
+              navigate(`/teacher/exams/${row._id}/details`);
             }}
             className="px-2 py-1"
+            title="Xem chi tiết"
           >
             <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Xem</span>
             <span className="d-inline d-lg-none">👁</span>
@@ -530,8 +524,7 @@ const TeacherExamList = () => {
                       try {
                         const response = await workRequestService.recreateEntity(row._id, {
                           title: `Exam for ${row.requestType}`,
-                          examType: 'cambridge',
-                          level: 'Academic'
+                          examType: 'cambridge'
                         });
 
                         console.log('Recreated exam:', response);

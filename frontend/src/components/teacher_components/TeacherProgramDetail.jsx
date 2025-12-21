@@ -3,19 +3,23 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import Breadcrumb from '../compo/Breadcrumb';
-import Card from '../compo/Card';
-import Button from '../compo/Button';
-import StatusBadge from '../compo/StatusBadge';
-import Table from '../compo/Table';
-import FilterBar from '../compo/FilterBar';
-import programService from '../../../services/programService';
-import { courseService } from '../../../services/courseService';
-import approvalRequestService from '../../../services/approvalRequestService';
-import centerHeadService from '../../../services/centerHeadService';
-import { formatDate } from '../../../helper/helper';
+import Breadcrumb from '../CenterHead/compo/Breadcrumb';
+import Card from '../CenterHead/compo/Card';
+import Button from '../CenterHead/compo/Button';
+import StatusBadge from '../CenterHead/compo/StatusBadge';
+import Table from '../CenterHead/compo/Table';
+import FilterBar from '../CenterHead/compo/FilterBar';
+import programService from '../../services/programService';
+import { courseService } from '../../services/courseService';
+import approvalRequestService from '../../services/approvalRequestService';
+import workRequestService from '../../services/workRequestService';
+import { formatDate } from '../../helper/helper';
 
-const ProgramDetail = ({ viewMode = 'center-head' }) => {
+/**
+ * TeacherProgramDetail - Trang chi tiết Program cho Teacher/Subject Leader
+ * Có đầy đủ quyền: view, edit, create course, delete course, submit
+ */
+const TeacherProgramDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [program, setProgram] = useState(null);
@@ -24,22 +28,13 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
   const [filteredCourses, setFilteredCourses] = useState([]);
   const [courseFilterValues, setCourseFilterValues] = useState({});
   const [actionLoading, setActionLoading] = useState(false);
-  const [showRejectProgramModal, setShowRejectProgramModal] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState('');
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [submissionNote, setSubmissionNote] = useState('');
-  const [togglingCourseId, setTogglingCourseId] = useState(null);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawNote, setWithdrawNote] = useState('');
 
-  // Get user role from localStorage
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const userRole = user.roleId?.name || user.role;
-
-  // Determine base path based on viewMode
-  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
-
-  // Center Head should not see edit/delete buttons
-  const isViewOnly = viewMode === 'center-head' || userRole === 'Center Head';
+  const basePath = '/teacher';
 
   useEffect(() => {
     fetchProgramDetail();
@@ -65,12 +60,8 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
 
       if (programData) {
         setProgram(programData);
-
-        // Courses are included in the program response
         const programCourses = programData.courses || [];
         setCourses(programCourses);
-
-        console.log('Program detail loaded from API:', programData);
       }
 
     } catch (err) {
@@ -80,7 +71,6 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
       setLoading(false);
     }
   };
-
 
   // ===== COURSE DELETE HANDLER =====
   const handleDeleteCourse = async (courseId, courseName) => {
@@ -105,7 +95,6 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
 
       if (response.success) {
         toast.success('Xóa khóa học thành công!', { position: 'top-right' });
-        // Refresh the courses list
         setCourses(courses.filter(c => c._id !== courseId));
       } else {
         toast.error(response.message || 'Xóa khóa học thất bại!', { position: 'top-right' });
@@ -144,232 +133,29 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
     }
   };
 
-  const handleApproveProgram = async () => {
-    const result = await Swal.fire({
-      title: 'Xác nhận duyệt chương trình',
-      html: 'Bạn có chắc chắn muốn duyệt chương trình này?<br><br><strong>Lưu ý:</strong> Tất cả các khóa học trong chương trình sẽ được duyệt cùng lúc.',
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonColor: '#10b981',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Duyệt',
-      cancelButtonText: 'Hủy',
-    });
+  // ===== WITHDRAW SUBMISSION HANDLER =====
+  const handleWithdrawSubmission = () => {
+    setShowWithdrawModal(true);
+  };
 
-    if (!result.isConfirmed) {
-      return;
-    }
-
+  const handleConfirmWithdraw = async () => {
     try {
       setActionLoading(true);
-      await programService.approveProgram(id, {
-        approvalNote: 'Đã được phê duyệt bởi Center Head'
+      const response = await workRequestService.withdrawProgramSubmission(id, {
+        note: withdrawNote.trim() || undefined
       });
-      toast.success('Đã duyệt chương trình và toàn bộ khóa học thành công!', { position: 'top-right' });
-      fetchProgramDetail();
-    } catch (err) {
-      console.error('Error approving program:', err);
-      toast.error(err.message || 'Có lỗi xảy ra khi duyệt chương trình', { position: 'top-right' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
-  const handleRejectProgram = () => {
-    setShowRejectProgramModal(true);
-  };
-
-  const handleConfirmRejectProgram = async () => {
-    if (!rejectionReason.trim()) {
-      toast.warning('Vui lòng nhập lý do từ chối', { position: 'top-right' });
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      await programService.rejectProgram(id, {
-        rejectionReason
-      });
-      toast.success('Đã từ chối chương trình thành công!', { position: 'top-right' });
-      setShowRejectProgramModal(false);
-      setRejectionReason('');
-      fetchProgramDetail();
-    } catch (err) {
-      console.error('Error rejecting program:', err);
-      toast.error(err.message || 'Có lỗi xảy ra khi từ chối chương trình', { position: 'top-right' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // ===== COURSE WORKFLOW HANDLERS =====
-  // Course không có workflow phê duyệt riêng, chỉ có draft và completed
-  // Workflow phê duyệt chỉ áp dụng cho Program level
-
-  // Helper function để format ngày
-  const formatDateShort = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  };
-
-  // ===== TOGGLE ACTIVE HANDLER =====
-  const handleToggleActive = async () => {
-    const newIsActive = !program.isActive;
-
-    try {
-      setActionLoading(true);
-
-      // Nếu đang tắt (deactivate), kiểm tra trước
-      if (!newIsActive) {
-        const checkResult = await centerHeadService.canDeactivateProgram(id);
-
-        if (!checkResult.canDeactivate) {
-          // Hiển thị cảnh báo chi tiết về các course đang active
-          const activeCourses = checkResult.activeCourses || [];
-
-          let warningMessage = `Không thể tạm dừng chương trình!\n\n`;
-          warningMessage += `Còn ${activeCourses.length} khóa học đang hoạt động:\n`;
-
-          activeCourses.forEach((course, index) => {
-            if (index < 3) {
-              warningMessage += `• ${course.name || course.courseCode}`;
-              if (course.activeClassCount > 0) {
-                warningMessage += ` (${course.activeClassCount} lớp`;
-                if (course.estimatedEndDate) {
-                  warningMessage += ` - đến ${formatDateShort(course.estimatedEndDate)}`;
-                }
-                warningMessage += `)`;
-              }
-              warningMessage += `\n`;
-            }
-          });
-
-          if (activeCourses.length > 3) {
-            warningMessage += `... và ${activeCourses.length - 3} khóa học khác`;
-          }
-
-          toast.warning(warningMessage, {
-            position: 'top-right',
-            autoClose: 8000,
-            style: { whiteSpace: 'pre-line' }
-          });
-
-          setActionLoading(false);
-          return;
-        }
-
-        await centerHeadService.deactivateProgram(id);
-      } else {
-        await centerHeadService.activateProgram(id);
+      if (response.success) {
+        toast.success('Đã hủy nộp thành công! Bạn có thể chỉnh sửa và nộp lại sau.', { position: 'top-right' });
+        setShowWithdrawModal(false);
+        setWithdrawNote('');
+        fetchProgramDetail();
       }
-
-      // Cập nhật state trực tiếp
-      setProgram(prev => ({ ...prev, isActive: newIsActive }));
-
-      toast.success(
-        newIsActive
-          ? 'Đã kích hoạt chương trình thành công'
-          : 'Đã vô hiệu hóa chương trình thành công',
-        { position: 'top-right' }
-      );
-    } catch (error) {
-      console.error('Error toggling program active status:', error);
-      toast.error(
-        error.response?.data?.message || error.message || 'Không thể thay đổi trạng thái hoạt động',
-        { position: 'top-right' }
-      );
+    } catch (err) {
+      console.error('Error withdrawing submission:', err);
+      toast.error(err.message || 'Có lỗi xảy ra khi hủy nộp', { position: 'top-right' });
     } finally {
       setActionLoading(false);
-    }
-  };
-
-  // ===== TOGGLE COURSE ACTIVE HANDLER =====
-  const handleToggleCourseActive = async (courseId, currentIsActive, e) => {
-    e.stopPropagation();
-
-    if (togglingCourseId === courseId) return;
-
-    try {
-      setTogglingCourseId(courseId);
-      const newIsActive = !currentIsActive;
-
-      // Nếu đang tắt (deactivate), kiểm tra trước
-      if (!newIsActive) {
-        const checkResult = await centerHeadService.canDeactivateCourse(courseId);
-
-        if (!checkResult.canDeactivate) {
-          // Hiển thị cảnh báo chi tiết về các class đang active
-          const activeClasses = checkResult.activeClasses || [];
-          const upcomingSchedules = checkResult.upcomingSchedules || [];
-
-          let warningMessage = `Không thể tạm dừng khóa học!\n\n`;
-
-          if (activeClasses.length > 0) {
-            warningMessage += `Còn ${activeClasses.length} lớp đang học:\n`;
-            activeClasses.forEach((cls, index) => {
-              if (index < 3) {
-                warningMessage += `• ${cls.name}\n`;
-              }
-            });
-            if (activeClasses.length > 3) {
-              warningMessage += `... và ${activeClasses.length - 3} lớp khác\n`;
-            }
-          }
-
-          if (upcomingSchedules.length > 0) {
-            warningMessage += `\nLịch học sắp tới:\n`;
-            upcomingSchedules.slice(0, 3).forEach(schedule => {
-              warningMessage += `• ${schedule.className}: ${formatDateShort(schedule.date)} (${schedule.startTime} - ${schedule.endTime})\n`;
-            });
-          }
-
-          if (checkResult.estimatedEndDate) {
-            warningMessage += `\nDự kiến kết thúc: ${formatDateShort(checkResult.estimatedEndDate)}`;
-          }
-
-          if (checkResult.totalFutureSchedules) {
-            warningMessage += `\nTổng: ${checkResult.totalFutureSchedules} buổi học còn lại`;
-          }
-
-          toast.warning(warningMessage, {
-            position: 'top-right',
-            autoClose: 10000,
-            style: { whiteSpace: 'pre-line' }
-          });
-
-          setTogglingCourseId(null);
-          return;
-        }
-
-        await centerHeadService.deactivateCourse(courseId);
-      } else {
-        await centerHeadService.activateCourse(courseId);
-      }
-
-      // Cập nhật state trực tiếp
-      setCourses(prevCourses =>
-        prevCourses.map(course =>
-          course._id === courseId
-            ? { ...course, isActive: newIsActive }
-            : course
-        )
-      );
-
-      toast.success(
-        newIsActive
-          ? 'Đã kích hoạt khóa học thành công'
-          : 'Đã vô hiệu hóa khóa học thành công',
-        { position: 'top-right' }
-      );
-    } catch (error) {
-      console.error('Error toggling course active status:', error);
-      toast.error(
-        error.response?.data?.message || error.message || 'Không thể thay đổi trạng thái hoạt động',
-        { position: 'top-right' }
-      );
-    } finally {
-      setTogglingCourseId(null);
     }
   };
 
@@ -397,6 +183,9 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
       </Card>
     );
   }
+
+  // Có thể edit khi program đang draft hoặc needs_revision
+  const canEdit = program.status === 'draft' || program.status === 'needs_revision';
 
   const breadcrumbItems = [
     { label: 'Dashboard', path: `${basePath}/dashboard` },
@@ -436,51 +225,13 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
         <span className="text-neutral-700">{formatDate(row.updatedAt)}</span>
       ),
     },
-    // Cột Hoạt động - chỉ hiển thị cho Center Head
-    ...(userRole === 'Center Head' ? [{
-      header: 'Hoạt động',
-      field: 'isActive',
-      render: (row) => {
-        // Chỉ hiển thị toggle cho course có status completed
-        if (row.status !== 'completed') {
-          return (
-            <span className="text-neutral-500" style={{ fontSize: '0.75rem' }}>
-              N/A
-            </span>
-          );
-        }
-
-        const isToggling = togglingCourseId === row._id;
-
-        return (
-          <div className="form-check form-switch d-flex justify-content-center align-items-center">
-            {isToggling ? (
-              <div className="spinner-border spinner-border-sm text-primary" role="status">
-                <span className="visually-hidden">Loading...</span>
-              </div>
-            ) : (
-              <input
-                className="form-check-input"
-                type="checkbox"
-                role="switch"
-                checked={row.isActive || false}
-                onChange={(e) => handleToggleCourseActive(row._id, row.isActive, e)}
-                onClick={(e) => e.stopPropagation()}
-                style={{ cursor: 'pointer' }}
-                title={row.isActive ? 'Tạm dừng khóa học' : 'Kích hoạt khóa học'}
-              />
-            )}
-          </div>
-        );
-      },
-    }] : []),
     {
       header: 'Hành động',
       field: 'actions',
       render: (row) => (
         <div className="d-flex flex-wrap gap-2">
-          {/* Draft: Show "Continue" button to continue wizard - only for non-Center Head */}
-          {row.status === 'draft' && userRole !== 'Center Head' && (
+          {/* Draft: Show "Continue" button to continue wizard */}
+          {row.status === 'draft' && (
             <Button
               variant="primary"
               size="sm"
@@ -507,8 +258,8 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
             Xem
           </Button>
 
-          {/* Delete button - only for non-view-only */}
-          {!isViewOnly && (
+          {/* Delete button - only when program is editable */}
+          {canEdit && (
             <Button
               variant="danger"
               size="sm"
@@ -564,32 +315,11 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
           <div className="d-flex flex-wrap align-items-center gap-3">
             <StatusBadge status={program.status} />
             <span className="text-neutral-600">Mã: <strong>{program.code}</strong></span>
-
-            {/* Toggle Active - Only for Center Head and Approved programs */}
-            {userRole === 'Center Head' && program.status === 'approved' && (
-              <div className="d-flex align-items-center gap-2 ms-auto">
-                <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>
-                  {program.isActive ? 'Đang hoạt động' : 'Tạm dừng'}
-                </span>
-                <div className="form-check form-switch mb-0">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    checked={program.isActive || false}
-                    onChange={handleToggleActive}
-                    disabled={actionLoading}
-                    style={{ cursor: actionLoading ? 'not-allowed' : 'pointer' }}
-                    title={program.isActive ? 'Tạm dừng chương trình' : 'Mở chương trình cho đăng ký'}
-                  />
-                </div>
-              </div>
-            )}
           </div>
         </div>
         <div className="d-flex flex-wrap gap-2">
           {/* Draft or Needs Revision: Subject Leader can submit */}
-          {(program.status === 'draft' || program.status === 'needs_revision') && userRole !== 'Center Head' && (
+          {canEdit && (
             <Button
               variant="primary"
               icon="ph ph-paper-plane-tilt"
@@ -600,30 +330,20 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
             </Button>
           )}
 
-          {/* Pending Approval: Center Head can approve/reject */}
-          {program.status === 'pending_approval' && userRole === 'Center Head' && (
-            <>
-              <Button
-                variant="success"
-                icon="ph ph-check"
-                onClick={handleApproveProgram}
-                disabled={actionLoading}
-              >
-                Duyệt Program
-              </Button>
-              <Button
-                variant="danger"
-                icon="ph ph-x"
-                onClick={handleRejectProgram}
-                disabled={actionLoading}
-              >
-                Từ chối Program
-              </Button>
-            </>
+          {/* Pending Approval: Subject Leader can withdraw submission */}
+          {program.status === 'pending_approval' && (
+            <Button
+              variant="warning"
+              icon="ph ph-arrow-u-up-left"
+              onClick={handleWithdrawSubmission}
+              disabled={actionLoading}
+            >
+              Hủy nộp
+            </Button>
           )}
 
-          {/* Edit button - only for non-view-only */}
-          {!isViewOnly && (
+          {/* Edit button - only when program is editable */}
+          {canEdit && (
             <Button
               variant="outline"
               icon="ph ph-pencil-simple"
@@ -635,20 +355,16 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
         </div>
       </div>
 
-      {/* Program Rejection Warning */}
-      {program.status === 'needs_revision' && program.rejectionReason && (
-        <div className="alert alert-warning mb-24" role="alert" style={{ borderLeft: '4px solid #f59e0b' }}>
+      {/* Program Pending Approval Info */}
+      {program.status === 'pending_approval' && (
+        <div className="alert alert-info mb-24" role="alert" style={{ borderLeft: '4px solid #3b82f6' }}>
           <div className="d-flex align-items-start">
-            <i className="ph ph-warning-circle" style={{ fontSize: '24px', marginRight: '12px', color: '#f59e0b' }}></i>
+            <i className="ph ph-clock" style={{ fontSize: '24px', marginRight: '12px', color: '#3b82f6' }}></i>
             <div>
-              <h6 className="mb-2 fw-bold">Program bị từ chối - Cần chỉnh sửa</h6>
-              <p className="mb-1"><strong>Lý do từ chối:</strong></p>
-              <p className="mb-0">{program.rejectionReason}</p>
-              {program.rejectedBy && (
-                <p className="mb-0 mt-2 text-sm text-muted">
-                  Từ chối bởi: {program.rejectedBy.username || program.rejectedBy.email} - {formatDate(program.rejectedAt)}
-                </p>
-              )}
+              <h6 className="mb-2 fw-bold">Đang chờ phê duyệt</h6>
+              <p className="mb-0">
+                Chương trình đang chờ Center Head phê duyệt. Nếu bạn cần chỉnh sửa, hãy nhấn nút <strong>"Hủy nộp"</strong> để rút lại yêu cầu.
+              </p>
             </div>
           </div>
         </div>
@@ -733,8 +449,8 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
               Các khóa học thuộc chương trình này
             </p>
           </div>
-          {/* Show Create Course button only when program is draft or needs_revision and not view-only */}
-          {!isViewOnly && (program?.status === 'draft' || program?.status === 'needs_revision') && (
+          {/* Show Create Course button only when program is editable */}
+          {canEdit && (
             <Button
               variant="primary"
               onClick={() => navigate(`${basePath}/programs/${id}/courses/create`)}
@@ -842,92 +558,41 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
         </div>
       )}
 
-      {/* Sticky Action Bar - Only for Center Head with Pending Approval */}
-      {program.status === 'pending_approval' && userRole === 'Center Head' && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 0,
-            left: '280px', // Sidebar width
-            right: 0,
-            backgroundColor: 'white',
-            borderTop: '2px solid #e5e7eb',
-            padding: '16px 32px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1)',
-            zIndex: 1000
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div
-              style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: '#f59e0b',
-                animation: 'pulse 2s infinite'
-              }}
-            ></div>
-            <div>
-              <div style={{ fontWeight: '600', fontSize: '14px', color: '#111827' }}>
-                Chương trình đang chờ phê duyệt
-              </div>
-              <div style={{ fontSize: '13px', color: '#6b7280' }}>
-                {program.program_name} - Mã: {program.code}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <Button
-              variant="danger"
-              icon="ph ph-x"
-              onClick={handleRejectProgram}
-              disabled={actionLoading}
-              style={{ padding: '10px 24px' }}
-            >
-              Từ chối
-            </Button>
-            <Button
-              variant="success"
-              icon="ph ph-check"
-              onClick={handleApproveProgram}
-              disabled={actionLoading}
-              style={{ padding: '10px 24px' }}
-            >
-              Duyệt chương trình
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Reject Program Modal */}
-      {showRejectProgramModal && (
+      {/* Withdraw Submission Modal */}
+      {showWithdrawModal && (
         <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Từ chối chương trình</h5>
+              <div className="modal-header" style={{ borderBottom: '3px solid #f59e0b' }}>
+                <h5 className="modal-title">
+                  <i className="ph ph-arrow-u-up-left me-2" style={{ color: '#f59e0b' }}></i>
+                  Hủy nộp chương trình
+                </h5>
                 <button
                   type="button"
                   className="btn-close"
                   onClick={() => {
-                    setShowRejectProgramModal(false);
-                    setRejectionReason('');
+                    setShowWithdrawModal(false);
+                    setWithdrawNote('');
                   }}
                   disabled={actionLoading}
                 ></button>
               </div>
               <div className="modal-body">
-                <label className="form-label">Lý do từ chối *</label>
+                <div className="alert alert-warning mb-3" role="alert">
+                  <i className="ph ph-warning me-2"></i>
+                  Sau khi hủy nộp, chương trình sẽ quay về trạng thái <strong>Draft</strong> và bạn có thể chỉnh sửa lại trước khi nộp lại.
+                </div>
+                <p className="text-neutral-600 mb-3">
+                  Bạn đang hủy nộp chương trình <strong>{program?.program_name}</strong>.
+                </p>
+                <label className="form-label">Lý do hủy nộp (tùy chọn)</label>
                 <textarea
                   className="form-control"
-                  rows="4"
-                  placeholder="Nhập lý do từ chối chương trình..."
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
+                  rows="3"
+                  placeholder="Nhập lý do hủy nộp (nếu có)..."
+                  value={withdrawNote}
+                  onChange={(e) => setWithdrawNote(e.target.value)}
                   disabled={actionLoading}
                 ></textarea>
               </div>
@@ -935,19 +600,19 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    setShowRejectProgramModal(false);
-                    setRejectionReason('');
+                    setShowWithdrawModal(false);
+                    setWithdrawNote('');
                   }}
                   disabled={actionLoading}
                 >
-                  Hủy
+                  Đóng
                 </Button>
                 <Button
-                  variant="danger"
-                  onClick={handleConfirmRejectProgram}
+                  variant="warning"
+                  onClick={handleConfirmWithdraw}
                   disabled={actionLoading}
                 >
-                  {actionLoading ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+                  {actionLoading ? 'Đang xử lý...' : 'Xác nhận hủy nộp'}
                 </Button>
               </div>
             </div>
@@ -961,4 +626,4 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
   );
 };
 
-export default ProgramDetail;
+export default TeacherProgramDetail;

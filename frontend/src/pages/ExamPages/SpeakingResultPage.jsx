@@ -310,11 +310,9 @@ const SpeakingResultPage = () => {
                 </div>
                 {result.parts?.map((partData, partIndex) => (
                   <div key={partIndex} className={partIndex > 0 ? "mt-20 pt-20 border-top border-neutral-30" : ""}>
-                    {result.parts.length > 1 && (
-                      <div className="mb-16">
-                        <h6 className="text-main-600 fw-semibold text-14">Part {partData.part}</h6>
-                      </div>
-                    )}
+                    <div className="mb-16">
+                      <h6 className="text-main-600 fw-semibold text-14">Part {partData.part}</h6>
+                    </div>
                     <div className="row gy-3">
                       {partData.results?.map((item, index) => {
                         const recordingUrl = getRecordingUrl(item.recordingUrl);

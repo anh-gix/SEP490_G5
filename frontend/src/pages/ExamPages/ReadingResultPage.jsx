@@ -556,11 +556,9 @@ const ReadingResultPage = () => {
                           const allQuestions = getAllQuestionsForPart(partData.part);
                           return (
                             <div key={partIndex} className="mb-16">
-                              {result.parts.length > 1 && (
-                                <div className="mb-12">
-                                  <h6 className="text-main-600 fw-semibold text-14">Part {partData.part}</h6>
-                                </div>
-                              )}
+                              <div className="mb-12">
+                                <h6 className="text-main-600 fw-semibold text-14">Part {partData.part}</h6>
+                              </div>
                               <div className='row gy-2'>
                                 {allQuestions.map((item, index) => {
                                   const isAnswered = item.studentAnswer !== null && item.studentAnswer !== undefined;
@@ -669,11 +667,9 @@ const ReadingResultPage = () => {
                         const allQuestions = getAllQuestionsForPart(partData.part);
                         return (
                           <div key={partIndex} className="mb-24">
-                            {result.parts.length > 1 && (
-                              <div className="mb-16">
-                                <h5 className="text-main-600 fw-semibold">Part {partData.part}</h5>
-                              </div>
-                            )}
+                            <div className="mb-16">
+                              <h5 className="text-main-600 fw-semibold">Part {partData.part}</h5>
+                            </div>
                             <div className='row gy-2'>
                               {allQuestions.map((item, index) => {
                                 const isAnswered = item.studentAnswer !== null && item.studentAnswer !== undefined;

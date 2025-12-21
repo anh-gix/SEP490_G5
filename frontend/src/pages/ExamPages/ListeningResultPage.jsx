@@ -593,11 +593,9 @@ const ListeningResultPage = () => {
                             if (allQuestions.length === 0) return null;
                             return (
                               <div key={partIndex} className="mb-16">
-                                {allParts.length > 1 && (
-                                  <div className="mb-12">
-                                    <h6 className="text-main-600 fw-semibold text-14">Part {partNumber}</h6>
-                                  </div>
-                                )}
+                                <div className="mb-12">
+                                  <h6 className="text-main-600 fw-semibold text-14">Part {partNumber}</h6>
+                                </div>
                               <div className='row gy-2'>
                                 {allQuestions.map((item, index) => {
                                   const isAnswered = item.studentAnswer !== null && item.studentAnswer !== undefined;
@@ -709,11 +707,9 @@ const ListeningResultPage = () => {
                           if (allQuestions.length === 0) return null;
                           return (
                             <div key={partIndex} className="mb-16">
-                              {allParts.length > 1 && (
-                                <div className="mb-12">
-                                  <h6 className="text-main-600 fw-semibold text-14">Part {partNumber}</h6>
-                                </div>
-                              )}
+                              <div className="mb-12">
+                                <h6 className="text-main-600 fw-semibold text-14">Part {partNumber}</h6>
+                              </div>
                             <div className='row gy-2'>
                               {allQuestions.map((item, index) => {
                                 const isAnswered = item.studentAnswer !== null && item.studentAnswer !== undefined;

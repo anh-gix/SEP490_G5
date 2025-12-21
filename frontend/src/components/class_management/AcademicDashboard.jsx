@@ -106,8 +106,8 @@ const AcademicDashboard = () => {
             {/* Tổng số đơn trong 1 tuần qua */}
             <Col md={3} lg={3}>
                 <Card className="bg-purple-50 border border-purple-200 rounded-8 h-100 transition-2 item-hover">
-                  <Card.Body className="p-16">
-                    <div className="d-flex justify-content-between align-items-center">
+                  <Card.Body className="p-16 d-flex align-items-center">
+                    <div className="d-flex justify-content-between align-items-center w-100">
                       <div className="text-purple-700 fw-bold" style={{ fontSize: '14px' }}>
                         Tổng số đơn trong 1 tuần qua
                       </div>

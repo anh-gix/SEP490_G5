@@ -356,8 +356,22 @@ const RequestManagement = () => {
         setChangeRequests(changeReqs);
         setWorkRequests(workReqs);
         setMergedRequests(merged);
-        setTotal(merged.length);
-        setTotalPages(Math.ceil(merged.length / 10));
+
+        // Calculate total from backend responses
+        let totalFromBackend = 0;
+
+        // Add ChangeRequest total if showing ChangeRequests
+        if (filterType !== 'assign_students') {
+          totalFromBackend += changeResponse.total || 0;
+        }
+
+        // Add WorkRequest total if showing WorkRequests
+        if (!filterType || filterType === 'all' || filterType === 'assign_students') {
+          totalFromBackend += workReqs.length; // WorkRequests don't have pagination
+        }
+
+        setTotal(totalFromBackend);
+        setTotalPages(Math.ceil(totalFromBackend / 10));
       } else {
         setError('Không thể tải danh sách đơn');
       }

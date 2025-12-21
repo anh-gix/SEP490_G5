@@ -984,6 +984,7 @@ exports.updateSchedule = async (req, res) => {
       if (date) schedule.date = date;
       if (startTime) schedule.startTime = startTime;
       if (endTime) schedule.endTime = endTime;
+      if (room) schedule.room = room;
 
       // Check if schedule has original values (was changed before)
       if (schedule.originalDate) {

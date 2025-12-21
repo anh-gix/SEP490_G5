@@ -40,19 +40,19 @@ const TeacherNavigation = () => {
       title: 'Lịch dạy',
       icon: 'fa-calendar-alt',
       path: '/teacher/schedule',
-      color: 'info'
+      color: 'main'
     },
     {
       title: 'Quản lý đơn đã gửi',
       icon: 'fa-file-alt',
       path: '/teacher/applications',
-      color: 'warning'
+      color: 'main'
     },
     {
       title: 'Lớp học của tôi',
       icon: 'fa-chalkboard-teacher',
       path: '/teacher/classes',
-      color: 'success'
+      color: 'main'
     },
     // {
     //   title: 'Bài tập',
@@ -74,18 +74,18 @@ const TeacherNavigation = () => {
     // }
     {
       title: 'Chương trình đào tạo',
-      icon: 'fa-book',
+      icon: 'fa-graduation-cap',
       path: '/teacher/programs',
       color: 'main'
     },
     {
-      title: 'Đề thi',
+      title: 'Quản lý đề luyện thi',
       icon: 'fa-file-alt',
       path: '/teacher/exams',
       color: 'warning'
     },
     {
-      title: 'Quản lý tips',
+      title: 'Quản lý tips luyện thi',
       icon: 'fa-lightbulb',
       path: '/teacher/tips',
       color: 'info'

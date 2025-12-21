@@ -4,6 +4,7 @@ import Animation from "../../helper/Animation";
 import Preloader from "../../helper/Preloader";
 import { examService } from "../../services/examService";
 import { useAuth } from "../../contexts/AuthContext";
+import Swal from "sweetalert2";
 
 const SpeakingExamPage = () => {
   const { examId, submissionId } = useParams();
@@ -24,6 +25,7 @@ const SpeakingExamPage = () => {
   const timerRef = useRef(null);
   const mediaRecorderRefs = useRef({}); // { part_1_question_1: MediaRecorder, part_2_question_1: MediaRecorder, ... }
   const audioChunksRefs = useRef({}); // { part_1_question_1: Blob[], part_2_question_1: Blob[], ... }
+  const recordingStopPromisesRefs = useRef({}); // { part_1_question_1: { resolve, reject }, ... }
   const containerRef = useRef(null);
   const isResizingRef = useRef(false);
   const questionRefs = useRef({});
@@ -36,19 +38,78 @@ const SpeakingExamPage = () => {
         timerRef.current = null;
       }
 
-      // Stop all recordings
-      Object.keys(mediaRecorderRefs.current).forEach((key) => {
-        const recorder = mediaRecorderRefs.current[key];
-        if (recorder && recorder.state !== "inactive") {
-          recorder.stop();
-        }
-      });
-
       // Prevent double submission unless forced
       if (submitting && !force) return;
 
       try {
         setSubmitting(true);
+
+        // Stop all recordings and wait for them to finish
+        const stopPromises = [];
+        Object.keys(mediaRecorderRefs.current).forEach((key) => {
+          const recorder = mediaRecorderRefs.current[key];
+          if (recorder && recorder.state !== "inactive") {
+            // Get the existing stop promise if it exists
+            const stopPromiseRef = recordingStopPromisesRefs.current[key];
+            if (stopPromiseRef && stopPromiseRef.promise) {
+              stopPromises.push(stopPromiseRef.promise);
+            } else {
+              // Create a new promise if one doesn't exist
+              let resolveStopPromise = null;
+              const stopPromise = new Promise((resolve) => {
+                resolveStopPromise = resolve;
+              });
+              recordingStopPromisesRefs.current[key] = { 
+                resolve: resolveStopPromise,
+                promise: stopPromise
+              };
+              stopPromises.push(stopPromise);
+            }
+            recorder.stop();
+          }
+        });
+
+        // Wait for all recordings to stop and process
+        if (stopPromises.length > 0) {
+          await Promise.all(stopPromises);
+          // Give a small delay to ensure state updates are processed
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        
+        // Clean up stop promises after waiting
+        Object.keys(recordingStopPromisesRefs.current).forEach((key) => {
+          const recorder = mediaRecorderRefs.current[key];
+          if (!recorder || recorder.state === "inactive") {
+            delete recordingStopPromisesRefs.current[key];
+          }
+        });
+
+        // Get the latest recordings from both state and refs
+        // This ensures we capture recordings that were just stopped
+        const allRecordings = { ...recordings };
+        
+        // Also check audioChunksRefs for any recordings that might not be in state yet
+        Object.keys(audioChunksRefs.current).forEach((key) => {
+          const chunks = audioChunksRefs.current[key];
+          if (chunks && chunks.length > 0) {
+            // Parse key format: part_1_question_1
+            const match = key.match(/^part_(\d+)_question_(\d+)$/);
+            if (match) {
+              const part = parseInt(match[1]);
+              const questionNumber = parseInt(match[2]);
+              const partKey = `part_${part}`;
+              
+              // Create blob from chunks if not already in state
+              if (!allRecordings[partKey] || !allRecordings[partKey][questionNumber]) {
+                const audioBlob = new Blob(chunks, { type: "audio/webm" });
+                if (!allRecordings[partKey]) {
+                  allRecordings[partKey] = {};
+                }
+                allRecordings[partKey][questionNumber] = audioBlob;
+              }
+            }
+          }
+        });
 
         // Create FormData for file upload
         const formData = new FormData();
@@ -57,7 +118,7 @@ const SpeakingExamPage = () => {
         if (sectionData?.parts) {
           for (const partData of sectionData.parts) {
             const part = partData.part;
-            const partRecordings = recordings[`part_${part}`] || {};
+            const partRecordings = allRecordings[`part_${part}`] || {};
             const answersArray = [];
             
             Object.keys(partRecordings).forEach((qNum) => {
@@ -98,6 +159,23 @@ const SpeakingExamPage = () => {
     },
     [submitting, recordings, examId, submissionId, navigate, sectionData]
   );
+
+  const handleSubmitWithConfirmation = useCallback(async () => {
+    const result = await Swal.fire({
+      title: "Xác nhận nộp bài",
+      text: "Bạn có chắc chắn muốn nộp bài? Sau khi nộp bài, bạn sẽ không thể chỉnh sửa lại.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Có, nộp bài",
+      cancelButtonText: "Hủy",
+    });
+
+    if (result.isConfirmed) {
+      handleSubmit();
+    }
+  }, [handleSubmit]);
 
   // Fetch section + initialize state
   useEffect(() => {
@@ -175,8 +253,32 @@ const SpeakingExamPage = () => {
       }
       // Auto submit if not already submitting
       if (!submitting) {
-        // call handleSubmit but allow submission even if submitting flag is stale
-        handleSubmit(true);
+        // Check if there are any recordings
+        const hasAnyRecording = sectionData?.parts?.some((partData) => {
+          const partRecordings = recordings[`part_${partData.part}`] || {};
+          return Object.keys(partRecordings).some((qNum) => {
+            const recording = partRecordings[qNum];
+            // Check if recording exists (not null/undefined)
+            return recording !== undefined && recording !== null;
+          });
+        });
+
+        if (hasAnyRecording) {
+          // call handleSubmit but allow submission even if submitting flag is stale
+          handleSubmit(true);
+        } else {
+          // Show alert if no recordings
+          Swal.fire({
+            title: "Đã hết thời gian!!",
+            text: "chúng tôi vẫn chưa ghi nhận được bất cứ bản ghi âm nào của bạn",
+            icon: "warning",
+            confirmButtonText: "Đã hiểu",
+            confirmButtonColor: "#3085d6",
+          }).then(() => {
+            // Navigate to result page even without recordings
+            navigate(`/student/exams/${examId}`);
+          });
+        }
       }
       return;
     }
@@ -192,7 +294,7 @@ const SpeakingExamPage = () => {
     // Cleanup on unmount is handled in the separate effect below.
 
     // No cleanup here to avoid clearing interval each second (which would stop the timer)
-  }, [timeRemaining, submitting, handleSubmit]);
+  }, [timeRemaining, submitting, handleSubmit, recordings, sectionData, examId, navigate]);
 
   // Clear interval and cleanup on unmount to avoid leaks
   useEffect(() => {
@@ -308,6 +410,23 @@ const SpeakingExamPage = () => {
           },
         }));
         stream.getTracks().forEach((track) => track.stop());
+        
+        // Resolve the stop promise if it exists
+        const stopPromiseRef = recordingStopPromisesRefs.current[recorderKey];
+        if (stopPromiseRef && stopPromiseRef.resolve) {
+          stopPromiseRef.resolve();
+          // Don't delete here - let handleSubmit clean it up after waiting
+        }
+      };
+
+      // Create a promise that will be resolved when recording stops
+      let resolveStopPromise = null;
+      const stopPromise = new Promise((resolve) => {
+        resolveStopPromise = resolve;
+      });
+      recordingStopPromisesRefs.current[recorderKey] = { 
+        resolve: resolveStopPromise,
+        promise: stopPromise
       };
 
       mediaRecorder.start();
@@ -370,6 +489,7 @@ const SpeakingExamPage = () => {
     }));
     delete mediaRecorderRefs.current[recorderKey];
     delete audioChunksRefs.current[recorderKey];
+    delete recordingStopPromisesRefs.current[recorderKey];
   };
 
   const getPDFUrl = (part) => {
@@ -509,9 +629,7 @@ const SpeakingExamPage = () => {
 
   return (
     <>
-      <Preloader />
-      <Animation />
-      
+     
       <div className="speaking-exam-container" style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
         <style>{`
           .hide-scrollbar::-webkit-scrollbar {
@@ -648,7 +766,7 @@ const SpeakingExamPage = () => {
               {isFullscreen ? "Thoát" : "Toàn màn hình"}
             </button>
             <button
-              onClick={() => handleSubmit()}
+              onClick={handleSubmitWithConfirmation}
               disabled={
                 submitting ||
                 (() => {

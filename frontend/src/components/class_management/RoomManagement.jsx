@@ -180,7 +180,6 @@ const RoomManagement = () => {
   const getStatusBadge = (status) => {
     const config = {
       available: { bg: 'bg-success-600', text: 'Sẵn sàng', icon: 'fa-check-circle' },
-      in_use: { bg: 'bg-info-600', text: 'Đang sử dụng', icon: 'fa-door-open' },
       maintenance: { bg: 'bg-warning-600', text: 'Bảo trì', icon: 'fa-tools' }
     };
     const { bg, text, icon } = config[status] || config.available;
@@ -376,7 +375,6 @@ const RoomManagement = () => {
           >
             <option value="all">Tất cả trạng thái</option>
             <option value="available">Sẵn sàng</option>
-            <option value="in_use">Đang sử dụng</option>
             <option value="maintenance">Bảo trì</option>
           </Form.Select>
         </Col>
@@ -519,7 +517,6 @@ const RoomManagement = () => {
                     onChange={handleInputChange}
                   >
                     <option value="available">Sẵn sàng</option>
-                    <option value="in_use">Đang sử dụng</option>
                     <option value="maintenance">Bảo trì</option>
                   </Form.Select>
                 </Form.Group>

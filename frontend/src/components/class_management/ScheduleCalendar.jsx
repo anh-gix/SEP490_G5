@@ -420,9 +420,13 @@ const ScheduleCalendar = ({
                         // Tooltip text
                         let tooltipText = 'Buổi chưa học';
                         if (schedule.isOldClassSchedule) {
-                          tooltipText = `Buổi lớp cũ: ${schedule.className}`;
+                          tooltipText = schedule.isRoomChangeOnly
+                            ? `Phòng cũ: ${schedule.roomName}`
+                            : `Buổi lớp cũ: ${schedule.className}`;
                         } else if (schedule.isNewClassSchedule) {
-                          tooltipText = `Buổi lớp mới: ${schedule.className}`;
+                          tooltipText = schedule.isRoomChangeOnly
+                            ? `Phòng mới: ${schedule.roomName}`
+                            : `Buổi lớp mới: ${schedule.className}`;
                         } else if (isMakeup) {
                           tooltipText = `Buổi học bù: ${schedule.className}`;
                         } else if (schedule.isCancelled || schedule.scheduleStatus === 'cancelled') {
@@ -492,12 +496,20 @@ const ScheduleCalendar = ({
                               )}
                             </div>
                             <div className="text-truncate d-flex align-items-center gap-1 flex-wrap">
-                              <span>{schedule.className}</span>
+                              {!schedule.isRoomChangeOnly && (
+                                <span>
+                                  {schedule.className}
+                                </span>
+                              )}
                               {schedule.isOldClassSchedule && (
-                                <Badge bg="secondary" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#9C27B0' }}>Lớp cũ</Badge>
+                                <Badge bg="secondary" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#9C27B0' }}>
+                                  {schedule.isRoomChangeOnly ? `Phòng cũ: ${schedule.roomName || 'Chưa có phòng'}` : 'Lớp cũ'}
+                                </Badge>
                               )}
                               {schedule.isNewClassSchedule && (
-                                <Badge bg="primary" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#2196F3' }}>Lớp mới</Badge>
+                                <Badge bg="primary" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#2196F3' }}>
+                                  {schedule.isRoomChangeOnly ? `Phòng mới: ${schedule.roomName || 'Chưa có phòng'}` : 'Lớp mới'}
+                                </Badge>
                               )}
                               {isMakeup && (
                                 <Badge bg="warning" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#FF9800' }}>Học bù</Badge>
@@ -507,6 +519,12 @@ const ScheduleCalendar = ({
                               )}
                               {(schedule.isAbsentSchedule || schedule.status === 'absent') && !(schedule.isCancelled || schedule.scheduleStatus === 'cancelled') && (
                                 <Badge bg="danger" style={{ fontSize: '8px', padding: '2px 4px' }}>Buổi nghỉ</Badge>
+                              )}
+                              {schedule.roomStatus === 'maintenance' && (
+                                <Badge bg="danger" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#DC3545' }}>
+                                  <i className="fas fa-exclamation-triangle me-1"></i>
+                                  Phòng bảo trì
+                                </Badge>
                               )}
                             </div>
                             <div className="mt-1 d-flex justify-content-end gap-1">

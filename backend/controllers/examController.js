@@ -1427,9 +1427,9 @@ exports.submitReadingAnswers = async (req, res) => {
 
     // Kiểm tra xem tất cả các section (của tất cả các type) đã được nộp chưa
     const allSectionsSubmitted = submission.sections.every(
-      (section) => section.submittedAt !== null
+      (section) => section.submittedAt instanceof Date
     );
-    submission.status = allSectionsSubmitted ? "completed" : "partially-submitted";
+    submission.status = allSectionsSubmitted ? "completed" : "in-progress";
 
     await submission.save();
 
@@ -1568,9 +1568,9 @@ exports.submitListeningAnswers = async (req, res) => {
 
     // Kiểm tra xem tất cả các section (của tất cả các type) đã được nộp chưa
     const allSectionsSubmitted = submission.sections.every(
-      (section) => section.submittedAt !== null
+      (section) => section.submittedAt instanceof Date
     );
-    submission.status = allSectionsSubmitted ? "completed" : "partially-submitted";
+    submission.status = allSectionsSubmitted ? "completed" : "in-progress";
 
     await submission.save();
 
@@ -1698,9 +1698,9 @@ exports.submitWritingAnswers = async (req, res) => {
 
     // Kiểm tra xem tất cả các section (của tất cả các type) đã được nộp chưa
     const allSectionsSubmitted = submission.sections.every(
-      (section) => section.submittedAt !== null
+      (section) => section.submittedAt instanceof Date
     );
-    submission.status = allSectionsSubmitted ? "completed" : "partially-submitted";
+    submission.status = allSectionsSubmitted ? "completed" : "in-progress";
 
     await submission.save();
 
@@ -1863,9 +1863,9 @@ exports.submitSpeakingAnswers = async (req, res) => {
 
     // Kiểm tra xem tất cả các section (của tất cả các type) đã được nộp chưa
     const allSectionsSubmitted = submission.sections.every(
-      (section) => section.submittedAt !== null
+      (section) => section.submittedAt instanceof Date
     );
-    submission.status = allSectionsSubmitted ? "completed" : "partially-submitted";
+    submission.status = allSectionsSubmitted ? "completed" : "in-progress";
 
     await submission.save();
 

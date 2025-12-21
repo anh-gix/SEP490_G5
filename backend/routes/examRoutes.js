@@ -77,7 +77,7 @@ router.post("/:examId/submissions/:submissionId/speaking/submit", verifyToken, u
 //  Xem kết quả Speaking (protected)
 router.get("/:examId/submissions/:submissionId/speaking/result", verifyToken, examController.getSpeakingResult);
 
-// 🧠 Lấy thông tin bài thi theo ID (public) - đặt cuối để tránh conflict
+//  Lấy thông tin bài thi theo ID (public) - đặt cuối để tránh conflict
 router.get("/:id", examController.getExamById);
 
 module.exports = router;

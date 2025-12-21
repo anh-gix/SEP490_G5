@@ -14,38 +14,38 @@ const CenterHeadLayout = ({ children }) => {
       title: 'Tài khoản',
       icon: 'fa-user-circle',
       path: '/center-head/users',
-      color: 'success'
+      color: 'main'
     },
     {
       title: 'Vai trò',
       icon: 'fa-user-shield',
       path: '/center-head/roles',
-      color: 'purple'
+      color: 'main'
     },
     {
-      title: 'Chương trình',
+      title: 'Quản lý chương trình',
       icon: 'fa-graduation-cap',
       path: '/center-head/programs',
-      color: 'warning'
+      color: 'main'
     },
     {
       title: 'Yêu cầu phê duyệt',
       icon: 'fa-clipboard-check',
       path: '/center-head/approval-requests',
-      color: 'warning'
+      color: 'main'
     },
     {
-      title: 'Đề thi',
+      title: 'Quản lý đề luyện thi',
       icon: 'fa-file-alt',
       path: '/center-head/exams',
-      color: 'purple'
+      color: 'main'
     },
-    {
-      title: 'Báo cáo',
-      icon: 'fa-chart-bar',
-      path: '/center-head/reports',
-      color: 'info'
-    }
+    // {
+    //   title: 'Báo cáo',
+    //   icon: 'fa-chart-bar',
+    //   path: '/center-head/reports',
+    //   color: 'info'
+    // }
   ];
 
   // User info - should be fetched from auth context or API

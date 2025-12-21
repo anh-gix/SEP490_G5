@@ -253,8 +253,32 @@ const SpeakingExamPage = () => {
       }
       // Auto submit if not already submitting
       if (!submitting) {
-        // call handleSubmit but allow submission even if submitting flag is stale
-        handleSubmit(true);
+        // Check if there are any recordings
+        const hasAnyRecording = sectionData?.parts?.some((partData) => {
+          const partRecordings = recordings[`part_${partData.part}`] || {};
+          return Object.keys(partRecordings).some((qNum) => {
+            const recording = partRecordings[qNum];
+            // Check if recording exists (not null/undefined)
+            return recording !== undefined && recording !== null;
+          });
+        });
+
+        if (hasAnyRecording) {
+          // call handleSubmit but allow submission even if submitting flag is stale
+          handleSubmit(true);
+        } else {
+          // Show alert if no recordings
+          Swal.fire({
+            title: "Đã hết thời gian!!",
+            text: "chúng tôi vẫn chưa ghi nhận được bất cứ bản ghi âm nào của bạn",
+            icon: "warning",
+            confirmButtonText: "Đã hiểu",
+            confirmButtonColor: "#3085d6",
+          }).then(() => {
+            // Navigate to result page even without recordings
+            navigate(`/student/exams/${examId}`);
+          });
+        }
       }
       return;
     }
@@ -270,7 +294,7 @@ const SpeakingExamPage = () => {
     // Cleanup on unmount is handled in the separate effect below.
 
     // No cleanup here to avoid clearing interval each second (which would stop the timer)
-  }, [timeRemaining, submitting, handleSubmit]);
+  }, [timeRemaining, submitting, handleSubmit, recordings, sectionData, examId, navigate]);
 
   // Clear interval and cleanup on unmount to avoid leaks
   useEffect(() => {

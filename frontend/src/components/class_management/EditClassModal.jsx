@@ -4098,9 +4098,17 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
               <div className="col-md-6">
                 <Form.Group>
                   <Form.Label>Trạng thái</Form.Label>
-                  <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
-                    {getStatusLabel(formData.status)}
-                  </div>
+                  <Form.Select
+                    name="status"
+                    value={formData.status}
+                    onChange={handleInputChange}
+                    className="border-neutral-30 radius-8 px-16 py-10"
+                  >
+                    <option value="pending">{getStatusLabel('pending')}</option>
+                    <option value="disable">{getStatusLabel('disable')}</option>
+                    <option value="active">{getStatusLabel('active')}</option>
+                    <option value="completed">{getStatusLabel('completed')}</option>
+                  </Form.Select>
                 </Form.Group>
               </div>
             </div>

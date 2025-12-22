@@ -40,7 +40,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     endDate: '',
     scheduleEntries: [createEmptyScheduleEntry()],
     tuitionFee: 0,
-    status: 'pending'
+    status: 'disable'
   });
 
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -761,7 +761,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     const sessions = [];
     const start = new Date(startDate);
     
-    // Find first occurrence of each day of week from start date
+    // Find first occurrences of each day of week from start date
     const firstOccurrences = {};
     scheduleEntries.forEach(entry => {
       const dayOfWeek = getDayOfWeekNumber(entry.day);
@@ -987,10 +987,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
           if (!teacherId) return;
 
           try {
-            const response = await teacherService.getTeacherSchedule(teacherId, {
-              startDate: minDate,
-              endDate: maxDate
-            });
+            // Fetch ALL schedules (không giới hạn date range) để hiển thị đầy đủ
+            const response = await teacherService.getTeacherSchedule(teacherId, {});
 
             if (response && response.schedules) {
               schedulesMap[String(teacherId)] = response.schedules;
@@ -1005,7 +1003,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     };
 
     fetchTeacherSchedules();
-  }, [teachers, effectiveGeneratedSessions]);
+  }, [teachers, effectiveGeneratedSessions, formData.teacherId]);
 
   // Fetch room schedules for all rooms to check conflicts
   useEffect(() => {
@@ -2630,6 +2628,12 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
 
+    // If only status changes, preserve all other data
+    if (name === 'status') {
+      setFormData(prev => ({ ...prev, status: value }));
+      return;
+    }
+
     // Auto-update band when programId is selected
     if (name === 'programId' && value) {
       const selectedProgram = allProgramsFromDB.find(p => String(p._id) === String(value));
@@ -2700,8 +2704,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     if (name === 'startDate') {
       const today = getTodayDate();
 
-      // Only validate start date is not in the past for pending/disable classes
-      if ((formData.status === 'pending' || formData.status === 'disable') && value && value < today) {
+      // Only validate start date is not in the past for disable classes
+      if (formData.status === 'disable' && value && value < today) {
         setDateError('Ngày khai giảng không được là quá khứ!');
       } else {
         setDateError('');
@@ -2712,20 +2716,32 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
   };
 
   const checkDuplicateEntries = (entries) => {
-    const seen = new Set();
     const duplicates = [];
-    
+
     entries.forEach((entry, index) => {
       // Chỉ kiểm tra entries đã điền đầy đủ
       if (!entry.day || !entry.startTime || !entry.endTime) {
         return;
       }
-      
-      const key = `${entry.day}-${entry.startTime}-${entry.endTime}`;
-      if (seen.has(key)) {
-        duplicates.push(index);
-      } else {
-        seen.add(key);
+
+      // Check against all previous entries for overlap
+      for (let j = 0; j < index; j++) {
+        const prevEntry = entries[j];
+
+        // Skip if previous entry is not complete or already marked as duplicate
+        if (!prevEntry.day || !prevEntry.startTime || !prevEntry.endTime) {
+          continue;
+        }
+        
+        // Check if same day and time overlaps
+        if (entry.day === prevEntry.day) {
+          const overlap = hasTimeOverlap(entry.startTime, entry.endTime, prevEntry.startTime, prevEntry.endTime);
+          
+          if (overlap) {
+            duplicates.push(index);
+            break; // Mark current entry as duplicate and stop checking
+          }
+        }
       }
     });
     
@@ -2774,7 +2790,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
   useEffect(() => {
     const fetchBand = async () => {
       // Only fetch band if status is pending (editable mode)
-      if (formData.status !== 'pending') {
+      if (formData.status !== 'disable') {
         return;
       }
 
@@ -2942,7 +2958,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         return;
       }
 
-      if (formData.status !== 'pending' && formData.status !== 'disable') {
+      if (formData.status !== 'disable') {
         setAvailablePrograms([]);
         setAvailableLevels([]);
         return;
@@ -3022,7 +3038,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
   // Filter levels based on selected program (when status is pending or disable)
   useEffect(() => {
     const filterLevels = async () => {
-      if (formData.status !== 'pending' && formData.status !== 'disable') {
+      if (formData.status !== 'disable') {
         return;
       }
 
@@ -3063,7 +3079,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       }
     };
 
-    if (formData.status === 'pending' || formData.status === 'disable') {
+    if (formData.status === 'disable') {
       filterLevels();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3171,7 +3187,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
 
   // Filter courses based on selected filters (program type, level, or programId) and status
   useEffect(() => {
-    if (formData.status !== 'pending' && formData.status !== 'disable') {
+    if (formData.status !== 'disable') {
       // For non-editable status, show only current course if exists
       if (formData.course && selectedCourse) {
         setCourses([selectedCourse]);
@@ -3249,8 +3265,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         return;
       }
 
-      // First, try to find course in the courses list (if in pending/disable mode and courses are loaded)
-      if ((formData.status === 'pending' || formData.status === 'disable') && courses.length > 0) {
+      // First, try to find course in the courses list (if in disable mode and courses are loaded)
+      if (formData.status === 'disable' && courses.length > 0) {
         const foundCourse = courses.find(c => (c._id || c.id) === formData.course);
         if (foundCourse) {
           setSelectedCourse(foundCourse);
@@ -3719,14 +3735,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         // Get room details including status
         const roomData = await roomService.getRoomById(roomId);
 
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('🏫 TRẠNG THÁI PHÒNG HỌC');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(`Phòng: ${roomData.room?.room_name || roomName}`);
-        console.log(`ID: ${roomId}`);
-        console.log(`Vị trí: ${roomData.room?.location || 'N/A'}`);
-        console.log(`Sức chứa: ${roomData.room?.capacity || 'N/A'} người`);
-
         // Display status with icon
         const statusMap = {
           'available': '✅ Sẵn sàng',
@@ -3806,8 +3814,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     setScheduleEntriesError(null);
 
     // Validate start date is not in the past
-    // Only validate for pending/disable classes - active/completed classes can have past start dates
-    if (formData.status === 'pending' || formData.status === 'disable') {
+    // Only validate for disable classes - active/completed classes can have past start dates
+    if (formData.status === 'disable') {
       const today = getTodayDate();
       if (formData.startDate && formData.startDate < today) {
         await Swal.fire({
@@ -4077,11 +4085,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Tên lớp <span className="text-danger-600">*</span>
                   </Form.Label>
-                  {formData.status === 'active'? (
-                    <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
-                      {formData.name}
-                    </div>
-                  ) : (
+                  {fullClassData?.status === 'disable' ? (
                     <Form.Control
                       type="text"
                       name="name"
@@ -4091,6 +4095,10 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       required
                       className="border-neutral-30 radius-8 px-16 py-10"
                     />
+                  ) : (
+                    <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
+                      {formData.name}
+                    </div>
                   )}
                 </Form.Group>
               </div>
@@ -4098,9 +4106,21 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
               <div className="col-md-6">
                 <Form.Group>
                   <Form.Label>Trạng thái</Form.Label>
-                  <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
-                    {getStatusLabel(formData.status)}
-                  </div>
+                  {(fullClassData?.status === 'active' || fullClassData?.status === 'completed') ? (
+                    <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
+                      {getStatusLabel(fullClassData?.status || formData.status)}
+                    </div>
+                  ) : (
+                    <Form.Select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleInputChange}
+                      className="border-neutral-30 radius-8 px-16 py-10"
+                    >
+                      <option value="pending">{getStatusLabel('pending')}</option>
+                      <option value="disable">{getStatusLabel('disable')}</option>
+                    </Form.Select>
+                  )}
                 </Form.Group>
               </div>
             </div>
@@ -4111,7 +4131,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Chương trình <span className="text-danger-600">*</span>
                   </Form.Label>
-                  {(formData.status === 'pending' || formData.status === 'disable') ? (
+                  {formData.status === 'disable' ? (
                     <Form.Select
                       name="program"
                       value={typeToProgramMap[formData.program] || ''}
@@ -4136,9 +4156,12 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       )}
                     </Form.Select>
                   ) : (
-                    <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
-                      {typeToProgramMap[formData.program] || formData.program || '--'}
-                    </div>
+                    <>
+                      <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
+                        {typeToProgramMap[formData.program] || formData.program || '--'}
+                      </div>
+                      <input type="hidden" name="program" value={formData.program} />
+                    </>
                   )}
                 </Form.Group>
               </div>
@@ -4148,7 +4171,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Cấp độ <span className="text-danger-600">*</span>
                   </Form.Label>
-                  {(formData.status === 'pending' || formData.status === 'disable') ? (
+                  {formData.status === 'disable' ? (
                     <Form.Select
                       name="level"
                       value={formData.level || ''}
@@ -4171,9 +4194,12 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       )}
                     </Form.Select>
                   ) : (
-                    <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
-                      {formData.level || '--'}
-                    </div>
+                    <>
+                      <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
+                        {formData.level || '--'}
+                      </div>
+                      <input type="hidden" name="level" value={formData.level} />
+                    </>
                   )}
                 </Form.Group>
               </div>
@@ -4185,7 +4211,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Program
                   </Form.Label>
-                  {(formData.status === 'pending' || formData.status === 'disable') ? (
+                  {formData.status === 'disable' ? (
                     <Form.Select
                       name="programId"
                       value={formData.programId}
@@ -4200,11 +4226,14 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       ))}
                     </Form.Select>
                   ) : (
-                    <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
-                      {formData.programId
-                        ? (allProgramsFromDB.find(p => p._id === formData.programId)?.program_name || formData.programId)
-                        : '--'}
-                    </div>
+                    <>
+                      <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
+                        {formData.programId
+                          ? (allProgramsFromDB.find(p => p._id === formData.programId)?.program_name || formData.programId)
+                          : '--'}
+                      </div>
+                      <input type="hidden" name="programId" value={formData.programId} />
+                    </>
                   )}
                 </Form.Group>
               </div>
@@ -4216,7 +4245,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Course <span className="text-danger-600">*</span>
                   </Form.Label>
-                  {(formData.status === 'pending' || formData.status === 'disable') ? (
+                  {formData.status === 'disable' ? (
                     <Form.Select
                       name="course"
                       value={formData.course}
@@ -4240,9 +4269,12 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       })}
                     </Form.Select>
                   ) : (
-                    <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
-                      {selectedCourse ? `${selectedCourse.name}${selectedCourse.numberOfSessions ? ` (${selectedCourse.numberOfSessions} buổi)` : ''}` : (formData.course ? 'Đang tải...' : '--')}
-                    </div>
+                    <>
+                      <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
+                        {selectedCourse ? `${selectedCourse.name}${selectedCourse.numberOfSessions ? ` (${selectedCourse.numberOfSessions} buổi)` : ''}` : (formData.course ? 'Đang tải...' : '--')}
+                      </div>
+                      <input type="hidden" name="course" value={formData.course} />
+                    </>
                   )}
                 </Form.Group>
               </div>
@@ -4271,7 +4303,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Ngày khai giảng
                   </Form.Label>
-                  {(formData.status === 'pending' || formData.status === 'disable') ? (
+                  {fullClassData?.status === 'disable' ? (
                     <>
                       <Form.Control
                         type="date"
@@ -4410,8 +4442,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <ScheduleCalendar
                     schedules={calendarSchedules}
                     onLessonClick={(scheduleId) => {
-                      // Khóa khi startDate bị thay đổi
-                      if (formData.startDate !== initialStartDate) {
+                      // Khóa khi startDate bị thay đổi hoặc status là completed
+                      if (formData.startDate !== initialStartDate || fullClassData?.status === 'completed') {
                         return;
                       }
 
@@ -4435,8 +4467,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <ScheduleWeekly
                     schedules={calendarSchedules}
                     onScheduleClick={(schedule) => {
-                      // Khóa khi startDate bị thay đổi
-                      if (formData.startDate !== initialStartDate) {
+                      // Khóa khi startDate bị thay đổi hoặc status là completed
+                      if (formData.startDate !== initialStartDate || fullClassData?.status === 'completed') {
                         return;
                       }
 
@@ -4475,7 +4507,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                     value={formData.teacherId}
                     onChange={handleInputChange}
                     className="border-neutral-30 radius-8 px-16 py-10"
-                    disabled={teachers.length === 0}
+                    disabled={teachers.length === 0 || fullClassData?.status === 'completed'}
                   >
                     <option value="">-- Chọn giáo viên --</option>
                     {teachers.length === 0 ? (
@@ -4538,6 +4570,13 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                                     return false;
                                   }
                                 })
+                                // Remove duplicate conflicts based on unique key
+                                .filter((conflict, index, self) => {
+                                  const key = `${conflict.date}-${conflict.time || conflict.teacherTime}-${conflict.className}`;
+                                  return index === self.findIndex(c => 
+                                    `${c.date}-${c.time || c.teacherTime}-${c.className}` === key
+                                  );
+                                })
                                 .map((conflict, idx) => {
                                   try {
                                     // Get current class schedule for this date AND time to show the exact conflicting schedule
@@ -4558,8 +4597,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                                       currentSchedule = currentClassSchedulesForRender?.find(s => formatDateToYYYYMMDD(s?.date) === formatDateToYYYYMMDD(conflict?.date));
                                     }
                                     
-                                    // Ưu tiên dùng thời gian từ conflict (chính xác nhất), sau đó từ currentSchedule, cuối cùng là fallback
-                                    // Sử dụng currentClassTime từ conflict object (đã được lưu chính xác khi phát hiện conflict)
+                                    // Ưu tiên dùng thời gian từ conflict object (đã được lưu chính xác khi phát hiện conflict)
                                     let currentClassTime = conflict.currentClassTime || conflict.classTime;
                                     
                                     // Nếu không có, thử tìm từ currentSchedule
@@ -4621,7 +4659,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
               <div className="col-md-6">
                 <Form.Group>
                   <Form.Label className="text-neutral-700 fw-medium mb-8">Phòng học</Form.Label>
-                  {formData.status !== 'pending' && formData.status !== 'disable' ? (
+                  {fullClassData?.status !== 'disable' ? (
                     <>
                       <div className="radius-8 px-16 py-10 text-neutral-700" style={{ lineHeight: '1.5' }}>
                         {rooms.find(r => (r._id || r.id) === formData.roomId)?.room_name ||
@@ -4629,7 +4667,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                          'Chưa chọn phòng học'}
                       </div>
                       <Form.Text className="text-neutral-500 text-12">
-                        Chỉ có thể sửa phòng học khi lớp ở trạng thái "Đang chờ duyệt" hoặc "Vô hiệu hóa".
+                        Chỉ có thể sửa phòng học khi lớp ở trạng thái "Vô hiệu hóa".
                       </Form.Text>
                     </>
                   ) : (
@@ -4688,6 +4726,13 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                                     console.error('Error filtering room conflicts:', err);
                                     return false;
                                   }
+                                })
+                                // Remove duplicate conflicts based on unique key
+                                .filter((conflict, index, self) => {
+                                  const key = `${conflict.date}-${conflict.time || conflict.roomTime}-${conflict.className}`;
+                                  return index === self.findIndex(c => 
+                                    `${c.date}-${c.time || c.roomTime}-${c.className}` === key
+                                  );
                                 })
                                 .map((conflict, idx) => {
                                   try {
@@ -4778,8 +4823,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 <Form.Label className="text-neutral-700 fw-medium mb-0">
                   Danh sách học viên đã chọn
                 </Form.Label>
-                {/* Chỉ hiển thị nút thêm/import học viên cho lớp pending hoặc disable */}
-                {(fullClassData?.status === 'pending' || fullClassData?.status === 'disable') && (
+                {/* Chỉ hiển thị nút thêm/import học viên khi trạng thái là disable */}
+                {fullClassData?.status === 'disable' && (
                   <div className="d-flex gap-8">
                     <Button
                       type="button"
@@ -4849,7 +4894,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                                   Đang tải thông tin...
                                 </div>
                               </div>
-                              {(fullClassData?.status === 'pending' || fullClassData?.status === 'disable') && (
+                              {fullClassData?.status === 'disable' && (
                                 <Button
                                   type="button"
                                   variant="outline-danger"
@@ -4915,8 +4960,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                                 </div>
                               )}
                             </div>
-                            {/* Hiển thị nút xóa cho lớp pending hoặc disable */}
-                            {(fullClassData?.status === 'pending' || fullClassData?.status === 'disable') && (
+                            {/* Hiển thị nút xóa khi trạng thái là disable */}
+                            {fullClassData?.status === 'disable' && (
                               <Button
                                 type="button"
                                 variant="outline-danger"
@@ -4946,7 +4991,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         {/* Action Buttons */}
         <div className="d-flex justify-content-between align-items-center gap-12 mt-24">
           <div>
-            {(formData.status === 'pending' || formData.status === 'disable') && onDelete && (
+            {fullClassData?.status === 'disable' && onDelete && (
               <Button
                 variant="outline-danger"
                 className="text-15 fw-medium px-24 py-12 radius-8"
@@ -4970,6 +5015,13 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
               variant="warning"
               className="text-white text-15 fw-semibold px-24 py-12 radius-8"
               type="submit"
+              disabled={
+                scheduleEntriesError || 
+                duplicateEntryIndices.length > 0 ||
+                teacherRoomConflicts.teacherConflicts.length > 0 ||
+                teacherRoomConflicts.roomConflicts.length > 0 ||
+                studentConflicts.size > 0
+              }
             >
               <i className="fas fa-save me-2"></i>
               Lưu thay đổi
@@ -5294,7 +5346,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                         })}
                         min={new Date().toISOString().split('T')[0]}
                         className="border-neutral-30 radius-8 px-16 py-10"
-                        disabled={hasAttendance || checkingAttendance}
+                        disabled={hasAttendance || checkingAttendance || fullClassData?.status !== 'disable'}
                       />
                     )}
                   </Form.Group>
@@ -5349,7 +5401,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                             });
                           }}
                           className="border-neutral-30 radius-8 px-16 py-10"
-                          disabled={hasAttendance || checkingAttendance}
+                          disabled={hasAttendance || checkingAttendance || fullClassData?.status !== 'disable'}
                         />
                         {editedSchedule.startTime && editedSchedule.endTime && editedSchedule.startTime >= editedSchedule.endTime && (
                           <Form.Text className="text-danger text-12 mt-1">
@@ -5395,7 +5447,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                             });
                           }}
                           className="border-neutral-30 radius-8 px-16 py-10"
-                          disabled={hasAttendance || checkingAttendance}
+                          disabled={hasAttendance || checkingAttendance || fullClassData?.status !== 'disable'}
                         />
                         {editedSchedule.startTime && editedSchedule.endTime && editedSchedule.endTime <= editedSchedule.startTime && (
                           <Form.Text className="text-danger text-12 mt-1">
@@ -5450,7 +5502,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                         }));
                       }}
                       className="border-neutral-30 radius-8 px-16 py-10"
-                      disabled={hasAttendance}
+                      disabled={hasAttendance || fullClassData?.status !== 'disable'}
                     >
                       <option value="">-- Chọn phòng học --</option>
                       {filteredRooms.map(room => {
@@ -5485,7 +5537,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
           {!isPastSchedule && (
           <Button
             className="btn-main text-15 fw-semibold px-24 py-10 radius-8"
-            disabled={!hasScheduleChanges || hasAttendance || checkingAttendance || savingSchedule || validatingScheduleEdit ||
+            disabled={!hasScheduleChanges || hasAttendance || checkingAttendance || savingSchedule || validatingScheduleEdit || fullClassData?.status !== 'disable' ||
               (scheduleValidationResult?.conflicts?.hasConflict === true &&
                ((scheduleValidationResult.conflicts.teacher && scheduleValidationResult.conflicts.teacher.length > 0) ||
                 (scheduleValidationResult.conflicts.room && scheduleValidationResult.conflicts.room.filter(c => !c.isCurrentClass).length > 0) ||
@@ -6234,6 +6286,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 onChange={(e) => setNewScheduleData({ ...newScheduleData, day: e.target.value })}
                 className="border-neutral-30 radius-8 px-16 py-10"
                 required
+                disabled={fullClassData?.status !== 'disable'}
               >
                 <option value="">-- Chọn thứ --</option>
                 {daysOfWeek.map(option => (
@@ -6256,6 +6309,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                     onChange={(e) => setNewScheduleData({ ...newScheduleData, startTime: e.target.value })}
                     className="border-neutral-30 radius-8 px-16 py-10"
                     required
+                    disabled={fullClassData?.status !== 'disable'}
                   />
                 </Form.Group>
               </div>
@@ -6271,6 +6325,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                     onChange={(e) => setNewScheduleData({ ...newScheduleData, endTime: e.target.value })}
                     className="border-neutral-30 radius-8 px-16 py-10"
                     required
+                    disabled={fullClassData?.status !== 'disable'}
                   />
                 </Form.Group>
               </div>
@@ -6284,6 +6339,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 checked={newScheduleData.repeatWeekly}
                 onChange={(e) => setNewScheduleData({ ...newScheduleData, repeatWeekly: e.target.checked })}
                 className="text-neutral-700"
+                disabled={fullClassData?.status !== 'disable'}
               />
             </Form.Group>
           </Form>
@@ -6378,7 +6434,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
           <Button
             variant="primary"
             className="btn-main text-14 fw-medium px-20 py-10"
-            disabled={savingSchedule || validatingSchedule || (validationResult?.conflicts?.hasConflict === true)}
+            disabled={savingSchedule || validatingSchedule || (validationResult?.conflicts?.hasConflict === true) || fullClassData?.status !== 'disable'}
             onClick={async () => {
               if (!newScheduleData.day || !newScheduleData.startTime || !newScheduleData.endTime) {
                 return;
@@ -6661,4 +6717,5 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
 };
 
 export default EditClassForm;
+
 

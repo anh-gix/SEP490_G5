@@ -781,13 +781,15 @@ exports.getTeacherSchedule = async (req, res) => {
       .lean();
     
     // Add class date range info to each schedule for easier conflict checking
+    // Keep date as ISO format for accurate conflict checking
     const schedulesWithClassInfo = schedules.map(schedule => {
       const classInfo = teacherClasses.find(c => c._id.toString() === schedule.class._id.toString());
       return {
         ...schedule,
-        date: formatDateToVN(schedule.date),
-        classStartDate: formatDateToVN(classInfo?.startDate),
-        classEndDate: formatDateToVN(classInfo?.endDate),
+        // Keep date as Date object/ISO string - don't format to DD/MM/YYYY
+        // Frontend will handle display formatting
+        classStartDate: classInfo?.startDate,
+        classEndDate: classInfo?.endDate,
         programType: schedule.class?.course?.program?.type || null
       };
     });

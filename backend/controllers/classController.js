@@ -24,19 +24,22 @@ exports.getAllClasses = async (req, res) => {
     if (courseId) query.course = courseId;
     if (search) query.name = { $regex: search, $options: 'i' };
     
-    //update pending → active
-    if (status !== 'pending') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      await Class.updateMany(
-        {
-          status: 'pending',
-          startDate: { $exists: true, $lte: today }
-        },
-        { $set: { status: 'active' } }
-      );
-    }
+    // Auto-update pending → active (always run, regardless of filter)
+    const today = new Date();
+    const todayStart = new Date(Date.UTC(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      0, 0, 0, 0
+    ));
+    
+    await Class.updateMany(
+      {
+        status: 'pending',
+        startDate: { $exists: true, $lte: todayStart }
+      },
+      { $set: { status: 'active' } }
+    );
     
     const classes = await Class.find(query)
       // user model uses 'username' rather than firstName/lastName/fullName
@@ -108,6 +111,23 @@ exports.getAllClasses = async (req, res) => {
 exports.getClassById = async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Auto-update pending → active (same as getAllClasses)
+    const today = new Date();
+    const todayStart = new Date(Date.UTC(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      0, 0, 0, 0
+    ));
+    
+    await Class.updateMany(
+      {
+        status: 'pending',
+        startDate: { $exists: true, $lte: todayStart }
+      },
+      { $set: { status: 'active' } }
+    );
     
     const classData = await Class.findById(id)
       .populate('teacher', 'username email phone')
@@ -387,6 +407,37 @@ exports.getClassStats = async (req, res) => {
  * @param {Object} classData - Class data { _id, teacher, students }
  * @returns {Object} { hasConflict: boolean, conflicts: { teacher: [], room: [], students: [] } }
  */
+// Helper function to update class endDate based on schedules
+const updateClassEndDateFromSchedules = async (classId, session = null) => {
+  try {
+    // Find the last schedule by date
+    const lastSchedule = await ClassSchedule.findOne({
+      class: classId,
+      status: { $in: ['temporary', 'fixed'] }
+    })
+      .sort({ date: -1 }) // Sort descending to get the latest date
+      .select('date')
+      .session(session)
+      .lean();
+    
+    if (lastSchedule && lastSchedule.date) {
+      const updateOptions = { endDate: lastSchedule.date };
+      if (session) {
+        await Class.findByIdAndUpdate(classId, updateOptions, { session });
+      } else {
+        await Class.findByIdAndUpdate(classId, updateOptions);
+      }
+      console.log(`✓ Updated endDate to ${lastSchedule.date} for class ${classId}`);
+      return lastSchedule.date;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error updating endDate from schedules:', error);
+    return null;
+  }
+};
+
 const validateClassSchedulesConflicts = async (classSchedules, classData) => {
   const conflicts = {
     teacher: [],
@@ -507,19 +558,18 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
     if (teacherClasses.length > 0) {
       const teacherClassIds = teacherClasses.map(c => c._id);
 
-      // Query all teacher schedules for all dates
+      // Query teacher schedules for conflict checking
       const teacherSchedules = await ClassSchedule.find({
         class: { $in: teacherClassIds },
         date: { $in: uniqueDates },
         status: { $in: ['temporary', 'fixed'] },
-        // FIX: Chỉ lấy các buổi mà giáo viên này thực sự dạy
         $or: [
           { teacher: teacherId },
           { substituteTeacher: teacherId }
         ]
       })
         .populate('class', 'name')
-        .select('date startTime endTime class')
+        .select('_id date startTime endTime class status')
         .lean();
 
       classSchedules.forEach((newSchedule, newIdx) => {
@@ -537,11 +587,6 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
           const hasOverlap = hasTimeOverlap(newSchedule.startTime, newSchedule.endTime, existingSchedule.startTime, existingSchedule.endTime);
           
           if (sameDate && hasOverlap) {
-            console.log(`\n   PHÁT HIỆN XUNG ĐỘT [${newIdx + 1} vs ${existIdx + 1}]:`);
-            console.log(`     - Ngày: ${newDateStr}`);
-            console.log(`     - Lớp hiện tại: ${newSchedule.startTime} - ${newSchedule.endTime}`);
-            console.log(`     - Lớp khác "${existingSchedule.class?.name || 'N/A'}": ${existingSchedule.startTime} - ${existingSchedule.endTime}`);
-            
             conflicts.teacher.push({
               teacherId: teacherId.toString(),
               className: existingSchedule.class?.name || 'N/A',
@@ -554,12 +599,7 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
           }
         });
       });
-      
-      console.log('  - Tổng số xung đột tìm thấy:', conflicts.teacher.length);
-    } else {
-      console.log(' Giáo viên không có lớp nào khác, không có xung đột');
     }
-    console.log('  ============================================\n');
   }
 
   // 3. Kiểm tra conflict SINH VIÊN
@@ -1079,16 +1119,6 @@ exports.createClass = async (req, res) => {
       });
     }
     
-    // Check if class name exists
-    const existingClass = await Class.findOne({ name }).session(session);
-    if (existingClass) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        success: false,
-        message: 'Tên lớp học đã tồn tại'
-      });
-    }
     
     // Validate room capacity if room is provided and auto-set maxStudents
     let finalMaxStudents = maxStudents;
@@ -1122,19 +1152,6 @@ exports.createClass = async (req, res) => {
       finalMaxStudents = undefined;
     }
     
-    // Kiểm tra đầy đủ thông tin để set status tự động
-    const classDataForValidation = {
-      course,
-      startDate,
-      teacher,
-      room,
-      scheduleEntries,
-      students: students || []
-    };
-
-    // Chỉ set 'pending' nếu đủ thông tin, không thì 'disable'
-    const autoStatus = isClassDataComplete(classDataForValidation) ? 'pending' : 'disable';
-
     const newClass = new Class({
       name,
       course,
@@ -1145,7 +1162,7 @@ exports.createClass = async (req, res) => {
       startDate,
       endDate,
       maxStudents: finalMaxStudents,
-      status: status || autoStatus
+      status: status || 'disable'
     });
     
     await newClass.save({ session });
@@ -1303,6 +1320,20 @@ exports.createClass = async (req, res) => {
           // Create all ClassSchedule entries
           const createdSchedules = await ClassSchedule.insertMany(classSchedules, { session });
 
+          // Auto-update endDate to the last schedule's date
+          if (createdSchedules.length > 0) {
+            const lastSchedule = createdSchedules[createdSchedules.length - 1];
+            const lastScheduleDate = lastSchedule.date;
+            
+            await Class.findByIdAndUpdate(
+              newClass._id,
+              { endDate: lastScheduleDate },
+              { session }
+            );
+            
+            console.log(`✓ Auto-set endDate to last schedule date: ${lastScheduleDate}`);
+          }
+
           // Create StudentSchedule entries for each ClassSchedule
           if (students && students.length > 0) {
             const studentSchedules = [];
@@ -1458,6 +1489,23 @@ const compareScheduleEntries = (oldEntries, newEntries) => {
 };
 
 exports.updateClass = async (req, res) => {
+  // Auto-update pending → active BEFORE starting transaction
+  const today = new Date();
+  const todayStart = new Date(Date.UTC(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+    0, 0, 0, 0
+  ));
+  
+  await Class.updateMany(
+    {
+      status: 'pending',
+      startDate: { $exists: true, $lte: todayStart }
+    },
+    { $set: { status: 'active' } }
+  );
+  
   const session = await mongoose.startSession();
   session.startTransaction();
   
@@ -1489,6 +1537,9 @@ exports.updateClass = async (req, res) => {
         return res.status(400).json(result);
       }
 
+      // Update endDate from schedules before committing
+      await updateClassEndDateFromSchedules(classData._id, session);
+
       await session.commitTransaction();
       session.endSession();
       return res.status(200).json(result);
@@ -1505,6 +1556,9 @@ exports.updateClass = async (req, res) => {
         return res.status(400).json(result);
       }
 
+      // Update endDate from schedules before committing
+      await updateClassEndDateFromSchedules(classData._id, session);
+
       await session.commitTransaction();
       session.endSession();
       return res.status(200).json(result);
@@ -1519,18 +1573,6 @@ exports.updateClass = async (req, res) => {
     
     // Check name conflict
     if (name && name !== classData.name) {
-      const existingClass = await Class.findOne({ 
-        name, 
-        _id: { $ne: req.params.id } 
-      }).session(session);
-      if (existingClass) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({
-          success: false,
-          message: 'Tên lớp học đã tồn tại'
-        });
-      }
     }
     
     // Determine final room and students for validation
@@ -2012,6 +2054,20 @@ exports.updateClass = async (req, res) => {
           console.log(' [DEBUG] Creating', classSchedules.length, 'new schedules in FULL REGENERATION');
           const createdSchedules = await ClassSchedule.insertMany(classSchedules, { session });
           
+          // Auto-update endDate to the last schedule's date
+          if (createdSchedules.length > 0) {
+            const lastSchedule = createdSchedules[createdSchedules.length - 1];
+            const lastScheduleDate = lastSchedule.date;
+            
+            await Class.findByIdAndUpdate(
+              classData._id,
+              { endDate: lastScheduleDate },
+              { session }
+            );
+            
+            console.log(`✓ Auto-set endDate to last schedule date: ${lastScheduleDate}`);
+          }
+          
           // Create StudentSchedule entries for each ClassSchedule
           if (finalStudentsList && finalStudentsList.length > 0) {
             const studentSchedules = [];
@@ -2275,32 +2331,6 @@ exports.updateClass = async (req, res) => {
         }
       } else {
         console.log(' [DEBUG] No ClassSchedules found for this class, skipping StudentSchedule updates');
-      }
-    }
-
-    // TỰ ĐỘNG NÂNG CẤP từ disable → pending nếu đủ thông tin
-    if (classData.status === 'disable') {
-      // Lấy scheduleEntries từ database
-      const existingSchedules = await ClassSchedule.find({ class: req.params.id }).session(session);
-      const hasScheduleEntries = existingSchedules && existingSchedules.length > 0;
-
-      // Lấy thông tin lớp sau update để kiểm tra
-      const updatedClassForCheck = await Class.findById(req.params.id).session(session);
-
-      const dataForValidation = {
-        course: updatedClassForCheck.course,
-        startDate: updatedClassForCheck.startDate,
-        teacher: updatedClassForCheck.teacher || updatedClassForCheck.teacherId,
-        room: updatedClassForCheck.room,
-        scheduleEntries: hasScheduleEntries ? [{dummy: true}] : [],
-        students: updatedClassForCheck.students
-      };
-
-      // Nếu đủ thông tin, tự động nâng lên pending
-      if (isClassDataComplete(dataForValidation)) {
-        updatedClassForCheck.status = 'pending';
-        await updatedClassForCheck.save({ session });
-        console.log(`✓ Tự động nâng cấp lớp từ disable → pending`);
       }
     }
 
@@ -3247,6 +3277,14 @@ const handleActiveClassUpdate = async (classData, updateData, session) => {
       }
     }
 
+    // 5. Handle status update (if provided)
+    if (updateData.status && updateData.status !== classData.status?.toString()) {
+      const updatedClassForStatus = await Class.findById(classData._id).session(session);
+      updatedClassForStatus.status = updateData.status;
+      await updatedClassForStatus.save({ session });
+      console.log(`✓ Cập nhật status lớp: ${classData.status} → ${updateData.status}`);
+    }
+
     // Get updated class data
     const updatedClass = await Class.findById(classData._id).session(session);
 
@@ -3294,34 +3332,6 @@ const handlePendingClassUpdate = async (classData, updateData, userId, session) 
       }
       // After course change, other schedule-related updates may not be needed
       // Return early with course update result
-
-      // Kiểm tra status sau khi đổi course
-      const updatedClassData = await Class.findById(classData._id)
-        .populate('course')
-        .populate('teacher')
-        .populate('room')
-        .populate('students')
-        .session(session);
-
-      const existingSchedules = await ClassSchedule.find({ class: classData._id }).session(session);
-      const hasScheduleEntries = existingSchedules && existingSchedules.length > 0;
-
-      const updatedDataForValidation = {
-        course: updatedClassData.course,
-        startDate: updatedClassData.startDate,
-        teacher: updatedClassData.teacher,
-        room: updatedClassData.room,
-        scheduleEntries: hasScheduleEntries ? [{dummy: true}] : [],
-        students: updatedClassData.students
-      };
-
-      const newStatus = isClassDataComplete(updatedDataForValidation) ? 'pending' : 'disable';
-
-      if (updatedClassData.status !== newStatus) {
-        updatedClassData.status = newStatus;
-        await updatedClassData.save({ session });
-        console.log(`✓ Tự động cập nhật status lớp sau khi đổi course: ${classData.status} → ${newStatus}`);
-      }
 
       const updatedClass = await Class.findById(classData._id).session(session);
       return {
@@ -3415,6 +3425,14 @@ const handlePendingClassUpdate = async (classData, updateData, userId, session) 
       }
     }
 
+    // 7. Handle status update (if provided)
+    if (updateData.status && updateData.status !== classData.status?.toString()) {
+      const updatedClassForStatus = await Class.findById(classData._id).session(session);
+      updatedClassForStatus.status = updateData.status;
+      await updatedClassForStatus.save({ session });
+      console.log(`✓ Cập nhật status lớp: ${classData.status} → ${updateData.status}`);
+    }
+
     // Lấy lại dữ liệu lớp sau khi update xong (với populate)
     const updatedClassData = await Class.findById(classData._id)
       .populate('course')
@@ -3422,30 +3440,6 @@ const handlePendingClassUpdate = async (classData, updateData, userId, session) 
       .populate('room')
       .populate('students')
       .session(session);
-
-    // Lấy scheduleEntries từ database để kiểm tra
-    const existingSchedules = await ClassSchedule.find({ class: classData._id }).session(session);
-    const hasScheduleEntries = existingSchedules && existingSchedules.length > 0;
-
-    // Kiểm tra xem sau khi update, lớp còn đủ thông tin không
-    const updatedDataForValidation = {
-      course: updatedClassData.course,
-      startDate: updatedClassData.startDate,
-      teacher: updatedClassData.teacher,
-      room: updatedClassData.room,
-      scheduleEntries: hasScheduleEntries ? [{dummy: true}] : [], // Chỉ cần check có hay không
-      students: updatedClassData.students
-    };
-
-    // Tính status mới dựa vào độ đầy đủ thông tin
-    const newStatus = isClassDataComplete(updatedDataForValidation) ? 'pending' : 'disable';
-
-    // Nếu status thay đổi, cập nhật vào database
-    if (updatedClassData.status !== newStatus) {
-      updatedClassData.status = newStatus;
-      await updatedClassData.save({ session });
-      console.log(`✓ Tự động cập nhật status lớp: ${classData.status} → ${newStatus}`);
-    }
 
     const updatedClass = await Class.findById(classData._id).session(session);
 

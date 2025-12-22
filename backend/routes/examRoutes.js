@@ -13,6 +13,8 @@ router.delete("/management/:id", examController.deleteExamForManagement);
 router.post("/management/:id/publish", examController.publishExamForManagement);
 router.post("/management/:id/unpublish", examController.unpublishExamForManagement);
 router.post("/management/upload-answer-key", upload.single("file"), examController.uploadAnswerKeyForManagement);
+router.post("/management/upload-exam-file", upload.single("file"), examController.uploadExamFileForManagement);
+router.post("/management/delete-exam-file", examController.deleteExamFileForManagement);
 
 // Helper route to check exam submission status
 router.get("/management/:id/submission-status", examController.getExamSubmissionStatus);

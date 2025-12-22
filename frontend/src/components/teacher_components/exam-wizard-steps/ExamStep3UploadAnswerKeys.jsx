@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
+import { toast } from 'react-toastify';
+import { examService } from '../../../services/examService';
 
 const ExamStep3UploadAnswerKeys = ({ examData, setExamData, onNext, onPrevious }) => {
   const [activeSkill, setActiveSkill] = useState(() => {
@@ -61,7 +63,8 @@ const ExamStep3UploadAnswerKeys = ({ examData, setExamData, onNext, onPrevious }
         { key: 'D', text: '' }
       ],
       correctAnswer: [],
-      maxScore: 1
+      maxScore: 1,
+      tags: []
     };
 
     setCurrentEditingQuestion(newQuestion);
@@ -89,13 +92,25 @@ const ExamStep3UploadAnswerKeys = ({ examData, setExamData, onNext, onPrevious }
         q.questionNumber = idx + 1;
       });
 
+      // Calculate new maxScore for the section after deletion
+      const newMaxScore = calculateSectionMaxScore(newAnswerKey);
+
       newSections[sectionIndex] = {
         ...newSections[sectionIndex],
-        answerKey: newAnswerKey
+        answerKey: newAnswerKey,
+        maxScore: newMaxScore
       };
+
+      console.log(`📊 Updated maxScore for section ${sectionIndex} after deletion: ${newMaxScore} points`);
 
       return { ...prev, sections: newSections };
     });
+  };
+
+  const calculateSectionMaxScore = (answerKey) => {
+    return (answerKey || []).reduce((sum, question) => {
+      return sum + (question.maxScore || 0);
+    }, 0);
   };
 
   const handleSaveQuestion = (question) => {
@@ -111,10 +126,16 @@ const ExamStep3UploadAnswerKeys = ({ examData, setExamData, onNext, onPrevious }
         answerKey.push(question);
       }
 
+      // Calculate new maxScore for the section
+      const newMaxScore = calculateSectionMaxScore(answerKey);
+
       newSections[currentSectionIndex] = {
         ...newSections[currentSectionIndex],
-        answerKey
+        answerKey,
+        maxScore: newMaxScore
       };
+
+      console.log(`📊 Updated maxScore for section ${currentSectionIndex}: ${newMaxScore} points`);
 
       return { ...prev, sections: newSections };
     });
@@ -124,33 +145,125 @@ const ExamStep3UploadAnswerKeys = ({ examData, setExamData, onNext, onPrevious }
     setCurrentSectionIndex(null);
   };
 
-  const handleImportQuestions = (sectionIndex) => {
-    // Mock import functionality
-    alert('Chức năng import từ CSV/Excel sẽ được triển khai sau');
-  };
 
-  const validateAndNext = () => {
+  const validateAndNext = async () => {
+    const missingFields = [];
+
+    // Validate each section has correct number of questions
+    examData.sections.forEach((section, index) => {
+      const partLabel = `${section.type.charAt(0).toUpperCase() + section.type.slice(1)} Part ${section.part || index + 1}`;
+      const answerKeyCount = section.answerKey?.length || 0;
+      const requiredCount = section.questionCount || 0;
+
+      if (answerKeyCount !== requiredCount) {
+        missingFields.push(`${partLabel}: Cần ${requiredCount} câu hỏi nhưng chỉ có ${answerKeyCount} câu`);
+      }
+    });
+
+    // Show validation errors
+    if (missingFields.length > 0) {
+      toast.error(
+        <div>
+          <ul className="mb-0 ps-3 mt-1" style={{ maxHeight: '200px', overflow: 'auto' }}>
+            {missingFields.slice(0, 5).map((field, index) => (
+              <li key={index} className="text-danger">{field}</li>
+            ))}
+            {missingFields.length > 5 && (
+              <li className="text-danger">... và {missingFields.length - 5} lỗi khác</li>
+            )}
+          </ul>
+        </div>,
+        {
+          position: 'top-right',
+          autoClose: 6000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          style: { minWidth: '350px' }
+        }
+      );
+      return;
+    }
+
     const totalQuestions = examData.sections.reduce((sum, s) => sum + (s.questionCount || 0), 0);
     const totalAnswerKeys = examData.sections.reduce((sum, s) => sum + (s.answerKey?.length || 0), 0);
 
     if (totalAnswerKeys === 0) {
-      alert('Vui lòng tạo ít nhất 1 câu hỏi!');
+      toast.error(
+        <div>
+          <div className="d-flex align-items-center">
+            <i className="ph ph-x-circle fs-4 me-2"></i>
+            <span>Vui lòng tạo ít nhất 1 câu hỏi!</span>
+          </div>
+        </div>,
+        {
+          position: 'top-right',
+          autoClose: 4000,
+        }
+      );
       return;
     }
 
-    if (totalAnswerKeys < totalQuestions) {
-      const confirmContinue = confirm(
-        `Bạn mới tạo ${totalAnswerKeys}/${totalQuestions} câu hỏi.\n\nBạn có muốn tiếp tục?`
+    try {
+      // Calculate maxScore for each section based on total question scores
+      const updatedSections = examData.sections.map(section => {
+        const totalSectionScore = (section.answerKey || []).reduce((sum, question) => {
+          return sum + (question.maxScore || 0);
+        }, 0);
+
+        return {
+          ...section,
+          maxScore: totalSectionScore
+        };
+      });
+
+      console.log('📊 Calculated maxScore for sections:', updatedSections.map(s => ({
+        type: s.type,
+        part: s.part,
+        maxScore: s.maxScore,
+        questions: s.answerKey?.length || 0
+      })));
+
+      // Update exam in database with calculated maxScore
+      await examService.updateExamForManagement(examData._id, {
+        sections: updatedSections,
+        lastCompletedStep: 3
+      });
+
+      // Update local state
+      setExamData(prev => ({
+        ...prev,
+        sections: updatedSections,
+        lastCompletedStep: 3
+      }));
+
+      toast.success(
+        <div className="d-flex align-items-center">
+          <i className="ph ph-check-circle fs-4 me-2 text-success"></i>
+          <span>Đã lưu điểm số và chuyển sang bước xem lại!</span>
+        </div>,
+        {
+          position: 'top-right',
+          autoClose: 3000,
+        }
       );
-      if (!confirmContinue) return;
+
+      onNext();
+    } catch (error) {
+      console.error('Error updating exam with maxScore:', error);
+      toast.error(
+        <div>
+          <div className="d-flex align-items-center">
+            <i className="ph ph-x-circle fs-4 me-2"></i>
+            <span>Lỗi khi lưu điểm số: {error.message}</span>
+          </div>
+        </div>,
+        {
+          position: 'top-right',
+          autoClose: 5000,
+        }
+      );
     }
-
-    setExamData(prev => ({
-      ...prev,
-      lastCompletedStep: 3
-    }));
-
-    onNext();
   };
 
   const existingSkillTypes = [...new Set(examData.sections.map(s => s.type))];
@@ -229,13 +342,6 @@ const ExamStep3UploadAnswerKeys = ({ examData, setExamData, onNext, onPrevious }
                   </div>
                   <div className="d-flex gap-2">
                     <button
-                      className={`btn btn-sm btn-outline-${config.color}`}
-                      onClick={() => handleImportQuestions(section.originalIndex)}
-                    >
-                      <i className="ph ph-upload me-1"></i>
-                      Import CSV
-                    </button>
-                    <button
                       className={`btn btn-sm btn-${config.color}`}
                       onClick={() => handleAddQuestion(section.originalIndex)}
                     >
@@ -276,9 +382,17 @@ const ExamStep3UploadAnswerKeys = ({ examData, setExamData, onNext, onPrevious }
                                 </div>
                               </td>
                               <td>
-                                <span className="badge bg-light text-dark border">
-                                  {section.type}
-                                </span>
+                                <div className="d-flex flex-wrap gap-1">
+                                  {question.tags && question.tags.length > 0 ? (
+                                    question.tags.map(tag => (
+                                      <span key={tag} className="badge bg-secondary badge-sm">
+                                        {tag.replace('_', ' ')}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-muted small">Không có tags</span>
+                                  )}
+                                </div>
                               </td>
                               <td className="text-center">
                                 <input
@@ -412,6 +526,14 @@ const QuestionModal = ({ question, onSave, onClose }) => {
       ? currentCorrect.filter(k => k !== key)
       : [...currentCorrect, key];
     setFormData(prev => ({ ...prev, correctAnswer: newCorrect }));
+  };
+
+  const handleTagToggle = (tag) => {
+    const currentTags = formData.tags || [];
+    const newTags = currentTags.includes(tag)
+      ? currentTags.filter(t => t !== tag)
+      : [...currentTags, tag];
+    setFormData(prev => ({ ...prev, tags: newTags }));
   };
 
   const handleTypeChange = (type) => {
@@ -569,6 +691,35 @@ const QuestionModal = ({ question, onSave, onClose }) => {
                 min="0"
                 step="0.5"
               />
+            </div>
+
+            {/* Tags */}
+            <div className="mb-3">
+              <label className="form-label fw-semibold">Tags (nhấn để chọn/bỏ chọn)</label>
+              <div className="d-flex flex-wrap gap-2">
+                {[
+                  { value: 'grammar', label: 'Ngữ pháp' },
+                  { value: 'vocabulary', label: 'Từ vựng' },
+                  { value: 'listening', label: 'Nghe' },
+                  { value: 'reading_comprehension', label: 'Đọc hiểu' },
+                  { value: 'writing', label: 'Viết' },
+                  { value: 'speaking', label: 'Nói' }
+                ].map(tag => (
+                  <button
+                    key={tag.value}
+                    type="button"
+                    className={`btn btn-sm ${formData.tags?.includes(tag.value) ? 'btn-primary' : 'btn-outline-primary'}`}
+                    onClick={() => handleTagToggle(tag.value)}
+                    title={`${formData.tags?.includes(tag.value) ? 'Bỏ chọn' : 'Chọn'} tag: ${tag.label}`}
+                  >
+                    {tag.label}
+                  </button>
+                ))}
+              </div>
+              <small className="text-muted">
+                Tags đã chọn: {formData.tags?.length || 0}
+                {formData.tags?.length > 0 && ` (${formData.tags.join(', ')})`}
+              </small>
             </div>
           </div>
           <div className="modal-footer">

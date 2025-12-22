@@ -272,7 +272,7 @@ const TeacherExamDetail = () => {
                             <div className="d-flex flex-column gap-2">
                               {section.audioUrls.map((url, idx) => (
                                 <audio key={idx} controls className="w-100">
-                                  <source src={url} type="audio/mpeg" />
+                                  <source src={url.startsWith('/uploads') ? `http://localhost:${import.meta.env.VITE_API_PORT}${url}` : url} type="audio/mpeg" />
                                 </audio>
                               ))}
                             </div>
@@ -353,7 +353,7 @@ const TeacherExamDetail = () => {
                         {section.fileUrl ? (
                           <div className="border rounded overflow-hidden" style={{ height: '550px', backgroundColor: '#fff' }}>
                             <iframe
-                              src={section.fileUrl}
+                              src={section.fileUrl.startsWith('/uploads') ? `http://localhost:${import.meta.env.VITE_API_PORT}${section.fileUrl}` : section.fileUrl}
                               style={{
                                 width: '100%',
                                 height: '100%',

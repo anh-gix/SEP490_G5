@@ -23,7 +23,7 @@ const TeacherProgramList = () => {
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [filterValues, setFilterValues] = useState({});
-  const [stats, setStats] = useState({ total: 0, active: 0, draft: 0, archived: 0 });
+  const [stats, setStats] = useState({ total: 0, draft: 0, pending_approval: 0, approved: 0, needs_revision: 0 });
   const [requestStats, setRequestStats] = useState({ total: 0, pending: 0, in_progress: 0, completed: 0 });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -127,9 +127,10 @@ const TeacherProgramList = () => {
       const sourceData = activeTab === 'my-programs' ? myProgramsData : allProgramsData;
       const calculatedStats = {
         total: sourceData.length,
-        active: sourceData.filter(p => p.status === 'active').length,
         draft: sourceData.filter(p => p.status === 'draft').length,
-        archived: sourceData.filter(p => p.status === 'archived').length
+        pending_approval: sourceData.filter(p => p.status === 'pending_approval').length,
+        approved: sourceData.filter(p => p.status === 'approved').length,
+        needs_revision: sourceData.filter(p => p.status === 'needs_revision').length
       };
       setStats(calculatedStats);
 
@@ -158,7 +159,7 @@ const TeacherProgramList = () => {
       const requestsData = [...createRequests, ...editRequests].sort(
         (a, b) => new Date(b.requestedAt) - new Date(a.requestedAt)
       );
-
+      
       setWorkRequests(requestsData);
 
       // Calculate request stats
@@ -329,9 +330,10 @@ const TeacherProgramList = () => {
       const sourceData = activeTab === 'my-programs' ? myPrograms : programs;
       const calculatedStats = {
         total: sourceData.length,
-        active: sourceData.filter(p => p.status === 'active').length,
         draft: sourceData.filter(p => p.status === 'draft').length,
-        archived: sourceData.filter(p => p.status === 'archived').length
+        pending_approval: sourceData.filter(p => p.status === 'pending_approval').length,
+        approved: sourceData.filter(p => p.status === 'approved').length,
+        needs_revision: sourceData.filter(p => p.status === 'needs_revision').length
       };
       setStats(calculatedStats);
     }
@@ -342,9 +344,10 @@ const TeacherProgramList = () => {
       key: "status",
       label: "Trạng thái",
       options: [
-        { value: "active", label: "Đang hoạt động" },
         { value: "draft", label: "Bản nháp" },
-        { value: "archived", label: "Đã lưu trữ" },
+        { value: "pending_approval", label: "Chờ duyệt" },
+        { value: "approved", label: "Đã duyệt" },
+        { value: "needs_revision", label: "Cần chỉnh sửa" },
       ]
     },
     {
@@ -697,7 +700,7 @@ const TeacherProgramList = () => {
               onClick={() => handleTabChange('my-programs')}
             >
               <i className="ph ph-folder-user me-2"></i>
-              Chương trình phụ trách ({myPrograms.length})
+              Chương trình phụ trách 
             </button>
           </li>
           <li className="nav-item">
@@ -706,7 +709,7 @@ const TeacherProgramList = () => {
               onClick={() => handleTabChange('all-programs')}
             >
               <i className="ph ph-list me-2"></i>
-              Tất cả chương trình ({programs.length})
+              Tất cả chương trình
             </button>
           </li>
           <li className="nav-item">
@@ -715,7 +718,7 @@ const TeacherProgramList = () => {
               onClick={() => handleTabChange('work-requests')}
             >
               <i className="ph ph-clipboard-text me-2"></i>
-              Yêu cầu được giao ({workRequests.length})
+              Yêu cầu được giao
             </button>
           </li>
         </ul>
@@ -751,28 +754,34 @@ const TeacherProgramList = () => {
         </div>
       ) : (
         <div className="row g-4 mb-24">
-          <div className="col-md-3">
+          <div className="col-6 col-lg-3 col-xl">
             <Card variant="shadow">
               <h6 className="text-neutral-600 mb-8">Tổng Programs</h6>
               <h4 className="text-neutral-900 fw-bold mb-0">{stats.total}</h4>
             </Card>
           </div>
-          <div className="col-md-3">
-            <Card variant="shadow">
-              <h6 className="text-neutral-600 mb-8">Đang hoạt động</h6>
-              <h4 className="text-success-600 fw-bold mb-0">{stats.active}</h4>
-            </Card>
-          </div>
-          <div className="col-md-3">
+          <div className="col-6 col-lg-3 col-xl">
             <Card variant="shadow">
               <h6 className="text-neutral-600 mb-8">Bản nháp</h6>
               <h4 className="text-warning-600 fw-bold mb-0">{stats.draft}</h4>
             </Card>
           </div>
-          <div className="col-md-3">
+          <div className="col-6 col-lg-3 col-xl">
             <Card variant="shadow">
-              <h6 className="text-neutral-600 mb-8">Đã lưu trữ</h6>
-              <h4 className="text-neutral-600 fw-bold mb-0">{stats.archived}</h4>
+              <h6 className="text-neutral-600 mb-8">Chờ duyệt</h6>
+              <h4 className="text-info-600 fw-bold mb-0">{stats.pending_approval}</h4>
+            </Card>
+          </div>
+          <div className="col-6 col-lg-3 col-xl">
+            <Card variant="shadow">
+              <h6 className="text-neutral-600 mb-8">Đã duyệt</h6>
+              <h4 className="text-success-600 fw-bold mb-0">{stats.approved}</h4>
+            </Card>
+          </div>
+          <div className="col-6 col-lg-3 col-xl">
+            <Card variant="shadow">
+              <h6 className="text-neutral-600 mb-8">Cần chỉnh sửa</h6>
+              <h4 className="text-danger-600 fw-bold mb-0">{stats.needs_revision}</h4>
             </Card>
           </div>
         </div>

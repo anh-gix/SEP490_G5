@@ -101,12 +101,24 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
       return;
     }
 
-    if (!editingCLO) {
-      const isDuplicate = clos.some(clo => clo.code === cloForm.code);
-      if (isDuplicate) {
-        toast.error(`Mã CLO "${cloForm.code}" đã tồn tại!`);
-        return;
+    // Check duplicate CLO code (exclude current editing CLO)
+    const isDuplicate = clos.some(clo => {
+      // If editing, exclude the current CLO from duplicate check
+      if (editingCLO && clo._id === editingCLO._id) {
+        return false;
       }
+      return clo.code === cloForm.code;
+    });
+
+    if (isDuplicate) {
+      toast.error(`Mã CLO "${cloForm.code}" đã tồn tại trong khóa học này!`);
+      return;
+    }
+
+    // Validate CLO must be mapped to at least 1 PLO
+    if (!cloForm.mappedPLOs || cloForm.mappedPLOs.length === 0) {
+      toast.error('CLO phải được ánh xạ với ít nhất 1 PLO!');
+      return;
     }
 
     try {
@@ -339,11 +351,7 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
                       onChange={handleInputChange}
                       className="form-control"
                       placeholder="VD: CLO1"
-                      disabled={!!editingCLO}
                     />
-                    {editingCLO && (
-                      <small className="text-muted">Không thể thay đổi mã CLO</small>
-                    )}
                   </div>
                   <div className="col-md-9">
                     <label className="form-label fw-semibold">

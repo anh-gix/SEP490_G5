@@ -16,13 +16,16 @@ const CourseStep4Sessions = ({ courseData, onPrevious, navigate, basePath = '/ce
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingSessionData, setEditingSessionData] = useState(null);
   const [showIncompleteModal, setShowIncompleteModal] = useState(false);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   const fetchCourseSessions = useCallback(async () => {
     try {
       const response = await courseService.getCourseById(courseData._id);
       setSessions(response.data.sessions || []);
+      setInitialLoadDone(true);
     } catch (error) {
       console.error('Error loading sessions:', error);
+      setInitialLoadDone(true);
     }
   }, [courseData._id]);
 
@@ -42,14 +45,24 @@ const CourseStep4Sessions = ({ courseData, onPrevious, navigate, basePath = '/ce
     }
   }, [courseData._id, fetchCourseSessions, fetchCourseCLOs]);
 
-  // Check if should show auto-generate modal when entering step 4 for the first time
+  // Check if should show auto-generate modal when entering step 4
+  // Only show if no sessions exist yet (first time entering or sessions were deleted)
   useEffect(() => {
-    if (courseData._id && sessions.length === 0 && courseData.numberOfSessions > 0 && courseData.lastCompletedStep >= 3) {
-      // Only show modal if sessions array is empty and numberOfSessions is set
-      // and user has completed step 3 (meaning they went through basic info step)
+    // Only show modal if:
+    // 1. Course exists
+    // 2. Initial data fetch is complete
+    // 3. No sessions have been created yet (sessions.length === 0)
+    // 4. numberOfSessions is defined and > 0
+    const shouldShowModal =
+      courseData._id &&
+      initialLoadDone &&
+      sessions.length === 0 &&
+      courseData.numberOfSessions > 0;
+
+    if (shouldShowModal) {
       setShowAutoGenerateModal(true);
     }
-  }, [sessions.length, courseData.numberOfSessions, courseData.lastCompletedStep, courseData._id]);
+  }, [sessions.length, courseData.numberOfSessions, courseData._id, initialLoadDone]);
 
   const handleGenerateSessions = async () => {
     const maxSessions = courseData.numberOfSessions || 30;
@@ -359,7 +372,7 @@ const CourseStep4Sessions = ({ courseData, onPrevious, navigate, basePath = '/ce
               </div>
               <div className="modal-body">
                 <p>Chúng tôi phát hiện bạn chưa tạo buổi học nào cho học phần này.</p>
-                <p><strong>Học phần "{courseData.name}"</strong> có <strong>{courseData.numberOfSessions} buổi học</strong>.</p>
+                <p><strong>Khóa học "{courseData.name}"</strong> có <strong>{courseData.numberOfSessions} buổi học</strong>.</p>
                 <p>Bạn có muốn hệ thống tự động tạo <strong>{courseData.numberOfSessions} buổi học mẫu</strong> không?</p>
                 <div className="alert alert-info">
                   <small>
@@ -424,7 +437,7 @@ const CourseStep4Sessions = ({ courseData, onPrevious, navigate, basePath = '/ce
                 <div className="alert alert-info mt-3">
                   <small>
                     <i className="ph ph-info me-1"></i>
-                    Buổi được chọn sẽ có tên "Mock Test X" và loại "Mock Test". Bạn có thể chỉnh sửa chi tiết sau.
+                    Hãy chọn các buổi học là Mock Test. Bạn có thể chỉnh sửa chi tiết sau.
                   </small>
                 </div>
               </div>

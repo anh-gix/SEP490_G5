@@ -36,10 +36,20 @@ const TeacherCourseDetail = () => {
     try {
       setLoading(true);
       const response = await courseService.getCourseDetails(id);
-
+      console.log(response.data);
+      
       if (response.success) {
         setCourse(response.data);
         setError(null);
+        console.log(response.data);
+        
+        // Log program status, course isActive and course status
+        console.log('=== Course Status Debug ===');
+        console.log('Program Status:', response.data.program?.status);
+        console.log('Course isActive:', response.data.isActive);
+        console.log('Course Status:', response.data.status);
+        console.log('Can Edit:', (response.data.program?.status === 'draft' || response.data.program?.status === 'needs_revision') && !response.data.isActive && response.data.status !== 'active');
+        console.log('========================');
       } else {
         setError('Không tìm thấy giáo trình');
       }
@@ -126,8 +136,16 @@ const TeacherCourseDetail = () => {
     );
   }
 
-  // Điều kiện có thể edit: program đang draft/needs_revision VÀ course không active
-  const canEdit = (course.program?.status === 'draft' || course.program?.status === 'needs_revision') && !course.isActive;
+  // Điều kiện có thể edit: program đang draft/needs_revision VÀ course không active và status != active
+  const canEdit = (course.program?.status === 'draft' || course.program?.status === 'needs_revision') && !course.isActive && course.status !== 'active';
+
+  // Debug logging
+  console.log('=== Course Edit Conditions Debug ===');
+  console.log('Program Status:', course?.program?.status);
+  console.log('Course isActive:', course?.isActive);
+  console.log('Course Status:', course?.status);
+  console.log('Can Edit Result:', canEdit);
+  console.log('==================================');
 
   // Tab 1: General Information
   const generalInfoTab = (
@@ -152,7 +170,7 @@ const TeacherCourseDetail = () => {
           <div className="info-item mb-24">
             <label className="text-neutral-600 text-sm mb-8 d-block">Người tạo</label>
             <p className="text-neutral-900 mb-0">
-              {course.createdBy?.fullname || 'N/A'}
+              {course.createdBy?.username || 'N/A'}
               {course.createdBy?.email && (
                 <span className="text-neutral-600 text-sm d-block">
                   {course.createdBy.email}
@@ -257,7 +275,7 @@ const TeacherCourseDetail = () => {
                   {course.mocktestSessionOrders.map((order, index) => (
                     <Badge key={index} variant="warning" size="md">
                       <i className="ph ph-exam me-1"></i>
-                      Buổi {order}
+                      Buổi {order+1}
                     </Badge>
                   ))}
                 </div>
@@ -419,12 +437,15 @@ const TeacherCourseDetail = () => {
                   </td>
                   <td className="px-24 py-16" style={{ verticalAlign: 'top' }}>
                     {session.clos && session.clos.length > 0 ? (
-                      <div className="d-flex flex-wrap gap-1">
-                        {session.clos.map((clo, cloIndex) => (
-                          <Badge key={cloIndex} variant="success" size="sm">
-                            {typeof clo === 'object' ? clo.code : clo}
-                          </Badge>
-                        ))}
+                      <div className="d-flex flex-column gap-1">
+                        {session.clos.map((clo, cloIndex) => {
+                          const cloData = typeof clo === 'object' ? clo : course.clos?.find(c => c._id === clo || c.code === clo);
+                          return (
+                            <Badge key={cloIndex} variant="success" size="sm" title={cloData?.detail || ''}>
+                              {cloData?.code || clo}: {cloData?.name || ''}
+                            </Badge>
+                          );
+                        })}
                       </div>
                     ) : (
                       '-'
@@ -438,7 +459,7 @@ const TeacherCourseDetail = () => {
       ) : (
         <div className="text-center py-5 text-neutral-500">
           <i className="ph ph-book-open text-6xl mb-3 d-block"></i>
-          <p>Chưa có thông tin đề cương</p>
+          <p>Chưa có thông tin buổi học</p>
         </div>
       )}
     </div>
@@ -448,78 +469,39 @@ const TeacherCourseDetail = () => {
   const cloTab = (
     <div className="clo-mapping">
       <h5 className="mb-16 text-neutral-900 fw-bold">Course Learning Outcomes (CLO)</h5>
-      <p className="text-neutral-600 text-sm mb-24">Chuẩn đầu ra của học phần và ánh xạ với PLO</p>
+      <p className="text-neutral-600 text-sm mb-24">Chuẩn đầu ra của học phần</p>
 
       {course.clos && course.clos.length > 0 ? (
-        <>
-          {/* CLO Table */}
-          <div className="table-responsive mb-32">
-            <table className="table table-hover border border-neutral-40">
-              <thead className="bg-neutral-20">
-                <tr>
-                  <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '15%' }}>Mã CLO</th>
-                  <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '25%' }}>Tên CLO</th>
-                  <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '60%' }}>Chi tiết</th>
+        <div className="table-responsive">
+          <table className="table table-hover border border-neutral-40">
+            <thead className="bg-neutral-20">
+              <tr>
+                <th className="px-24 py-16 text-neutral-700 fw-semibold text-center" style={{ width: '8%' }}>#</th>
+                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '15%' }}>Mã CLO</th>
+                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '25%' }}>Tên CLO</th>
+                <th className="px-24 py-16 text-neutral-700 fw-semibold" style={{ width: '52%' }}>Mô tả</th>
+              </tr>
+            </thead>
+            <tbody>
+              {course.clos.map((clo, index) => (
+                <tr key={clo._id}>
+                  <td className="px-24 py-16 text-center" style={{ verticalAlign: 'top' }}>
+                    <span className="fw-semibold text-neutral-900">{index + 1}</span>
+                  </td>
+                  <td className="px-24 py-16" style={{ verticalAlign: 'top' }}>
+                    <span className="fw-semibold text-neutral-900">{clo.code}</span>
+                  </td>
+                  <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top' }}>
+                    {clo.name || '-'}
+                  </td>
+                  <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top', whiteSpace: 'pre-wrap' }}>
+                    {clo.detail || '-'}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {course.clos.map((clo) => (
-                  <tr key={clo._id}>
-                    <td className="px-24 py-16" style={{ verticalAlign: 'top' }}>
-                      <span className="fw-semibold text-neutral-900">{clo.code}</span>
-                    </td>
-                    <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top' }}>
-                      {clo.name || '-'}
-                    </td>
-                    <td className="px-24 py-16 text-neutral-700" style={{ verticalAlign: 'top', whiteSpace: 'pre-wrap' }}>
-                      {clo.detail || '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* CLO-PLO Mapping Matrix */}
-          <h5 className="mb-16 text-neutral-900 fw-bold">Ma trận CLO-PLO</h5>
-          <div className="table-responsive">
-            <table className="table table-bordered border border-neutral-40">
-              <thead className="bg-neutral-20">
-                <tr>
-                  <th className="px-24 py-16 text-neutral-700 fw-semibold">CLO / PLO</th>
-                  {course.program?.plos && course.program.plos.map((plo) => (
-                    <th key={plo._id} className="px-24 py-16 text-neutral-700 fw-semibold text-center">
-                      {plo.code}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {course.clos.map((clo) => (
-                  <tr key={clo._id}>
-                    <td className="px-24 py-16 fw-semibold text-neutral-900">
-                      {clo.code}
-                    </td>
-                    {course.program?.plos && course.program.plos.map((plo) => {
-                      const isMapped = clo.mappedPLOs && clo.mappedPLOs.some(
-                        mappedPlo => (typeof mappedPlo === 'object' ? mappedPlo._id : mappedPlo) === plo._id
-                      );
-                      return (
-                        <td key={plo._id} className="px-24 py-16 text-center">
-                          {isMapped ? (
-                            <i className="ph ph-check-circle text-success-600" style={{ fontSize: '20px' }}></i>
-                          ) : (
-                            <span className="text-neutral-300">-</span>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="text-center py-5 text-neutral-500">
           <i className="ph ph-target text-6xl mb-3 d-block"></i>
@@ -531,7 +513,7 @@ const TeacherCourseDetail = () => {
 
   const tabs = [
     { label: 'Thông tin chung', icon: 'ph ph-info', content: generalInfoTab },
-    { label: 'Đề cương', icon: 'ph ph-book-open', content: syllabusTab },
+    { label: 'Buổi học', icon: 'ph ph-book-open', content: syllabusTab },
     { label: 'CLO/PLO', icon: 'ph ph-target', content: cloTab },
   ];
 

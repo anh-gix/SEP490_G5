@@ -40,6 +40,9 @@ const TeacherProgramDetail = () => {
   const [showSubmitEditModal, setShowSubmitEditModal] = useState(false);
   const [submitEditNote, setSubmitEditNote] = useState('');
 
+  // Rejection info state (for needs_revision status)
+  const [rejectionInfo, setRejectionInfo] = useState(null);
+
   // Get current user
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -80,6 +83,13 @@ const TeacherProgramDetail = () => {
         } else {
           console.log('Program is not approved, skipping edit request fetch');
         }
+
+        // Fetch rejection info if program needs revision
+        if (programData.status === 'needs_revision') {
+          await fetchRejectionInfo();
+        } else {
+          setRejectionInfo(null);
+        }
       }
 
     } catch (err) {
@@ -90,13 +100,27 @@ const TeacherProgramDetail = () => {
     }
   };
 
+  // Fetch rejection info for needs_revision program
+  const fetchRejectionInfo = async () => {
+    try {
+      const response = await workRequestService.getProgramRejectionInfo(id);
+      if (response.success && response.hasRejection) {
+        setRejectionInfo(response.data);
+      } else {
+        setRejectionInfo(null);
+      }
+    } catch (error) {
+      console.error('Error fetching rejection info:', error);
+      setRejectionInfo(null);
+    }
+  };
+
   // Fetch edit_program work request for this program
   const fetchEditProgramRequest = async (currentCourses) => {
     try {
       const response = await workRequestService.checkProgramEditStatus(id);
-      console.log('Edit program status response:', response);
-      console.log('Current user:', user);
-      console.log('User _id:', user._id);
+      console.log(response);
+      
 
       // API returns hasActiveEditRequest and activeRequest (not hasActiveRequest and request)
       if (response.success && response.hasActiveEditRequest) {
@@ -512,6 +536,35 @@ const TeacherProgramDetail = () => {
         </div>
       )}
 
+      {/* Program Needs Revision Alert - Show rejection reason */}
+      {program.status === 'needs_revision' && rejectionInfo && (
+        <div className="alert alert-danger mb-24" role="alert" style={{ borderLeft: '4px solid #dc2626' }}>
+          <div className="d-flex align-items-start">
+            <i className="ph ph-warning-circle" style={{ fontSize: '24px', marginRight: '12px', color: '#dc2626' }}></i>
+            <div className="flex-grow-1">
+              <h6 className="mb-2 fw-bold">Chương trình cần chỉnh sửa</h6>
+              <p className="mb-2">
+                Center Head đã yêu cầu chỉnh sửa chương trình này. Vui lòng xem lý do bên dưới và thực hiện các thay đổi cần thiết.
+              </p>
+              <div className="bg-white p-3 rounded border" style={{ borderColor: '#fecaca' }}>
+                <p className="mb-1 fw-semibold text-danger-700">
+                  Lý do từ chối:
+                </p>
+                <p className="mb-0 text-neutral-800" style={{ whiteSpace: 'pre-wrap' }}>
+                  {rejectionInfo.rejectionReason}
+                </p>
+              </div>
+              {rejectionInfo.rejectedBy && (
+                <p className="mb-0 mt-2 text-sm text-muted">
+                  Từ chối bởi: {rejectionInfo.rejectedBy.username || rejectionInfo.rejectedBy.email}
+                  {rejectionInfo.rejectedAt && ` - ${formatDate(rejectionInfo.rejectedAt)}`}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit Program Request Alert */}
       {editProgramRequest && (
         <div
@@ -634,7 +687,7 @@ const TeacherProgramDetail = () => {
       <Card variant="shadow">
         <div className="d-flex justify-content-between align-items-center mb-20">
           <div>
-            <h5 className="mb-4 text-neutral-900 fw-bold">Danh sách Khóa học ({filteredCourses.length}/{courses.length})</h5>
+            <h5 className="mb-4 text-neutral-900 fw-bold">Danh sách Khóa học</h5>
             <p className="text-neutral-600 mb-0 text-sm">
               Các khóa học thuộc chương trình này
             </p>

@@ -213,7 +213,7 @@ const CenterHeadCourseDetail = () => {
                   {course.mocktestSessionOrders.map((order, index) => (
                     <Badge key={index} variant="warning" size="md">
                       <i className="ph ph-exam me-1"></i>
-                      Buổi {order}
+                      Buổi {order+1}
                     </Badge>
                   ))}
                 </div>

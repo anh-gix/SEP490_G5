@@ -65,8 +65,8 @@ exports.getCourseById = async (req, res) => {
     try {
         const course = await Course.findById(req.params.id)
             // Cần type để FE biết đây có phải course CAM không
-            .populate('program', 'program_name code type level')
-            .populate('createdBy', 'fullname email')
+            .populate('program', 'program_name code type level status')
+            .populate('createdBy', 'fullname email username')
             // Sessions thường
             .populate({
                 path: 'sessions',

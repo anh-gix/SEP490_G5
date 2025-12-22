@@ -378,13 +378,7 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
         <div className="container-fluid">
           <div className="d-flex align-items-center justify-content-between mb-12">
             <div className="d-flex align-items-center gap-3">
-              <Button
-                variant="ghost"
-                onClick={() => safeToast.success('Toast test thành công! 🎉')}
-                icon="ph ph-bell"
-                className="text-neutral-600 hover:text-neutral-900"
-                title="Test Toast"
-              />
+              
               <Button
                 variant="ghost"
                 onClick={handleExit}

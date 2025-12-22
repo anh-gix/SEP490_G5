@@ -299,10 +299,12 @@ exports.getClassById = async (req, res) => {
         
         // Calculate attendance percentage
         let attendanceRate = 0;
+        let attendanceCount = 0;
         if (studentSchedules.length > 0) {
           const presentCount = studentSchedules.filter(
             s => s.attendance && s.attendance.status === 'present'
           ).length;
+          attendanceCount = presentCount;
           attendanceRate = Math.round((presentCount / studentSchedules.length) * 100);
         }
         
@@ -331,6 +333,7 @@ exports.getClassById = async (req, res) => {
           email: student.email,
           phone: student.phone,
           attendance: attendanceRate,
+          attendanceCount: attendanceCount,
           homeworkCompletionRate: homeworkCompletionRate,
           submittedAssignments: submittedCount,
           totalAssignments: totalAssignments

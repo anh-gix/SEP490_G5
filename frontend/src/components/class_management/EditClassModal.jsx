@@ -3120,10 +3120,14 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         const response = await courseService.getAllCourses();
 
         if (response && response.success && response.data) {
-          // Filter to only show courses with status 'completed' or 'active' and isActive = true
+          // Filter to only show courses with status 'completed' or 'active'
+          // Filter out courses explicitly marked as inactive (isActive = false)
+          // Accept courses with isActive = true or undefined (not set yet)
           // But include current course even if not completed/active or not active (to preserve existing data)
           const validCourses = response.data.filter(course =>
-            (course.status === 'completed' || course.status === 'active') && course.isActive === true
+            (course.status === 'completed' || course.status === 'active') && 
+            course.isActive !== false &&
+            course.program?.isActive !== false
           );
           
           // If current class has a course, check if it's in the valid list
@@ -3133,7 +3137,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
             const currentCourse = response.data.find(c =>
               String(c._id) === String(formData.course) || String(c.id) === String(formData.course)
             );
-            if (currentCourse && ((currentCourse.status !== 'completed' && currentCourse.status !== 'active') || currentCourse.isActive !== true)) {
+            if (currentCourse && ((currentCourse.status !== 'completed' && currentCourse.status !== 'active') || currentCourse.isActive === false || currentCourse.program?.isActive === false)) {
               // Add current course even if not completed/active or not active
               coursesToUse.push(currentCourse);
             }

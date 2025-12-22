@@ -577,8 +577,12 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
 
         if (response && response.success && response.data) {
           // Filter to only show courses with status 'completed' or 'active'
+          // Filter out courses explicitly marked as inactive (isActive = false)
+          // Accept courses with isActive = true or undefined (not set yet)
           const validCourses = response.data.filter(course => 
-            course.status === 'completed' || course.status === 'active'
+            (course.status === 'completed' || course.status === 'active') &&
+            course.isActive !== false &&
+            course.program?.isActive !== false
           );
           setAllCourses(validCourses);
           setCourses(validCourses); // Initially show only completed/active courses

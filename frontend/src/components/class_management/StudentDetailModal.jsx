@@ -116,7 +116,15 @@ const StudentDetailModal = ({
       // Load all courses
       const coursesResponse = await courseService.getAllCourses();
       const allCoursesList = coursesResponse?.data || coursesResponse || [];
-      setAllCourses(allCoursesList);
+      
+      // Filter out courses explicitly marked as inactive (isActive = false)
+      // Accept courses with isActive = true or undefined (not set yet)
+      const activeCourses = allCoursesList.filter(course =>
+        course.isActive !== false && 
+        course.program?.isActive !== false
+      );
+      
+      setAllCourses(activeCourses);
 
       // Set currently enrolled courses as selected
       const currentCourseIds = selectedStudent?.courses?.map(course => {

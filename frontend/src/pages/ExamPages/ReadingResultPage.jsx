@@ -78,7 +78,12 @@ const ReadingResultPage = () => {
     if (!examData || !examData.sections) return result?.maxScore || 0;
     const readingSections = examData.sections.filter(s => s.type === "reading");
     return readingSections.reduce((sum, section) => {
-      return sum + (section.maxScore || 0);
+      // Tính tổng điểm từ các câu hỏi trong answerKey
+      if (!section.answerKey || section.answerKey.length === 0) return sum;
+      const sectionMaxScore = section.answerKey.reduce((sectionSum, question) => {
+        return sectionSum + (question.maxScore || 0);
+      }, 0);
+      return sum + sectionMaxScore;
     }, 0);
   };
 
@@ -253,8 +258,7 @@ const ReadingResultPage = () => {
 
   // Initialize selected band score when result changes
   useEffect(() => {
-    const totalMaxScore = getTotalMaxScore();
-    if (result && totalMaxScore > 0) {
+    if (result) {
       const bandScore = getBandScore();
       if (bandScore !== null) {
         setSelectedBandScore(bandScore);
@@ -342,7 +346,7 @@ const ReadingResultPage = () => {
               </div>
 
               {/* Band Score Section */}
-              {getTotalMaxScore() > 0 && (() => {
+              {(() => {
                 const currentBandScore = getBandScore();
                 const bandScores = [9, 8.5, 8, 7.5, 7, 6.5, 6, 5.5, 5, 4.5, 4, 3.5, 3];
                 const displayBandScore = selectedBandScore !== null ? selectedBandScore : currentBandScore;

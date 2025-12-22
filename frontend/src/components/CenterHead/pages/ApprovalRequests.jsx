@@ -12,7 +12,7 @@ import userService from '../../../services/userService';
 
 const ApprovalRequests = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('top_down'); // Only 'top_down' - Công việc đã giao
+  const [activeTab] = useState('top_down'); // Only 'top_down' - Công việc đã giao
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,6 +34,9 @@ const ApprovalRequests = () => {
   const [showRevokeModal, setShowRevokeModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+
+  // Modal transition state
+  const [pendingModal, setPendingModal] = useState(null); // 'approve', 'reject', 'cancel', 'revoke', null
   const [createRequestType, setCreateRequestType] = useState('create_program'); // 'create_program' | 'create_exam'
   const [approveNote, setApproveNote] = useState('');
   const [rejectReason, setRejectReason] = useState('');
@@ -62,9 +65,62 @@ const ApprovalRequests = () => {
     fetchRequests();
   }, [activeTab, statusFilter, currentPage, itemsPerPage]);
 
+  // Calculate stats from current requests list
+  const calculateStatsFromRequests = (requestsList) => {
+    const statsCount = {
+      pending: 0,
+      in_progress: 0,
+      pending_approval: 0,
+      completed: 0
+    };
+
+    requestsList.forEach(request => {
+      if (statsCount[request.status] !== undefined) {
+        statsCount[request.status]++;
+      }
+    });
+
+    setStats({
+      pendingApprovals: 0, // Not used for center head view
+      approved: 0, // Not used for center head view
+      rejected: 0, // Not used for center head view
+      pendingTasks: statsCount.pending,
+      inProgressTasks: statsCount.in_progress,
+      pendingApprovalTasks: statsCount.pending_approval,
+      completedTasks: statsCount.completed
+    });
+  };
+
+  // Handle modal transitions
   useEffect(() => {
-    fetchStats();
-  }, []);
+    if (pendingModal) {
+      // Close detail modal first
+      setShowDetailModal(false);
+
+      // Use a timeout to ensure the detail modal is fully closed before opening the new modal
+      const timer = setTimeout(() => {
+        switch (pendingModal) {
+          case 'approve':
+            setShowApproveModal(true);
+            break;
+          case 'reject':
+            setShowRejectModal(true);
+            break;
+          case 'cancel':
+            setShowCancelModal(true);
+            break;
+          case 'revoke':
+            setShowRevokeModal(true);
+            break;
+          default:
+            break;
+        }
+        setPendingModal(null);
+      }, 200);
+
+      return () => clearTimeout(timer);
+    }
+  }, [pendingModal]);
 
   // Fetch assignees based on request type
   const fetchAssignees = async (requestType) => {
@@ -117,6 +173,26 @@ const ApprovalRequests = () => {
           setTotalItems(response.pagination.total);
           setTotalPages(response.pagination.totalPages);
         }
+
+        // Calculate stats from all requests (fetch without pagination for accurate stats)
+        const allRequestsParams = {
+          direction: activeTab,
+          limit: 1000 // Large limit to get all records for stats calculation
+        };
+        if (statusFilter && statusFilter !== 'all') {
+          allRequestsParams.status = statusFilter;
+        }
+
+        try {
+          const allRequestsResponse = await workRequestService.getAllRequests(allRequestsParams);
+          if (allRequestsResponse.success) {
+            calculateStatsFromRequests(allRequestsResponse.data);
+          }
+        } catch (statsError) {
+          console.error('Error fetching stats:', statsError);
+          // Fallback to current page stats if all requests fetch fails
+          calculateStatsFromRequests(response.data);
+        }
       }
     } catch (error) {
       console.error('Error fetching requests:', error);
@@ -125,33 +201,6 @@ const ApprovalRequests = () => {
     }
   };
 
-  const fetchStats = async () => {
-    try {
-      const response = await workRequestService.getStats();
-      if (response.success) {
-        const data = response.data;
-
-        // Bottom-up stats
-        const bottomUpStats = data.byDirection?.bottom_up || {};
-        // Top-down stats
-        const topDownStats = data.byDirection?.top_down || {};
-
-        setStats({
-          // Bottom-up
-          pendingApprovals: bottomUpStats.pending || 0,
-          approved: bottomUpStats.approved || 0,
-          rejected: bottomUpStats.rejected || 0,
-          // Top-down
-          pendingTasks: topDownStats.pending || 0,
-          inProgressTasks: topDownStats.in_progress || 0,
-          pendingApprovalTasks: topDownStats.pending_approval || 0,
-          completedTasks: topDownStats.completed || 0
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  };
 
   const handleViewDetail = (request) => {
     setSelectedRequest(request);
@@ -174,7 +223,6 @@ const ApprovalRequests = () => {
         setApproveNote('');
         setSelectedRequest(null);
         fetchRequests();
-        fetchStats();
       }
     } catch (error) {
       console.error('Error approving request:', error);
@@ -205,7 +253,6 @@ const ApprovalRequests = () => {
         setReviewNote('');
         setSelectedRequest(null);
         fetchRequests();
-        fetchStats();
       }
     } catch (error) {
       console.error('Error rejecting request:', error);
@@ -234,7 +281,6 @@ const ApprovalRequests = () => {
         setRevokeReason('');
         setSelectedRequest(null);
         fetchRequests();
-        fetchStats();
       }
     } catch (error) {
       console.error('Error revoking approval:', error);
@@ -267,7 +313,6 @@ const ApprovalRequests = () => {
         setDeleteLinkedEntity(false);
         setSelectedRequest(null);
         fetchRequests();
-        fetchStats();
       }
     } catch (error) {
       console.error('Error canceling request:', error);
@@ -335,7 +380,6 @@ const ApprovalRequests = () => {
         });
         setShowCreateModal(false);
         fetchRequests();
-        fetchStats();
       }
     } catch (error) {
       console.error('Error creating work request:', error);
@@ -392,6 +436,7 @@ const ApprovalRequests = () => {
       program: 'Chương trình',
       exam: 'Đề thi',
       create_program: 'Tạo chương trình',
+      edit_program: 'Chỉnh sửa chương trình',
       edit_course: 'Chỉnh sửa khóa học',
       create_exam: 'Tạo đề thi',
       assign_students: 'Sắp xếp học viên'
@@ -498,7 +543,7 @@ const ApprovalRequests = () => {
       {/* Stats Cards Section */}
       <div className="row g-4 mb-5">
           <div className="col-md-3">
-            <Card>
+            <Card variant="shadow">
               <div className="p-4">
                 <div className="d-flex align-items-center justify-content-between">
                   <div>
@@ -513,7 +558,7 @@ const ApprovalRequests = () => {
             </Card>
           </div>
           <div className="col-md-3">
-            <Card>
+            <Card variant="shadow">
               <div className="p-4">
                 <div className="d-flex align-items-center justify-content-between">
                   <div>
@@ -528,7 +573,7 @@ const ApprovalRequests = () => {
             </Card>
           </div>
           <div className="col-md-3">
-            <Card>
+            <Card variant="shadow">
               <div className="p-4">
                 <div className="d-flex align-items-center justify-content-between">
                   <div>
@@ -543,7 +588,7 @@ const ApprovalRequests = () => {
             </Card>
           </div>
           <div className="col-md-3">
-            <Card>
+            <Card variant="shadow">
               <div className="p-4">
                 <div className="d-flex align-items-center justify-content-between">
                   <div>
@@ -560,7 +605,7 @@ const ApprovalRequests = () => {
         </div>
 
       {/* Filters Section */}
-      <Card className="mb-4">
+      <Card variant="shadow" className="mb-4">
         <div className="p-3">
           {/* Basic Filters */}
           <div className="row g-3">
@@ -600,7 +645,7 @@ const ApprovalRequests = () => {
       </Card>
 
       {/* Requests Table Section */}
-      <Card className="mb-4">
+      <Card variant="shadow" className="mb-4">
         <div className="p-3 border-bottom bg-light">
           <div className="d-flex justify-content-between align-items-center">
             <div>
@@ -679,7 +724,7 @@ const ApprovalRequests = () => {
 
       {/* Pagination Section */}
       {totalPages > 1 && (
-        <Card>
+        <Card variant="shadow">
           <div className="p-3">
             <div className="d-flex justify-content-between align-items-center">
               <div className="text-muted small">
@@ -761,16 +806,22 @@ const ApprovalRequests = () => {
 
       {/* Detail Modal */}
       {showDetailModal && selectedRequest && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
           <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div className="modal-content">
               {/* Modal Header */}
-              <div className="modal-header border-bottom">
-                <div>
-                  <h5 className="modal-title fw-bold mb-1">Chi tiết yêu cầu</h5>
-                  <p className="text-muted small mb-0">
-                    {selectedRequest.entityId?.program_name || selectedRequest.entityId?.name || selectedRequest.entityId?.title || 'N/A'}
-                  </p>
+              <div className="modal-header border-bottom bg-light">
+                <div className="d-flex align-items-center gap-3">
+                  <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center"
+                       style={{ width: '48px', height: '48px' }}>
+                    <i className="ph ph-clipboard-text text-primary fs-4"></i>
+                  </div>
+                  <div>
+                    <h5 className="modal-title fw-bold mb-1">Chi tiết yêu cầu công việc</h5>
+                    <p className="text-muted small mb-0">
+                      {selectedRequest.entityId?.program_name || selectedRequest.entityId?.name || selectedRequest.entityId?.title || 'Chưa có thông tin'}
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -784,189 +835,311 @@ const ApprovalRequests = () => {
 
               {/* Modal Body */}
               <div className="modal-body">
-                {/* Direction Badge */}
-                <div className="mb-3">
-                  <span className={`badge ${selectedRequest.direction === 'bottom_up' ? 'bg-info' : 'bg-purple'} text-white px-3 py-2`}>
-                    <i className={`ph ${selectedRequest.direction === 'bottom_up' ? 'ph-arrow-circle-up' : 'ph-arrow-circle-down'} me-2`}></i>
-                    {selectedRequest.direction === 'bottom_up' ? 'Yêu cầu phê duyệt' : 'Công việc được giao'}
-                  </span>
-                </div>
+                <div className="row g-4">
+                  {/* Request Type Card */}
+                  <div className="col-12">
+                    <div className="card bg-light border-0">
+                      <div className="card-body py-3">
+                        <div className="d-flex align-items-center justify-content-between">
+                          <div className="d-flex align-items-center gap-3">
+                            <i className="ph ph-clipboard-text text-primary fs-4"></i>
+                            <div>
+                              <small className="text-muted d-block">Loại yêu cầu</small>
+                              <span className="fw-semibold">{getRequestTypeName(selectedRequest.requestType)}</span>
+                            </div>
+                          </div>
+                          <span className={`badge ${selectedRequest.direction === 'bottom_up' ? 'bg-info' : 'bg-purple'} text-white px-3 py-2`}>
+                            <i className={`ph ${selectedRequest.direction === 'bottom_up' ? 'ph-arrow-circle-up' : 'ph-arrow-circle-down'} me-2`}></i>
+                            {selectedRequest.direction === 'bottom_up' ? 'Yêu cầu phê duyệt' : 'Công việc được giao'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-                {/* Status and Type */}
-                <div className="row g-3 mb-4 pb-4 border-bottom">
-                  <div className="col-6">
-                    <label className="form-label text-muted small text-uppercase fw-semibold">Trạng thái</label>
+                  {/* Status and Date */}
+                  <div className="col-md-6">
+                    <label className="form-label text-muted small mb-2">Trạng thái</label>
                     <div>{getStatusBadge(selectedRequest.status)}</div>
                   </div>
-                  <div className="col-6">
-                    <label className="form-label text-muted small text-uppercase fw-semibold">Loại</label>
-                    <p className="mb-0 fw-medium">{getRequestTypeName(selectedRequest.requestType)}</p>
+                  <div className="col-md-6">
+                    <label className="form-label text-muted small mb-2">Ngày giao việc</label>
+                    <div className="d-flex align-items-center gap-2">
+                      <i className="ph ph-calendar text-muted"></i>
+                      <span>{formatDate(selectedRequest.requestedAt)}</span>
+                    </div>
                   </div>
-                </div>
 
-                {/* Entity Info */}
-                {selectedRequest.entityId && (
-                  <div className="mb-4 pb-4 border-bottom">
-                    <h6 className="fw-semibold mb-3">
-                      <i className="ph ph-info me-2"></i>
-                      Thông tin {selectedRequest.entityType}
-                    </h6>
-                    <div className="row g-3">
-                      <div className="col-6">
-                        <label className="form-label text-muted small text-uppercase">Tên</label>
-                        <p className="mb-0">{selectedRequest.entityId?.program_name || selectedRequest.entityId?.name || selectedRequest.entityId?.title}</p>
+                  {/* Người giao việc */}
+                  <div className="col-12">
+                    <label className="form-label text-muted small mb-2">Người giao việc (Center Head)</label>
+                    <div className="card border">
+                      <div className="card-body py-2">
+                        <div className="d-flex align-items-center gap-3">
+                          <div className="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center"
+                               style={{ width: '40px', height: '40px' }}>
+                            <i className="ph ph-user text-primary fs-5"></i>
+                          </div>
+                          <div>
+                            <div className="fw-semibold">
+                              {selectedRequest.requestedBy?.username || selectedRequest.requestedBy?.name || 'N/A'}
+                            </div>
+                            <div className="text-sm text-muted">
+                              {selectedRequest.requestedBy?.email || ''}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="col-6">
-                        <label className="form-label text-muted small text-uppercase">Mã</label>
-                        <p className="mb-0">{selectedRequest.entityId?.code || 'N/A'}</p>
-                      </div>
-                    </div>
-                    <div className="mt-3">
-                      <button
-                        className="btn btn-link p-0 text-decoration-none"
-                        onClick={handleViewEntityDetail}
-                      >
-                        <i className="ph ph-arrow-square-out me-2"></i>
-                        Xem chi tiết
-                      </button>
                     </div>
                   </div>
-                )}
 
-                {/* Request Info */}
-                <div className="mb-4 pb-4 border-bottom">
-                  <h6 className="fw-semibold mb-3">
-                    <i className="ph ph-user me-2"></i>
-                    Thông tin yêu cầu
-                  </h6>
-                  <div className="row g-3">
-                    <div className="col-6">
-                      <label className="form-label text-muted small text-uppercase">Người tạo</label>
-                      <p className="mb-0 fw-medium">{selectedRequest.requestedBy?.username || selectedRequest.requestedBy?.name}</p>
-                      <small className="text-muted">{selectedRequest.requestedBy?.email}</small>
-                    </div>
-                    {selectedRequest.direction === 'top_down' && selectedRequest.assignedTo && (
-                      <div className="col-6">
-                        <label className="form-label text-muted small text-uppercase">Người được giao</label>
-                        <p className="mb-0 fw-medium">{selectedRequest.assignedTo?.username || selectedRequest.assignedTo?.name}</p>
-                        <small className="text-muted">{selectedRequest.assignedTo?.email}</small>
+                  {/* Người được giao */}
+                  {selectedRequest.direction === 'top_down' && selectedRequest.assignedTo && (
+                    <div className="col-12">
+                      <label className="form-label text-muted small mb-2">Người được giao (Subject Leader)</label>
+                      <div className="card border border-success">
+                        <div className="card-body py-2">
+                          <div className="d-flex align-items-center gap-3">
+                            <div className="bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center"
+                                 style={{ width: '40px', height: '40px' }}>
+                              <i className="ph ph-user-check text-success fs-5"></i>
+                            </div>
+                            <div>
+                              <div className="fw-semibold">
+                                {selectedRequest.assignedTo?.username || selectedRequest.assignedTo?.name || 'N/A'}
+                              </div>
+                              <div className="text-sm text-muted">
+                                {selectedRequest.assignedTo?.email || ''}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                    <div className="col-6">
-                      <label className="form-label text-muted small text-uppercase">Ngày tạo</label>
-                      <p className="mb-0">{formatDate(selectedRequest.requestedAt)}</p>
+                    </div>
+                  )}
+
+                  {/* Entity Info */}
+                  {selectedRequest.entityId && (
+                    <div className="col-12">
+                      <label className="form-label text-muted small mb-2">
+                        <i className="ph ph-info me-1"></i>
+                        Thông tin {selectedRequest.entityType}
+                      </label>
+                      <div className="card border border-info">
+                        <div className="card-body">
+                          <div className="row g-3">
+                            <div className="col-md-8">
+                              <small className="text-muted d-block">Tên</small>
+                              <span className="fw-semibold">{selectedRequest.entityId?.program_name || selectedRequest.entityId?.name || selectedRequest.entityId?.title}</span>
+                            </div>
+                            <div className="col-md-4">
+                              <small className="text-muted d-block">Mã</small>
+                              <span className="fw-medium">{selectedRequest.entityId?.code || 'N/A'}</span>
+                            </div>
+                          </div>
+                          <div className="mt-3">
+                            <button
+                              className="btn btn-sm btn-outline-info"
+                              onClick={handleViewEntityDetail}
+                            >
+                              <i className="ph ph-arrow-square-out me-2"></i>
+                              Xem chi tiết
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Ghi chú yêu cầu */}
+                  <div className="col-12">
+                    <label className="form-label text-muted small mb-2">
+                      <i className="ph ph-note me-1"></i>
+                      Ghi chú yêu cầu
+                    </label>
+                    <div className="card border bg-light">
+                      <div className="card-body">
+                        <p className="mb-0" style={{ whiteSpace: 'pre-wrap' }}>
+                          {selectedRequest.requestNote || 'Không có ghi chú'}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  {selectedRequest.requestNote && (
-                    <div className="mt-3">
-                      <label className="form-label text-muted small text-uppercase">Ghi chú</label>
-                      <div className="p-3 bg-light rounded border">
-                        {selectedRequest.requestNote}
+
+                  {/* Response Info (if processed) */}
+                  {selectedRequest.processedBy && (
+                    <div className="col-12">
+                      <label className="form-label text-muted small mb-2">
+                        <i className="ph ph-check-square me-1"></i>
+                        Thông tin xử lý
+                      </label>
+                      <div className="card border">
+                        <div className="card-body">
+                          <div className="row g-3 mb-3">
+                            <div className="col-md-6">
+                              <small className="text-muted d-block">Người xử lý</small>
+                              <span className="fw-semibold">{selectedRequest.processedBy?.username || selectedRequest.processedBy?.name}</span>
+                              <small className="text-muted d-block">{selectedRequest.processedBy?.email}</small>
+                            </div>
+                            <div className="col-md-6">
+                              <small className="text-muted d-block">Ngày xử lý</small>
+                              <span>{formatDate(selectedRequest.processedAt)}</span>
+                            </div>
+                          </div>
+                          {selectedRequest.responseNote && (
+                            <div className="p-3  bg-opacity-10">
+                              <small className="text ">Phản hồi</small>
+                              <p className="mb-0">{selectedRequest.responseNote}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rejection Reason */}
+                  {selectedRequest.rejectionReason && (
+                    <div className="col-12">
+                      <label className="form-label text-danger small mb-2">
+                        <i className="ph ph-warning-circle me-1"></i>
+                        Lý do từ chối
+                      </label>
+                      <div className="card border border-danger bg-danger bg-opacity-10">
+                        <div className="card-body">
+                          <p className="mb-0" style={{ whiteSpace: 'pre-wrap' }}>
+                            {selectedRequest.rejectionReason}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Revocation Info (if revoked) */}
+                  {selectedRequest.revocation?.revokedBy && (
+                    <div className="col-12">
+                      <label className="form-label text-warning small mb-2">
+                        <i className="ph ph-arrow-counter-clockwise me-1"></i>
+                        Thông tin thu hồi phê duyệt
+                      </label>
+                      <div className="card border border-warning bg-warning bg-opacity-10">
+                        <div className="card-body">
+                          <div className="row g-3 mb-3">
+                            <div className="col-md-6">
+                              <small className="text-muted d-block">Người thu hồi</small>
+                              <span className="fw-semibold">{selectedRequest.revocation.revokedBy?.username || selectedRequest.revocation.revokedBy?.name || 'N/A'}</span>
+                            </div>
+                            <div className="col-md-6">
+                              <small className="text-muted d-block">Ngày thu hồi</small>
+                              <span>{formatDate(selectedRequest.revocation.revokedAt)}</span>
+                            </div>
+                          </div>
+                          {selectedRequest.revocation.revocationReason && (
+                            <div className="p-3 bg-white rounded border border-warning">
+                              <small className="text-warning fw-semibold d-block mb-1">Lý do thu hồi</small>
+                              <p className="mb-0">{selectedRequest.revocation.revocationReason}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* History */}
+                  {selectedRequest.history && selectedRequest.history.length > 0 && (
+                    <div className="col-12">
+                      <label className="form-label text-muted small mb-2">
+                        <i className="ph ph-clock-counter-clockwise me-1"></i>
+                        Lịch sử
+                      </label>
+                      <div className="card border">
+                        <div className="card-body">
+                          <div className="timeline">
+                            {selectedRequest.history.slice().reverse().map((entry, idx) => {
+                              // Map action to icon
+                              const actionIcons = {
+                                created: 'plus-circle',
+                                assigned: 'user-plus',
+                                in_progress: 'play',
+                                pending_approval: 'hourglass',
+                                completed: 'check-circle',
+                                completed_and_submitted: 'paper-plane-tilt',
+                                approved: 'check-circle',
+                                rejected: 'x-circle',
+                                need_revision: 'arrow-counter-clockwise',
+                                revoked: 'arrow-u-up-left',
+                                submitted: 'paper-plane-tilt',
+                                withdrawn: 'arrow-bend-up-left',
+                                entity_recreated: 'plus-circle'
+                              };
+
+                              // Map action to label
+                              const actionLabels = {
+                                created: 'Tạo yêu cầu',
+                                assigned: 'Được giao việc',
+                                in_progress: 'Bắt đầu xử lý',
+                                pending_approval: 'Chờ phê duyệt',
+                                completed: 'Hoàn thành',
+                                completed_and_submitted: 'Hoàn thành và nộp duyệt',
+                                approved: 'Đã phê duyệt',
+                                rejected: 'Bị từ chối',
+                                need_revision: 'Yêu cầu chỉnh sửa',
+                                revoked: 'Thu hồi phê duyệt',
+                                submitted: 'Đã nộp',
+                                withdrawn: 'Rút lại yêu cầu',
+                                entity_recreated: 'Đã tạo lại chương trình'
+                              };
+
+                              // Map action to color
+                              const actionColors = {
+                                created: 'primary',
+                                assigned: 'primary',
+                                in_progress: 'info',
+                                pending_approval: 'info',
+                                completed: 'success',
+                                completed_and_submitted: 'success',
+                                approved: 'success',
+                                rejected: 'danger',
+                                need_revision: 'warning',
+                                revoked: 'secondary',
+                                submitted: 'info',
+                                withdrawn: 'secondary',
+                                entity_recreated: 'success'
+                              };
+
+                              const actionText = actionLabels[entry.action] || entry.action;
+                              const actionIcon = actionIcons[entry.action] || 'clock';
+                              const actionColor = actionColors[entry.action] || 'secondary';
+
+                              return (
+                                <div key={idx} className="timeline-item d-flex gap-3 mb-3">
+                                  <div className="timeline-marker">
+                                    <div
+                                      className={`bg-${actionColor} bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center`}
+                                      style={{ width: '32px', height: '32px', minWidth: '32px' }}
+                                    >
+                                      <i className={`ph ph-${actionIcon} text-${actionColor}`}></i>
+                                    </div>
+                                  </div>
+                                  <div className="flex-grow-1">
+                                    <div className="fw-medium text-neutral-900">
+                                      {actionText}
+                                    </div>
+                                    <div className="text-sm text-muted">
+                                      {formatDate(entry.performedAt)}
+                                    </div>
+                                    {entry.note && (
+                                      <p className="mt-1 mb-0 text-muted fst-italic small">{entry.note}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
                 </div>
-
-                {/* Response Info (if processed) */}
-                {selectedRequest.processedBy && (
-                  <div className="mb-4 pb-4 border-bottom">
-                    <h6 className="fw-semibold mb-3">
-                      <i className="ph ph-check-square me-2"></i>
-                      Thông tin xử lý
-                    </h6>
-                    <div className="row g-3">
-                      <div className="col-6">
-                        <label className="form-label text-muted small text-uppercase">Người xử lý</label>
-                        <p className="mb-0 fw-medium">{selectedRequest.processedBy?.username || selectedRequest.processedBy?.name}</p>
-                        <small className="text-muted">{selectedRequest.processedBy?.email}</small>
-                      </div>
-                      <div className="col-6">
-                        <label className="form-label text-muted small text-uppercase">Ngày xử lý</label>
-                        <p className="mb-0">{formatDate(selectedRequest.processedAt)}</p>
-                      </div>
-                    </div>
-                    {selectedRequest.responseNote && (
-                      <div className="mt-3">
-                        <label className="form-label text-muted small text-uppercase">Phản hồi</label>
-                        <div className="p-3 bg-light rounded border">
-                          {selectedRequest.responseNote}
-                        </div>
-                      </div>
-                    )}
-                    {selectedRequest.rejectionReason && (
-                      <div className="mt-3">
-                        <label className="form-label text-danger small text-uppercase fw-semibold">Lý do từ chối</label>
-                        <div className="p-3 bg-danger-subtle rounded border border-danger">
-                          {selectedRequest.rejectionReason}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Revocation Info (if revoked) */}
-                {selectedRequest.revocation?.revokedBy && (
-                  <div className="mb-4 pb-4 border-bottom">
-                    <h6 className="fw-semibold mb-3 text-warning">
-                      <i className="ph ph-arrow-counter-clockwise me-2"></i>
-                      Thông tin thu hồi phê duyệt
-                    </h6>
-                    <div className="alert alert-warning border-warning">
-                      <div className="row g-3">
-                        <div className="col-6">
-                          <label className="form-label text-muted small text-uppercase">Người thu hồi</label>
-                          <p className="mb-0 fw-medium">{selectedRequest.revocation.revokedBy?.username || selectedRequest.revocation.revokedBy?.name || 'N/A'}</p>
-                        </div>
-                        <div className="col-6">
-                          <label className="form-label text-muted small text-uppercase">Ngày thu hồi</label>
-                          <p className="mb-0">{formatDate(selectedRequest.revocation.revokedAt)}</p>
-                        </div>
-                      </div>
-                      {selectedRequest.revocation.revocationReason && (
-                        <div className="mt-3">
-                          <label className="form-label text-warning-emphasis small text-uppercase fw-semibold">Lý do thu hồi</label>
-                          <div className="p-3 bg-white rounded border border-warning">
-                            {selectedRequest.revocation.revocationReason}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* History */}
-                {selectedRequest.history && selectedRequest.history.length > 0 && (
-                  <div>
-                    <h6 className="fw-semibold mb-3">
-                      <i className="ph ph-clock-counter-clockwise me-2"></i>
-                      Lịch sử
-                    </h6>
-                    <div className="vstack gap-3">
-                      {selectedRequest.history.map((entry, idx) => (
-                        <div key={idx} className="p-3 bg-light rounded border">
-                          <div className="d-flex justify-content-between align-items-start">
-                            <div>
-                              <p className="mb-1 fw-medium text-capitalize">
-                                {entry.action} bởi {entry.performedBy?.username || entry.performedBy?.name}
-                              </p>
-                              <small className="text-muted">
-                                {formatDate(entry.performedAt)}
-                              </small>
-                            </div>
-                            {entry.previousStatus && (
-                              <small className="text-muted text-capitalize">
-                                {entry.previousStatus} → {entry.action}
-                              </small>
-                            )}
-                          </div>
-                          {entry.note && (
-                            <p className="mt-2 mb-0 text-muted fst-italic small">{entry.note}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Modal Footer - Actions */}
@@ -976,8 +1149,7 @@ const ApprovalRequests = () => {
                   <Button
                     variant="success"
                     onClick={() => {
-                      setShowDetailModal(false);
-                      setShowApproveModal(true);
+                      setPendingModal('approve');
                     }}
                   >
                     <i className="ph ph-check me-2"></i>
@@ -986,8 +1158,7 @@ const ApprovalRequests = () => {
                   <Button
                     variant="danger"
                     onClick={() => {
-                      setShowDetailModal(false);
-                      setShowRejectModal(true);
+                      setPendingModal('reject');
                     }}
                   >
                     <i className="ph ph-x me-2"></i>
@@ -1008,8 +1179,7 @@ const ApprovalRequests = () => {
                       <Button
                         variant="danger"
                         onClick={() => {
-                          setShowDetailModal(false);
-                          setShowCancelModal(true);
+                          setPendingModal('cancel');
                         }}
                       >
                         <i className="ph ph-x-circle me-2"></i>
@@ -1026,9 +1196,9 @@ const ApprovalRequests = () => {
 
       {/* Approve Modal - Enhanced with detailed confirmation */}
       {showApproveModal && selectedRequest && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
           <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content">
+            <div className="modal-content border-0 shadow-lg">
               <div className="modal-header bg-success-subtle">
                 <div>
                   <h5 className="modal-title fw-bold text-success">
@@ -1139,9 +1309,9 @@ const ApprovalRequests = () => {
 
       {/* Reject Modal */}
       {showRejectModal && selectedRequest && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
           <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
+            <div className="modal-content border-0 shadow-lg">
               <div className="modal-header">
                 <h5 className="modal-title">Từ chối yêu cầu</h5>
                 <button
@@ -1208,9 +1378,9 @@ const ApprovalRequests = () => {
 
       {/* Revoke Approval Modal */}
       {showRevokeModal && selectedRequest && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
           <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content">
+            <div className="modal-content border-0 shadow-lg">
               <div className="modal-header bg-warning-subtle">
                 <div>
                   <h5 className="modal-title fw-bold text-warning-emphasis">
@@ -1326,9 +1496,9 @@ const ApprovalRequests = () => {
 
       {/* Cancel Request Modal */}
       {showCancelModal && selectedRequest && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
           <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content">
+            <div className="modal-content border-0 shadow-lg">
               <div className="modal-header bg-danger-subtle">
                 <div>
                   <h5 className="modal-title fw-bold text-danger">

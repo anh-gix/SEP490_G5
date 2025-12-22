@@ -7,6 +7,8 @@ import ProgramListPage from "../pages/CenterHead/ProgramListPage.jsx";
 import CenterHeadProgramDetailPage from "../pages/CenterHead/CenterHeadProgramDetailPage.jsx";
 import CenterHeadCourseDetailPage from "../pages/CenterHead/CenterHeadCourseDetailPage.jsx";
 import ApprovalRequestsPage from "../pages/CenterHead/ApprovalRequestsPage.jsx";
+import CenterHeadExamListPage from "../pages/CenterHead/CenterHeadExamListPage.jsx";
+import CenterHeadExamDetailPage from "../pages/CenterHead/CenterHeadExamDetailPage.jsx";
 
 /**
  * CenterHeadRoutes
@@ -32,5 +34,9 @@ export const centerHeadRoutes = [
 
   // III. Approval Requests Management
   { path: '/center-head/approval-requests', element: <ApprovalRequestsPage /> },
+
+  // IV. Exam Management
+  { path: '/center-head/exams', element: <CenterHeadExamListPage /> },
+  { path: '/center-head/exams/:id/details', element: <CenterHeadExamDetailPage /> },
 
 ];

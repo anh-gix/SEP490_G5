@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import Button from '../../compo/Button';
 import Badge from '../../compo/Badge';
 import courseService from '../../../../services/courseService';
@@ -27,7 +28,7 @@ const CourseStep2PLOMapping = ({ courseData, setCourseData, program, onNext, onP
       setProgramPLOs(response.data.plos || []);
     } catch (error) {
       console.error('Error loading program PLOs:', error);
-      alert(error.message || 'Không thể tải danh sách PLO của chương trình!');
+      toast.error(error.message || 'Không thể tải danh sách PLO của chương trình!');
     } finally {
       setLoading(false);
     }
@@ -53,7 +54,7 @@ const CourseStep2PLOMapping = ({ courseData, setCourseData, program, onNext, onP
 
   const handleSaveAndNext = async () => {
     if (selectedPLOs.length === 0) {
-      alert('Vui lòng chọn ít nhất 1 PLO để mapping!');
+      toast.error('Vui lòng chọn ít nhất 1 PLO để mapping!');
       return;
     }
 
@@ -73,11 +74,11 @@ const CourseStep2PLOMapping = ({ courseData, setCourseData, program, onNext, onP
         lastCompletedStep: 2
       }));
 
-      alert('Cập nhật PLO mapping thành công!');
+      toast.success('Cập nhật PLO mapping thành công!');
       onNext();
     } catch (error) {
       console.error('Error saving PLO mapping:', error);
-      alert(error.message || 'Lỗi khi lưu PLO mapping!');
+      toast.error(error.message || 'Lỗi khi lưu PLO mapping!');
     } finally {
       setLoading(false);
     }
@@ -98,7 +99,7 @@ const CourseStep2PLOMapping = ({ courseData, setCourseData, program, onNext, onP
       <div className="alert alert-info mb-24">
         <i className="ph ph-info me-2"></i>
         Chọn các PLO (Program Learning Outcomes) mà học phần này sẽ ánh xạ tới.
-        Đây là bảng mapping giữa <strong>Course</strong> và <strong>PLO của Program</strong>.
+        Đây là bảng mapping giữa <strong>Khóa học</strong> và <strong>PLO của Chương trình</strong>.
       </div>
 
       {/* Select All Button */}
@@ -164,26 +165,6 @@ const CourseStep2PLOMapping = ({ courseData, setCourseData, program, onNext, onP
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Mapping Matrix Preview (Optional) */}
-      {selectedPLOs.length > 0 && (
-        <div className="border border-success-300 radius-8 p-16 mb-24 bg-success-50">
-          <h6 className="text-sm fw-semibold mb-12">
-            <i className="ph ph-check-circle text-success-600 me-2"></i>
-            PLO đã chọn ({selectedPLOs.length})
-          </h6>
-          <div className="d-flex flex-wrap gap-2">
-            {selectedPLOs.map(ploId => {
-              const plo = programPLOs.find(p => p._id === ploId);
-              return plo ? (
-                <Badge key={ploId} variant="success" size="lg">
-                  {plo.code}
-                </Badge>
-              ) : null;
-            })}
-          </div>
         </div>
       )}
 

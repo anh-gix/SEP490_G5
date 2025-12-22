@@ -391,7 +391,7 @@ const ViewRequestModal = ({ show, onClose, request, onRequestUpdated }) => {
                 // Navigate đến program đã được tạo
                 if (request.entityId) {
                   const programId = typeof request.entityId === 'object' ? request.entityId._id : request.entityId;
-                  navigate(`/teacher/programs/${programId}/edit`);
+                  navigate(`/teacher/programs/${programId}`);
                 } else {
                   alert('Chưa có program được tạo cho request này.');
                 }

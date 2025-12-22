@@ -271,6 +271,28 @@ export const courseService = {
       throw error.response?.data || { message: 'Không thể kích hoạt khóa học' };
     }
   },
+
+  /**
+   * Upload material file
+   * @param {File} file - File to upload
+   * @returns {Promise<{url: string}>}
+   */
+  uploadMaterialFile: async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append('material', file);
+
+      const response = await axios.post(`${API_BASE_URL}/upload-material`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Upload file thất bại' };
+    }
+  },
 };
 
 export default courseService;

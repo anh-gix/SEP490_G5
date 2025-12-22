@@ -77,14 +77,9 @@ exports.getCourseById = async (req, res) => {
                 path: 'camSessions',
                 options: { sort: { Order: 1 } }
             })
-            // CLOs cùng mapped PLOs (nếu cần hiển thị chi tiết)
-            .populate({
-                path: 'clos',
-                populate: {
-                    path: 'mappedPLOs',
-                    select: 'code name'
-                }
-            });
+            // CLOs - mappedPLOs là embedded ObjectIds trong cloSchema, không cần populate
+            // vì PLO là embedded trong Program, không phải model riêng
+            ;
 
         if (!course) {
             return res.status(404).json({
@@ -892,6 +887,39 @@ exports.updateCoursePLOMapping = async (req, res) => {
 // =========================
 // COURSE MATERIALS
 // =========================
+
+/**
+ * Upload material file
+ * POST /api/courses/upload-material
+ */
+exports.uploadMaterialFile = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'Không có file được upload'
+            });
+        }
+
+        // Build URL for the uploaded file
+        const fileUrl = `${req.protocol}://${req.get('host')}/uploads/course-materials/${req.file.filename}`;
+
+        res.status(200).json({
+            success: true,
+            message: 'Upload file thành công',
+            url: fileUrl,
+            filename: req.file.filename,
+            originalName: req.file.originalname,
+            size: req.file.size
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server khi upload file',
+            error: err.message
+        });
+    }
+};
 
 /**
  * Get course materials

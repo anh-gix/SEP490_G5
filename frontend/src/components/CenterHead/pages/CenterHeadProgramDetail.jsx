@@ -11,6 +11,8 @@ import Table from '../compo/Table';
 import FilterBar from '../compo/FilterBar';
 import programService from '../../../services/programService';
 import centerHeadService from '../../../services/centerHeadService';
+import workRequestService from '../../../services/workRequestService';
+import { userService } from '../../../services/userService';
 import { formatDate } from '../../../helper/helper';
 
 /**
@@ -32,11 +34,30 @@ const CenterHeadProgramDetail = () => {
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [togglingCourseId, setTogglingCourseId] = useState(null);
 
+  // Edit Program Request states
+  const [showEditRequestModal, setShowEditRequestModal] = useState(false);
+  const [editRequestNote, setEditRequestNote] = useState('');
+  const [selectedSubjectLeader, setSelectedSubjectLeader] = useState('');
+  const [subjectLeaders, setSubjectLeaders] = useState([]);
+  const [loadingSubjectLeaders, setLoadingSubjectLeaders] = useState(false);
+  const [activeEditRequest, setActiveEditRequest] = useState(null);
+  const [showApproveEditModal, setShowApproveEditModal] = useState(false);
+  const [showRejectEditModal, setShowRejectEditModal] = useState(false);
+  const [editApprovalNote, setEditApprovalNote] = useState('');
+  const [editRejectionReason, setEditRejectionReason] = useState('');
+
   const basePath = '/center-head';
 
   useEffect(() => {
     fetchProgramDetail();
   }, [id]);
+
+  // Fetch edit request status when program is loaded
+  useEffect(() => {
+    if (program && program.status === 'approved') {
+      fetchEditRequestStatus();
+    }
+  }, [program?.status]);
 
   // Filter courses based on learningType
   useEffect(() => {
@@ -136,76 +157,6 @@ const CenterHeadProgramDetail = () => {
     return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
-  // ===== TOGGLE ACTIVE HANDLER =====
-  const handleToggleActive = async () => {
-    const newIsActive = !program.isActive;
-
-    try {
-      setActionLoading(true);
-
-      // Nếu đang tắt (deactivate), kiểm tra trước
-      if (!newIsActive) {
-        const checkResult = await centerHeadService.canDeactivateProgram(id);
-
-        if (!checkResult.canDeactivate) {
-          // Hiển thị cảnh báo chi tiết về các course đang active
-          const activeCourses = checkResult.activeCourses || [];
-
-          let warningMessage = `Không thể tạm dừng chương trình!\n\n`;
-          warningMessage += `Còn ${activeCourses.length} khóa học đang hoạt động:\n`;
-
-          activeCourses.forEach((course, index) => {
-            if (index < 3) {
-              warningMessage += `• ${course.name || course.courseCode}`;
-              if (course.activeClassCount > 0) {
-                warningMessage += ` (${course.activeClassCount} lớp`;
-                if (course.estimatedEndDate) {
-                  warningMessage += ` - đến ${formatDateShort(course.estimatedEndDate)}`;
-                }
-                warningMessage += `)`;
-              }
-              warningMessage += `\n`;
-            }
-          });
-
-          if (activeCourses.length > 3) {
-            warningMessage += `... và ${activeCourses.length - 3} khóa học khác`;
-          }
-
-          toast.warning(warningMessage, {
-            position: 'top-right',
-            autoClose: 8000,
-            style: { whiteSpace: 'pre-line' }
-          });
-
-          setActionLoading(false);
-          return;
-        }
-
-        await centerHeadService.deactivateProgram(id);
-      } else {
-        await centerHeadService.activateProgram(id);
-      }
-
-      setProgram(prev => ({ ...prev, isActive: newIsActive }));
-
-      toast.success(
-        newIsActive
-          ? 'Đã kích hoạt chương trình thành công'
-          : 'Đã vô hiệu hóa chương trình thành công',
-        { position: 'top-right' }
-      );
-    } catch (error) {
-      console.error('Error toggling program active status:', error);
-      toast.error(
-        error.response?.data?.message || error.message || 'Không thể thay đổi trạng thái hoạt động',
-        { position: 'top-right' }
-      );
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   // ===== TOGGLE COURSE ACTIVE HANDLER =====
   const handleToggleCourseActive = async (courseId, currentIsActive, e) => {
     e.stopPropagation();
@@ -292,6 +243,166 @@ const CenterHeadProgramDetail = () => {
     } finally {
       setTogglingCourseId(null);
     }
+  };
+
+  // ===== EDIT PROGRAM REQUEST HANDLERS =====
+  const fetchEditRequestStatus = async () => {
+    try {
+      const result = await workRequestService.checkProgramEditStatus(id);
+      if (result.hasActiveEditRequest) {
+        setActiveEditRequest(result.activeRequest);
+      } else {
+        setActiveEditRequest(null);
+      }
+    } catch (error) {
+      console.error('Error fetching edit request status:', error);
+    }
+  };
+
+  const fetchSubjectLeaders = async () => {
+    try {
+      setLoadingSubjectLeaders(true);
+      const result = await userService.getUsersByRoles(['Subject Leader']);
+      setSubjectLeaders(result.data || []);
+    } catch (error) {
+      console.error('Error fetching subject leaders:', error);
+      toast.error('Không thể lấy danh sách Subject Leader', { position: 'top-right' });
+    } finally {
+      setLoadingSubjectLeaders(false);
+    }
+  };
+
+  const handleOpenEditRequestModal = () => {
+    fetchSubjectLeaders();
+    setShowEditRequestModal(true);
+  };
+
+  const handleCreateEditRequest = async () => {
+    if (!selectedSubjectLeader) {
+      toast.warning('Vui lòng chọn Subject Leader', { position: 'top-right' });
+      return;
+    }
+
+    if (!editRequestNote.trim()) {
+      toast.warning('Vui lòng nhập nội dung yêu cầu', { position: 'top-right' });
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await workRequestService.createEditProgramRequest({
+        entityId: id,
+        assignedTo: selectedSubjectLeader,
+        requestNote: editRequestNote
+      });
+
+      toast.success('Đã tạo yêu cầu chỉnh sửa chương trình thành công!', { position: 'top-right' });
+      setShowEditRequestModal(false);
+      setEditRequestNote('');
+      setSelectedSubjectLeader('');
+      fetchEditRequestStatus();
+    } catch (error) {
+      console.error('Error creating edit request:', error);
+      toast.error(error.message || 'Không thể tạo yêu cầu chỉnh sửa', { position: 'top-right' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancelEditRequest = async () => {
+    if (!activeEditRequest) return;
+
+    const result = await Swal.fire({
+      title: 'Xác nhận hủy yêu cầu',
+      text: 'Bạn có chắc chắn muốn hủy yêu cầu chỉnh sửa này?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Hủy yêu cầu',
+      cancelButtonText: 'Đóng'
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      setActionLoading(true);
+      await workRequestService.cancelRequest(activeEditRequest._id);
+      toast.success('Đã hủy yêu cầu chỉnh sửa', { position: 'top-right' });
+      setActiveEditRequest(null);
+    } catch (error) {
+      console.error('Error canceling edit request:', error);
+      toast.error(error.message || 'Không thể hủy yêu cầu', { position: 'top-right' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleApproveEditRequest = async () => {
+    if (!activeEditRequest) return;
+
+    try {
+      setActionLoading(true);
+      await workRequestService.approveEditProgram(activeEditRequest._id, {
+        note: editApprovalNote
+      });
+      toast.success('Đã duyệt yêu cầu chỉnh sửa chương trình!', { position: 'top-right' });
+      setShowApproveEditModal(false);
+      setEditApprovalNote('');
+      setActiveEditRequest(null);
+      fetchProgramDetail();
+    } catch (error) {
+      console.error('Error approving edit request:', error);
+      toast.error(error.message || 'Không thể duyệt yêu cầu', { position: 'top-right' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectEditRequest = async () => {
+    if (!activeEditRequest) return;
+
+    if (!editRejectionReason.trim()) {
+      toast.warning('Vui lòng nhập lý do từ chối', { position: 'top-right' });
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await workRequestService.rejectEditProgram(activeEditRequest._id, {
+        rejectionReason: editRejectionReason
+      });
+      toast.success('Đã từ chối yêu cầu chỉnh sửa. Subject Leader có thể sửa và nộp lại.', { position: 'top-right' });
+      setShowRejectEditModal(false);
+      setEditRejectionReason('');
+      fetchEditRequestStatus();
+    } catch (error) {
+      console.error('Error rejecting edit request:', error);
+      toast.error(error.message || 'Không thể từ chối yêu cầu', { position: 'top-right' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const getEditRequestStatusBadge = (status) => {
+    const statusConfig = {
+      pending: { label: 'Chờ xử lý', color: '#f59e0b', bg: '#fef3c7' },
+      in_progress: { label: 'Đang xử lý', color: '#3b82f6', bg: '#dbeafe' },
+      pending_approval: { label: 'Chờ duyệt', color: '#8b5cf6', bg: '#ede9fe' }
+    };
+    const config = statusConfig[status] || { label: status, color: '#6b7280', bg: '#f3f4f6' };
+    return (
+      <span style={{
+        padding: '4px 8px',
+        borderRadius: '4px',
+        fontSize: '12px',
+        fontWeight: '500',
+        color: config.color,
+        backgroundColor: config.bg
+      }}>
+        {config.label}
+      </span>
+    );
   };
 
   if (loading) {
@@ -455,27 +566,6 @@ const CenterHeadProgramDetail = () => {
           <div className="d-flex flex-wrap align-items-center gap-3">
             <StatusBadge status={program.status} />
             <span className="text-neutral-600">Mã: <strong>{program.code}</strong></span>
-
-            {/* Toggle Active - Only for Approved programs */}
-            {program.status === 'approved' && (
-              <div className="d-flex align-items-center gap-2 ms-auto">
-                <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>
-                  {program.isActive ? 'Đang hoạt động' : 'Tạm dừng'}
-                </span>
-                <div className="form-check form-switch mb-0">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    checked={program.isActive || false}
-                    onChange={handleToggleActive}
-                    disabled={actionLoading}
-                    style={{ cursor: actionLoading ? 'not-allowed' : 'pointer' }}
-                    title={program.isActive ? 'Tạm dừng chương trình' : 'Mở chương trình cho đăng ký'}
-                  />
-                </div>
-              </div>
-            )}
           </div>
         </div>
         <div className="d-flex flex-wrap gap-2">
@@ -500,8 +590,93 @@ const CenterHeadProgramDetail = () => {
               </Button>
             </>
           )}
+
+          {/* Edit Program Request Button - For Approved programs */}
+          {program.status === 'approved' && !activeEditRequest && (
+            <Button
+              variant="outline"
+              icon="ph ph-pencil-simple"
+              onClick={handleOpenEditRequestModal}
+              disabled={actionLoading}
+            >
+              Yêu cầu chỉnh sửa
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Active Edit Request Alert */}
+      {program.status === 'approved' && activeEditRequest && (
+        <div
+          className="alert mb-24"
+          role="alert"
+          style={{
+            borderLeft: `4px solid ${activeEditRequest.status === 'pending_approval' ? '#8b5cf6' : '#3b82f6'}`,
+            backgroundColor: activeEditRequest.status === 'pending_approval' ? '#f5f3ff' : '#eff6ff'
+          }}
+        >
+          <div className="d-flex align-items-start justify-content-between">
+            <div className="d-flex align-items-start">
+              <i
+                className={`ph ${activeEditRequest.status === 'pending_approval' ? 'ph-clock-countdown' : 'ph-pencil-circle'}`}
+                style={{ fontSize: '24px', marginRight: '12px', color: activeEditRequest.status === 'pending_approval' ? '#8b5cf6' : '#3b82f6' }}
+              ></i>
+              <div>
+                <div className="d-flex align-items-center gap-2 mb-2">
+                  <h6 className="mb-0 fw-bold">
+                    {activeEditRequest.status === 'pending_approval'
+                      ? 'Yêu cầu chỉnh sửa đang chờ duyệt'
+                      : 'Đang có yêu cầu chỉnh sửa chương trình'}
+                  </h6>
+                  {getEditRequestStatusBadge(activeEditRequest.status)}
+                </div>
+                <p className="mb-1"><strong>Giao cho:</strong> {activeEditRequest.assignedTo?.name || activeEditRequest.assignedTo?.username || 'N/A'}</p>
+                {activeEditRequest.requestNote && (
+                  <p className="mb-1"><strong>Nội dung:</strong> {activeEditRequest.requestNote}</p>
+                )}
+                <p className="mb-0 text-sm text-muted">
+                  Tạo lúc: {formatDate(activeEditRequest.requestedAt)}
+                </p>
+              </div>
+            </div>
+            <div className="d-flex gap-2">
+              {activeEditRequest.status === 'pending_approval' && (
+                <>
+                  <Button
+                    variant="success"
+                    size="sm"
+                    icon="ph ph-check"
+                    onClick={() => setShowApproveEditModal(true)}
+                    disabled={actionLoading}
+                  >
+                    Duyệt
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    icon="ph ph-x"
+                    onClick={() => setShowRejectEditModal(true)}
+                    disabled={actionLoading}
+                  >
+                    Từ chối
+                  </Button>
+                </>
+              )}
+              {['pending', 'in_progress'].includes(activeEditRequest.status) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon="ph ph-x"
+                  onClick={handleCancelEditRequest}
+                  disabled={actionLoading}
+                >
+                  Hủy yêu cầu
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Program Rejection Warning */}
       {program.status === 'needs_revision' && program.rejectionReason && (
@@ -748,6 +923,205 @@ const CenterHeadProgramDetail = () => {
                 <Button
                   variant="danger"
                   onClick={handleConfirmRejectProgram}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Request Modal - Create new edit request */}
+      {showEditRequestModal && (
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Yêu cầu chỉnh sửa chương trình</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowEditRequestModal(false);
+                    setEditRequestNote('');
+                    setSelectedSubjectLeader('');
+                  }}
+                  disabled={actionLoading}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="mb-3">
+                  <label className="form-label fw-semibold">Chương trình</label>
+                  <div className="p-3 bg-light rounded">
+                    <strong>{program.program_name}</strong>
+                    <span className="text-muted ms-2">({program.code})</span>
+                  </div>
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label fw-semibold">Giao cho Subject Leader *</label>
+                  {loadingSubjectLeaders ? (
+                    <div className="d-flex align-items-center gap-2">
+                      <div className="spinner-border spinner-border-sm" role="status"></div>
+                      <span>Đang tải...</span>
+                    </div>
+                  ) : (
+                    <select
+                      className="form-select"
+                      value={selectedSubjectLeader}
+                      onChange={(e) => setSelectedSubjectLeader(e.target.value)}
+                      disabled={actionLoading}
+                    >
+                      <option value="">-- Chọn Subject Leader --</option>
+                      {subjectLeaders.map((sl) => (
+                        <option key={sl._id} value={sl._id}>
+                          {sl.name || sl.username} ({sl.email})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label fw-semibold">Nội dung yêu cầu *</label>
+                  <textarea
+                    className="form-control"
+                    rows="4"
+                    placeholder="Mô tả yêu cầu chỉnh sửa (VD: Thêm course mới thay thế cho course ABC đã bị vô hiệu hóa...)"
+                    value={editRequestNote}
+                    onChange={(e) => setEditRequestNote(e.target.value)}
+                    disabled={actionLoading}
+                  ></textarea>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowEditRequestModal(false);
+                    setEditRequestNote('');
+                    setSelectedSubjectLeader('');
+                  }}
+                  disabled={actionLoading}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  variant="primary"
+                  icon="ph ph-paper-plane-tilt"
+                  onClick={handleCreateEditRequest}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Đang gửi...' : 'Gửi yêu cầu'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approve Edit Request Modal */}
+      {showApproveEditModal && (
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Duyệt yêu cầu chỉnh sửa</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowApproveEditModal(false);
+                    setEditApprovalNote('');
+                  }}
+                  disabled={actionLoading}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <p className="text-neutral-700 mb-3">
+                  Xác nhận duyệt yêu cầu chỉnh sửa chương trình từ <strong>{activeEditRequest?.assignedTo?.name || activeEditRequest?.assignedTo?.username}</strong>?
+                </p>
+                <label className="form-label">Ghi chú (tùy chọn)</label>
+                <textarea
+                  className="form-control"
+                  rows="3"
+                  placeholder="Nhập ghi chú..."
+                  value={editApprovalNote}
+                  onChange={(e) => setEditApprovalNote(e.target.value)}
+                  disabled={actionLoading}
+                ></textarea>
+              </div>
+              <div className="modal-footer">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowApproveEditModal(false);
+                    setEditApprovalNote('');
+                  }}
+                  disabled={actionLoading}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  variant="success"
+                  onClick={handleApproveEditRequest}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Đang xử lý...' : 'Xác nhận duyệt'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Edit Request Modal */}
+      {showRejectEditModal && (
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Từ chối yêu cầu chỉnh sửa</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowRejectEditModal(false);
+                    setEditRejectionReason('');
+                  }}
+                  disabled={actionLoading}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <p className="text-neutral-700 mb-3">
+                  Subject Leader có thể chỉnh sửa và nộp lại sau khi bạn từ chối.
+                </p>
+                <label className="form-label">Lý do từ chối *</label>
+                <textarea
+                  className="form-control"
+                  rows="4"
+                  placeholder="Nhập lý do từ chối..."
+                  value={editRejectionReason}
+                  onChange={(e) => setEditRejectionReason(e.target.value)}
+                  disabled={actionLoading}
+                ></textarea>
+              </div>
+              <div className="modal-footer">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowRejectEditModal(false);
+                    setEditRejectionReason('');
+                  }}
+                  disabled={actionLoading}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={handleRejectEditRequest}
                   disabled={actionLoading}
                 >
                   {actionLoading ? 'Đang xử lý...' : 'Xác nhận từ chối'}

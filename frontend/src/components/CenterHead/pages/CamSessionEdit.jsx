@@ -549,7 +549,7 @@ const CamSessionEdit = ({ viewMode = 'center-head' }) => {
               </Col>
               <Col xs="auto">
                 <div className="d-flex gap-2">
-                  <Button variant="outline-secondary" >
+                  <Button variant="outline-secondary" onClick={() => navigate(-1)}>
                     <i className="ph ph-arrow-left me-2"></i>
                     Quay lại
                   </Button>

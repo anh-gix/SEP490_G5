@@ -147,11 +147,18 @@ const TeacherProgramList = () => {
     try {
       setLoading(true);
 
-      // Fetch work requests assigned to current user (Subject Leader)
-      const response = await workRequestService.getAssignedToMe({
-        requestType: 'create_program' 
-      });
-      const requestsData = response.data || [];
+      // Fetch both create_program and edit_program work requests assigned to current user
+      const [createResponse, editResponse] = await Promise.all([
+        workRequestService.getAssignedToMe({ requestType: 'create_program' }),
+        workRequestService.getAssignedToMe({ requestType: 'edit_program' })
+      ]);
+
+      const createRequests = createResponse.data || [];
+      const editRequests = editResponse.data || [];
+      const requestsData = [...createRequests, ...editRequests].sort(
+        (a, b) => new Date(b.requestedAt) - new Date(a.requestedAt)
+      );
+
       setWorkRequests(requestsData);
 
       // Calculate request stats
@@ -159,6 +166,7 @@ const TeacherProgramList = () => {
         total: requestsData.length,
         pending: requestsData.filter(r => r.status === 'pending').length,
         in_progress: requestsData.filter(r => r.status === 'in_progress').length,
+        pending_approval: requestsData.filter(r => r.status === 'pending_approval').length,
         completed: requestsData.filter(r => r.status === 'completed').length
       };
       setRequestStats(calculatedRequestStats);
@@ -248,6 +256,48 @@ const TeacherProgramList = () => {
     }
   };
 
+  // Handle start edit program request
+  const handleStartEditProgram = async (request) => {
+    try {
+      const response = await workRequestService.startEditProgram(request._id);
+      console.log('Start edit program response:', response);
+
+      // Refresh work requests
+      await fetchWorkRequests();
+
+      // Navigate to program detail page
+      const programId = response.programId || request.entityId?._id || request.entityId;
+      if (programId) {
+        navigate(`/teacher/programs/${programId}`);
+      }
+    } catch (error) {
+      console.error('Error starting edit program:', error);
+      alert(error.message || 'Không thể bắt đầu xử lý yêu cầu!');
+    }
+  };
+
+  // Handle submit edit program for approval
+  const handleSubmitEditProgram = async (request) => {
+    const confirmSubmit = window.confirm(
+      'Xác nhận nộp yêu cầu chỉnh sửa chương trình?\n\n' +
+      'Sau khi nộp, Center Head sẽ xem xét và duyệt các thay đổi của bạn.'
+    );
+
+    if (!confirmSubmit) return;
+
+    try {
+      await workRequestService.submitEditProgram(request._id, {
+        note: 'Đã hoàn thành chỉnh sửa chương trình'
+      });
+
+      alert('Đã nộp yêu cầu chỉnh sửa thành công! Chờ Center Head duyệt.');
+      await fetchWorkRequests();
+    } catch (error) {
+      console.error('Error submitting edit program:', error);
+      alert(error.message || 'Không thể nộp yêu cầu!');
+    }
+  };
+
   const handleRequestUpdated = () => {
     // Refresh work requests after update
     fetchWorkRequests();
@@ -315,6 +365,7 @@ const TeacherProgramList = () => {
       options: [
         { value: "pending", label: "Chờ xử lý" },
         { value: "in_progress", label: "Đang xử lý" },
+        { value: "pending_approval", label: "Chờ duyệt" },
         { value: "completed", label: "Hoàn thành" },
       ]
     }
@@ -407,18 +458,38 @@ const TeacherProgramList = () => {
     },
   ];
 
+  const getRequestTypeLabel = (requestType) => {
+    const labels = {
+      'create_program': { text: 'Tạo chương trình mới', color: 'success' },
+      'edit_program': { text: 'Chỉnh sửa chương trình', color: 'warning' }
+    };
+    return labels[requestType] || { text: requestType, color: 'secondary' };
+  };
+
   const requestColumns = [
     {
       header: 'Yêu cầu',
       field: 'requestNote',
-      render: (row) => (
-        <div>
-          <div className="fw-semibold text-neutral-900 mb-1">Tạo chương trình mới</div>
-          <div className="text-sm text-neutral-600" style={{ maxWidth: '300px' }}>
-            {row.requestNote || 'Không có ghi chú'}
+      render: (row) => {
+        const typeInfo = getRequestTypeLabel(row.requestType);
+        return (
+          <div>
+            <div className="d-flex align-items-center gap-2 mb-1">
+              <span className={`badge bg-${typeInfo.color}`} style={{ fontSize: '0.6875rem' }}>
+                {typeInfo.text}
+              </span>
+            </div>
+            {row.requestType === 'edit_program' && row.entityId && (
+              <div className="text-neutral-900 fw-semibold mb-1" style={{ fontSize: '0.8125rem' }}>
+                {row.entityId.program_name || row.entityId.code || 'Chương trình'}
+              </div>
+            )}
+            <div className="text-sm text-neutral-600" style={{ maxWidth: '300px' }}>
+              {row.requestNote || 'Không có ghi chú'}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       header: 'Người giao',
@@ -446,34 +517,64 @@ const TeacherProgramList = () => {
       header: 'Hành động',
       field: 'actions',
       render: (row) => (
-        <div className="d-flex gap-2 justify-content-center">
-          <button
-            className="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
+        <div className="d-flex gap-1 justify-content-center flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            icon="ph ph-eye"
             onClick={(e) => {
               e.stopPropagation();
               handleViewRequest(row);
             }}
+            className="px-2 py-1"
             title="Xem chi tiết"
           >
-            <i className="ph ph-eye"></i>
-            <span className="d-none d-md-inline">Xem</span>
-          </button>
-          {row.status === 'pending' && (
-            <button
-              className="btn btn-sm btn-success d-flex align-items-center gap-1"
+            <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Xem</span>
+            <span className="d-inline d-lg-none">👁</span>
+          </Button>
+
+          {/* Pending: Bắt đầu xử lý */}
+          {row.status === 'pending' && row.requestType === 'create_program' && (
+            <Button
+              variant="success"
+              size="sm"
+              icon="ph ph-play"
               onClick={(e) => {
                 e.stopPropagation();
                 handleStartProcessing(row);
               }}
+              className="px-2 py-1"
               title="Bắt đầu xử lý"
             >
-              <i className="ph ph-play"></i>
-              <span className="d-none d-md-inline">Bắt đầu</span>
-            </button>
+              <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Bắt đầu</span>
+              <span className="d-inline d-lg-none">▶</span>
+            </Button>
           )}
-          {row.status === 'in_progress' && row.entityId && (
-            <button
-              className="btn btn-sm btn-info d-flex align-items-center gap-1"
+
+          {/* Pending edit_program: Nhận việc */}
+          {row.status === 'pending' && row.requestType === 'edit_program' && (
+            <Button
+              variant="success"
+              size="sm"
+              icon="ph ph-play"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleStartEditProgram(row);
+              }}
+              className="px-2 py-1"
+              title="Nhận việc chỉnh sửa"
+            >
+              <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Nhận việc</span>
+              <span className="d-inline d-lg-none">▶</span>
+            </Button>
+          )}
+
+          {/* In progress create_program: Tiếp tục */}
+          {row.status === 'in_progress' && row.requestType === 'create_program' && row.entityId && (
+            <Button
+              variant="info"
+              size="sm"
+              icon="ph ph-pencil"
               onClick={async (e) => {
                 e.stopPropagation();
                 const programId = typeof row.entityId === 'object' ? row.entityId._id : row.entityId;
@@ -488,15 +589,44 @@ const TeacherProgramList = () => {
                   await fetchWorkRequests();
                 }
               }}
+              className="px-2 py-1"
               title="Tiếp tục tạo chương trình"
             >
-              <i className="ph ph-pencil"></i>
-              <span className="d-none d-md-inline">Tiếp tục</span>
-            </button>
+              <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Tiếp tục</span>
+              <span className="d-inline d-lg-none">✏</span>
+            </Button>
+          )}
+
+          {/* In progress edit_program: Chỉnh sửa */}
+          {row.status === 'in_progress' && row.requestType === 'edit_program' && row.entityId && (
+            <Button
+              variant="primary"
+              size="sm"
+              icon="ph ph-pencil"
+              onClick={(e) => {
+                e.stopPropagation();
+                const programId = typeof row.entityId === 'object' ? row.entityId._id : row.entityId;
+                navigate(`/teacher/programs/${programId}`);
+              }}
+              className="px-2 py-1"
+              title="Xem và chỉnh sửa chương trình"
+            >
+              <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Chỉnh sửa</span>
+              <span className="d-inline d-lg-none">✏</span>
+            </Button>
+          )}
+
+          {/* Pending approval: Đang chờ duyệt */}
+          {row.status === 'pending_approval' && (
+            <span className="badge bg-purple-100 text-purple-600" style={{ fontSize: '0.75rem' }}>
+              Đang chờ duyệt
+            </span>
           )}
           {row.status === 'in_progress' && !row.entityId && (
-            <button
-              className="btn btn-sm btn-warning d-flex align-items-center gap-1"
+            <Button
+              variant="warning"
+              size="sm"
+              icon="ph ph-plus-circle"
               onClick={async (e) => {
                 e.stopPropagation();
 
@@ -529,11 +659,12 @@ const TeacherProgramList = () => {
                   }
                 }
               }}
+              className="px-2 py-1"
               title="Tạo lại chương trình đã bị xóa"
             >
-              <i className="ph ph-plus-circle"></i>
-              <span className="d-none d-md-inline">Tạo lại</span>
-            </button>
+              <span className="d-none d-lg-inline" style={{ fontSize: '0.75rem' }}>Tạo lại</span>
+              <span className="d-inline d-lg-none">➕</span>
+            </Button>
           )}
         </div>
       ),
@@ -565,8 +696,8 @@ const TeacherProgramList = () => {
               className={`nav-link ${activeTab === 'my-programs' ? 'active' : ''}`}
               onClick={() => handleTabChange('my-programs')}
             >
-              <i className="ph ph-user me-2"></i>
-              Chương trình của tôi ({myPrograms.length})
+              <i className="ph ph-folder-user me-2"></i>
+              Chương trình phụ trách ({myPrograms.length})
             </button>
           </li>
           <li className="nav-item">
@@ -584,7 +715,7 @@ const TeacherProgramList = () => {
               onClick={() => handleTabChange('work-requests')}
             >
               <i className="ph ph-clipboard-text me-2"></i>
-              Yêu cầu từ Center Head ({workRequests.length})
+              Yêu cầu được giao ({workRequests.length})
             </button>
           </li>
         </ul>

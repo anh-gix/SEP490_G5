@@ -69,11 +69,6 @@ const CamSession = ({ courseData, viewMode = 'center-head', programId }) => {
         // Center head only views existing sessions
         setCamSessions(existing.sort((a, b) => (a.order || 0) - (b.order || 0)));
       }
-
-      const nextSessions = [...existing, ...createdCamSessions].sort(
-        (a, b) => (a.order || 0) - (b.order || 0)
-      );
-      setCamSessions(nextSessions);
     } catch (error) {
       console.error('Error ensuring cam sessions:', error);
       alert(error.response?.data?.message || 'Lỗi khi tải CAM Session');
@@ -153,7 +148,6 @@ const CamSession = ({ courseData, viewMode = 'center-head', programId }) => {
                   <th className="px-16 py-12">Tiêu đề</th>
                   <th className="px-16 py-12">Loại</th>
                   <th className="px-16 py-12">Mô tả</th>
-                  <th className="px-16 py-12">Video URL</th>
                   <th className="px-16 py-12 text-center">Thao tác</th>
                 </tr>
               </thead>
@@ -166,15 +160,6 @@ const CamSession = ({ courseData, viewMode = 'center-head', programId }) => {
                     <td className="px-16 py-12 fw-semibold">{camSession.title}</td>
                     <td className="px-16 py-12">{camSession.sessionType || '-'}</td>
                     <td className="px-16 py-12">{camSession.description || '-'}</td>
-                    <td className="px-16 py-12">
-                      {camSession.videoURL ? (
-                        <a href={camSession.videoURL} target="_blank" rel="noreferrer">
-                          Xem video
-                        </a>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
                     <td className="px-16 py-12 text-center">
                       <div className="d-flex gap-1 justify-content-center">
                         {canEdit ? (

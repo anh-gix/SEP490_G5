@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const programController = require('../controllers/programController');
 
+// PROGRAM HELPER ROUTES (must be before :id routes to avoid conflicts)
+router.get('/band-options/:type', programController.getBandOptions);
+
 // PROGRAM CRUD ROUTES
 router.get('/', programController.getAllPrograms);
 router.get('/my-programs', programController.getMyPrograms);
@@ -12,9 +15,6 @@ router.delete('/:id', programController.deleteProgram);
 
 // PROGRAM PLOs ROUTES
 router.get('/:id/plos', programController.getProgramPLOs);
-
-// PROGRAM HELPER ROUTES
-router.get('/band-options/:type', programController.getBandOptions);  // Must be before /:id routes
 router.get('/:id/submission-status', programController.getProgramSubmissionStatus);
 
 // PROGRAM MANAGEMENT ROUTES

@@ -1,6 +1,46 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const courseController = require('../controllers/courseController');
+
+// Ensure upload directory exists
+const uploadDir = path.join(__dirname, '../uploads/course-materials');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Configure multer for material file uploads
+const materialStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, 'material-' + uniqueSuffix + ext);
+    }
+});
+
+const materialUpload = multer({
+    storage: materialStorage,
+    limits: {
+        fileSize: 50 * 1024 * 1024 // 50MB limit
+    },
+    fileFilter: function (req, file, cb) {
+        const allowedTypes = [
+            '.pdf', '.doc', '.docx', '.xls', '.xlsx',
+            '.ppt', '.pptx', '.txt', '.zip', '.rar'
+        ];
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (allowedTypes.includes(ext)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Định dạng file không được hỗ trợ. Chỉ chấp nhận: PDF, Word, Excel, PowerPoint, TXT, ZIP, RAR'));
+        }
+    }
+});
 
 
 
@@ -39,6 +79,7 @@ router.get('/:id/program-plos', courseController.getProgramPLOs);
 router.put('/:id/map-plos', courseController.updateCoursePLOMapping);
 
 // MATERIALS ROUTES - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
+router.post('/upload-material', materialUpload.single('material'), courseController.uploadMaterialFile);
 router.get('/:courseId/materials', courseController.getCourseMaterials);
 
 // ACTIVATION/DEACTIVATION ROUTES - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict

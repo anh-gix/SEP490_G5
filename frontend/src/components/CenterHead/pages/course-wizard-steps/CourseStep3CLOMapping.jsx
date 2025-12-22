@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import Button from '../../compo/Button';
 import Badge from '../../compo/Badge';
 import courseService from '../../../../services/courseService';
 
 const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onPrevious }) => {
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('manage'); // 'manage' or 'mapping'
   const [showCLOForm, setShowCLOForm] = useState(false);
   const [editingCLO, setEditingCLO] = useState(null);
   const [cloForm, setCLOForm] = useState({ code: '', name: '', detail: '', mappedPLOs: [] });
@@ -16,7 +16,7 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
     if (courseData._id) {
       fetchCourseCLOs();
     }
-  }, [courseData._id]); // This will trigger on mount and when courseData._id changes
+  }, [courseData._id]);
 
   // Also initialize from courseData.clos on mount
   useEffect(() => {
@@ -47,69 +47,30 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
   };
 
   const handlePLOCheckbox = (ploId) => {
-    setCLOForm(prev => ({
-      ...prev,
-      mappedPLOs: prev.mappedPLOs.includes(ploId)
-        ? prev.mappedPLOs.filter(id => id !== ploId)
-        : [...prev.mappedPLOs, ploId]
-    }));
-  };
-
-  // Toggle mapping trong ma trận
-  const handleToggleMapping = async (cloId, ploId) => {
-    try {
-      const updatedCLOs = clos.map(c => {
-        if (c._id === cloId) {
-          const mappedPLOs = c.mappedPLOs || [];
-          const isCurrentlyMapped = mappedPLOs.some(id => {
-            const compareId = typeof id === 'object' ? id._id : id;
-            const targetId = typeof ploId === 'object' ? ploId._id : ploId;
-            return compareId === targetId;
-          });
-
-          return {
-            ...c,
-            mappedPLOs: isCurrentlyMapped
-              ? mappedPLOs.filter(id => {
-                  const compareId = typeof id === 'object' ? id._id : id;
-                  const targetId = typeof ploId === 'object' ? ploId._id : ploId;
-                  return compareId !== targetId;
-                })
-              : [...mappedPLOs, ploId]
-          };
-        }
-        return c;
+    setCLOForm(prev => {
+      // Check if ploId already exists in mappedPLOs (handle both string and object formats)
+      const isAlreadyMapped = prev.mappedPLOs.some(id => {
+        const existingId = typeof id === 'object' ? id._id : id;
+        return existingId === ploId;
       });
 
-      const savedCLOs = updatedCLOs.map(c => ({
-        code: c.code,
-        name: c.name,
-        detail: c.detail,
-        mappedPLOs: c.mappedPLOs || []
-      }));
-
-      await courseService.updateCourse(courseData._id, {
-        clos: savedCLOs
-      });
-
-      // Update both local and parent state
-      setCLOs(updatedCLOs);
-      setCourseData(prev => ({
+      return {
         ...prev,
-        clos: updatedCLOs
-      }));
-    } catch (error) {
-      console.error('Error updating mapping:', error);
-      alert('Lỗi khi cập nhật mapping!');
-    }
+        mappedPLOs: isAlreadyMapped
+          ? prev.mappedPLOs.filter(id => {
+              const existingId = typeof id === 'object' ? id._id : id;
+              return existingId !== ploId;
+            })
+          : [...prev.mappedPLOs, ploId]
+      };
+    });
   };
 
-  const isMapped = (clo, ploId) => {
-    const mappedPLOs = clo.mappedPLOs || [];
-    return mappedPLOs.some(id => {
-      const compareId = typeof id === 'object' ? id._id : id;
-      const targetId = typeof ploId === 'object' ? ploId._id : ploId;
-      return compareId === targetId;
+  // Helper function to check if a PLO is selected in the form
+  const isPLOSelected = (ploId) => {
+    return cloForm.mappedPLOs.some(id => {
+      const existingId = typeof id === 'object' ? id._id : id;
+      return existingId === ploId;
     });
   };
 
@@ -121,25 +82,29 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
 
   const handleEditCLO = (clo) => {
     setEditingCLO(clo);
+    // Extract PLO IDs from mappedPLOs (handle both object and string formats)
+    const mappedPLOIds = (clo.mappedPLOs || []).map(ploId =>
+      typeof ploId === 'object' ? ploId._id : ploId
+    );
     setCLOForm({
       code: clo.code,
       name: clo.name,
       detail: clo.detail,
-      mappedPLOs: clo.mappedPLOs || []
+      mappedPLOs: mappedPLOIds
     });
     setShowCLOForm(true);
   };
 
   const handleSaveCLO = async () => {
     if (!cloForm.code || !cloForm.name || !cloForm.detail) {
-      alert('Vui lòng điền đầy đủ thông tin CLO!');
+      toast.error('Vui lòng điền đầy đủ thông tin CLO!');
       return;
     }
 
     if (!editingCLO) {
       const isDuplicate = clos.some(clo => clo.code === cloForm.code);
       if (isDuplicate) {
-        alert(`Mã CLO "${cloForm.code}" đã tồn tại!`);
+        toast.error(`Mã CLO "${cloForm.code}" đã tồn tại!`);
         return;
       }
     }
@@ -166,7 +131,9 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
         code: c.code,
         name: c.name,
         detail: c.detail,
-        mappedPLOs: c.mappedPLOs || []
+        mappedPLOs: (c.mappedPLOs || []).map(ploId =>
+          typeof ploId === 'object' ? ploId._id : ploId
+        )
       }));
 
       await courseService.updateCourse(courseData._id, {
@@ -179,10 +146,10 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
       setCLOForm({ code: '', name: '', detail: '', mappedPLOs: [] });
       setShowCLOForm(false);
       setEditingCLO(null);
-      alert(editingCLO ? 'Cập nhật CLO thành công!' : 'Tạo CLO thành công!');
+      toast.success(editingCLO ? 'Cập nhật CLO thành công!' : 'Tạo CLO thành công!');
     } catch (error) {
       console.error('Error saving CLO:', error);
-      alert(error.response?.data?.message || 'Lỗi khi lưu CLO!');
+      toast.error(error.response?.data?.message || 'Lỗi khi lưu CLO!');
     } finally {
       setLoading(false);
     }
@@ -196,7 +163,9 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
         code: c.code,
         name: c.name,
         detail: c.detail,
-        mappedPLOs: c.mappedPLOs || []
+        mappedPLOs: (c.mappedPLOs || []).map(ploId =>
+          typeof ploId === 'object' ? ploId._id : ploId
+        )
       }));
 
       await courseService.updateCourse(courseData._id, {
@@ -204,17 +173,16 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
       });
 
       await fetchCourseCLOs();
-      alert('Xóa CLO thành công!');
+      toast.success('Xóa CLO thành công!');
     } catch (error) {
       console.error('Error deleting CLO:', error);
-      alert('Lỗi khi xóa CLO!');
+      toast.error('Lỗi khi xóa CLO!');
     }
   };
 
   const handleSaveAndNext = async () => {
     if (clos.length === 0) {
-      alert('Vui lòng thêm ít nhất 1 CLO!');
-      setActiveTab('manage');
+      toast.error('Vui lòng thêm ít nhất 1 CLO!');
       return;
     }
 
@@ -224,7 +192,6 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
         `Có ${unmappedCLOs.length} CLO chưa được ánh xạ với PLO nào. Bạn có muốn tiếp tục?`
       );
       if (!confirm) {
-        setActiveTab('mapping');
         return;
       }
     }
@@ -267,180 +234,74 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
 
   return (
     <div>
-      {/* Tabs Navigation */}
-      <ul className="nav nav-tabs mb-24">
-        <li className="nav-item">
-          <button
-            className={`nav-link ${activeTab === 'manage' ? 'active' : ''}`}
-            onClick={() => setActiveTab('manage')}
-          >
-            <i className="ph ph-list-bullets me-2"></i>
-            Quản lý CLO
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            className={`nav-link ${activeTab === 'mapping' ? 'active' : ''}`}
-            onClick={() => setActiveTab('mapping')}
-            disabled={clos.length === 0}
-          >
-            <i className="ph ph-grid-four me-2"></i>
-            Ma trận Mapping
-            {clos.length === 0 && <small className="ms-2 text-muted">(Tạo CLO trước)</small>}
-          </button>
-        </li>
-      </ul>
+      {/* Header */}
+      <div className="d-flex justify-content-between align-items-center mb-16">
+        <h6 className="text-md fw-semibold mb-0">
+          <i className="ph ph-list-bullets me-2"></i>
+          Danh sách CLO ({clos.length})
+        </h6>
+        <Button variant="primary" size="sm" onClick={handleAddCLO} icon="ph ph-plus">
+          Thêm CLO
+        </Button>
+      </div>
 
-      {/* Tab Content */}
-      {activeTab === 'manage' ? (
-        /* ========== TAB 1: QUẢN LÝ CLO ========== */
-        <div>
-          <div className="d-flex justify-content-between align-items-center mb-16">
-            <h6 className="text-md fw-semibold mb-0">Danh sách CLO ({clos.length})</h6>
-            <Button variant="primary" size="sm" onClick={handleAddCLO} icon="ph ph-plus">
-              Thêm CLO
-            </Button>
-          </div>
-
-          {clos.length === 0 ? (
-            <div className="text-center py-32 bg-neutral-50 radius-8">
-              <i className="ph ph-list-dashes text-neutral-400" style={{ fontSize: '48px' }}></i>
-              <p className="text-neutral-600 mt-3 mb-0">Chưa có CLO nào. Hãy tạo CLO để bắt đầu.</p>
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table table-hover align-middle">
-                <thead className="bg-neutral-50">
-                  <tr>
-                    <th className="px-16 py-12">#</th>
-                    <th className="px-16 py-12">Mã CLO</th>
-                    <th className="px-16 py-12">Tên CLO</th>
-                    <th className="px-16 py-12">Chi tiết</th>
-                    <th className="px-16 py-12">PLO đã ánh xạ</th>
-                    <th className="px-16 py-12 text-center">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {clos.map((clo, index) => (
-                    <tr key={clo._id}>
-                      <td className="px-16 py-12">{index + 1}</td>
-                      <td className="px-16 py-12"><Badge variant="success">{clo.code}</Badge></td>
-                      <td className="px-16 py-12 fw-semibold">{clo.name}</td>
-                      <td className="px-16 py-12 text-sm" style={{ maxWidth: '300px' }}>
-                        {clo.detail.length > 80 ? clo.detail.substring(0, 80) + '...' : clo.detail}
-                      </td>
-                      <td className="px-16 py-12">
-                        {(clo.mappedPLOs || []).length > 0 ? (
-                          (clo.mappedPLOs || []).map((ploId, idx) => {
-                            const plo = getPLODetails(ploId);
-                            const displayId = typeof ploId === 'object' ? ploId._id : ploId;
-                            return plo ? (
-                              <Badge key={displayId || idx} variant="primary" className="me-1">
-                                {plo.code || displayId}
-                              </Badge>
-                            ) : (
-                              <Badge key={displayId || idx} variant="secondary" className="me-1">
-                                {displayId}
-                              </Badge>
-                            );
-                          })
-                        ) : (
-                          <span className="text-muted">Chưa mapping</span>
-                        )}
-                      </td>
-                      <td className="px-16 py-12 text-center">
-                        <div className="d-flex gap-1 justify-content-center">
-                          <Button variant="outline-primary" size="sm" onClick={() => handleEditCLO(clo)} icon="ph ph-pencil" />
-                          <Button variant="outline-danger" size="sm" onClick={() => handleDeleteCLO(clo._id)} icon="ph ph-trash" />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+      {/* CLO List */}
+      {clos.length === 0 ? (
+        <div className="text-center py-32 bg-neutral-50 radius-8">
+          <i className="ph ph-list-dashes text-neutral-400" style={{ fontSize: '48px' }}></i>
+          <p className="text-neutral-600 mt-3 mb-0">Chưa có CLO nào. Hãy tạo CLO để bắt đầu.</p>
         </div>
       ) : (
-        /* ========== TAB 2: MA TRẬN MAPPING ========== */
-        <div>
-          <div className="mb-16">
-            <h6 className="text-md fw-semibold mb-1">Ma trận CLO - PLO Mapping</h6>
-            <p className="text-sm text-muted mb-0">
-              Tick vào ô giao nhau để ánh xạ CLO với PLO
-            </p>
-          </div>
-
-          <div className="table-responsive" style={{ overflowX: 'auto' }}>
-            <table className="table table-bordered align-middle" style={{ minWidth: '700px' }}>
-              <thead className="bg-primary-50">
-                <tr>
-                  <th className="px-8 py-8 text-center" style={{ width: '140px', position: 'sticky', left: 0, backgroundColor: '#f0f7ff', zIndex: 10 }}>
-                    <div className="fw-bold text-primary-600 text-xs">PLO</div>
-                    <div className="text-xxs text-muted mt-1">CLO →</div>
-                  </th>
-                  {clos.map((clo) => (
-                    <th key={clo._id} className="px-6 py-8 text-center bg-success-50" style={{ minWidth: '100px' }}>
-                      <div className="d-flex flex-column gap-1">
-                        <span className="badge bg-success text-white fw-bold text-xs">{clo.code}</span>
-                        <div className="text-xxs text-dark" style={{ wordBreak: 'break-word' }}>
-                          {clo.name.length > 30 ? clo.name.substring(0, 30) + '...' : clo.name}
-                        </div>
-                      </div>
-                    </th>
-                  ))}
+        <div className="table-responsive">
+          <table className="table table-hover align-middle">
+            <thead className="bg-neutral-50">
+              <tr>
+                <th className="px-16 py-12">#</th>
+                <th className="px-16 py-12">Mã CLO</th>
+                <th className="px-16 py-12">Tên CLO</th>
+                <th className="px-16 py-12">Chi tiết</th>
+                <th className="px-16 py-12">PLO đã ánh xạ</th>
+                <th className="px-16 py-12 text-center">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clos.map((clo, index) => (
+                <tr key={clo._id}>
+                  <td className="px-16 py-12">{index + 1}</td>
+                  <td className="px-16 py-12"><Badge variant="success">{clo.code}</Badge></td>
+                  <td className="px-16 py-12 fw-semibold">{clo.name}</td>
+                  <td className="px-16 py-12 text-sm" style={{ maxWidth: '300px' }}>
+                    {clo.detail.length > 80 ? clo.detail.substring(0, 80) + '...' : clo.detail}
+                  </td>
+                  <td className="px-16 py-12">
+                    {(clo.mappedPLOs || []).length > 0 ? (
+                      (clo.mappedPLOs || []).map((ploId, idx) => {
+                        const plo = getPLODetails(ploId);
+                        const displayId = typeof ploId === 'object' ? ploId._id : ploId;
+                        return plo ? (
+                          <Badge key={displayId || idx} variant="primary" className="me-1">
+                            {plo.code || displayId}
+                          </Badge>
+                        ) : (
+                          <Badge key={displayId || idx} variant="secondary" className="me-1">
+                            {displayId}
+                          </Badge>
+                        );
+                      })
+                    ) : (
+                      <span className="text-muted">Chưa mapping</span>
+                    )}
+                  </td>
+                  <td className="px-16 py-12 text-center">
+                    <div className="d-flex gap-1 justify-content-center">
+                      <Button variant="outline-primary" size="sm" onClick={() => handleEditCLO(clo)} icon="ph ph-pencil" />
+                      <Button variant="outline-danger" size="sm" onClick={() => handleDeleteCLO(clo._id)} icon="ph ph-trash" />
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {program?.plos && program.plos.length > 0 ? (
-                  program.plos.map((plo) => {
-                    const ploData = typeof plo === 'object' ? plo : getPLODetails(plo);
-                    const ploId = ploData?._id || plo;
-
-                    return (
-                      <tr key={ploId}>
-                        <td className="px-8 py-8 bg-light" style={{ position: 'sticky', left: 0, backgroundColor: '#f8f9fa', zIndex: 5 }}>
-                          <div>
-                            <span className="badge bg-primary fw-bold text-xs mb-1 d-block">
-                              {ploData?.code || ploId}
-                            </span>
-                            <div className="text-xxs text-dark fw-semibold">
-                              {ploData?.name ? (ploData.name.length > 40 ? ploData.name.substring(0, 40) + '...' : ploData.name) : 'N/A'}
-                            </div>
-                          </div>
-                        </td>
-                        {clos.map((clo) => (
-                          <td key={`${ploId}-${clo._id}`} className="px-6 py-8 text-center" style={{ verticalAlign: 'middle' }}>
-                            <div className="form-check d-flex justify-content-center align-items-center" style={{ minHeight: '20px' }}>
-                              <input
-                                type="checkbox"
-                                className="form-check-input"
-                                style={{
-                                  width: '18px',
-                                  height: '18px',
-                                  cursor: 'pointer',
-                                  margin: 0
-                                }}
-                                checked={isMapped(clo, ploId)}
-                                onChange={() => handleToggleMapping(clo._id, ploId)}
-                              />
-                            </div>
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={clos.length + 1} className="text-center py-32">
-                      <i className="ph ph-warning text-warning" style={{ fontSize: '32px' }}></i>
-                      <p className="text-muted mb-0 mt-2">Chương trình chưa có PLO nào</p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -511,23 +372,26 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
                     />
                   </div>
                   <div className="col-12">
-                    <label className="form-label fw-semibold mb-3">Ánh xạ với PLO (Tùy chọn)</label>
+                    <label className="form-label fw-semibold mb-3">
+                      Ánh xạ với PLO <span className="text-danger">*</span>
+                    </label>
                     {program?.plos && program.plos.length > 0 ? (
                       <div className="border rounded p-3 bg-light">
                         <div className="row g-3">
                           {program.plos.map(plo => {
                             const ploData = typeof plo === 'object' ? plo : getPLODetails(plo);
+                            const ploId = ploData?._id || plo;
                             return (
-                              <div key={ploData?._id || plo} className="col-md-6">
+                              <div key={ploId} className="col-md-6">
                                 <div className="form-check">
                                   <input
                                     type="checkbox"
                                     className="form-check-input"
-                                    id={`plo-${ploData?._id || plo}`}
-                                    checked={cloForm.mappedPLOs.includes(ploData?._id || plo)}
-                                    onChange={() => handlePLOCheckbox(ploData?._id || plo)}
+                                    id={`plo-${ploId}`}
+                                    checked={isPLOSelected(ploId)}
+                                    onChange={() => handlePLOCheckbox(ploId)}
                                   />
-                                  <label className="form-check-label" htmlFor={`plo-${ploData?._id || plo}`}>
+                                  <label className="form-check-label" htmlFor={`plo-${ploId}`}>
                                     <strong>{ploData?.code || plo}</strong>
                                     {ploData?.name && <div className="text-muted small">{ploData.name}</div>}
                                   </label>
@@ -543,9 +407,6 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
                         Chương trình chưa có PLO nào
                       </div>
                     )}
-                    <small className="text-muted d-block mt-2">
-                      Bạn cũng có thể mapping sau trong tab "Ma trận Mapping"
-                    </small>
                   </div>
                 </div>
               </div>

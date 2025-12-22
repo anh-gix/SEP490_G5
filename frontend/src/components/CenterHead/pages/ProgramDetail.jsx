@@ -13,6 +13,7 @@ import programService from '../../../services/programService';
 import { courseService } from '../../../services/courseService';
 import approvalRequestService from '../../../services/approvalRequestService';
 import centerHeadService from '../../../services/centerHeadService';
+import workRequestService from '../../../services/workRequestService';
 import { formatDate } from '../../../helper/helper';
 
 const ProgramDetail = ({ viewMode = 'center-head' }) => {
@@ -30,6 +31,12 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [submissionNote, setSubmissionNote] = useState('');
   const [togglingCourseId, setTogglingCourseId] = useState(null);
+
+  // Edit program work request state
+  const [editProgramRequest, setEditProgramRequest] = useState(null);
+  const [originalCourseIds, setOriginalCourseIds] = useState([]);
+  const [showSubmitEditModal, setShowSubmitEditModal] = useState(false);
+  const [submitEditNote, setSubmitEditNote] = useState('');
 
   // Get user role from localStorage
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -71,6 +78,11 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
         setCourses(programCourses);
 
         console.log('Program detail loaded from API:', programData);
+
+        // For Subject Leader: Check if there's an active edit_program request
+        if (viewMode === 'teacher' && programData.status === 'approved') {
+          await fetchEditProgramRequest(programCourses);
+        }
       }
 
     } catch (err) {
@@ -78,6 +90,50 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
       toast.error('Không thể tải thông tin chương trình!', { position: 'top-right' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fetch edit_program work request for this program
+  const fetchEditProgramRequest = async (currentCourses) => {
+    try {
+      const response = await workRequestService.checkProgramEditStatus(id);
+      if (response.success && response.hasActiveRequest) {
+        const request = response.request;
+
+        // Only show edit controls if current user is the assignee
+        const assignedToId = typeof request.assignedTo === 'object'
+          ? request.assignedTo._id
+          : request.assignedTo;
+
+        if (assignedToId !== user._id) {
+          // User is not the assignee, don't show edit mode
+          setEditProgramRequest(null);
+          setOriginalCourseIds([]);
+          return;
+        }
+
+        setEditProgramRequest(request);
+
+        // Store original course IDs when request started (courses that existed before edit)
+        // We consider courses that were in program when request was created as "original"
+        if (request.status === 'in_progress' || request.status === 'pending_approval') {
+          // Get course IDs that existed when request was assigned
+          // For simplicity, we'll store the current course IDs minus any newly created ones
+          // Or we can use changeDetails if stored
+          if (request.changeDetails?.originalCourseIds) {
+            setOriginalCourseIds(request.changeDetails.originalCourseIds);
+          } else {
+            // Fallback: all current courses are considered original
+            setOriginalCourseIds(currentCourses.map(c => c._id));
+          }
+        }
+      } else {
+        setEditProgramRequest(null);
+        setOriginalCourseIds([]);
+      }
+    } catch (error) {
+      console.error('Error fetching edit program request:', error);
+      // Don't show error toast, just silently fail
     }
   };
 
@@ -284,6 +340,42 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
     }
   };
 
+  // ===== SUBMIT EDIT PROGRAM HANDLER =====
+  const handleSubmitEditProgram = () => {
+    setShowSubmitEditModal(true);
+  };
+
+  const handleConfirmSubmitEditProgram = async () => {
+    if (!editProgramRequest) return;
+
+    try {
+      setActionLoading(true);
+      const response = await workRequestService.submitEditProgram(editProgramRequest._id, {
+        note: submitEditNote.trim() || undefined
+      });
+
+      if (response.success) {
+        toast.success('Đã gửi yêu cầu phê duyệt chỉnh sửa chương trình!', { position: 'top-right' });
+        setShowSubmitEditModal(false);
+        setSubmitEditNote('');
+        fetchProgramDetail();
+      }
+    } catch (err) {
+      console.error('Error submitting edit program:', err);
+      toast.error(err.message || 'Có lỗi xảy ra khi gửi yêu cầu phê duyệt', { position: 'top-right' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Check if a course is an original course (existed before edit request)
+  const isOriginalCourse = (courseId) => {
+    return originalCourseIds.includes(courseId);
+  };
+
+  // Check if edit mode is active (edit_program request in_progress)
+  const isEditModeActive = editProgramRequest && editProgramRequest.status === 'in_progress';
+
   // ===== TOGGLE COURSE ACTIVE HANDLER =====
   const handleToggleCourseActive = async (courseId, currentIsActive, e) => {
     e.stopPropagation();
@@ -477,52 +569,68 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
     {
       header: 'Hành động',
       field: 'actions',
-      render: (row) => (
-        <div className="d-flex flex-wrap gap-2">
-          {/* Draft: Show "Continue" button to continue wizard - only for non-Center Head */}
-          {row.status === 'draft' && userRole !== 'Center Head' && (
+      render: (row) => {
+        // Check if this is an original course (cannot be edited/deleted in edit mode)
+        const isOriginal = isOriginalCourse(row._id);
+        // In edit mode, original courses can only be viewed
+        const canEditOrDelete = !isViewOnly && (!isEditModeActive || !isOriginal);
+
+        return (
+          <div className="d-flex flex-wrap gap-2">
+            {/* Draft: Show "Continue" button to continue wizard - only for non-Center Head */}
+            {/* In edit mode, only allow continuing new courses (not original) */}
+            {row.status === 'draft' && userRole !== 'Center Head' && canEditOrDelete && (
+              <Button
+                variant="primary"
+                size="sm"
+                icon="ph ph-play-circle"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`${basePath}/programs/${id}/courses/${row._id}/edit`);
+                }}
+              >
+                Tiếp tục
+              </Button>
+            )}
+
+            {/* View button for all statuses */}
             <Button
-              variant="primary"
+              variant="outline"
               size="sm"
-              icon="ph ph-play-circle"
+              icon="ph ph-eye"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`${basePath}/programs/${id}/courses/${row._id}/edit`);
+                navigate(`${basePath}/programs/${id}/courses/${row._id}/details`);
               }}
             >
-              Tiếp tục
+              Xem
             </Button>
-          )}
 
-          {/* View button for all statuses */}
-          <Button
-            variant="outline"
-            size="sm"
-            icon="ph ph-eye"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`${basePath}/programs/${id}/courses/${row._id}/details`);
-            }}
-          >
-            Xem
-          </Button>
+            {/* Delete button - only for non-view-only and not original courses in edit mode */}
+            {canEditOrDelete && (
+              <Button
+                variant="danger"
+                size="sm"
+                icon="ph ph-trash"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteCourse(row._id, row.name);
+                }}
+              >
+                Xóa
+              </Button>
+            )}
 
-          {/* Delete button - only for non-view-only */}
-          {!isViewOnly && (
-            <Button
-              variant="danger"
-              size="sm"
-              icon="ph ph-trash"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDeleteCourse(row._id, row.name);
-              }}
-            >
-              Xóa
-            </Button>
-          )}
-        </div>
-      ),
+            {/* Show locked indicator for original courses in edit mode */}
+            {isEditModeActive && isOriginal && (
+              <span className="text-neutral-500 d-flex align-items-center" title="Không thể chỉnh sửa khóa học gốc">
+                <i className="ph ph-lock-simple me-1"></i>
+                <small>Đã khóa</small>
+              </span>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -564,27 +672,6 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
           <div className="d-flex flex-wrap align-items-center gap-3">
             <StatusBadge status={program.status} />
             <span className="text-neutral-600">Mã: <strong>{program.code}</strong></span>
-
-            {/* Toggle Active - Only for Center Head and Approved programs */}
-            {userRole === 'Center Head' && program.status === 'approved' && (
-              <div className="d-flex align-items-center gap-2 ms-auto">
-                <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>
-                  {program.isActive ? 'Đang hoạt động' : 'Tạm dừng'}
-                </span>
-                <div className="form-check form-switch mb-0">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    checked={program.isActive || false}
-                    onChange={handleToggleActive}
-                    disabled={actionLoading}
-                    style={{ cursor: actionLoading ? 'not-allowed' : 'pointer' }}
-                    title={program.isActive ? 'Tạm dừng chương trình' : 'Mở chương trình cho đăng ký'}
-                  />
-                </div>
-              </div>
-            )}
           </div>
         </div>
         <div className="d-flex flex-wrap gap-2">
@@ -622,8 +709,9 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
             </>
           )}
 
-          {/* Edit button - only for non-view-only */}
-          {!isViewOnly && (
+          {/* Edit button - only for non-view-only and not in edit_program mode */}
+          {/* In edit_program mode, program info cannot be edited, only add new courses */}
+          {!isViewOnly && !isEditModeActive && (
             <Button
               variant="outline"
               icon="ph ph-pencil-simple"
@@ -724,6 +812,54 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
         )}
       </Card>
 
+      {/* Edit Program Request Alert - For Subject Leader */}
+      {editProgramRequest && viewMode === 'teacher' && (
+        <div
+          className={`alert mb-24 ${editProgramRequest.status === 'in_progress' ? 'alert-info' : 'alert-warning'}`}
+          role="alert"
+          style={{ borderLeft: `4px solid ${editProgramRequest.status === 'in_progress' ? '#0ea5e9' : '#f59e0b'}` }}
+        >
+          <div className="d-flex align-items-start">
+            <i
+              className={`ph ${editProgramRequest.status === 'in_progress' ? 'ph-pencil-simple-line' : 'ph-hourglass'}`}
+              style={{ fontSize: '24px', marginRight: '12px', color: editProgramRequest.status === 'in_progress' ? '#0ea5e9' : '#f59e0b' }}
+            ></i>
+            <div className="flex-grow-1">
+              <h6 className="mb-2 fw-bold">
+                {editProgramRequest.status === 'in_progress'
+                  ? 'Đang chỉnh sửa chương trình'
+                  : 'Chờ phê duyệt chỉnh sửa'}
+              </h6>
+              <p className="mb-1">
+                {editProgramRequest.status === 'in_progress'
+                  ? 'Bạn có thể thêm khóa học mới vào chương trình này. Các khóa học đã có sẽ bị khóa và không thể chỉnh sửa hoặc xóa.'
+                  : 'Yêu cầu chỉnh sửa đang chờ Center Head phê duyệt.'}
+              </p>
+              {editProgramRequest.requestNote && (
+                <p className="mb-1 text-sm"><strong>Ghi chú từ Center Head:</strong> {editProgramRequest.requestNote}</p>
+              )}
+              {editProgramRequest.requestedBy && (
+                <p className="mb-0 mt-2 text-sm text-muted">
+                  Yêu cầu từ: {editProgramRequest.requestedBy.username || editProgramRequest.requestedBy.email} - {formatDate(editProgramRequest.createdAt)}
+                </p>
+              )}
+            </div>
+            {/* Submit button when in_progress */}
+            {editProgramRequest.status === 'in_progress' && (
+              <Button
+                variant="primary"
+                size="sm"
+                icon="ph ph-paper-plane-tilt"
+                onClick={handleSubmitEditProgram}
+                disabled={actionLoading}
+              >
+                Gửi phê duyệt
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Courses List */}
       <Card variant="shadow">
         <div className="d-flex justify-content-between align-items-center mb-20">
@@ -733,8 +869,14 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
               Các khóa học thuộc chương trình này
             </p>
           </div>
-          {/* Show Create Course button only when program is draft or needs_revision and not view-only */}
-          {!isViewOnly && (program?.status === 'draft' || program?.status === 'needs_revision') && (
+          {/* Show Create Course button:
+              1. When program is draft or needs_revision (normal workflow)
+              2. When edit_program request is in_progress (edit mode) */}
+          {!isViewOnly && (
+            program?.status === 'draft' ||
+            program?.status === 'needs_revision' ||
+            isEditModeActive
+          ) && (
             <Button
               variant="primary"
               onClick={() => navigate(`${basePath}/programs/${id}/courses/create`)}
@@ -948,6 +1090,64 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
                   disabled={actionLoading}
                 >
                   {actionLoading ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Submit Edit Program Modal */}
+      {showSubmitEditModal && (
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Gửi yêu cầu phê duyệt chỉnh sửa</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowSubmitEditModal(false);
+                    setSubmitEditNote('');
+                  }}
+                  disabled={actionLoading}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <p className="text-neutral-600 mb-3">
+                  Bạn đang gửi yêu cầu phê duyệt chỉnh sửa cho chương trình <strong>{program?.program_name}</strong>.
+                </p>
+                <p className="text-neutral-600 mb-3">
+                  Các khóa học mới thêm sẽ được Center Head xem xét và phê duyệt.
+                </p>
+                <label className="form-label">Ghi chú (tùy chọn)</label>
+                <textarea
+                  className="form-control"
+                  rows="4"
+                  placeholder="Mô tả các thay đổi bạn đã thực hiện..."
+                  value={submitEditNote}
+                  onChange={(e) => setSubmitEditNote(e.target.value)}
+                  disabled={actionLoading}
+                ></textarea>
+              </div>
+              <div className="modal-footer">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowSubmitEditModal(false);
+                    setSubmitEditNote('');
+                  }}
+                  disabled={actionLoading}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleConfirmSubmitEditProgram}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Đang xử lý...' : 'Gửi phê duyệt'}
                 </Button>
               </div>
             </div>

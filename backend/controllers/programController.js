@@ -127,7 +127,7 @@ const getProgramById = async (req, res) => {
     const courses = await Course.find({ program: id })
       .populate('createdBy', 'username email')
       .populate('sessions', 'title order')
-      .select('_id courseCode name description status createdAt updatedAt clos sessions mappedPLOs');
+      .select('_id courseCode name description status isActive learningType createdAt updatedAt clos sessions mappedPLOs');
 
     // Get work request info if exists (use WorkRequest model)
     const workRequest = await WorkRequest.findOne({

@@ -996,28 +996,31 @@ exports.canDeactivateCourse = async (req, res) => {
             });
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        yesterday.setHours(23, 59, 59, 999); // Bao gồm cả schedule đang diễn ra hôm nay
 
-        // Tìm các class đang active hoặc pending sử dụng course này
-        const activeClasses = await Class.find({
-            course: id,
-            status: { $in: ['pending', 'active'] }
+        // Tìm tất cả các class sử dụng course này (không phân biệt status)
+        const allClasses = await Class.find({
+            course: id
         }).select('_id name status');
 
-        if (activeClasses.length === 0) {
+        if (allClasses.length === 0) {
             return res.status(200).json({
                 success: true,
                 canDeactivate: true,
-                message: 'Không có lớp học nào đang sử dụng khóa học này'
+                message: 'Không có lớp học nào sử dụng khóa học này'
             });
         }
 
-        // Check xem các class này còn schedule tương lai không
+        // Lọc ra các class đang active hoặc có schedule
+        const activeClasses = allClasses.filter(c => c.status === 'active' || c.status === 'pending');
+
+        // Check xem các class này còn schedule đang diễn ra hoặc tương lai không
         const classIds = activeClasses.map(c => c._id);
         const futureSchedules = await ClassSchedule.find({
             class: { $in: classIds },
-            date: { $gte: today },
+            date: { $gte: yesterday },
             status: { $in: ['temporary', 'fixed'] }
         })
         .populate('class', 'name')
@@ -1052,7 +1055,7 @@ exports.canDeactivateCourse = async (req, res) => {
                 estimatedEndDate: lastSchedule?.date,
                 totalFutureSchedules: await ClassSchedule.countDocuments({
                     class: { $in: classIds },
-                    date: { $gte: today },
+                    date: { $gte: yesterday },
                     status: { $in: ['temporary', 'fixed'] }
                 })
             });

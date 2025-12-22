@@ -473,14 +473,8 @@ const CenterHeadProgramDetail = () => {
       header: 'Hoạt động',
       field: 'isActive',
       render: (row) => {
-        // Chỉ hiển thị toggle cho course có status completed
-        if (row.status !== 'completed') {
-          return (
-            <span className="text-neutral-500" style={{ fontSize: '0.75rem' }}>
-              N/A
-            </span>
-          );
-        }
+        // Hiển thị toggle cho tất cả course (isActive không liên quan đến status course)
+        // Logic kiểm tra có thể deactivate hay không sẽ được thực hiện khi toggle
 
         const isToggling = togglingCourseId === row._id;
 

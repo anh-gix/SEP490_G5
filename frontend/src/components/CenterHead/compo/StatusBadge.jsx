@@ -31,7 +31,6 @@ const StatusBadge = ({ status, label, size = "md" }) => {
 
     // Room
     available: { variant: "success", icon: "ph-check", text: "Có sẵn" },
-    in_use: { variant: "primary", icon: "ph-users", text: "Đang sử dụng" },
     maintenance: { variant: "warning", icon: "ph-wrench", text: "Bảo trì" },
 
     // Exam & Submission

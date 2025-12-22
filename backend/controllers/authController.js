@@ -83,13 +83,7 @@ const updateUserProfile = async (req, res) => {
       }
     }
 
-    // Check if phone is being changed and if it already exists
-    if (req.body.phone && req.body.phone !== user.phone) {
-      const phoneExists = await User.findOne({ phone: req.body.phone });
-      if (phoneExists) {
-        return res.status(400).json({ message: 'Số điện thoại đã được sử dụng' });
-      }
-    }
+    // Phone can be duplicate, no need to check
 
     user.email = req.body.email || user.email;
     user.username = req.body.username || user.username;

@@ -384,13 +384,7 @@ exports.createTeacher = async (req, res) => {
       });
     }
     
-    // Check if phone number already exists
-    const phoneExists = await User.findOne({ phone });
-    if (phoneExists) {
-      return res.status(400).json({ 
-        message: "Số điện thoại đã tồn tại trong hệ thống" 
-      });
-    }
+    // Phone can be duplicate, no need to check
     
     // Find teacher role
     const teacherRole = await Role.findOne({ name: 'Teacher' });
@@ -535,20 +529,54 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
       // Parse dates carefully to avoid timezone issues
       // Expecting YYYY-MM-DD format from frontend
       const parseDate = (dateStr) => {
-        const [year, month, day] = dateStr.split('-').map(Number);
-        return new Date(Date.UTC(year, month - 1, day));
+        // Validate input
+        if (!dateStr || typeof dateStr !== 'string') {
+          return null;
+        }
+        
+        const parts = dateStr.split('-');
+        if (parts.length !== 3) {
+          return null;
+        }
+        
+        const [year, month, day] = parts.map(Number);
+        
+        // Validate parsed values
+        if (isNaN(year) || isNaN(month) || isNaN(day)) {
+          return null;
+        }
+        
+        // Validate date range
+        if (month < 1 || month > 12 || day < 1 || day > 31) {
+          return null;
+        }
+        
+        const date = new Date(Date.UTC(year, month - 1, day));
+        
+        // Check if date is valid
+        if (isNaN(date.getTime())) {
+          return null;
+        }
+        
+        return date;
       };
       
       const start = parseDate(startDate);
-      start.setUTCHours(0, 0, 0, 0);
-      
       const end = parseDate(endDate);
-      end.setUTCHours(23, 59, 59, 999);
       
-      query.date = {
-        $gte: start,
-        $lte: end
-      };
+      // Only add date filter if both dates are valid
+      if (start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        start.setUTCHours(0, 0, 0, 0);
+        end.setUTCHours(23, 59, 59, 999);
+        
+        query.date = {
+          $gte: start,
+          $lte: end
+        };
+      } else {
+        // Log error but don't throw - just skip date filter
+        console.warn('Invalid date range provided:', { startDate, endDate });
+      }
     }
     
     const schedules = await ClassSchedule.find(query)
@@ -557,7 +585,11 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
         path: 'class',
         populate: {
           path: 'course',
-          select: 'name'
+          select: 'name program',
+          populate: {
+            path: 'program',
+            select: 'type'
+          }
         }
       })
       .populate('room', 'room_name location')
@@ -734,7 +766,11 @@ exports.getTeacherSchedule = async (req, res) => {
         path: 'class',
         populate: {
           path: 'course',
-          select: 'name'
+          select: 'name program',
+          populate: {
+            path: 'program',
+            select: 'type'
+          }
         }
       })
       .populate('room', 'room_name location')
@@ -2136,39 +2172,56 @@ exports.importTeachers = async (req, res) => {
           continue;
         }
         
-        // Validate phone number length (10-11 digits)
+        // Validate phone number length (10 digits only)
+        let normalizedPhone = teacherData.phone || '';
         if (teacherData.phone) {
           const phoneDigits = teacherData.phone.replace(/\D/g, '');
-          if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+          // Validate BEFORE adding leading zero
+          if (phoneDigits.length === 0) {
             results.failed.push({
               email: teacherData.email,
               username: teacherData.username,
               phone: teacherData.phone || '',
-              reason: 'Số điện thoại phải có 10 hoặc 11 chữ số'
+              reason: 'Số điện thoại không được để trống'
             });
             continue;
+          }
+          
+          if (phoneDigits[0] === '0') {
+            // Has leading zero: must be exactly 10 digits
+            if (phoneDigits.length !== 10) {
+              results.failed.push({
+                email: teacherData.email,
+                username: teacherData.username,
+                phone: teacherData.phone || '',
+                reason: 'Số điện thoại phải có 10 chữ số'
+              });
+              continue;
+            }
+            normalizedPhone = phoneDigits;
+          } else {
+            // No leading zero (Excel removed it): must be exactly 9 digits
+            if (phoneDigits.length !== 9) {
+              results.failed.push({
+                email: teacherData.email,
+                username: teacherData.username,
+                phone: teacherData.phone || '',
+                reason: 'Số điện thoại phải có 9 chữ số (thiếu số 0 ở đầu do Excel)'
+              });
+              continue;
+            }
+            // Add leading zero to normalize to 10 digits
+            normalizedPhone = '0' + phoneDigits;
           }
         }
         
-        // Check if phone number exists
-        if (teacherData.phone) {
-          const phoneExists = await User.findOne({ phone: teacherData.phone });
-          if (phoneExists) {
-            results.failed.push({
-              email: teacherData.email,
-              username: teacherData.username,
-              phone: teacherData.phone,
-              reason: 'Số điện thoại đã tồn tại trong hệ thống'
-            });
-            continue;
-          }
-        }
+        // Phone can be duplicate, no need to check
         
         // Create teacher
         const newTeacher = await User.create({
           email: teacherData.email,
           username: teacherData.username,
-          phone: teacherData.phone || '',
+          phone: normalizedPhone,
           address: teacherData.address || '',
           password: teacherData.password || '123456', // Default password
           roleId: teacherRole._id

@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { toast, ToastContainer } from 'react-toastify';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
 import CourseWizardIntro from '../compo/CourseWizardIntro';
 import CourseSuccessModal from '../compo/CourseSuccessModal';
-import { ToastContainer } from '../compo/Toast';
 import programService from '../../../services/programService';
 import courseService from '../../../services/courseService';
 
@@ -25,6 +25,22 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
   // Determine base path
   const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
 
+  // Safe toast utility to prevent timing issues
+  const safeToast = {
+    success: (message, delay = 0) => {
+      setTimeout(() => toast.success(message), delay);
+    },
+    error: (message, delay = 0) => {
+      setTimeout(() => toast.error(message), delay);
+    },
+    info: (message, delay = 0) => {
+      setTimeout(() => toast.info(message), delay);
+    },
+    warning: (message, delay = 0) => {
+      setTimeout(() => toast.warning(message), delay);
+    }
+  };
+
   const [showIntro, setShowIntro] = useState(!isEdit); // Show intro for new courses only
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -33,7 +49,6 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
   const [autoSaveStatus, setAutoSaveStatus] = useState('saved'); // 'saved', 'saving', 'error'
   const autoSaveTimeoutRef = useRef(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [toasts, setToasts] = useState([]);
 
   // Course data state
   const [courseData, setCourseData] = useState({
@@ -115,21 +130,6 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
     { label: isEdit ? 'Chỉnh sửa học phần' : 'Tạo học phần mới' }
   ];
 
-  // Toast helpers
-  const showToast = (message, type = 'info', duration = 3000) => {
-    const newToast = {
-      id: Date.now(),
-      message,
-      type,
-      duration,
-      position: 'top-right'
-    };
-    setToasts(prev => [...prev, newToast]);
-  };
-
-  const removeToast = (id) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-  };
 
   // Intro Screen handlers
   const handleStartWizard = () => {
@@ -166,7 +166,7 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
         setProgram(response.data);
       } catch (error) {
         console.error('Error loading program:', error);
-        showToast('Không thể tải thông tin chương trình!', 'error');
+        toast.error('Không thể tải thông tin chương trình!');
         navigate(`${basePath}/programs`);
       } finally {
         setLoading(false);
@@ -215,7 +215,7 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
           }
         } catch (error) {
           console.error('Error loading existing course:', error);
-          showToast('Không thể tải thông tin học phần hiện tại!', 'error');
+          toast.error('Không thể tải thông tin học phần hiện tại!');
         }
       }
     };
@@ -317,7 +317,7 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
                       setShowSuccessModal(true);
                     } catch (error) {
                       console.error('Error updating course status:', error);
-                      showToast('Có lỗi khi cập nhật trạng thái học phần!', 'error');
+                      toast.error('Có lỗi khi cập nhật trạng thái học phần!');
                     }
                   }}
                   icon="ph ph-check-circle"
@@ -351,7 +351,6 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
   if (showIntro && !isEdit) {
     return (
       <div className="dashboard-body wizard-container py-5">
-        <ToastContainer toasts={toasts} removeToast={removeToast} />
         <CourseWizardIntro
           program={program}
           onStart={handleStartWizard}
@@ -364,8 +363,6 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
   return (
     <div className="dashboard-body wizard-container">
       {/* Toast Notifications */}
-      <ToastContainer toasts={toasts} removeToast={removeToast} />
-
       {/* Success Modal */}
       <CourseSuccessModal
         show={showSuccessModal}
@@ -381,6 +378,13 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
         <div className="container-fluid">
           <div className="d-flex align-items-center justify-content-between mb-12">
             <div className="d-flex align-items-center gap-3">
+              <Button
+                variant="ghost"
+                onClick={() => safeToast.success('Toast test thành công! 🎉')}
+                icon="ph ph-bell"
+                className="text-neutral-600 hover:text-neutral-900"
+                title="Test Toast"
+              />
               <Button
                 variant="ghost"
                 onClick={handleExit}
@@ -421,55 +425,7 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
                   </>
                 )}
               </div>
-
-              {/* Progress percentage */}
-              <div className="d-flex align-items-center gap-2">
-                <div className="text-end">
-                  <div className="fw-bold text-sm text-neutral-900">{getProgressPercentage()}%</div>
-                  <div className="text-xxs text-neutral-600">Hoàn thành</div>
-                </div>
-                <div className="position-relative" style={{ width: '60px', height: '60px' }}>
-                  <svg width="60" height="60" className="progress-ring">
-                    <circle
-                      cx="30"
-                      cy="30"
-                      r="26"
-                      fill="none"
-                      stroke="#e5e7eb"
-                      strokeWidth="4"
-                    />
-                    <circle
-                      cx="30"
-                      cy="30"
-                      r="26"
-                      fill="none"
-                      stroke="#3b82f6"
-                      strokeWidth="4"
-                      strokeDasharray={`${2 * Math.PI * 26}`}
-                      strokeDashoffset={`${2 * Math.PI * 26 * (1 - getProgressPercentage() / 100)}`}
-                      strokeLinecap="round"
-                      transform="rotate(-90 30 30)"
-                      style={{ transition: 'stroke-dashoffset 0.5s ease' }}
-                    />
-                  </svg>
-                  <div className="position-absolute top-50 start-50 translate-middle">
-                    <span className="fw-bold text-xs text-primary-600">{currentStep}/5</span>
-                  </div>
-                </div>
-              </div>
             </div>
-          </div>
-
-          {/* Progress bar */}
-          <div className="progress" style={{ height: '6px' }}>
-            <div
-              className="progress-bar bg-success-600"
-              role="progressbar"
-              style={{ width: `${getProgressPercentage()}%`, transition: 'width 0.5s ease' }}
-              aria-valuenow={getProgressPercentage()}
-              aria-valuemin="0"
-              aria-valuemax="100"
-            ></div>
           </div>
         </div>
       </div>
@@ -667,6 +623,20 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
           }
         }
       `}</style>
+
+      {/* Toast Notifications */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 };

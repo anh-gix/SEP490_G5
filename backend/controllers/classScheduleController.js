@@ -261,7 +261,12 @@ exports.validateAddClassSchedule = async (req, res) => {
             $gte: startOfDay,
             $lte: endOfDay
           },
-          status: { $in: ['temporary', 'fixed'] }
+          status: { $in: ['temporary', 'fixed'] },
+          // FIX: Chỉ lấy các buổi mà giáo viên này thực sự dạy
+          $or: [
+            { teacher: teacherId },
+            { substituteTeacher: teacherId }
+          ]
         };
         if (excludeScheduleId) {
           teacherScheduleQuery._id = { $ne: new mongoose.Types.ObjectId(excludeScheduleId) };
@@ -290,122 +295,92 @@ exports.validateAddClassSchedule = async (req, res) => {
       }
     }
 
-    // 3. Kiểm tra conflict SINH VIÊN
+    // 3. Kiểm tra conflict SINH VIÊN (sử dụng StudentSchedule thay vì ClassSchedule)
     if (students.length > 0) {
-      // Lấy tất cả lớp khác của sinh viên (trừ lớp hiện tại)
-      const studentClasses = await Class.find({
-        students: { $in: students },
-        _id: { $ne: classId }
-      }).select('_id name students').lean();
+      const studentIds = students.map(s => s._id || s);
 
-      if (studentClasses.length > 0) {
-        const studentClassIds = studentClasses.map(c => c._id);
+      // Group conflicts by student
+      const studentConflictMap = new Map();
 
-        // Build query for student schedules, excluding all schedules of current class
-        // Loại trừ tất cả schedules của lớp hiện tại để tránh báo conflict với chính lớp đang chỉnh sửa
-        const currentClassSchedulesForStudents = await ClassSchedule.find({
-          class: new mongoose.Types.ObjectId(classId),
-          date: {
-            $gte: startOfDay,
-            $lte: endOfDay
-          },
-          status: { $in: ['temporary', 'fixed'] }
-        }).select('_id').lean();
-        
-        const currentClassScheduleIdsForStudents = currentClassSchedulesForStudents.map(s => s._id);
-        
-        const studentScheduleQuery = {
-          class: { $in: studentClassIds },
-          date: {
-            $gte: startOfDay,
-            $lte: endOfDay
-          },
-          status: { $in: ['temporary', 'fixed'] }
-        };
-        
-        // Loại trừ tất cả schedules của lớp hiện tại
-        if (currentClassScheduleIdsForStudents.length > 0) {
-          studentScheduleQuery._id = { $nin: currentClassScheduleIdsForStudents };
-        } else if (excludeScheduleId) {
-          // Nếu không có schedules của lớp hiện tại, chỉ loại trừ schedule cụ thể nếu có
-          studentScheduleQuery._id = { $ne: new mongoose.Types.ObjectId(excludeScheduleId) };
-        }
+      // Kiểm tra lịch học của từng sinh viên
+      for (const student of students) {
+        const studentId = student._id || student;
+        const studentName = student.username || student.fullName || `Sinh viên ${studentId}`;
 
-        // Lấy lịch học của sinh viên trong ngày đó
-        const studentSchedules = await ClassSchedule.find(studentScheduleQuery)
-          .populate('class', 'name')
-          .select('date startTime endTime class')
+        // Lấy tất cả StudentSchedule của sinh viên trong ngày đó
+        const studentSchedules = await StudentSchedule.find({
+          student: studentId
+        })
+          .populate({
+            path: 'classSchedule',
+            match: {
+              date: {
+                $gte: startOfDay,
+                $lte: endOfDay
+              },
+              status: { $in: ['temporary', 'fixed'] }
+            },
+            select: 'date startTime endTime class',
+            populate: {
+              path: 'class',
+              select: 'name'
+            }
+          })
           .lean();
 
-        // Group conflicts by student
-        const studentConflictMap = new Map();
+        // Filter out null classSchedule (không match điều kiện)
+        const validStudentSchedules = studentSchedules
+          .filter(ss => ss.classSchedule != null)
+          .map(ss => ss.classSchedule);
 
-        studentSchedules.forEach((schedule, idx) => {
-          const hasOverlap = hasTimeOverlap(startTime, endTime, schedule.startTime, schedule.endTime);
+        validStudentSchedules.forEach((schedule) => {
           const scheduleClassId = schedule.class?._id?.toString() || schedule.class?.toString() || null;
           const scheduleClassName = schedule.class?.name || 'N/A';
           const isCurrentClass = scheduleClassId === classId.toString();
-          const scheduleDateStr = formatDateLocal(schedule.date);
-          
+
+          // Bỏ qua nếu là lớp hiện tại
+          if (isCurrentClass) {
+            // Nếu đang update (có excludeScheduleId), kiểm tra xem có phải schedule đang được update không
+            if (excludeScheduleId && schedule._id.toString() === excludeScheduleId) {
+              return; // Bỏ qua schedule đang được update
+            }
+            // Nếu không phải schedule đang update nhưng cùng lớp, vẫn bỏ qua để tránh báo conflict với chính lớp
+            return;
+          }
+
+          const hasOverlap = hasTimeOverlap(startTime, endTime, schedule.startTime, schedule.endTime);
+
           if (hasOverlap) {
-            // Tìm lớp nào có schedule này
-            if (!scheduleClassId) {
-              return;
-            }
+            const studentIdStr = studentId.toString();
 
-            // Kiểm tra xem có phải là lớp hiện tại không
-            if (isCurrentClass) {
-              return; // Bỏ qua conflict với chính lớp hiện tại
-            }
-
-            // Tìm lớp trong studentClasses có ID trùng với scheduleClassId
-            const conflictingClass = studentClasses.find(cls => cls._id.toString() === scheduleClassId);
-            if (!conflictingClass) {
-              return;
-            }
-
-            // Tìm sinh viên nào trong lớp hiện tại cũng có trong lớp conflict
-            conflictingClass.students.forEach(studentIdInConflictClass => {
-              const studentIdInConflictClassStr = studentIdInConflictClass.toString();
-              
-              // Check if this student is also in the current class và lấy thông tin sinh viên
-              const studentInCurrentClass = students.find(s => {
-                const studentIdStr = s._id?.toString() || s.toString();
-                return studentIdStr === studentIdInConflictClassStr;
+            if (!studentConflictMap.has(studentIdStr)) {
+              studentConflictMap.set(studentIdStr, {
+                studentId: studentIdStr,
+                studentName: studentName,
+                conflicts: []
               });
+            }
 
-              if (studentInCurrentClass) {
-                const studentName = studentInCurrentClass.username || studentInCurrentClass.fullName || `Sinh viên ${studentIdInConflictClassStr}`;
-                
-                if (!studentConflictMap.has(studentIdInConflictClassStr)) {
-                  studentConflictMap.set(studentIdInConflictClassStr, {
-                    studentId: studentIdInConflictClassStr,
-                    studentName: studentName,
-                    conflicts: []
-                  });
-                }
-                studentConflictMap.get(studentIdInConflictClassStr).conflicts.push({
-                  className: schedule.class?.name || conflictingClass.name || 'N/A',
-                  date: formatDateLocal(schedule.date),
-                  time: `${schedule.startTime} - ${schedule.endTime}`,
-                  conflictingTime: `${startTime} - ${endTime}`
-                });
-                conflicts.hasConflict = true;
-              }
+            studentConflictMap.get(studentIdStr).conflicts.push({
+              className: scheduleClassName,
+              date: formatDateLocal(schedule.date),
+              time: `${schedule.startTime} - ${schedule.endTime}`,
+              conflictingTime: `${startTime} - ${endTime}`
             });
+            conflicts.hasConflict = true;
           }
         });
+      }
 
-        // Convert map to array
-        studentConflictMap.forEach((studentConflict) => {
-          conflicts.students.push(studentConflict);
-        });
-        
-        if (studentConflictMap.size === 0) {
-          console.log('  ✓ Không có học sinh nào bị conflict');
-        } else {
-          console.log(`   Có ${studentConflictMap.size} học sinh bị conflict`);
-        }
+      // Convert map to array
+      studentConflictMap.forEach((studentConflict) => {
+        conflicts.students.push(studentConflict);
+      });
+
+      if (studentConflictMap.size === 0) {
+        console.log('  ✓ Không có học sinh nào bị conflict');
+      } else {
+        console.log(`   Có ${studentConflictMap.size} học sinh bị conflict`);
       }
     }
 
@@ -1333,6 +1308,7 @@ exports.getStudentSchedulesByClassSchedules = async (req, res) => {
 exports.getStudentSchedule = async (req, res) => {
   try {
     const { studentId } = req.params;
+    const { startDate, endDate } = req.query;
     const Class = require("../models/classModel");
     const Course = require("../models/courseModel");
 
@@ -1371,7 +1347,32 @@ exports.getStudentSchedule = async (req, res) => {
       })
       .lean();
 
-    studentSchedules.sort((a, b) => {
+    // Filter by date range if provided
+    let filteredSchedules = studentSchedules;
+    if (startDate || endDate) {
+      filteredSchedules = studentSchedules.filter((ss) => {
+        if (!ss.classSchedule || !ss.classSchedule.date) return false;
+
+        const scheduleDate = new Date(ss.classSchedule.date);
+        scheduleDate.setHours(0, 0, 0, 0);
+
+        if (startDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          if (scheduleDate < start) return false;
+        }
+
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(0, 0, 0, 0);
+          if (scheduleDate > end) return false;
+        }
+
+        return true;
+      });
+    }
+
+    filteredSchedules.sort((a, b) => {
       if (!a.classSchedule || !b.classSchedule) return 0;
       const dateA = new Date(a.classSchedule.date);
       const dateB = new Date(b.classSchedule.date);
@@ -1381,7 +1382,7 @@ exports.getStudentSchedule = async (req, res) => {
       return (a.classSchedule.startTime || "").localeCompare(b.classSchedule.startTime || "");
     });
 
-    if (!studentSchedules || studentSchedules.length === 0) {
+    if (!filteredSchedules || filteredSchedules.length === 0) {
       return res.status(200).json({
         message: "Học sinh này chưa có lịch học nào.",
         total: 0,
@@ -1390,9 +1391,9 @@ exports.getStudentSchedule = async (req, res) => {
     }
 
     const classSessionsMap = {};
-    
+
     const formattedSchedules = await Promise.all(
-      studentSchedules
+      filteredSchedules
         .filter((ss) => ss.classSchedule)
         .map(async (ss) => {
           const classSchedule = ss.classSchedule;
@@ -1789,7 +1790,12 @@ exports.validateScheduleConflictSimple = async (req, res) => {
             $gte: scheduleDateStart,
             $lt: scheduleDateEnd
           },
-          status: { $in: ['temporary', 'fixed'] }
+          status: { $in: ['temporary', 'fixed'] },
+          // FIX: Chỉ lấy các buổi mà giáo viên này thực sự dạy
+          $or: [
+            { teacher: teacher },
+            { substituteTeacher: teacher }
+          ]
         };
 
         if (excludeScheduleId) {
@@ -1800,19 +1806,6 @@ exports.validateScheduleConflictSimple = async (req, res) => {
           .populate('class', 'name')
           .select('date startTime endTime class')
           .lean();
-
-        console.log(' Kiểm tra conflict giáo viên:', {
-          teacherId: teacher,
-          date: date,
-          excludeScheduleId: excludeScheduleId,
-          foundSchedules: teacherSchedules.length,
-          schedules: teacherSchedules.map(s => ({
-            id: s._id,
-            className: s.class?.name,
-            date: formatDateLocal(s.date),
-            time: `${s.startTime} - ${s.endTime}`
-          }))
-        });
 
         teacherSchedules.forEach((schedule) => {
           if (hasTimeOverlap(startTime, endTime, schedule.startTime, schedule.endTime)) {
@@ -1945,13 +1938,24 @@ exports.createMakeupClassSchedule = async (req, res) => {
     if (teacherClasses.length > 0) {
       const teacherClassIds = teacherClasses.map(c => c._id);
       const teacherConflict = await ClassSchedule.findOne({
-        class: { $in: teacherClassIds },
-        date: scheduleDate,
-        status: { $in: ['temporary', 'fixed'] },
-        $or: [
-          { $and: [{ startTime: { $lte: startTime } }, { endTime: { $gt: startTime } }] },
-          { $and: [{ startTime: { $lt: endTime } }, { endTime: { $gte: endTime } }] },
-          { $and: [{ startTime: { $gte: startTime } }, { endTime: { $lte: endTime } }] }
+        $and: [
+          {
+            class: { $in: teacherClassIds },
+            date: scheduleDate,
+            status: { $in: ['temporary', 'fixed'] },
+            // FIX: Chỉ lấy các buổi mà giáo viên này thực sự dạy
+            $or: [
+              { teacher: teacher },
+              { substituteTeacher: teacher }
+            ]
+          },
+          {
+            $or: [
+              { $and: [{ startTime: { $lte: startTime } }, { endTime: { $gt: startTime } }] },
+              { $and: [{ startTime: { $lt: endTime } }, { endTime: { $gte: endTime } }] },
+              { $and: [{ startTime: { $gte: startTime } }, { endTime: { $lte: endTime } }] }
+            ]
+          }
         ]
       }).lean();
 

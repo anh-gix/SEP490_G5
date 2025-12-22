@@ -3,7 +3,7 @@ import { Modal, Button, Form, Alert } from 'react-bootstrap';
 import studentService from '../../services/studentService';
 import courseService from '../../services/courseService';
 
-const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents = [], generatedSessions = [], courseId }) => {
+const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents = [], generatedSessions = [], courseId, currentClassId = null, currentClassName = null }) => {
   const [students, setStudents] = useState([]);
   const [studentSearchTerm, setStudentSearchTerm] = useState('');
   const [studentsLoading, setStudentsLoading] = useState(true);
@@ -183,6 +183,38 @@ const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents 
         const sessionEnd = parseTime(session.endTime);
 
         schedules.forEach((schedule) => {
+          // Filter out schedules from current class if in edit mode
+          if (currentClassId) {
+            // Get class ID from various possible paths in API response
+            const scheduleClassId = 
+              schedule.classSchedule?.class?._id ||
+              schedule.classSchedule?.class?.id ||
+              schedule.classId ||
+              schedule.class?._id ||
+              schedule.class?.id;
+            
+            // Convert both to strings for comparison (handle ObjectId and string formats)
+            const scheduleClassIdStr = scheduleClassId ? String(scheduleClassId) : null;
+            const currentClassIdStr = currentClassId ? String(currentClassId) : null;
+            
+            // Exclude if same class ID
+            if (scheduleClassIdStr && currentClassIdStr && scheduleClassIdStr === currentClassIdStr) {
+              return; // Skip schedule from current class
+            }
+            
+            // Also check by class name as fallback (in case ID matching fails)
+            if (currentClassName) {
+              const scheduleClassName = 
+                schedule.classSchedule?.class?.name ||
+                schedule.className ||
+                schedule.class?.name;
+              
+              if (scheduleClassName && scheduleClassName === currentClassName) {
+                return; // Skip schedule from current class by name
+              }
+            }
+          }
+
           // Get schedule date - handle different response formats
           const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate || schedule.classSchedule?.date;
           if (!scheduleDate) return;
@@ -250,7 +282,7 @@ const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents 
     });
 
     return conflicts;
-  }, [generatedSessions, studentSchedules]);
+  }, [generatedSessions, studentSchedules, currentClassId, currentClassName]);
 
   const filteredStudentList = useMemo(() => {
     // First filter by enrollment

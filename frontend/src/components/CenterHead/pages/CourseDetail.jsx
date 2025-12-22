@@ -560,9 +560,10 @@ console.log(response.data);
           >
             Quay lại
           </Button>
-          {/* Edit and Delete buttons - only for non-Center Head */}
-          {!isViewOnly && (
-            <>
+          {/* Edit button - only when program is draft/needs_revision AND course is not active */}
+          {!isViewOnly &&
+            (course.program?.status === 'draft' || course.program?.status === 'needs_revision') &&
+            !course.isActive && (
               <Button
                 variant="primary"
                 icon="ph ph-pencil"
@@ -573,21 +574,23 @@ console.log(response.data);
               >
                 Sửa
               </Button>
-              <Button
-                variant="danger"
-                icon="ph ph-trash"
-                onClick={handleDeleteCourse}
-                disabled={deleteLoading}
-              >
-                {deleteLoading ? 'Đang xóa...' : 'Xóa'}
-              </Button>
-            </>
+          )}
+          {/* Delete button - only for non-Center Head */}
+          {!isViewOnly && (
+            <Button
+              variant="danger"
+              icon="ph ph-trash"
+              onClick={handleDeleteCourse}
+              disabled={deleteLoading}
+            >
+              {deleteLoading ? 'Đang xóa...' : 'Xóa'}
+            </Button>
           )}
         </div>
       </div>
 
       {/* Tabs */}
-      <Card>
+      <Card variant="shadow">
         <Tabs tabs={tabs} />
       </Card>
 

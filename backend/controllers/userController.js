@@ -41,21 +41,35 @@ const createUser = async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Validate phone number length (10-11 digits)
+    // Validate phone number length (10 digits only)
+    // Allow duplicate phone numbers
+    let normalizedPhone = phone || '';
     if (phone) {
       const phoneDigits = phone.replace(/\D/g, '');
-      if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+      // Validate BEFORE adding leading zero
+      if (phoneDigits.length === 0) {
         return res.status(400).json({ 
-          message: 'Số điện thoại phải có 10 hoặc 11 chữ số' 
+          message: 'Số điện thoại không được để trống' 
         });
       }
-    }
-
-    // Check if phone number already exists
-    if (phone) {
-      const phoneExists = await User.findOne({ phone });
-      if (phoneExists) {
-        return res.status(400).json({ message: 'Số điện thoại đã tồn tại trong hệ thống' });
+      
+      if (phoneDigits[0] === '0') {
+        // Has leading zero: must be exactly 10 digits
+        if (phoneDigits.length !== 10) {
+          return res.status(400).json({ 
+            message: 'Số điện thoại phải có 10 chữ số' 
+          });
+        }
+        normalizedPhone = phoneDigits;
+      } else {
+        // No leading zero (Excel removed it): must be exactly 9 digits
+        if (phoneDigits.length !== 9) {
+          return res.status(400).json({ 
+            message: 'Số điện thoại phải có 9 chữ số (thiếu số 0 ở đầu do Excel)' 
+          });
+        }
+        // Add leading zero to normalize to 10 digits
+        normalizedPhone = '0' + phoneDigits;
       }
     }
 
@@ -69,7 +83,7 @@ const createUser = async (req, res) => {
       email,
       password,
       username,
-      phone,
+      phone: normalizedPhone,
       address,
       roleId
     });
@@ -341,28 +355,57 @@ const saveBulkUsers = async (req, res) => {
           continue;
         }
 
-        // Validate phone number length (10-11 digits)
+        // Validate phone number length (10 digits only)
+        let normalizedPhone = userData.phone || '';
         if (userData.phone) {
           const phoneDigits = userData.phone.replace(/\D/g, '');
-          if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+          // Validate BEFORE adding leading zero
+          if (phoneDigits.length === 0) {
             results.failed.push({
               email: userData.email,
               username: userData.username,
               phone: userData.phone || '',
-              reason: 'Số điện thoại phải có 10 hoặc 11 chữ số'
+              reason: 'Số điện thoại không được để trống'
             });
             continue;
+          }
+          
+          if (phoneDigits[0] === '0') {
+            // Has leading zero: must be exactly 10 digits
+            if (phoneDigits.length !== 10) {
+              results.failed.push({
+                email: userData.email,
+                username: userData.username,
+                phone: userData.phone || '',
+                reason: 'Số điện thoại phải có 10 chữ số'
+              });
+              continue;
+            }
+            normalizedPhone = phoneDigits;
+          } else {
+            // No leading zero (Excel removed it): must be exactly 9 digits
+            if (phoneDigits.length !== 9) {
+              results.failed.push({
+                email: userData.email,
+                username: userData.username,
+                phone: userData.phone || '',
+                reason: 'Số điện thoại phải có 9 chữ số (thiếu số 0 ở đầu do Excel)'
+              });
+              continue;
+            }
+            // Add leading zero to normalize to 10 digits
+            normalizedPhone = '0' + phoneDigits;
           }
         }
 
         // Kiểm tra phone number đã tồn tại chưa
-        if (userData.phone) {
-          const existingPhone = await User.findOne({ phone: userData.phone });
+        if (normalizedPhone) {
+          const existingPhone = await User.findOne({ phone: normalizedPhone });
           if (existingPhone) {
             results.failed.push({
               email: userData.email,
               username: userData.username,
-              phone: userData.phone,
+              phone: normalizedPhone,
               reason: 'Số điện thoại đã tồn tại trong hệ thống'
             });
             continue;
@@ -376,7 +419,7 @@ const saveBulkUsers = async (req, res) => {
         const newUser = await User.create({
           email: userData.email,
           username: userData.username,
-          phone: userData.phone,
+          phone: normalizedPhone,
           address: userData.address,
           password: password, // Sẽ được hash tự động bởi pre-save hook
           roleId: roleId

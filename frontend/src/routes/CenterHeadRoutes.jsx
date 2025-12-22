@@ -4,19 +4,17 @@ import UserCreatePage from "../pages/CenterHead/UserCreatePage.jsx";
 import UserEditPage from "../pages/CenterHead/UserEditPage.jsx";
 import RoleManagementPage from "../pages/CenterHead/RoleManagementPage.jsx";
 import ProgramListPage from "../pages/CenterHead/ProgramListPage.jsx";
-import ProgramDetailPage from "../pages/CenterHead/ProgramDetailPage.jsx";
-import ProgramFormPage from "../pages/CenterHead/ProgramFormPage.jsx";
-import CourseWizardPage from "../pages/CenterHead/CourseWizardPage.jsx";
-import CourseDetailPage from "../pages/CenterHead/CourseDetailPage.jsx";
-import CourseFormPage from "../pages/CenterHead/CourseFormPage.jsx";
-import CamSessionPage from "../pages/CenterHead/CamSessionPage.jsx";
-import CamSessionEditPage from "../pages/CenterHead/CamSessionEditPage.jsx";
+import CenterHeadProgramDetailPage from "../pages/CenterHead/CenterHeadProgramDetailPage.jsx";
+import CenterHeadCourseDetailPage from "../pages/CenterHead/CenterHeadCourseDetailPage.jsx";
 import ApprovalRequestsPage from "../pages/CenterHead/ApprovalRequestsPage.jsx";
+import CenterHeadExamListPage from "../pages/CenterHead/CenterHeadExamListPage.jsx";
+import CenterHeadExamDetailPage from "../pages/CenterHead/CenterHeadExamDetailPage.jsx";
 
 /**
  * CenterHeadRoutes
  *
- * Routes cho Center Head với luồng tạo program hoàn chỉnh
+ * Routes cho Center Head - chỉ có quyền xem, duyệt/từ chối, toggle active
+ * Không có quyền create/edit program/course (chỉ Subject Leader có)
  */
 export const centerHeadRoutes = [
   // Dashboard
@@ -28,29 +26,17 @@ export const centerHeadRoutes = [
   { path: '/center-head/users/:id/edit', element: <UserEditPage /> },
   { path: '/center-head/roles', element: <RoleManagementPage /> },
 
-  // II. Program & Course Management
+  // II. Program & Course Management (View Only)
   { path: '/center-head/programs', element: <ProgramListPage /> },
-
-  // Tạo Program (Simple Form) - NEW STRUCTURE
-  { path: '/center-head/programs/create', element: <ProgramFormPage /> },
-  { path: '/center-head/programs/:id/edit', element: <ProgramFormPage /> },
-
-  // Tạo Course (Wizard - 4 steps) - NEW STRUCTURE
-  { path: '/center-head/programs/:programId/courses/create', element: <CourseWizardPage /> },
-  // Edit Course - Route dựa trên status
-  { path: '/center-head/programs/:programId/courses/:courseId/edit', element: <CourseWizardPage /> }, // For draft courses
-  { path: '/center-head/programs/:programId/courses/:courseId/edit-form', element: <CourseFormPage /> }, // For completed courses
-
-  // CAM Session Management
-  { path: '/center-head/cam-sessions/create', element: <CamSessionPage /> },
-  { path: '/center-head/cam-sessions/:sessionId/edit', element: <CamSessionEditPage /> },
-
-  // Program Detail & Course Management
-  { path: '/center-head/programs/:id', element: <ProgramDetailPage /> },
-  { path: '/center-head/programs/:programId/courses/:id/details', element: <CourseDetailPage /> },
-  { path: '/center-head/courses/:id/details', element: <CourseDetailPage /> },
+  { path: '/center-head/programs/:id', element: <CenterHeadProgramDetailPage /> },
+  { path: '/center-head/programs/:programId/courses/:id/details', element: <CenterHeadCourseDetailPage /> },
+  { path: '/center-head/courses/:id/details', element: <CenterHeadCourseDetailPage /> },
 
   // III. Approval Requests Management
   { path: '/center-head/approval-requests', element: <ApprovalRequestsPage /> },
+
+  // IV. Exam Management
+  { path: '/center-head/exams', element: <CenterHeadExamListPage /> },
+  { path: '/center-head/exams/:id/details', element: <CenterHeadExamDetailPage /> },
 
 ];

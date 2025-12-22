@@ -57,7 +57,7 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
     // Check basic info
     checks.push({
       label: 'Tất cả thông tin cơ bản đã điền đầy đủ',
-      status: examData.title && examData.examType && examData.level && examData.totalDuration
+      status: examData.title && examData.examType && examData.totalDuration
     });
 
     // Check sections

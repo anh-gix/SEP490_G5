@@ -54,9 +54,24 @@ const MakeupClassRequestModal = ({
   const [teacherConflict, setTeacherConflict] = useState(null);
   const [checkingTeacherConflict, setCheckingTeacherConflict] = useState(false);
   
+  // State to track conflicted substitute teachers (for request_replace_teacher)
+  const [conflictedSubstituteTeacherIds, setConflictedSubstituteTeacherIds] = useState(new Set());
+  
   // Original schedule info
   const [originalScheduleInfo, setOriginalScheduleInfo] = useState(null);
   const [loadingOriginalSchedule, setLoadingOriginalSchedule] = useState(false);
+
+  // State to track if date and time are selected (for sequential form)
+  const [isDateTimeSelected, setIsDateTimeSelected] = useState(false);
+  
+  // State to track conflicted rooms (rooms that have schedule conflicts with selected time)
+  const [conflictedRoomIds, setConflictedRoomIds] = useState(new Set());
+  
+  // State to track conflicted teachers (teachers that have schedule conflicts with selected time)
+  const [conflictedTeacherIds, setConflictedTeacherIds] = useState(new Set());
+  
+  // State to track student schedule conflicts
+  const [studentScheduleConflict, setStudentScheduleConflict] = useState(null);
 
   // Load original schedule info when modal opens
   useEffect(() => {
@@ -88,6 +103,347 @@ const MakeupClassRequestModal = ({
     }
   }, [show, makeupOption, originalScheduleInfo, originalSchedule, sessionId, effectiveRequestType, isStudentMode]);
 
+  // Check if date and time are selected (for sequential form when creating new makeup class)
+  useEffect(() => {
+    if (makeupOption === 'new') {
+      const hasDate = !!formData.date;
+      const hasStartTime = !!formData.startTime;
+      const hasEndTime = !!formData.endTime;
+      const allDateTimeSelected = hasDate && hasStartTime && hasEndTime;
+      
+      setIsDateTimeSelected(allDateTimeSelected);
+      
+      // Clear room and teacher if date/time changes (user needs to reselect)
+      if (!allDateTimeSelected && (formData.room || formData.teacher)) {
+        setFormData(prev => ({
+          ...prev,
+          room: '',
+          teacher: ''
+        }));
+        setConflicts(null);
+      }
+    } else {
+      // Reset when switching to 'existing' option
+      setIsDateTimeSelected(false);
+    }
+  }, [formData.date, formData.startTime, formData.endTime, makeupOption]);
+
+  // Check room conflicts for the selected date when date/time is selected
+  useEffect(() => {
+    const checkRoomConflicts = async () => {
+      if (makeupOption === 'new' && isDateTimeSelected && formData.date && formData.startTime && formData.endTime && rooms.length > 0) {
+        try {
+          const conflictedRooms = new Set();
+          
+          // Fetch schedules for all rooms in parallel
+          const schedulePromises = rooms.map(async (room) => {
+            try {
+              const roomId = room._id || room.id;
+              const response = await roomService.getRoomSchedule(roomId, { date: formData.date });
+              
+              return {
+                roomId: roomId,
+                schedules: response.schedules || []
+              };
+            } catch (error) {
+              return {
+                roomId: room._id || room.id,
+                schedules: []
+              };
+            }
+          });
+          
+          const results = await Promise.all(schedulePromises);
+          
+          // Check for conflicts
+          results.forEach((roomData) => {
+            let hasConflict = false;
+            
+            roomData.schedules.forEach((schedule) => {
+              // Check if this schedule conflicts with selected time
+              if (schedule.startTime && schedule.endTime) {
+                const conflict = hasTimeOverlap(
+                    formData.startTime,
+                    formData.endTime,
+                    schedule.startTime,
+                    schedule.endTime
+                  );
+                
+                if (conflict) {
+                  hasConflict = true;
+                }
+              }
+            });
+            
+            if (hasConflict) {
+              conflictedRooms.add(String(roomData.roomId));
+            }
+          });
+          
+          // Update conflicted rooms state
+          setConflictedRoomIds(conflictedRooms);
+          
+          // Clear selected room if it becomes conflicted
+          if (formData.room && conflictedRooms.has(String(formData.room))) {
+            setFormData(prev => ({
+              ...prev,
+              room: ''
+            }));
+            setConflicts(null);
+          }
+          
+        } catch (error) {
+          // Silent error handling
+        }
+      } else {
+        // Clear conflicted rooms when date/time is not selected
+        setConflictedRoomIds(new Set());
+      }
+    };
+    
+    checkRoomConflicts();
+  }, [isDateTimeSelected, formData.date, formData.startTime, formData.endTime, makeupOption, rooms]);
+
+  // Check teacher conflicts for the selected date when date/time is selected
+  useEffect(() => {
+    const checkTeacherConflicts = async () => {
+      if (makeupOption === 'new' && isDateTimeSelected && formData.date && formData.startTime && formData.endTime && teachers.length > 0) {
+        try {
+          const conflictedTeachers = new Set();
+          
+          // Fetch schedules for all teachers in parallel
+          const schedulePromises = teachers.map(async (teacher) => {
+            try {
+              const teacherId = teacher._id || teacher.id;
+              // Use the same date for startDate and endDate to get schedules for that specific day
+              const response = await teacherService.getTeacherSchedule(teacherId, { 
+                startDate: formData.date, 
+                endDate: formData.date 
+              });
+              
+              return {
+                teacherId: teacherId,
+                schedules: response.schedules || []
+              };
+            } catch (error) {
+              return {
+                teacherId: teacher._id || teacher.id,
+                schedules: []
+              };
+            }
+          });
+          
+          const results = await Promise.all(schedulePromises);
+          
+          // Check for conflicts
+          results.forEach((teacherData) => {
+            let hasConflict = false;
+            
+            teacherData.schedules.forEach((schedule) => {
+              // Check if this schedule conflicts with selected time
+              if (schedule.startTime && schedule.endTime) {
+                const conflict = hasTimeOverlap(
+                    formData.startTime,
+                    formData.endTime,
+                    schedule.startTime,
+                    schedule.endTime
+                  );
+                
+                if (conflict) {
+                  hasConflict = true;
+                }
+              }
+            });
+            
+            if (hasConflict) {
+              conflictedTeachers.add(String(teacherData.teacherId));
+            }
+          });
+          
+          // Update conflicted teachers state
+          setConflictedTeacherIds(conflictedTeachers);
+          
+          // Clear selected teacher if it becomes conflicted
+          if (formData.teacher && conflictedTeachers.has(String(formData.teacher))) {
+            setFormData(prev => ({
+              ...prev,
+              teacher: ''
+            }));
+            setConflicts(null);
+          }
+          
+        } catch (error) {
+          // Silent error handling
+        }
+      } else {
+        // Clear conflicted teachers when date/time is not selected
+        setConflictedTeacherIds(new Set());
+      }
+    };
+    
+    checkTeacherConflicts();
+  }, [isDateTimeSelected, formData.date, formData.startTime, formData.endTime, makeupOption, teachers]);
+
+  // Check substitute teacher conflicts when modal opens (for request_replace_teacher)
+  useEffect(() => {
+    const checkSubstituteTeacherConflicts = async () => {
+      if (show && effectiveRequestType === 'request_replace_teacher' && originalScheduleInfo && teachers.length > 0) {
+        try {
+          const conflictedTeachers = new Set();
+          
+          // Check conflicts for all teachers in parallel
+          const conflictPromises = teachers.map(async (teacher) => {
+            try {
+              const teacherId = teacher._id || teacher.id;
+              
+              // Skip current teacher
+              const currentTeacherId = originalScheduleInfo.teacher?.toString();
+              if (teacherId.toString() === currentTeacherId) {
+                return { teacherId, hasConflict: false };
+              }
+              
+              const response = await classScheduleService.validateScheduleConflictSimple({
+                date: originalScheduleInfo.date,
+                startTime: originalScheduleInfo.startTime,
+                endTime: originalScheduleInfo.endTime,
+                room: originalScheduleInfo.room,
+                teacher: teacherId,
+                studentId: null,
+                excludeScheduleId: originalScheduleInfo.classScheduleId
+              });
+              
+              const hasConflict = response.success && response.conflicts?.teacher?.length > 0;
+              return { teacherId, hasConflict };
+            } catch (error) {
+              // On error, assume no conflict to be safe
+              return { teacherId: teacher._id || teacher.id, hasConflict: false };
+            }
+          });
+          
+          const results = await Promise.all(conflictPromises);
+          
+          results.forEach(({ teacherId, hasConflict }) => {
+            if (hasConflict) {
+              conflictedTeachers.add(String(teacherId));
+            }
+          });
+          
+          setConflictedSubstituteTeacherIds(conflictedTeachers);
+        } catch (error) {
+          console.error('Error checking substitute teacher conflicts:', error);
+        }
+      } else {
+        setConflictedSubstituteTeacherIds(new Set());
+      }
+    };
+    
+    checkSubstituteTeacherConflicts();
+  }, [show, effectiveRequestType, originalScheduleInfo, teachers]);
+
+  // Log student schedule for the selected date when date/time is selected
+  useEffect(() => {
+    const logStudentSchedule = async () => {
+      if (makeupOption === 'new' && isDateTimeSelected && formData.date && formData.startTime && formData.endTime) {
+        try {
+          let targetStudentId = null;
+          
+          // Determine student ID based on mode
+          if (isStudentMode && studentId) {
+            targetStudentId = studentId;
+          } else if (isAcademicStaffMode && studentScheduleId) {
+            // For AcademicStaff mode, need to get studentId from studentScheduleId
+            try {
+              const response = await studentScheduleService.getClassScheduleByStudentScheduleId(studentScheduleId);
+              if (response.success && response.studentSchedule?.student) {
+                targetStudentId = response.studentSchedule.student._id || response.studentSchedule.student;
+              }
+            } catch (error) {
+              console.error('[DEBUG] Error fetching studentId:', error);
+              return;
+            }
+          }
+
+          if (!targetStudentId) {
+            return;
+          }
+          
+          // Get student schedule for the selected date
+          // Use the same date for startDate and endDate to get schedules for that specific day
+          const apiPort = import.meta.env.VITE_API_PORT || 8080;
+          const apiUrl = `http://localhost:${apiPort}/api/student-schedules/student/${targetStudentId}/schedule?startDate=${formData.date}&endDate=${formData.date}`;
+
+          const response = await fetch(apiUrl, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            
+            // API returns schedules array directly, not wrapped in success field
+            if (data.schedules && Array.isArray(data.schedules)) {
+              const schedulesOnDate = data.schedules;
+
+              if (schedulesOnDate.length === 0) {
+                // Clear conflict when no schedules
+                setStudentScheduleConflict(null);
+              } else {
+                let hasStudentConflict = false;
+                let conflictSchedule = null;
+
+                schedulesOnDate.forEach((schedule, index) => {
+                  // Check if this schedule conflicts with selected time
+                  if (schedule.startTime && schedule.endTime) {
+                    const conflict = hasTimeOverlap(
+                      formData.startTime,
+                      formData.endTime,
+                      schedule.startTime,
+                      schedule.endTime
+                    );
+
+                    if (conflict) {
+                      hasStudentConflict = true;
+                      conflictSchedule = schedule;
+                    }
+                  }
+                });
+                
+                // Update student schedule conflict state
+                if (hasStudentConflict && conflictSchedule) {
+                  setStudentScheduleConflict({
+                    hasConflict: true,
+                    className: conflictSchedule.className || 'N/A',
+                    timeRange: `${conflictSchedule.startTime} - ${conflictSchedule.endTime}`,
+                    roomName: conflictSchedule.room?.room_name || 'N/A',
+                    sessionTitle: conflictSchedule.sessionTitle || 'N/A'
+                  });
+                } else {
+                  setStudentScheduleConflict(null);
+                }
+              }
+            }
+          } else {
+            const errorText = await response.text();
+            console.error('[DEBUG] API error:', response.status, errorText);
+            // Clear conflict on error
+            setStudentScheduleConflict(null);
+          }
+        } catch (error) {
+          console.error('[DEBUG] Error in logStudentSchedule:', error);
+          // Clear conflict on error
+          setStudentScheduleConflict(null);
+        }
+      } else {
+        // Clear conflict when date/time is not selected or makeupOption is not 'new'
+        setStudentScheduleConflict(null);
+      }
+    };
+    
+    logStudentSchedule();
+  }, [isDateTimeSelected, formData.date, formData.startTime, formData.endTime, makeupOption, studentId, studentScheduleId, isStudentMode, isAcademicStaffMode]);
+
   const resetForm = () => {
     setFormData({
       date: '',
@@ -106,6 +462,11 @@ const MakeupClassRequestModal = ({
     setAvailableSchedules([]);
     setSessionId(null);
     setCurrentClassScheduleId(null);
+    setIsDateTimeSelected(false);
+    setConflictedRoomIds(new Set());
+    setConflictedTeacherIds(new Set());
+    setStudentScheduleConflict(null);
+    setConflictedSubstituteTeacherIds(new Set());
   };
 
   const fetchOriginalSchedule = async () => {
@@ -285,6 +646,46 @@ const MakeupClassRequestModal = ({
     let sessionIdToUse = sessionId;
     let currentScheduleInfo = originalScheduleInfo || originalSchedule;
     
+    // Fetch student schedule for conflict checking (AcademicStaff mode)
+    let studentScheduleForConflict = senderSchedule || [];
+    if (isAcademicStaffMode && studentScheduleId) {
+      try {
+        // Get studentId from studentScheduleId
+        const response = await studentScheduleService.getClassScheduleByStudentScheduleId(studentScheduleId);
+        if (response.success && response.studentSchedule?.student) {
+          const targetStudentId = response.studentSchedule.student._id || response.studentSchedule.student;
+          
+          // Fetch full student schedule for conflict checking
+          const apiPort = import.meta.env.VITE_API_PORT || 8080;
+          const scheduleResponse = await fetch(
+            `http://localhost:${apiPort}/api/student-schedules/student/${targetStudentId}/schedule`,
+            {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          
+          if (scheduleResponse.ok) {
+            const scheduleData = await scheduleResponse.json();
+            if (scheduleData.schedules && Array.isArray(scheduleData.schedules)) {
+              // Convert to format compatible with hasConflictWithSchedule
+              studentScheduleForConflict = scheduleData.schedules.map(s => ({
+                date: s.date,
+                startTime: s.startTime,
+                endTime: s.endTime,
+                scheduleStatus: s.scheduleStatus
+              }));
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching student schedule for conflict check:', error);
+        // Fallback to senderSchedule
+      }
+    }
+    
     // For Student mode, try to get sessionId if not available
     if (isStudentMode && !sessionIdToUse && originalSchedule?.studentScheduleId) {
       try {
@@ -330,7 +731,7 @@ const MakeupClassRequestModal = ({
                 if (isStudentMode && hasConflictWithSchedule(schedule, studentSchedule)) {
                   return false;
                 }
-                if (isAcademicStaffMode && hasConflictWithSchedule(schedule, senderSchedule)) {
+                if (isAcademicStaffMode && hasConflictWithSchedule(schedule, studentScheduleForConflict)) {
                   return false;
                 }
                 return true;
@@ -382,7 +783,7 @@ const MakeupClassRequestModal = ({
           if (isStudentMode && hasConflictWithSchedule(schedule, studentSchedule)) {
             return false;
           }
-          if (isAcademicStaffMode && hasConflictWithSchedule(schedule, senderSchedule)) {
+          if (isAcademicStaffMode && hasConflictWithSchedule(schedule, studentScheduleForConflict)) {
             return false;
           }
           
@@ -651,6 +1052,12 @@ const MakeupClassRequestModal = ({
           return;
         }
 
+        // Check student schedule conflict
+        if (studentScheduleConflict && studentScheduleConflict.hasConflict) {
+          setError(`Không thể tạo buổi học bù: Học viên đã có buổi học "${studentScheduleConflict.className}" vào thời gian ${studentScheduleConflict.timeRange} trong ngày này. Vui lòng chọn thời gian khác.`);
+          return;
+        }
+
         // Validate conflict
         const isValid = await validateConflict();
         if (!isValid) {
@@ -853,13 +1260,8 @@ const MakeupClassRequestModal = ({
                 onChange={(e) => {
                   const teacherId = e.target.value;
                   setSelectedSubstituteTeacherId(teacherId);
-                  if (teacherId) {
-                    checkSubstituteTeacherConflict(teacherId);
-                  } else {
-                    setTeacherConflict(null);
-                  }
                 }}
-                disabled={checkingTeacherConflict || loadingOriginalSchedule || !originalScheduleInfo}
+                disabled={loadingOriginalSchedule || !originalScheduleInfo}
                 required
               >
                 <option value="">-- Chọn giáo viên dạy thay --</option>
@@ -867,7 +1269,14 @@ const MakeupClassRequestModal = ({
                   .filter(teacher => {
                     const teacherId = (teacher._id || teacher.id)?.toString();
                     const currentTeacherId = originalScheduleInfo?.teacher?.toString();
-                    return teacherId !== currentTeacherId;
+                    // Filter out current teacher and conflicted teachers
+                    if (teacherId === currentTeacherId) {
+                      return false;
+                    }
+                    if (conflictedSubstituteTeacherIds.has(teacherId)) {
+                      return false;
+                    }
+                    return true;
                   })
                   .map(teacher => (
                     <option key={teacher._id || teacher.id} value={teacher._id || teacher.id}>
@@ -882,36 +1291,6 @@ const MakeupClassRequestModal = ({
                   <i className="fas fa-spinner fa-spin me-2"></i>
                   Đang tải thông tin buổi học...
                 </div>
-              )}
-              
-              {checkingTeacherConflict && (
-                <div className="mt-2 text-info">
-                  <i className="fas fa-spinner fa-spin me-2"></i>
-                  Đang kiểm tra xung đột lịch dạy...
-                </div>
-              )}
-
-              {teacherConflict && teacherConflict.hasConflict && (
-                <Alert variant="danger" className="mt-3 mb-0">
-                  <Alert.Heading className="h6">
-                    <i className="fas fa-exclamation-triangle me-2"></i>
-                    Giáo viên đã có lịch dạy trùng giờ!
-                  </Alert.Heading>
-                  <ul className="mb-0 mt-2">
-                    {teacherConflict.conflicts.map((conflict, idx) => (
-                      <li key={idx}>
-                        Lớp {conflict.className} - {conflict.date} ({conflict.time})
-                      </li>
-                    ))}
-                  </ul>
-                </Alert>
-              )}
-
-              {teacherConflict && !teacherConflict.hasConflict && selectedSubstituteTeacherId && (
-                <Alert variant="success" className="mt-3 mb-0">
-                  <i className="fas fa-check-circle me-2"></i>
-                  Giáo viên không có xung đột lịch dạy
-                </Alert>
               )}
             </Form.Group>
           ) : (
@@ -946,20 +1325,6 @@ const MakeupClassRequestModal = ({
               {/* Existing schedule selection */}
               {makeupOption === 'existing' ? (
                 <div className="mb-3">
-                  {/* Class selection dropdown (AcademicStaff only) */}
-                  {isAcademicStaffMode && (
-                    <Form.Group className="mb-3">
-                      <Form.Label>
-                        Chọn lớp học
-                      </Form.Label>
-                      <Form.Select
-                        value={selectedClassId}
-                        onChange={(e) => setSelectedClassId(e.target.value)}
-                      >
-                        <option value="">-- Chọn lớp học (tùy chọn) --</option>
-                      </Form.Select>
-                    </Form.Group>
-                  )}
 
                   <Form.Label>
                     Chọn buổi học bù <span className="text-danger">*</span>
@@ -1127,6 +1492,33 @@ const MakeupClassRequestModal = ({
                     </div>
                   </div>
 
+                  {/* Hint message when date/time not selected */}
+                  {!isDateTimeSelected && (
+                    <Alert variant="info" className="mb-3">
+                      <i className="fas fa-info-circle me-2"></i>
+                      Vui lòng chọn ngày và giờ trước khi chọn phòng và giáo viên.
+                    </Alert>
+                  )}
+
+                  {/* Warning when student has schedule conflict */}
+                  {studentScheduleConflict && studentScheduleConflict.hasConflict && (
+                    <Alert variant="danger" className="mb-3">
+                      <Alert.Heading>
+                        <i className="fas fa-exclamation-triangle me-2"></i>
+                        Xung đột lịch học của học viên!
+                      </Alert.Heading>
+                      <p className="mb-0">
+                        Học viên đã có buổi học <strong>"{studentScheduleConflict.className}"</strong> vào thời gian <strong>{studentScheduleConflict.timeRange}</strong> trong ngày này.
+                      </p>
+                      <p className="mb-0 mt-2">
+                        <strong>Không thể tạo buổi học bù</strong> vì sẽ trùng với lịch học hiện tại của học viên.
+                      </p>
+                      <p className="mb-0 mt-2 text-muted">
+                        Vui lòng chọn thời gian khác hoặc hủy buổi học hiện tại trước.
+                      </p>
+                    </Alert>
+                  )}
+
                   <div className="row g-3 mb-3">
                     <div className="col-md-6">
                       <Form.Group>
@@ -1137,14 +1529,28 @@ const MakeupClassRequestModal = ({
                           name="room"
                           value={formData.room}
                           onChange={handleInputChange}
+                          disabled={!isDateTimeSelected}
                           required
                         >
                           <option value="">Chọn phòng học</option>
-                          {rooms.map(room => (
-                            <option key={room._id || room.id} value={room._id || room.id}>
-                              {room.room_name || room.name} {room.location ? `(${room.location})` : ''}
-                            </option>
-                          ))}
+                          {rooms
+                            .filter(room => {
+                              const roomId = String(room._id || room.id);
+                              return !conflictedRoomIds.has(roomId);
+                            })
+                            .map(room => {
+                              const roomName = room.room_name || room.name;
+                              const location = room.location ? `(${room.location})` : '';
+                              
+                              return (
+                                <option 
+                                  key={room._id || room.id} 
+                                  value={room._id || room.id}
+                                >
+                                  {roomName} {location}
+                                </option>
+                              );
+                            })}
                         </Form.Select>
                       </Form.Group>
                     </div>
@@ -1158,33 +1564,24 @@ const MakeupClassRequestModal = ({
                           name="teacher"
                           value={formData.teacher}
                           onChange={handleInputChange}
+                          disabled={!isDateTimeSelected}
                           required
                         >
                           <option value="">Chọn giáo viên</option>
-                          {teachers.map(teacher => (
-                            <option key={teacher._id || teacher.id} value={teacher._id || teacher.id}>
-                              {teacher.username || teacher.fullName || teacher.name || 'N/A'}
-                            </option>
-                          ))}
+                          {teachers
+                            .filter(teacher => {
+                              const teacherId = String(teacher._id || teacher.id);
+                              return !conflictedTeacherIds.has(teacherId);
+                            })
+                            .map(teacher => (
+                              <option key={teacher._id || teacher.id} value={teacher._id || teacher.id}>
+                                {teacher.username || teacher.fullName || teacher.name || 'N/A'}
+                              </option>
+                            ))}
                         </Form.Select>
                       </Form.Group>
                     </div>
                   </div>
-
-                  {/* Reason field (Student mode only) */}
-                  {isStudentMode && (
-                    <Form.Group className="mb-3">
-                      <Form.Label>Lý do (tùy chọn)</Form.Label>
-                      <Form.Control
-                        as="textarea"
-                        rows={3}
-                        name="reason"
-                        value={formData.reason}
-                        onChange={handleInputChange}
-                        placeholder="Nhập lý do học bù..."
-                      />
-                    </Form.Group>
-                  )}
 
                   {validating && (
                     <Alert variant="info" className="mb-0">
@@ -1208,10 +1605,9 @@ const MakeupClassRequestModal = ({
             disabled={
               loading || 
               validating || 
-              checkingTeacherConflict ||
               (effectiveRequestType === 'request_replace_teacher' && !selectedSubstituteTeacherId) ||
-              (effectiveRequestType === 'request_replace_teacher' && teacherConflict?.hasConflict) ||
               (effectiveRequestType === 'makeup_class' && makeupOption === 'new' && conflicts && conflicts.hasConflict) ||
+              (effectiveRequestType === 'makeup_class' && makeupOption === 'new' && studentScheduleConflict && studentScheduleConflict.hasConflict) ||
               (effectiveRequestType === 'makeup_class' && makeupOption === 'existing' && !selectedExistingScheduleId)
             }
           >

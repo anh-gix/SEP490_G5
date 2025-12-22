@@ -144,20 +144,24 @@ const courseSchema = new Schema({
 
     // ===== STATUS VÀ TRACKING =====
     // Status chỉ để tracking trạng thái course, KHÔNG có approval workflow
+    // Lifecycle: draft -> completed -> active -> available -> active -> ...
     status: {
         type: String,
         enum: [
             'draft',              // Đang tạo, chưa hoàn thiện
-            'completed',          // Đã tạo xong, sẵn sàng sử dụng
-            'active',             // Course đang có students (check qua studentEnrollments.length > 0)
-            'archived'            // Course đã lưu trữ
+            'completed',          // Đã tạo xong, sẵn sàng sử dụng (chưa có class nào dùng)
+            'active',             // Đang có class sử dụng
+            'available',          // Đã từng có class, hiện không còn class active (sẵn sàng dùng lại)
         ],
         default: 'draft',
         index: true
     },
+    // isActive dùng để control việc có thể tạo class mới hay không
+    // true = có thể tạo class mới, false = không cho phép tạo class mới
     isActive: {
         type: Boolean,
         default: false,
+        index: true
     },
 
     // Track wizard progress - step cuối cùng đã hoàn thành (0-5)

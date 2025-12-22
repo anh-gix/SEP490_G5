@@ -1,6 +1,8 @@
 
 const Course = require('../models/courseModel');
 const Program = require('../models/programModel');
+const Class = require('../models/classModel');
+const ClassSchedule = require('../models/classScheduleModel');
 
 // =========================
 // COURSE CRUD OPERATIONS
@@ -37,7 +39,7 @@ exports.getAllCourses = async (req, res) => {
         }
         
         const courses = await Course.find(query)
-            .populate('program', 'program_name code')
+            .populate('program', 'program_name code type level band')
             .populate('createdBy', 'fullname email')
             .sort({ createdAt: -1 });
 
@@ -75,14 +77,9 @@ exports.getCourseById = async (req, res) => {
                 path: 'camSessions',
                 options: { sort: { Order: 1 } }
             })
-            // CLOs cùng mapped PLOs (nếu cần hiển thị chi tiết)
-            .populate({
-                path: 'clos',
-                populate: {
-                    path: 'mappedPLOs',
-                    select: 'code name'
-                }
-            });
+            // CLOs - mappedPLOs là embedded ObjectIds trong cloSchema, không cần populate
+            // vì PLO là embedded trong Program, không phải model riêng
+            ;
 
         if (!course) {
             return res.status(404).json({
@@ -446,8 +443,8 @@ exports.archiveCourse = async (req, res) => {
  */
 exports.getAllTypes = async (req, res) => {
     try {
-        const types = await Program.distinct('type', { status: 'active' });
-        
+        const types = await Program.distinct('type', { status: 'approved' });
+
         res.status(200).json({
             success: true,
             types: types.sort()
@@ -467,8 +464,8 @@ exports.getAllTypes = async (req, res) => {
  */
 exports.getAllLevels = async (req, res) => {
     try {
-        const levels = await Program.distinct('level', { status: 'active' });
-        
+        const levels = await Program.distinct('level', { status: 'approved' });
+
         // Sort levels in order: Pre-A1, A1, A2, B1, B2, C1, C2
         const levelOrder = ['Pre-A1', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
         const sortedLevels = levels.sort((a, b) => {
@@ -476,7 +473,7 @@ exports.getAllLevels = async (req, res) => {
             const indexB = levelOrder.indexOf(b);
             return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
         });
-        
+
         res.status(200).json({
             success: true,
             levels: sortedLevels
@@ -497,19 +494,26 @@ exports.getAllLevels = async (req, res) => {
 exports.getLevelsByType = async (req, res) => {
     try {
         const { type } = req.query;
-        
+
         if (!type) {
             return res.status(400).json({
                 success: false,
                 message: 'Thiếu tham số type'
             });
         }
-        
-        const levels = await Program.distinct('level', { 
+
+        const levels = await Program.distinct('level', {
             type: type,
-            status: 'active' 
+            status: 'approved'
         });
-        
+
+        // Debug logging
+        console.log(`[getLevelsByType] Type: ${type}, Found levels:`, levels);
+
+        // Also log the programs for this type to verify
+        const programsCount = await Program.countDocuments({ type: type, status: 'approved' });
+        console.log(`[getLevelsByType] Total approved programs for ${type}:`, programsCount);
+
         // Sort levels in order
         const levelOrder = ['Pre-A1', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
         const sortedLevels = levels.sort((a, b) => {
@@ -517,7 +521,7 @@ exports.getLevelsByType = async (req, res) => {
             const indexB = levelOrder.indexOf(b);
             return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
         });
-        
+
         res.status(200).json({
             success: true,
             levels: sortedLevels
@@ -591,6 +595,55 @@ exports.getCoursesByProgram = async (req, res) => {
         .select('name description program')
         .sort({ name: 1 });
         
+        res.status(200).json({
+            success: true,
+            courses: courses
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Get courses by program ID(s)
+ * GET /api/courses/by-program-id?programIds=id1,id2,id3
+ * Supports single or multiple program IDs (comma-separated)
+ */
+exports.getCoursesByProgramId = async (req, res) => {
+    try {
+        const { programIds } = req.query;
+
+        if (!programIds) {
+            return res.status(400).json({
+                success: false,
+                message: 'Thiếu tham số programIds'
+            });
+        }
+
+        // Parse program IDs (can be comma-separated)
+        const programIdArray = programIds.split(',').map(id => id.trim()).filter(id => id.length > 0);
+
+        if (programIdArray.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Không có program ID hợp lệ'
+            });
+        }
+
+        // Find courses that belong to these programs
+        // Get courses with status 'completed' or 'active' (courses ready to use)
+        const courses = await Course.find({
+            program: { $in: programIdArray },
+            status: { $in: ['completed', 'active'] }
+        })
+        .populate('program', 'program_name code type level')
+        .select('name description program status isActive')
+        .sort({ name: 1 });
+
         res.status(200).json({
             success: true,
             courses: courses
@@ -697,7 +750,7 @@ exports.getTypesByLevel = async (req, res) => {
 
         const programs = await Program.find({
             level: level,
-            status: 'active'
+            status: 'approved'
         }).distinct('type');
 
         res.status(200).json({
@@ -836,6 +889,39 @@ exports.updateCoursePLOMapping = async (req, res) => {
 // =========================
 
 /**
+ * Upload material file
+ * POST /api/courses/upload-material
+ */
+exports.uploadMaterialFile = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'Không có file được upload'
+            });
+        }
+
+        // Build URL for the uploaded file
+        const fileUrl = `${req.protocol}://${req.get('host')}/uploads/course-materials/${req.file.filename}`;
+
+        res.status(200).json({
+            success: true,
+            message: 'Upload file thành công',
+            url: fileUrl,
+            filename: req.file.filename,
+            originalName: req.file.originalname,
+            size: req.file.size
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server khi upload file',
+            error: err.message
+        });
+    }
+};
+
+/**
  * Get course materials
  * GET /api/courses/:courseId/materials
  */
@@ -872,6 +958,276 @@ exports.getCourseMaterials = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Lỗi server khi lấy tài liệu khóa học',
+            error: err.message
+        });
+    }
+};
+
+// =========================
+// COURSE ACTIVATION/DEACTIVATION
+// =========================
+
+/**
+ * Check if a course can be deactivated
+ * GET /api/courses/:id/can-deactivate
+ *
+ * Logic: Course chỉ có thể deactivate khi:
+ * - Không có class nào đang active/pending sử dụng course
+ * - HOẶC tất cả class đang dùng course không còn schedule tương lai
+ */
+exports.canDeactivateCourse = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const course = await Course.findById(id);
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy khóa học'
+            });
+        }
+
+        // Nếu course đã inactive rồi
+        if (!course.isActive) {
+            return res.status(200).json({
+                success: true,
+                canDeactivate: true,
+                message: 'Khóa học đã ở trạng thái inactive'
+            });
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Tìm các class đang active hoặc pending sử dụng course này
+        const activeClasses = await Class.find({
+            course: id,
+            status: { $in: ['pending', 'active'] }
+        }).select('_id name status');
+
+        if (activeClasses.length === 0) {
+            return res.status(200).json({
+                success: true,
+                canDeactivate: true,
+                message: 'Không có lớp học nào đang sử dụng khóa học này'
+            });
+        }
+
+        // Check xem các class này còn schedule tương lai không
+        const classIds = activeClasses.map(c => c._id);
+        const futureSchedules = await ClassSchedule.find({
+            class: { $in: classIds },
+            date: { $gte: today },
+            status: { $in: ['temporary', 'fixed'] }
+        })
+        .populate('class', 'name')
+        .select('class date startTime endTime')
+        .sort({ date: 1 })
+        .limit(10);
+
+        if (futureSchedules.length > 0) {
+            // Tìm ngày kết thúc cuối cùng
+            const lastSchedule = await ClassSchedule.findOne({
+                class: { $in: classIds },
+                status: { $in: ['temporary', 'fixed'] }
+            })
+            .sort({ date: -1 })
+            .select('date');
+
+            return res.status(200).json({
+                success: true,
+                canDeactivate: false,
+                message: 'Còn lớp học đang sử dụng khóa học này với lịch học trong tương lai',
+                activeClasses: activeClasses.map(c => ({
+                    _id: c._id,
+                    name: c.name,
+                    status: c.status
+                })),
+                upcomingSchedules: futureSchedules.map(s => ({
+                    className: s.class?.name,
+                    date: s.date,
+                    startTime: s.startTime,
+                    endTime: s.endTime
+                })),
+                estimatedEndDate: lastSchedule?.date,
+                totalFutureSchedules: await ClassSchedule.countDocuments({
+                    class: { $in: classIds },
+                    date: { $gte: today },
+                    status: { $in: ['temporary', 'fixed'] }
+                })
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            canDeactivate: true,
+            message: 'Có thể deactivate khóa học - các lớp đã hết lịch học'
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server khi kiểm tra trạng thái khóa học',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Deactivate a course
+ * PATCH /api/courses/:id/deactivate
+ *
+ * Logic:
+ * - Check canDeactivate trước
+ * - Nếu OK thì set isActive = false, status = 'available'
+ * - Update các class liên quan thành 'completed' nếu cần
+ */
+exports.deactivateCourse = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { force = false } = req.body; // force = true để bỏ qua check
+
+        const course = await Course.findById(id);
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy khóa học'
+            });
+        }
+
+        // Nếu course đã inactive rồi
+        if (!course.isActive) {
+            return res.status(400).json({
+                success: false,
+                message: 'Khóa học đã ở trạng thái inactive'
+            });
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Tìm các class đang active/pending
+        const activeClasses = await Class.find({
+            course: id,
+            status: { $in: ['pending', 'active'] }
+        }).select('_id name');
+
+        if (activeClasses.length > 0 && !force) {
+            const classIds = activeClasses.map(c => c._id);
+
+            // Check schedule tương lai
+            const futureScheduleCount = await ClassSchedule.countDocuments({
+                class: { $in: classIds },
+                date: { $gte: today },
+                status: { $in: ['temporary', 'fixed'] }
+            });
+
+            if (futureScheduleCount > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Không thể deactivate - còn ${futureScheduleCount} buổi học trong tương lai`,
+                    hint: 'Sử dụng force=true để bỏ qua kiểm tra này'
+                });
+            }
+
+            // Cập nhật các class thành 'completed'
+            await Class.updateMany(
+                { _id: { $in: classIds } },
+                { status: 'completed' }
+            );
+        }
+
+        // Deactivate course
+        const updatedCourse = await Course.findByIdAndUpdate(
+            id,
+            {
+                isActive: false,
+                status: 'available'
+            },
+            { new: true }
+        ).populate('program', 'program_name isActive');
+
+        res.status(200).json({
+            success: true,
+            message: 'Đã deactivate khóa học thành công',
+            course: {
+                _id: updatedCourse._id,
+                courseCode: updatedCourse.courseCode,
+                name: updatedCourse.name,
+                status: updatedCourse.status,
+                isActive: updatedCourse.isActive,
+                program: updatedCourse.program
+            },
+            classesUpdated: activeClasses.length
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server khi deactivate khóa học',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Activate a course
+ * PATCH /api/courses/:id/activate
+ *
+ * Logic: Chỉ cho phép activate nếu course status là 'completed' hoặc 'available'
+ */
+exports.activateCourse = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const course = await Course.findById(id);
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy khóa học'
+            });
+        }
+
+        // Chỉ cho phép activate nếu course đã completed hoặc available
+        if (!['completed', 'available'].includes(course.status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Không thể activate khóa học ở trạng thái "${course.status}". Chỉ có thể activate khóa học đã hoàn thiện.`
+            });
+        }
+
+        // Activate course
+        const updatedCourse = await Course.findByIdAndUpdate(
+            id,
+            { isActive: true },
+            { new: true }
+        ).populate('program', 'program_name isActive');
+
+        // Activate program nếu chưa active
+        if (updatedCourse.program && !updatedCourse.program.isActive) {
+            await Program.findByIdAndUpdate(
+                updatedCourse.program._id,
+                { isActive: true }
+            );
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Đã activate khóa học thành công',
+            course: {
+                _id: updatedCourse._id,
+                courseCode: updatedCourse.courseCode,
+                name: updatedCourse.name,
+                status: updatedCourse.status,
+                isActive: updatedCourse.isActive,
+                program: updatedCourse.program
+            }
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server khi activate khóa học',
             error: err.message
         });
     }

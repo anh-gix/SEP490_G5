@@ -235,12 +235,33 @@ exports.getMyClassDetail = async (req, res) => {
       });
     }
 
-    // Check if student is enrolled in this class
+    // Check if student is enrolled in this class OR has makeup schedules in this class
     const isEnrolled = classData.students.some(
       s => s.toString() === studentId.toString()
     );
 
-    if (!isEnrolled) {
+    // If not enrolled, check if student has any StudentSchedule for this class (makeup/audit)
+    let hasAccess = isEnrolled;
+    if (!hasAccess) {
+      // Get all ClassSchedules for this class
+      const classSchedules = await ClassSchedule.find({ class: classId })
+        .select('_id')
+        .lean();
+      
+      const classScheduleIds = classSchedules.map(cs => cs._id);
+      
+      // Check if student has any StudentSchedule for these ClassSchedules
+      if (classScheduleIds.length > 0) {
+        const studentSchedule = await StudentSchedule.findOne({
+          student: studentId,
+          classSchedule: { $in: classScheduleIds }
+        }).lean();
+        
+        hasAccess = !!studentSchedule;
+      }
+    }
+
+    if (!hasAccess) {
       return res.status(403).json({
         success: false,
         message: 'Bạn không có quyền truy cập lớp học này'
@@ -545,8 +566,7 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       });
     }
 
-    // Check if student is enrolled in this class
-    // For makeup classes (no class), check via StudentSchedule instead
+    // Check if student is enrolled in this class OR has StudentSchedule for this schedule (makeup/audit)
     let isEnrolled = false;
     
     if (classSchedule.class) {
@@ -554,6 +574,16 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       isEnrolled = classSchedule.class.students.some(
         s => s.toString() === studentId.toString()
       );
+      
+      // If not enrolled, check if student has StudentSchedule for this schedule (makeup/audit)
+      if (!isEnrolled) {
+        const studentSchedule = await StudentSchedule.findOne({
+          student: studentId,
+          classSchedule: scheduleId
+        }).lean();
+        
+        isEnrolled = !!studentSchedule;
+      }
     } else {
       // Makeup class (no class): check if student has StudentSchedule for this schedule
       const studentSchedule = await StudentSchedule.findOne({
@@ -1341,42 +1371,61 @@ exports.getDashboardData = async (req, res) => {
 
     const practiceTests = submissions
       .filter(sub => {
-        const hasExam = sub.examId && sub.totalScore !== undefined;
+        const hasExam = sub.examId && sub.sections && sub.sections.length > 0;
         return hasExam;
       })
       .map((sub, index) => {
         const exam = sub.examId;
+        const examType = (exam.examType || exam.type || 'toeic').toLowerCase();
         
         const result = {
           id: sub._id.toString(),
           testName: exam.title,
           date: sub.createdAt,
-          type: exam.examType || exam.type || 'toeic'
+          type: examType
         };
 
-        // Calculate scores by section type
-        if (exam.type === 'toeic' || exam.examType === 'toeic') {
-          const listeningSection = sub.sections?.find(s => s.sectionType === 'listening');
-          const readingSection = sub.sections?.find(s => s.sectionType === 'reading');
-          const writingSection = sub.sections?.find(s => s.sectionType === 'writing');
-          const speakingSection = sub.sections?.find(s => s.sectionType === 'speaking');
+        // Tính điểm từng kỹ năng bằng cách cộng sectionScore của sections cùng sectionType
+        const skillScores = {
+          listening: 0,
+          reading: 0,
+          writing: 0,
+          speaking: 0
+        };
 
-          result.listening = listeningSection?.sectionScore || 0;
-          result.reading = readingSection?.sectionScore || 0;
-          result.writing = writingSection?.sectionScore || 0;
-          result.speaking = speakingSection?.sectionScore || 0;
-          result.total = sub.totalScore || 0;
-        } else if (exam.type === 'ielts' || exam.examType === 'ielts') {
-          const listeningSection = sub.sections?.find(s => s.sectionType === 'listening');
-          const readingSection = sub.sections?.find(s => s.sectionType === 'reading');
-          const writingSection = sub.sections?.find(s => s.sectionType === 'writing');
-          const speakingSection = sub.sections?.find(s => s.sectionType === 'speaking');
+        // Duyệt qua tất cả sections và cộng điểm theo sectionType
+        if (sub.sections && Array.isArray(sub.sections)) {
+          sub.sections.forEach(section => {
+            const skillType = section.sectionType?.toLowerCase();
+            if (skillType && skillScores.hasOwnProperty(skillType)) {
+              skillScores[skillType] += (section.sectionScore || 0);
+            }
+          });
+        }
 
-          result.listening = listeningSection?.sectionScore || 0;
-          result.reading = readingSection?.sectionScore || 0;
-          result.writing = writingSection?.sectionScore || 0;
-          result.speaking = speakingSection?.sectionScore || 0;
-          result.overallBand = sub.bandScore || 0;
+        // Format kết quả theo loại đề thi
+        if (examType === 'toeic') {
+          // TOEIC: Chỉ hiển thị Listening và Reading
+          result.listening = skillScores.listening;
+          result.reading = skillScores.reading;
+          result.total = skillScores.listening + skillScores.reading;
+        } else if (examType === 'ielts') {
+          // IELTS: Hiển thị Listening, Reading và "chưa chấm" cho Writing, Speaking
+          result.listening = skillScores.listening;
+          result.reading = skillScores.reading;
+          result.writing = skillScores.writing > 0 ? skillScores.writing : null; // null = chưa chấm
+          result.speaking = skillScores.speaking > 0 ? skillScores.speaking : null; // null = chưa chấm
+          // Calculate overall band (trung bình 4 kỹ năng nếu có đủ)
+          const scoredSkills = [skillScores.listening, skillScores.reading, skillScores.writing, skillScores.speaking].filter(s => s > 0);
+          result.overallBand = scoredSkills.length > 0 
+            ? Math.round((scoredSkills.reduce((a, b) => a + b, 0) / scoredSkills.length) * 10) / 10
+            : 0;
+        } else if (examType === 'cambridge') {
+          // Cambridge: Reading & Writing (dùng score từ reading), Listening
+          result.readingWriting = skillScores.reading; // Tận dụng sectionType reading
+          result.listening = skillScores.listening;
+          result.total = skillScores.reading + skillScores.listening;
+          result.shields = Math.round(result.total / 15); // Giả sử tổng điểm tối đa là 150, mỗi shield = 15 điểm
         }
 
         return result;
@@ -1761,26 +1810,40 @@ exports.createStudent = async (req, res) => {
       });
     }
     
-    // Validate phone number length (10-11 digits)
+    // Validate phone number length (10 digits only)
+    // Allow duplicate phone numbers
     if (phone) {
       const phoneDigits = phone.replace(/\D/g, '');
-      if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+      // Validate BEFORE adding leading zero
+      if (phoneDigits.length === 0) {
         return res.status(400).json({
           success: false,
-          message: 'Số điện thoại phải có 10 hoặc 11 chữ số'
+          message: 'Số điện thoại không được để trống'
         });
       }
-    }
-    
-    // Check if phone number already exists
-    if (phone) {
-      const phoneExists = await User.findOne({ phone });
-      if (phoneExists) {
-        return res.status(400).json({
-          success: false,
-          message: 'Số điện thoại đã tồn tại trong hệ thống'
-        });
+      
+      let normalizedPhone = phoneDigits;
+      if (phoneDigits[0] === '0') {
+        // Has leading zero: must be exactly 10 digits
+        if (phoneDigits.length !== 10) {
+          return res.status(400).json({
+            success: false,
+            message: 'Số điện thoại phải có 10 chữ số'
+          });
+        }
+      } else {
+        // No leading zero (Excel removed it): must be exactly 9 digits
+        if (phoneDigits.length !== 9) {
+          return res.status(400).json({
+            success: false,
+            message: 'Số điện thoại phải có 9 chữ số (thiếu số 0 ở đầu do Excel)'
+          });
+        }
+        // Add leading zero to normalize to 10 digits
+        normalizedPhone = '0' + phoneDigits;
       }
+      // Update phone with normalized value
+      phone = normalizedPhone;
     }
     
     // Create student
@@ -1857,18 +1920,11 @@ const parseLevelsToStudy = (levelsToStudyStr) => {
 // Helper function to find existing student by email or phone
 const findExistingStudent = async (email, phone, studentRole) => {
   try {
-    // Find by email first
+    // Only check by email, allow duplicate phone numbers
     if (email) {
       const byEmail = await User.findOne({ email: email.toLowerCase() });
       if (byEmail && byEmail.roleId && byEmail.roleId.toString() === studentRole._id.toString()) {
         return byEmail;
-      }
-    }
-    // If not found, find by phone
-    if (phone) {
-      const byPhone = await User.findOne({ phone: phone });
-      if (byPhone && byPhone.roleId && byPhone.roleId.toString() === studentRole._id.toString()) {
-        return byPhone;
       }
     }
     return null;
@@ -1877,42 +1933,78 @@ const findExistingStudent = async (email, phone, studentRole) => {
   }
 };
 
-// Helper function to enroll student into courses based on levelsToStudy
-const enrollStudentInCourses = async (studentId, levelsToStudyStr, type) => {
+// Helper function to enroll student into courses based on levelsToStudy and programCode (REQUIRED)
+const enrollStudentInCourses = async (studentId, levelsToStudyStr, type, programCode) => {
   try {
-    if (!levelsToStudyStr || !type) {
-      return { enrolled: 0, courses: [] };
+    // Validate required parameters
+    if (!levelsToStudyStr || !type || !programCode) {
+      return {
+        enrolled: 0,
+        courses: [],
+        error: 'Missing required parameters: levelsToStudy, type, and programCode are all required'
+      };
     }
 
     // Parse levels from string
     const levels = parseLevelsToStudy(levelsToStudyStr);
     if (levels.length === 0) {
-      return { enrolled: 0, courses: [] };
+      return { enrolled: 0, courses: [], error: 'Invalid levelsToStudy format' };
     }
 
     const typeStr = type.toString().trim().toLowerCase();
+    const programCodeStr = programCode.toString().trim();
 
-    // Find programs matching type and levels
+    if (!programCodeStr) {
+      return { enrolled: 0, courses: [], error: 'Program code is required and cannot be empty' };
+    }
+
+    // Parse multiple program codes (split by comma, semicolon, or pipe)
+    const programCodes = programCodeStr
+      .split(/[,;|]/)
+      .map(code => code.trim())
+      .filter(code => code.length > 0);
+
+    if (programCodes.length === 0) {
+      return { enrolled: 0, courses: [], error: 'No valid program codes found' };
+    }
+
+    // Find programs by codes - ONLY use program codes, no fallback to type+level
+    // Only use approved programs (programs that have been approved by Center Head)
     const programs = await Program.find({
-      type: typeStr,
-      level: { $in: levels },
-      status: 'active'
-    }).select('_id level');
+      code: { $in: programCodes },
+      status: 'approved'
+    }).select('_id level code');
 
     if (programs.length === 0) {
-      return { enrolled: 0, courses: [] };
+      return {
+        enrolled: 0,
+        courses: [],
+        error: `None of the program codes [${programCodes.join(', ')}] found in the system`
+      };
+    }
+
+    // Log warning if some codes were not found
+    const foundCodes = programs.map(p => p.code);
+    const notFoundCodes = programCodes.filter(code => !foundCodes.includes(code));
+    if (notFoundCodes.length > 0) {
+      console.log(`Warning: Programs with codes [${notFoundCodes.join(', ')}] not found.`);
     }
 
     const programIds = programs.map(p => p._id);
 
     // Find all courses belonging to these programs
+    // Get courses with status 'completed' or 'active' (courses ready to use)
     const courses = await Course.find({
       program: { $in: programIds },
-      status: 'active'
-    }).select('_id name program');
+      status: { $in: ['completed', 'active'] }
+    }).select('_id name program status');
 
     if (courses.length === 0) {
-      return { enrolled: 0, courses: [] };
+      return {
+        enrolled: 0,
+        courses: [],
+        error: `No active courses found for programs [${foundCodes.join(', ')}]`
+      };
     }
 
     // Enroll student in all courses
@@ -1930,13 +2022,31 @@ const enrollStudentInCourses = async (studentId, levelsToStudyStr, type) => {
         if (result.modifiedCount > 0 || result.matchedCount > 0) {
           enrolledCount++;
           enrolledCourseIds.push(course._id);
+
+          // If course status was 'completed' and now has students, change to 'active'
+          if (course.status === 'completed') {
+            try {
+              await Course.updateOne(
+                { _id: course._id },
+                { $set: { status: 'active' } }
+              );
+              console.log(`Course ${course._id} status changed from 'completed' to 'active'`);
+            } catch (statusError) {
+              console.error(`Error updating course status for ${course._id}:`, statusError.message);
+            }
+          }
         }
       } catch (courseError) {
         // Continue with other courses even if one fails
+        console.error(`Error enrolling in course ${course._id}:`, courseError.message);
       }
     }
 
-    return { enrolled: enrolledCount, courses: enrolledCourseIds };
+    return {
+      enrolled: enrolledCount,
+      courses: enrolledCourseIds,
+      programsFound: foundCodes
+    };
   } catch (error) {
     return { enrolled: 0, courses: [], error: error.message };
   }
@@ -1981,22 +2091,33 @@ exports.importStudents = async (req, res) => {
         
         if (existingStudent) {
           // Student already exists, try to enroll in courses
-          if (studentData.levelsToStudy && studentData.type) {
+          if (studentData.levelsToStudy && studentData.type && studentData.programCode) {
             try {
               const enrollmentResult = await enrollStudentInCourses(
                 existingStudent._id,
                 studentData.levelsToStudy,
-                studentData.type
+                studentData.type,
+                studentData.programCode
               );
-              results.enrolled.push({
-                _id: existingStudent._id,
-                email: existingStudent.email,
-                username: existingStudent.username,
-                phone: existingStudent.phone || '',
-                enrolledCourses: enrollmentResult.enrolled || 0
-              });
+
+              // Check if enrollment returned an error
+              if (enrollmentResult.error) {
+                results.skipped.push({
+                  email: studentData.email,
+                  username: studentData.username,
+                  phone: studentData.phone || '',
+                  reason: enrollmentResult.error
+                });
+              } else {
+                results.enrolled.push({
+                  _id: existingStudent._id,
+                  email: existingStudent.email,
+                  username: existingStudent.username,
+                  phone: existingStudent.phone || '',
+                  enrolledCourses: enrollmentResult.enrolled || 0
+                });
+              }
             } catch (enrollmentError) {
-              // Log error but add to skipped
               results.skipped.push({
                 email: studentData.email,
                 username: studentData.username,
@@ -2005,28 +2126,61 @@ exports.importStudents = async (req, res) => {
               });
             }
           } else {
-            // No course information, skip
+            const missingFields = [];
+            if (!studentData.levelsToStudy) missingFields.push('lộ trình học');
+            if (!studentData.type) missingFields.push('loại chương trình');
+            if (!studentData.programCode) missingFields.push('mã chương trình');
+
             results.skipped.push({
               email: studentData.email,
               username: studentData.username,
               phone: studentData.phone || '',
-              reason: 'Học viên đã có tài khoản nhưng không có thông tin lộ trình học'
+              reason: `Học viên đã có tài khoản nhưng thiếu thông tin: ${missingFields.join(', ')}`
             });
           }
           continue;
         }
         
-        // Validate phone number length (10-11 digits)
+        // Validate phone number length (10 digits only)
+        let normalizedPhone = studentData.phone || '';
         if (studentData.phone) {
           const phoneDigits = studentData.phone.replace(/\D/g, '');
-          if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+          // Validate BEFORE adding leading zero
+          if (phoneDigits.length === 0) {
             results.failed.push({
               email: studentData.email,
               username: studentData.username,
               phone: studentData.phone || '',
-              reason: 'Số điện thoại phải có 10 hoặc 11 chữ số'
+              reason: 'Số điện thoại không được để trống'
             });
             continue;
+          }
+          
+          if (phoneDigits[0] === '0') {
+            // Has leading zero: must be exactly 10 digits
+            if (phoneDigits.length !== 10) {
+              results.failed.push({
+                email: studentData.email,
+                username: studentData.username,
+                phone: studentData.phone || '',
+                reason: 'Số điện thoại phải có 10 chữ số'
+              });
+              continue;
+            }
+            normalizedPhone = phoneDigits;
+          } else {
+            // No leading zero (Excel removed it): must be exactly 9 digits
+            if (phoneDigits.length !== 9) {
+              results.failed.push({
+                email: studentData.email,
+                username: studentData.username,
+                phone: studentData.phone || '',
+                reason: 'Số điện thoại phải có 9 chữ số (thiếu số 0 ở đầu do Excel)'
+              });
+              continue;
+            }
+            // Add leading zero to normalize to 10 digits
+            normalizedPhone = '0' + phoneDigits;
           }
         }
         
@@ -2034,27 +2188,34 @@ exports.importStudents = async (req, res) => {
         const newStudent = await User.create({
           email: studentData.email,
           username: studentData.username,
-          phone: studentData.phone || '',
+          phone: normalizedPhone,
           address: studentData.address || '',
           password: studentData.password || '123456', // Default password
           roleId: studentRole._id
         });
         
         // Enroll student in courses based on levelsToStudy
-        // Note: We don't save aim, currentLevel, type, levelsToStudy to User model
+        // Note: We don't save aim, currentLevel, type, levelsToStudy, programCode to User model
         // They are only used to determine which courses to enroll in
-        if (studentData.levelsToStudy && studentData.type) {
+        if (studentData.levelsToStudy && studentData.type && studentData.programCode) {
           try {
             const enrollmentResult = await enrollStudentInCourses(
               newStudent._id,
               studentData.levelsToStudy,
-              studentData.type
+              studentData.type,
+              studentData.programCode
             );
+
+            // Log if enrollment returned an error (but don't fail the student creation)
+            if (enrollmentResult.error) {
+              console.error(`Enrollment error for ${studentData.email}:`, enrollmentResult.error);
+            }
           } catch (enrollmentError) {
             // Log error but don't fail the import
+            console.error(`Enrollment exception for ${studentData.email}:`, enrollmentError.message);
           }
         }
-        
+
         results.created.push({
           _id: newStudent._id,
           email: newStudent.email,
@@ -2181,6 +2342,21 @@ exports.updateStudentCourseEnrollments = async (req, res) => {
         { session }
       );
       updatedCourses.push(...coursesToAdd);
+
+      // Update course status from 'completed' to 'active' for courses that now have students
+      const coursesToActivate = await Course.find({
+        _id: { $in: coursesToAdd.map(id => new mongoose.Types.ObjectId(id)) },
+        status: 'completed'
+      }).session(session).select('_id name');
+
+      if (coursesToActivate.length > 0) {
+        await Course.updateMany(
+          { _id: { $in: coursesToActivate.map(c => c._id) } },
+          { $set: { status: 'active' } },
+          { session }
+        );
+        console.log(`Updated ${coursesToActivate.length} courses from 'completed' to 'active' when enrolling student ${studentId}`);
+      }
     }
 
     // Remove student from courses using $pull
@@ -2192,6 +2368,23 @@ exports.updateStudentCourseEnrollments = async (req, res) => {
         { session }
       );
       updatedCourses.push(...coursesToRemove);
+
+      // Check if courses now have no students, if so change from 'active' to 'completed'
+      const coursesAfterRemoval = await Course.find({
+        _id: { $in: coursesToRemove.map(id => new mongoose.Types.ObjectId(id)) },
+        status: 'active'
+      }).session(session).select('_id name studentEnrollments');
+
+      for (const course of coursesAfterRemoval) {
+        if (course.studentEnrollments.length === 0) {
+          await Course.updateOne(
+            { _id: course._id },
+            { $set: { status: 'completed' } },
+            { session }
+          );
+          console.log(`Course ${course._id} status changed from 'active' to 'completed' (no more students)`);
+        }
+      }
     }
 
     // Commit transaction

@@ -179,7 +179,12 @@ async function validateScheduleConflict(scheduleData, classData) {
       const teacherScheduleQuery = {
         class: { $in: teacherClassIds },
         date: scheduleDate,
-        status: { $in: ['temporary', 'fixed'] }
+        status: { $in: ['temporary', 'fixed'] },
+        // FIX: Chỉ lấy các buổi mà giáo viên này thực sự dạy
+        $or: [
+          { teacher: teacherId },
+          { substituteTeacher: teacherId }
+        ]
       };
       if (excludeScheduleId) {
         teacherScheduleQuery._id = { $ne: new mongoose.Types.ObjectId(excludeScheduleId) };
@@ -984,6 +989,7 @@ exports.updateSchedule = async (req, res) => {
       if (date) schedule.date = date;
       if (startTime) schedule.startTime = startTime;
       if (endTime) schedule.endTime = endTime;
+      if (room) schedule.room = room;
 
       // Check if schedule has original values (was changed before)
       if (schedule.originalDate) {

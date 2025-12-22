@@ -432,7 +432,7 @@ const ClassManagement = () => {
                   <option value="pending">Chờ khai giảng</option>
                   <option value="active">Đang học</option>
                   <option value="completed">Đã hoàn thành</option>
-                  <option value="cancelled">Đã hủy</option>
+                  <option value="disable">Vô hiệu hóa</option>
                 </Form.Select>
               </Form.Group>
             </Col>

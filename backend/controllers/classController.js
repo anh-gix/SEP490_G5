@@ -7,6 +7,7 @@ const Course = require("../models/courseModel");
 const Program = require("../models/programModel");
 const Room = require("../models/room");
 const mongoose = require("mongoose");
+const { isClassDataComplete } = require("../helpers/classValidationHelpers");
 
 exports.getAllClasses = async (req, res) => {
   try {
@@ -22,6 +23,20 @@ exports.getAllClasses = async (req, res) => {
     if (status) query.status = status;
     if (courseId) query.course = courseId;
     if (search) query.name = { $regex: search, $options: 'i' };
+    
+    //update pending → active
+    if (status !== 'pending') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      await Class.updateMany(
+        {
+          status: 'pending',
+          startDate: { $exists: true, $lte: today }
+        },
+        { $set: { status: 'active' } }
+      );
+    }
     
     const classes = await Class.find(query)
       // user model uses 'username' rather than firstName/lastName/fullName
@@ -496,7 +511,12 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
       const teacherSchedules = await ClassSchedule.find({
         class: { $in: teacherClassIds },
         date: { $in: uniqueDates },
-        status: { $in: ['temporary', 'fixed'] }
+        status: { $in: ['temporary', 'fixed'] },
+        // FIX: Chỉ lấy các buổi mà giáo viên này thực sự dạy
+        $or: [
+          { teacher: teacherId },
+          { substituteTeacher: teacherId }
+        ]
       })
         .populate('class', 'name')
         .select('date startTime endTime class')
@@ -1102,6 +1122,19 @@ exports.createClass = async (req, res) => {
       finalMaxStudents = undefined;
     }
     
+    // Kiểm tra đầy đủ thông tin để set status tự động
+    const classDataForValidation = {
+      course,
+      startDate,
+      teacher,
+      room,
+      scheduleEntries,
+      students: students || []
+    };
+
+    // Chỉ set 'pending' nếu đủ thông tin, không thì 'disable'
+    const autoStatus = isClassDataComplete(classDataForValidation) ? 'pending' : 'disable';
+
     const newClass = new Class({
       name,
       course,
@@ -1112,13 +1145,14 @@ exports.createClass = async (req, res) => {
       startDate,
       endDate,
       maxStudents: finalMaxStudents,
-      status: status || 'pending'
+      status: status || autoStatus
     });
     
     await newClass.save({ session });
     
-    // Generate ClassSchedule entries if scheduleEntries and course are provided
-    if (scheduleEntries && scheduleEntries.length > 0 && course && startDate) {
+    // Generate ClassSchedule entries only if all required fields are available
+    // ClassSchedule requires: teacher, room, createdBy (from req.user or teacher)
+    if (scheduleEntries && scheduleEntries.length > 0 && course && startDate && teacher && room) {
       // Get course details including numberOfSessions and sessions
       const courseData = await Course.findById(course)
         .populate('sessions', 'order')
@@ -1268,7 +1302,7 @@ exports.createClass = async (req, res) => {
           
           // Create all ClassSchedule entries
           const createdSchedules = await ClassSchedule.insertMany(classSchedules, { session });
-          
+
           // Create StudentSchedule entries for each ClassSchedule
           if (students && students.length > 0) {
             const studentSchedules = [];
@@ -1281,7 +1315,7 @@ exports.createClass = async (req, res) => {
                 });
               });
             });
-            
+
             if (studentSchedules.length > 0) {
               await StudentSchedule.insertMany(studentSchedules, { session });
             }
@@ -1293,17 +1327,43 @@ exports.createClass = async (req, res) => {
     // Commit transaction before populating (populate doesn't need to be in transaction)
     await session.commitTransaction();
     session.endSession();
-    
+
+    // Auto active Course và Program khi tạo class mới
+    if (course) {
+      try {
+        // Cập nhật Course: status = 'active', isActive = true
+        const updatedCourse = await Course.findByIdAndUpdate(
+          course,
+          {
+            status: 'active',
+            isActive: true
+          },
+          { new: true }
+        );
+
+        // Cập nhật Program: isActive = true nếu course thuộc program
+        if (updatedCourse?.program) {
+          await Program.findByIdAndUpdate(
+            updatedCourse.program,
+            { isActive: true }
+          );
+        }
+      } catch (activationError) {
+        // Log lỗi nhưng không fail request vì class đã được tạo thành công
+        console.error('Error activating course/program:', activationError);
+      }
+    }
+
     const populatedClass = await Class.findById(newClass._id)
       .populate('teacher', 'username email phone')
       .populate('students', 'username email')
       .populate('room', 'room_name location capacity')
-      .populate({ 
-        path: 'course', 
-        select: 'name',
-        populate: { path: 'program', select: 'program_name name level band tuitionFee type' } 
+      .populate({
+        path: 'course',
+        select: 'name status isActive',
+        populate: { path: 'program', select: 'program_name name level band tuitionFee type isActive' }
       });
-    
+
     res.status(201).json({
       success: true,
       message: 'Tạo lớp học thành công',
@@ -1435,9 +1495,9 @@ exports.updateClass = async (req, res) => {
     }
 
     // For pending class, use new handler as well
-    if (classData.status === 'pending') {
+    if (classData.status === 'pending' || classData.status === 'disable') {
       console.log(' → Routing to handlePendingClassUpdate');
-      const result = await handlePendingClassUpdate(classData, req.body, session);
+      const result = await handlePendingClassUpdate(classData, req.body, req.user?._id, session);
 
       if (!result.success) {
         await session.abortTransaction();
@@ -2217,11 +2277,37 @@ exports.updateClass = async (req, res) => {
         console.log(' [DEBUG] No ClassSchedules found for this class, skipping StudentSchedule updates');
       }
     }
-    
+
+    // TỰ ĐỘNG NÂNG CẤP từ disable → pending nếu đủ thông tin
+    if (classData.status === 'disable') {
+      // Lấy scheduleEntries từ database
+      const existingSchedules = await ClassSchedule.find({ class: req.params.id }).session(session);
+      const hasScheduleEntries = existingSchedules && existingSchedules.length > 0;
+
+      // Lấy thông tin lớp sau update để kiểm tra
+      const updatedClassForCheck = await Class.findById(req.params.id).session(session);
+
+      const dataForValidation = {
+        course: updatedClassForCheck.course,
+        startDate: updatedClassForCheck.startDate,
+        teacher: updatedClassForCheck.teacher || updatedClassForCheck.teacherId,
+        room: updatedClassForCheck.room,
+        scheduleEntries: hasScheduleEntries ? [{dummy: true}] : [],
+        students: updatedClassForCheck.students
+      };
+
+      // Nếu đủ thông tin, tự động nâng lên pending
+      if (isClassDataComplete(dataForValidation)) {
+        updatedClassForCheck.status = 'pending';
+        await updatedClassForCheck.save({ session });
+        console.log(`✓ Tự động nâng cấp lớp từ disable → pending`);
+      }
+    }
+
     // Commit transaction before populating (populate doesn't need to be in transaction)
     await session.commitTransaction();
     session.endSession();
-    
+
     const updatedClass = await Class.findById(classData._id)
       .populate('teacher', 'username email phone')
       .populate('students', 'username email')
@@ -2268,13 +2354,22 @@ exports.deleteClass = async (req, res) => {
       });
     }
     
-    // Only allow deletion of classes with "pending" status
-    if (classData.status !== 'pending') {
+    // Only allow deletion of classes with "pending" or "disable" status
+    if (classData.status !== 'pending' && classData.status !== 'disable') {
       await session.abortTransaction();
       session.endSession();
+
+      // Map status to Vietnamese
+      const statusMap = {
+        'active': 'Đang học',
+        'completed': 'Đã hoàn thành',
+        'disable': 'Vô hiệu hóa'
+      };
+      const statusText = statusMap[classData.status] || classData.status;
+
       return res.status(400).json({
         success: false,
-        message: `Chỉ có thể xóa lớp học ở trạng thái "Chờ khai giảng". Lớp học này đang ở trạng thái "${classData.status === 'active' ? 'Đang học' : classData.status === 'completed' ? 'Đã hoàn thành' : 'Đã hủy'}"`
+        message: `Chỉ có thể xóa lớp học ở trạng thái "Chờ khai giảng" hoặc "Vô hiệu hóa". Lớp học này đang ở trạng thái "${statusText}"`
       });
     }
     
@@ -2399,7 +2494,12 @@ const checkTeacherConflictsWithSchedules = async (teacherId, schedules, excludeC
     const teacherSchedules = await ClassSchedule.find({
       class: { $in: teacherClassIds },
       date: { $in: uniqueDates },
-      status: { $in: ['temporary', 'fixed'] }
+      status: { $in: ['temporary', 'fixed'] },
+      // FIX: Chỉ lấy các buổi mà giáo viên này thực sự dạy
+      $or: [
+        { teacher: teacherId },
+        { substituteTeacher: teacherId }
+      ]
     })
       .populate('class', 'name')
       .select('date startTime endTime class')
@@ -3068,6 +3168,28 @@ const handleActiveClassUpdate = async (classData, updateData, session) => {
       studentUpdate: null
     };
 
+    // VALIDATION: Ngăn chặn xóa teacher/room/course khỏi lớp đang học
+    if ((updateData.teacher === null || updateData.teacher === '') && classData.teacher) {
+      return {
+        success: false,
+        message: 'Không thể xóa giáo viên khỏi lớp đang học'
+      };
+    }
+
+    if ((updateData.room === null || updateData.room === '') && classData.room) {
+      return {
+        success: false,
+        message: 'Không thể xóa phòng học khỏi lớp đang học'
+      };
+    }
+
+    if ((updateData.course === null || updateData.course === '') && classData.course) {
+      return {
+        success: false,
+        message: 'Không thể xóa khóa học khỏi lớp đang học'
+      };
+    }
+
     // 1. Handle schedule updates first (if any)
     if (updateData.scheduleUpdates && updateData.scheduleUpdates.length > 0) {
       results.scheduleUpdates = await updateSchedulesForActiveClass(
@@ -3146,7 +3268,7 @@ const handleActiveClassUpdate = async (classData, updateData, session) => {
 /**
  * Handle updates for pending class
  */
-const handlePendingClassUpdate = async (classData, updateData, session) => {
+const handlePendingClassUpdate = async (classData, updateData, userId, session) => {
   try {
     const results = {
       courseUpdate: null,
@@ -3164,6 +3286,7 @@ const handlePendingClassUpdate = async (classData, updateData, session) => {
         classData._id,
         updateData.course,
         classData,
+        userId,
         session
       );
       if (!results.courseUpdate.success) {
@@ -3171,6 +3294,35 @@ const handlePendingClassUpdate = async (classData, updateData, session) => {
       }
       // After course change, other schedule-related updates may not be needed
       // Return early with course update result
+
+      // Kiểm tra status sau khi đổi course
+      const updatedClassData = await Class.findById(classData._id)
+        .populate('course')
+        .populate('teacher')
+        .populate('room')
+        .populate('students')
+        .session(session);
+
+      const existingSchedules = await ClassSchedule.find({ class: classData._id }).session(session);
+      const hasScheduleEntries = existingSchedules && existingSchedules.length > 0;
+
+      const updatedDataForValidation = {
+        course: updatedClassData.course,
+        startDate: updatedClassData.startDate,
+        teacher: updatedClassData.teacher,
+        room: updatedClassData.room,
+        scheduleEntries: hasScheduleEntries ? [{dummy: true}] : [],
+        students: updatedClassData.students
+      };
+
+      const newStatus = isClassDataComplete(updatedDataForValidation) ? 'pending' : 'disable';
+
+      if (updatedClassData.status !== newStatus) {
+        updatedClassData.status = newStatus;
+        await updatedClassData.save({ session });
+        console.log(`✓ Tự động cập nhật status lớp sau khi đổi course: ${classData.status} → ${newStatus}`);
+      }
+
       const updatedClass = await Class.findById(classData._id).session(session);
       return {
         success: true,
@@ -3261,6 +3413,38 @@ const handlePendingClassUpdate = async (classData, updateData, session) => {
           return results.removeStudents;
         }
       }
+    }
+
+    // Lấy lại dữ liệu lớp sau khi update xong (với populate)
+    const updatedClassData = await Class.findById(classData._id)
+      .populate('course')
+      .populate('teacher')
+      .populate('room')
+      .populate('students')
+      .session(session);
+
+    // Lấy scheduleEntries từ database để kiểm tra
+    const existingSchedules = await ClassSchedule.find({ class: classData._id }).session(session);
+    const hasScheduleEntries = existingSchedules && existingSchedules.length > 0;
+
+    // Kiểm tra xem sau khi update, lớp còn đủ thông tin không
+    const updatedDataForValidation = {
+      course: updatedClassData.course,
+      startDate: updatedClassData.startDate,
+      teacher: updatedClassData.teacher,
+      room: updatedClassData.room,
+      scheduleEntries: hasScheduleEntries ? [{dummy: true}] : [], // Chỉ cần check có hay không
+      students: updatedClassData.students
+    };
+
+    // Tính status mới dựa vào độ đầy đủ thông tin
+    const newStatus = isClassDataComplete(updatedDataForValidation) ? 'pending' : 'disable';
+
+    // Nếu status thay đổi, cập nhật vào database
+    if (updatedClassData.status !== newStatus) {
+      updatedClassData.status = newStatus;
+      await updatedClassData.save({ session });
+      console.log(`✓ Tự động cập nhật status lớp: ${classData.status} → ${newStatus}`);
     }
 
     const updatedClass = await Class.findById(classData._id).session(session);

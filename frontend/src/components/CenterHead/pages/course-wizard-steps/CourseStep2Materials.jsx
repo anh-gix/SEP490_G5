@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { toast } from 'react-toastify';
 import Button from '../../compo/Button';
 import Badge from '../../compo/Badge';
 import Modal from '../../compo/Modal';
@@ -6,8 +7,12 @@ import courseService from '../../../../services/courseService';
 
 const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious }) => {
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
+  const [urlType, setUrlType] = useState('link'); // 'link' or 'file'
+  const [selectedFile, setSelectedFile] = useState(null);
+  const fileInputRef = useRef(null);
   const [materialForm, setMaterialForm] = useState({
     description: '',
     author: '',
@@ -25,29 +30,73 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
   const handleAddMaterial = () => {
     setMaterialForm({ description: '', author: '', publisher: '', publishedDate: '', onlineUrl: '', note: '' });
     setEditingIndex(null);
+    setUrlType('link');
+    setSelectedFile(null);
     setShowMaterialModal(true);
   };
 
   const handleEditMaterial = (index) => {
-    setMaterialForm(courseData.materials[index]);
+    const material = courseData.materials[index];
+    setMaterialForm(material);
     setEditingIndex(index);
+    // Check if it's a file URL (contains /uploads/course-materials/)
+    if (material.onlineUrl && material.onlineUrl.includes('/uploads/course-materials/')) {
+      setUrlType('file');
+    } else {
+      setUrlType('link');
+    }
+    setSelectedFile(null);
     setShowMaterialModal(true);
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const handleUploadFile = async () => {
+    if (!selectedFile) return null;
+
+    try {
+      setUploading(true);
+      const result = await courseService.uploadMaterialFile(selectedFile);
+      return result.url;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      throw error;
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSaveMaterial = async () => {
     if (!materialForm.description) {
-      alert('Vui lòng nhập mô tả tài liệu!');
+      toast.error('Vui lòng nhập mô tả tài liệu!');
       return;
     }
 
-    const newMaterials = [...courseData.materials];
-    if (editingIndex !== null) {
-      newMaterials[editingIndex] = materialForm;
-    } else {
-      newMaterials.push(materialForm);
-    }
-
     try {
+      let finalUrl = materialForm.onlineUrl;
+
+      // If file upload mode and file selected, upload first
+      if (urlType === 'file' && selectedFile) {
+        finalUrl = await handleUploadFile();
+      }
+
+      const materialData = {
+        ...materialForm,
+        onlineUrl: finalUrl
+      };
+
+      const newMaterials = [...courseData.materials];
+      if (editingIndex !== null) {
+        newMaterials[editingIndex] = materialData;
+      } else {
+        newMaterials.push(materialData);
+      }
+
       // Save to database immediately
       await courseService.updateCourse(courseData._id, {
         materials: newMaterials
@@ -55,9 +104,10 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
 
       setCourseData(prev => ({ ...prev, materials: newMaterials }));
       setShowMaterialModal(false);
+      setSelectedFile(null);
     } catch (error) {
       console.error('Error saving material:', error);
-      alert('Lỗi khi lưu tài liệu!');
+      toast.error('Lỗi khi lưu tài liệu!');
     }
   };
 
@@ -78,7 +128,7 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
       }));
     } catch (error) {
       console.error('Error deleting material:', error);
-      alert('Lỗi khi xóa tài liệu!');
+      toast.error('Lỗi khi xóa tài liệu!');
     }
   };
 
@@ -96,11 +146,11 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
         lastCompletedStep: 3
       }));
 
-      alert('Lưu tài liệu thành công!');
+      toast.success('Lưu tài liệu thành công!');
       onNext();
     } catch (error) {
       console.error('Error saving materials:', error);
-      alert('Lỗi khi lưu tài liệu!');
+      toast.error('Lỗi khi lưu tài liệu!');
     } finally {
       setLoading(false);
     }
@@ -190,9 +240,76 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
               <label className="form-label fw-semibold">Ngày phát hành</label>
               <input type="text" name="publishedDate" value={materialForm.publishedDate} onChange={handleInputChange} className="form-control radius-8" placeholder="2024" />
             </div>
-            <div className="col-md-6">
-              <label className="form-label fw-semibold">URL</label>
-              <input type="text" name="onlineUrl" value={materialForm.onlineUrl} onChange={handleInputChange} className="form-control radius-8" placeholder="https://..." />
+            <div className="col-12">
+              <label className="form-label fw-semibold">Tài liệu trực tuyến</label>
+              <div className="d-flex gap-3 mb-2">
+                <div className="form-check">
+                  <input
+                    type="radio"
+                    id="urlTypeLink"
+                    name="urlType"
+                    className="form-check-input"
+                    checked={urlType === 'link'}
+                    onChange={() => setUrlType('link')}
+                  />
+                  <label htmlFor="urlTypeLink" className="form-check-label">
+                    <i className="ph ph-link me-1"></i> Nhập URL
+                  </label>
+                </div>
+                <div className="form-check">
+                  <input
+                    type="radio"
+                    id="urlTypeFile"
+                    name="urlType"
+                    className="form-check-input"
+                    checked={urlType === 'file'}
+                    onChange={() => setUrlType('file')}
+                  />
+                  <label htmlFor="urlTypeFile" className="form-check-label">
+                    <i className="ph ph-upload me-1"></i> Upload file
+                  </label>
+                </div>
+              </div>
+
+              {urlType === 'link' ? (
+                <input
+                  type="text"
+                  name="onlineUrl"
+                  value={materialForm.onlineUrl}
+                  onChange={handleInputChange}
+                  className="form-control radius-8"
+                  placeholder="https://..."
+                />
+              ) : (
+                <div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="form-control radius-8"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
+                  />
+                  <small className="text-neutral-500">
+                    Hỗ trợ: PDF, Word, Excel, PowerPoint, TXT, ZIP, RAR (tối đa 50MB)
+                  </small>
+                  {selectedFile && (
+                    <div className="mt-2 p-2 bg-neutral-50 radius-8 d-flex align-items-center gap-2">
+                      <i className="ph ph-file text-primary"></i>
+                      <span className="text-sm">{selectedFile.name}</span>
+                      <Badge variant="secondary" className="ms-auto">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</Badge>
+                    </div>
+                  )}
+                  {materialForm.onlineUrl && materialForm.onlineUrl.includes('/uploads/course-materials/') && !selectedFile && (
+                    <div className="mt-2 p-2 bg-success-50 radius-8 d-flex align-items-center gap-2">
+                      <i className="ph ph-check-circle text-success"></i>
+                      <span className="text-sm text-success">Đã có file tải lên</span>
+                      <a href={materialForm.onlineUrl} target="_blank" rel="noopener noreferrer" className="ms-auto text-sm">
+                        <i className="ph ph-eye me-1"></i>Xem
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="col-12">
               <label className="form-label fw-semibold">Ghi chú</label>
@@ -200,8 +317,15 @@ const CourseStep2Materials = ({ courseData, setCourseData, onNext, onPrevious })
             </div>
           </div>
           <div className="d-flex justify-content-end gap-2 mt-16">
-            <Button variant="outline" onClick={() => setShowMaterialModal(false)}>Hủy</Button>
-            <Button variant="primary" onClick={handleSaveMaterial}>Lưu</Button>
+            <Button variant="outline" onClick={() => setShowMaterialModal(false)} disabled={uploading}>Hủy</Button>
+            <Button variant="primary" onClick={handleSaveMaterial} disabled={uploading}>
+              {uploading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Đang tải lên...
+                </>
+              ) : 'Lưu'}
+            </Button>
           </div>
         </Modal>
       )}

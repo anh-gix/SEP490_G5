@@ -1122,19 +1122,6 @@ exports.createClass = async (req, res) => {
       finalMaxStudents = undefined;
     }
     
-    // Kiểm tra đầy đủ thông tin để set status tự động
-    const classDataForValidation = {
-      course,
-      startDate,
-      teacher,
-      room,
-      scheduleEntries,
-      students: students || []
-    };
-
-    // Chỉ set 'pending' nếu đủ thông tin, không thì 'disable'
-    const autoStatus = isClassDataComplete(classDataForValidation) ? 'pending' : 'disable';
-
     const newClass = new Class({
       name,
       course,
@@ -1145,7 +1132,7 @@ exports.createClass = async (req, res) => {
       startDate,
       endDate,
       maxStudents: finalMaxStudents,
-      status: status || autoStatus
+      status: status || 'disable'
     });
     
     await newClass.save({ session });

@@ -34,7 +34,7 @@ const classSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['pending', 'active', 'completed', 'disable'],
-    default: 'pending'
+    default: 'disable'
   },
   teacherId: {
     type: mongoose.Schema.Types.ObjectId,

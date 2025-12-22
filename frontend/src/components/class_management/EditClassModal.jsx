@@ -987,10 +987,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
           if (!teacherId) return;
 
           try {
-            const response = await teacherService.getTeacherSchedule(teacherId, {
-              startDate: minDate,
-              endDate: maxDate
-            });
+            // Fetch ALL schedules (không giới hạn date range) để hiển thị đầy đủ
+            const response = await teacherService.getTeacherSchedule(teacherId, {});
 
             if (response && response.schedules) {
               schedulesMap[String(teacherId)] = response.schedules;
@@ -1005,7 +1003,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     };
 
     fetchTeacherSchedules();
-  }, [teachers, effectiveGeneratedSessions]);
+  }, [teachers, effectiveGeneratedSessions, formData.teacherId]);
 
   // Fetch room schedules for all rooms to check conflicts
   useEffect(() => {
@@ -2712,20 +2710,32 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
   };
 
   const checkDuplicateEntries = (entries) => {
-    const seen = new Set();
     const duplicates = [];
-    
+
     entries.forEach((entry, index) => {
       // Chỉ kiểm tra entries đã điền đầy đủ
       if (!entry.day || !entry.startTime || !entry.endTime) {
         return;
       }
-      
-      const key = `${entry.day}-${entry.startTime}-${entry.endTime}`;
-      if (seen.has(key)) {
-        duplicates.push(index);
-      } else {
-        seen.add(key);
+
+      // Check against all previous entries for overlap
+      for (let j = 0; j < index; j++) {
+        const prevEntry = entries[j];
+
+        // Skip if previous entry is not complete or already marked as duplicate
+        if (!prevEntry.day || !prevEntry.startTime || !prevEntry.endTime) {
+          continue;
+        }
+        
+        // Check if same day and time overlaps
+        if (entry.day === prevEntry.day) {
+          const overlap = hasTimeOverlap(entry.startTime, entry.endTime, prevEntry.startTime, prevEntry.endTime);
+          
+          if (overlap) {
+            duplicates.push(index);
+            break; // Mark current entry as duplicate and stop checking
+          }
+        }
       }
     });
     
@@ -4542,6 +4552,13 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                                     return false;
                                   }
                                 })
+                                // Remove duplicate conflicts based on unique key
+                                .filter((conflict, index, self) => {
+                                  const key = `${conflict.date}-${conflict.time || conflict.teacherTime}-${conflict.className}`;
+                                  return index === self.findIndex(c => 
+                                    `${c.date}-${c.time || c.teacherTime}-${c.className}` === key
+                                  );
+                                })
                                 .map((conflict, idx) => {
                                   try {
                                     // Get current class schedule for this date AND time to show the exact conflicting schedule
@@ -4691,6 +4708,13 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                                     console.error('Error filtering room conflicts:', err);
                                     return false;
                                   }
+                                })
+                                // Remove duplicate conflicts based on unique key
+                                .filter((conflict, index, self) => {
+                                  const key = `${conflict.date}-${conflict.time || conflict.roomTime}-${conflict.className}`;
+                                  return index === self.findIndex(c => 
+                                    `${c.date}-${c.time || c.roomTime}-${c.className}` === key
+                                  );
                                 })
                                 .map((conflict, idx) => {
                                   try {
@@ -4973,6 +4997,13 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
               variant="warning"
               className="text-white text-15 fw-semibold px-24 py-12 radius-8"
               type="submit"
+              disabled={
+                scheduleEntriesError || 
+                duplicateEntryIndices.length > 0 ||
+                teacherRoomConflicts.teacherConflicts.length > 0 ||
+                teacherRoomConflicts.roomConflicts.length > 0 ||
+                studentConflicts.size > 0
+              }
             >
               <i className="fas fa-save me-2"></i>
               Lưu thay đổi

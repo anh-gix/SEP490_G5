@@ -972,19 +972,25 @@ const ImportStudentFromExcel = ({ onBack }) => {
       }
       
       // Tạo data cho Excel
-      const reportData = filteredStudents.map(student => ({
-        Username: student.username,
-        Email: student.email,
-        Phone: student.phone,
-        Address: student.address,
-        Aim: student.aim || '',
-        'Trình độ hiện tại': student.currentLevel || '',
-        Type: student.type || '',
-        'Program Code': student.programCode || '',
-        'Các khóa học đăng ký': student.courses && student.courses.length > 0
-          ? student.courses.join(', ')
-          : ''
-      }));
+      const reportData = filteredStudents.map(student => {
+        // Find the program to get its name
+        const program = allPrograms.find(p => p.code === student.programCode);
+        
+        return {
+          Username: student.username,
+          Email: student.email,
+          Phone: student.phone,
+          Address: student.address,
+          Aim: student.aim || '',
+          'Trình độ hiện tại': student.currentLevel || '',
+          Type: student.type || '',
+          'Program Code': student.programCode || '',
+          'Tên Program': program?.program_name || '',
+          'Các khóa học đăng ký': student.courses && student.courses.length > 0
+            ? student.courses.join(', ')
+            : ''
+        };
+      });
       
       // Tạo worksheet
       const ws = XLSX.utils.json_to_sheet(reportData);

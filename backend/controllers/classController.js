@@ -507,19 +507,18 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
     if (teacherClasses.length > 0) {
       const teacherClassIds = teacherClasses.map(c => c._id);
 
-      // Query all teacher schedules for all dates
+      // Query teacher schedules for conflict checking
       const teacherSchedules = await ClassSchedule.find({
         class: { $in: teacherClassIds },
         date: { $in: uniqueDates },
         status: { $in: ['temporary', 'fixed'] },
-        // FIX: Chỉ lấy các buổi mà giáo viên này thực sự dạy
         $or: [
           { teacher: teacherId },
           { substituteTeacher: teacherId }
         ]
       })
         .populate('class', 'name')
-        .select('date startTime endTime class')
+        .select('_id date startTime endTime class status')
         .lean();
 
       classSchedules.forEach((newSchedule, newIdx) => {
@@ -537,11 +536,6 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
           const hasOverlap = hasTimeOverlap(newSchedule.startTime, newSchedule.endTime, existingSchedule.startTime, existingSchedule.endTime);
           
           if (sameDate && hasOverlap) {
-            console.log(`\n   PHÁT HIỆN XUNG ĐỘT [${newIdx + 1} vs ${existIdx + 1}]:`);
-            console.log(`     - Ngày: ${newDateStr}`);
-            console.log(`     - Lớp hiện tại: ${newSchedule.startTime} - ${newSchedule.endTime}`);
-            console.log(`     - Lớp khác "${existingSchedule.class?.name || 'N/A'}": ${existingSchedule.startTime} - ${existingSchedule.endTime}`);
-            
             conflicts.teacher.push({
               teacherId: teacherId.toString(),
               className: existingSchedule.class?.name || 'N/A',
@@ -554,12 +548,7 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
           }
         });
       });
-      
-      console.log('  - Tổng số xung đột tìm thấy:', conflicts.teacher.length);
-    } else {
-      console.log(' Giáo viên không có lớp nào khác, không có xung đột');
     }
-    console.log('  ============================================\n');
   }
 
   // 3. Kiểm tra conflict SINH VIÊN
@@ -1079,16 +1068,6 @@ exports.createClass = async (req, res) => {
       });
     }
     
-    // Check if class name exists
-    const existingClass = await Class.findOne({ name }).session(session);
-    if (existingClass) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        success: false,
-        message: 'Tên lớp học đã tồn tại'
-      });
-    }
     
     // Validate room capacity if room is provided and auto-set maxStudents
     let finalMaxStudents = maxStudents;
@@ -1480,18 +1459,6 @@ exports.updateClass = async (req, res) => {
     
     // Check name conflict
     if (name && name !== classData.name) {
-      const existingClass = await Class.findOne({ 
-        name, 
-        _id: { $ne: req.params.id } 
-      }).session(session);
-      if (existingClass) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({
-          success: false,
-          message: 'Tên lớp học đã tồn tại'
-        });
-      }
     }
     
     // Determine final room and students for validation

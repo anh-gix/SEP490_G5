@@ -78,9 +78,10 @@ const ListeningResultPage = () => {
     if (!examData || !examData.sections) return result?.maxScore || 0;
     const listeningSections = examData.sections.filter(s => s.type === "listening");
     return listeningSections.reduce((sum, section) => {
-      if (!section.answerKey || !Array.isArray(section.answerKey)) return sum;
-      const sectionMaxScore = section.answerKey.reduce((sectionSum, item) => {
-        return sectionSum + (item.maxScore || 1);
+      // Tính tổng điểm từ các câu hỏi trong answerKey
+      if (!section.answerKey || section.answerKey.length === 0) return sum;
+      const sectionMaxScore = section.answerKey.reduce((sectionSum, question) => {
+        return sectionSum + (question.maxScore || 0);
       }, 0);
       return sum + sectionMaxScore;
     }, 0);
@@ -185,7 +186,7 @@ const ListeningResultPage = () => {
   };
 
   const getBandScore = () => {
-    if (!result || !result.maxScore || result.maxScore === 0) return null;
+    if (!result) return null;
     const correctAnswers = getCorrectAnswersCount();
     
     // Map correct answers to band score
@@ -290,7 +291,7 @@ const ListeningResultPage = () => {
 
   // Initialize selected band score when result changes
   useEffect(() => {
-    if (result && result.maxScore > 0) {
+    if (result) {
       const bandScore = getBandScore();
       if (bandScore !== null) {
         setSelectedBandScore(bandScore);
@@ -380,7 +381,7 @@ const ListeningResultPage = () => {
               </div>
 
               {/* Band Score Section */}
-              {result.maxScore > 0 && (() => {
+              { (() => {
                 const currentBandScore = getBandScore();
                 const bandScores = [9, 8.5, 8, 7.5, 7, 6.5, 6, 5.5, 5, 4.5, 4, 3.5, 3];
                 const displayBandScore = selectedBandScore !== null ? selectedBandScore : currentBandScore;

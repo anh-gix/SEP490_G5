@@ -89,7 +89,7 @@ const ExamDetailPage = () => {
   };
 
   // Get section configuration
-  const getSectionConfig = (type) => {
+  const getSectionConfig = (type, examType) => {
     switch (type) {
       case "listening":
         return {
@@ -100,9 +100,11 @@ const ExamDetailPage = () => {
           iconColor: "#06b6d4",
         };
       case "reading":
+        // For Cambridge exams, display "Reading and Writing" instead of just "Reading"
+        const readingName = examType === "cambridge" ? "Reading and Writing" : "Reading";
         return {
           icon: "ph-file-text",
-          name: "Reading",
+          name: readingName,
           gradient: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
           bgColor: "rgba(16, 185, 129, 0.1)",
           iconColor: "#10b981",
@@ -501,7 +503,7 @@ const ExamDetailPage = () => {
                 const uniqueTypes = Object.keys(sectionsByType);
 
                 return uniqueTypes.map((sectionType, index) => {
-                  const config = getSectionConfig(sectionType);
+                  const config = getSectionConfig(sectionType, exam.examType);
                   const isCompleted = isSectionCompleted(sectionType);
                   const sectionsOfType = sectionsByType[sectionType];
                  

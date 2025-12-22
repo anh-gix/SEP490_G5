@@ -42,7 +42,7 @@ const SpeakingResultPage = () => {
 
   // Initialize selected band score when result changes
   useEffect(() => {
-    if (result && result.maxScore > 0) {
+    if (result) {
       const bandScore = getBandScore();
       if (bandScore !== null) {
         setSelectedBandScore(bandScore);
@@ -96,7 +96,8 @@ const SpeakingResultPage = () => {
   };
 
   const getBandScore = () => {
-    if (!result || !result.maxScore || result.maxScore === 0) return null;
+    if (!result) return null;
+    if (!result.maxScore || result.maxScore === 0) return null; // Need maxScore to calculate
     const percentage = getScorePercentage();
     const correctAnswers = Math.round((result.sectionScore / result.maxScore) * 40); // Assuming max 40 questions
     
@@ -188,7 +189,7 @@ const SpeakingResultPage = () => {
               )}
 
               {/* Band Score Section */}
-              {result.maxScore > 0 && (() => {
+              {(() => {
                 const currentBandScore = getBandScore();
                 const bandScores = [9, 8.5, 8, 7.5, 7, 6.5, 6, 5.5, 5, 4.5, 4, 3.5, 3];
                 const displayBandScore = selectedBandScore !== null ? selectedBandScore : currentBandScore;

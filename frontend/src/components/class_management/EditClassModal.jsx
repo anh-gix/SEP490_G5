@@ -2628,6 +2628,12 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
 
+    // If only status changes, preserve all other data
+    if (name === 'status') {
+      setFormData(prev => ({ ...prev, status: value }));
+      return;
+    }
+
     // Auto-update band when programId is selected
     if (name === 'programId' && value) {
       const selectedProgram = allProgramsFromDB.find(p => String(p._id) === String(value));
@@ -4125,7 +4131,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Chương trình <span className="text-danger-600">*</span>
                   </Form.Label>
-                  {fullClassData?.status === 'disable' ? (
+                  {formData.status === 'disable' ? (
                     <Form.Select
                       name="program"
                       value={typeToProgramMap[formData.program] || ''}
@@ -4150,9 +4156,12 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       )}
                     </Form.Select>
                   ) : (
-                    <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
-                      {typeToProgramMap[formData.program] || formData.program || '--'}
-                    </div>
+                    <>
+                      <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
+                        {typeToProgramMap[formData.program] || formData.program || '--'}
+                      </div>
+                      <input type="hidden" name="program" value={formData.program} />
+                    </>
                   )}
                 </Form.Group>
               </div>
@@ -4162,7 +4171,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Cấp độ <span className="text-danger-600">*</span>
                   </Form.Label>
-                  {fullClassData?.status === 'disable' ? (
+                  {formData.status === 'disable' ? (
                     <Form.Select
                       name="level"
                       value={formData.level || ''}
@@ -4185,9 +4194,12 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       )}
                     </Form.Select>
                   ) : (
-                    <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
-                      {formData.level || '--'}
-                    </div>
+                    <>
+                      <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
+                        {formData.level || '--'}
+                      </div>
+                      <input type="hidden" name="level" value={formData.level} />
+                    </>
                   )}
                 </Form.Group>
               </div>
@@ -4199,7 +4211,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Program
                   </Form.Label>
-                  {fullClassData?.status === 'disable' ? (
+                  {formData.status === 'disable' ? (
                     <Form.Select
                       name="programId"
                       value={formData.programId}
@@ -4214,11 +4226,14 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       ))}
                     </Form.Select>
                   ) : (
-                    <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
-                      {formData.programId
-                        ? (allProgramsFromDB.find(p => p._id === formData.programId)?.program_name || formData.programId)
-                        : '--'}
-                    </div>
+                    <>
+                      <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
+                        {formData.programId
+                          ? (allProgramsFromDB.find(p => p._id === formData.programId)?.program_name || formData.programId)
+                          : '--'}
+                      </div>
+                      <input type="hidden" name="programId" value={formData.programId} />
+                    </>
                   )}
                 </Form.Group>
               </div>
@@ -4230,7 +4245,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Course <span className="text-danger-600">*</span>
                   </Form.Label>
-                  {fullClassData?.status === 'disable' ? (
+                  {formData.status === 'disable' ? (
                     <Form.Select
                       name="course"
                       value={formData.course}
@@ -4254,9 +4269,12 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       })}
                     </Form.Select>
                   ) : (
-                    <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
-                      {selectedCourse ? `${selectedCourse.name}${selectedCourse.numberOfSessions ? ` (${selectedCourse.numberOfSessions} buổi)` : ''}` : (formData.course ? 'Đang tải...' : '--')}
-                    </div>
+                    <>
+                      <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
+                        {selectedCourse ? `${selectedCourse.name}${selectedCourse.numberOfSessions ? ` (${selectedCourse.numberOfSessions} buổi)` : ''}` : (formData.course ? 'Đang tải...' : '--')}
+                      </div>
+                      <input type="hidden" name="course" value={formData.course} />
+                    </>
                   )}
                 </Form.Group>
               </div>

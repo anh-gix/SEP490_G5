@@ -24,19 +24,17 @@ exports.getAllClasses = async (req, res) => {
     if (courseId) query.course = courseId;
     if (search) query.name = { $regex: search, $options: 'i' };
     
-    //update pending → active
-    if (status !== 'pending') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      await Class.updateMany(
-        {
-          status: 'pending',
-          startDate: { $exists: true, $lte: today }
-        },
-        { $set: { status: 'active' } }
-      );
-    }
+    // Auto-update pending → active (always run, regardless of filter)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    await Class.updateMany(
+      {
+        status: 'pending',
+        startDate: { $exists: true, $lte: today }
+      },
+      { $set: { status: 'active' } }
+    );
     
     const classes = await Class.find(query)
       // user model uses 'username' rather than firstName/lastName/fullName
@@ -108,6 +106,18 @@ exports.getAllClasses = async (req, res) => {
 exports.getClassById = async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Auto-update pending → active (same as getAllClasses)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    await Class.updateMany(
+      {
+        status: 'pending',
+        startDate: { $exists: true, $lte: today }
+      },
+      { $set: { status: 'active' } }
+    );
     
     const classData = await Class.findById(id)
       .populate('teacher', 'username email phone')
@@ -387,6 +397,37 @@ exports.getClassStats = async (req, res) => {
  * @param {Object} classData - Class data { _id, teacher, students }
  * @returns {Object} { hasConflict: boolean, conflicts: { teacher: [], room: [], students: [] } }
  */
+// Helper function to update class endDate based on schedules
+const updateClassEndDateFromSchedules = async (classId, session = null) => {
+  try {
+    // Find the last schedule by date
+    const lastSchedule = await ClassSchedule.findOne({
+      class: classId,
+      status: { $in: ['temporary', 'fixed'] }
+    })
+      .sort({ date: -1 }) // Sort descending to get the latest date
+      .select('date')
+      .session(session)
+      .lean();
+    
+    if (lastSchedule && lastSchedule.date) {
+      const updateOptions = { endDate: lastSchedule.date };
+      if (session) {
+        await Class.findByIdAndUpdate(classId, updateOptions, { session });
+      } else {
+        await Class.findByIdAndUpdate(classId, updateOptions);
+      }
+      console.log(`✓ Updated endDate to ${lastSchedule.date} for class ${classId}`);
+      return lastSchedule.date;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error updating endDate from schedules:', error);
+    return null;
+  }
+};
+
 const validateClassSchedulesConflicts = async (classSchedules, classData) => {
   const conflicts = {
     teacher: [],
@@ -1269,6 +1310,20 @@ exports.createClass = async (req, res) => {
           // Create all ClassSchedule entries
           const createdSchedules = await ClassSchedule.insertMany(classSchedules, { session });
 
+          // Auto-update endDate to the last schedule's date
+          if (createdSchedules.length > 0) {
+            const lastSchedule = createdSchedules[createdSchedules.length - 1];
+            const lastScheduleDate = lastSchedule.date;
+            
+            await Class.findByIdAndUpdate(
+              newClass._id,
+              { endDate: lastScheduleDate },
+              { session }
+            );
+            
+            console.log(`✓ Auto-set endDate to last schedule date: ${lastScheduleDate}`);
+          }
+
           // Create StudentSchedule entries for each ClassSchedule
           if (students && students.length > 0) {
             const studentSchedules = [];
@@ -1398,6 +1453,18 @@ const compareScheduleEntries = (oldEntries, newEntries) => {
 };
 
 exports.updateClass = async (req, res) => {
+  // Auto-update pending → active BEFORE starting transaction
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  await Class.updateMany(
+    {
+      status: 'pending',
+      startDate: { $exists: true, $lte: today }
+    },
+    { $set: { status: 'active' } }
+  );
+  
   const session = await mongoose.startSession();
   session.startTransaction();
   
@@ -1429,6 +1496,9 @@ exports.updateClass = async (req, res) => {
         return res.status(400).json(result);
       }
 
+      // Update endDate from schedules before committing
+      await updateClassEndDateFromSchedules(classData._id, session);
+
       await session.commitTransaction();
       session.endSession();
       return res.status(200).json(result);
@@ -1444,6 +1514,9 @@ exports.updateClass = async (req, res) => {
         session.endSession();
         return res.status(400).json(result);
       }
+
+      // Update endDate from schedules before committing
+      await updateClassEndDateFromSchedules(classData._id, session);
 
       await session.commitTransaction();
       session.endSession();
@@ -1939,6 +2012,20 @@ exports.updateClass = async (req, res) => {
         if (classSchedules.length > 0) {
           console.log(' [DEBUG] Creating', classSchedules.length, 'new schedules in FULL REGENERATION');
           const createdSchedules = await ClassSchedule.insertMany(classSchedules, { session });
+          
+          // Auto-update endDate to the last schedule's date
+          if (createdSchedules.length > 0) {
+            const lastSchedule = createdSchedules[createdSchedules.length - 1];
+            const lastScheduleDate = lastSchedule.date;
+            
+            await Class.findByIdAndUpdate(
+              classData._id,
+              { endDate: lastScheduleDate },
+              { session }
+            );
+            
+            console.log(`✓ Auto-set endDate to last schedule date: ${lastScheduleDate}`);
+          }
           
           // Create StudentSchedule entries for each ClassSchedule
           if (finalStudentsList && finalStudentsList.length > 0) {

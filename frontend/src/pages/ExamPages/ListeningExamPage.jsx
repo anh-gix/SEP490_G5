@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import Animation from "../../helper/Animation";
-import Preloader from "../../helper/Preloader";
 import { examService } from "../../services/examService";
 import { useAuth } from "../../contexts/AuthContext";
 import Swal from "sweetalert2";
+import logo from "../../assets/CamQuiz_img/LOGO.png";
+
 
 const ListeningExamPage = () => {
   const { examId, submissionId } = useParams();
@@ -612,7 +612,7 @@ const ListeningExamPage = () => {
         <div className="listening-exam-header">
           <div className="logo">
             <Link to="/" className="link">
-              <img src="assets/images/logo/logo.png" alt="Logo" />
+              <img src={logo} alt="Logo" />
             </Link>
           </div>
           

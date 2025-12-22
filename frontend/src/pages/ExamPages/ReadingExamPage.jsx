@@ -5,6 +5,7 @@ import Preloader from "../../helper/Preloader";
 import { examService } from "../../services/examService";
 import { useAuth } from "../../contexts/AuthContext";
 import Swal from "sweetalert2";
+import logo from "../../assets/CamQuiz_img/LOGO.png";
 
 const ReadingExamPage = () => {
   const { examId, submissionId } = useParams();
@@ -557,7 +558,7 @@ const ReadingExamPage = () => {
         <div className="reading-exam-header">
           <div className="logo">
             <Link to="/" className="link">
-              <img src="assets/images/logo/logo.png" alt="Logo" />
+              <img src={logo} alt="Logo" />
             </Link>
           </div>
           

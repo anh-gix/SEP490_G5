@@ -9,7 +9,10 @@ exports.getTeacherDashboard = async (req, res) => {
     
     console.log(' Getting dashboard data for teacher:', teacherId);
 
-    const classes = await Class.find({ teacher: teacherId })
+    const classes = await Class.find({ 
+      teacher: teacherId,
+      status: { $in: ['active', 'pending'] } // Mặc định filter active và pending
+    })
       .populate('course', 'name')
       .populate('students', 'username email')
       .lean();
@@ -178,6 +181,7 @@ exports.getTeacherDashboard = async (req, res) => {
           totalLessons,
           completedLessons,
           progress,
+          status: classInfo.status, // Thêm status
           nextTest: upcomingMocktest ? `Mocktest ${upcomingMocktest.session?.order}` : 'Chưa có',
           nextTestDate: upcomingMocktest ? new Date(upcomingMocktest.date).toLocaleDateString('vi-VN') : '-',
           upcomingAssignment: upcomingHomework?.homework?.[0]?.assignment?.title || 'Chưa có bài tập',

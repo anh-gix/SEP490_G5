@@ -100,8 +100,13 @@ exports.getMyClasses = async (req, res) => {
     // MongoDB automatically searches in array when using { students: studentId }
     // But we can also use $in to be explicit: { students: { $in: [studentObjectId] } }
     let query = { students: studentObjectId };
+    
+    // Mặc định chỉ hiển thị lớp active và pending
     if (status && status !== 'all') {
       query.status = status;
+    } else if (!status) {
+      // Mặc định filter active và pending
+      query.status = { $in: ['active', 'pending'] };
     }
 
 
@@ -1247,12 +1252,12 @@ exports.getDashboardData = async (req, res) => {
 
     const activeClasses = await Class.find({
       students: studentId,
-      status: 'active'
+      status: { $in: ['active', 'pending'] } // Lấy cả active và pending
     })
       .populate('course', 'name')
       .populate('teacher', 'username')
       .populate('room', 'room_name')
-      .select('name course teacher room startDate endDate')
+      .select('name course teacher room startDate endDate status')
       .lean();
 
     const classIds = activeClasses.map(cls => cls._id);

@@ -818,8 +818,13 @@ exports.getMyClasses = async (req, res) => {
 
     // Build query
     let query = { teacher: teacherId };
+    
+    // Mặc định chỉ hiển thị lớp active và pending
     if (status && status !== 'all') {
       query.status = status;
+    } else if (!status) {
+      // Mặc định filter active và pending
+      query.status = { $in: ['active', 'pending'] };
     }
 
     // Find all classes taught by this teacher

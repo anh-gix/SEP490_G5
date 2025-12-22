@@ -71,6 +71,22 @@ const StudentDashboard = () => {
     });
   };
 
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      pending: { bg: 'bg-info-600', text: 'Chờ khai giảng', icon: 'fa-clock' },
+      active: { bg: 'bg-success-600', text: 'Đang học', icon: 'fa-play-circle' },
+      completed: { bg: 'bg-neutral-600', text: 'Đã hoàn thành', icon: 'fa-check-circle' },
+      disable: { bg: 'bg-danger-600', text: 'Vô hiệu hóa', icon: 'fa-ban' }
+    };
+    const config = statusConfig[status] || statusConfig.active;
+    return (
+      <Badge className={`${config.bg} text-white px-8 py-4 text-11`}>
+        <i className={`fas ${config.icon} me-1`}></i>
+        {config.text}
+      </Badge>
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-vh-100" style={{ backgroundColor: '#F5F7FA' }}>
@@ -422,6 +438,7 @@ const StudentDashboard = () => {
                                 <Badge className="bg-success-100 text-success-600 text-10 fw-semibold">
                                   {cls.course}
                                 </Badge>
+                                {cls.status && getStatusBadge(cls.status)}
                               </div>
                             </div>
                             <div className="text-end ms-2">

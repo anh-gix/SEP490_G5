@@ -6,6 +6,7 @@ import courseService from '../../../../services/courseService';
 const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEdit }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -42,6 +43,17 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
       return;
     }
 
+    // Show confirmation modal only when creating new course (first time)
+    if (!courseData._id) {
+      setShowConfirmModal(true);
+      return;
+    }
+
+    // If course already exists, proceed with update
+    await saveAndProceed();
+  };
+
+  const saveAndProceed = async () => {
     try {
       setLoading(true);
 
@@ -121,6 +133,69 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
 
   return (
     <div>
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header bg-warning-50">
+                <h5 className="modal-title">
+                  <i className="ph ph-warning-circle text-warning-600 me-2"></i>
+                  Xác nhận tạo khóa học
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowConfirmModal(false)}
+                  disabled={loading}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="alert alert-warning mb-3">
+                  <i className="ph ph-info me-2"></i>
+                  <strong>Lưu ý quan trọng:</strong> Các thông tin sau đây sẽ <strong>không thể thay đổi</strong> sau khi tạo khóa học.
+                </div>
+
+                <div className="border rounded p-3 bg-neutral-50">
+                  <div className="mb-3">
+                    <span className="text-muted">Mã khóa học:</span>
+                    <div className="fw-bold text-primary-600 fs-5">{courseData.courseCode}</div>
+                  </div>
+                  <div>
+                    <span className="text-muted">Số lượng buổi học:</span>
+                    <div className="fw-bold text-primary-600 fs-5">{courseData.numberOfSessions} buổi</div>
+                  </div>
+                </div>
+
+                <p className="mt-3 mb-0 text-center">
+                  Bạn có chắc chắn muốn tiếp tục?
+                </p>
+              </div>
+              <div className="modal-footer">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowConfirmModal(false)}
+                  disabled={loading}
+                >
+                  Quay lại chỉnh sửa
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={async () => {
+                    setShowConfirmModal(false);
+                    await saveAndProceed();
+                  }}
+                  disabled={loading}
+                  icon={loading ? 'ph ph-spinner-gap spinner' : 'ph ph-check'}
+                >
+                  {loading ? 'Đang tạo...' : 'Xác nhận & Tiếp tục'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Section 1: Basic Information */}
       <div className="mb-32">
         <div className="row gy-3">
@@ -173,10 +248,15 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
               className={`form-control radius-8 ${errors.numberOfSessions ? 'is-invalid' : ''}`}
               placeholder="30"
               min="1"
+              disabled={courseData._id !== null}
               style={{ height: '44px' }}
             />
             {errors.numberOfSessions && <div className="invalid-feedback">{errors.numberOfSessions}</div>}
-            <small className="text-muted">Tổng số buổi học trong học phần</small>
+            {courseData._id ? (
+              <small className="text-muted">Số lượng buổi học không thể thay đổi sau khi đã tạo</small>
+            ) : (
+              <small className="text-muted">Tổng số buổi học trong học phần</small>
+            )}
           </div>
 
           {/* Loại hình học - Chỉ hiển thị khi program.type = 'cam' */}

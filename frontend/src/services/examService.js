@@ -160,6 +160,30 @@ export const examService = {
     }
   },
 
+  // Upload exam file (PDF, audio) for section
+  uploadExamFileForManagement: async (formData) => {
+    try {
+      const response = await api.post('/management/upload-exam-file', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể upload file đề thi' };
+    }
+  },
+
+  // Delete exam file (PDF, audio) from section
+  deleteExamFileForManagement: async (data) => {
+    try {
+      const response = await api.post('/management/delete-exam-file', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể xóa file' };
+    }
+  },
+
   // Validate exam data trước khi gửi
   validateExamData: (examData) => {
     const errors = [];

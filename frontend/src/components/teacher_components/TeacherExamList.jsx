@@ -537,7 +537,7 @@ const TeacherExamList = () => {
               onClick={() => handleTabChange('my-exams')}
             >
               <i className="ph ph-user me-2"></i>
-              Đề thi của tôi ({myExams.length})
+              Đề thi của tôi 
             </button>
           </li>
           <li className="nav-item">
@@ -546,7 +546,7 @@ const TeacherExamList = () => {
               onClick={() => handleTabChange('all-exams')}
             >
               <i className="ph ph-list me-2"></i>
-              Tất cả đề thi ({exams.length})
+              Tất cả đề thi 
             </button>
           </li>
           <li className="nav-item">
@@ -555,7 +555,7 @@ const TeacherExamList = () => {
               onClick={() => handleTabChange('work-requests')}
             >
               <i className="ph ph-clipboard-text me-2"></i>
-              Yêu cầu từ Center Head ({workRequests.length})
+              Yêu cầu được giao
             </button>
           </li>
         </ul>

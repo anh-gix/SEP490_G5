@@ -379,6 +379,19 @@ export const workRequestService = {
   },
 
   /**
+   * Get rejection info for a program (for needs_revision status)
+   * @param {string} programId - Program ID
+   */
+  getProgramRejectionInfo: async (programId) => {
+    try {
+      const response = await api.get(`/work-requests/program/${programId}/rejection-info`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy thông tin từ chối' };
+    }
+  },
+
+  /**
    * Create edit_program request (Center Head assigns to Subject Leader)
    * @param {object} data - { entityId: programId, assignedTo: userId, requestNote: string }
    */

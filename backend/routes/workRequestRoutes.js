@@ -88,6 +88,12 @@ router.get(
   workRequestController.checkProgramEditStatus
 );
 
+// Get rejection info for a program (for needs_revision status)
+router.get(
+  '/program/:programId/rejection-info',
+  workRequestController.getProgramRejectionInfo
+);
+
 // Start processing edit_program request (Subject Leader accepts)
 router.post(
   '/:id/start-edit-program',

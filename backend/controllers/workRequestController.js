@@ -25,7 +25,7 @@ const validateProgramBeforeSubmit = async (programId) => {
   // Check có ít nhất 1 course
   const courseCount = await Course.countDocuments({ program: programId });
   if (courseCount === 0) {
-    throw new Error('Program must have at least one course');
+    throw new Error('Chương trình cần ít nhất một khóa học');
   }
 
   // Check TẤT CẢ courses phải completed
@@ -2436,7 +2436,7 @@ exports.submitEditProgram = async (req, res) => {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: 'Program must have at least one course before submitting'
+        message: 'Chương trình cần ít nhất một khóa học trước khi nộp.'
       });
     }
 
@@ -2649,6 +2649,53 @@ exports.rejectEditProgram = async (req, res) => {
     });
   } finally {
     session.endSession();
+  }
+};
+
+/**
+ * Get rejection info for a program (for needs_revision status)
+ * GET /api/work-requests/program/:programId/rejection-info
+ */
+exports.getProgramRejectionInfo = async (req, res) => {
+  try {
+    const { programId } = req.params;
+
+    // Find the most recent work request with rejection reason for this program
+    const request = await WorkRequest.findOne({
+      entityType: 'Program',
+      entityId: programId,
+      rejectionReason: { $exists: true, $ne: null, $ne: '' }
+    })
+      .populate('processedBy', 'name email username')
+      .populate('requestedBy', 'name email username')
+      .sort({ processedAt: -1, updatedAt: -1 });
+
+    if (!request) {
+      return res.status(200).json({
+        success: true,
+        hasRejection: false,
+        data: null
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      hasRejection: true,
+      data: {
+        rejectionReason: request.rejectionReason,
+        rejectedBy: request.processedBy,
+        rejectedAt: request.processedAt || request.updatedAt,
+        requestType: request.requestType,
+        responseNote: request.responseNote
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting program rejection info:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting program rejection info'
+    });
   }
 };
 

@@ -577,7 +577,7 @@ const ApprovalRequests = () => {
               <div className="p-4">
                 <div className="d-flex align-items-center justify-content-between">
                   <div>
-                    <div className="text-muted small mb-1">Chờ duyệt lại</div>
+                    <div className="text-muted small mb-1">Chờ duyệt</div>
                     <div className="h3 fw-bold text-primary mb-0">{stats.pendingApprovalTasks}</div>
                   </div>
                   <div className="text-primary" style={{ fontSize: '2.5rem', opacity: 0.2 }}>
@@ -635,7 +635,7 @@ const ApprovalRequests = () => {
                 <option value="all">Tất cả</option>
                 <option value="pending">Chưa nhận</option>
                 <option value="in_progress">Đang làm</option>
-                <option value="pending_approval">Chờ duyệt lại</option>
+                <option value="pending_approval">Chờ duyệt</option>
                 <option value="approved">Đã duyệt</option>
                 <option value="completed">Hoàn thành</option>
               </select>

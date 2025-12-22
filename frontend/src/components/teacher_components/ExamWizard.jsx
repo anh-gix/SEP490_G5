@@ -332,53 +332,7 @@ const ExamWizard = ({ viewMode = 'teacher' }) => {
         onGoToExamList={handleGoToExamList}
       />
 
-      {/* Sticky Header with Progress */}
-      <div className="wizard-header bg-white shadow-sm pb-16 pt-16" style={{ position: 'sticky', top: 0, zIndex: 1000 }}>
-        <div className="container-fluid">
-          <div className="d-flex align-items-center justify-content-between mb-12">
-            <div className="d-flex align-items-center gap-3">
-              <button
-                className="btn btn-ghost"
-                onClick={handleExit}
-              >
-                <i className="ph ph-x"></i>
-              </button>
-              <div>
-                <h5 className="mb-0 fw-bold text-neutral-900">
-                  {isEdit ? 'Chỉnh sửa đề thi' : 'Tạo đề thi mới'}
-                </h5>
-                <small className="text-neutral-600">
-                  <i className="ph ph-exam me-1"></i>
-                  {examData.title || 'Chưa có tên'}
-                </small>
-              </div>
-            </div>
-            <div className="d-flex align-items-center gap-3">
-              {/* Auto-save indicator */}
-              <div className="d-flex align-items-center gap-2 px-3 py-2 rounded bg-light">
-                {autoSaveStatus === 'saving' && (
-                  <>
-                    <i className="ph ph-spinner-gap text-primary-600 spinner"></i>
-                    <span className="text-xs text-neutral-600">Đang lưu...</span>
-                  </>
-                )}
-                {autoSaveStatus === 'saved' && (
-                  <>
-                    <i className="ph ph-check-circle text-success-600"></i>
-                    <span className="text-xs text-success-600">Đã lưu</span>
-                  </>
-                )}
-                {autoSaveStatus === 'error' && (
-                  <>
-                    <i className="ph ph-warning-circle text-danger-600"></i>
-                    <span className="text-xs text-danger-600">Lỗi lưu</span>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      
 
       <div className="row gy-4 px-24 py-24">
         {/* Enhanced Progress Steps */}

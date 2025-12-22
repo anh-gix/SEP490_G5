@@ -1371,42 +1371,61 @@ exports.getDashboardData = async (req, res) => {
 
     const practiceTests = submissions
       .filter(sub => {
-        const hasExam = sub.examId && sub.totalScore !== undefined;
+        const hasExam = sub.examId && sub.sections && sub.sections.length > 0;
         return hasExam;
       })
       .map((sub, index) => {
         const exam = sub.examId;
+        const examType = (exam.examType || exam.type || 'toeic').toLowerCase();
         
         const result = {
           id: sub._id.toString(),
           testName: exam.title,
           date: sub.createdAt,
-          type: exam.examType || exam.type || 'toeic'
+          type: examType
         };
 
-        // Calculate scores by section type
-        if (exam.type === 'toeic' || exam.examType === 'toeic') {
-          const listeningSection = sub.sections?.find(s => s.sectionType === 'listening');
-          const readingSection = sub.sections?.find(s => s.sectionType === 'reading');
-          const writingSection = sub.sections?.find(s => s.sectionType === 'writing');
-          const speakingSection = sub.sections?.find(s => s.sectionType === 'speaking');
+        // Tính điểm từng kỹ năng bằng cách cộng sectionScore của sections cùng sectionType
+        const skillScores = {
+          listening: 0,
+          reading: 0,
+          writing: 0,
+          speaking: 0
+        };
 
-          result.listening = listeningSection?.sectionScore || 0;
-          result.reading = readingSection?.sectionScore || 0;
-          result.writing = writingSection?.sectionScore || 0;
-          result.speaking = speakingSection?.sectionScore || 0;
-          result.total = sub.totalScore || 0;
-        } else if (exam.type === 'ielts' || exam.examType === 'ielts') {
-          const listeningSection = sub.sections?.find(s => s.sectionType === 'listening');
-          const readingSection = sub.sections?.find(s => s.sectionType === 'reading');
-          const writingSection = sub.sections?.find(s => s.sectionType === 'writing');
-          const speakingSection = sub.sections?.find(s => s.sectionType === 'speaking');
+        // Duyệt qua tất cả sections và cộng điểm theo sectionType
+        if (sub.sections && Array.isArray(sub.sections)) {
+          sub.sections.forEach(section => {
+            const skillType = section.sectionType?.toLowerCase();
+            if (skillType && skillScores.hasOwnProperty(skillType)) {
+              skillScores[skillType] += (section.sectionScore || 0);
+            }
+          });
+        }
 
-          result.listening = listeningSection?.sectionScore || 0;
-          result.reading = readingSection?.sectionScore || 0;
-          result.writing = writingSection?.sectionScore || 0;
-          result.speaking = speakingSection?.sectionScore || 0;
-          result.overallBand = sub.bandScore || 0;
+        // Format kết quả theo loại đề thi
+        if (examType === 'toeic') {
+          // TOEIC: Chỉ hiển thị Listening và Reading
+          result.listening = skillScores.listening;
+          result.reading = skillScores.reading;
+          result.total = skillScores.listening + skillScores.reading;
+        } else if (examType === 'ielts') {
+          // IELTS: Hiển thị Listening, Reading và "chưa chấm" cho Writing, Speaking
+          result.listening = skillScores.listening;
+          result.reading = skillScores.reading;
+          result.writing = skillScores.writing > 0 ? skillScores.writing : null; // null = chưa chấm
+          result.speaking = skillScores.speaking > 0 ? skillScores.speaking : null; // null = chưa chấm
+          // Calculate overall band (trung bình 4 kỹ năng nếu có đủ)
+          const scoredSkills = [skillScores.listening, skillScores.reading, skillScores.writing, skillScores.speaking].filter(s => s > 0);
+          result.overallBand = scoredSkills.length > 0 
+            ? Math.round((scoredSkills.reduce((a, b) => a + b, 0) / scoredSkills.length) * 10) / 10
+            : 0;
+        } else if (examType === 'cambridge') {
+          // Cambridge: Reading & Writing (dùng score từ reading), Listening
+          result.readingWriting = skillScores.reading; // Tận dụng sectionType reading
+          result.listening = skillScores.listening;
+          result.total = skillScores.reading + skillScores.listening;
+          result.shields = Math.round(result.total / 15); // Giả sử tổng điểm tối đa là 150, mỗi shield = 15 điểm
         }
 
         return result;

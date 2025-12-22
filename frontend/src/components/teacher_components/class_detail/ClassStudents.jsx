@@ -155,7 +155,23 @@ const ClassStudents = ({ students, onViewStudentDetail, hideActions = false, cla
           </tr>
         </thead>
         <tbody>
-          {students.map((student, index) => (
+          {students.map((student, index) => {
+            // Calculate actual attendance count based on rate and total
+            // If attendanceCount is 0 but rate is not 0, calculate from rate
+            const actualAttendanceCount = student.attendanceCount > 0 
+              ? student.attendanceCount 
+              : (student.attendanceRate > 0 && student.totalLessons > 0)
+                ? Math.round((student.attendanceRate / 100) * student.totalLessons)
+                : 0;
+            
+            // Calculate actual homework count based on rate and total
+            const actualHomeworkCount = student.submittedAssignments > 0
+              ? student.submittedAssignments
+              : (student.homeworkCompletionRate > 0 && student.totalAssignments > 0)
+                ? Math.round((student.homeworkCompletionRate / 100) * student.totalAssignments)
+                : 0;
+            
+            return (
             <tr key={student.id || student._id}>
               <td className="px-12 py-16 text-neutral-700 text-13 text-center">{index + 1}</td>
               <td className="px-16 py-16 text-neutral-900 text-14 text-center">{student.name}</td>
@@ -166,7 +182,7 @@ const ClassStudents = ({ students, onViewStudentDetail, hideActions = false, cla
                     {student.attendanceRate}%
                   </Badge>
                   <div className="text-neutral-500 text-11">
-                    {student.attendanceCount}/{student.totalLessons} buổi
+                    {actualAttendanceCount}/{student.totalLessons} buổi
                   </div>
                 </div>
               </td>
@@ -176,7 +192,7 @@ const ClassStudents = ({ students, onViewStudentDetail, hideActions = false, cla
                     {student.homeworkCompletionRate}%
                   </Badge>
                   <div className="text-neutral-500 text-11">
-                    {student.submittedAssignments}/{student.totalAssignments} bài
+                    {actualHomeworkCount}/{student.totalAssignments} bài
                   </div>
                 </div>
               </td>
@@ -281,7 +297,8 @@ const ClassStudents = ({ students, onViewStudentDetail, hideActions = false, cla
                 </td>
               )}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </Table>
 

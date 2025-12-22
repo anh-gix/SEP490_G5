@@ -26,12 +26,17 @@ exports.getAllClasses = async (req, res) => {
     
     // Auto-update pending → active (always run, regardless of filter)
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayStart = new Date(Date.UTC(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      0, 0, 0, 0
+    ));
     
     await Class.updateMany(
       {
         status: 'pending',
-        startDate: { $exists: true, $lte: today }
+        startDate: { $exists: true, $lte: todayStart }
       },
       { $set: { status: 'active' } }
     );
@@ -109,12 +114,17 @@ exports.getClassById = async (req, res) => {
     
     // Auto-update pending → active (same as getAllClasses)
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayStart = new Date(Date.UTC(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      0, 0, 0, 0
+    ));
     
     await Class.updateMany(
       {
         status: 'pending',
-        startDate: { $exists: true, $lte: today }
+        startDate: { $exists: true, $lte: todayStart }
       },
       { $set: { status: 'active' } }
     );
@@ -1455,12 +1465,17 @@ const compareScheduleEntries = (oldEntries, newEntries) => {
 exports.updateClass = async (req, res) => {
   // Auto-update pending → active BEFORE starting transaction
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const todayStart = new Date(Date.UTC(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+    0, 0, 0, 0
+  ));
   
   await Class.updateMany(
     {
       status: 'pending',
-      startDate: { $exists: true, $lte: today }
+      startDate: { $exists: true, $lte: todayStart }
     },
     { $set: { status: 'active' } }
   );

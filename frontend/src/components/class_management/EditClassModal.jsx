@@ -4102,6 +4102,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                     name="status"
                     value={formData.status}
                     onChange={handleInputChange}
+                    disabled={fullClassData?.status === 'active'}
                     className="border-neutral-30 radius-8 px-16 py-10"
                   >
                     <option value="pending">{getStatusLabel('pending')}</option>
@@ -4109,6 +4110,12 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                     <option value="active">{getStatusLabel('active')}</option>
                     <option value="completed">{getStatusLabel('completed')}</option>
                   </Form.Select>
+                  {fullClassData?.status === 'active' && (
+                    <Form.Text className="text-neutral-500 text-12 mt-4 d-block">
+                      <i className="fas fa-info-circle me-1"></i>
+                      Không thể thay đổi trạng thái của lớp đang học
+                    </Form.Text>
+                  )}
                 </Form.Group>
               </div>
             </div>

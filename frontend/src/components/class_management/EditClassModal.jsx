@@ -4786,8 +4786,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 <Form.Label className="text-neutral-700 fw-medium mb-0">
                   Danh sách học viên đã chọn
                 </Form.Label>
-                {/* Chỉ hiển thị nút thêm/import học viên cho lớp pending hoặc disable */}
-                {(fullClassData?.status === 'pending' || fullClassData?.status === 'disable') && (
+                {/* Chỉ hiển thị nút thêm/import học viên khi trạng thái không phải active */}
+                {formData.status !== 'active' && (
                   <div className="d-flex gap-8">
                     <Button
                       type="button"
@@ -4857,7 +4857,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                                   Đang tải thông tin...
                                 </div>
                               </div>
-                              {(fullClassData?.status === 'pending' || fullClassData?.status === 'disable') && (
+                              {formData.status !== 'active' && (
                                 <Button
                                   type="button"
                                   variant="outline-danger"
@@ -4923,8 +4923,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                                 </div>
                               )}
                             </div>
-                            {/* Hiển thị nút xóa cho lớp pending hoặc disable */}
-                            {(fullClassData?.status === 'pending' || fullClassData?.status === 'disable') && (
+                            {/* Hiển thị nút xóa khi trạng thái không phải active */}
+                            {formData.status !== 'active' && (
                               <Button
                                 type="button"
                                 variant="outline-danger"

@@ -78,11 +78,7 @@ const ListeningResultPage = () => {
     if (!examData || !examData.sections) return result?.maxScore || 0;
     const listeningSections = examData.sections.filter(s => s.type === "listening");
     return listeningSections.reduce((sum, section) => {
-      if (!section.answerKey || !Array.isArray(section.answerKey)) return sum;
-      const sectionMaxScore = section.answerKey.reduce((sectionSum, item) => {
-        return sectionSum + (item.maxScore || 1);
-      }, 0);
-      return sum + sectionMaxScore;
+      return sum + (section.maxScore || 0);
     }, 0);
   };
 

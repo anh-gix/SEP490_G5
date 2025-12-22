@@ -64,8 +64,28 @@ const SignInInner = () => {
 
     setIsLoading(true);
     try {
-      await login(formData);
-      navigate('/'); // Chuyển hướng về trang chủ sau khi đăng nhập thành công
+      const userData = await login(formData);
+      
+      // Navigate theo role
+      const roleName = userData.roleId?.name;
+      
+      switch(roleName) {
+        case 'Student':
+          navigate('/student/dashboard');
+          break;
+        case 'Teacher':
+        case 'Subject Leader':
+          navigate('/teacher/dashboard');
+          break;
+        case 'Academic Staff':
+          navigate('/academic/dashboard');
+          break;
+        case 'Center Head':
+          navigate('/center-head/dashboard');
+          break;
+        default:
+          navigate('/'); // Fallback to home page
+      }
     } catch (error) {
       console.error('Đăng nhập thất bại:', error);
     } finally {

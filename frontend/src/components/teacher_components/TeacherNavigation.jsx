@@ -29,6 +29,9 @@ const TeacherNavigation = () => {
     }
   }, [user]);
 
+  // Check if user is Subject Leader
+  const isSubjectLeader = user?.roleId?.name === 'Subject Leader';
+
   const menuItems = [
     {
       title: 'Tổng quan',
@@ -54,43 +57,33 @@ const TeacherNavigation = () => {
       path: '/teacher/classes',
       color: 'main'
     },
-    // {
-    //   title: 'Bài tập',
-    //   icon: 'fa-tasks',
-    //   path: '/teacher/assignments',
-    //   color: 'warning'
-    // },
     {
       title: 'Điểm danh',
       icon: 'fa-user-check',
       path: '/teacher/attendance',
       color: 'main'
     },
-    // {
-    //   title: 'Tài liệu giảng dạy',
-    //   icon: 'fa-file-alt',
-    //   path: '/teacher/materials',
-    //   color: 'info'
-    // }
-    {
-      title: 'Chương trình đào tạo',
-      icon: 'fa-graduation-cap',
-      path: '/teacher/programs',
-      color: 'main'
-    },
-    {
-      title: 'Quản lý đề luyện thi',
-      icon: 'fa-file-alt',
-      path: '/teacher/exams',
-      color: 'warning'
-    },
-    {
-      title: 'Quản lý tips luyện thi',
-      icon: 'fa-lightbulb',
-      path: '/teacher/tips',
-      color: 'info'
-    }
-    
+    // Chỉ hiển thị 3 tab sau cho Subject Leader
+    ...(isSubjectLeader ? [
+      {
+        title: 'Chương trình đào tạo',
+        icon: 'fa-graduation-cap',
+        path: '/teacher/programs',
+        color: 'main'
+      },
+      {
+        title: 'Quản lý đề luyện thi',
+        icon: 'fa-file-alt',
+        path: '/teacher/exams',
+        color: 'main'
+      },
+      {
+        title: 'Quản lý tips luyện thi',
+        icon: 'fa-lightbulb',
+        path: '/teacher/tips',
+        color: 'main'
+      }
+    ] : [])
   ];
 
   const userInfo = {

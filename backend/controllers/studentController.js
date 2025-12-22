@@ -529,7 +529,7 @@ exports.getLessonDetail = async (req, res) => {
 
 const makeup_class = await ClassSchedule.findById(scheduleId)
       .populate('room', 'room_name location')
-      .populate('session', 'title order content objectives')
+      .populate('session', 'title order content objectives clos')
       .populate('teacher', 'username email')
       .lean();
 
@@ -539,14 +539,14 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       .populate({
         path: 'class',
         populate: [
-          { path: 'course', select: 'name description level' },
+          { path: 'course', select: 'name description level clos' },
           { path: 'teacher', select: 'username email' }
         ]
       })
       .populate('teacher', 'username email') // Populate teacher của ClassSchedule
       .populate('substituteTeacher', 'username email') // Populate substituteTeacher của ClassSchedule
       .populate('room', 'room_name location')
-      .populate('session', 'title order content objectives')
+      .populate('session', 'title order content objectives clos')
       .lean();
 
 
@@ -607,6 +607,18 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       classSchedule: scheduleId
     }).lean();
 
+    // Lấy CLOs từ course.clos dựa vào session.clos (array of ObjectIds)
+    let sessionClos = [];
+    if (classSchedule.session && classSchedule.session.clos && classSchedule.session.clos.length > 0 && classSchedule.class && classSchedule.class.course) {
+      const closIds = classSchedule.session.clos.map(id => id.toString());
+      const courseClos = classSchedule.class.course.clos || [];
+      
+      // Lọc CLOs từ course.clos theo closIds trong session.clos
+      sessionClos = courseClos.filter(clo => 
+        closIds.includes(clo._id.toString())
+      );
+    }
+
     // Format the lesson detail
     const lessonDetail = {
       _id: classSchedule._id,
@@ -624,7 +636,7 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       topic: classSchedule.session?.title || classSchedule.topic || 'Chưa có chủ đề',
       lessonNumber: classSchedule.session?.order || 0,
       description: classSchedule.session?.content || classSchedule.description || '',
-      objectives: classSchedule.session?.objectives || [],
+      objectives: sessionClos, // Sử dụng sessionClos thay vì session.objectives
       
       // Teacher info
       // Ưu tiên: substituteTeacher > teacher (ClassSchedule) > class.teacher

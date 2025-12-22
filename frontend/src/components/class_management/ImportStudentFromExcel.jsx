@@ -955,8 +955,24 @@ const ImportStudentFromExcel = ({ onBack }) => {
     }
 
     try {
+      // Filter chỉ lấy students có program với isActive = true
+      const filteredStudents = previewStudents.filter(student => {
+        if (!student.programCode) return false;
+        
+        // Tìm program theo code trong allPrograms (có đầy đủ thông tin isActive)
+        const program = allPrograms.find(p => p.code === student.programCode);
+        
+        // Chỉ export nếu program có isActive = true
+        return program && program.isActive === true;
+      });
+      
+      if (filteredStudents.length === 0) {
+        toast.warning('Không có học viên nào có chương trình đang hoạt động để xuất báo cáo');
+        return;
+      }
+      
       // Tạo data cho Excel
-      const reportData = previewStudents.map(student => ({
+      const reportData = filteredStudents.map(student => ({
         Username: student.username,
         Email: student.email,
         Phone: student.phone,
@@ -984,7 +1000,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
       
       // Download
       XLSX.writeFile(wb, fileName);
-      toast.success('Xuất báo cáo thành công!');
+      toast.success(`Xuất báo cáo thành công! (${filteredStudents.length} học viên)`);
     } catch (error) {
       toast.error('Lỗi khi xuất báo cáo: ' + (error.message || 'Vui lòng thử lại'));
     }

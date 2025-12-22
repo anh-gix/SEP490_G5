@@ -261,7 +261,12 @@ exports.validateAddClassSchedule = async (req, res) => {
             $gte: startOfDay,
             $lte: endOfDay
           },
-          status: { $in: ['temporary', 'fixed'] }
+          status: { $in: ['temporary', 'fixed'] },
+          // FIX: Chỉ lấy các buổi mà giáo viên này thực sự dạy
+          $or: [
+            { teacher: teacherId },
+            { substituteTeacher: teacherId }
+          ]
         };
         if (excludeScheduleId) {
           teacherScheduleQuery._id = { $ne: new mongoose.Types.ObjectId(excludeScheduleId) };
@@ -1785,7 +1790,12 @@ exports.validateScheduleConflictSimple = async (req, res) => {
             $gte: scheduleDateStart,
             $lt: scheduleDateEnd
           },
-          status: { $in: ['temporary', 'fixed'] }
+          status: { $in: ['temporary', 'fixed'] },
+          // FIX: Chỉ lấy các buổi mà giáo viên này thực sự dạy
+          $or: [
+            { teacher: teacher },
+            { substituteTeacher: teacher }
+          ]
         };
 
         if (excludeScheduleId) {
@@ -1796,19 +1806,6 @@ exports.validateScheduleConflictSimple = async (req, res) => {
           .populate('class', 'name')
           .select('date startTime endTime class')
           .lean();
-
-        console.log(' Kiểm tra conflict giáo viên:', {
-          teacherId: teacher,
-          date: date,
-          excludeScheduleId: excludeScheduleId,
-          foundSchedules: teacherSchedules.length,
-          schedules: teacherSchedules.map(s => ({
-            id: s._id,
-            className: s.class?.name,
-            date: formatDateLocal(s.date),
-            time: `${s.startTime} - ${s.endTime}`
-          }))
-        });
 
         teacherSchedules.forEach((schedule) => {
           if (hasTimeOverlap(startTime, endTime, schedule.startTime, schedule.endTime)) {
@@ -1941,13 +1938,24 @@ exports.createMakeupClassSchedule = async (req, res) => {
     if (teacherClasses.length > 0) {
       const teacherClassIds = teacherClasses.map(c => c._id);
       const teacherConflict = await ClassSchedule.findOne({
-        class: { $in: teacherClassIds },
-        date: scheduleDate,
-        status: { $in: ['temporary', 'fixed'] },
-        $or: [
-          { $and: [{ startTime: { $lte: startTime } }, { endTime: { $gt: startTime } }] },
-          { $and: [{ startTime: { $lt: endTime } }, { endTime: { $gte: endTime } }] },
-          { $and: [{ startTime: { $gte: startTime } }, { endTime: { $lte: endTime } }] }
+        $and: [
+          {
+            class: { $in: teacherClassIds },
+            date: scheduleDate,
+            status: { $in: ['temporary', 'fixed'] },
+            // FIX: Chỉ lấy các buổi mà giáo viên này thực sự dạy
+            $or: [
+              { teacher: teacher },
+              { substituteTeacher: teacher }
+            ]
+          },
+          {
+            $or: [
+              { $and: [{ startTime: { $lte: startTime } }, { endTime: { $gt: startTime } }] },
+              { $and: [{ startTime: { $lt: endTime } }, { endTime: { $gte: endTime } }] },
+              { $and: [{ startTime: { $gte: startTime } }, { endTime: { $lte: endTime } }] }
+            ]
+          }
         ]
       }).lean();
 

@@ -54,7 +54,7 @@ const updateTeacherForActiveClass = async (classId, newTeacherId, checkTeacherCo
 
     if (futureSchedules.length === 0) {
       // No future schedules, just update class
-      await Class.findByIdAndUpdate(classId, { teacher: newTeacherId }, { session });
+      await Class.findByIdAndUpdate(classId, { teacher: newTeacherId, teacherId: newTeacherId }, { session });
       return {
         success: true,
         message: 'Cập nhật giáo viên thành công (không có buổi học tương lai)',
@@ -82,7 +82,7 @@ const updateTeacherForActiveClass = async (classId, newTeacherId, checkTeacherCo
 
     // No conflict - proceed with update
     // Update class
-    await Class.findByIdAndUpdate(classId, { teacher: newTeacherId }, { session });
+    await Class.findByIdAndUpdate(classId, { teacher: newTeacherId, teacherId: newTeacherId }, { session });
 
     // Bulk update all future schedules
     const scheduleIds = futureSchedules.map(s => s._id);
@@ -144,12 +144,25 @@ const updateRoomForActiveClass = async (classId, newRoomId, checkRoomConflicts, 
       }
     }
 
-    // Update only class.room (not schedule.room)
+    // Update class.room
     await Class.findByIdAndUpdate(classId, { room: newRoomId }, { session });
+
+    // Update room for all future schedules
+    const updateResult = await ClassSchedule.updateMany(
+      {
+        class: classId,
+        date: { $gte: today }
+      },
+      { $set: { room: newRoomId } },
+      { session }
+    );
+
+    console.log(`✓ Đã cập nhật phòng học cho ${updateResult.modifiedCount} buổi học tương lai`);
 
     return {
       success: true,
-      message: 'Cập nhật phòng học thành công'
+      message: `Cập nhật phòng học thành công cho lớp và ${updateResult.modifiedCount} buổi học tương lai`,
+      updatedSchedulesCount: updateResult.modifiedCount
     };
   } catch (error) {
     console.error('Error in updateRoomForActiveClass:', error);
@@ -720,7 +733,7 @@ const updateTeacherForPendingClass = async (classId, newTeacherId, checkTeacherC
       .lean();
 
     if (allSchedules.length === 0) {
-      await Class.findByIdAndUpdate(classId, { teacher: newTeacherId }, { session });
+      await Class.findByIdAndUpdate(classId, { teacher: newTeacherId, teacherId: newTeacherId }, { session });
       return {
         success: true,
         message: 'Cập nhật giáo viên thành công (không có buổi học)',
@@ -744,7 +757,7 @@ const updateTeacherForPendingClass = async (classId, newTeacherId, checkTeacherC
       };
     }
 
-    await Class.findByIdAndUpdate(classId, { teacher: newTeacherId }, { session });
+    await Class.findByIdAndUpdate(classId, { teacher: newTeacherId, teacherId: newTeacherId }, { session });
 
     const scheduleIds = allSchedules.map(s => s._id);
     const updateResult = await ClassSchedule.updateMany(

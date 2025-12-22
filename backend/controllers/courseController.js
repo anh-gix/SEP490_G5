@@ -641,7 +641,7 @@ exports.getCoursesByProgramId = async (req, res) => {
             status: { $in: ['completed', 'active'] }
         })
         .populate('program', 'program_name code type level')
-        .select('name description program status')
+        .select('name description program status isActive')
         .sort({ name: 1 });
 
         res.status(200).json({

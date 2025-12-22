@@ -1810,16 +1810,40 @@ exports.createStudent = async (req, res) => {
       });
     }
     
-    // Validate phone number length (10-11 digits)
+    // Validate phone number length (10 digits only)
     // Allow duplicate phone numbers
     if (phone) {
       const phoneDigits = phone.replace(/\D/g, '');
-      if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+      // Validate BEFORE adding leading zero
+      if (phoneDigits.length === 0) {
         return res.status(400).json({
           success: false,
-          message: 'Số điện thoại phải có 10 hoặc 11 chữ số'
+          message: 'Số điện thoại không được để trống'
         });
       }
+      
+      let normalizedPhone = phoneDigits;
+      if (phoneDigits[0] === '0') {
+        // Has leading zero: must be exactly 10 digits
+        if (phoneDigits.length !== 10) {
+          return res.status(400).json({
+            success: false,
+            message: 'Số điện thoại phải có 10 chữ số'
+          });
+        }
+      } else {
+        // No leading zero (Excel removed it): must be exactly 9 digits
+        if (phoneDigits.length !== 9) {
+          return res.status(400).json({
+            success: false,
+            message: 'Số điện thoại phải có 9 chữ số (thiếu số 0 ở đầu do Excel)'
+          });
+        }
+        // Add leading zero to normalize to 10 digits
+        normalizedPhone = '0' + phoneDigits;
+      }
+      // Update phone with normalized value
+      phone = normalizedPhone;
     }
     
     // Create student
@@ -1973,7 +1997,7 @@ const enrollStudentInCourses = async (studentId, levelsToStudyStr, type, program
     const courses = await Course.find({
       program: { $in: programIds },
       status: { $in: ['completed', 'active'] }
-    }).select('_id name program');
+    }).select('_id name program status');
 
     if (courses.length === 0) {
       return {
@@ -1998,6 +2022,19 @@ const enrollStudentInCourses = async (studentId, levelsToStudyStr, type, program
         if (result.modifiedCount > 0 || result.matchedCount > 0) {
           enrolledCount++;
           enrolledCourseIds.push(course._id);
+
+          // If course status was 'completed' and now has students, change to 'active'
+          if (course.status === 'completed') {
+            try {
+              await Course.updateOne(
+                { _id: course._id },
+                { $set: { status: 'active' } }
+              );
+              console.log(`Course ${course._id} status changed from 'completed' to 'active'`);
+            } catch (statusError) {
+              console.error(`Error updating course status for ${course._id}:`, statusError.message);
+            }
+          }
         }
       } catch (courseError) {
         // Continue with other courses even if one fails
@@ -2081,7 +2118,6 @@ exports.importStudents = async (req, res) => {
                 });
               }
             } catch (enrollmentError) {
-              // Log error but add to skipped
               results.skipped.push({
                 email: studentData.email,
                 username: studentData.username,
@@ -2090,7 +2126,6 @@ exports.importStudents = async (req, res) => {
               });
             }
           } else {
-            // No course information, skip
             const missingFields = [];
             if (!studentData.levelsToStudy) missingFields.push('lộ trình học');
             if (!studentData.type) missingFields.push('loại chương trình');
@@ -2106,17 +2141,46 @@ exports.importStudents = async (req, res) => {
           continue;
         }
         
-        // Validate phone number length (10-11 digits)
+        // Validate phone number length (10 digits only)
+        let normalizedPhone = studentData.phone || '';
         if (studentData.phone) {
           const phoneDigits = studentData.phone.replace(/\D/g, '');
-          if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+          // Validate BEFORE adding leading zero
+          if (phoneDigits.length === 0) {
             results.failed.push({
               email: studentData.email,
               username: studentData.username,
               phone: studentData.phone || '',
-              reason: 'Số điện thoại phải có 10 hoặc 11 chữ số'
+              reason: 'Số điện thoại không được để trống'
             });
             continue;
+          }
+          
+          if (phoneDigits[0] === '0') {
+            // Has leading zero: must be exactly 10 digits
+            if (phoneDigits.length !== 10) {
+              results.failed.push({
+                email: studentData.email,
+                username: studentData.username,
+                phone: studentData.phone || '',
+                reason: 'Số điện thoại phải có 10 chữ số'
+              });
+              continue;
+            }
+            normalizedPhone = phoneDigits;
+          } else {
+            // No leading zero (Excel removed it): must be exactly 9 digits
+            if (phoneDigits.length !== 9) {
+              results.failed.push({
+                email: studentData.email,
+                username: studentData.username,
+                phone: studentData.phone || '',
+                reason: 'Số điện thoại phải có 9 chữ số (thiếu số 0 ở đầu do Excel)'
+              });
+              continue;
+            }
+            // Add leading zero to normalize to 10 digits
+            normalizedPhone = '0' + phoneDigits;
           }
         }
         
@@ -2124,7 +2188,7 @@ exports.importStudents = async (req, res) => {
         const newStudent = await User.create({
           email: studentData.email,
           username: studentData.username,
-          phone: studentData.phone || '',
+          phone: normalizedPhone,
           address: studentData.address || '',
           password: studentData.password || '123456', // Default password
           roleId: studentRole._id
@@ -2278,6 +2342,21 @@ exports.updateStudentCourseEnrollments = async (req, res) => {
         { session }
       );
       updatedCourses.push(...coursesToAdd);
+
+      // Update course status from 'completed' to 'active' for courses that now have students
+      const coursesToActivate = await Course.find({
+        _id: { $in: coursesToAdd.map(id => new mongoose.Types.ObjectId(id)) },
+        status: 'completed'
+      }).session(session).select('_id name');
+
+      if (coursesToActivate.length > 0) {
+        await Course.updateMany(
+          { _id: { $in: coursesToActivate.map(c => c._id) } },
+          { $set: { status: 'active' } },
+          { session }
+        );
+        console.log(`Updated ${coursesToActivate.length} courses from 'completed' to 'active' when enrolling student ${studentId}`);
+      }
     }
 
     // Remove student from courses using $pull
@@ -2289,6 +2368,23 @@ exports.updateStudentCourseEnrollments = async (req, res) => {
         { session }
       );
       updatedCourses.push(...coursesToRemove);
+
+      // Check if courses now have no students, if so change from 'active' to 'completed'
+      const coursesAfterRemoval = await Course.find({
+        _id: { $in: coursesToRemove.map(id => new mongoose.Types.ObjectId(id)) },
+        status: 'active'
+      }).session(session).select('_id name studentEnrollments');
+
+      for (const course of coursesAfterRemoval) {
+        if (course.studentEnrollments.length === 0) {
+          await Course.updateOne(
+            { _id: course._id },
+            { $set: { status: 'completed' } },
+            { session }
+          );
+          console.log(`Course ${course._id} status changed from 'active' to 'completed' (no more students)`);
+        }
+      }
     }
 
     // Commit transaction

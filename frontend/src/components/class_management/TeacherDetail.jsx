@@ -43,6 +43,7 @@ const TeacherDetail = ({ teacherId, onBack }) => {
   const [validatingConflict, setValidatingConflict] = useState(false);
   const [substituteTeacherSchedule, setSubstituteTeacherSchedule] = useState([]);
   const [loadingSubstituteTeacherSchedule, setLoadingSubstituteTeacherSchedule] = useState(false);
+  const [conflictedSubstituteTeacherIds, setConflictedSubstituteTeacherIds] = useState(new Set());
 
   // Helper function to normalize date from various formats
   const normalizeDate = (dateInput) => {
@@ -327,7 +328,7 @@ const TeacherDetail = ({ teacherId, onBack }) => {
     setConflictInfo(null);
     setShowSubstituteModal(true);
     
-    // Load available teachers
+    // Load available teachers and check conflicts
     try {
       setLoadingSubstituteTeachers(true);
       const response = await teacherService.getAllTeachers();
@@ -351,18 +352,58 @@ const TeacherDetail = ({ teacherId, onBack }) => {
         }
         
         // Filter out current teacher
-        const filteredTeachers = allTeachers.filter(t => {
+        const candidateTeachers = allTeachers.filter(t => {
           const teacherId = (t._id || t.id)?.toString();
           return teacherId && teacherId !== currentTeacherId;
+        });
+        
+        // Check conflicts for all candidate teachers
+        const conflictedIds = new Set();
+        const roomId = schedule.roomId || schedule.room?._id || schedule.room?.id || schedule.room;
+        const scheduleId = schedule.id || schedule._id;
+        
+        if (roomId && schedule.date && schedule.startTime && schedule.endTime) {
+          const conflictPromises = candidateTeachers.map(async (t) => {
+            try {
+              const teacherId = (t._id || t.id)?.toString();
+              const validateResponse = await classScheduleService.validateScheduleConflictSimple({
+                date: schedule.date,
+                startTime: schedule.startTime,
+                endTime: schedule.endTime,
+                teacher: teacherId,
+                room: roomId,
+                excludeScheduleId: scheduleId
+              });
+              
+              if (validateResponse.success && validateResponse.hasConflict && validateResponse.conflicts?.teacher?.length > 0) {
+                conflictedIds.add(teacherId);
+              }
+            } catch (error) {
+              // On error, assume no conflict to be safe
+            }
+            return null;
+          });
+          
+          await Promise.all(conflictPromises);
+        }
+        
+        setConflictedSubstituteTeacherIds(conflictedIds);
+        
+        // Filter out conflicted teachers
+        const filteredTeachers = candidateTeachers.filter(t => {
+          const teacherId = (t._id || t.id)?.toString();
+          return !conflictedIds.has(teacherId);
         });
         
         setAvailableSubstituteTeachers(filteredTeachers);
       } else {
         setAvailableSubstituteTeachers([]);
+        setConflictedSubstituteTeacherIds(new Set());
       }
     } catch (err) {
       console.error('Error loading substitute teachers:', err);
       setAvailableSubstituteTeachers([]);
+      setConflictedSubstituteTeacherIds(new Set());
     } finally {
       setLoadingSubstituteTeachers(false);
     }
@@ -372,12 +413,6 @@ const TeacherDetail = ({ teacherId, onBack }) => {
   const handleSubmitAssignSubstitute = async () => {
     if (!selectedSubstituteTeacherId || !selectedScheduleForSubstitute) {
       toast.error('Vui lòng chọn giáo viên dạy thay');
-      return;
-    }
-
-    // Không cho phép xác nhận nếu có xung đột
-    if (conflictInfo?.hasConflict) {
-      toast.error('Không thể xác nhận khi giáo viên dạy thay có xung đột lịch học. Vui lòng chọn giáo viên khác.');
       return;
     }
 
@@ -401,6 +436,8 @@ const TeacherDetail = ({ teacherId, onBack }) => {
         setSelectedScheduleForSubstitute(null);
         setSelectedSubstituteTeacherId(null);
         setConflictInfo(null);
+        setSubstituteTeacherSchedule([]);
+        setConflictedSubstituteTeacherIds(new Set());
       } else {
         toast.error(response.message || 'Không thể xếp người dạy thay');
       }
@@ -908,6 +945,7 @@ const TeacherDetail = ({ teacherId, onBack }) => {
         setSelectedSubstituteTeacherId(null);
         setConflictInfo(null);
         setSubstituteTeacherSchedule([]);
+        setConflictedSubstituteTeacherIds(new Set());
       }} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>
@@ -984,132 +1022,6 @@ const TeacherDetail = ({ teacherId, onBack }) => {
                   </>
                 )}
               </Form.Group>
-
-              {/* Conflict Info */}
-              {validatingConflict && (
-                <Alert variant="info" className="mb-3">
-                  <i className="fas fa-spinner fa-spin me-2"></i>
-                  Đang kiểm tra xung đột lịch học...
-                </Alert>
-              )}
-              {conflictInfo && !validatingConflict && (
-                <Alert variant={conflictInfo.hasConflict ? 'warning' : 'success'} className="mb-3">
-                  {conflictInfo.hasConflict ? (
-                    <>
-                      <i className="fas fa-exclamation-triangle me-2"></i>
-                      <strong>Cảnh báo:</strong> {conflictInfo.message}
-                      {conflictInfo.conflicts && (
-                        <div className="mt-2">
-                          {conflictInfo.conflicts.teacher && conflictInfo.conflicts.teacher.length > 0 && (
-                            <div className="text-13">
-                              <strong>Xung đột với giáo viên:</strong>
-                              <ul className="mb-0 mt-1">
-                                {conflictInfo.conflicts.teacher.map((conflict, idx) => (
-                                  <li key={idx}>
-                                    {conflict.className} - {conflict.time}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          {conflictInfo.conflicts.room && conflictInfo.conflicts.room.length > 0 && (
-                            <div className="text-13 mt-2">
-                              <strong>Xung đột với phòng:</strong>
-                              <ul className="mb-0 mt-1">
-                                {conflictInfo.conflicts.room.map((conflict, idx) => (
-                                  <li key={idx}>
-                                    {conflict.className} - {conflict.time}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <i className="fas fa-check-circle me-2"></i>
-                      {conflictInfo.message}
-                    </>
-                  )}
-                </Alert>
-              )}
-
-              {/* Substitute Teacher Schedule */}
-              {selectedSubstituteTeacherId && (
-                <Card className="mb-3 border border-neutral-200">
-                  <Card.Body>
-                    <h6 className="mb-3">
-                      <i className="fas fa-calendar-alt me-2"></i>
-                      Lịch dạy của giáo viên được chọn vào ngày{' '}
-                      {formatDateForDisplay(selectedScheduleForSubstitute?.date)}
-                    </h6>
-                    {loadingSubstituteTeacherSchedule ? (
-                      <div className="text-center py-3">
-                        <i className="fas fa-spinner fa-spin me-2"></i>
-                        Đang tải lịch dạy...
-                      </div>
-                    ) : substituteTeacherSchedule.length > 0 ? (
-                      <Table hover size="sm" className="mb-0">
-                        <thead className="bg-neutral-25">
-                          <tr>
-                            <th className="px-12 py-8 text-12">Thời gian</th>
-                            <th className="px-12 py-8 text-12">Lớp học</th>
-                            <th className="px-12 py-8 text-12">Phòng</th>
-                            <th className="px-12 py-8 text-12">Trạng thái</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {substituteTeacherSchedule.map((schedule, idx) => {
-                            // Use normalizeDate helper for consistency
-                            const scheduleDate = normalizeDate(schedule.date);
-                            
-                            const isSameTime = 
-                              schedule.startTime === selectedScheduleForSubstitute.startTime &&
-                              schedule.endTime === selectedScheduleForSubstitute.endTime;
-                            
-                            return (
-                              <tr 
-                                key={idx}
-                                className={isSameTime ? 'table-warning' : ''}
-                              >
-                                <td className="px-12 py-8">
-                                  <div className="text-13 fw-semibold">
-                                    {schedule.startTime} - {schedule.endTime}
-                                  </div>
-                                </td>
-                                <td className="px-12 py-8 text-13">
-                                  {schedule.class?.name || 'N/A'}
-                                </td>
-                                <td className="px-12 py-8 text-13">
-                                  {schedule.room?.room_name || 'N/A'}
-                                </td>
-                                <td className="px-12 py-8">
-                                  {isSameTime ? (
-                                    <Badge bg="warning" text="dark" style={{ fontSize: '10px' }}>
-                                      Trùng giờ
-                                    </Badge>
-                                  ) : (
-                                    <Badge bg="secondary" style={{ fontSize: '10px' }}>
-                                      {schedule.status === 'fixed' ? 'Cố định' : 'Tạm'}
-                                    </Badge>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </Table>
-                    ) : (
-                      <div className="text-center py-3 text-muted text-13">
-                        <i className="fas fa-calendar-times me-2"></i>
-                        Giáo viên này không có lịch dạy vào ngày này
-                      </div>
-                    )}
-                  </Card.Body>
-                </Card>
-              )}
             </>
           )}
         </Modal.Body>
@@ -1121,6 +1033,8 @@ const TeacherDetail = ({ teacherId, onBack }) => {
               setSelectedScheduleForSubstitute(null);
               setSelectedSubstituteTeacherId(null);
               setConflictInfo(null);
+              setSubstituteTeacherSchedule([]);
+              setConflictedSubstituteTeacherIds(new Set());
             }}
             disabled={assigningSubstitute}
           >
@@ -1132,13 +1046,7 @@ const TeacherDetail = ({ teacherId, onBack }) => {
             disabled={
               !selectedSubstituteTeacherId || 
               assigningSubstitute || 
-              loadingSubstituteTeachers || 
-              (conflictInfo && conflictInfo.hasConflict) // Disable if there's a conflict
-            }
-            title={
-              conflictInfo && conflictInfo.hasConflict 
-                ? 'Không thể xác nhận khi có xung đột lịch học' 
-                : ''
+              loadingSubstituteTeachers
             }
           >
             {assigningSubstitute ? (

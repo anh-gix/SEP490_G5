@@ -440,12 +440,6 @@ const ImportStudentFromExcel = ({ onBack }) => {
         // Remove any non-digit characters (spaces, dashes, etc.)
         phone = phone.replace(/\D/g, '');
         
-        // Always add leading zero if phone doesn't start with 0
-        // This handles the case where Excel removes leading zeros from phone numbers
-        if (phone && phone.length > 0 && phone[0] !== '0') {
-          phone = '0' + phone;
-        }
-        
         const address = row.address || row.Address || row['Địa chỉ'] || '';
         
         // Parse new columns (support both Vietnamese and English)
@@ -465,13 +459,23 @@ const ImportStudentFromExcel = ({ onBack }) => {
           errors.push('Email không hợp lệ');
         }
 
-        if (!phone || !phone.toString().trim()) {
+        // Validate phone BEFORE adding leading zero
+        if (!phone || phone.length === 0) {
           errors.push('Số điện thoại không được để trống');
         } else {
-          // Validate phone length (10-11 digits after normalization)
-          const phoneDigits = phone.replace(/\D/g, '');
-          if (phoneDigits.length < 10 || phoneDigits.length > 11) {
-            errors.push('Số điện thoại phải có 10 hoặc 11 chữ số');
+          if (phone[0] === '0') {
+            // Has leading zero: must be exactly 10 digits
+            if (phone.length !== 10) {
+              errors.push('Số điện thoại phải có 10 chữ số');
+            }
+          } else {
+            // No leading zero (Excel removed it): must be exactly 9 digits
+            if (phone.length !== 9) {
+              errors.push('Số điện thoại phải có 9 chữ số (thiếu số 0 ở đầu do Excel)');
+            } else {
+              // Add leading zero to normalize to 10 digits
+              phone = '0' + phone;
+            }
           }
         }
 
@@ -580,9 +584,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
         // Fetch courses if programCode exists (ignore other validation errors)
         if (item.programCode && item.programCode.trim()) {
           try {
-            console.log(`Fetching courses for program code: ${item.programCode}`);
             const courses = await getCoursesByProgramCodes(item.programCode);
-            console.log(`Courses fetched for ${item.email}:`, courses);
             item.courses = courses;
           } catch (error) {
             console.error(`Error fetching courses for ${item.email}:`, error);
@@ -639,10 +641,10 @@ const ImportStudentFromExcel = ({ onBack }) => {
 
         const existingEmails = new Set(allUsers.map(u => u.email?.toLowerCase()).filter(Boolean));
 
-        // Get all approved program codes from database (only approved programs can be used)
+        // Get all approved and active program codes from database (only approved and active programs can be used)
         const approvedProgramCodes = new Set(
           programs
-            .filter(p => p.status === 'approved')
+            .filter(p => p.status === 'approved' && p.isActive === true)
             .map(p => p.code)
             .filter(Boolean)
         );
@@ -650,7 +652,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
         previewData.forEach((item) => {
           const email = item.email.toLowerCase();
 
-          // Only check duplicate email, allow duplicate phone
+          // Check duplicate email with existing users (allow duplicate phone)
           if (email && existingEmails.has(email)) {
             if (!item.warnings.includes('Học viên đã có tài khoản trong hệ thống')) {
               item.warnings.push('Học viên đã có tài khoản trong hệ thống');
@@ -668,6 +670,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
 
             const invalidCodes = []; // Programs that don't exist at all
             const notApprovedCodes = []; // Programs that exist but are not approved
+            const inactiveCodes = []; // Programs that are approved but not active
             const validCodes = [];
             const mismatchedTypeCodes = [];
             const mismatchedLevelCodes = [];
@@ -682,49 +685,58 @@ const ImportStudentFromExcel = ({ onBack }) => {
               if (!programExists) {
                 // Program doesn't exist at all
                 invalidCodes.push(code);
-              } else if (approvedProgramCodes.has(code)) {
-                // Program exists and is approved
-                validCodes.push(code);
+              } else {
+                // Program exists, check its status and isActive
+                const program = allPrograms.find(p => p.code === code);
 
-                // Check if program type matches the student's type
-                const program = programs.find(p => p.code === code && p.status === 'approved');
-                if (program && item.type) {
-                  const itemTypeStr = item.type.toString().trim().toLowerCase();
-                  const programTypeStr = program.type?.toString().trim().toLowerCase() || '';
+                if (program.status !== 'approved') {
+                  // Program exists but is not approved
+                  notApprovedCodes.push({ code, status: program.status || 'unknown' });
+                } else if (program.isActive !== true) {
+                  // Program is approved but not active
+                  inactiveCodes.push(code);
+                } else {
+                  // Program exists, is approved and active
+                  validCodes.push(code);
+                }
+              }
+            });
 
-                  // Normalize type names for comparison
-                  const normalizeType = (type) => {
-                    if (type === 'cam') return 'cambridge';
-                    return type;
-                  };
+            // Check type and level validation for valid programs only
+            validCodes.forEach(code => {
+              const program = programs.find(p => p.code === code && p.status === 'approved' && p.isActive === true);
+              if (program && item.type) {
+                const itemTypeStr = item.type.toString().trim().toLowerCase();
+                const programTypeStr = program.type?.toString().trim().toLowerCase() || '';
 
-                  const normalizedItemType = normalizeType(itemTypeStr);
-                  const normalizedProgramType = normalizeType(programTypeStr);
+                // Normalize type names for comparison
+                const normalizeType = (type) => {
+                  if (type === 'cam') return 'cambridge';
+                  return type;
+                };
 
-                  if (normalizedItemType && normalizedProgramType && normalizedItemType !== normalizedProgramType) {
-                    mismatchedTypeCodes.push({
+                const normalizedItemType = normalizeType(itemTypeStr);
+                const normalizedProgramType = normalizeType(programTypeStr);
+
+                if (normalizedItemType && normalizedProgramType && normalizedItemType !== normalizedProgramType) {
+                  mismatchedTypeCodes.push({
+                    code: code,
+                    expected: itemTypeStr.toUpperCase(),
+                    actual: programTypeStr.toUpperCase()
+                  });
+                }
+
+                // Check if program level matches the levelsToStudy
+                if (requiredLevels.length > 0 && program.level) {
+                  const programLevel = program.level.toString().trim();
+                  if (!requiredLevels.includes(programLevel)) {
+                    mismatchedLevelCodes.push({
                       code: code,
-                      expected: itemTypeStr.toUpperCase(),
-                      actual: programTypeStr.toUpperCase()
+                      programLevel: programLevel,
+                      requiredLevels: requiredLevels.join(', ')
                     });
                   }
-
-                  // Check if program level matches the levelsToStudy
-                  if (requiredLevels.length > 0 && program.level) {
-                    const programLevel = program.level.toString().trim();
-                    if (!requiredLevels.includes(programLevel)) {
-                      mismatchedLevelCodes.push({
-                        code: code,
-                        programLevel: programLevel,
-                        requiredLevels: requiredLevels.join(', ')
-                      });
-                    }
-                  }
                 }
-              } else {
-                // Program exists but is not approved
-                const program = allPrograms.find(p => p.code === code);
-                notApprovedCodes.push({ code, status: program?.status || 'unknown' });
               }
             });
 
@@ -745,6 +757,17 @@ const ImportStudentFromExcel = ({ onBack }) => {
                                    status === 'needs_revision' ? 'cần chỉnh sửa' :
                                    status === 'archived' ? 'đã lưu trữ' : status;
                 const errorMsg = `Mã chương trình "${code}" chưa được phê duyệt (trạng thái: ${statusText})`;
+                if (!item.errors.includes(errorMsg)) {
+                  item.errors.push(errorMsg);
+                  item.hasError = true;
+                }
+              });
+            }
+
+            // Add error if program is approved but not active
+            if (inactiveCodes.length > 0) {
+              inactiveCodes.forEach(code => {
+                const errorMsg = `Mã chương trình "${code}" đã được phê duyệt nhưng chưa được kích hoạt (isActive = false)`;
                 if (!item.errors.includes(errorMsg)) {
                   item.errors.push(errorMsg);
                   item.hasError = true;
@@ -884,6 +907,34 @@ const ImportStudentFromExcel = ({ onBack }) => {
 
     // Create worksheet
     const ws = XLSX.utils.json_to_sheet(sampleData);
+    
+    // Find phone column index
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    let phoneColIndex = -1;
+    
+    // Find phone column (check header row)
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+      const cell = ws[cellAddress];
+      if (cell && (cell.v === 'phone' || cell.v === 'Phone' || cell.v === 'Số điện thoại')) {
+        phoneColIndex = col;
+        break;
+      }
+    }
+    
+    // Format phone column as text
+    if (phoneColIndex >= 0) {
+      for (let row = range.s.r + 1; row <= range.e.r; row++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: row, c: phoneColIndex });
+        if (ws[cellAddress]) {
+          // Set cell type to string and ensure value is string
+          ws[cellAddress].t = 's'; // 's' = string type
+          ws[cellAddress].v = String(ws[cellAddress].v);
+          // Set cell style to text format
+          ws[cellAddress].z = '@'; // '@' = text format in Excel
+        }
+      }
+    }
     
     // Create workbook
     const wb = XLSX.utils.book_new();

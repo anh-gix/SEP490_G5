@@ -384,13 +384,7 @@ exports.createTeacher = async (req, res) => {
       });
     }
     
-    // Check if phone number already exists
-    const phoneExists = await User.findOne({ phone });
-    if (phoneExists) {
-      return res.status(400).json({ 
-        message: "Số điện thoại đã tồn tại trong hệ thống" 
-      });
-    }
+    // Phone can be duplicate, no need to check
     
     // Find teacher role
     const teacherRole = await Role.findOne({ name: 'Teacher' });
@@ -2178,39 +2172,56 @@ exports.importTeachers = async (req, res) => {
           continue;
         }
         
-        // Validate phone number length (10-11 digits)
+        // Validate phone number length (10 digits only)
+        let normalizedPhone = teacherData.phone || '';
         if (teacherData.phone) {
           const phoneDigits = teacherData.phone.replace(/\D/g, '');
-          if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+          // Validate BEFORE adding leading zero
+          if (phoneDigits.length === 0) {
             results.failed.push({
               email: teacherData.email,
               username: teacherData.username,
               phone: teacherData.phone || '',
-              reason: 'Số điện thoại phải có 10 hoặc 11 chữ số'
+              reason: 'Số điện thoại không được để trống'
             });
             continue;
+          }
+          
+          if (phoneDigits[0] === '0') {
+            // Has leading zero: must be exactly 10 digits
+            if (phoneDigits.length !== 10) {
+              results.failed.push({
+                email: teacherData.email,
+                username: teacherData.username,
+                phone: teacherData.phone || '',
+                reason: 'Số điện thoại phải có 10 chữ số'
+              });
+              continue;
+            }
+            normalizedPhone = phoneDigits;
+          } else {
+            // No leading zero (Excel removed it): must be exactly 9 digits
+            if (phoneDigits.length !== 9) {
+              results.failed.push({
+                email: teacherData.email,
+                username: teacherData.username,
+                phone: teacherData.phone || '',
+                reason: 'Số điện thoại phải có 9 chữ số (thiếu số 0 ở đầu do Excel)'
+              });
+              continue;
+            }
+            // Add leading zero to normalize to 10 digits
+            normalizedPhone = '0' + phoneDigits;
           }
         }
         
-        // Check if phone number exists
-        if (teacherData.phone) {
-          const phoneExists = await User.findOne({ phone: teacherData.phone });
-          if (phoneExists) {
-            results.failed.push({
-              email: teacherData.email,
-              username: teacherData.username,
-              phone: teacherData.phone,
-              reason: 'Số điện thoại đã tồn tại trong hệ thống'
-            });
-            continue;
-          }
-        }
+        // Phone can be duplicate, no need to check
         
         // Create teacher
         const newTeacher = await User.create({
           email: teacherData.email,
           username: teacherData.username,
-          phone: teacherData.phone || '',
+          phone: normalizedPhone,
           address: teacherData.address || '',
           password: teacherData.password || '123456', // Default password
           roleId: teacherRole._id

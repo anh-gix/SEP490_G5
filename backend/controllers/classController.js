@@ -24,6 +24,20 @@ exports.getAllClasses = async (req, res) => {
     if (courseId) query.course = courseId;
     if (search) query.name = { $regex: search, $options: 'i' };
     
+    //update pending → active
+    if (status !== 'pending') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      await Class.updateMany(
+        {
+          status: 'pending',
+          startDate: { $exists: true, $lte: today }
+        },
+        { $set: { status: 'active' } }
+      );
+    }
+    
     const classes = await Class.find(query)
       // user model uses 'username' rather than firstName/lastName/fullName
       .populate('teacher', 'username email phone')
@@ -497,7 +511,12 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
       const teacherSchedules = await ClassSchedule.find({
         class: { $in: teacherClassIds },
         date: { $in: uniqueDates },
-        status: { $in: ['temporary', 'fixed'] }
+        status: { $in: ['temporary', 'fixed'] },
+        // FIX: Chỉ lấy các buổi mà giáo viên này thực sự dạy
+        $or: [
+          { teacher: teacherId },
+          { substituteTeacher: teacherId }
+        ]
       })
         .populate('class', 'name')
         .select('date startTime endTime class')
@@ -2475,7 +2494,12 @@ const checkTeacherConflictsWithSchedules = async (teacherId, schedules, excludeC
     const teacherSchedules = await ClassSchedule.find({
       class: { $in: teacherClassIds },
       date: { $in: uniqueDates },
-      status: { $in: ['temporary', 'fixed'] }
+      status: { $in: ['temporary', 'fixed'] },
+      // FIX: Chỉ lấy các buổi mà giáo viên này thực sự dạy
+      $or: [
+        { teacher: teacherId },
+        { substituteTeacher: teacherId }
+      ]
     })
       .populate('class', 'name')
       .select('date startTime endTime class')

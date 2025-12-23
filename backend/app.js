@@ -14,14 +14,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 
-// Database connection
-mongoose.connect(process.env.MONGODB_URI, {
-  dbName: process.env.DB_NAME,
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log('Connected to MongoDB'))
-.catch(err => console.error('MongoDB connection error:', err));
+// Database connection - skip if running tests (tests use their own MongoDB Memory Server)
+if (process.env.NODE_ENV !== 'test') {
+  mongoose.connect(process.env.MONGODB_URI, {
+    dbName: process.env.DB_NAME,
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
+}
 
 // Routes
 app.use('/api/courses', require('./routes/courseRoute'));

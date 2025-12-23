@@ -1358,7 +1358,7 @@ exports.getLessonDetail = async (req, res) => {
     const schedule = await ClassSchedule.findById(scheduleId)
       .populate({
         path: 'class',
-        select: 'name course teacher students startDate endDate',
+        select: 'name course teacher students startDate endDate status',
         populate: [
           {
             path: 'course',
@@ -1482,6 +1482,7 @@ exports.getLessonDetail = async (req, res) => {
       
       // Class info
       className: schedule.class?.name || 'Lớp học bù',
+      classStatus: schedule.class?.status,
       courseName: schedule.class?.course?.name,
       courseDescription: schedule.class?.course?.description,
       classStartDate: formatDateToVN(schedule.class?.startDate),

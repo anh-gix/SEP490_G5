@@ -34,6 +34,7 @@ const LessonDetail = () => {
           endTime: lesson.endTime,
           time: `${lesson.startTime} - ${lesson.endTime}`,
           className: lesson.className,
+          classStatus: lesson.classStatus,
           level: lesson.className?.split('-')[0] || 'N/A',
           room: lesson.roomName ? `${lesson.roomName}${lesson.roomLocation ? ` - ${lesson.roomLocation}` : ''}` : 'Chưa xác định',
           students: lesson.totalStudents,
@@ -164,13 +165,15 @@ const LessonDetail = () => {
               <i className="fas fa-user-check me-2"></i>
               Điểm danh
             </Link>
-            <Button 
-              onClick={() => setShowAbsenceModal(true)}
-              className="btn-outline-warning text-13 px-16 py-8 radius-8"
-            >
-              <i className="fas fa-hand-paper me-2"></i>
-              Xin nghỉ
-            </Button>
+            {(!lessonData.classStatus || lessonData.classStatus === 'active') && (
+              <Button 
+                onClick={() => setShowAbsenceModal(true)}
+                className="btn-outline-warning text-13 px-16 py-8 radius-8"
+              >
+                <i className="fas fa-hand-paper me-2"></i>
+                Xin nghỉ
+              </Button>
+            )}
           </div>
         </div>
       </div>

@@ -48,6 +48,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
   const [studentsFetched, setStudentsFetched] = useState(false);
   const [teachers, setTeachers] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [allRooms, setAllRooms] = useState([]); // Lưu toàn bộ phòng (bao gồm cả đang bảo trì) để hiển thị trạng thái
   const [dateError, setDateError] = useState('');
   // Teacher and room conflict checking states (from backend)
   const [teacherRoomConflicts, setTeacherRoomConflicts] = useState({
@@ -738,14 +739,19 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
 
         if (response && (response.rooms || response.data)) {
           const fetchedRooms = response.rooms || response.data || [];
-          // Only show rooms with status 'available'
+          // Lưu toàn bộ phòng để biết trạng thái (kể cả phòng đang bảo trì)
+          setAllRooms(fetchedRooms);
+
+          // Chỉ cho phép chọn phòng đang available
           const availableRooms = fetchedRooms.filter(room => room.status === 'available');
           setRooms(availableRooms);
         } else {
           setRooms([]);
+          setAllRooms([]);
         }
       } catch (error) {
         setRooms([]);
+        setAllRooms([]);
       }
     };
 
@@ -3549,8 +3555,9 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       // Get roomId from schedule
       const scheduleRoomId = schedule.room?._id || schedule.room?.id || schedule.room;
 
-      // Get room status
-      const roomData = rooms.find(r => {
+      // Get room status (ưu tiên lấy từ danh sách allRooms để vẫn biết phòng đang bảo trì)
+      const roomSource = (allRooms && allRooms.length > 0) ? allRooms : rooms;
+      const roomData = roomSource.find(r => {
         const roomId = r._id || r.id;
         return String(roomId) === String(scheduleRoomId);
       });

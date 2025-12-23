@@ -62,6 +62,7 @@ const ClassManagement = () => {
         roomId: cls.room?._id || null,
         roomName: cls.roomName || cls.room?.room_name || 'N/A',
         roomLocation: cls.roomLocation || cls.room?.location || 'N/A',
+        roomStatus: cls.roomStatus || cls.room?.status || 'available',
         totalStudents: cls.totalStudents || cls.students?.length || 0,
         maxStudents: cls.maxStudents || 25,
         currentLesson: cls.completedSchedules || 0, // Số buổi đã hoàn thành

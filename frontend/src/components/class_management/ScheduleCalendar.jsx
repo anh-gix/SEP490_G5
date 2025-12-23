@@ -548,7 +548,8 @@ const ScheduleCalendar = ({
                               {(schedule.isAbsentSchedule || schedule.status === 'absent') && !(schedule.isCancelled || schedule.scheduleStatus === 'cancelled') && (
                                 <Badge bg="danger" style={{ fontSize: '8px', padding: '2px 4px' }}>Buổi nghỉ</Badge>
                               )}
-                              {schedule.roomStatus === 'maintenance' && (
+                              {/* Chỉ cảnh báo phòng bảo trì cho các buổi hiện tại hoặc tương lai (không hiển thị cho buổi đã hoàn thành/quá khứ) */}
+                              {schedule.roomStatus === 'maintenance' && schedule.timeStatus !== 'completed' && (
                                 <Badge bg="danger" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#DC3545' }}>
                                   <i className="fas fa-exclamation-triangle me-1"></i>
                                   Phòng bảo trì

@@ -45,7 +45,7 @@ exports.getAllClasses = async (req, res) => {
       // user model uses 'username' rather than firstName/lastName/fullName
       .populate('teacher', 'username email phone')
       .populate('students', 'username email')
-      .populate('room', 'room_name location capacity')
+      .populate('room', 'room_name location capacity status')
       .populate({ 
         path: 'course', 
         select: 'name',
@@ -89,7 +89,8 @@ exports.getAllClasses = async (req, res) => {
             courseType: cls.course?.program?.type || 'N/A',
             // Add room info
             roomName: cls.room?.room_name || 'N/A',
-            roomLocation: cls.room?.location || 'N/A'
+            roomLocation: cls.room?.location || 'N/A',
+            roomStatus: cls.room?.status || 'available'
           };
       })
     );
@@ -159,7 +160,8 @@ exports.getClassById = async (req, res) => {
     
     // Get schedules for this class
     const schedules = await ClassSchedule.find({ class: id })
-      .populate('room', 'room_name location capacity')
+      // Bao gồm status của phòng để frontend biết buổi nào đang dùng phòng bảo trì
+      .populate('room', 'room_name location capacity status')
       .populate('session', 'title order')
       .populate('teacher', 'username email phone')
       .populate('substituteTeacher', 'username email phone')

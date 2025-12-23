@@ -41,19 +41,17 @@ const TeacherAttendance = () => {
       const today = new Date().toISOString().split('T')[0];
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
-      
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
       const response = await teacherService.getCurrentTeacherSchedule({
         startDate: today,
-        endDate: tomorrow.toISOString().split('T')[0]
+        endDate: tomorrowStr
       });
 
       if (response.success) {
         setTodaySchedules(response.schedules || []);
         
-        // Auto-select first schedule if no scheduleId in URL
-        if (!scheduleId && response.schedules.length > 0) {
-          navigate(`/teacher/attendance/${response.schedules[0]._id}`, { replace: true });
-        }
+        // Don't auto-select - let user choose from the list
       }
     } catch (error) {
       console.error('Error fetching today schedules:', error);

@@ -174,7 +174,9 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess, preselectedSchedule
     try {
       const response = await studentService.getMyClasses();
       if (response.success && response.classes) {
-        setClasses(response.classes);
+        // Only show active classes in the filter dropdown
+        const activeClasses = response.classes.filter(cls => cls.status === 'active');
+        setClasses(activeClasses);
       }
     } catch (err) {
       // Error fetching classes for filter
@@ -199,7 +201,7 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess, preselectedSchedule
       
       if (response && response.success) {
         if (response.schedules && Array.isArray(response.schedules)) {
-          // Filter out cancelled schedules
+          // Filter out cancelled schedules and schedules from non-active classes
           const activeSchedules = response.schedules.filter(schedule => {
             // Check both scheduleStatus (from StudentSchedule) and status (from ClassSchedule)
             const isCancelled = 
@@ -208,7 +210,11 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess, preselectedSchedule
               schedule.status === 'cancelled' || 
               schedule.status === 'canceled';
             
-            return !isCancelled;
+            // Only allow schedules from active classes (not pending, completed, or disable)
+            const classStatus = schedule.class?.status;
+            const isActiveClass = classStatus === 'active';
+            
+            return !isCancelled && isActiveClass;
           });
           
           // Filter: Only allow makeup requests for absent or not-yet-attended sessions

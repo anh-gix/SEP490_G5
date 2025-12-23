@@ -524,29 +524,7 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
       ]
     };
     
-    // Filter by date range if provided
-    // Add status to class populate for filtering
-    const schedules = await ClassSchedule.find(query)
-      .populate('class', 'name course startDate endDate status')
-      .populate({
-        path: 'class',
-        populate: {
-          path: 'course',
-          select: 'name program',
-          populate: {
-            path: 'program',
-            select: 'type'
-          }
-        }
-      })
-      .populate('room', 'room_name location')
-      .populate('session', 'title order content')
-      .populate('teacher', 'username email')
-      .populate('substituteTeacher', 'username email')
-      .sort({ date: 1, startTime: 1 })
-      .lean();
-
-    // Filter by date range if provided
+    // Filter by date range if provided (MUST be before query execution)
     if (startDate && endDate) {
       // Parse dates carefully to avoid timezone issues
       // Expecting YYYY-MM-DD format from frontend
@@ -590,16 +568,34 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
       if (start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
         start.setUTCHours(0, 0, 0, 0);
         end.setUTCHours(23, 59, 59, 999);
-        
+
         query.date = {
           $gte: start,
           $lte: end
         };
-      } else {
-        // Log error but don't throw - just skip date filter
-        console.warn('Invalid date range provided:', { startDate, endDate });
       }
     }
+
+    // Execute query AFTER date filter is applied
+    const schedules = await ClassSchedule.find(query)
+      .populate('class', 'name course startDate endDate status')
+      .populate({
+        path: 'class',
+        populate: {
+          path: 'course',
+          select: 'name program',
+          populate: {
+            path: 'program',
+            select: 'type'
+          }
+        }
+      })
+      .populate('room', 'room_name location')
+      .populate('session', 'title order content')
+      .populate('teacher', 'username email')
+      .populate('substituteTeacher', 'username email')
+      .sort({ date: 1, startTime: 1 })
+      .lean();
 
     // For makeup classes (no class), find course from session
     const Course = require('../models/courseModel');

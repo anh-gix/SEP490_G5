@@ -81,10 +81,9 @@ const MyClasses = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
+      pending: { bg: 'bg-warning-600', text: 'Chờ khai giảng', icon: 'fa-clock' },
       active: { bg: 'bg-success-600', text: 'Đang học', icon: 'fa-play-circle' },
-      completed: { bg: 'bg-neutral-600', text: 'Đã hoàn thành', icon: 'fa-check-circle' },
-      paused: { bg: 'bg-warning-600', text: 'Tạm dừng', icon: 'fa-pause-circle' },
-      cancelled: { bg: 'bg-danger-600', text: 'Đã hủy', icon: 'fa-times-circle' }
+      completed: { bg: 'bg-neutral-600', text: 'Đã hoàn thành', icon: 'fa-check-circle' }
     };
 
     const config = statusConfig[status] || statusConfig.active;
@@ -105,10 +104,12 @@ const MyClasses = () => {
   }, [filterStatus]);
 
   const filteredClasses = classes.filter(cls => {
+    // Only show active, pending, or completed classes (exclude disabled)
+    const isActiveClass = cls.status === 'pending' || cls.status === 'active' || cls.status === 'completed';
     const matchesSearch = cls.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          cls.level.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          cls.teacher.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
+    return isActiveClass && matchesSearch;
   });
 
   const renderGridView = () => {
@@ -417,9 +418,9 @@ const MyClasses = () => {
                   className="border-neutral-30 radius-8 px-16 py-10 text-13"
                 >
                   <option value="all">Tất cả trạng thái</option>
+                  <option value="pending">Chờ khai giảng</option>
                   <option value="active">Đang học</option>
                   <option value="completed">Đã hoàn thành</option>
-                  <option value="paused">Tạm dừng</option>
                 </Form.Select>
               </Form.Group>
             </Col>
@@ -495,7 +496,7 @@ const MyClasses = () => {
               <div className="d-flex justify-content-between align-items-center">
                 <div>
                   <div className="text-warning-600 text-24 fw-bold">
-                    {classes.reduce((sum, c) => sum + c.pendingAssignments, 0)}
+                    {classes.filter(c => c.status === 'pending' || c.status === 'active' || c.status === 'completed').reduce((sum, c) => sum + c.pendingAssignments, 0)}
                   </div>
                   <div className="text-neutral-700 text-13">Bài tập chưa nộp</div>
                 </div>

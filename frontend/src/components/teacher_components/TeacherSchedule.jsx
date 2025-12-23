@@ -819,18 +819,20 @@ const TeacherSchedule = () => {
                 )}
 
                 {/* Page numbers around current page */}
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const pageNum = Math.max(1, Math.min(totalPages, currentPage - 2 + i));
-                  if (pageNum < 1 || pageNum > totalPages) return null;
-                  return (
-                    <Pagination.Item
-                      key={pageNum}
-                      active={pageNum === currentPage}
-                      onClick={() => setCurrentPage(pageNum)}
-                    >
-                      {pageNum}
-                    </Pagination.Item>
-                  );
+                {Array.from({ length: 5 }, (_, i) => {
+                  const pageNum = currentPage - 2 + i;
+                  if (pageNum >= 1 && pageNum <= totalPages) {
+                    return (
+                      <Pagination.Item
+                        key={pageNum}
+                        active={pageNum === currentPage}
+                        onClick={() => setCurrentPage(pageNum)}
+                      >
+                        {pageNum}
+                      </Pagination.Item>
+                    );
+                  }
+                  return null;
                 }).filter(Boolean)}
 
                 {/* Last page */}

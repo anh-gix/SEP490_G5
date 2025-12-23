@@ -260,9 +260,14 @@ const CreateTeacherChangeRequestModal = ({ show, onHide, onSuccess }) => {
       
       if (response && response.success) {
         if (response.schedules && Array.isArray(response.schedules)) {
-          // Bỏ filter cancelled - hiển thị tất cả
-          setClassSchedules(response.schedules);
-          setFilteredClassSchedules(response.schedules);
+          // Only show schedules from active classes
+          const activeClassSchedules = response.schedules.filter(schedule => {
+            const classStatus = schedule.class?.status;
+            // Keep makeup classes (no class) and schedules from active classes
+            return !classStatus || classStatus === 'active';
+          });
+          setClassSchedules(activeClassSchedules);
+          setFilteredClassSchedules(activeClassSchedules);
         } else {
           setClassSchedules([]);
           setFilteredClassSchedules([]);

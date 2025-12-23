@@ -398,7 +398,7 @@ exports.getMySchedule = async (req, res) => {
         populate: [
           {
             path: 'class',
-            select: 'name course',
+            select: 'name course status',
             populate: {
               path: 'course',
               select: 'name'
@@ -538,6 +538,7 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
     const classSchedule = await ClassSchedule.findById(scheduleId)
       .populate({
         path: 'class',
+        select: 'name status students',
         populate: [
           { path: 'course', select: 'name description level' },
           { path: 'teacher', select: 'username email' }
@@ -616,6 +617,7 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       
       // Class info
       className: classSchedule.class?.name || 'Lớp học bù',
+      classStatus: classSchedule.class?.status,
       level: classSchedule.class?.course?.level,
       courseName: classSchedule.class?.course?.name,
       courseDescription: classSchedule.class?.course?.description,

@@ -7,6 +7,7 @@ const Course = require("../models/courseModel");
 const Program = require("../models/programModel");
 const Room = require("../models/room");
 const mongoose = require("mongoose");
+const { isClassDataComplete } = require("../helpers/classValidationHelpers");
 
 exports.getAllClasses = async (req, res) => {
   try {
@@ -22,6 +23,23 @@ exports.getAllClasses = async (req, res) => {
     if (status) query.status = status;
     if (courseId) query.course = courseId;
     if (search) query.name = { $regex: search, $options: 'i' };
+    
+    // Auto-update pending → active (always run, regardless of filter)
+    const today = new Date();
+    const todayStart = new Date(Date.UTC(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      0, 0, 0, 0
+    ));
+    
+    await Class.updateMany(
+      {
+        status: 'pending',
+        startDate: { $exists: true, $lte: todayStart }
+      },
+      { $set: { status: 'active' } }
+    );
     
     const classes = await Class.find(query)
       // user model uses 'username' rather than firstName/lastName/fullName
@@ -94,6 +112,23 @@ exports.getClassById = async (req, res) => {
   try {
     const { id } = req.params;
     
+    // Auto-update pending → active (same as getAllClasses)
+    const today = new Date();
+    const todayStart = new Date(Date.UTC(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+      0, 0, 0, 0
+    ));
+    
+    await Class.updateMany(
+      {
+        status: 'pending',
+        startDate: { $exists: true, $lte: todayStart }
+      },
+      { $set: { status: 'active' } }
+    );
+    
     const classData = await Class.findById(id)
       .populate('teacher', 'username email phone')
       .populate('students', 'username email phone')
@@ -126,6 +161,8 @@ exports.getClassById = async (req, res) => {
     const schedules = await ClassSchedule.find({ class: id })
       .populate('room', 'room_name location capacity')
       .populate('session', 'title order')
+      .populate('teacher', 'username email phone')
+      .populate('substituteTeacher', 'username email phone')
       .sort({ date: 1 });
 
 
@@ -264,10 +301,12 @@ exports.getClassById = async (req, res) => {
         
         // Calculate attendance percentage
         let attendanceRate = 0;
+        let attendanceCount = 0;
         if (studentSchedules.length > 0) {
           const presentCount = studentSchedules.filter(
             s => s.attendance && s.attendance.status === 'present'
           ).length;
+          attendanceCount = presentCount;
           attendanceRate = Math.round((presentCount / studentSchedules.length) * 100);
         }
         
@@ -296,6 +335,7 @@ exports.getClassById = async (req, res) => {
           email: student.email,
           phone: student.phone,
           attendance: attendanceRate,
+          attendanceCount: attendanceCount,
           homeworkCompletionRate: homeworkCompletionRate,
           submittedAssignments: submittedCount,
           totalAssignments: totalAssignments
@@ -372,6 +412,37 @@ exports.getClassStats = async (req, res) => {
  * @param {Object} classData - Class data { _id, teacher, students }
  * @returns {Object} { hasConflict: boolean, conflicts: { teacher: [], room: [], students: [] } }
  */
+// Helper function to update class endDate based on schedules
+const updateClassEndDateFromSchedules = async (classId, session = null) => {
+  try {
+    // Find the last schedule by date
+    const lastSchedule = await ClassSchedule.findOne({
+      class: classId,
+      status: { $in: ['temporary', 'fixed'] }
+    })
+      .sort({ date: -1 }) // Sort descending to get the latest date
+      .select('date')
+      .session(session)
+      .lean();
+    
+    if (lastSchedule && lastSchedule.date) {
+      const updateOptions = { endDate: lastSchedule.date };
+      if (session) {
+        await Class.findByIdAndUpdate(classId, updateOptions, { session });
+      } else {
+        await Class.findByIdAndUpdate(classId, updateOptions);
+      }
+      console.log(`✓ Updated endDate to ${lastSchedule.date} for class ${classId}`);
+      return lastSchedule.date;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error updating endDate from schedules:', error);
+    return null;
+  }
+};
+
 const validateClassSchedulesConflicts = async (classSchedules, classData) => {
   const conflicts = {
     teacher: [],
@@ -492,14 +563,18 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
     if (teacherClasses.length > 0) {
       const teacherClassIds = teacherClasses.map(c => c._id);
 
-      // Query all teacher schedules for all dates
+      // Query teacher schedules for conflict checking
       const teacherSchedules = await ClassSchedule.find({
         class: { $in: teacherClassIds },
         date: { $in: uniqueDates },
-        status: { $in: ['temporary', 'fixed'] }
+        status: { $in: ['temporary', 'fixed'] },
+        $or: [
+          { teacher: teacherId },
+          { substituteTeacher: teacherId }
+        ]
       })
         .populate('class', 'name')
-        .select('date startTime endTime class')
+        .select('_id date startTime endTime class status')
         .lean();
 
       classSchedules.forEach((newSchedule, newIdx) => {
@@ -517,11 +592,6 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
           const hasOverlap = hasTimeOverlap(newSchedule.startTime, newSchedule.endTime, existingSchedule.startTime, existingSchedule.endTime);
           
           if (sameDate && hasOverlap) {
-            console.log(`\n   PHÁT HIỆN XUNG ĐỘT [${newIdx + 1} vs ${existIdx + 1}]:`);
-            console.log(`     - Ngày: ${newDateStr}`);
-            console.log(`     - Lớp hiện tại: ${newSchedule.startTime} - ${newSchedule.endTime}`);
-            console.log(`     - Lớp khác "${existingSchedule.class?.name || 'N/A'}": ${existingSchedule.startTime} - ${existingSchedule.endTime}`);
-            
             conflicts.teacher.push({
               teacherId: teacherId.toString(),
               className: existingSchedule.class?.name || 'N/A',
@@ -534,12 +604,7 @@ const validateClassSchedulesConflicts = async (classSchedules, classData) => {
           }
         });
       });
-      
-      console.log('  - Tổng số xung đột tìm thấy:', conflicts.teacher.length);
-    } else {
-      console.log(' Giáo viên không có lớp nào khác, không có xung đột');
     }
-    console.log('  ============================================\n');
   }
 
   // 3. Kiểm tra conflict SINH VIÊN
@@ -830,13 +895,6 @@ exports.checkTeacherRoomConflicts = async (req, res) => {
     const { id: classId } = req.params;
     const { teacherId, roomId, scheduleEntries, startDate } = req.body;
     
-    console.log('\n ========== KIỂM TRA CONFLICT TEACHER/ROOM (checkTeacherRoomConflicts) ==========');
-    console.log('  - ClassId:', classId);
-    console.log('  - TeacherId:', teacherId || 'Không có');
-    console.log('  - RoomId:', roomId || 'Không có');
-    console.log('  - StartDate:', startDate || 'Không có');
-    console.log('  - ScheduleEntries:', scheduleEntries?.length || 0);
-    
     // Get class data to get course info
     const classData = await Class.findById(classId)
       .populate('course', 'numberOfSessions')
@@ -1066,16 +1124,6 @@ exports.createClass = async (req, res) => {
       });
     }
     
-    // Check if class name exists
-    const existingClass = await Class.findOne({ name }).session(session);
-    if (existingClass) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        success: false,
-        message: 'Tên lớp học đã tồn tại'
-      });
-    }
     
     // Validate room capacity if room is provided and auto-set maxStudents
     let finalMaxStudents = maxStudents;
@@ -1119,13 +1167,14 @@ exports.createClass = async (req, res) => {
       startDate,
       endDate,
       maxStudents: finalMaxStudents,
-      status: status || 'pending'
+      status: status || 'disable'
     });
     
     await newClass.save({ session });
     
-    // Generate ClassSchedule entries if scheduleEntries and course are provided
-    if (scheduleEntries && scheduleEntries.length > 0 && course && startDate) {
+    // Generate ClassSchedule entries only if all required fields are available
+    // ClassSchedule requires: teacher, room, createdBy (from req.user or teacher)
+    if (scheduleEntries && scheduleEntries.length > 0 && course && startDate && teacher && room) {
       // Get course details including numberOfSessions and sessions
       const courseData = await Course.findById(course)
         .populate('sessions', 'order')
@@ -1275,7 +1324,21 @@ exports.createClass = async (req, res) => {
           
           // Create all ClassSchedule entries
           const createdSchedules = await ClassSchedule.insertMany(classSchedules, { session });
-          
+
+          // Auto-update endDate to the last schedule's date
+          if (createdSchedules.length > 0) {
+            const lastSchedule = createdSchedules[createdSchedules.length - 1];
+            const lastScheduleDate = lastSchedule.date;
+            
+            await Class.findByIdAndUpdate(
+              newClass._id,
+              { endDate: lastScheduleDate },
+              { session }
+            );
+            
+            console.log(`✓ Auto-set endDate to last schedule date: ${lastScheduleDate}`);
+          }
+
           // Create StudentSchedule entries for each ClassSchedule
           if (students && students.length > 0) {
             const studentSchedules = [];
@@ -1288,7 +1351,7 @@ exports.createClass = async (req, res) => {
                 });
               });
             });
-            
+
             if (studentSchedules.length > 0) {
               await StudentSchedule.insertMany(studentSchedules, { session });
             }
@@ -1405,6 +1468,23 @@ const compareScheduleEntries = (oldEntries, newEntries) => {
 };
 
 exports.updateClass = async (req, res) => {
+  // Auto-update pending → active BEFORE starting transaction
+  const today = new Date();
+  const todayStart = new Date(Date.UTC(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+    0, 0, 0, 0
+  ));
+  
+  await Class.updateMany(
+    {
+      status: 'pending',
+      startDate: { $exists: true, $lte: todayStart }
+    },
+    { $set: { status: 'active' } }
+  );
+  
   const session = await mongoose.startSession();
   session.startTransaction();
   
@@ -1421,23 +1501,57 @@ exports.updateClass = async (req, res) => {
       });
     }
     
+    // ============================================
+    // NEW LOGIC: Handle Active vs Pending Class Updates
+    // ============================================
+    console.log(' [NEW UPDATE LOGIC] Class status:', classData.status);
+
+    if (classData.status === 'active') {
+      console.log(' → Routing to handleActiveClassUpdate');
+      const result = await handleActiveClassUpdate(classData, req.body, session);
+
+      if (!result.success) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json(result);
+      }
+
+      // Update endDate from schedules before committing
+      await updateClassEndDateFromSchedules(classData._id, session);
+
+      await session.commitTransaction();
+      session.endSession();
+      return res.status(200).json(result);
+    }
+
+    // For pending class, use new handler as well
+    if (classData.status === 'pending' || classData.status === 'disable') {
+      console.log(' → Routing to handlePendingClassUpdate');
+      const result = await handlePendingClassUpdate(classData, req.body, req.user?._id, session);
+
+      if (!result.success) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json(result);
+      }
+
+      // Update endDate from schedules before committing
+      await updateClassEndDateFromSchedules(classData._id, session);
+
+      await session.commitTransaction();
+      session.endSession();
+      return res.status(200).json(result);
+    }
+
+    // For other statuses (completed, cancelled), use old logic below
+    console.log(' → Using legacy update logic for status:', classData.status);
+    // ============================================
+    
     // Capture old students list before it gets modified
     const oldStudentsList = classData.students ? [...classData.students] : [];
     
     // Check name conflict
     if (name && name !== classData.name) {
-      const existingClass = await Class.findOne({ 
-        name, 
-        _id: { $ne: req.params.id } 
-      }).session(session);
-      if (existingClass) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({
-          success: false,
-          message: 'Tên lớp học đã tồn tại'
-        });
-      }
     }
     
     // Determine final room and students for validation
@@ -1618,9 +1732,9 @@ exports.updateClass = async (req, res) => {
     const finalTeacher = teacher || classData.teacher;
     const finalStudentsList = students !== undefined ? students : classData.students;
     
-    // Smart update: Only update future schedules when only scheduleEntries changed
+    // Smart update: UPDATE future schedules when only scheduleEntries changed (keep IDs, don't delete/create)
     if (scheduleEntriesOnlyChanged && scheduleEntries && scheduleEntries.length > 0 && finalCourse && finalStartDate) {
-      console.log(' [DEBUG] Entering SMART UPDATE block');
+      console.log(' [DEBUG] Entering SMART UPDATE block - UPDATE future schedules (keep IDs)');
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Reset time to compare dates only
       
@@ -1631,87 +1745,44 @@ exports.updateClass = async (req, res) => {
         return scheduleDate < today;
       });
       
-      const futureSchedules = existingClassSchedules.filter(schedule => {
-        const scheduleDate = new Date(schedule.date);
-        scheduleDate.setHours(0, 0, 0, 0);
-        return scheduleDate >= today;
-      });
+      // Get future schedules (sorted by date) - these will be UPDATED, not deleted
+      const futureSchedules = existingClassSchedules
+        .filter(schedule => {
+          const scheduleDate = new Date(schedule.date);
+          scheduleDate.setHours(0, 0, 0, 0);
+          return scheduleDate >= today;
+        })
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
       
-      // Get future schedule IDs for deletion
-      const futureScheduleIds = futureSchedules.map(s => s._id);
-      
-      // Delete future schedules and related data
-      if (futureScheduleIds.length > 0) {
-        // 1. Delete HomeworkSubmissions for future schedules
-        await HomeworkSubmission.deleteMany(
-          { classSchedule: { $in: futureScheduleIds } }
-        ).session(session);
+      if (futureSchedules.length === 0) {
+        console.log(' [DEBUG] No future schedules to update');
+      } else {
+        console.log(` [DEBUG] Found ${futureSchedules.length} future schedules to update`);
         
-        // 2. Delete StudentSchedules for future schedules
-        await StudentSchedule.deleteMany(
-          { classSchedule: { $in: futureScheduleIds } }
-        ).session(session);
+        // Get course details to determine sessions
+        const courseData = await Course.findById(finalCourse)
+          .populate('sessions', 'order')
+          .select('numberOfSessions sessions')
+          .session(session);
         
-        // 3. Delete future ClassSchedules
-        await ClassSchedule.deleteMany(
-          { _id: { $in: futureScheduleIds } }
-        ).session(session);
-      }
-      
-      // Get course details to determine how many sessions to create
-      const courseData = await Course.findById(finalCourse)
-        .populate('sessions', 'order')
-        .select('numberOfSessions sessions')
-        .session(session);
-      
-      if (courseData && courseData.numberOfSessions) {
-        const numberOfSessions = courseData.numberOfSessions;
-        const pastSessionsCount = pastSchedules.length;
-        const totalExistingSchedules = existingClassSchedules.length; // Tổng số schedules trước khi xóa
-        const futureSchedulesCount = futureSchedules.length; // Số future schedules đã bị xóa
-        
-        // Chỉ tạo lại số lượng future schedules đã bị xóa
-        // Hoặc nếu tổng số schedules hiện tại < numberOfSessions, tạo thêm cho đủ
-        // Nhưng không tạo thêm nếu đã có đủ số schedules
-        // Note: After deletion, only pastSessionsCount schedules remain, so use that for calculation
-        let remainingSessions = 0;
-        if (totalExistingSchedules < numberOfSessions) {
-          // Chưa đủ số schedules, cần tạo thêm
-          // Use pastSessionsCount (remaining after deletion) instead of totalExistingSchedules
-          remainingSessions = numberOfSessions - pastSessionsCount;
-        } else if (futureSchedulesCount > 0) {
-          // Đã đủ số schedules nhưng có future schedules bị xóa, chỉ tạo lại số đó
-          remainingSessions = futureSchedulesCount;
-        }
-        
-        console.log(' [DEBUG] Schedule counts:', {
-          numberOfSessions,
-          pastSessionsCount,
-          futureSchedulesCount,
-          totalExistingSchedules,
-          remainingSessions
-        });
-        
-        // Only create new schedules if there are remaining sessions
-        if (remainingSessions > 0) {
-          // Sort sessions by order
+        if (courseData && courseData.numberOfSessions) {
           const courseSessions = (courseData.sessions || []).sort((a, b) => (a.order || 0) - (b.order || 0));
-      
-      // Helper function to convert day string to day of week number
-      const getDayOfWeekNumber = (dayStr) => {
-        const dayMap = {
-          'CN': 0,
-          '2': 1,
-          '3': 2,
-          '4': 3,
-          '5': 4,
-          '6': 5,
-          '7': 6
-        };
-        return dayMap[dayStr] !== undefined ? dayMap[dayStr] : null;
-      };
-      
-          // Helper function to find next occurrence of day of week
+          const pastSessionsCount = pastSchedules.length;
+          
+          // Helper functions
+          const getDayOfWeekNumber = (dayStr) => {
+            const dayMap = {
+              'CN': 0,
+              '2': 1,
+              '3': 2,
+              '4': 3,
+              '5': 4,
+              '6': 5,
+              '7': 6
+            };
+            return dayMap[dayStr] !== undefined ? dayMap[dayStr] : null;
+          };
+          
           const findNextDayOfWeek = (startDate, targetDayOfWeek) => {
             const start = new Date(startDate);
             const currentDay = start.getDay();
@@ -1724,11 +1795,10 @@ exports.updateClass = async (req, res) => {
             return result;
           };
           
-          // Find the latest past schedule date to determine where to start
+          // Determine start date for new pattern
           let startDateForNewSchedules = finalStartDate;
           if (pastSchedules.length > 0) {
             const latestPastDate = new Date(Math.max(...pastSchedules.map(s => new Date(s.date).getTime())));
-            // Start from the day after the latest past schedule
             startDateForNewSchedules = new Date(latestPastDate);
             startDateForNewSchedules.setDate(latestPastDate.getDate() + 1);
           }
@@ -1746,45 +1816,54 @@ exports.updateClass = async (req, res) => {
             }
           });
           
-          // Generate ClassSchedule entries for remaining sessions
-          const classSchedules = [];
+          // Map future schedules to new pattern and prepare updates
           let entryIndex = 0;
           let weekOffset = 0;
+          const updatePromises = [];
           
-          for (let i = 0; i < remainingSessions; i++) {
+          for (let i = 0; i < futureSchedules.length; i++) {
+            const oldSchedule = futureSchedules[i];
             const entry = scheduleEntries[entryIndex % scheduleEntries.length];
             const dayOfWeek = getDayOfWeekNumber(entry.day);
             
-            if (dayOfWeek === null) {
-              entryIndex++;
-              continue;
+            if (dayOfWeek !== null) {
+              // Calculate new date based on pattern
+              const firstOccurrence = firstOccurrences[dayOfWeek];
+              const newDate = new Date(firstOccurrence);
+              newDate.setDate(firstOccurrence.getDate() + (weekOffset * 7));
+              // Set time to 00:00:00 to ensure correct date format
+              newDate.setHours(0, 0, 0, 0);
+              
+              // Determine new session (continue from where we left off)
+              const sessionIndex = (pastSessionsCount + i) < courseSessions.length 
+                ? (pastSessionsCount + i) 
+                : (pastSessionsCount + i) % courseSessions.length;
+              const newSessionId = courseSessions[sessionIndex]?._id || null;
+              
+              // Log before update
+              const oldDateStr = new Date(oldSchedule.date).toISOString().split('T')[0];
+              const newDateStr = newDate.toISOString().split('T')[0];
+              console.log(` [DEBUG] Updating schedule ${oldSchedule._id}:`);
+              console.log(`   - Old date: ${oldDateStr} ${oldSchedule.startTime}-${oldSchedule.endTime}`);
+              console.log(`   - New date: ${newDateStr} ${entry.startTime}-${entry.endTime}`);
+              console.log(`   - New session: ${newSessionId}`);
+              
+              // Use findByIdAndUpdate instead of updateOne to ensure update works
+              const updatePromise = ClassSchedule.findByIdAndUpdate(
+                oldSchedule._id,
+                {
+                  $set: {
+                    date: newDate,
+                    startTime: entry.startTime,
+                    endTime: entry.endTime,
+                    session: newSessionId
+                  }
+                },
+                { new: false } // Don't return updated doc, just update
+              ).session(session);
+              
+              updatePromises.push(updatePromise);
             }
-            
-            // Get the first occurrence of this day
-            const firstOccurrence = firstOccurrences[dayOfWeek];
-            
-            // Calculate the date for this session
-            const sessionDate = new Date(firstOccurrence);
-            sessionDate.setDate(firstOccurrence.getDate() + (weekOffset * 7));
-            
-            // Get corresponding session from course (continue from where we left off)
-            const sessionIndex = (pastSessionsCount + i) < courseSessions.length 
-              ? (pastSessionsCount + i) 
-              : (pastSessionsCount + i) % courseSessions.length;
-            const sessionId = courseSessions[sessionIndex]?._id || null;
-            
-            classSchedules.push({
-              class: classData._id,
-              session: sessionId,
-              date: sessionDate,
-              startTime: entry.startTime,
-              endTime: entry.endTime,
-              room: finalRoomId,
-              teacher: finalTeacher,
-              createdBy: req.user?._id || finalTeacher,
-              reason: `Buổi học ${pastSessionsCount + i + 1}`,
-              status: 'fixed'
-            });
             
             // Move to next entry (round-robin)
             entryIndex++;
@@ -1794,33 +1873,13 @@ exports.updateClass = async (req, res) => {
             }
           }
           
-          // Create all new ClassSchedule entries
-          if (classSchedules.length > 0) {
-            console.log(' [DEBUG] Creating', classSchedules.length, 'new schedules in SMART UPDATE');
-            const createdSchedules = await ClassSchedule.insertMany(classSchedules, { session });
-            
-            // Create StudentSchedule entries for each new ClassSchedule
-            if (finalStudentsList && finalStudentsList.length > 0) {
-              const studentSchedules = [];
-              createdSchedules.forEach(schedule => {
-                finalStudentsList.forEach(studentId => {
-                  studentSchedules.push({
-                    student: studentId,
-                    classSchedule: schedule._id,
-                    // Không set attendance - để null cho đến khi giáo viên điểm danh
-                  });
-                });
-              });
-              
-              if (studentSchedules.length > 0) {
-                await StudentSchedule.insertMany(studentSchedules, { session });
-              }
-            }
-          } else {
-            console.log(' [DEBUG] No new schedules to create in SMART UPDATE');
+          // Execute all updates
+          if (updatePromises.length > 0) {
+            await Promise.all(updatePromises);
+            console.log(` [DEBUG] Updated ${updatePromises.length} future schedules (kept IDs, no deletion)`);
           }
         } else {
-          console.log(' [DEBUG] No remaining sessions to create in SMART UPDATE');
+          console.log(' [DEBUG] Course data not found or invalid');
         }
       }
     }
@@ -1973,6 +2032,20 @@ exports.updateClass = async (req, res) => {
         if (classSchedules.length > 0) {
           console.log(' [DEBUG] Creating', classSchedules.length, 'new schedules in FULL REGENERATION');
           const createdSchedules = await ClassSchedule.insertMany(classSchedules, { session });
+          
+          // Auto-update endDate to the last schedule's date
+          if (createdSchedules.length > 0) {
+            const lastSchedule = createdSchedules[createdSchedules.length - 1];
+            const lastScheduleDate = lastSchedule.date;
+            
+            await Class.findByIdAndUpdate(
+              classData._id,
+              { endDate: lastScheduleDate },
+              { session }
+            );
+            
+            console.log(`✓ Auto-set endDate to last schedule date: ${lastScheduleDate}`);
+          }
           
           // Create StudentSchedule entries for each ClassSchedule
           if (finalStudentsList && finalStudentsList.length > 0) {
@@ -2239,11 +2312,11 @@ exports.updateClass = async (req, res) => {
         console.log(' [DEBUG] No ClassSchedules found for this class, skipping StudentSchedule updates');
       }
     }
-    
+
     // Commit transaction before populating (populate doesn't need to be in transaction)
     await session.commitTransaction();
     session.endSession();
-    
+
     const updatedClass = await Class.findById(classData._id)
       .populate('teacher', 'username email phone')
       .populate('students', 'username email')
@@ -2290,13 +2363,22 @@ exports.deleteClass = async (req, res) => {
       });
     }
     
-    // Only allow deletion of classes with "pending" status
-    if (classData.status !== 'pending') {
+    // Only allow deletion of classes with "pending" or "disable" status
+    if (classData.status !== 'pending' && classData.status !== 'disable') {
       await session.abortTransaction();
       session.endSession();
+
+      // Map status to Vietnamese
+      const statusMap = {
+        'active': 'Đang học',
+        'completed': 'Đã hoàn thành',
+        'disable': 'Vô hiệu hóa'
+      };
+      const statusText = statusMap[classData.status] || classData.status;
+
       return res.status(400).json({
         success: false,
-        message: `Chỉ có thể xóa lớp học ở trạng thái "Chờ khai giảng". Lớp học này đang ở trạng thái "${classData.status === 'active' ? 'Đang học' : classData.status === 'completed' ? 'Đã hoàn thành' : 'Đã hủy'}"`
+        message: `Chỉ có thể xóa lớp học ở trạng thái "Chờ khai giảng" hoặc "Vô hiệu hóa". Lớp học này đang ở trạng thái "${statusText}"`
       });
     }
     
@@ -2337,11 +2419,1020 @@ exports.deleteClass = async (req, res) => {
     // Rollback transaction on error
     await session.abortTransaction();
     session.endSession();
-    
+
     res.status(500).json({
       success: false,
       message: 'Lỗi khi xóa lớp học',
       error: error.message
     });
+  }
+};
+
+// ============================================
+// HELPER FUNCTIONS FOR NEW UPDATE LOGIC
+// ============================================
+
+/**
+ * Phase 1: Conflict Checking Functions
+ */
+
+/**
+ * Check teacher conflicts with given schedules
+ * @param {ObjectId} teacherId - Teacher ID to check
+ * @param {Array} schedules - Array of {date, startTime, endTime}
+ * @param {ObjectId} excludeClassId - Current class ID to exclude
+ * @returns {Promise<{hasConflict: boolean, conflicts: Array}>}
+ */
+const checkTeacherConflictsWithSchedules = async (teacherId, schedules, excludeClassId) => {
+  const conflicts = [];
+
+  if (!teacherId || !schedules || schedules.length === 0) {
+    return { hasConflict: false, conflicts };
+  }
+
+  // Reuse existing helper
+  const hasTimeOverlap = (start1, end1, start2, end2) => {
+    const timeToMinutes = (timeStr) => {
+      if (!timeStr) return 0;
+      const parts = timeStr.split(':');
+      if (parts.length !== 2) return 0;
+      const hours = parseInt(parts[0], 10);
+      const minutes = parseInt(parts[1], 10);
+      return hours * 60 + minutes;
+    };
+    const start1Min = timeToMinutes(start1);
+    const end1Min = timeToMinutes(end1);
+    const start2Min = timeToMinutes(start2);
+    const end2Min = timeToMinutes(end2);
+    return start1Min < end2Min && end1Min > start2Min;
+  };
+
+  const formatDateLocal = (dateInput) => {
+    if (!dateInput) return null;
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return null;
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Get unique dates
+  const uniqueDates = [...new Set(schedules.map(s => {
+    const d = new Date(s.date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }))];
+
+  // Find all classes taught by this teacher
+  const teacherQuery = {
+    $or: [
+      { teacher: teacherId },
+      { teacherId: teacherId }
+    ]
+  };
+  if (excludeClassId) {
+    teacherQuery._id = { $ne: excludeClassId };
+  }
+  const teacherClasses = await Class.find(teacherQuery).select('_id name').lean();
+
+  if (teacherClasses.length > 0) {
+    const teacherClassIds = teacherClasses.map(c => c._id);
+
+    // Query all teacher schedules
+    const teacherSchedules = await ClassSchedule.find({
+      class: { $in: teacherClassIds },
+      date: { $in: uniqueDates },
+      status: { $in: ['temporary', 'fixed'] },
+      // FIX: Chỉ lấy các buổi mà giáo viên này thực sự dạy
+      $or: [
+        { teacher: teacherId },
+        { substituteTeacher: teacherId }
+      ]
+    })
+      .populate('class', 'name')
+      .select('date startTime endTime class')
+      .lean();
+
+    schedules.forEach(newSchedule => {
+      const scheduleDate = new Date(newSchedule.date);
+      scheduleDate.setHours(0, 0, 0, 0);
+
+      teacherSchedules.forEach(existingSchedule => {
+        const existingDate = new Date(existingSchedule.date);
+        existingDate.setHours(0, 0, 0, 0);
+
+        if (scheduleDate.getTime() === existingDate.getTime() &&
+            hasTimeOverlap(newSchedule.startTime, newSchedule.endTime, existingSchedule.startTime, existingSchedule.endTime)) {
+          conflicts.push({
+            date: formatDateLocal(existingSchedule.date),
+            time: `${existingSchedule.startTime} - ${existingSchedule.endTime}`,
+            conflictingClass: existingSchedule.class?.name || 'N/A',
+            conflictingScheduleId: existingSchedule._id
+          });
+        }
+      });
+    });
+  }
+
+  return {
+    hasConflict: conflicts.length > 0,
+    conflicts
+  };
+};
+
+/**
+ * Check room conflicts with given schedules
+ */
+const checkRoomConflictsWithSchedules = async (roomId, schedules, excludeClassId) => {
+  const conflicts = [];
+
+  if (!roomId || !schedules || schedules.length === 0) {
+    return { hasConflict: false, conflicts };
+  }
+
+  const hasTimeOverlap = (start1, end1, start2, end2) => {
+    const timeToMinutes = (timeStr) => {
+      if (!timeStr) return 0;
+      const parts = timeStr.split(':');
+      if (parts.length !== 2) return 0;
+      const hours = parseInt(parts[0], 10);
+      const minutes = parseInt(parts[1], 10);
+      return hours * 60 + minutes;
+    };
+    const start1Min = timeToMinutes(start1);
+    const end1Min = timeToMinutes(end1);
+    const start2Min = timeToMinutes(start2);
+    const end2Min = timeToMinutes(end2);
+    return start1Min < end2Min && end1Min > start2Min;
+  };
+
+  const formatDateLocal = (dateInput) => {
+    if (!dateInput) return null;
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return null;
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const uniqueDates = [...new Set(schedules.map(s => {
+    const d = new Date(s.date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }))];
+
+  const roomScheduleQuery = {
+    room: new mongoose.Types.ObjectId(roomId),
+    date: { $in: uniqueDates },
+    status: { $in: ['temporary', 'fixed'] }
+  };
+
+  if (excludeClassId) {
+    roomScheduleQuery.class = { $ne: new mongoose.Types.ObjectId(excludeClassId) };
+  }
+
+  const roomSchedules = await ClassSchedule.find(roomScheduleQuery)
+    .populate('class', 'name')
+    .select('date startTime endTime class')
+    .lean();
+
+  schedules.forEach(newSchedule => {
+    const scheduleDate = new Date(newSchedule.date);
+    scheduleDate.setHours(0, 0, 0, 0);
+
+    roomSchedules.forEach(existingSchedule => {
+      const existingDate = new Date(existingSchedule.date);
+      existingDate.setHours(0, 0, 0, 0);
+
+      if (scheduleDate.getTime() === existingDate.getTime() &&
+          hasTimeOverlap(newSchedule.startTime, newSchedule.endTime, existingSchedule.startTime, existingSchedule.endTime)) {
+        conflicts.push({
+          date: formatDateLocal(existingSchedule.date),
+          time: `${existingSchedule.startTime} - ${existingSchedule.endTime}`,
+          conflictingClass: existingSchedule.class?.name || 'N/A',
+          conflictingScheduleId: existingSchedule._id
+        });
+      }
+    });
+  });
+
+  return {
+    hasConflict: conflicts.length > 0,
+    conflicts
+  };
+};
+
+/**
+ * Check student conflicts with given schedules
+ */
+const checkStudentsConflictsWithSchedules = async (studentIds, schedules, excludeClassId) => {
+  const conflicts = [];
+
+  if (!studentIds || studentIds.length === 0 || !schedules || schedules.length === 0) {
+    return { hasConflict: false, conflicts };
+  }
+
+  const hasTimeOverlap = (start1, end1, start2, end2) => {
+    const timeToMinutes = (timeStr) => {
+      if (!timeStr) return 0;
+      const parts = timeStr.split(':');
+      if (parts.length !== 2) return 0;
+      const hours = parseInt(parts[0], 10);
+      const minutes = parseInt(parts[1], 10);
+      return hours * 60 + minutes;
+    };
+    const start1Min = timeToMinutes(start1);
+    const end1Min = timeToMinutes(end1);
+    const start2Min = timeToMinutes(start2);
+    const end2Min = timeToMinutes(end2);
+    return start1Min < end2Min && end1Min > start2Min;
+  };
+
+  const formatDateLocal = (dateInput) => {
+    if (!dateInput) return null;
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return null;
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Convert to ObjectIds
+  const studentObjectIds = studentIds.map(s => {
+    if (typeof s === 'string') {
+      return new mongoose.Types.ObjectId(s);
+    } else if (s._id) {
+      return new mongoose.Types.ObjectId(s._id);
+    } else {
+      return new mongoose.Types.ObjectId(s);
+    }
+  });
+
+  // Fetch student info
+  const studentInfo = await User.find({
+    _id: { $in: studentObjectIds }
+  }).select('_id username fullName name email').lean();
+
+  const studentInfoMap = new Map();
+  studentInfo.forEach(student => {
+    const studentIdStr = student._id.toString();
+    const studentName = student.fullName || student.name || student.username || student.email?.split('@')[0] || `Học viên ${studentIdStr}`;
+    studentInfoMap.set(studentIdStr, {
+      studentId: studentIdStr,
+      studentName: studentName
+    });
+  });
+
+  const uniqueDates = [...new Set(schedules.map(s => {
+    const d = new Date(s.date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }))];
+
+  // Find all classes with these students
+  const studentQuery = {
+    students: { $in: studentObjectIds }
+  };
+  if (excludeClassId) {
+    studentQuery._id = { $ne: excludeClassId };
+  }
+  const studentClasses = await Class.find(studentQuery).select('_id name students').lean();
+
+  if (studentClasses.length > 0) {
+    const studentClassIds = studentClasses.map(c => c._id);
+
+    const studentSchedules = await ClassSchedule.find({
+      class: { $in: studentClassIds },
+      date: { $in: uniqueDates },
+      status: { $in: ['temporary', 'fixed'] }
+    })
+      .populate('class', 'name')
+      .select('date startTime endTime class')
+      .lean();
+
+    const studentConflictMap = new Map();
+
+    schedules.forEach(newSchedule => {
+      const scheduleDate = new Date(newSchedule.date);
+      scheduleDate.setHours(0, 0, 0, 0);
+
+      studentSchedules.forEach(existingSchedule => {
+        const existingDate = new Date(existingSchedule.date);
+        existingDate.setHours(0, 0, 0, 0);
+
+        if (scheduleDate.getTime() === existingDate.getTime() &&
+            hasTimeOverlap(newSchedule.startTime, newSchedule.endTime, existingSchedule.startTime, existingSchedule.endTime)) {
+          const scheduleClassId = existingSchedule.class?._id?.toString() || existingSchedule.class?.toString() || null;
+          if (!scheduleClassId) return;
+
+          const conflictingClass = studentClasses.find(cls => cls._id.toString() === scheduleClassId);
+          if (!conflictingClass) return;
+
+          conflictingClass.students.forEach(studentIdInConflictClass => {
+            const studentIdInConflictClassStr = studentIdInConflictClass.toString();
+
+            const isInCurrentClass = studentObjectIds.some(sid => sid.toString() === studentIdInConflictClassStr);
+
+            if (isInCurrentClass) {
+              const studentInfo = studentInfoMap.get(studentIdInConflictClassStr);
+              const studentName = studentInfo ? studentInfo.studentName : `Học viên ${studentIdInConflictClassStr}`;
+
+              if (!studentConflictMap.has(studentIdInConflictClassStr)) {
+                studentConflictMap.set(studentIdInConflictClassStr, {
+                  studentId: studentIdInConflictClassStr,
+                  studentName: studentName,
+                  conflictingSchedules: []
+                });
+              }
+              studentConflictMap.get(studentIdInConflictClassStr).conflictingSchedules.push({
+                date: formatDateLocal(existingSchedule.date),
+                time: `${existingSchedule.startTime} - ${existingSchedule.endTime}`,
+                className: existingSchedule.class?.name || conflictingClass.name || 'N/A'
+              });
+            }
+          });
+        }
+      });
+    });
+
+    studentConflictMap.forEach((studentConflict) => {
+      conflicts.push(studentConflict);
+    });
+  }
+
+  return {
+    hasConflict: conflicts.length > 0,
+    conflicts
+  };
+};
+
+/**
+ * Phase 2: Schedule Update Functions
+ */
+
+/**
+ * Helper: Convert date string to UTC midnight
+ * @param {string} dateString - Date string in YYYY-MM-DD format
+ * @returns {Date} Date object at UTC midnight
+ */
+const toUTCMidnight = (dateString) => {
+  // Parse date string and create UTC date at midnight
+  const parts = dateString.split('-');
+  if (parts.length !== 3) {
+    throw new Error('Invalid date format. Expected YYYY-MM-DD');
+  }
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+  const day = parseInt(parts[2], 10);
+  return new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+};
+
+/**
+ * Re-assign sessions to all schedules in correct date order
+ * @param {ObjectId} classId - Class ID
+ * @param {Object} session - MongoDB transaction session
+ * @returns {Promise<{success: boolean, reassignedCount: number}>}
+ */
+const reassignSessionsToSchedules = async (classId, session) => {
+  try {
+    // Load class to get courseId
+    const classData = await Class.findById(classId).select('course').session(session).lean();
+    if (!classData || !classData.course) {
+      return { success: false, message: 'Không tìm thấy lớp học hoặc khóa học' };
+    }
+
+    // Load course to get sessions
+    const courseData = await Course.findById(classData.course)
+      .populate('sessions', 'order _id')
+      .select('sessions')
+      .session(session)
+      .lean();
+
+    if (!courseData || !courseData.sessions || courseData.sessions.length === 0) {
+      return { success: false, message: 'Khóa học không có sessions' };
+    }
+
+    // Sort sessions by order
+    const courseSessions = [...courseData.sessions].sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    // Load all class schedules sorted by date
+    const allSchedules = await ClassSchedule.find({ class: classId })
+      .sort({ date: 1 })
+      .select('_id date')
+      .session(session)
+      .lean();
+
+    if (allSchedules.length === 0) {
+      return { success: true, reassignedCount: 0 };
+    }
+
+    // Prepare bulk update operations
+    const bulkOps = allSchedules.map((schedule, index) => {
+      const sessionIndex = index % courseSessions.length;
+      const sessionId = courseSessions[sessionIndex]._id;
+
+      return {
+        updateOne: {
+          filter: { _id: schedule._id },
+          update: { $set: { session: sessionId } }
+        }
+      };
+    });
+
+    // Execute bulk update
+    await ClassSchedule.bulkWrite(bulkOps, { session });
+
+    console.log(`✅ Re-assigned ${allSchedules.length} sessions for class ${classId}`);
+
+    return {
+      success: true,
+      reassignedCount: allSchedules.length
+    };
+  } catch (error) {
+    console.error('Error in reassignSessionsToSchedules:', error);
+    return {
+      success: false,
+      message: error.message
+    };
+  }
+};
+
+/**
+ * Update schedules for active class
+ * @param {ObjectId} classId - Class ID
+ * @param {Array} scheduleUpdates - Array of {scheduleId, newDate, newStartTime, newEndTime, updateScope}
+ * @param {Object} session - MongoDB transaction session
+ * @returns {Promise<{success: boolean, updatedScheduleIds: Array, message?: string}>}
+ */
+const updateSchedulesForActiveClass = async (classId, scheduleUpdates, session) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const updatedScheduleIds = [];
+
+    for (const update of scheduleUpdates) {
+      const { scheduleId, newDate, newStartTime, newEndTime, updateScope } = update;
+
+      // Load schedule
+      const schedule = await ClassSchedule.findById(scheduleId).session(session);
+      if (!schedule) {
+        return { success: false, message: `Không tìm thấy lịch học ${scheduleId}` };
+      }
+
+      // Validate: schedule date >= today
+      const scheduleDate = new Date(schedule.date);
+      scheduleDate.setHours(0, 0, 0, 0);
+      if (scheduleDate < today) {
+        return { success: false, message: 'Không thể update buổi học đã qua' };
+      }
+
+      // Check attendance
+      const hasAttendance = await StudentSchedule.findOne({
+        classSchedule: scheduleId,
+        'attendance.status': { $ne: null }
+      }).session(session);
+
+      if (hasAttendance) {
+        return { success: false, message: 'Buổi học đã có điểm danh, không thể update' };
+      }
+
+      if (updateScope === 'single') {
+        // Update single schedule
+        schedule.date = toUTCMidnight(newDate);
+        schedule.startTime = newStartTime || schedule.startTime;
+        schedule.endTime = newEndTime || schedule.endTime;
+        schedule.status = 'temporary';
+        await schedule.save({ session });
+        updatedScheduleIds.push(scheduleId);
+
+        console.log(`✅ Updated single schedule ${scheduleId}`);
+      } else if (updateScope === 'future') {
+        // Find all matching schedules (same day of week, same time)
+        const currentDate = new Date(schedule.date);
+        currentDate.setHours(0, 0, 0, 0);
+        const currentDayOfWeek = currentDate.getDay();
+        const currentStartTime = schedule.startTime;
+        const currentEndTime = schedule.endTime;
+
+        const matchingSchedules = await ClassSchedule.find({
+          class: classId,
+          date: { $gte: currentDate },
+          startTime: currentStartTime,
+          endTime: currentEndTime
+        }).session(session).lean();
+
+        const filteredSchedules = matchingSchedules.filter(s => {
+          const sDate = new Date(s.date);
+          sDate.setHours(0, 0, 0, 0);
+          return sDate.getDay() === currentDayOfWeek;
+        });
+
+        if (filteredSchedules.length === 0) {
+          return { success: false, message: 'Không tìm thấy buổi học nào có cùng pattern' };
+        }
+
+        // Find the SELECTED schedule (the one user clicked on) in filteredSchedules
+        const selectedSchedule = filteredSchedules.find(s => s._id.toString() === scheduleId.toString());
+        if (!selectedSchedule) {
+          return { success: false, message: 'Schedule được chọn không nằm trong danh sách matching schedules' };
+        }
+
+        // Use SELECTED schedule as reference point (not first schedule!)
+        const selectedScheduleDate = new Date(selectedSchedule.date);
+        const selectedScheduleDateUTC = new Date(Date.UTC(
+          selectedScheduleDate.getUTCFullYear(),
+          selectedScheduleDate.getUTCMonth(),
+          selectedScheduleDate.getUTCDate(),
+          0, 0, 0, 0
+        ));
+
+        const newDateObj = toUTCMidnight(newDate);
+
+        console.log(`🔍 [DEBUG] Selected schedule date: ${selectedScheduleDateUTC.toISOString()} → New date: ${newDateObj.toISOString()}`);
+
+        const bulkOps = filteredSchedules.map((sch, index) => {
+          const originalDate = new Date(sch.date);
+          const originalDateUTC = new Date(Date.UTC(
+            originalDate.getUTCFullYear(),
+            originalDate.getUTCMonth(),
+            originalDate.getUTCDate(),
+            0, 0, 0, 0
+          ));
+
+          // Calculate days from SELECTED schedule (not first schedule!)
+          const daysFromSelected = Math.floor((originalDateUTC.getTime() - selectedScheduleDateUTC.getTime()) / (24 * 60 * 60 * 1000));
+          const weeksFromSelected = Math.floor(daysFromSelected / 7);
+
+          // Calculate new date: newDate + offset from selected
+          const newScheduleDate = new Date(Date.UTC(
+            newDateObj.getUTCFullYear(),
+            newDateObj.getUTCMonth(),
+            newDateObj.getUTCDate() + (weeksFromSelected * 7),
+            0, 0, 0, 0
+          ));
+
+          return {
+            updateOne: {
+              filter: { _id: sch._id },
+              update: {
+                $set: {
+                  date: newScheduleDate,
+                  startTime: newStartTime || currentStartTime,
+                  endTime: newEndTime || currentEndTime
+                }
+              }
+            }
+          };
+        });
+
+        // Debug logging
+        console.log('🔍 [DEBUG] BulkWrite operations:');
+        bulkOps.forEach((op, idx) => {
+          console.log(`  ${idx + 1}. Update ${op.updateOne.filter._id} → date: ${op.updateOne.update.$set.date.toISOString()}`);
+        });
+
+        await ClassSchedule.bulkWrite(bulkOps, { session });
+        updatedScheduleIds.push(...filteredSchedules.map(s => s._id));
+
+        console.log(`✅ Updated ${filteredSchedules.length} future schedules`);
+      }
+    }
+
+    // Re-assign sessions after updates
+    const reassignResult = await reassignSessionsToSchedules(classId, session);
+    if (!reassignResult.success) {
+      return { success: false, message: reassignResult.message };
+    }
+
+    return {
+      success: true,
+      updatedScheduleIds,
+      reassignedSessions: true
+    };
+  } catch (error) {
+    console.error('Error in updateSchedulesForActiveClass:', error);
+    return {
+      success: false,
+      message: error.message
+    };
+  }
+};
+
+/**
+ * Update schedules for pending class (similar to active but no attendance check)
+ */
+const updateSchedulesForPendingClass = async (classId, scheduleUpdates, session) => {
+  // Same logic as updateSchedulesForActiveClass but without attendance check and date >= today check
+  try {
+    const updatedScheduleIds = [];
+
+    for (const update of scheduleUpdates) {
+      const { scheduleId, newDate, newStartTime, newEndTime, updateScope } = update;
+
+      const schedule = await ClassSchedule.findById(scheduleId).session(session);
+      if (!schedule) {
+        return { success: false, message: `Không tìm thấy lịch học ${scheduleId}` };
+      }
+
+      if (updateScope === 'single') {
+        schedule.date = toUTCMidnight(newDate);
+        schedule.startTime = newStartTime || schedule.startTime;
+        schedule.endTime = newEndTime || schedule.endTime;
+        schedule.status = 'temporary';
+        await schedule.save({ session });
+        updatedScheduleIds.push(scheduleId);
+      } else if (updateScope === 'future') {
+        const currentDate = new Date(schedule.date);
+        currentDate.setHours(0, 0, 0, 0);
+        const currentDayOfWeek = currentDate.getDay();
+        const currentStartTime = schedule.startTime;
+        const currentEndTime = schedule.endTime;
+
+        const matchingSchedules = await ClassSchedule.find({
+          class: classId,
+          date: { $gte: currentDate },
+          startTime: currentStartTime,
+          endTime: currentEndTime
+        }).session(session).lean();
+
+        const filteredSchedules = matchingSchedules.filter(s => {
+          const sDate = new Date(s.date);
+          sDate.setHours(0, 0, 0, 0);
+          return sDate.getDay() === currentDayOfWeek;
+        });
+
+        if (filteredSchedules.length === 0) {
+          return { success: false, message: 'Không tìm thấy buổi học nào có cùng pattern' };
+        }
+
+        // Find the SELECTED schedule (the one user clicked on) in filteredSchedules
+        const selectedSchedule = filteredSchedules.find(s => s._id.toString() === scheduleId.toString());
+        if (!selectedSchedule) {
+          return { success: false, message: 'Schedule được chọn không nằm trong danh sách matching schedules' };
+        }
+
+        // Use SELECTED schedule as reference point
+        const selectedScheduleDate = new Date(selectedSchedule.date);
+        const selectedScheduleDateUTC = new Date(Date.UTC(
+          selectedScheduleDate.getUTCFullYear(),
+          selectedScheduleDate.getUTCMonth(),
+          selectedScheduleDate.getUTCDate(),
+          0, 0, 0, 0
+        ));
+
+        const newDateObj = toUTCMidnight(newDate);
+
+        console.log(`🔍 [PENDING] Selected schedule date: ${selectedScheduleDateUTC.toISOString()} → New date: ${newDateObj.toISOString()}`);
+
+        const bulkOps = filteredSchedules.map((sch) => {
+          const originalDate = new Date(sch.date);
+          const originalDateUTC = new Date(Date.UTC(
+            originalDate.getUTCFullYear(),
+            originalDate.getUTCMonth(),
+            originalDate.getUTCDate(),
+            0, 0, 0, 0
+          ));
+
+          const daysFromSelected = Math.floor((originalDateUTC.getTime() - selectedScheduleDateUTC.getTime()) / (24 * 60 * 60 * 1000));
+          const weeksFromSelected = Math.floor(daysFromSelected / 7);
+
+          const newScheduleDate = new Date(Date.UTC(
+            newDateObj.getUTCFullYear(),
+            newDateObj.getUTCMonth(),
+            newDateObj.getUTCDate() + (weeksFromSelected * 7),
+            0, 0, 0, 0
+          ));
+
+          return {
+            updateOne: {
+              filter: { _id: sch._id },
+              update: {
+                $set: {
+                  date: newScheduleDate,
+                  startTime: newStartTime || currentStartTime,
+                  endTime: newEndTime || currentEndTime
+                }
+              }
+            }
+          };
+        });
+
+        await ClassSchedule.bulkWrite(bulkOps, { session });
+        updatedScheduleIds.push(...filteredSchedules.map(s => s._id));
+      }
+    }
+
+    const reassignResult = await reassignSessionsToSchedules(classId, session);
+    if (!reassignResult.success) {
+      return { success: false, message: reassignResult.message };
+    }
+
+    return {
+      success: true,
+      updatedScheduleIds,
+      reassignedSessions: true
+    };
+  } catch (error) {
+    console.error('Error in updateSchedulesForPendingClass:', error);
+    return {
+      success: false,
+      message: error.message
+    };
+  }
+};
+
+/**
+ * Phase 5: Main Handlers
+ */
+
+// Import helper functions
+const {
+  updateTeacherForActiveClass,
+  updateRoomForActiveClass,
+  addStudentsToActiveClass,
+  removeStudentsFromPendingClass,
+  regenerateAllSchedules,
+  recalculateScheduleDates,
+  updateTeacherForPendingClass,
+  addStudentsToPendingClass
+} = require('../helpers/classUpdateHelpers');
+
+/**
+ * Handle updates for active class
+ * @param {Object} classData - Current class document
+ * @param {Object} updateData - Update data from request body
+ * @param {Object} session - MongoDB transaction session
+ * @returns {Promise<{success: boolean, message: string, updatedClass?: Object}>}
+ */
+const handleActiveClassUpdate = async (classData, updateData, session) => {
+  try {
+    const results = {
+      scheduleUpdates: null,
+      teacherUpdate: null,
+      roomUpdate: null,
+      studentUpdate: null
+    };
+
+    // VALIDATION: Ngăn chặn xóa teacher/room/course khỏi lớp đang học
+    if ((updateData.teacher === null || updateData.teacher === '') && classData.teacher) {
+      return {
+        success: false,
+        message: 'Không thể xóa giáo viên khỏi lớp đang học'
+      };
+    }
+
+    if ((updateData.room === null || updateData.room === '') && classData.room) {
+      return {
+        success: false,
+        message: 'Không thể xóa phòng học khỏi lớp đang học'
+      };
+    }
+
+    if ((updateData.course === null || updateData.course === '') && classData.course) {
+      return {
+        success: false,
+        message: 'Không thể xóa khóa học khỏi lớp đang học'
+      };
+    }
+
+    // 1. Handle schedule updates first (if any)
+    if (updateData.scheduleUpdates && updateData.scheduleUpdates.length > 0) {
+      results.scheduleUpdates = await updateSchedulesForActiveClass(
+        classData._id,
+        updateData.scheduleUpdates,
+        session
+      );
+      if (!results.scheduleUpdates.success) {
+        return results.scheduleUpdates;
+      }
+    }
+
+    // 2. Handle teacher update
+    if (updateData.teacher && updateData.teacher !== classData.teacher?.toString()) {
+      results.teacherUpdate = await updateTeacherForActiveClass(
+        classData._id,
+        updateData.teacher,
+        checkTeacherConflictsWithSchedules,
+        session
+      );
+      if (!results.teacherUpdate.success) {
+        return results.teacherUpdate;
+      }
+    }
+
+    // 3. Handle room update
+    if (updateData.room && updateData.room !== classData.room?.toString()) {
+      results.roomUpdate = await updateRoomForActiveClass(
+        classData._id,
+        updateData.room,
+        checkRoomConflictsWithSchedules,
+        session
+      );
+      if (!results.roomUpdate.success) {
+        return results.roomUpdate;
+      }
+    }
+
+    // 4. Handle add students
+    if (updateData.students) {
+      const oldStudentIds = (classData.students || []).map(s => s.toString());
+      const newStudentIds = updateData.students.map(s => s.toString());
+      const studentsToAdd = newStudentIds.filter(sid => !oldStudentIds.includes(sid));
+
+      if (studentsToAdd.length > 0) {
+        results.studentUpdate = await addStudentsToActiveClass(
+          classData._id,
+          studentsToAdd,
+          checkStudentsConflictsWithSchedules,
+          session
+        );
+        if (!results.studentUpdate.success) {
+          return results.studentUpdate;
+        }
+      }
+    }
+
+    // 5. Handle status update (if provided)
+    if (updateData.status && updateData.status !== classData.status?.toString()) {
+      const updatedClassForStatus = await Class.findById(classData._id).session(session);
+      updatedClassForStatus.status = updateData.status;
+      await updatedClassForStatus.save({ session });
+      console.log(`✓ Cập nhật status lớp: ${classData.status} → ${updateData.status}`);
+    }
+
+    // Get updated class data
+    const updatedClass = await Class.findById(classData._id).session(session);
+
+    return {
+      success: true,
+      message: 'Cập nhật lớp học thành công',
+      updatedClass,
+      details: results
+    };
+  } catch (error) {
+    console.error('Error in handleActiveClassUpdate:', error);
+    return {
+      success: false,
+      message: error.message
+    };
+  }
+};
+
+/**
+ * Handle updates for pending class
+ */
+const handlePendingClassUpdate = async (classData, updateData, userId, session) => {
+  try {
+    const results = {
+      courseUpdate: null,
+      startDateUpdate: null,
+      scheduleUpdates: null,
+      teacherUpdate: null,
+      roomUpdate: null,
+      addStudents: null,
+      removeStudents: null
+    };
+
+    // 1. Handle course change (regenerate all schedules)
+    if (updateData.course && updateData.course !== classData.course?.toString()) {
+      results.courseUpdate = await regenerateAllSchedules(
+        classData._id,
+        updateData.course,
+        classData,
+        userId,
+        session
+      );
+      if (!results.courseUpdate.success) {
+        return results.courseUpdate;
+      }
+      // After course change, other schedule-related updates may not be needed
+      // Return early with course update result
+
+      const updatedClass = await Class.findById(classData._id).session(session);
+      return {
+        success: true,
+        message: 'Cập nhật khóa học thành công. Đã xóa và tạo lại tất cả lịch học.',
+        updatedClass,
+        details: results
+      };
+    }
+
+    // 2. Handle startDate change
+    if (updateData.startDate && updateData.startDate !== classData.startDate) {
+      results.startDateUpdate = await recalculateScheduleDates(
+        classData._id,
+        updateData.startDate,
+        session
+      );
+      if (!results.startDateUpdate.success) {
+        return results.startDateUpdate;
+      }
+    }
+
+    // 3. Handle schedule updates
+    if (updateData.scheduleUpdates && updateData.scheduleUpdates.length > 0) {
+      results.scheduleUpdates = await updateSchedulesForPendingClass(
+        classData._id,
+        updateData.scheduleUpdates,
+        session
+      );
+      if (!results.scheduleUpdates.success) {
+        return results.scheduleUpdates;
+      }
+    }
+
+    // 4. Handle teacher update
+    if (updateData.teacher && updateData.teacher !== classData.teacher?.toString()) {
+      results.teacherUpdate = await updateTeacherForPendingClass(
+        classData._id,
+        updateData.teacher,
+        checkTeacherConflictsWithSchedules,
+        session
+      );
+      if (!results.teacherUpdate.success) {
+        return results.teacherUpdate;
+      }
+    }
+
+    // 5. Handle room update
+    if (updateData.room && updateData.room !== classData.room?.toString()) {
+      results.roomUpdate = await updateRoomForActiveClass( // Same logic for pending
+        classData._id,
+        updateData.room,
+        checkRoomConflictsWithSchedules,
+        session
+      );
+      if (!results.roomUpdate.success) {
+        return results.roomUpdate;
+      }
+    }
+
+    // 6. Handle add/remove students
+    if (updateData.students) {
+      const oldStudentIds = (classData.students || []).map(s => s.toString());
+      const newStudentIds = updateData.students.map(s => s.toString());
+
+      // Add students
+      const studentsToAdd = newStudentIds.filter(sid => !oldStudentIds.includes(sid));
+      if (studentsToAdd.length > 0) {
+        results.addStudents = await addStudentsToPendingClass(
+          classData._id,
+          studentsToAdd,
+          checkStudentsConflictsWithSchedules,
+          session
+        );
+        if (!results.addStudents.success) {
+          return results.addStudents;
+        }
+      }
+
+      // Remove students
+      const studentsToRemove = oldStudentIds.filter(sid => !newStudentIds.includes(sid));
+      if (studentsToRemove.length > 0) {
+        results.removeStudents = await removeStudentsFromPendingClass(
+          classData._id,
+          studentsToRemove,
+          session
+        );
+        if (!results.removeStudents.success) {
+          return results.removeStudents;
+        }
+      }
+    }
+
+    // 7. Handle status update (if provided)
+    if (updateData.status && updateData.status !== classData.status?.toString()) {
+      const updatedClassForStatus = await Class.findById(classData._id).session(session);
+      updatedClassForStatus.status = updateData.status;
+      await updatedClassForStatus.save({ session });
+      console.log(`✓ Cập nhật status lớp: ${classData.status} → ${updateData.status}`);
+    }
+
+    // Lấy lại dữ liệu lớp sau khi update xong (với populate)
+    const updatedClassData = await Class.findById(classData._id)
+      .populate('course')
+      .populate('teacher')
+      .populate('room')
+      .populate('students')
+      .session(session);
+
+    const updatedClass = await Class.findById(classData._id).session(session);
+
+    return {
+      success: true,
+      message: 'Cập nhật lớp học thành công',
+      updatedClass,
+      details: results
+    };
+  } catch (error) {
+    console.error('Error in handlePendingClassUpdate:', error);
+    return {
+      success: false,
+      message: error.message
+    };
   }
 };

@@ -109,65 +109,9 @@ export const courseService = {
     }
   },
 
-  // Submit course for approval
-  submitCourse: async (id, data) => {
-    try {
-      const response = await api.patch(`/${id}/submit`, data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Nộp giáo trình thất bại' };
-    }
-  },
-
-  // Phê duyệt course
-  approveCourse: async (id, data) => {
-    try {
-      const response = await api.patch(`/${id}/approve`, data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Phê duyệt giáo trình thất bại' };
-    }
-  },
-
-  // Reject course
-  rejectCourse: async (id, data) => {
-    try {
-      const response = await api.patch(`/${id}/reject`, data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Từ chối giáo trình thất bại' };
-    }
-  },
-
-  // Yêu cầu chỉnh sửa course
-  requestRevision: async (id, data) => {
-    try {
-      const response = await api.patch(`/${id}/revise`, data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Gửi yêu cầu chỉnh sửa thất bại' };
-    }
-  },
-
-  // Accept course to program (Program Head)
-  acceptCourseToProgram: async (id, data) => {
-    try {
-      const response = await api.patch(`/${id}/accept`, data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Chấp nhận giáo trình thất bại' };
-    }
-  },
-
-  // Reject course from program (Program Head)
-  rejectCourseFromProgram: async (id, data) => {
-    try {
-      const response = await api.patch(`/${id}/reject`, data);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { message: 'Từ chối giáo trình thất bại' };
-    }
-  },
+  // NOTE: Course không có approval workflow
+  // Approval chỉ áp dụng ở Program level
+  // Course chỉ có status: draft, completed, active, archived
 
   // Get all course mappings (type, level, band)
   getCourseMappings: async () => {
@@ -245,6 +189,21 @@ export const courseService = {
     } catch (error) {
       console.error('Error fetching courses by program:', error);
       throw error.response?.data || { message: 'Không thể lấy danh sách khóa học' };
+    }
+  },
+
+  // Get courses by program ID(s)
+  getCoursesByProgramId: async (programIds) => {
+    try {
+      // programIds can be a single ID or array of IDs
+      const idsParam = Array.isArray(programIds) ? programIds.join(',') : programIds;
+      const response = await api.get('/by-program-id', {
+        params: { programIds: idsParam }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching courses by program ID:', error);
+      throw error.response?.data || { message: 'Không thể lấy danh sách khóa học theo program ID' };
     }
   },
 

@@ -43,11 +43,13 @@ const StudentClassDetailLayout = () => {
         console.log('📚 Class Detail:', response.data); // Debug log
         setClassInfo(response.data);
       } else {
-        setError('Không thể tải thông tin lớp học');
+        setError(response.message || 'Không thể tải thông tin lớp học');
       }
     } catch (error) {
       console.error('Error fetching class info:', error);
-      setError('Lỗi khi tải thông tin lớp học');
+      // Lấy message từ error response
+      const errorMessage = error?.response?.data?.message || error?.message || 'Lỗi khi tải thông tin lớp học';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -77,8 +79,9 @@ const StudentClassDetailLayout = () => {
       <Container fluid className="py-24 px-24">
         <Card className="bg-white border-0 rounded-12 box-shadow-sm">
           <Card.Body className="text-center py-5">
-            <i className="fas fa-exclamation-triangle text-warning-600" style={{ fontSize: '48px' }}></i>
-            <h5 className="text-neutral-700 mt-3 mb-2">{error || 'Không tìm thấy lớp học'}</h5>
+            <i className="fas fa-exclamation-triangle text-danger-600" style={{ fontSize: '48px' }}></i>
+            <h4 className="text-danger-600 mt-3 mb-2 fw-bold">Lỗi!</h4>
+            <h5 className="text-neutral-700 mb-3">{error || 'Không tìm thấy lớp học'}</h5>
             <Link to="/student/courses">
               <button className="btn btn-primary mt-3">
                 <i className="fas fa-arrow-left me-2"></i>

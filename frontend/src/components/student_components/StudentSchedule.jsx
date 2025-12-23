@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table, Spinner, Alert } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import studentService from '../../services/studentService';
 
@@ -10,6 +10,7 @@ import studentService from '../../services/studentService';
  */
 const StudentSchedule = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState('week'); // 'week', 'month', or 'list'
   const [selectedWeek, setSelectedWeek] = useState(getCurrentWeek());
   const [selectedMonth, setSelectedMonth] = useState(new Date());
@@ -472,14 +473,15 @@ const StudentSchedule = () => {
                                 {schedule.room}
                               </div>
 
-                              <Link to={`/student/lessons/${schedule.id}`} className="w-100">
-                                <Button
-                                  className="btn-outline-main w-100 py-4 radius-6"
-                                  style={{ fontSize: '10px' }}
-                                >
-                                  Chi tiết
-                                </Button>
-                              </Link>
+                              <Button
+                                className="btn-outline-main w-100 py-4 radius-6"
+                                style={{ fontSize: '10px' }}
+                                onClick={() => navigate(`/student/lessons/${schedule.id}`, { 
+                                  state: { from: 'schedule' } 
+                                })}
+                              >
+                                Chi tiết
+                              </Button>
                             </div>
                           ))}
                         </div>
@@ -562,42 +564,40 @@ const StudentSchedule = () => {
 
                   <div className="d-flex flex-column gap-4">
                     {daySchedules.slice(0, 2).map(schedule => (
-                      <Link 
+                      <div
                         key={schedule.id}
-                        to={`/student/lessons/${schedule.id}`}
-                        className="text-decoration-none"
+                        onClick={() => navigate(`/student/lessons/${schedule.id}`, { 
+                          state: { from: 'schedule' } 
+                        })}
+                        className={`rounded-6 px-6 py-4 cursor-pointer transition-2 ${
+                          schedule.status === 'upcoming'
+                            ? 'bg-main-100 border-start border-main-600 border-2'
+                            : schedule.attendanceStatus === 'present'
+                            ? 'bg-success-100 border-start border-success-600 border-2'
+                            : schedule.attendanceStatus === 'absent'
+                            ? 'bg-danger-100 border-start border-danger-600 border-2'
+                            : 'bg-neutral-100 border-start border-neutral-400 border-2'
+                        }`}
+                        style={{ cursor: 'pointer' }}
                       >
-                        <div
-                          className={`rounded-6 px-6 py-4 cursor-pointer transition-2 ${
-                            schedule.status === 'upcoming'
-                              ? 'bg-main-100 border-start border-main-600 border-2'
-                              : schedule.attendanceStatus === 'present'
-                              ? 'bg-success-100 border-start border-success-600 border-2'
-                              : schedule.attendanceStatus === 'absent'
-                              ? 'bg-danger-100 border-start border-danger-600 border-2'
-                              : 'bg-neutral-100 border-start border-neutral-400 border-2'
-                          }`}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          <div className="text-neutral-900 fw-medium" style={{ 
-                            fontSize: '11px',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}>
-                            {schedule.startTime} - {schedule.endTime}
-                          </div>
-                          <div className="text-neutral-700 fw-normal" style={{ 
-                            fontSize: '10px',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            marginTop: '2px'
-                          }}>
-                            {schedule.className}
-                          </div>
+                        <div className="text-neutral-900 fw-medium" style={{ 
+                          fontSize: '11px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          {schedule.startTime} - {schedule.endTime}
                         </div>
-                      </Link>
+                        <div className="text-neutral-700 fw-normal" style={{ 
+                          fontSize: '10px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          marginTop: '2px'
+                        }}>
+                          {schedule.className}
+                        </div>
+                      </div>
                     ))}
                     {daySchedules.length > 2 && (
                       <div className="text-main-600 text-11 fw-medium">
@@ -687,13 +687,14 @@ const StudentSchedule = () => {
                         {getAttendanceBadge(schedule.attendanceStatus)}
                       </td>
                       <td className="px-20 py-16 text-center">
-                        <Link to={`/student/lessons/${schedule.id}`}>
-                          <Button
-                            className="btn-outline-main text-13 fw-medium px-12 py-6 radius-6"
-                          >
-                            Chi tiết
-                          </Button>
-                        </Link>
+                        <Button
+                          className="btn-outline-main text-13 fw-medium px-12 py-6 radius-6"
+                          onClick={() => navigate(`/student/lessons/${schedule.id}`, { 
+                            state: { from: 'schedule' } 
+                          })}
+                        >
+                          Chi tiết
+                        </Button>
                       </td>
                     </tr>
                   ))

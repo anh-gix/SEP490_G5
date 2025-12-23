@@ -11,10 +11,6 @@ import CourseDetailPage from "../pages/CenterHead/CourseDetailPage.jsx";
 import CourseFormPage from "../pages/CenterHead/CourseFormPage.jsx";
 import CamSessionPage from "../pages/CenterHead/CamSessionPage.jsx";
 import CamSessionEditPage from "../pages/CenterHead/CamSessionEditPage.jsx";
-import ExamListPage from "../pages/CenterHead/ExamListPage.jsx";
-import ExamCreatePage from "../pages/CenterHead/ExamCreatePage.jsx";
-import ExamViewPage from "../pages/CenterHead/ExamViewPage.jsx";
-import ExamEditPage from "../pages/CenterHead/ExamEditPage.jsx";
 import ApprovalRequestsPage from "../pages/CenterHead/ApprovalRequestsPage.jsx";
 
 /**
@@ -51,16 +47,10 @@ export const centerHeadRoutes = [
 
   // Program Detail & Course Management
   { path: '/center-head/programs/:id', element: <ProgramDetailPage /> },
+  { path: '/center-head/programs/:programId/courses/:id/details', element: <CourseDetailPage /> },
   { path: '/center-head/courses/:id/details', element: <CourseDetailPage /> },
 
   // III. Approval Requests Management
   { path: '/center-head/approval-requests', element: <ApprovalRequestsPage /> },
-
-
-  // IV. Exam Management
-  { path: '/center-head/exams', element: <ExamListPage /> },
-  { path: '/center-head/exams/create', element: <ExamCreatePage /> },
-  { path: '/center-head/exams/:id', element: <ExamViewPage /> },
-  { path: '/center-head/exams/:id/edit', element: <ExamEditPage /> },
 
 ];

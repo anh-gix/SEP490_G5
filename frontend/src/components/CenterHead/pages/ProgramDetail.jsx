@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import Swal from 'sweetalert2';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
 import StatusBadge from '../compo/StatusBadge';
 import Table from '../compo/Table';
+import FilterBar from '../compo/FilterBar';
 import programService from '../../../services/programService';
 import { courseService } from '../../../services/courseService';
 import approvalRequestService from '../../../services/approvalRequestService';
@@ -16,6 +20,8 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
   const [program, setProgram] = useState(null);
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState([]);
+  const [filteredCourses, setFilteredCourses] = useState([]);
+  const [courseFilterValues, setCourseFilterValues] = useState({});
   const [actionLoading, setActionLoading] = useState(false);
   const [showRejectProgramModal, setShowRejectProgramModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -37,6 +43,17 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
     fetchProgramDetail();
   }, [id]);
 
+  // Filter courses based on learningType
+  useEffect(() => {
+    let filtered = [...courses];
+
+    if (courseFilterValues.learningType && courseFilterValues.learningType !== "all") {
+      filtered = filtered.filter(course => course.learningType === courseFilterValues.learningType);
+    }
+
+    setFilteredCourses(filtered);
+  }, [courses, courseFilterValues]);
+
   const fetchProgramDetail = async () => {
     try {
       setLoading(true);
@@ -56,7 +73,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
 
     } catch (err) {
       console.error('Error fetching program detail:', err);
-      alert('Không thể tải thông tin chương trình!');
+      toast.error('Không thể tải thông tin chương trình!', { position: 'top-right' });
     } finally {
       setLoading(false);
     }
@@ -65,7 +82,18 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
 
   // ===== COURSE DELETE HANDLER =====
   const handleDeleteCourse = async (courseId, courseName) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa môn học "${courseName}"?\n\nHành động này không thể hoàn tác.`)) {
+    const result = await Swal.fire({
+      title: 'Xác nhận xóa',
+      text: `Bạn có chắc chắn muốn xóa khóa học "${courseName}"? Hành động này không thể hoàn tác.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (!result.isConfirmed) {
       return;
     }
 
@@ -74,15 +102,15 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
       const response = await courseService.deleteCourse(courseId);
 
       if (response.success) {
-        alert('Xóa môn học thành công!');
+        toast.success('Xóa khóa học thành công!', { position: 'top-right' });
         // Refresh the courses list
         setCourses(courses.filter(c => c._id !== courseId));
       } else {
-        alert(response.message || 'Xóa môn học thất bại!');
+        toast.error(response.message || 'Xóa khóa học thất bại!', { position: 'top-right' });
       }
     } catch (error) {
       console.error('Error deleting course:', error);
-      alert(error.message || 'Không thể xóa môn học. Vui lòng thử lại sau.');
+      toast.error(error.message || 'Không thể xóa khóa học. Vui lòng thử lại sau.', { position: 'top-right' });
     } finally {
       setActionLoading(false);
     }
@@ -101,21 +129,32 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
       });
 
       if (response.success) {
-        alert('Đã nộp chương trình thành công! Chờ Center Head phê duyệt.');
+        toast.success('Đã nộp chương trình thành công! Chờ Center Head phê duyệt.', { position: 'top-right' });
         setShowSubmitModal(false);
         setSubmissionNote('');
         fetchProgramDetail();
       }
     } catch (err) {
       console.error('Error submitting program:', err);
-      alert(err.message || 'Có lỗi xảy ra khi nộp chương trình');
+      toast.error(err.message || 'Có lỗi xảy ra khi nộp chương trình', { position: 'top-right' });
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleApproveProgram = async () => {
-    if (!window.confirm('Bạn có chắc chắn muốn duyệt chương trình này?\n\nLưu ý: Tất cả các môn học trong chương trình sẽ được duyệt cùng lúc.')) {
+    const result = await Swal.fire({
+      title: 'Xác nhận duyệt chương trình',
+      html: 'Bạn có chắc chắn muốn duyệt chương trình này?<br><br><strong>Lưu ý:</strong> Tất cả các khóa học trong chương trình sẽ được duyệt cùng lúc.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#10b981',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Duyệt',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (!result.isConfirmed) {
       return;
     }
 
@@ -124,11 +163,11 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
       await programService.approveProgram(id, {
         approvalNote: 'Đã được phê duyệt bởi Center Head'
       });
-      alert('Đã duyệt chương trình và toàn bộ môn học thành công!');
+      toast.success('Đã duyệt chương trình và toàn bộ khóa học thành công!', { position: 'top-right' });
       fetchProgramDetail();
     } catch (err) {
       console.error('Error approving program:', err);
-      alert(err.message || 'Có lỗi xảy ra khi duyệt chương trình');
+      toast.error(err.message || 'Có lỗi xảy ra khi duyệt chương trình', { position: 'top-right' });
     } finally {
       setActionLoading(false);
     }
@@ -140,7 +179,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
 
   const handleConfirmRejectProgram = async () => {
     if (!rejectionReason.trim()) {
-      alert('Vui lòng nhập lý do từ chối');
+      toast.warning('Vui lòng nhập lý do từ chối', { position: 'top-right' });
       return;
     }
 
@@ -149,13 +188,13 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
       await programService.rejectProgram(id, {
         rejectionReason
       });
-      alert('Đã từ chối chương trình thành công!');
+      toast.success('Đã từ chối chương trình thành công!', { position: 'top-right' });
       setShowRejectProgramModal(false);
       setRejectionReason('');
       fetchProgramDetail();
     } catch (err) {
       console.error('Error rejecting program:', err);
-      alert(err.message || 'Có lỗi xảy ra khi từ chối chương trình');
+      toast.error(err.message || 'Có lỗi xảy ra khi từ chối chương trình', { position: 'top-right' });
     } finally {
       setActionLoading(false);
     }
@@ -164,6 +203,27 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
   // ===== COURSE WORKFLOW HANDLERS =====
   // Course không có workflow phê duyệt riêng, chỉ có draft và completed
   // Workflow phê duyệt chỉ áp dụng cho Program level
+
+  // ===== TOGGLE ACTIVE HANDLER =====
+  const handleToggleActive = async () => {
+    const newIsActive = !program.isActive;
+
+    try {
+      setActionLoading(true);
+      await programService.toggleProgramActive(id, newIsActive);
+      alert(
+        newIsActive
+          ? 'Đã mở chương trình cho đăng ký'
+          : 'Đã tạm dừng chương trình'
+      );
+      fetchProgramDetail();
+    } catch (error) {
+      console.error('Error toggling program active status:', error);
+      alert(error.message || 'Không thể thay đổi trạng thái hoạt động');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -193,12 +253,12 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
   const breadcrumbItems = [
     { label: 'Dashboard', path: `${basePath}/dashboard` },
     { label: 'Chương trình đào tạo', path: `${basePath}/programs` },
-    { label: program.program_name, path: `${basePath}/programs/${id}` },
+    { label: program.program_name },
   ];
 
   const courseColumns = [
     {
-      header: 'Tên môn học',
+      header: 'Tên khóa học',
       field: 'name',
       render: (row) => (
         <div>
@@ -252,8 +312,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
                 navigate(`${basePath}/programs/${id}/courses/${row._id}/edit`);
               }}
             >
-              <span className="d-none d-md-inline">Tiếp tục</span>
-              <span className="d-inline d-md-none">▶</span>
+              Tiếp tục
             </Button>
           )}
 
@@ -268,8 +327,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
                 navigate(`${basePath}/programs/${id}/courses/${row._id}/edit-form`);
               }}
             >
-              <span className="d-none d-md-inline">Sửa</span>
-              <span className="d-inline d-md-none">✏</span>
+              Sửa
             </Button>
           )}
 
@@ -280,11 +338,10 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
             icon="ph ph-eye"
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`${basePath}/courses/${row._id}/details`);
+              navigate(`${basePath}/programs/${id}/courses/${row._id}/details`);
             }}
           >
-            <span className="d-none d-md-inline">Xem</span>
-            <span className="d-inline d-md-none">👁</span>
+            Xem
           </Button>
 
           {/* Delete button - only for non-view-only */}
@@ -298,8 +355,7 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
                 handleDeleteCourse(row._id, row.name);
               }}
             >
-              <span className="d-none d-md-inline">Xóa</span>
-              <span className="d-inline d-md-none">🗑</span>
+              Xóa
             </Button>
           )}
         </div>
@@ -345,6 +401,27 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
           <div className="d-flex flex-wrap align-items-center gap-3">
             <StatusBadge status={program.status} />
             <span className="text-neutral-600">Mã: <strong>{program.code}</strong></span>
+
+            {/* Toggle Active - Only for Center Head and Approved programs */}
+            {userRole === 'Center Head' && program.status === 'approved' && (
+              <div className="d-flex align-items-center gap-2 ms-auto">
+                <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>
+                  {program.isActive ? 'Đang hoạt động' : 'Tạm dừng'}
+                </span>
+                <div className="form-check form-switch mb-0">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    checked={program.isActive || false}
+                    onChange={handleToggleActive}
+                    disabled={actionLoading}
+                    style={{ cursor: actionLoading ? 'not-allowed' : 'pointer' }}
+                    title={program.isActive ? 'Tạm dừng chương trình' : 'Mở chương trình cho đăng ký'}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <div className="d-flex flex-wrap gap-2">
@@ -363,80 +440,22 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
           {/* Pending Approval: Center Head can approve/reject */}
           {program.status === 'pending_approval' && userRole === 'Center Head' && (
             <>
-              <button
-                className="btn"
+              <Button
+                variant="success"
+                icon="ph ph-check"
                 onClick={handleApproveProgram}
                 disabled={actionLoading}
-                style={{
-                  borderWidth: '1px',
-                  borderStyle: 'solid',
-                  borderColor: '#10b981',
-                  color: '#10b981',
-                  backgroundColor: 'transparent',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: actionLoading ? 'not-allowed' : 'pointer',
-                  opacity: actionLoading ? 0.6 : 1,
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  if (!actionLoading) {
-                    e.currentTarget.style.backgroundColor = '#10b981';
-                    e.currentTarget.style.color = 'white';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!actionLoading) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = '#10b981';
-                  }
-                }}
               >
-                <i className="ph ph-check"></i>
                 Duyệt Program
-              </button>
-              <button
-                className="btn"
+              </Button>
+              <Button
+                variant="danger"
+                icon="ph ph-x"
                 onClick={handleRejectProgram}
                 disabled={actionLoading}
-                style={{
-                  borderWidth: '1px',
-                  borderStyle: 'solid',
-                  borderColor: '#ef4444',
-                  color: '#ef4444',
-                  backgroundColor: 'transparent',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: actionLoading ? 'not-allowed' : 'pointer',
-                  opacity: actionLoading ? 0.6 : 1,
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  if (!actionLoading) {
-                    e.currentTarget.style.backgroundColor = '#ef4444';
-                    e.currentTarget.style.color = 'white';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!actionLoading) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = '#ef4444';
-                  }
-                }}
               >
-                <i className="ph ph-x"></i>
                 Từ chối Program
-              </button>
+              </Button>
             </>
           )}
 
@@ -546,9 +565,9 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
       <Card>
         <div className="d-flex justify-content-between align-items-center mb-20">
           <div>
-            <h5 className="mb-4 text-neutral-900 fw-bold">Danh sách Môn học ({courses.length})</h5>
+            <h5 className="mb-4 text-neutral-900 fw-bold">Danh sách Khóa học ({filteredCourses.length}/{courses.length})</h5>
             <p className="text-neutral-600 mb-0 text-sm">
-              Các môn học thuộc chương trình này
+              Các khóa học thuộc chương trình này
             </p>
           </div>
           {/* Show Create Course button only when program is draft or needs_revision and not view-only */}
@@ -558,21 +577,49 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
               onClick={() => navigate(`${basePath}/programs/${id}/courses/create`)}
             >
               <i className="ph ph-plus me-2"></i>
-              Tạo học phần mới
+              Tạo khóa học mới
             </Button>
           )}
         </div>
 
+        {/* Course Filters */}
+        {courses.length > 0 && (
+          <div className="mb-20">
+            <FilterBar
+              filters={[
+                {
+                  key: "learningType",
+                  label: "Loại khóa học",
+                  options: [
+                    { value: "online", label: "Online" },
+                    { value: "offline", label: "Offline" },
+                  ]
+                }
+              ]}
+              values={courseFilterValues}
+              onChange={(key, value) => setCourseFilterValues({ ...courseFilterValues, [key]: value })}
+              onReset={() => setCourseFilterValues({})}
+            />
+          </div>
+        )}
+
         {courses.length > 0 ? (
-          <Table
-            columns={courseColumns}
-            data={courses}
-            onRowClick={(row) => navigate(`${basePath}/courses/${row._id}/details`)}
-          />
+          filteredCourses.length > 0 ? (
+            <Table
+              columns={courseColumns}
+              data={filteredCourses}
+              onRowClick={(row) => navigate(`${basePath}/programs/${id}/courses/${row._id}/details`)}
+            />
+          ) : (
+            <div className="text-center py-5 text-neutral-600">
+              <i className="ph ph-funnel text-neutral-400" style={{ fontSize: '48px' }}></i>
+              <p className="mt-3 mb-0">Không tìm thấy khóa học nào với bộ lọc đã chọn</p>
+            </div>
+          )
         ) : (
           <div className="text-center py-5 text-neutral-600">
             <i className="ph ph-book text-neutral-400" style={{ fontSize: '48px' }}></i>
-            <p className="mt-3 mb-0">Chưa có môn học nào trong chương trình này</p>
+            <p className="mt-3 mb-0">Chưa có khóa học nào trong chương trình này</p>
           </div>
         )}
       </Card>
@@ -671,78 +718,24 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
           </div>
 
           <div style={{ display: 'flex', gap: '12px' }}>
-            <button
-              className="btn"
+            <Button
+              variant="danger"
+              icon="ph ph-x"
               onClick={handleRejectProgram}
               disabled={actionLoading}
-              style={{
-                borderWidth: '1px',
-                borderStyle: 'solid',
-                borderColor: '#ef4444',
-                color: '#ef4444',
-                backgroundColor: 'transparent',
-                padding: '10px 24px',
-                borderRadius: '6px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: actionLoading ? 'not-allowed' : 'pointer',
-                opacity: actionLoading ? 0.6 : 1,
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                if (!actionLoading) {
-                  e.currentTarget.style.backgroundColor = '#ef4444';
-                  e.currentTarget.style.color = 'white';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!actionLoading) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '#ef4444';
-                }
-              }}
+              style={{ padding: '10px 24px' }}
             >
-              <i className="ph ph-x"></i>
               Từ chối
-            </button>
-            <button
-              className="btn"
+            </Button>
+            <Button
+              variant="success"
+              icon="ph ph-check"
               onClick={handleApproveProgram}
               disabled={actionLoading}
-              style={{
-                borderWidth: '1px',
-                borderStyle: 'solid',
-                borderColor: '#10b981',
-                color: 'white',
-                backgroundColor: '#10b981',
-                padding: '10px 24px',
-                borderRadius: '6px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: actionLoading ? 'not-allowed' : 'pointer',
-                opacity: actionLoading ? 0.6 : 1,
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                if (!actionLoading) {
-                  e.currentTarget.style.backgroundColor = '#059669';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!actionLoading) {
-                  e.currentTarget.style.backgroundColor = '#10b981';
-                }
-              }}
+              style={{ padding: '10px 24px' }}
             >
-              <i className="ph ph-check"></i>
               Duyệt chương trình
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -798,6 +791,9 @@ const ProgramDetail = ({ viewMode = 'center-head' }) => {
           </div>
         </div>
       )}
+
+      {/* Toast Container */}
+      <ToastContainer />
     </div>
   );
 };

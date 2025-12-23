@@ -38,7 +38,7 @@ const courseSchema = new Schema({
     },
     learningType: {
         type: String,
-        enum: ['online', 'offline', 'hybrid'],
+        enum: ['online', 'offline'],
         required: true
     },
     description: {
@@ -143,18 +143,21 @@ const courseSchema = new Schema({
     }],
 
     // ===== STATUS VÀ TRACKING =====
+    // Status chỉ để tracking trạng thái course, KHÔNG có approval workflow
     status: {
         type: String,
         enum: [
-            'draft',              // Đang tạo, chưa hoàn thiện (thiếu CLO, session, materials...)
-            'completed',          // Đã tạo xong (đủ thông tin để submit program)
-            'pending_revision',   // Center Head yêu cầu chỉnh sửa (có work request edit_course)
-            'in_revision',        // Subject Leader đang chỉnh sửa theo yêu cầu
-            'active',             // Course đang được sử dụng (sau khi program approved)
-            'archived'            // Course đã được lưu trữ
+            'draft',              // Đang tạo, chưa hoàn thiện
+            'completed',          // Đã tạo xong, sẵn sàng sử dụng
+            'active',             // Course đang có students (check qua studentEnrollments.length > 0)
+            'archived'            // Course đã lưu trữ
         ],
         default: 'draft',
         index: true
+    },
+    isActive: {
+        type: Boolean,
+        default: false,
     },
 
     // Track wizard progress - step cuối cùng đã hoàn thành (0-5)

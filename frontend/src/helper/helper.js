@@ -88,68 +88,75 @@ export const truncateText = (text, maxLength = 100) => {
 };
 
 /**
- * Format date to YYYY-MM-DD string using LOCAL timezone (not UTC)
- * This avoids timezone issues when converting dates
+ * Format date to YYYY-MM-DD string
+ * CRITICAL: ALWAYS extracts the date part from ISO strings, ignoring time component completely
  * @param {string|Date} date - Date string or Date object
  * @returns {string} Date in YYYY-MM-DD format
  */
 export const formatDateToYYYYMMDD = (date) => {
   if (!date) return '';
-  
+
   // If already a string in YYYY-MM-DD format, return as is
   if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return date;
   }
-  
-  // If string in ISO format, parse it first
+
+  // If string in ISO format with time component
   if (typeof date === 'string' && date.includes('T')) {
+    // ALWAYS extract date part directly, ignore time completely
+    // "2025-12-23T17:00:00.000Z" → "2025-12-23"
+    // "2025-12-23T00:00:00.000Z" → "2025-12-23"
     const datePart = date.split('T')[0];
-    if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
-      return datePart;
+    const dateMatch = datePart.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (dateMatch) {
+      return dateMatch[1]; // Return date part only, ignore time
     }
   }
   
   // Parse date string or use Date object
   let dateObj;
   if (typeof date === 'string') {
-    // Parse date string directly to avoid timezone issues
+    // Try to extract YYYY-MM-DD directly first
     const dateMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (dateMatch) {
-      // Direct parse from YYYY-MM-DD
+      // Direct parse from YYYY-MM-DD - return immediately to avoid timezone issues
       return dateMatch[0];
     }
+    // Only use new Date() as last resort
     dateObj = new Date(date);
   } else {
     dateObj = date;
   }
-  
+
   if (isNaN(dateObj.getTime())) return '';
-  
-  // Use local timezone methods, not UTC
+
+  // For Date objects, use LOCAL methods (calendar creates dates in local timezone)
+  // This ensures calendar dates like new Date(2025, 11, 23) display as Dec 23, not Dec 22
   const year = dateObj.getFullYear();
   const month = String(dateObj.getMonth() + 1).padStart(2, '0');
   const day = String(dateObj.getDate()).padStart(2, '0');
-  
+
   return `${year}-${month}-${day}`;
 };
 
 /**
- * Parse date string to Date object using LOCAL timezone
+ * Parse date string to Date object using UTC timezone
  * @param {string} dateString - Date string in YYYY-MM-DD format
- * @returns {Date} Date object in local timezone
+ * @returns {Date} Date object in UTC timezone at midnight
  */
 export const parseDateString = (dateString) => {
   if (!dateString) return null;
-  
-  // If already YYYY-MM-DD format, parse directly
+
+  // If already YYYY-MM-DD format, parse directly in UTC
   const dateMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (dateMatch) {
     const year = parseInt(dateMatch[1], 10);
     const month = parseInt(dateMatch[2], 10) - 1; // Month is 0-indexed
     const day = parseInt(dateMatch[3], 10);
-    return new Date(year, month, day);
+    // Use Date.UTC() to create date at UTC midnight
+    return new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
   }
-  
+
   // Fallback to regular Date parsing
   return new Date(dateString);
 };

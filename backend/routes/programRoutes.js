@@ -18,8 +18,8 @@ router.get('/band-options/:type', programController.getBandOptions);  // Must be
 router.get('/:id/submission-status', programController.getProgramSubmissionStatus);
 
 // PROGRAM MANAGEMENT ROUTES
-// NOTE: Submit/Approve/Reject are now handled by /api/approval-requests routes
-router.patch('/:id/activate', programController.activateProgram);
+// NOTE: Submit/Approve/Reject are now handled by /api/work-requests routes
+router.patch('/:id/active', programController.updateProgramActiveStatus); // Set isActive (body: { isActive: boolean })
 router.patch('/:id/archive', programController.archiveProgram);
 
 module.exports = router;

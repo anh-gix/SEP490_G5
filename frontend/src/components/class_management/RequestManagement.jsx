@@ -11,9 +11,9 @@ import RequestStats from './RequestStats';
 import RequestFilters from './RequestFilters';
 import RequestTable from './RequestTable';
 import RejectRequestModal from './RejectRequestModal';
-import MakeupClassModalForAcademicStaff from './MakeupClassModalForAcademicStaff';
+import MakeupClassRequestModal from './MakeupClassRequestModal';
 import RequestDetailPage from './RequestDetailPage';
-import WorkRequestDetail from '../AcademicStaff/WorkRequestDetail';
+import WorkRequestDetail from './WorkRequestDetail';
 import { formatDate, naturalCompare } from '../../utils/requestHelpers';
 
 /**
@@ -30,15 +30,6 @@ const RequestManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Debug: Log component mount and user state
-  useEffect(() => {
-    console.log('[DEBUG] RequestManagement - Component mounted', {
-      user,
-      userId: user?._id,
-      userRole: user?.role,
-      timestamp: new Date().toISOString()
-    });
-  }, []);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -94,33 +85,17 @@ const RequestManagement = () => {
 
   // Fetch both ChangeRequests and WorkRequests when filters change
   useEffect(() => {
-    console.log('[DEBUG] RequestManagement - useEffect fetchAllRequests triggered', {
-      userId: user?._id,
-      page,
-      debouncedSearchTerm,
-      filterStatus,
-      filterType,
-      sortBy,
-      userExists: !!user
-    });
     if (user?._id) {
       fetchAllRequests();
     } else {
-      console.warn('[DEBUG] RequestManagement - User not available, skipping fetchAllRequests');
     }
   }, [user, page, debouncedSearchTerm, filterStatus, filterType, sortBy]);
 
   // Fetch stats separately
   useEffect(() => {
-    console.log('[DEBUG] RequestManagement - useEffect fetchStats triggered', {
-      userId: user?._id,
-      filterStatus,
-      userExists: !!user
-    });
     if (user?._id) {
       fetchStats();
     } else {
-      console.warn('[DEBUG] RequestManagement - User not available, skipping fetchStats');
     }
   }, [user, filterStatus]);
 
@@ -137,25 +112,20 @@ const RequestManagement = () => {
 
   const fetchStats = async () => {
     try {
-      console.log('[DEBUG] fetchStats - Starting', { filterStatus, userId: user?._id });
       const params = {};
       if (filterStatus && filterStatus !== 'all') {
         params.status = filterStatus;
       }
       
-      console.log('[DEBUG] fetchStats - Fetching ChangeRequest stats with params:', params);
       // Fetch ChangeRequest stats
       const changeResponse = await changeRequestService.getStats(params);
-      console.log('[DEBUG] fetchStats - ChangeRequest response:', changeResponse);
       
       // Fetch WorkRequest stats
       const workParams = { userId: user._id };
       if (filterStatus && filterStatus !== 'all') {
         workParams.status = filterStatus;
       }
-      console.log('[DEBUG] fetchStats - Fetching WorkRequest stats with params:', workParams);
       const workResponse = await academicWorkRequestService.getStats(workParams);
-      console.log('[DEBUG] fetchStats - WorkRequest response:', workResponse);
       
       if (changeResponse.success && workResponse.success) {
         const changeStats = changeResponse.stats || {};
@@ -169,23 +139,10 @@ const RequestManagement = () => {
           requestReplaceTeacher: changeStats.requestReplaceTeacher || 0,
           assignStudents: workStats.assign_students || 0
         };
-        console.log('[DEBUG] fetchStats - Setting stats:', newStats);
         setStats(newStats);
-      } else {
-        console.error('[DEBUG] fetchStats - Response not successful:', {
-          changeResponseSuccess: changeResponse.success,
-          workResponseSuccess: workResponse.success,
-          changeResponse,
-          workResponse
-        });
       }
     } catch (err) {
-      console.error('[DEBUG] fetchStats - Error:', err);
-      console.error('[DEBUG] fetchStats - Error details:', {
-        message: err.message,
-        response: err.response,
-        stack: err.stack
-      });
+      // Error handling - keep silent or use non-debug logging if needed
     }
   };
 
@@ -273,7 +230,6 @@ const RequestManagement = () => {
         }
       } catch (err) {
         // Not a WorkRequest or not found, continue to try ChangeRequest
-        console.log('Not a WorkRequest, trying ChangeRequest...');
       }
 
       // Step 3: Try to fetch as ChangeRequest (slower, requires fetching all)
@@ -319,14 +275,6 @@ const RequestManagement = () => {
 
   const fetchAllRequests = async () => {
     try {
-      console.log('[DEBUG] fetchAllRequests - Starting', {
-        page,
-        debouncedSearchTerm,
-        filterStatus,
-        filterType,
-        sortBy,
-        userId: user?._id
-      });
       setLoading(true);
       setError(null);
       
@@ -351,24 +299,15 @@ const RequestManagement = () => {
       const workParams = { userId: user._id };
       if (filterStatus && filterStatus !== 'all') workParams.status = filterStatus;
       
-      console.log('[DEBUG] fetchAllRequests - ChangeRequest params:', changeParams);
-      console.log('[DEBUG] fetchAllRequests - WorkRequest params:', workParams);
-      
       // Fetch both ChangeRequests and WorkRequests in parallel
-      console.log('[DEBUG] fetchAllRequests - Starting parallel fetch...');
       const [changeResponse, workResponse] = await Promise.all([
         changeRequestService.getAllChangeRequests(changeParams).catch(err => {
-          console.error('[DEBUG] fetchAllRequests - ChangeRequest fetch failed:', err);
           throw err;
         }),
         academicWorkRequestService.getAssignedRequests(workParams).catch(err => {
-          console.error('[DEBUG] fetchAllRequests - WorkRequest fetch failed:', err);
           throw err;
         })
       ]);
-      
-      console.log('[DEBUG] fetchAllRequests - ChangeRequest response:', changeResponse);
-      console.log('[DEBUG] fetchAllRequests - WorkRequest response:', workResponse);
       
       if (changeResponse.success && workResponse.success) {
         let changeReqs = (changeResponse.changeRequests || []).map(req => 
@@ -377,11 +316,6 @@ const RequestManagement = () => {
         let workReqs = (workResponse.data || []).map(req => 
           normalizeRequest(req, 'workRequest')
         );
-        
-        console.log('[DEBUG] fetchAllRequests - Normalized:', {
-          changeReqsCount: changeReqs.length,
-          workReqsCount: workReqs.length
-        });
         
         // Filter by type if needed (for WorkRequest types)
         if (filterType && filterType === 'assign_students') {
@@ -418,34 +352,31 @@ const RequestManagement = () => {
           merged = merged.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
         }
         
-        console.log('[DEBUG] fetchAllRequests - Final merged count:', merged.length);
         setChangeRequests(changeReqs);
         setWorkRequests(workReqs);
         setMergedRequests(merged);
-        setTotal(merged.length);
-        setTotalPages(Math.ceil(merged.length / 10));
+
+        // Calculate total from backend responses
+        let totalFromBackend = 0;
+
+        // Add ChangeRequest total if showing ChangeRequests
+        if (filterType !== 'assign_students') {
+          totalFromBackend += changeResponse.total || 0;
+        }
+
+        // Add WorkRequest total if showing WorkRequests
+        if (!filterType || filterType === 'all' || filterType === 'assign_students') {
+          totalFromBackend += workReqs.length; // WorkRequests don't have pagination
+        }
+
+        setTotal(totalFromBackend);
+        setTotalPages(Math.ceil(totalFromBackend / 10));
       } else {
-        console.error('[DEBUG] fetchAllRequests - Response not successful:', {
-          changeResponseSuccess: changeResponse.success,
-          workResponseSuccess: workResponse.success,
-          changeResponse,
-          workResponse
-        });
         setError('Không thể tải danh sách đơn');
       }
     } catch (err) {
-      console.error('[DEBUG] fetchAllRequests - Error:', err);
-      console.error('[DEBUG] fetchAllRequests - Error details:', {
-        message: err.message,
-        response: err.response,
-        responseData: err.response?.data,
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        stack: err.stack
-      });
       setError(err.message || 'Có lỗi xảy ra khi tải danh sách đơn');
     } finally {
-      console.log('[DEBUG] fetchAllRequests - Finished, setting loading to false');
       setLoading(false);
     }
   };
@@ -770,7 +701,7 @@ const RequestManagement = () => {
           formatDate={formatDate}
         />
         {/* Makeup Class Modal - render here so it's available when detail page is shown */}
-        <MakeupClassModalForAcademicStaff
+        <MakeupClassRequestModal
           show={showMakeupModal}
           studentScheduleId={selectedStudentScheduleId}
           requestType={selectedRequest?.type || 'makeup_class'}

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Table, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import studentService from '../../services/studentService';
 import teacherService from '../../services/teacherService';
 import programService from '../../services/programService';
@@ -18,7 +19,8 @@ const ImportStudentFromExcel = ({ onBack }) => {
   const [previewStudents, setPreviewStudents] = useState([]);
   const [importing, setImporting] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [programs, setPrograms] = useState([]);
+  const [programs, setPrograms] = useState([]); // Only approved programs
+  const [allPrograms, setAllPrograms] = useState([]); // All programs (for validation)
   const fileInputRef = useRef(null);
 
   // Helper function to parse levelsToStudy string into array of levels
@@ -37,52 +39,63 @@ const ImportStudentFromExcel = ({ onBack }) => {
     return levels;
   };
 
-  // Function to get courses for a student based on levelsToStudy and type
-  const getCoursesForStudent = async (levelsToStudy, type) => {
-    if (!levelsToStudy || !type) return [];
-    
-    const levels = parseLevelsToStudy(levelsToStudy);
-    if (levels.length === 0) return [];
-    
-    const typeStr = type.toString().trim().toLowerCase();
-    const programNameMap = {
-      'ielts': 'IELTS',
-      'toeic': 'TOEIC',
-      'cam': 'Cambridge',
-      'cambridge': 'Cambridge'
-    };
-    const programName = programNameMap[typeStr] || typeStr;
-    
-    // Lấy courses cho tất cả levels
-    const allCourses = [];
-    for (const level of levels) {
+  // Function to get courses for a student based on program codes
+  const getCoursesByProgramCodes = async (programCode) => {
+    if (!programCode || !programCode.trim()) return [];
+
+    try {
+      // Parse multiple program codes
+      const programCodes = programCode
+        .split(/[,;|]/)
+        .map(code => code.trim())
+        .filter(code => code.length > 0);
+
+      if (programCodes.length === 0) return [];
+
+      // Find programs matching the codes
+      // Only use approved programs (programs that have been approved by Center Head)
+      const matchingPrograms = programs.filter(p =>
+        programCodes.includes(p.code) && p.status === 'approved'
+      );
+
+      if (matchingPrograms.length === 0) return [];
+
+      const programIds = matchingPrograms.map(p => p._id);
+
+      // Fetch courses for all programs at once using the new endpoint
       try {
-        const response = await courseService.getCoursesByProgram(programName, level);
+        const response = await courseService.getCoursesByProgramId(programIds);
         if (response?.success && response.courses) {
-          allCourses.push(...response.courses);
+          // Extract unique course names
+          const uniqueCourseNames = [...new Set(response.courses.map(c => c.name))];
+          return uniqueCourseNames;
         }
+        return [];
       } catch (error) {
-        // Error fetching courses
+        console.error('Error fetching courses by program IDs:', error);
+        return [];
       }
+    } catch (error) {
+      console.error('Error getting courses by program codes:', error);
+      return [];
     }
-    
-    // Loại bỏ duplicates và trả về tên courses
-    const uniqueCourseNames = [...new Set(allCourses.map(c => c.name))];
-    return uniqueCourseNames;
   };
 
-  // Fetch active programs from database on component mount
+  // Fetch programs from database on component mount
   useEffect(() => {
     const fetchPrograms = async () => {
       try {
         const response = await programService.getAllPrograms();
-        const allPrograms = response.data || [];
-        // Filter only active programs
-        const activePrograms = allPrograms.filter(p => p.status === 'active');
-        setPrograms(activePrograms);
+        const allProgramsData = response.data || [];
+        // Store all programs for validation
+        setAllPrograms(allProgramsData);
+        // Filter only approved programs for enrollment
+        const approvedPrograms = allProgramsData.filter(p => p.status === 'approved');
+        setPrograms(approvedPrograms);
       } catch (error) {
         // Continue with empty array if fetch fails
         setPrograms([]);
+        setAllPrograms([]);
       }
     };
     fetchPrograms();
@@ -101,7 +114,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
                        file.name.endsWith('.xls');
 
     if (!isValidType) {
-      alert('Vui lòng chọn file Excel (.xlsx hoặc .xls)');
+      toast.error('Vui lòng chọn file Excel (.xlsx hoặc .xls)');
       e.target.value = '';
       return;
     }
@@ -112,7 +125,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
 
   const handlePreviewExcel = async () => {
     if (!importFile) {
-      alert('Vui lòng chọn file Excel');
+      toast.warning('Vui lòng chọn file Excel');
       return;
     }
 
@@ -124,7 +137,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
 
       // Get first sheet
       if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-        alert('File Excel không có sheet nào');
+        toast.error('File Excel không có sheet nào');
         setImporting(false);
         return;
       }
@@ -133,7 +146,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
       const worksheet = workbook.Sheets[sheetName];
 
       if (!worksheet) {
-        alert('Sheet đầu tiên không có dữ liệu');
+        toast.error('Sheet đầu tiên không có dữ liệu');
         setImporting(false);
         return;
       }
@@ -162,7 +175,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
       });
 
       if (!jsonData || jsonData.length === 0) {
-        alert('File Excel không có dữ liệu');
+        toast.error('File Excel không có dữ liệu');
         setImporting(false);
         return;
       }
@@ -427,18 +440,13 @@ const ImportStudentFromExcel = ({ onBack }) => {
         // Remove any non-digit characters (spaces, dashes, etc.)
         phone = phone.replace(/\D/g, '');
         
-        // Always add leading zero if phone doesn't start with 0
-        // This handles the case where Excel removes leading zeros from phone numbers
-        if (phone && phone.length > 0 && phone[0] !== '0') {
-          phone = '0' + phone;
-        }
-        
         const address = row.address || row.Address || row['Địa chỉ'] || '';
         
         // Parse new columns (support both Vietnamese and English)
         const aim = row.aim || row.Aim || row['Điểm mục tiêu'] || row['Mục tiêu'] || '';
         const currentLevel = row.currentLevel || row.CurrentLevel || row['Trình độ hiện tại'] || row['Trình độ'] || '';
         const type = row.type || row.Type || row['Loại'] || row['Chương trình'] || '';
+        const programCode = row.programCode || row.ProgramCode || row['Mã chương trình'] || row['program_code'] || '';
 
         // Validate
         if (!username || !username.toString().trim()) {
@@ -451,18 +459,33 @@ const ImportStudentFromExcel = ({ onBack }) => {
           errors.push('Email không hợp lệ');
         }
 
-        if (!phone || !phone.toString().trim()) {
+        // Validate phone BEFORE adding leading zero
+        if (!phone || phone.length === 0) {
           errors.push('Số điện thoại không được để trống');
         } else {
-          // Validate phone length (10-11 digits after normalization)
-          const phoneDigits = phone.replace(/\D/g, '');
-          if (phoneDigits.length < 10 || phoneDigits.length > 11) {
-            errors.push('Số điện thoại phải có 10 hoặc 11 chữ số');
+          if (phone[0] === '0') {
+            // Has leading zero: must be exactly 10 digits
+            if (phone.length !== 10) {
+              errors.push('Số điện thoại phải có 10 chữ số');
+            }
+          } else {
+            // No leading zero (Excel removed it): must be exactly 9 digits
+            if (phone.length !== 9) {
+              errors.push('Số điện thoại phải có 9 chữ số (thiếu số 0 ở đầu do Excel)');
+            } else {
+              // Add leading zero to normalize to 10 digits
+              phone = '0' + phone;
+            }
           }
         }
 
         if (!address || !address.toString().trim()) {
           errors.push('Địa chỉ không được để trống');
+        }
+
+        // Validate program code - REQUIRED
+        if (!programCode || !programCode.toString().trim()) {
+          errors.push('Mã chương trình (Program Code) không được để trống');
         }
 
         // Validate aim and currentLevel based on type
@@ -544,6 +567,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
           aim: aim ? aim.toString().trim() : '',
           currentLevel: currentLevel ? currentLevel.toString().trim() : '',
           type: type ? type.toString().trim() : '',
+          programCode: programCode ? programCode.toString().trim() : '',
           levelsToStudy: levelsToStudy,
           hasError: errors.length > 0,
           errors,
@@ -553,16 +577,21 @@ const ImportStudentFromExcel = ({ onBack }) => {
         });
       });
 
-      // Fetch courses for each student
+      // Fetch courses for each student based on program codes
+      // Note: Fetch courses regardless of validation errors, as long as programCode exists
       for (let i = 0; i < previewData.length; i++) {
         const item = previewData[i];
-        if (item.levelsToStudy && item.type && !item.hasError) {
+        // Fetch courses if programCode exists (ignore other validation errors)
+        if (item.programCode && item.programCode.trim()) {
           try {
-            const courses = await getCoursesForStudent(item.levelsToStudy, item.type);
+            const courses = await getCoursesByProgramCodes(item.programCode);
             item.courses = courses;
           } catch (error) {
+            console.error(`Error fetching courses for ${item.email}:`, error);
             item.courses = [];
           }
+        } else {
+          item.courses = [];
         }
       }
 
@@ -576,14 +605,11 @@ const ImportStudentFromExcel = ({ onBack }) => {
         return phoneStr;
       };
 
-      // Check for duplicates within the Excel file
+      // Check for duplicates within the Excel file (only email)
       const emailMap = new Map();
-      const phoneMap = new Map();
       
       previewData.forEach((item, index) => {
         const email = item.email.toLowerCase();
-        // Normalize phone before checking duplicates
-        const phone = normalizePhone(item.phone);
         
         // Check duplicate email in file
         if (email && emailMap.has(email)) {
@@ -599,68 +625,195 @@ const ImportStudentFromExcel = ({ onBack }) => {
         } else if (email) {
           emailMap.set(email, index);
         }
-        
-        // Check duplicate phone in file
-        if (phone && phoneMap.has(phone)) {
-          const firstIndex = phoneMap.get(phone);
-          if (!previewData[firstIndex].errors.includes('Số điện thoại trùng lặp trong file Excel')) {
-            previewData[firstIndex].errors.push('Số điện thoại trùng lặp trong file Excel');
-            previewData[firstIndex].hasError = true;
-          }
-          if (!item.errors.includes('Số điện thoại trùng lặp trong file Excel')) {
-            item.errors.push('Số điện thoại trùng lặp trong file Excel');
-            item.hasError = true;
-          }
-        } else if (phone) {
-          phoneMap.set(phone, index);
-        }
       });
 
-      // Check for duplicates with existing data in database
+      // Validate program codes and check for duplicates with existing data in database
       try {
-        // Get all students and teachers from database
+        // Get all students, teachers, and programs from database
         const [studentsResponse, teachersResponse] = await Promise.all([
           studentService.getAllStudents().catch(() => ({ students: [] })),
           teacherService.getAllTeachers().catch(() => ({ teachers: [] }))
         ]);
-        
+
         const allStudents = studentsResponse.students || [];
         const allTeachers = teachersResponse.teachers || [];
         const allUsers = [...allStudents, ...allTeachers];
-        
+
         const existingEmails = new Set(allUsers.map(u => u.email?.toLowerCase()).filter(Boolean));
-        
-        const existingPhones = new Set(
-          allUsers
-            .map(u => normalizePhone(u.phone))
+
+        // Get all approved and active program codes from database (only approved and active programs can be used)
+        const approvedProgramCodes = new Set(
+          programs
+            .filter(p => p.status === 'approved' && p.isActive === true)
+            .map(p => p.code)
             .filter(Boolean)
         );
-        
+
         previewData.forEach((item) => {
           const email = item.email.toLowerCase();
-          const phone = normalizePhone(item.phone);
-          
+
+          // Check duplicate email with existing users (allow duplicate phone)
           if (email && existingEmails.has(email)) {
             if (!item.warnings.includes('Học viên đã có tài khoản trong hệ thống')) {
               item.warnings.push('Học viên đã có tài khoản trong hệ thống');
               item.isExistingAccount = true;
             }
           }
-          
-          if (phone && existingPhones.has(phone)) {
-            if (!item.warnings.includes('Học viên đã có tài khoản trong hệ thống')) {
-              item.warnings.push('Học viên đã có tài khoản trong hệ thống');
-              item.isExistingAccount = true;
+
+          // Validate program codes against database
+          if (item.programCode && item.programCode.trim()) {
+            // Parse multiple program codes
+            const programCodes = item.programCode
+              .split(/[,;|]/)
+              .map(code => code.trim())
+              .filter(code => code.length > 0);
+
+            const invalidCodes = []; // Programs that don't exist at all
+            const notApprovedCodes = []; // Programs that exist but are not approved
+            const inactiveCodes = []; // Programs that are approved but not active
+            const validCodes = [];
+            const mismatchedTypeCodes = [];
+            const mismatchedLevelCodes = [];
+
+            // Parse levels from levelsToStudy if available
+            const requiredLevels = item.levelsToStudy ? parseLevelsToStudy(item.levelsToStudy) : [];
+
+            programCodes.forEach(code => {
+              // Check if program exists in all programs
+              const programExists = allPrograms.some(p => p.code === code);
+
+              if (!programExists) {
+                // Program doesn't exist at all
+                invalidCodes.push(code);
+              } else {
+                // Program exists, check its status and isActive
+                const program = allPrograms.find(p => p.code === code);
+
+                if (program.status !== 'approved') {
+                  // Program exists but is not approved
+                  notApprovedCodes.push({ code, status: program.status || 'unknown' });
+                } else if (program.isActive !== true) {
+                  // Program is approved but not active
+                  inactiveCodes.push(code);
+                } else {
+                  // Program exists, is approved and active
+                  validCodes.push(code);
+                }
+              }
+            });
+
+            // Check type and level validation for valid programs only
+            validCodes.forEach(code => {
+              const program = programs.find(p => p.code === code && p.status === 'approved' && p.isActive === true);
+              if (program && item.type) {
+                const itemTypeStr = item.type.toString().trim().toLowerCase();
+                const programTypeStr = program.type?.toString().trim().toLowerCase() || '';
+
+                // Normalize type names for comparison
+                const normalizeType = (type) => {
+                  if (type === 'cam') return 'cambridge';
+                  return type;
+                };
+
+                const normalizedItemType = normalizeType(itemTypeStr);
+                const normalizedProgramType = normalizeType(programTypeStr);
+
+                if (normalizedItemType && normalizedProgramType && normalizedItemType !== normalizedProgramType) {
+                  mismatchedTypeCodes.push({
+                    code: code,
+                    expected: itemTypeStr.toUpperCase(),
+                    actual: programTypeStr.toUpperCase()
+                  });
+                }
+
+                // Check if program level matches the levelsToStudy
+                if (requiredLevels.length > 0 && program.level) {
+                  const programLevel = program.level.toString().trim();
+                  if (!requiredLevels.includes(programLevel)) {
+                    mismatchedLevelCodes.push({
+                      code: code,
+                      programLevel: programLevel,
+                      requiredLevels: requiredLevels.join(', ')
+                    });
+                  }
+                }
+              }
+            });
+
+            // Add error if any program code doesn't exist
+            if (invalidCodes.length > 0) {
+              const errorMsg = `Mã chương trình không tồn tại: ${invalidCodes.join(', ')}`;
+              if (!item.errors.includes(errorMsg)) {
+                item.errors.push(errorMsg);
+                item.hasError = true;
+              }
+            }
+
+            // Add error if program exists but is not approved
+            if (notApprovedCodes.length > 0) {
+              notApprovedCodes.forEach(({ code, status }) => {
+                const statusText = status === 'draft' ? 'đang soạn thảo' :
+                                   status === 'pending_approval' ? 'chờ phê duyệt' :
+                                   status === 'needs_revision' ? 'cần chỉnh sửa' :
+                                   status === 'archived' ? 'đã lưu trữ' : status;
+                const errorMsg = `Mã chương trình "${code}" chưa được phê duyệt (trạng thái: ${statusText})`;
+                if (!item.errors.includes(errorMsg)) {
+                  item.errors.push(errorMsg);
+                  item.hasError = true;
+                }
+              });
+            }
+
+            // Add error if program is approved but not active
+            if (inactiveCodes.length > 0) {
+              inactiveCodes.forEach(code => {
+                const errorMsg = `Mã chương trình "${code}" đã được phê duyệt nhưng chưa được kích hoạt (isActive = false)`;
+                if (!item.errors.includes(errorMsg)) {
+                  item.errors.push(errorMsg);
+                  item.hasError = true;
+                }
+              });
+            }
+
+            // Add error if program type doesn't match student type
+            if (mismatchedTypeCodes.length > 0) {
+              mismatchedTypeCodes.forEach(mismatch => {
+                const errorMsg = `Mã chương trình "${mismatch.code}" thuộc loại ${mismatch.actual}, không khớp với loại ${mismatch.expected} của học viên`;
+                if (!item.errors.includes(errorMsg)) {
+                  item.errors.push(errorMsg);
+                  item.hasError = true;
+                }
+              });
+            }
+
+            // Add error if program level doesn't match levelsToStudy
+            if (mismatchedLevelCodes.length > 0) {
+              mismatchedLevelCodes.forEach(mismatch => {
+                const errorMsg = `Mã chương trình "${mismatch.code}" có level ${mismatch.programLevel}, không nằm trong lộ trình học [${mismatch.requiredLevels}]`;
+                if (!item.errors.includes(errorMsg)) {
+                  item.errors.push(errorMsg);
+                  item.hasError = true;
+                }
+              });
+            }
+
+            // Add warning if some codes are valid but some are invalid
+            if (validCodes.length > 0 && invalidCodes.length > 0) {
+              const warningMsg = `Chỉ ${validCodes.length}/${programCodes.length} mã chương trình hợp lệ: ${validCodes.join(', ')}`;
+              if (!item.warnings.includes(warningMsg)) {
+                item.warnings.push(warningMsg);
+              }
             }
           }
         });
       } catch (err) {
         // Error checking existing users
+        console.error('Error validating data:', err);
       }
 
       setPreviewStudents(previewData);
     } catch (error) {
-      alert('Lỗi khi đọc file Excel: ' + (error.message || 'Vui lòng thử lại'));
+      toast.error('Lỗi khi đọc file Excel: ' + (error.message || 'Vui lòng thử lại'));
     } finally {
       setImporting(false);
     }
@@ -668,9 +821,9 @@ const ImportStudentFromExcel = ({ onBack }) => {
 
   const handleConfirmImport = async () => {
     const validStudents = previewStudents.filter(s => !s.hasError);
-    
+
     if (validStudents.length === 0) {
-      alert('Không có học viên hợp lệ để import');
+      toast.warning('Không có học viên hợp lệ để import');
       return;
     }
 
@@ -682,7 +835,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
       const enrolledCount = result.enrolledCount || result.results?.enrolled?.length || 0;
       const skippedCount = result.skippedCount || result.results?.skipped?.length || 0;
       const failedCount = result.failedCount || result.results?.failed?.length || 0;
-      
+
       let message = '';
       if (createdCount > 0) {
         message += `Tạo mới: ${createdCount} học viên\n`;
@@ -696,12 +849,12 @@ const ImportStudentFromExcel = ({ onBack }) => {
       if (failedCount > 0) {
         message += `Thất bại: ${failedCount} học viên\n`;
       }
-      
+
       if (!message) {
         message = 'Không có học viên nào được xử lý';
       }
-      
-      alert(message.trim());
+
+      toast.success(message.trim(), { autoClose: 5000 });
       
       // Navigate back to student management page after successful import
       if (onBack) {
@@ -711,7 +864,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
       }
     } catch (err) {
       const errorMessage = err.message || (typeof err === 'string' ? err : 'Không thể import học viên');
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -727,7 +880,8 @@ const ImportStudentFromExcel = ({ onBack }) => {
         address: '123 Đường ABC, Quận 1, TP.HCM',
         aim: '6.0',
         currentLevel: '4.0',
-        type: 'ielts'
+        type: 'ielts',
+        programCode: 'IELTS_B1'
       },
       {
         username: 'student2',
@@ -736,7 +890,8 @@ const ImportStudentFromExcel = ({ onBack }) => {
         address: '456 Đường XYZ, Quận 2, TP.HCM',
         aim: '600',
         currentLevel: '400',
-        type: 'toeic'
+        type: 'toeic',
+        programCode: 'TOEIC_B1, TOEIC_B2'
       },
       {
         username: 'student3',
@@ -745,12 +900,41 @@ const ImportStudentFromExcel = ({ onBack }) => {
         address: '789 Đường DEF, Quận 3, TP.HCM',
         aim: 'Mover',
         currentLevel: 'Starter',
-        type: 'cambridge'
+        type: 'cambridge',
+        programCode: 'CAM_A1'
       }
     ];
 
     // Create worksheet
     const ws = XLSX.utils.json_to_sheet(sampleData);
+    
+    // Find phone column index
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    let phoneColIndex = -1;
+    
+    // Find phone column (check header row)
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+      const cell = ws[cellAddress];
+      if (cell && (cell.v === 'phone' || cell.v === 'Phone' || cell.v === 'Số điện thoại')) {
+        phoneColIndex = col;
+        break;
+      }
+    }
+    
+    // Format phone column as text
+    if (phoneColIndex >= 0) {
+      for (let row = range.s.r + 1; row <= range.e.r; row++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: row, c: phoneColIndex });
+        if (ws[cellAddress]) {
+          // Set cell type to string and ensure value is string
+          ws[cellAddress].t = 's'; // 's' = string type
+          ws[cellAddress].v = String(ws[cellAddress].v);
+          // Set cell style to text format
+          ws[cellAddress].z = '@'; // '@' = text format in Excel
+        }
+      }
+    }
     
     // Create workbook
     const wb = XLSX.utils.book_new();
@@ -766,24 +950,47 @@ const ImportStudentFromExcel = ({ onBack }) => {
 
   const handleExportReport = () => {
     if (previewStudents.length === 0) {
-      alert('Không có dữ liệu để xuất báo cáo');
+      toast.warning('Không có dữ liệu để xuất báo cáo');
       return;
     }
 
     try {
+      // Filter chỉ lấy students có program với isActive = true
+      const filteredStudents = previewStudents.filter(student => {
+        if (!student.programCode) return false;
+        
+        // Tìm program theo code trong allPrograms (có đầy đủ thông tin isActive)
+        const program = allPrograms.find(p => p.code === student.programCode);
+        
+        // Chỉ export nếu program có isActive = true
+        return program && program.isActive === true;
+      });
+      
+      if (filteredStudents.length === 0) {
+        toast.warning('Không có học viên nào có chương trình đang hoạt động để xuất báo cáo');
+        return;
+      }
+      
       // Tạo data cho Excel
-      const reportData = previewStudents.map(student => ({
-        Username: student.username,
-        Email: student.email,
-        Phone: student.phone,
-        Address: student.address,
-        Aim: student.aim || '',
-        'Trình độ hiện tại': student.currentLevel || '',
-        Type: student.type || '',
-        'Các khóa học đăng ký': student.courses && student.courses.length > 0 
-          ? student.courses.join(', ') 
-          : ''
-      }));
+      const reportData = filteredStudents.map(student => {
+        // Find the program to get its name
+        const program = allPrograms.find(p => p.code === student.programCode);
+        
+        return {
+          Username: student.username,
+          Email: student.email,
+          Phone: student.phone,
+          Address: student.address,
+          Aim: student.aim || '',
+          'Trình độ hiện tại': student.currentLevel || '',
+          Type: student.type || '',
+          'Program Code': student.programCode || '',
+          'Tên Program': program?.program_name || '',
+          'Các khóa học đăng ký': student.courses && student.courses.length > 0
+            ? student.courses.join(', ')
+            : ''
+        };
+      });
       
       // Tạo worksheet
       const ws = XLSX.utils.json_to_sheet(reportData);
@@ -799,8 +1006,9 @@ const ImportStudentFromExcel = ({ onBack }) => {
       
       // Download
       XLSX.writeFile(wb, fileName);
+      toast.success(`Xuất báo cáo thành công! (${filteredStudents.length} học viên)`);
     } catch (error) {
-      alert('Lỗi khi xuất báo cáo: ' + (error.message || 'Vui lòng thử lại'));
+      toast.error('Lỗi khi xuất báo cáo: ' + (error.message || 'Vui lòng thử lại'));
     }
   };
 
@@ -837,6 +1045,13 @@ const ImportStudentFromExcel = ({ onBack }) => {
             <li><strong>IELTS:</strong> Aim và Trình độ hiện tại dùng điểm số từ 0.0 đến 9.0 (ví dụ: 6.0, 4.0)</li>
             <li><strong>TOEIC:</strong> Aim và Trình độ hiện tại dùng điểm số từ 0 đến 990 (ví dụ: 600, 400)</li>
             <li><strong>Cambridge:</strong> Aim và Trình độ hiện tại dùng level: Starter (hoặc Pre-A1) và Mover (hoặc A1) (ví dụ: Mover, Starter)</li>
+            <li><strong>Program Code (BẮT BUỘC):</strong> Mã chương trình - Phải nhập để xác định chính xác chương trình học
+              <ul style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                <li>Một chương trình: <code>IELTS_B1</code></li>
+                <li>Nhiều chương trình: <code>IELTS_B1, IELTS_B2</code> hoặc <code>IELTS_B1; IELTS_B2</code></li>
+                <li className="text-danger"><strong>Lưu ý:</strong> Nếu có nhiều chương trình cùng type và level, bạn phải chỉ định chính xác program code để tránh nhầm lẫn</li>
+              </ul>
+            </li>
           </ul>
           <p className="mb-3 text-muted">
             Lưu ý: Password sẽ tự động được tạo cho mỗi học viên
@@ -863,6 +1078,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
                 <th>Aim</th>
                 <th>Trình độ hiện tại</th>
                 <th>Type</th>
+                <th>Program Code</th>
               </tr>
             </thead>
             <tbody>
@@ -874,6 +1090,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
                 <td>6.0</td>
                 <td>4.0</td>
                 <td>ielts</td>
+                <td>IELTS_B1</td>
               </tr>
               <tr>
                 <td>student2</td>
@@ -883,6 +1100,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
                 <td>600</td>
                 <td>400</td>
                 <td>toeic</td>
+                <td>TOEIC_B1, TOEIC_B2</td>
               </tr>
               <tr>
                 <td>student3</td>
@@ -892,6 +1110,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
                 <td>Mover</td>
                 <td>Starter</td>
                 <td>cambridge</td>
+                <td>CAM_A1</td>
               </tr>
             </tbody>
           </Table>
@@ -991,6 +1210,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
                     <th>Trình độ hiện tại</th>
                     <th>Lộ trình học</th>
                     <th>Type</th>
+                    <th>Program Code</th>
                     <th>Trạng thái</th>
                     <th>Lỗi</th>
                   </tr>
@@ -1015,6 +1235,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
                         <td>{student.currentLevel || '-'}</td>
                         <td>{student.levelsToStudy || '-'}</td>
                         <td>{student.type || '-'}</td>
+                        <td>{student.programCode || '-'}</td>
                         <td>
                           {student.hasError ? (
                             <Badge bg="danger">Lỗi</Badge>

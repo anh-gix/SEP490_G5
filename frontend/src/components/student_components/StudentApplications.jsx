@@ -28,6 +28,7 @@ const StudentApplications = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [preselectedScheduleId, setPreselectedScheduleId] = useState(null);
 
   const itemsPerPage = 10;
 
@@ -111,6 +112,17 @@ const StudentApplications = () => {
     }
   }, [location.state, location.pathname, navigate]);
 
+  // Check for openCreateModal state from navigation
+  useEffect(() => {
+    // Chỉ mở modal khi có CẢ openCreateModal VÀ preselectedScheduleId
+    if (location.state?.openCreateModal && location.state?.preselectedScheduleId) {
+      setShowCreateModal(true);
+      setPreselectedScheduleId(location.state.preselectedScheduleId);
+      // Clear state để tránh mở lại khi refresh
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
+
   const fetchChangeRequests = async () => {
     try {
       setLoading(true);
@@ -175,6 +187,11 @@ const StudentApplications = () => {
     fetchChangeRequests();
   };
 
+  const handleCreateModalClose = () => {
+    setShowCreateModal(false);
+    setPreselectedScheduleId(null);
+  };
+
   return (
     <Container fluid className="p-24">
       {/* Header */}
@@ -231,13 +248,16 @@ const StudentApplications = () => {
               </Form.Select>
             </Col>
 
-            <Col md={2} className="d-flex justify-content-end">
+            <Col md={2}>
               <Button
                 variant="primary"
-                onClick={() => setShowCreateModal(true)}
-                className="w-100"
+                onClick={() => {
+                  setShowCreateModal(true);
+                  setPreselectedScheduleId(null); // Không có buổi học được chọn trước
+                }}
+                className="w-100 d-flex align-items-center justify-content-center gap-2"
               >
-                <i className="fas fa-plus me-2"></i>
+                <i className="fas fa-plus"></i>
                 Tạo đơn
               </Button>
             </Col>
@@ -474,8 +494,9 @@ const StudentApplications = () => {
       {/* Create Change Request Modal */}
       <CreateChangeRequestModal
         show={showCreateModal}
-        onHide={() => setShowCreateModal(false)}
+        onHide={handleCreateModalClose}
         onSuccess={handleCreateSuccess}
+        preselectedScheduleId={preselectedScheduleId}
       />
     </Container>
   );

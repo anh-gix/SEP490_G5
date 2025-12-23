@@ -1,10 +1,9 @@
-import React from 'react';
 import TeacherNavigation from '../../components/teacher_components/TeacherNavigation';
-import ExamList from '../../components/CenterHead/pages/ExamList';
+import TeacherExamList from '../../components/teacher_components/TeacherExamList';
 
 /**
  * Teacher Exam List Page
- * Page danh sách đề thi cho giảng viên
+ * Page hiển thị danh sách đề thi cho giảng viên
  */
 const TeacherExamListPage = () => {
   return (
@@ -13,8 +12,8 @@ const TeacherExamListPage = () => {
       <TeacherNavigation />
 
       {/* Main Content */}
-      <div className="flex-grow-1" style={{ backgroundColor: '#f8f9fa' }}>
-        <ExamList viewMode="teacher" />
+      <div className="flex-grow-1" style={{ backgroundColor: '#f8f9fa', overflow: 'auto', height: '100vh' }}>
+        <TeacherExamList />
       </div>
     </div>
   );

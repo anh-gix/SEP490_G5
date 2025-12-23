@@ -7,7 +7,7 @@ const ClassList = ({ classes, onEdit, onViewDetails }) => {
       pending: 'Chờ khai giảng',
       active: 'Đang học',
       completed: 'Đã hoàn thành',
-      cancelled: 'Đã hủy'
+      disable: 'Vô hiệu hóa'
     };
     return statusMap[status] || status;
   };
@@ -52,10 +52,6 @@ const ClassList = ({ classes, onEdit, onViewDetails }) => {
                   <div className="flex-align gap-8">
                     <i className="fas fa-door-open text-neutral-500" style={{ width: '20px' }}></i>
                     <span className="text-neutral-700">{classItem.roomName}</span>
-                  </div>
-                  <div className="flex-align gap-8">
-                    <i className="fas fa-calendar-alt text-neutral-500" style={{ width: '20px' }}></i>
-                    <span className="text-neutral-700">{classItem.schedule}</span>
                   </div>
                   <div className="flex-align gap-8">
                     <i className="fas fa-users text-neutral-500" style={{ width: '20px' }}></i>

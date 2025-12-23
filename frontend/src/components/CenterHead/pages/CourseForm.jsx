@@ -107,7 +107,7 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
       label: "Chi tiết chương trình",
       path: `${basePath}/programs/${programId}`,
     },
-    { label: "Chỉnh sửa học phần" },
+    { label: "Chỉnh sửa khóa học" },
   ];
 
   // Load program data để lấy PLOs
@@ -1008,8 +1008,9 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
                   onChange={handleInputChange}
                 >
                   <option value="draft">Bản nháp</option>
-                  <option value="pending_approval">Chờ duyệt</option>
-                  <option value="approved">Đã duyệt</option>
+                  <option value="completed">Hoàn thành</option>
+                  <option value="active">Đang hoạt động</option>
+                  <option value="archived">Đã lưu trữ</option>
                 </select>
               </div>
 

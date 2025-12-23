@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Badge, ProgressBar, Table } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import teacherService from '../../services/teacherService';
 
 /**
@@ -8,6 +8,7 @@ import teacherService from '../../services/teacherService';
  * Trang tổng quan cho giảng viên
  */
 const TeacherDashboard = () => {
+  const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState({
     stats: {
       upcomingLessons: 0,
@@ -282,14 +283,15 @@ const TeacherDashboard = () => {
                           </div>
                         </Col>
                         <Col md={2} className="text-end">
-                          <Link to={`/teacher/lessons/${schedule.id}`}>
-                            <Button 
-                              className={`text-12 px-16 py-8 radius-8 ${isToday ? 'btn-main' : 'btn-outline-main'}`}
-                            >
-                              <i className="fas fa-chalkboard-teacher me-2"></i>
-                              {isToday ? 'Vào lớp' : 'Chi tiết'}
-                            </Button>
-                          </Link>
+                          <Button 
+                            className={`text-12 px-16 py-8 radius-8 ${isToday ? 'btn-main' : 'btn-outline-main'}`}
+                            onClick={() => navigate(`/teacher/lessons/${schedule.id}`, { 
+                              state: { from: 'dashboard' } 
+                            })}
+                          >
+                            <i className="fas fa-chalkboard-teacher me-2"></i>
+                            {isToday ? 'Vào lớp' : 'Chi tiết'}
+                          </Button>
                         </Col>
                       </Row>
                     </div>

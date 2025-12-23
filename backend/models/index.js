@@ -16,4 +16,4 @@ module.exports = {
     HomeworkSubmission: require('./homeworkSubmissionModel'),
     ChangeRequest: require('./changeRequestModel'),
     WorkRequest: require('./workRequestModel')
-};
+}

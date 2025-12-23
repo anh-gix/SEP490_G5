@@ -5,6 +5,10 @@ import teacherService from '../../services/teacherService';
 import { useAuth } from '../../contexts/AuthContext';
 import changeRequestService from '../../services/changeRequestService';
 
+/**
+ * Teacher Schedule Component
+ * Lịch dạy của giảng viên - tương tự student schedule
+ */
 const TeacherSchedule = () => {
   const { user } = useAuth();
   
@@ -51,35 +55,12 @@ const TeacherSchedule = () => {
 
       const params = {};
       if (startDate && endDate) {
-        // Format dates as YYYY-MM-DD to avoid timezone issues
-        const formatDateForAPI = (date) => {
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const day = String(date.getDate()).padStart(2, '0');
-          return `${year}-${month}-${day}`;
-        };
-        
-        params.startDate = formatDateForAPI(startDate);
-        params.endDate = formatDateForAPI(endDate);
+        params.startDate = startDate.toISOString();
+        params.endDate = endDate.toISOString();
       }
 
-      console.log('[TeacherSchedule] Fetching schedules:', {
-        viewMode,
-        params,
-        hasDateRange: !!(startDate && endDate),
-        startDate: startDate ,
-        endDate: endDate
-      });
-
       const response = await teacherService.getCurrentTeacherSchedule(params);
-      
-      console.log('[TeacherSchedule] Response received:', {
-        success: response.success,
-        total: response.total,
-        schedulesCount: response.schedules?.length || 0
-      });
 
-      
       if (response.success) {
         // Transform schedules to match frontend format
         const transformedSchedules = response.schedules.map(schedule => {
@@ -88,6 +69,7 @@ const TeacherSchedule = () => {
           if (!className && (schedule.class === null || schedule.class === undefined)) {
             className = 'Lớp học bù';
           }
+          
           return {
             _id: schedule._id,
             date: schedule.date,
@@ -120,8 +102,6 @@ const TeacherSchedule = () => {
       setLoading(false);
     }
   };
-
-
 
   const getScheduleStatus = (date, startTime) => {
     // Parse date string safely to avoid timezone issues
@@ -225,25 +205,42 @@ const TeacherSchedule = () => {
     // Parse date string to avoid timezone conversion issues
     // If date is already a Date object
     if (dateString instanceof Date) {
+      // Check if date is valid
+      if (isNaN(dateString.getTime())) return 'N/A';
       const year = dateString.getUTCFullYear();
       const month = String(dateString.getUTCMonth() + 1).padStart(2, '0');
       const day = String(dateString.getUTCDate()).padStart(2, '0');
       return `${day}/${month}/${year}`;
     }
     
-    // If date is a string, extract YYYY-MM-DD part
+    // If date is a string
     const dateStr = typeof dateString === 'string' ? dateString : dateString.toString();
-    const dateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
     
-    if (dateMatch) {
-      const year = dateMatch[1];
-      const month = dateMatch[2];
-      const day = dateMatch[3];
+    // Check if already in DD/MM/YYYY format
+    const ddMMyyyyMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (ddMMyyyyMatch) {
+      // Already in correct format, return as is
+      const day = ddMMyyyyMatch[1].padStart(2, '0');
+      const month = ddMMyyyyMatch[2].padStart(2, '0');
+      const year = ddMMyyyyMatch[3];
       return `${day}/${month}/${year}`;
     }
     
-    // Fallback: use UTC methods to avoid timezone conversion
+    // Check if in YYYY-MM-DD format
+    const yyyyMMddMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (yyyyMMddMatch) {
+      const year = yyyyMMddMatch[1];
+      const month = yyyyMMddMatch[2];
+      const day = yyyyMMddMatch[3];
+      return `${day}/${month}/${year}`;
+    }
+    
+    // Fallback: try to parse as Date
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      console.warn('[formatDate] Invalid date string:', dateString);
+      return 'N/A';
+    }
     const year = date.getUTCFullYear();
     const month = String(date.getUTCMonth() + 1).padStart(2, '0');
     const day = String(date.getUTCDate()).padStart(2, '0');
@@ -254,8 +251,7 @@ const TeacherSchedule = () => {
     const statusConfig = {
       upcoming: { bg: 'bg-main-600', text: 'Sắp dạy' },
       completed: { bg: 'bg-success-600', text: 'Đã dạy' },
-      cancelled: { bg: 'bg-danger-600', text: 'Đã hủy' },
-      absent: { bg: 'bg-warning-600', text: 'Nghỉ dạy' } // Thêm trạng thái nghỉ dạy
+      cancelled: { bg: 'bg-danger-600', text: 'Đã hủy' }
     };
     const config = statusConfig[status] || statusConfig.upcoming;
     return <Badge className={`${config.bg} text-white px-12 py-6`}>{config.text}</Badge>;
@@ -277,7 +273,7 @@ const TeacherSchedule = () => {
       create_class: { variant: 'info', text: 'Tạo lớp' },
       change_class: { variant: 'primary', text: 'Đổi lớp' },
       makeup_class: { variant: 'warning', text: 'Học bù' },
-      request_replace_teacher: { variant: 'secondary', text: 'Thay giáo viên' }
+      replace_teacher: { variant: 'secondary', text: 'Thay giáo viên' }
     };
     const config = typeConfig[type] || { variant: 'secondary', text: type || 'N/A' };
     return <Badge bg={config.variant}>{config.text}</Badge>;
@@ -319,20 +315,14 @@ const TeacherSchedule = () => {
   };
 
   const filteredSchedules = schedules.filter(schedule => {
-    // Filter by status
-    if (filterStatus === 'all') {
-      // Continue to next filter
-    } else if (filterStatus === 'upcoming') {
-      if (schedule.scheduleStatus !== 'upcoming') return false;
-    } else if (filterStatus === 'completed') {
-      if (schedule.scheduleStatus !== 'completed') return false;
-    }
+    if (filterStatus === 'all') return true;
+    if (filterStatus === 'upcoming') return schedule.scheduleStatus === 'upcoming';
+    if (filterStatus === 'completed') return schedule.scheduleStatus === 'completed';
     return true;
   });
 
   const renderWeekView = () => {
     const weekDays = getWeekDays();
-    
     const timeSlots = [
       '08:00 - 10:00',
       '10:00 - 12:00',
@@ -422,19 +412,45 @@ const TeacherSchedule = () => {
                 {/* Day columns */}
                 {weekDays.map((day, dayIndex) => {
                   const daySchedules = filteredSchedules.filter(s => {
-                    // Backend returns date as DD/MM/YYYY string
+                    // Parse date string safely to avoid timezone issues
                     const dateStr = s.date;
                     if (!dateStr) return false;
                     
-                    // Parse DD/MM/YYYY format
-                    const dateMatch = dateStr.toString().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-                    if (!dateMatch) return false;
+                    // Extract date components from schedule date (use UTC to avoid timezone issues)
+                    let scheduleYear, scheduleMonth, scheduleDay;
+                    if (dateStr instanceof Date) {
+                      if (isNaN(dateStr.getTime())) return false;
+                      scheduleYear = dateStr.getUTCFullYear();
+                      scheduleMonth = dateStr.getUTCMonth();
+                      scheduleDay = dateStr.getUTCDate();
+                    } else {
+                      const dateStrValue = dateStr.toString();
+                      
+                      // Check if in DD/MM/YYYY format
+                      const ddMMyyyyMatch = dateStrValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                      if (ddMMyyyyMatch) {
+                        scheduleDay = parseInt(ddMMyyyyMatch[1], 10);
+                        scheduleMonth = parseInt(ddMMyyyyMatch[2], 10) - 1; // Month is 0-indexed
+                        scheduleYear = parseInt(ddMMyyyyMatch[3], 10);
+                      } else {
+                        // Check if in YYYY-MM-DD format
+                        const yyyyMMddMatch = dateStrValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                        if (yyyyMMddMatch) {
+                          scheduleYear = parseInt(yyyyMMddMatch[1], 10);
+                          scheduleMonth = parseInt(yyyyMMddMatch[2], 10) - 1; // Month is 0-indexed
+                          scheduleDay = parseInt(yyyyMMddMatch[3], 10);
+                        } else {
+                          // Fallback: parse as Date and use UTC
+                          const date = new Date(dateStr);
+                          if (isNaN(date.getTime())) return false;
+                          scheduleYear = date.getUTCFullYear();
+                          scheduleMonth = date.getUTCMonth();
+                          scheduleDay = date.getUTCDate();
+                        }
+                      }
+                    }
                     
-                    const scheduleDay = parseInt(dateMatch[1], 10);
-                    const scheduleMonth = parseInt(dateMatch[2], 10) - 1; // Month is 0-indexed
-                    const scheduleYear = parseInt(dateMatch[3], 10);
-                    
-                    // Extract date components from day (local timezone)
+                    // Extract date components from day (use local date, not UTC, since day is already in local timezone)
                     const dayYear = day.getFullYear();
                     const dayMonth = day.getMonth();
                     const dayDay = day.getDate();
@@ -575,19 +591,45 @@ const TeacherSchedule = () => {
           <div className="d-flex flex-wrap">
             {monthDays.map((dayInfo, index) => {
               const daySchedules = filteredSchedules.filter(s => {
-                // Backend returns date as DD/MM/YYYY string
+                // Parse date string safely to avoid timezone issues
                 const dateStr = s.date;
                 if (!dateStr) return false;
                 
-                // Parse DD/MM/YYYY format
-                const dateMatch = dateStr.toString().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-                if (!dateMatch) return false;
+                // Extract date components from schedule date (use UTC to avoid timezone issues)
+                let scheduleYear, scheduleMonth, scheduleDay;
+                if (dateStr instanceof Date) {
+                  if (isNaN(dateStr.getTime())) return false;
+                  scheduleYear = dateStr.getUTCFullYear();
+                  scheduleMonth = dateStr.getUTCMonth();
+                  scheduleDay = dateStr.getUTCDate();
+                } else {
+                  const dateStrValue = dateStr.toString();
+                  
+                  // Check if in DD/MM/YYYY format
+                  const ddMMyyyyMatch = dateStrValue.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                  if (ddMMyyyyMatch) {
+                    scheduleDay = parseInt(ddMMyyyyMatch[1], 10);
+                    scheduleMonth = parseInt(ddMMyyyyMatch[2], 10) - 1; // Month is 0-indexed
+                    scheduleYear = parseInt(ddMMyyyyMatch[3], 10);
+                  } else {
+                    // Check if in YYYY-MM-DD format
+                    const yyyyMMddMatch = dateStrValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                    if (yyyyMMddMatch) {
+                      scheduleYear = parseInt(yyyyMMddMatch[1], 10);
+                      scheduleMonth = parseInt(yyyyMMddMatch[2], 10) - 1; // Month is 0-indexed
+                      scheduleDay = parseInt(yyyyMMddMatch[3], 10);
+                    } else {
+                      // Fallback: parse as Date and use UTC
+                      const date = new Date(dateStr);
+                      if (isNaN(date.getTime())) return false;
+                      scheduleYear = date.getUTCFullYear();
+                      scheduleMonth = date.getUTCMonth();
+                      scheduleDay = date.getUTCDate();
+                    }
+                  }
+                }
                 
-                const scheduleDay = parseInt(dateMatch[1], 10);
-                const scheduleMonth = parseInt(dateMatch[2], 10) - 1; // Month is 0-indexed
-                const scheduleYear = parseInt(dateMatch[3], 10);
-                
-                // Extract date components from dayInfo.date (local timezone)
+                // Extract date components from dayInfo.date (use local date, not UTC, since dayInfo.date is already in local timezone)
                 const dayYear = dayInfo.date.getFullYear();
                 const dayMonth = dayInfo.date.getMonth();
                 const dayDay = dayInfo.date.getDate();
@@ -679,7 +721,7 @@ const TeacherSchedule = () => {
                     <tr key={schedule._id} className="transition-2" style={{ cursor: 'pointer' }}>
                       <td className="px-20 py-16 text-neutral-700 text-13">
                         <Link to={`/teacher/lessons/${schedule._id}`} className="text-decoration-none text-neutral-700">
-                          {schedule.date}
+                          {formatDate(schedule.date)}
                         </Link>
                       </td>
                       <td className="px-20 py-16 text-neutral-700 text-13">

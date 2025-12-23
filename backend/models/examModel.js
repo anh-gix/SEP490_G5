@@ -68,8 +68,6 @@ const examSchema = new mongoose.Schema(
     // Giữ lại isPublished để quản lý việc publish exam cho học viên
     // isPublished: { type: Boolean, default: false }, 
     isPublished: { type: Boolean, default: false },  // exam có đang được mở cho học viên làm hay không
-    publishedAt: { type: Date },
-    unpublishedAt: { type: Date },
   },
   { timestamps: true }
 );

@@ -135,13 +135,13 @@ export const programService = {
     }
   },
 
-  // Activate program
-  activateProgram: async (id) => {
+  // Update program active status (set isActive = true/false)
+  updateProgramActiveStatus: async (id, isActive) => {
     try {
-      const response = await axios.patch(`${API_BASE_URL}/${id}/activate`);
+      const response = await api.patch(`/${id}/active`, { isActive });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'Kích hoạt chương trình thất bại' };
+      throw error.response?.data || { message: 'Thay đổi trạng thái hoạt động thất bại' };
     }
   },
 

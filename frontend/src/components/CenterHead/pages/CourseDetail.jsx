@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import Swal from 'sweetalert2';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
@@ -10,7 +13,7 @@ import { courseService } from '../../../services/courseService';
 import { formatDate } from '../../../helper/helper';
 
 const CourseDetails = ({ viewMode = 'center-head' }) => {
-  const { id } = useParams();
+  const { id, programId } = useParams();
   const navigate = useNavigate();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +58,18 @@ console.log(response.data);
   };
 
   const handleDeleteCourse = async () => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa môn học "${course.name}"?\n\nHành động này không thể hoàn tác.`)) {
+    const result = await Swal.fire({
+      title: 'Xác nhận xóa',
+      text: `Bạn có chắc chắn muốn xóa môn học "${course.name}"? Hành động này không thể hoàn tác.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (!result.isConfirmed) {
       return;
     }
 
@@ -64,24 +78,30 @@ console.log(response.data);
       const response = await courseService.deleteCourse(id);
 
       if (response.success) {
-        alert('Xóa môn học thành công!');
+        toast.success('Xóa môn học thành công!', { position: 'top-right' });
         // Navigate back to program detail or course list
-        navigate(-1);
+        setTimeout(() => navigate(-1), 1000);
       } else {
-        alert(response.message || 'Xóa môn học thất bại!');
+        toast.error(response.message || 'Xóa môn học thất bại!', { position: 'top-right' });
       }
     } catch (err) {
       console.error('Error deleting course:', err);
-      alert(err.message || 'Không thể xóa môn học. Vui lòng thử lại sau.');
+      toast.error(err.message || 'Không thể xóa môn học. Vui lòng thử lại sau.', { position: 'top-right' });
     } finally {
       setDeleteLoading(false);
     }
   };
 
-  const breadcrumbItems = [
+  // Build breadcrumb dynamically based on whether we have programId
+  const breadcrumbItems = programId && course?.program ? [
+    { label: 'Dashboard', path: `${basePath}/dashboard` },
+    { label: 'Chương trình đào tạo', path: `${basePath}/programs` },
+    { label: course.program.program_name, path: `${basePath}/programs/${programId}` },
+    { label: course.name },
+  ] : [
     { label: 'Dashboard', path: `${basePath}/dashboard` },
     { label: 'Danh sách môn học', path: `${basePath}/courses` },
-    { label: 'Chi tiết môn học', path: `${basePath}/courses/${id}/details` },
+    { label: course?.name || 'Chi tiết môn học' },
   ];
 
   if (loading) {
@@ -529,7 +549,14 @@ console.log(response.data);
           <Button
             variant="outline"
             icon="ph ph-arrow-left"
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              // Navigate back to program detail if programId exists, otherwise go back
+              if (programId) {
+                navigate(`${basePath}/programs/${programId}`);
+              } else {
+                navigate(-1);
+              }
+            }}
           >
             Quay lại
           </Button>
@@ -539,7 +566,10 @@ console.log(response.data);
               <Button
                 variant="primary"
                 icon="ph ph-pencil"
-                onClick={() => navigate(`${basePath}/programs/${course.program?._id || course.program}/courses/${id}/edit-form`)}
+                onClick={() => {
+                  const programIdToUse = programId || course.program?._id || course.program;
+                  navigate(`${basePath}/programs/${programIdToUse}/courses/${id}/edit-form`);
+                }}
               >
                 Sửa
               </Button>
@@ -689,6 +719,9 @@ console.log(response.data);
           </div>
         )}
       </Modal>
+
+      {/* Toast Container */}
+      <ToastContainer />
     </div>
   );
 };

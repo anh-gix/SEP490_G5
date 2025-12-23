@@ -22,6 +22,9 @@ router.get('/levels', courseController.getLevelsByType);
 // Lấy danh sách courses theo program name và level - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
 router.get('/by-program', courseController.getCoursesByProgram);
 
+// Lấy danh sách courses theo program ID(s) - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
+router.get('/by-program-id', courseController.getCoursesByProgramId);
+
 // Lấy band từ type và level - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
 router.get('/band', courseController.getBandByTypeAndLevel);
 

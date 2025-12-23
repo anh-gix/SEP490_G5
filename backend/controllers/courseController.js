@@ -37,7 +37,7 @@ exports.getAllCourses = async (req, res) => {
         }
         
         const courses = await Course.find(query)
-            .populate('program', 'program_name code')
+            .populate('program', 'program_name code type level band')
             .populate('createdBy', 'fullname email')
             .sort({ createdAt: -1 });
 
@@ -398,263 +398,10 @@ exports.deleteCourse = async (req, res) => {
 };
 
 // =========================
-// COURSE APPROVAL WORKFLOW
+// COURSE STATUS MANAGEMENT
 // =========================
-
-/**
- * Submit course for approval
- * PATCH /api/courses/:id/submit
- */
-exports.submitCourse = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { submittedBy } = req.body;
-
-        if (!submittedBy) {
-            return res.status(400).json({
-                success: false,
-                message: 'Thiếu thông tin người nộp (submittedBy)'
-            });
-        }
-
-        const course = await Course.findById(id);
-        if (!course) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy giáo trình'
-            });
-        }
-
-        // Check if course is in draft or needs_revision status
-        if (course.status !== 'draft' && course.status !== 'needs_revision') {
-            return res.status(400).json({
-                success: false,
-                message: `Không thể nộp giáo trình có trạng thái ${course.status}`
-            });
-        }
-
-        // Validate course has required data
-        if (!course.clos || course.clos.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Giáo trình phải có ít nhất 1 CLO trước khi nộp'
-            });
-        }
-
-        if (!course.sessions || course.sessions.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Giáo trình phải có ít nhất 1 session trước khi nộp'
-            });
-        }
-
-        // Validate course has mapped PLOs
-        if (!course.mappedPLOs || course.mappedPLOs.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Giáo trình phải mapping với ít nhất 1 PLO của chương trình trước khi nộp'
-            });
-        }
-
-        // Update status and tracking fields
-        course.status = 'pending_approval';
-        course.submittedAt = new Date();
-        course.submittedBy = submittedBy;
-
-        // Add to revision history
-        course.revisionHistory.push({
-            action: course.status === 'needs_revision' ? 'resubmitted' : 'submitted',
-            performedBy: submittedBy,
-            performedAt: new Date(),
-            note: 'Nộp giáo trình để Center Head duyệt'
-        });
-
-        await course.save();
-
-        res.status(200).json({
-            success: true,
-            message: 'Nộp giáo trình thành công',
-            data: course
-        });
-    } catch (err) {
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi nộp giáo trình',
-            error: err.message
-        });
-    }
-};
-
-/**
- * Approve course
- * PATCH /api/courses/:id/approve
- */
-exports.approveCourse = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { approvedBy, approvalNote } = req.body;
-
-        if (!approvedBy) {
-            return res.status(400).json({
-                success: false,
-                message: 'Thiếu thông tin người duyệt (approvedBy)'
-            });
-        }
-
-        const course = await Course.findById(id)
-            .populate('createdBy', 'username email');
-
-        if (!course) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy giáo trình'
-            });
-        }
-
-        // Check if course is in pending_approval status
-        if (course.status !== 'pending_approval') {
-            return res.status(400).json({
-                success: false,
-                message: `Không thể duyệt giáo trình có trạng thái ${course.status}`
-            });
-        }
-
-        // Update status and tracking fields
-        course.status = 'approved';
-        course.approvedAt = new Date();
-        course.approvedBy = approvedBy;
-        course.approvalNote = approvalNote || '';
-
-        // Clear rejection fields if any
-        course.rejectedAt = undefined;
-        course.rejectedBy = undefined;
-        course.rejectionReason = undefined;
-
-        // Add to revision history
-        course.revisionHistory.push({
-            action: 'approved',
-            performedBy: approvedBy,
-            performedAt: new Date(),
-            note: approvalNote || 'Đã duyệt giáo trình'
-        });
-
-        await course.save();
-
-        res.status(200).json({
-            success: true,
-            message: 'Duyệt giáo trình thành công',
-            data: course
-        });
-    } catch (err) {
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi duyệt giáo trình',
-            error: err.message
-        });
-    }
-};
-
-/**
- * Reject course
- * PATCH /api/courses/:id/reject
- */
-exports.rejectCourse = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { rejectedBy, rejectionReason } = req.body;
-
-        if (!rejectedBy) {
-            return res.status(400).json({
-                success: false,
-                message: 'Thiếu thông tin người từ chối (rejectedBy)'
-            });
-        }
-
-        if (!rejectionReason) {
-            return res.status(400).json({
-                success: false,
-                message: 'Vui lòng nhập lý do từ chối'
-            });
-        }
-
-        const course = await Course.findById(id)
-            .populate('createdBy', 'username email');
-
-        if (!course) {
-            return res.status(404).json({
-                success: false,
-                message: 'Không tìm thấy giáo trình'
-            });
-        }
-
-        // Check if course is in pending_approval status
-        if (course.status !== 'pending_approval') {
-            return res.status(400).json({
-                success: false,
-                message: `Không thể từ chối giáo trình có trạng thái ${course.status}`
-            });
-        }
-
-        // Update status and tracking fields
-        course.status = 'needs_revision';
-        course.rejectedAt = new Date();
-        course.rejectedBy = rejectedBy;
-        course.rejectionReason = rejectionReason;
-
-        // Clear approval fields if any
-        course.approvedAt = undefined;
-        course.approvedBy = undefined;
-        course.approvalNote = undefined;
-
-        // Add to revision history
-        course.revisionHistory.push({
-            action: 'rejected',
-            performedBy: rejectedBy,
-            performedAt: new Date(),
-            note: rejectionReason
-        });
-
-        await course.save();
-
-        res.status(200).json({
-            success: true,
-            message: 'Đã yêu cầu chỉnh sửa giáo trình',
-            data: course
-        });
-    } catch (err) {
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi khi từ chối giáo trình',
-            error: err.message
-        });
-    }
-};
-
-/**
- * Get pending courses (for Center Head review)
- * GET /api/courses/pending
- */
-exports.getPendingCourses = async (req, res) => {
-    try {
-        const pendingCourses = await Course.find({ status: 'pending_approval' })
-            .populate('createdBy', 'username email')
-            .populate('program', 'program_name code')
-            .select('name courseCode createdBy submittedAt status program')
-            .sort({ submittedAt: -1 });
-
-        res.status(200).json({
-            success: true,
-            count: pendingCourses.length,
-            data: pendingCourses
-        });
-    } catch (err) {
-        res.status(500).json({
-            success: false,
-            message: 'Lỗi máy chủ',
-            error: err.message
-        });
-    }
-};
+// Note: Course không có approval workflow
+// Status chỉ để tracking: draft, completed, active (có students), archived
 
 /**
  * Archive course
@@ -699,8 +446,8 @@ exports.archiveCourse = async (req, res) => {
  */
 exports.getAllTypes = async (req, res) => {
     try {
-        const types = await Program.distinct('type', { status: 'active' });
-        
+        const types = await Program.distinct('type', { status: 'approved' });
+
         res.status(200).json({
             success: true,
             types: types.sort()
@@ -720,8 +467,8 @@ exports.getAllTypes = async (req, res) => {
  */
 exports.getAllLevels = async (req, res) => {
     try {
-        const levels = await Program.distinct('level', { status: 'active' });
-        
+        const levels = await Program.distinct('level', { status: 'approved' });
+
         // Sort levels in order: Pre-A1, A1, A2, B1, B2, C1, C2
         const levelOrder = ['Pre-A1', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
         const sortedLevels = levels.sort((a, b) => {
@@ -729,7 +476,7 @@ exports.getAllLevels = async (req, res) => {
             const indexB = levelOrder.indexOf(b);
             return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
         });
-        
+
         res.status(200).json({
             success: true,
             levels: sortedLevels
@@ -750,19 +497,26 @@ exports.getAllLevels = async (req, res) => {
 exports.getLevelsByType = async (req, res) => {
     try {
         const { type } = req.query;
-        
+
         if (!type) {
             return res.status(400).json({
                 success: false,
                 message: 'Thiếu tham số type'
             });
         }
-        
-        const levels = await Program.distinct('level', { 
+
+        const levels = await Program.distinct('level', {
             type: type,
-            status: 'active' 
+            status: 'approved'
         });
-        
+
+        // Debug logging
+        console.log(`[getLevelsByType] Type: ${type}, Found levels:`, levels);
+
+        // Also log the programs for this type to verify
+        const programsCount = await Program.countDocuments({ type: type, status: 'approved' });
+        console.log(`[getLevelsByType] Total approved programs for ${type}:`, programsCount);
+
         // Sort levels in order
         const levelOrder = ['Pre-A1', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
         const sortedLevels = levels.sort((a, b) => {
@@ -770,7 +524,7 @@ exports.getLevelsByType = async (req, res) => {
             const indexB = levelOrder.indexOf(b);
             return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
         });
-        
+
         res.status(200).json({
             success: true,
             levels: sortedLevels
@@ -844,6 +598,55 @@ exports.getCoursesByProgram = async (req, res) => {
         .select('name description program')
         .sort({ name: 1 });
         
+        res.status(200).json({
+            success: true,
+            courses: courses
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi máy chủ',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Get courses by program ID(s)
+ * GET /api/courses/by-program-id?programIds=id1,id2,id3
+ * Supports single or multiple program IDs (comma-separated)
+ */
+exports.getCoursesByProgramId = async (req, res) => {
+    try {
+        const { programIds } = req.query;
+
+        if (!programIds) {
+            return res.status(400).json({
+                success: false,
+                message: 'Thiếu tham số programIds'
+            });
+        }
+
+        // Parse program IDs (can be comma-separated)
+        const programIdArray = programIds.split(',').map(id => id.trim()).filter(id => id.length > 0);
+
+        if (programIdArray.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Không có program ID hợp lệ'
+            });
+        }
+
+        // Find courses that belong to these programs
+        // Get courses with status 'completed' or 'active' (courses ready to use)
+        const courses = await Course.find({
+            program: { $in: programIdArray },
+            status: { $in: ['completed', 'active'] }
+        })
+        .populate('program', 'program_name code type level')
+        .select('name description program status isActive')
+        .sort({ name: 1 });
+
         res.status(200).json({
             success: true,
             courses: courses
@@ -950,7 +753,7 @@ exports.getTypesByLevel = async (req, res) => {
 
         const programs = await Program.find({
             level: level,
-            status: 'active'
+            status: 'approved'
         }).distinct('type');
 
         res.status(200).json({

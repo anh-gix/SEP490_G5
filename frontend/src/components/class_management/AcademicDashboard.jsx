@@ -106,83 +106,94 @@ const AcademicDashboard = () => {
             {/* Tổng số đơn trong 1 tuần qua */}
             <Col md={3} lg={3}>
                 <Card className="bg-purple-50 border border-purple-200 rounded-8 h-100 transition-2 item-hover">
-                  <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
-                    <div className="d-flex justify-content-between align-items-start">
+                  <Card.Body className="p-16 d-flex align-items-center">
+                    <div className="d-flex justify-content-between align-items-center w-100">
                       <div className="text-purple-700 fw-bold" style={{ fontSize: '14px' }}>
                         Tổng số đơn trong 1 tuần qua
                       </div>
-                    </div>
-                    <div className="text-center">
-                      <h1 className="text-purple-600 fw-bold mb-2" style={{ fontSize: '36px', lineHeight: '1' }}>
+                      <h1 className="text-purple-600 fw-bold mb-0" style={{ fontSize: '36px', lineHeight: '1' }}>
                         {todayOverview.totalRequestsLastWeek || 0}
                       </h1>
-                    </div>
-                    <div className="text-end">
-                    <Link to="/academic/request-management" className="text-decoration-none">
-                      <span className="text-purple-700 text-11 fw-medium">
-                        Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
-                      </span>
-                    </Link>
                     </div>
                   </Card.Body>
                 </Card>
             </Col>
 
-            {/* đơn lâu nhất chưa xử lý (bao nhiêu ngày chưa giải quyết) */}
+            {/* Các đơn lâu nhất chưa xử lý (bao nhiêu ngày chưa giải quyết) */}
             <Col md={9} lg={9}>
-              <Card 
-                className="bg-purple-50 border border-purple-200 rounded-8 h-100 transition-2 item-hover"
-                style={{ cursor: recentActivities && recentActivities.length > 0 && recentActivities[recentActivities.length - 1]?.id ? 'pointer' : 'default' }}
-                onClick={() => {
-                  const longestPendingRequest = recentActivities && recentActivities.length > 0 ? recentActivities[recentActivities.length - 1] : null;
-                  if (longestPendingRequest?.id) {
-                    window.location.href = `/academic/request-management?requestId=${longestPendingRequest.id}`;
-                  }
-                }}
-              >
-                <Card.Body className="p-16 d-flex flex-column justify-content-between" style={{ minHeight: '120px' }}>
-                  <div className="d-flex justify-content-between align-items-start">
+              <Card className="bg-purple-50 border border-purple-200 rounded-8 h-100">
+                <Card.Body className="p-16">
+                  <div className="mb-12">
                     <div className="text-purple-700 fw-bold" style={{ fontSize: '14px' }}>
-                      Đơn lâu nhất chưa xử lý
+                      Các đơn lâu nhất chưa xử lý
                     </div>
                   </div>
-                  <div className="text-center">
-                    <h1 className="text-purple-600 fw-bold mb-2" style={{ fontSize: '36px', lineHeight: '1' }}>
-                    {recentActivities && recentActivities.length > 0 ? (
-                      <>
-                        <div>
-                          <div className="fw-bold text-15 mb-0">
-                            {recentActivities[recentActivities.length - 1].message}
+                  
+                  {recentActivities && recentActivities.length > 0 ? (
+                    <div className="d-flex gap-16 flex-wrap">
+                      {recentActivities.slice(0, 3).map((activity, idx) => {
+                        // Map request type sang tên tiếng Việt
+                        const getRequestTypeName = (type) => {
+                          const typeMap = {
+                            'change_class': 'Đơn xin đổi lớp',
+                            'makeup_class': 'Đơn xin học bù',
+                            'create_class': 'Đơn tạo lớp mới',
+                            'request_replace_teacher': 'Đơn thay giáo viên'
+                          };
+                          return typeMap[type] || 'Đơn mới';
+                        };
+
+                        // Format date từ createdAt
+                        const formatDate = (date) => {
+                          if (!date) return 'N/A';
+                          const d = new Date(date);
+                          const day = String(d.getDate()).padStart(2, '0');
+                          const month = String(d.getMonth() + 1).padStart(2, '0');
+                          const year = d.getFullYear();
+                          return `${day}/${month}/${year}`;
+                        };
+
+                        return (
+                          <div 
+                            key={activity.id || idx} 
+                            className="d-flex align-items-center gap-8 flex-grow-1"
+                            style={{ minWidth: '200px' }}
+                          >
+                            <div 
+                              className="d-flex align-items-center justify-content-center rounded-circle text-purple-600"
+                              style={{ 
+                                width: '32px', 
+                                height: '32px', 
+                                backgroundColor: 'var(--purple-100)',
+                                minWidth: '32px',
+                                flexShrink: 0
+                              }}
+                            >
+                              <i className={`fas ${activity.icon || 'fa-file-alt'}`} style={{ fontSize: '14px' }}></i>
+                            </div>
+                            <div className="d-flex align-items-center gap-8 flex-wrap">
+                              <span className="text-neutral-900 fw-semibold text-13">
+                                {activity.senderName || 'Người dùng'}
+                              </span>
+                              <span className="text-neutral-600 text-12">
+                                {getRequestTypeName(activity.requestType)}
+                              </span>
+                              <span className="text-neutral-500 text-11">
+                                <i className="fas fa-calendar me-1"></i>
+                                {formatDate(activity.createdAt)}
+                              </span>
+                            </div>
                           </div>
-                          <div className="text-12 text-muted">
-                            {recentActivities[recentActivities.length - 1].time}
-                          </div>
-                        </div>
-                      </>
-                    ) : (
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
                       <span className="text-13 text-muted">Không có đơn chờ xử lý</span>
-                    )}
-                    </h1>
-                  </div>
-                  <div className="text-end">
-                    {recentActivities && recentActivities.length > 0 && recentActivities[recentActivities.length - 1]?.id ? (
-                      <Link 
-                        to={`/academic/request-management?requestId=${recentActivities[recentActivities.length - 1].id}`} 
-                        className="text-decoration-none"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <span className="text-purple-700 text-11 fw-medium">
-                          Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
-                        </span>
-                      </Link>
-                    ) : (
-                      <span className="text-purple-700 text-11 fw-medium">
-                        Xem chi tiết <i className="fas fa-arrow-right ms-1"></i>
-                      </span>
-                    )}
                     </div>
-                  </Card.Body>
-                </Card>
+                  )}
+                </Card.Body>
+              </Card>
             </Col>
 
 

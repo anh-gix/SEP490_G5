@@ -8,7 +8,7 @@ import { classScheduleService } from '../../services/classScheduleService';
 import studentScheduleService from '../../services/studentScheduleService';
 import classService from '../../services/classService';
 import ScheduleCalendar from './ScheduleCalendar';
-import MakeupClassModalForStudent from './MakeupClassModalForStudent';
+import MakeupClassRequestModal from './MakeupClassRequestModal';
 
 /**
  * Student Detail Component
@@ -44,6 +44,10 @@ const StudentDetail = ({ studentId, onBack }) => {
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [savingCourses, setSavingCourses] = useState(false);
 
+  // Filter state for courses
+  const [filterType, setFilterType] = useState('');
+  const [filterLevel, setFilterLevel] = useState('');
+
   // Makeup class modal state
   const [showMakeupModal, setShowMakeupModal] = useState(false);
   const [selectedScheduleForMakeup, setSelectedScheduleForMakeup] = useState(null);
@@ -67,11 +71,8 @@ const StudentDetail = ({ studentId, onBack }) => {
       setLoading(true);
       setDetailError(null);
       
-      console.log(' Fetching student info for:', studentId);
-      
       // Fetch Student details
       const data = await studentService.getStudentById(studentId);
-      console.log(' Student data response:', data);
       
       if (!data || !data.student) {
         throw new Error('Không nhận được dữ liệu học viên từ server');
@@ -91,7 +92,6 @@ const StudentDetail = ({ studentId, onBack }) => {
         studentData.classes = [];
       }
       
-      console.log(' Student courses:', studentData.courses?.length || 0, studentData.courses);
       setSelectedStudent(studentData);
     } catch (err) {
       console.error(' Error fetching Student info:', err);
@@ -131,13 +131,10 @@ const StudentDetail = ({ studentId, onBack }) => {
     
     try {
       setLoadingSchedule(true);
-      console.log(' Fetching student schedule...');
       const scheduleData = await studentService.getStudentSchedule(studentId);
-      console.log(' Schedule data response:', scheduleData);
       
       // Check response structure
       const schedules = scheduleData?.schedules || scheduleData?.data?.schedules || [];
-      console.log(' Student schedules:', schedules.length, schedules);
       setStudentSchedule(Array.isArray(schedules) ? schedules : []);
       setSchedulePage(1);
       setScheduleLoaded(true);
@@ -186,15 +183,27 @@ const StudentDetail = ({ studentId, onBack }) => {
       // Load all courses
       const coursesResponse = await courseService.getAllCourses();
       const allCoursesList = coursesResponse?.data || coursesResponse || [];
-      setAllCourses(allCoursesList);
       
+      // Filter out courses explicitly marked as inactive (isActive = false)
+      // Accept courses with isActive = true or undefined (not set yet)
+      const activeCourses = allCoursesList.filter(course =>
+        course.isActive !== false && 
+        course.program?.isActive !== false
+      );
+      
+      setAllCourses(activeCourses);
+
       // Set currently enrolled courses as selected
       const currentCourseIds = selectedStudent?.courses?.map(course => {
         const id = course._id || course.id;
         return id ? String(id) : null;
       }).filter(id => id !== null) || [];
       setSelectedCourseIds(currentCourseIds);
-      
+
+      // Reset filters when opening modal
+      setFilterType('');
+      setFilterLevel('');
+
       setShowEditCoursesModal(true);
     } catch (err) {
       console.error('Error loading courses:', err);
@@ -391,13 +400,13 @@ const StudentDetail = ({ studentId, onBack }) => {
   // Handler to confirm class change
   const handleConfirmChangeClass = async () => {
     if (!selectedClassToChange || !selectedNewClassId || !selectedNewClassInfo || !studentId) {
-      alert('Vui lòng chọn lớp mới');
+      toast.error('Vui lòng chọn lớp mới');
       return;
     }
 
     const oldClassId = selectedClassToChange._id;
     if (!oldClassId) {
-      alert('Không tìm thấy thông tin lớp cũ');
+      toast.error('Không tìm thấy thông tin lớp cũ');
       return;
     }
 
@@ -424,10 +433,10 @@ const StudentDetail = ({ studentId, onBack }) => {
       setSelectedNewClassId(null);
       setSelectedNewClassInfo(null);
       
-      alert('Đổi lớp học thành công!');
+      toast.success('Đổi lớp học thành công!');
     } catch (err) {
       console.error('Error changing class:', err);
-      alert('Không thể đổi lớp học: ' + (err.response?.data?.message || err.message || 'Lỗi không xác định'));
+      toast.error('Không thể đổi lớp học: ' + (err.response?.data?.message || err.message || 'Lỗi không xác định'));
     } finally {
       setChangingClass(false);
     }
@@ -436,7 +445,7 @@ const StudentDetail = ({ studentId, onBack }) => {
   // Handler to submit makeup class creation
   const handleSubmitMakeup = async (makeupData) => {
     if (!selectedScheduleForMakeup || !studentId) {
-      alert('Thiếu thông tin cần thiết');
+      toast.error('Thiếu thông tin cần thiết');
       return;
     }
 
@@ -445,13 +454,36 @@ const StudentDetail = ({ studentId, onBack }) => {
 
       if (makeupData.existingScheduleId) {
         // Trường hợp chọn buổi có sẵn
-        // 1. Tạo StudentSchedule entry để gán học viên vào buổi học bù
-        await studentScheduleService.createStudentSchedule(
-          studentId,
-          makeupData.existingScheduleId,
-          'rescheduled',
-          `Học bù cho buổi học ngày ${new Date(selectedScheduleForMakeup.date).toLocaleDateString('vi-VN')}`
+        // 1. Kiểm tra và cập nhật/tạo StudentSchedule cho buổi học bù
+        const reason = `Học bù cho buổi học ngày ${new Date(selectedScheduleForMakeup.date).toLocaleDateString('vi-VN')}`;
+
+        // Lấy danh sách StudentSchedule cho buổi học bù này
+        const response = await studentScheduleService.getStudentSchedulesByClassSchedules([makeupData.existingScheduleId]);
+        
+        // Tìm StudentSchedule đã tồn tại cho học viên này
+        const existingSchedule = response.studentSchedules?.find(
+          schedule => {
+            const scheduleStudentId = schedule.student?._id || schedule.student;
+            return scheduleStudentId && scheduleStudentId.toString() === studentId.toString();
+          }
         );
+
+        if (existingSchedule) {
+          // Cập nhật nếu đã tồn tại
+          await studentScheduleService.updateStudentSchedule(
+            existingSchedule._id,
+            'rescheduled',
+            reason
+          );
+        } else {
+          // Tạo mới nếu chưa tồn tại
+          await studentScheduleService.createStudentSchedule(
+            studentId,
+            makeupData.existingScheduleId,
+            'rescheduled',
+            reason
+          );
+        }
 
         // 2. Cập nhật StudentSchedule gốc thành cancelled
         if (selectedScheduleForMakeup.studentScheduleId) {
@@ -503,10 +535,10 @@ const StudentDetail = ({ studentId, onBack }) => {
 
       // 5. Đóng modal và hiển thị thông báo
       handleCloseMakeupModal();
-      alert('Đã tạo buổi học bù thành công!');
+      toast.success('Đã tạo buổi học bù thành công!');
     } catch (err) {
       console.error('Error creating makeup class:', err);
-      alert('Không thể tạo buổi học bù: ' + (err.response?.data?.message || err.message || 'Lỗi không xác định'));
+      toast.error('Không thể tạo buổi học bù: ' + (err.response?.data?.message || err.message || 'Lỗi không xác định'));
     } finally {
       setCreatingMakeup(false);
     }
@@ -538,6 +570,47 @@ const StudentDetail = ({ studentId, onBack }) => {
     return colorMap[status] || 'secondary';
   };
 
+  // Filter courses based on selected filters
+  const filteredCourses = useMemo(() => {
+    if (!allCourses || allCourses.length === 0) return [];
+
+    return allCourses.filter(course => {
+      // Filter by type
+      if (filterType && course.program?.type !== filterType) {
+        return false;
+      }
+
+      // Filter by level
+      if (filterLevel && course.program?.level !== filterLevel) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [allCourses, filterType, filterLevel]);
+
+  // Get unique program types from all courses
+  const programTypes = useMemo(() => {
+    const types = new Set();
+    allCourses.forEach(course => {
+      if (course.program?.type) {
+        types.add(course.program.type);
+      }
+    });
+    return Array.from(types).sort();
+  }, [allCourses]);
+
+  // Get unique program levels from all courses
+  const programLevels = useMemo(() => {
+    const levels = new Set();
+    allCourses.forEach(course => {
+      if (course.program?.level) {
+        levels.add(course.program.level);
+      }
+    });
+    return Array.from(levels).sort();
+  }, [allCourses]);
+
   // Transform schedule data for calendar view
   const calendarSchedules = useMemo(() => {
     if (!Array.isArray(studentSchedule) || studentSchedule.length === 0) {
@@ -546,6 +619,11 @@ const StudentDetail = ({ studentId, onBack }) => {
     
     return studentSchedule
       .filter(schedule => schedule && schedule.date) // Filter out invalid schedules
+      .filter(schedule => {
+        // Filter out cancelled schedules (buổi nghỉ)
+        const scheduleStatus = schedule.scheduleStatus || 'scheduled';
+        return scheduleStatus !== 'cancelled';
+      })
       .map((schedule, index) => {
         try {
           const scheduleDate = new Date(schedule.date);
@@ -563,7 +641,7 @@ const StudentDetail = ({ studentId, onBack }) => {
           
           // Get schedule status from StudentSchedule
           const scheduleStatus = schedule.scheduleStatus || 'scheduled';
-          const isMakeupSchedule = scheduleStatus === 'rescheduled';
+          const isMakeupSchedule = false; // Không hiển thị riêng biệt học bù ở StudentDetail
           const isCancelled = scheduleStatus === 'cancelled';
           const reason = schedule.reason || null;
           
@@ -578,11 +656,9 @@ const StudentDetail = ({ studentId, onBack }) => {
             className = null;
           }
           
-          // For makeup schedules, show "Lớp học bù" if no className
-          if (isMakeupSchedule && !className) {
-            className = 'Lớp học bù';
-          } else if (!className) {
-            // For non-makeup schedules, use 'N/A' if no className
+          // Buổi học bù hiển thị như buổi bình thường, không đổi className
+          if (!className) {
+            // Use 'N/A' if no className
             className = 'N/A';
           }
           
@@ -596,7 +672,7 @@ const StudentDetail = ({ studentId, onBack }) => {
             roomName: schedule.room?.room_name || schedule.roomName || 'N/A',
             roomId: schedule.room?._id || null,
             topic: schedule.topic || schedule.sessionTitle || '',
-            status: schedule.status === 'fixed' ? 'scheduled' : schedule.status === 'temporary' ? 'makeup' : 'scheduled',
+            status: 'scheduled', // Tất cả đều hiển thị như buổi học bình thường
             attendanceStatus: attendanceStatus, // 'present', 'absent', 'late', 'excused', or null
             hasAttendance: !!attendanceStatus,
             teacherName: schedule.teacher?.username || schedule.teacherName || 'N/A',
@@ -606,7 +682,7 @@ const StudentDetail = ({ studentId, onBack }) => {
             lessonTopic: schedule.topic || schedule.sessionTitle || '',
             scheduleStatus: scheduleStatus,
             reason: reason,
-            isMakeupSchedule: isMakeupSchedule,
+            isMakeupSchedule: isMakeupSchedule, // Luôn false để không hiển thị riêng
             isCancelled: isCancelled,
             cancellationReason: isCancelled ? reason : null,
             programType: programType
@@ -1007,11 +1083,77 @@ const StudentDetail = ({ studentId, onBack }) => {
             </div>
           ) : (
             <>
+              {/* Filter Section */}
+              <div className="mb-3 p-3 bg-light rounded">
+                <div className="d-flex align-items-center mb-2">
+                  <i className="fas fa-filter me-2 text-primary"></i>
+                  <span className="fw-semibold">Lọc khóa học:</span>
+                </div>
+                <Row className="g-2">
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label className="text-13 mb-1">Loại chương trình</Form.Label>
+                      <Form.Select
+                        size="sm"
+                        value={filterType}
+                        onChange={(e) => setFilterType(e.target.value)}
+                      >
+                        <option value="">Tất cả</option>
+                        {programTypes.map((type) => (
+                          <option key={type} value={type}>
+                            {type.toUpperCase()}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label className="text-13 mb-1">Trình độ</Form.Label>
+                      <Form.Select
+                        size="sm"
+                        value={filterLevel}
+                        onChange={(e) => setFilterLevel(e.target.value)}
+                      >
+                        <option value="">Tất cả</option>
+                        {programLevels.map((level) => (
+                          <option key={level} value={level}>
+                            {level}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                </Row>
+                {(filterType || filterLevel) && (
+                  <div className="mt-2">
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="p-0 text-decoration-none"
+                      onClick={() => {
+                        setFilterType('');
+                        setFilterLevel('');
+                      }}
+                    >
+                      <i className="fas fa-times me-1"></i>
+                      Xóa tất cả bộ lọc
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Course List Section */}
               <div className="mb-3">
-                <Form.Label className="fw-semibold">Chọn khóa học:</Form.Label>
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <Form.Label className="fw-semibold mb-0">Chọn khóa học:</Form.Label>
+                  <Badge bg="secondary" className="text-12">
+                    {filteredCourses.length} / {allCourses.length} khóa học
+                  </Badge>
+                </div>
                 <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid #dee2e6', borderRadius: '8px', padding: '12px' }}>
-                  {allCourses.length > 0 ? (
-                    allCourses.map((course) => {
+                  {filteredCourses.length > 0 ? (
+                    filteredCourses.map((course) => {
                       const courseId = course._id || course.id;
                       const courseIdStr = courseId ? String(courseId) : null;
                       if (!courseIdStr) return null;
@@ -1023,11 +1165,15 @@ const StudentDetail = ({ studentId, onBack }) => {
                           id={`course-${courseIdStr}`}
                           label={
                             <div>
-                              <span className="fw-semibold">{course.name || course.courseCode || 'N/A'}</span>
+                              <div>
+                                <span className="fw-semibold">{course.name || course.courseCode || 'N/A'}</span>
+                              </div>
                               {course.program && (
-                                <span className="text-muted ms-2 text-13">
-                                  ({course.program.program_name || course.program.name || course.program.type || 'N/A'})
-                                </span>
+                                <div className="text-muted text-12 mt-1">
+                                  <Badge bg="info" className="me-1">{course.program.type?.toUpperCase() || 'N/A'}</Badge>
+                                  <Badge bg="secondary" className="me-1">{course.program.level || 'N/A'}</Badge>
+                                  <span>{course.program.program_name || course.program.name || 'N/A'}</span>
+                                </div>
                               )}
                             </div>
                           }
@@ -1045,7 +1191,9 @@ const StudentDetail = ({ studentId, onBack }) => {
                     })
                   ) : (
                     <div className="text-center py-3 text-muted">
-                      Không có khóa học nào trong hệ thống
+                      {allCourses.length === 0
+                        ? 'Không có khóa học nào trong hệ thống'
+                        : 'Không tìm thấy khóa học phù hợp với bộ lọc'}
                     </div>
                   )}
                 </div>
@@ -1088,14 +1236,14 @@ const StudentDetail = ({ studentId, onBack }) => {
       </Modal>
 
       {/* Makeup Class Modal */}
-      <MakeupClassModalForStudent
+      <MakeupClassRequestModal
         show={showMakeupModal}
         originalSchedule={selectedScheduleForMakeup}
         studentId={studentId}
+        studentSchedule={studentSchedule}
         onClose={handleCloseMakeupModal}
         onSubmit={handleSubmitMakeup}
         loading={creatingMakeup}
-        studentSchedule={studentSchedule}
       />
 
       {/* Change Class Modal */}

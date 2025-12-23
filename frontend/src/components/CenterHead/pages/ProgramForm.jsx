@@ -228,9 +228,14 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
       }
 
       if (isEdit) {
-        await programService.updateProgram(id, programData);
+        const response = await programService.updateProgram(id, programData);
+        const updatedProgram = response.data || { ...programData, _id: id };
+
         toast.success('Cập nhật chương trình thành công!', { position: 'top-right' });
-        navigate(`${basePath}/programs`);
+
+        // Show success modal after update
+        setCreatedProgram(updatedProgram);
+        setShowSuccessModal(true);
       } else {
         const response = await programService.createProgram(programData);
         const newProgram = response.data;
@@ -273,6 +278,7 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
       <ProgramSuccessModal
         show={showSuccessModal}
         programData={createdProgram}
+        isEdit={isEdit}
         onCreateCourse={handleCreateCourse}
         onViewDetail={handleViewDetail}
         onGoToList={handleGoToList}

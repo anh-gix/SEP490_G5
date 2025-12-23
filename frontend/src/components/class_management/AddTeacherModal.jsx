@@ -29,27 +29,22 @@ const AddTeacherModal = ({
           <Row className="g-3">
             <Col md={6}>
               <Form.Group>
-                <Form.Label>Số điện thoại <span className="text-danger">*</span></Form.Label>
+                <Form.Label>Tên đăng nhập <span className="text-danger">*</span></Form.Label>
                 <Form.Control
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
+                  type="text"
+                  name="username"
+                  value={formData.username}
                   onChange={onInputChange}
-                  placeholder="0123456789"
+                  placeholder="Nhập tên đăng nhập"
                   required
-                  pattern="[0-9]{10,11}"
-                  minLength={10}
-                  maxLength={11}
-                  isInvalid={!!formErrors.phone}
+                  minLength={3}
+                  isInvalid={!!formErrors.username}
                 />
-                {formErrors.phone && (
+                {formErrors.username && (
                   <Form.Control.Feedback type="invalid">
-                    {formErrors.phone}
+                    {formErrors.username}
                   </Form.Control.Feedback>
                 )}
-                <Form.Text className="text-muted">
-                  Số điện thoại phải có 10 hoặc 11 chữ số
-                </Form.Text>
               </Form.Group>
             </Col>
 
@@ -68,6 +63,29 @@ const AddTeacherModal = ({
                 {formErrors.email && (
                   <Form.Control.Feedback type="invalid">
                     {formErrors.email}
+                  </Form.Control.Feedback>
+                )}
+              </Form.Group>
+            </Col>
+
+            <Col md={6}>
+              <Form.Group>
+                <Form.Label>Số điện thoại <span className="text-danger">*</span></Form.Label>
+                <Form.Control
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={onInputChange}
+                  placeholder="0123456789"
+                  required
+                  pattern="[0-9]{10,11}"
+                  minLength={10}
+                  maxLength={11}
+                  isInvalid={!!formErrors.phone}
+                />
+                {formErrors.phone && (
+                  <Form.Control.Feedback type="invalid">
+                    {formErrors.phone}
                   </Form.Control.Feedback>
                 )}
               </Form.Group>

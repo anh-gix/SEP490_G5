@@ -354,12 +354,9 @@ const TeacherManagement = () => {
 
       // Check for duplicates within the Excel file
       const emailMap = new Map();
-      const phoneMap = new Map();
       
       previewData.forEach((item, index) => {
         const email = item.email.toLowerCase();
-        // Normalize phone before checking duplicates
-        const phone = normalizePhone(item.phone);
         
         // Check duplicate email in file
         if (email && emailMap.has(email)) {
@@ -376,20 +373,7 @@ const TeacherManagement = () => {
           emailMap.set(email, index);
         }
         
-        // Check duplicate phone in file
-        if (phone && phoneMap.has(phone)) {
-          const firstIndex = phoneMap.get(phone);
-          if (!previewData[firstIndex].errors.includes('Số điện thoại trùng lặp trong file Excel')) {
-            previewData[firstIndex].errors.push('Số điện thoại trùng lặp trong file Excel');
-            previewData[firstIndex].hasError = true;
-          }
-          if (!item.errors.includes('Số điện thoại trùng lặp trong file Excel')) {
-            item.errors.push('Số điện thoại trùng lặp trong file Excel');
-            item.hasError = true;
-          }
-        } else if (phone) {
-          phoneMap.set(phone, index);
-        }
+        // Phone can be duplicate, no need to check
       });
 
       // Check for duplicates with existing data in database
@@ -406,25 +390,17 @@ const TeacherManagement = () => {
         
         const existingEmails = new Set(allUsers.map(u => u.email?.toLowerCase()).filter(Boolean));
         
-        const existingPhones = new Set(
-          allUsers
-            .map(u => normalizePhone(u.phone))
-            .filter(Boolean)
-        );
+        // Phone can be duplicate, no need to check
         
         previewData.forEach((item) => {
           const email = item.email.toLowerCase();
-          const phone = normalizePhone(item.phone);
           
           if (email && existingEmails.has(email)) {
             item.errors.push('Email đã tồn tại trong hệ thống');
             item.hasError = true;
           }
           
-          if (phone && existingPhones.has(phone)) {
-            item.errors.push('Số điện thoại đã tồn tại trong hệ thống');
-            item.hasError = true;
-          }
+          // Phone can be duplicate, no need to check
         });
       } catch (err) {
         console.error('Error checking existing users:', err);

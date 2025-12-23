@@ -114,15 +114,34 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
 
     // Get original roomId from selectedScheduleDetail
     const originalRoomId = selectedScheduleDetail.roomId || selectedScheduleDetail.room?._id || selectedScheduleDetail.room?.id;
+    
+    // Get original teacherId from selectedScheduleDetail (prioritize substituteTeacher if exists)
+    const originalTeacherId = selectedScheduleDetail.substituteTeacherId || 
+                             selectedScheduleDetail.substituteTeacher?._id || 
+                             selectedScheduleDetail.substituteTeacher?.id || 
+                             selectedScheduleDetail.teacherId || 
+                             selectedScheduleDetail.teacher?._id || 
+                             selectedScheduleDetail.teacher?.id;
 
     // Compare all fields
     return (
       editedSchedule.date !== selectedScheduleDetail.date ||
       editedSchedule.startTime !== selectedScheduleDetail.startTime ||
       editedSchedule.endTime !== selectedScheduleDetail.endTime ||
-      editedSchedule.roomId !== originalRoomId
+      editedSchedule.roomId !== originalRoomId ||
+      editedSchedule.teacherId !== originalTeacherId
     );
   }, [editedSchedule, selectedScheduleDetail]);
+
+  // Check if class teacher has been changed
+  const hasClassTeacherChanged = useMemo(() => {
+    if (!formData.teacherId || !fullClassData?.teacher) return false;
+    
+    const originalTeacherId = fullClassData.teacher._id || fullClassData.teacher.id || fullClassData.teacher;
+    const currentTeacherId = formData.teacherId;
+    
+    return String(currentTeacherId) !== String(originalTeacherId);
+  }, [formData.teacherId, fullClassData?.teacher]);
 
   // Validation states for "Xác nhận chỉnh sửa" modal
   const [confirmUpdateValidationResult, setConfirmUpdateValidationResult] = useState(null); // Validation result for confirm update modal
@@ -130,6 +149,21 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
   
   // Pending schedule changes (temporary changes not yet saved to database)
   const [pendingScheduleChanges, setPendingScheduleChanges] = useState([]); // Array<{ scheduleId, oldSchedule: {date, startTime, endTime}, newSchedule: {date, startTime, endTime}, updateScope: 'single'|'future', matchingScheduleIds?: string[] }>
+
+  // Check if there are pending schedule changes with teacher modifications
+  const hasPendingTeacherChanges = useMemo(() => {
+    if (!pendingScheduleChanges || pendingScheduleChanges.length === 0) return false;
+    
+    // Check if any pending change has teacher modification
+    return pendingScheduleChanges.some(change => {
+      const oldTeacherId = change.oldSchedule?.teacherId;
+      const newTeacherId = change.newSchedule?.teacherId;
+      
+      if (!oldTeacherId || !newTeacherId) return false;
+      
+      return String(oldTeacherId) !== String(newTeacherId);
+    });
+  }, [pendingScheduleChanges]);
 
   // Track initial startDate to detect changes
   const [initialStartDate, setInitialStartDate] = useState(null);
@@ -3523,7 +3557,11 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         hasAttendance: hasAttendance, // Thêm property để phân biệt buổi đã học/chưa học
         timeStatus: timeStatus, // 'upcoming', 'ongoing', 'completed'
         isOldClassSchedule: !!pendingChange, // Mark as old schedule if has pending change
-        isRoomChangeOnly: pendingChange?.isRoomChangeOnly // Mark if only room changed
+        isRoomChangeOnly: pendingChange?.isRoomChangeOnly, // Mark if only room changed
+        isTeacherChange: pendingChange ? (
+          pendingChange.oldSchedule?.teacherId && pendingChange.newSchedule?.teacherId && 
+          String(pendingChange.oldSchedule.teacherId) !== String(pendingChange.newSchedule.teacherId)
+        ) : false // Mark if teacher changed
       };
     }).filter(Boolean); // Remove null entries
     
@@ -3531,18 +3569,25 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     const newSchedulesFromPending = [];
     pendingScheduleChanges.forEach(change => {
       if (change.updateScope === 'single') {
-        // Get teacher and room info from formData or fullClassData
-        const teacherName = teachers.find(t => {
+        // Get NEW teacher name from change.newSchedule.teacherId
+        const newTeacherId = change.newSchedule.teacherId;
+        const newTeacherName = teachers.find(t => {
           const teacherId = t._id || t.id;
-          const formTeacherId = formData.teacherId || fullClassData?.teacher?._id || fullClassData?.teacher?.id || fullClassData?.teacher;
-          return String(teacherId) === String(formTeacherId);
+          return newTeacherId && String(teacherId) === String(newTeacherId);
+        })?.username || 
+        teachers.find(t => {
+          const teacherId = t._id || t.id;
+          return newTeacherId && String(teacherId) === String(newTeacherId);
         })?.fullName || 
         teachers.find(t => {
           const teacherId = t._id || t.id;
-          const formTeacherId = formData.teacherId || fullClassData?.teacher?._id || fullClassData?.teacher?.id || fullClassData?.teacher;
-          return String(teacherId) === String(formTeacherId);
+          return newTeacherId && String(teacherId) === String(newTeacherId);
         })?.name ||
         'Chưa có';
+        
+        // Check if teacher changed
+        const oldTeacherId = change.oldSchedule.teacherId;
+        const isTeacherChange = oldTeacherId && newTeacherId && String(oldTeacherId) !== String(newTeacherId);
         
         // Get new room name from change.newSchedule.roomId if available, otherwise use formData
         const newRoomId = change.newSchedule.roomId || formData.roomId || fullClassData?.room?._id || fullClassData?.room?.id || fullClassData?.room;
@@ -3563,12 +3608,13 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
           startTime: change.newSchedule.startTime,
           endTime: change.newSchedule.endTime,
           className: formData.name || 'Chưa có tên lớp',
-          teacherName: teacherName,
+          teacherName: newTeacherName,
           roomName: roomName,
           roomId: newRoomId, // Add roomId for modal initialization
           status: 'temporary',
           isNewClassSchedule: true, // Mark as new schedule (preview)
           isRoomChangeOnly: change.isRoomChangeOnly, // Mark if only room changed
+          isTeacherChange: isTeacherChange, // Mark if teacher changed
           timeStatus: 'upcoming'
         });
       } else if (change.updateScope === 'future') {
@@ -4047,13 +4093,14 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
             startTime: change.newSchedule.startTime,
             endTime: change.newSchedule.endTime,
             room: change.newSchedule.roomId,
+            teacher: change.newSchedule.teacherId,
             updateScope: change.updateScope
           };
 
           console.log(`\n📝 Đang cập nhật buổi học ID: ${change.scheduleId}`);
           console.log(`   Scope: ${change.updateScope}`);
-          console.log(`   Old: ${change.oldSchedule.date} ${change.oldSchedule.startTime}-${change.oldSchedule.endTime} (Phòng: ${change.oldSchedule.roomId})`);
-          console.log(`   New: ${change.newSchedule.date} ${change.newSchedule.startTime}-${change.newSchedule.endTime} (Phòng: ${change.newSchedule.roomId})`);
+          console.log(`   Old: ${change.oldSchedule.date} ${change.oldSchedule.startTime}-${change.oldSchedule.endTime} (Phòng: ${change.oldSchedule.roomId}, GV: ${change.oldSchedule.teacherId})`);
+          console.log(`   New: ${change.newSchedule.date} ${change.newSchedule.startTime}-${change.newSchedule.endTime} (Phòng: ${change.newSchedule.roomId}, GV: ${change.newSchedule.teacherId})`);
 
           try {
             await classScheduleService.updateClassSchedule(change.scheduleId, updateData);
@@ -4604,7 +4651,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                     value={formData.teacherId}
                     onChange={handleInputChange}
                     className="border-neutral-30 radius-8 px-16 py-10"
-                    disabled={teachers.length === 0 || fullClassData?.status === 'completed'}
+                    disabled={teachers.length === 0 || fullClassData?.status === 'completed' || hasPendingTeacherChanges}
                   >
                     <option value="">-- Chọn giáo viên --</option>
                     {teachers.length === 0 ? (
@@ -4635,13 +4682,20 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       );
                     })}
                   </Form.Select>
-                  <Form.Text className="text-neutral-500 text-12">
-                    {checkingTeacherRoomConflicts
-                      ? 'Đang kiểm tra xung đột...'
-                      : teachers.length === 0
-                      ? 'Đang tải danh sách giáo viên...'
-                      : `Có ${filteredTeachers.length} giáo viên. ${effectiveGeneratedSessions.length > 0 ? 'Chọn giáo viên để kiểm tra xung đột lịch học.' : 'Chọn lịch học để kiểm tra xung đột.'}`}
-                  </Form.Text>
+                  {hasPendingTeacherChanges ? (
+                    <Form.Text className="text-warning-600 text-12">
+                      <i className="fas fa-exclamation-triangle me-1"></i>
+                      Không thể chỉnh sửa giáo viên cho lớp vì có thay đổi giáo viên đang chờ lưu cho các buổi học
+                    </Form.Text>
+                  ) : (
+                    <Form.Text className="text-neutral-500 text-12">
+                      {checkingTeacherRoomConflicts
+                        ? 'Đang kiểm tra xung đột...'
+                        : teachers.length === 0
+                        ? 'Đang tải danh sách giáo viên...'
+                        : `Có ${filteredTeachers.length} giáo viên. ${effectiveGeneratedSessions.length > 0 ? 'Chọn giáo viên để kiểm tra xung đột lịch học.' : 'Chọn lịch học để kiểm tra xung đột.'}`}
+                    </Form.Text>
+                  )}
                   {teacherRoomConflicts.teacherConflicts.length > 0 && formData.teacherId && 
                    teacherRoomConflicts.teacherConflicts.some(c => c.teacherId === (formData.teacherId?.toString() || String(formData.teacherId))) && (
                     <Alert variant="warning" className="mt-12 mb-0">
@@ -5602,7 +5656,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                           }));
                         }}
                         className="border-neutral-30 radius-8 px-16 py-10"
-                        disabled={hasAttendance || fullClassData?.status === 'completed'}
+                        disabled={hasAttendance || fullClassData?.status === 'completed' || hasClassTeacherChanged}
                       >
                         <option value="">-- Chọn giáo viên --</option>
                         {availableTeachersForSchedule.map(teacher => {
@@ -5615,13 +5669,19 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                           );
                         })}
                       </Form.Select>
-                      {availableTeachersForSchedule.length === 0 && (
+                      {hasClassTeacherChanged && (
+                        <Form.Text className="text-warning-600 text-12 mt-4">
+                          <i className="fas fa-exclamation-triangle me-1"></i>
+                          Không thể chỉnh sửa giáo viên cho buổi học vì giáo viên của lớp đã thay đổi
+                        </Form.Text>
+                      )}
+                      {!hasClassTeacherChanged && availableTeachersForSchedule.length === 0 && (
                         <Form.Text className="text-danger text-12 mt-4">
                           <i className="fas fa-exclamation-triangle me-1"></i>
                           Không có giáo viên khả dụng trong khung giờ này
                         </Form.Text>
                       )}
-                      {availableTeachersForSchedule.length > 0 && (
+                      {!hasClassTeacherChanged && availableTeachersForSchedule.length > 0 && (
                         <Form.Text className="text-neutral-500 text-12 mt-4">
                           Có {availableTeachersForSchedule.length} giáo viên khả dụng
                         </Form.Text>
@@ -6189,11 +6249,19 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 
                 // Prepare old schedule data
                 const oldRoomId = selectedScheduleDetail.roomId || selectedScheduleDetail.room?._id || selectedScheduleDetail.room?.id;
+                // Prioritize substituteTeacherId if exists (same logic as editedSchedule initialization)
+                const oldTeacherId = selectedScheduleDetail.substituteTeacherId || 
+                                    selectedScheduleDetail.substituteTeacher?._id || 
+                                    selectedScheduleDetail.substituteTeacher?.id || 
+                                    selectedScheduleDetail.teacherId || 
+                                    selectedScheduleDetail.teacher?._id || 
+                                    selectedScheduleDetail.teacher?.id;
                 const oldSchedule = {
                   date: selectedScheduleDetail.date,
                   startTime: selectedScheduleDetail.startTime,
                   endTime: selectedScheduleDetail.endTime,
-                  roomId: oldRoomId
+                  roomId: oldRoomId,
+                  teacherId: oldTeacherId
                 };
 
                 // Prepare new schedule data
@@ -6201,7 +6269,8 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   date: editedSchedule.date,
                   startTime: editedSchedule.startTime,
                   endTime: editedSchedule.endTime,
-                  roomId: editedSchedule.roomId
+                  roomId: editedSchedule.roomId,
+                  teacherId: editedSchedule.teacherId
                 };
 
                 // Check if only room changed (date and time are the same)
@@ -6215,90 +6284,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 console.log('  - UpdateScope:', updateScope);
                 console.log('  - Old Schedule:', oldSchedule);
                 console.log('  - New Schedule:', newSchedule);
-
-                // Log all teacher schedules on the new schedule date
-                console.log('🔍 DEBUG: Bắt đầu lấy lịch giáo viên cho ngày', newSchedule.date);
-                (async () => {
-                  try {
-                    console.log('🔍 DEBUG: Gọi teacherService.getAllTeachers()');
-                    const teachersResponse = await teacherService.getAllTeachers();
-                    console.log('🔍 DEBUG: teachersResponse:', teachersResponse);
-
-                    if (teachersResponse && teachersResponse.teachers && teachersResponse.teachers.length > 0) {
-                      console.log(`📅 Lịch dạy của tất cả giáo viên vào ngày ${newSchedule.date}:`);
-                      console.log('🔍 DEBUG: Tổng số giáo viên:', teachersResponse.teachers.length);
-
-                      const teacherSchedulesPromises = teachersResponse.teachers.map(async (teacher, index) => {
-                        try {
-                          console.log(`🔍 DEBUG: Lấy lịch cho giáo viên ${index + 1}/${teachersResponse.length}:`, teacher.name || teacher._id);
-                          const scheduleResponse = await teacherService.getTeacherSchedule(teacher._id || teacher.id, {
-                            startDate: newSchedule.date,
-                            endDate: newSchedule.date
-                          });
-                          console.log(`🔍 DEBUG: Response cho ${teacher.name}:`, scheduleResponse);
-
-                          if (scheduleResponse && scheduleResponse.schedules && scheduleResponse.schedules.length > 0) {
-                            const schedulesOnDate = scheduleResponse.schedules.filter(s => {
-                              const scheduleDate = s.date || s.scheduleDate || s.classDate;
-
-                              // Chuẩn hóa format date để so sánh
-                              let normalizedScheduleDate = scheduleDate;
-                              if (scheduleDate && scheduleDate.includes('/')) {
-                                // Convert DD/MM/YYYY to YYYY-MM-DD
-                                const [day, month, year] = scheduleDate.split('/');
-                                normalizedScheduleDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                              }
-
-                              const matches = normalizedScheduleDate === newSchedule.date;
-                              console.log(`🔍 DEBUG: Kiểm tra schedule date ${scheduleDate} -> ${normalizedScheduleDate} === ${newSchedule.date}:`, matches);
-                              return matches;
-                            });
-
-                            console.log(`🔍 DEBUG: Số lịch trong ngày cho ${teacher.name}:`, schedulesOnDate.length);
-
-                            if (schedulesOnDate.length > 0) {
-                              return {
-                                teacherName: teacher.name || teacher.fullName || 'N/A',
-                                teacherId: teacher._id || teacher.id,
-                                schedules: schedulesOnDate.map(s => ({
-                                  className: s.className || s.class?.name || 'N/A',
-                                  startTime: s.startTime,
-                                  endTime: s.endTime,
-                                  room: s.room?.room_name || s.room?.name || 'N/A'
-                                }))
-                              };
-                            }
-                          }
-                        } catch (error) {
-                          console.log(`🔍 DEBUG: Lỗi lấy lịch cho ${teacher.name}:`, error.message);
-                          // Ignore individual teacher errors
-                        }
-                        return null;
-                      });
-
-                      console.log('🔍 DEBUG: Chờ Promise.all hoàn thành');
-                      const teacherSchedules = await Promise.all(teacherSchedulesPromises);
-                      const validSchedules = teacherSchedules.filter(s => s !== null);
-                      console.log('🔍 DEBUG: Số giáo viên có lịch:', validSchedules.length);
-
-                      if (validSchedules.length > 0) {
-                        validSchedules.forEach(teacherSchedule => {
-                          console.log(`  👨‍🏫 ${teacherSchedule.teacherName} (${teacherSchedule.teacherId}):`);
-                          teacherSchedule.schedules.forEach(schedule => {
-                            console.log(`    - ${schedule.className}: ${schedule.startTime}-${schedule.endTime} tại ${schedule.room}`);
-                          });
-                        });
-                      } else {
-                        console.log('  Không có lịch dạy nào vào ngày này');
-                      }
-                    } else {
-                      console.log('  Không có danh sách giáo viên');
-                    }
-                  } catch (error) {
-                    console.log('  Lỗi khi lấy lịch giáo viên:', error.message);
-                    console.log('  Chi tiết lỗi:', error);
-                  }
-                })();
 
                 // Calculate matching schedule IDs if updateScope is 'future'
                 let matchingScheduleIds = [];

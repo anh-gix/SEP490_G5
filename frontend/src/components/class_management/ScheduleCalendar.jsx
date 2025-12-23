@@ -420,11 +420,15 @@ const ScheduleCalendar = ({
                         // Tooltip text
                         let tooltipText = 'Buổi chưa học';
                         if (schedule.isOldClassSchedule) {
-                          tooltipText = schedule.isRoomChangeOnly
+                          tooltipText = schedule.isTeacherChange
+                            ? `GV cũ: ${schedule.teacherName}`
+                            : schedule.isRoomChangeOnly
                             ? `Phòng cũ: ${schedule.roomName}`
                             : `Buổi lớp cũ: ${schedule.className}`;
                         } else if (schedule.isNewClassSchedule) {
-                          tooltipText = schedule.isRoomChangeOnly
+                          tooltipText = schedule.isTeacherChange
+                            ? `GV mới: ${schedule.teacherName}`
+                            : schedule.isRoomChangeOnly
                             ? `Phòng mới: ${schedule.roomName}`
                             : `Buổi lớp mới: ${schedule.className}`;
                         } else if (isMakeup) {
@@ -524,12 +528,14 @@ const ScheduleCalendar = ({
                               )}
                               {schedule.isOldClassSchedule && (
                                 <Badge bg="secondary" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#9C27B0' }}>
-                                  {schedule.isRoomChangeOnly ? `Phòng cũ: ${schedule.roomName || 'Chưa có phòng'}` : 'Lớp cũ'}
+                                  {schedule.isTeacherChange ? `GV cũ: ${schedule.teacherName || 'Chưa có'}` : 
+                                   schedule.isRoomChangeOnly ? `Phòng cũ: ${schedule.roomName || 'Chưa có phòng'}` : 'Lớp cũ'}
                                 </Badge>
                               )}
                               {schedule.isNewClassSchedule && (
                                 <Badge bg="primary" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#2196F3' }}>
-                                  {schedule.isRoomChangeOnly ? `Phòng mới: ${schedule.roomName || 'Chưa có phòng'}` : 'Lớp mới'}
+                                  {schedule.isTeacherChange ? `GV mới: ${schedule.teacherName || 'Chưa có'}` : 
+                                   schedule.isRoomChangeOnly ? `Phòng mới: ${schedule.roomName || 'Chưa có phòng'}` : 'Lớp mới'}
                                 </Badge>
                               )}
                               {isMakeup && (

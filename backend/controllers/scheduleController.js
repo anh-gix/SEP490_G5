@@ -729,7 +729,7 @@ exports.updateSchedule = async (req, res) => {
       });
     }
     
-    const { class: classId, session, topic, date, startTime, endTime, room, reason, status, updateScope } = req.body;
+    const { class: classId, session, topic, date, startTime, endTime, room, teacher, reason, status, updateScope } = req.body;
     
     const scope = updateScope || 'single';
     
@@ -937,9 +937,24 @@ exports.updateSchedule = async (req, res) => {
           startTime: newStartTime,
           endTime: newEndTime
         };
-        
+
         if (room) {
           updateData.room = room;
+        }
+        
+        // Update substituteTeacher based on business logic
+        if (teacher) {
+          // Lấy teacher gốc của schedule để so sánh
+          const originalTeacherId = matchingSchedule.teacher?.toString() || matchingSchedule.teacher;
+          const newTeacherId = teacher.toString();
+          
+          if (newTeacherId === originalTeacherId) {
+            // Xóa substituteTeacher
+            updateData.substituteTeacher = null;
+          } else {
+            // Gán substituteTeacher
+            updateData.substituteTeacher = teacher;
+          }
         }
         
         return ClassSchedule.findByIdAndUpdate(
@@ -990,6 +1005,22 @@ exports.updateSchedule = async (req, res) => {
       if (startTime) schedule.startTime = startTime;
       if (endTime) schedule.endTime = endTime;
       if (room) schedule.room = room;
+      
+      // Update substituteTeacher based on business logic
+      if (teacher) {
+        const originalTeacherId = schedule.teacher?.toString() || schedule.teacher;
+        const newTeacherId = teacher.toString();
+        
+        if (newTeacherId === originalTeacherId) {
+          // Giáo viên mới = giáo viên chính → Xóa substituteTeacher
+          schedule.substituteTeacher = null;
+          console.log('  - Xóa substituteTeacher (giáo viên chính dạy lại)');
+        } else {
+          // Giáo viên mới ≠ giáo viên chính → Gán substituteTeacher
+          schedule.substituteTeacher = teacher;
+          console.log('  - Gán substituteTeacher:', teacher);
+        }
+      }
 
       // Check if schedule has original values (was changed before)
       if (schedule.originalDate) {

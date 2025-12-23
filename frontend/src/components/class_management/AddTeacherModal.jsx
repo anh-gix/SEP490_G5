@@ -30,16 +30,15 @@ const AddTeacherModal = ({
           <Row className="g-3">
             <Col md={6}>
               <Form.Group>
-                <Form.Label>Tên đăng nhập <span className="text-danger">*</span></Form.Label>
+                <Form.Label>Họ và tên <span className="text-danger">*</span></Form.Label>
                 <Form.Control
                   type="text"
                   name="username"
                   value={formData.username}
                   onChange={onInputChange}
-                  placeholder="Nhập tên đăng nhập"
+                  placeholder="Nhập họ và tên"
                   required
                   minLength={3}
-                  disabled={!!editingTeacher}
                   isInvalid={!!formErrors.username}
                 />
                 {formErrors.username && (

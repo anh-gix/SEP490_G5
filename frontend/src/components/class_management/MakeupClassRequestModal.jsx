@@ -1084,6 +1084,10 @@ const MakeupClassRequestModal = ({
           // AcademicStaff format
           const newMakeupSessionId = originalScheduleInfo?.sessionId || null;
 
+          // For new makeup classes, className should always be "Lớp học bù" (no class)
+          // Only for existing makeup classes (when selecting existing schedule) should we use the class name
+          const className = makeupOption === 'new' ? 'Lớp học bù' : (originalScheduleInfo?.className || 'Lớp học bù');
+
           onSubmit({
             absentScheduleId: studentScheduleId,
             isSubstituteClass: false,
@@ -1102,7 +1106,7 @@ const MakeupClassRequestModal = ({
               order: originalScheduleInfo?.sessionOrder || null
             },
             makeupClassInfo: {
-              className: originalScheduleInfo?.className || 'Lớp học bù'
+              className: className
             }
           });
         } else {

@@ -158,21 +158,23 @@ const LessonDetail = () => {
             </p>
           </div>
           <div className="d-flex gap-12">
-            <Link 
-              to={`/teacher/attendance/${lessonId}`}
-              className="btn btn-outline-warning text-13 px-16 py-8 radius-8"
-            >
-              <i className="fas fa-user-check me-2"></i>
-              Điểm danh
-            </Link>
             {(!lessonData.classStatus || lessonData.classStatus === 'active') && (
-              <Button 
-                onClick={() => setShowAbsenceModal(true)}
-                className="btn-outline-warning text-13 px-16 py-8 radius-8"
-              >
-                <i className="fas fa-hand-paper me-2"></i>
-                Xin nghỉ
-              </Button>
+              <>
+                <Link 
+                  to={`/teacher/attendance/${lessonId}`}
+                  className="btn btn-outline-warning text-13 px-16 py-8 radius-8"
+                >
+                  <i className="fas fa-user-check me-2"></i>
+                  Điểm danh
+                </Link>
+                <Button 
+                  onClick={() => setShowAbsenceModal(true)}
+                  className="btn-outline-warning text-13 px-16 py-8 radius-8"
+                >
+                  <i className="fas fa-hand-paper me-2"></i>
+                  Xin nghỉ
+                </Button>
+              </>
             )}
           </div>
         </div>

@@ -101,19 +101,8 @@ const TeacherClasses = () => {
         </Alert>
       )}
 
-      {/* Empty State */}
-      {!loading && !error && classes.length === 0 && (
-        <Card className="bg-white border-0 rounded-12 box-shadow-sm">
-          <Card.Body className="text-center py-5">
-            <i className="fas fa-chalkboard-teacher text-neutral-300" style={{ fontSize: '48px' }}></i>
-            <h5 className="text-neutral-700 mt-3 mb-2">Chưa có lớp học nào</h5>
-            <p className="text-neutral-500">Hiện tại bạn chưa được phân công giảng dạy lớp học nào</p>
-          </Card.Body>
-        </Card>
-      )}
-
-      {/* Content - Only show when not loading and no error */}
-      {!loading && !error && classes.length > 0 && (
+      {/* Filters - Always show when not loading and no error */}
+      {!loading && !error && (
       <>
       {/* Summary Stats */}
       {/* <Row className="g-3 mb-24">
@@ -241,7 +230,6 @@ const TeacherClasses = () => {
                 <option value="pending">Chờ khai giảng</option>
                 <option value="active">Đang dạy</option>
                 <option value="completed">Đã hoàn thành</option>
-                <option value="disable">Vô hiệu hóa</option>
               </Form.Select>
             </Col>
             <Col md={5} className="text-end">
@@ -266,8 +254,30 @@ const TeacherClasses = () => {
         </Card.Body>
       </Card>
 
-      {/* Classes Grid/List */}
-      {viewMode === 'grid' ? (
+      {/* Empty State - Show when no classes after filtering */}
+      {filteredClasses.length === 0 && classes.length === 0 && (
+        <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+          <Card.Body className="text-center py-5">
+            <i className="fas fa-chalkboard-teacher text-neutral-300" style={{ fontSize: '48px' }}></i>
+            <h5 className="text-neutral-700 mt-3 mb-2">Chưa có lớp học nào</h5>
+            <p className="text-neutral-500">Hiện tại bạn chưa được phân công giảng dạy lớp học nào</p>
+          </Card.Body>
+        </Card>
+      )}
+
+      {/* Empty State - Show when filter returns no results but there are classes */}
+      {filteredClasses.length === 0 && classes.length > 0 && (
+        <Card className="bg-white border-0 rounded-12 box-shadow-sm">
+          <Card.Body className="text-center py-5">
+            <i className="fas fa-search text-neutral-300" style={{ fontSize: '48px' }}></i>
+            <h5 className="text-neutral-700 mt-3 mb-2">Không tìm thấy lớp học</h5>
+            <p className="text-neutral-500">Không có lớp học nào phù hợp với bộ lọc bạn đã chọn</p>
+          </Card.Body>
+        </Card>
+      )}
+
+      {/* Classes Grid/List - Only show when there are filtered classes */}
+      {filteredClasses.length > 0 && viewMode === 'grid' && (
         <Row className="g-3">
           {filteredClasses.map(cls => {
             const progress = Math.round((cls.completedLessons / cls.totalLessons) * 100);
@@ -360,7 +370,9 @@ const TeacherClasses = () => {
             );
           })}
         </Row>
-      ) : (
+      )}
+
+      {filteredClasses.length > 0 && viewMode === 'list' && (
         <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm">
           <Card.Body className="p-0">
             <Table hover className="mb-0">

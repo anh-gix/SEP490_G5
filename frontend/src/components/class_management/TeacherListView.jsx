@@ -5,7 +5,7 @@ import { Card, Table, Pagination, Button } from 'react-bootstrap';
  * TeacherListView Component
  * Component hiển thị list/table view của giảng viên với pagination
  */
-const TeacherListView = ({ teachers, page, totalPages, onViewDetail, onPageChange }) => {
+const TeacherListView = ({ teachers, page, totalPages, onViewDetail, onEdit, onPageChange }) => {
   return (
     <Card className="bg-white border-0 rounded-12 box-shadow-sm">
       <Card.Body className="p-0">
@@ -47,6 +47,14 @@ const TeacherListView = ({ teachers, page, totalPages, onViewDetail, onPageChang
                   </td>
                   <td className="px-20 py-16">
                     <div className="d-flex gap-8">
+                      <Button
+                        variant="outline-warning"
+                        size="sm"
+                        onClick={() => onEdit(teacher)}
+                      >
+                        <i className="fas fa-edit me-1"></i>
+                        Chỉnh sửa
+                      </Button>
                       <Button
                         variant="outline-info"
                         size="sm"

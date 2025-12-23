@@ -726,15 +726,14 @@ const StudentManagementAPI = () => {
             <Row className="g-3">
               <Col md={6}>
                 <Form.Group>
-                  <Form.Label>Tên đăng nhập <span className="text-danger">*</span></Form.Label>
+                  <Form.Label>Họ và tên <span className="text-danger">*</span></Form.Label>
                   <Form.Control
                     type="text"
                     name="username"
                     value={formData.username}
                     onChange={handleInputChange}
-                    placeholder="Username"
+                    placeholder="Nhập họ và tên"
                     required
-                    disabled={!!editingStudent}
                     isInvalid={!!formErrors.username}
                   />
                   {formErrors.username && (

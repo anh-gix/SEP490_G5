@@ -129,10 +129,19 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess, preselectedSchedule
       
       // Filter by class
       if (selectedClassFilter) {
-        filtered = filtered.filter(schedule => {
-          const classId = schedule.class?._id || schedule.class;
-          return classId && classId.toString() === selectedClassFilter;
-        });
+        if (selectedClassFilter === 'makeup_class') {
+          // Filter for makeup classes (no class)
+          filtered = filtered.filter(schedule => {
+            const hasNoClass = !schedule.class || schedule.class === null || schedule.class === undefined;
+            return hasNoClass;
+          });
+        } else {
+          // Filter by specific class
+          filtered = filtered.filter(schedule => {
+            const classId = schedule.class?._id || schedule.class;
+            return classId && classId.toString() === selectedClassFilter;
+          });
+        }
       }
       
       // Filter by week
@@ -201,7 +210,8 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess, preselectedSchedule
       
       if (response && response.success) {
         if (response.schedules && Array.isArray(response.schedules)) {
-          // Filter out cancelled schedules and schedules from non-active classes
+          // Filter out cancelled schedules
+          // Allow schedules from active classes AND makeup classes (no class)
           const activeSchedules = response.schedules.filter(schedule => {
             // Check both scheduleStatus (from StudentSchedule) and status (from ClassSchedule)
             const isCancelled = 
@@ -210,11 +220,14 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess, preselectedSchedule
               schedule.status === 'cancelled' || 
               schedule.status === 'canceled';
             
-            // Only allow schedules from active classes (not pending, completed, or disable)
+            if (isCancelled) return false;
+            
+            // Allow makeup classes (no class) or schedules from active classes
+            const hasNoClass = !schedule.class || schedule.class === null || schedule.class === undefined;
             const classStatus = schedule.class?.status;
             const isActiveClass = classStatus === 'active';
             
-            return !isCancelled && isActiveClass;
+            return hasNoClass || isActiveClass;
           });
           
           // Filter: Only allow makeup requests for absent or not-yet-attended sessions
@@ -495,6 +508,7 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess, preselectedSchedule
                         className="border-neutral-30 radius-8 px-16 py-10 text-13"
                       >
                         <option value="">Tất cả các lớp</option>
+                        <option value="makeup_class">Lớp học bù</option>
                         {classes.map((cls) => (
                           <option key={cls._id} value={cls._id}>
                             {cls.name} {cls.course?.name ? `- ${cls.course.name}` : ''}
@@ -561,7 +575,11 @@ const CreateChangeRequestModal = ({ show, onHide, onSuccess, preselectedSchedule
                   {filteredStudentSchedules.length === 0 && !loadingSchedules && (
                     <Form.Text className="text-neutral-500 text-12 mt-8 d-block">
                       <i className="fas fa-info-circle me-2"></i>
-                      {selectedClassFilter ? 'Không có buổi học nào trong lớp đã chọn' : 'Bạn chưa có buổi học nào'}
+                      {selectedClassFilter === 'makeup_class' 
+                        ? 'Không có buổi học bù nào' 
+                        : selectedClassFilter 
+                          ? 'Không có buổi học nào trong lớp đã chọn' 
+                          : 'Bạn chưa có buổi học nào'}
                     </Form.Text>
                   )}
                 </>

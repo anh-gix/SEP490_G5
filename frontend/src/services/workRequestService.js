@@ -1,4 +1,5 @@
 import api from './api';
+import { getCookie } from '../utils/cookieUtils.js';
 
 /**
  * Work Request Service - Handles all work request operations
@@ -28,7 +29,7 @@ export const workRequestService = {
     try {
       // Auto-add requestedBy if not provided
       if (!formData.get('requestedBy')) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getCookie('user') || '{}');
         formData.append('requestedBy', user._id);
       }
 
@@ -55,7 +56,7 @@ export const workRequestService = {
   submitProgram: async (programId, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -74,7 +75,7 @@ export const workRequestService = {
   submitExam: async (examId, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -117,7 +118,7 @@ export const workRequestService = {
   getMyRequests: async (params = {}) => {
     try {
       if (!params.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getCookie('user') || '{}');
         params.userId = user._id;
       }
 
@@ -135,7 +136,7 @@ export const workRequestService = {
   getAssignedToMe: async (params = {}) => {
     try {
       if (!params.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getCookie('user') || '{}');
         params.userId = user._id;
       }
 
@@ -184,7 +185,7 @@ export const workRequestService = {
   approveRequest: async (id, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -203,7 +204,7 @@ export const workRequestService = {
   rejectRequest: async (id, data) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -222,7 +223,7 @@ export const workRequestService = {
   revokeApproval: async (id, data) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -245,7 +246,7 @@ export const workRequestService = {
   cancelRequest: async (id, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -253,6 +254,50 @@ export const workRequestService = {
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể hủy yêu cầu' };
+    }
+  },
+
+  // =========================
+  // WITHDRAW SUBMISSION (Subject Leader)
+  // =========================
+
+  /**
+   * Withdraw program submission (Hủy nộp program)
+   * Dùng khi program đang pending_approval và Subject Leader muốn rút lại để chỉnh sửa
+   * @param {string} programId - Program ID
+   * @param {object} data - { userId: string, note: string }
+   */
+  withdrawProgramSubmission: async (programId, data = {}) => {
+    try {
+      if (!data.userId) {
+        const user = JSON.parse(getCookie('user') || '{}');
+        data.userId = user._id;
+      }
+
+      const response = await api.post(`/work-requests/withdraw/program/${programId}`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể hủy nộp chương trình' };
+    }
+  },
+
+  /**
+   * Withdraw exam submission (Hủy nộp đề thi)
+   * Dùng khi exam đang pending_approval và Subject Leader muốn rút lại để chỉnh sửa
+   * @param {string} examId - Exam ID
+   * @param {object} data - { userId: string, note: string }
+   */
+  withdrawExamSubmission: async (examId, data = {}) => {
+    try {
+      if (!data.userId) {
+        const user = JSON.parse(getCookie('user') || '{}');
+        data.userId = user._id;
+      }
+
+      const response = await api.post(`/work-requests/withdraw/exam/${examId}`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể hủy nộp đề thi' };
     }
   },
 
@@ -268,7 +313,7 @@ export const workRequestService = {
   startProcessing: async (id, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -287,7 +332,7 @@ export const workRequestService = {
   completeRequest: async (id, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -306,7 +351,7 @@ export const workRequestService = {
   recreateEntity: async (id, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -314,6 +359,139 @@ export const workRequestService = {
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể tạo lại entity' };
+    }
+  },
+
+  // =========================
+  // EDIT PROGRAM WORKFLOW
+  // =========================
+
+  /**
+   * Check if program has active edit request
+   * @param {string} programId - Program ID
+   */
+  checkProgramEditStatus: async (programId) => {
+    try {
+      const response = await api.get(`/work-requests/program/${programId}/edit-status`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể kiểm tra trạng thái yêu cầu chỉnh sửa' };
+    }
+  },
+
+  /**
+   * Get rejection info for a program (for needs_revision status)
+   * @param {string} programId - Program ID
+   */
+  getProgramRejectionInfo: async (programId) => {
+    try {
+      const response = await api.get(`/work-requests/program/${programId}/rejection-info`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy thông tin từ chối' };
+    }
+  },
+
+  /**
+   * Create edit_program request (Center Head assigns to Subject Leader)
+   * @param {object} data - { entityId: programId, assignedTo: userId, requestNote: string }
+   */
+  createEditProgramRequest: async (data) => {
+    try {
+      const user = JSON.parse(getCookie('user') || '{}');
+      const formData = new FormData();
+      formData.append('requestType', 'edit_program');
+      formData.append('entityId', data.entityId);
+      formData.append('assignedTo', data.assignedTo);
+      formData.append('requestedBy', user._id);
+      if (data.requestNote) {
+        formData.append('requestNote', data.requestNote);
+      }
+
+      const response = await api.post('/work-requests/create', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể tạo yêu cầu chỉnh sửa chương trình' };
+    }
+  },
+
+  /**
+   * Start processing edit_program request (Subject Leader accepts)
+   * @param {string} id - Request ID
+   * @param {object} data - { userId: string }
+   */
+  startEditProgram: async (id, data = {}) => {
+    try {
+      if (!data.userId) {
+        const user = JSON.parse(getCookie('user') || '{}');
+        data.userId = user._id;
+      }
+
+      const response = await api.post(`/work-requests/${id}/start-edit-program`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể bắt đầu xử lý yêu cầu' };
+    }
+  },
+
+  /**
+   * Submit edit_program for approval (Subject Leader completes)
+   * @param {string} id - Request ID
+   * @param {object} data - { userId: string, note: string }
+   */
+  submitEditProgram: async (id, data = {}) => {
+    try {
+      if (!data.userId) {
+        const user = JSON.parse(getCookie('user') || '{}');
+        data.userId = user._id;
+      }
+
+      const response = await api.post(`/work-requests/${id}/submit-edit-program`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể gửi yêu cầu phê duyệt' };
+    }
+  },
+
+  /**
+   * Approve edit_program request (Center Head approves)
+   * @param {string} id - Request ID
+   * @param {object} data - { userId: string, note: string }
+   */
+  approveEditProgram: async (id, data = {}) => {
+    try {
+      if (!data.userId) {
+        const user = JSON.parse(getCookie('user') || '{}');
+        data.userId = user._id;
+      }
+
+      const response = await api.post(`/work-requests/${id}/approve-edit-program`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể duyệt yêu cầu chỉnh sửa' };
+    }
+  },
+
+  /**
+   * Reject edit_program request (Center Head rejects)
+   * @param {string} id - Request ID
+   * @param {object} data - { userId: string, rejectionReason: string }
+   */
+  rejectEditProgram: async (id, data) => {
+    try {
+      if (!data.userId) {
+        const user = JSON.parse(getCookie('user') || '{}');
+        data.userId = user._id;
+      }
+
+      const response = await api.post(`/work-requests/${id}/reject-edit-program`, data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể từ chối yêu cầu chỉnh sửa' };
     }
   },
 

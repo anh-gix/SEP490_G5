@@ -1356,17 +1356,43 @@ exports.createClass = async (req, res) => {
     // Commit transaction before populating (populate doesn't need to be in transaction)
     await session.commitTransaction();
     session.endSession();
-    
+
+    // Auto active Course và Program khi tạo class mới
+    if (course) {
+      try {
+        // Cập nhật Course: status = 'active', isActive = true
+        const updatedCourse = await Course.findByIdAndUpdate(
+          course,
+          {
+            status: 'active',
+            isActive: true
+          },
+          { new: true }
+        );
+
+        // Cập nhật Program: isActive = true nếu course thuộc program
+        if (updatedCourse?.program) {
+          await Program.findByIdAndUpdate(
+            updatedCourse.program,
+            { isActive: true }
+          );
+        }
+      } catch (activationError) {
+        // Log lỗi nhưng không fail request vì class đã được tạo thành công
+        console.error('Error activating course/program:', activationError);
+      }
+    }
+
     const populatedClass = await Class.findById(newClass._id)
       .populate('teacher', 'username email phone')
       .populate('students', 'username email')
       .populate('room', 'room_name location capacity')
-      .populate({ 
-        path: 'course', 
-        select: 'name',
-        populate: { path: 'program', select: 'program_name name level band tuitionFee type' } 
+      .populate({
+        path: 'course',
+        select: 'name status isActive',
+        populate: { path: 'program', select: 'program_name name level band tuitionFee type isActive' }
       });
-    
+
     res.status(201).json({
       success: true,
       message: 'Tạo lớp học thành công',

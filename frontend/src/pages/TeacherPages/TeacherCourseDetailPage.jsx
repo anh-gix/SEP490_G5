@@ -1,10 +1,11 @@
 import React from 'react';
 import TeacherNavigation from '../../components/teacher_components/TeacherNavigation';
-import CourseDetail from '../../components/CenterHead/pages/CourseDetail';
+import TeacherCourseDetail from '../../components/teacher_components/TeacherCourseDetail';
 
 /**
  * Teacher Course Detail Page
- * Page xem chi tiết course cho giảng viên
+ * Page xem chi tiết course cho giảng viên (Subject Leader)
+ * Có đầy đủ quyền: view, edit, delete (khi program đang draft/needs_revision và course không active)
  */
 const TeacherCourseDetailPage = () => {
   return (
@@ -14,7 +15,7 @@ const TeacherCourseDetailPage = () => {
 
       {/* Main Content */}
       <div className="flex-grow-1 py-24 px-24" style={{ backgroundColor: '#f8f9fa' }}>
-        <CourseDetail viewMode="teacher" />
+        <TeacherCourseDetail />
       </div>
     </div>
   );

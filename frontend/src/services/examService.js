@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getCookie } from '../utils/cookieUtils.js';
 const API_PORT = import.meta.env.VITE_API_PORT;
 
 const API_BASE_URL = `http://localhost:${API_PORT}/api/exams`;
@@ -12,7 +13,7 @@ const api = axios.create({
 // Interceptor để thêm token vào headers
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = getCookie('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -114,15 +115,15 @@ export const examService = {
   // Submit exam for approval
   submitExamForApproval: async (examId, submissionNote) => {
     try {
-      // Lấy user info từ localStorage
-      const userStr = localStorage.getItem('user');
+      // Lấy user info từ cookie
+      const userStr = getCookie('user');
       let submittedBy = null;
       if (userStr) {
         try {
           const user = JSON.parse(userStr);
           submittedBy = user._id || user.id;
         } catch (e) {
-          console.error('Error parsing user from localStorage:', e);
+          console.error('Error parsing user from cookie:', e);
         }
       }
 
@@ -160,16 +161,36 @@ export const examService = {
     }
   },
 
+  // Upload exam file (PDF, audio) for section
+  uploadExamFileForManagement: async (formData) => {
+    try {
+      const response = await api.post('/management/upload-exam-file', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể upload file đề thi' };
+    }
+  },
+
+  // Delete exam file (PDF, audio) from section
+  deleteExamFileForManagement: async (data) => {
+    try {
+      const response = await api.post('/management/delete-exam-file', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể xóa file' };
+    }
+  },
+
   // Validate exam data trước khi gửi
   validateExamData: (examData) => {
     const errors = [];
 
     if (!examData.title || examData.title.trim() === '') {
       errors.push('Tiêu đề đề thi không được để trống');
-    }
-
-    if (!examData.level) {
-      errors.push('Cấp độ đề thi không được để trống');
     }
 
     if (examData.sections && examData.sections.length > 0) {
@@ -198,7 +219,6 @@ export const examService = {
       title: examData.title?.trim(),
       description: examData.description?.trim() || '',
       examType: examData.examType || 'cambridge', // Default to cambridge
-      level: examData.level,
       totalDuration: parseInt(examData.totalDuration) || 0,
       sections: formattedSections,
       isPublished: examData.isPublished || false,

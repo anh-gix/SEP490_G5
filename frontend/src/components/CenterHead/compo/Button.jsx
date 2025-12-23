@@ -12,12 +12,14 @@ const Button = ({
   iconPosition = 'left'
 }) => {
   const variantClasses = {
-    primary: 'btn-main',
+    primary: 'btn-main text-white',
     secondary: 'btn-outline-main',
     'outline-secondary': 'btn-outline-secondary',
     success: 'bg-success-600 text-white border-success-600',
     danger: 'bg-danger-600 text-white border-danger-600',
     warning: 'bg-warning-600 text-white border-warning-600',
+    edit: 'bg-orange-600 text-white border-orange-600',
+    info: 'bg-info-600 text-white border-info-600',
     outline: 'bg-white text-neutral-700 border-neutral-300',
     ghost: 'bg-transparent text-neutral-700 border-0',
   };
@@ -26,6 +28,8 @@ const Button = ({
     success: { backgroundColor: 'var(--success-700)', borderColor: 'var(--success-700)' },
     danger: { backgroundColor: 'var(--danger-700)', borderColor: 'var(--danger-700)' },
     warning: { backgroundColor: 'var(--warning-700)', borderColor: 'var(--warning-700)' },
+    edit: { backgroundColor: 'var(--orange-700)', borderColor: 'var(--orange-700)' },
+    info: { backgroundColor: 'var(--info-700)', borderColor: 'var(--info-700)' },
   };
 
   const sizeClasses = {

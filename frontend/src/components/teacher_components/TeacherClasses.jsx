@@ -55,9 +55,10 @@ const TeacherClasses = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
+      pending: { bg: 'bg-info-600', text: 'Chờ khai giảng' },
       active: { bg: 'bg-success-600', text: 'Đang dạy' },
-      upcoming: { bg: 'bg-info-500', text: 'Sắp mở' },
-      completed: { bg: 'bg-neutral-500', text: 'Đã kết thúc' }
+      completed: { bg: 'bg-neutral-500', text: 'Đã hoàn thành' },
+      disable: { bg: 'bg-danger-600', text: 'Vô hiệu hóa' }
     };
     const config = statusConfig[status] || statusConfig.active;
     return <Badge className={`${config.bg} text-white px-12 py-6`}>{config.text}</Badge>;
@@ -115,7 +116,7 @@ const TeacherClasses = () => {
       {!loading && !error && classes.length > 0 && (
       <>
       {/* Summary Stats */}
-      <Row className="g-3 mb-24">
+      {/* <Row className="g-3 mb-24">
         <Col md={3}>
           <Card className="bg-white border-0 rounded-12 box-shadow-sm">
             <Card.Body className="p-20">
@@ -213,7 +214,7 @@ const TeacherClasses = () => {
             </Card.Body>
           </Card>
         </Col>
-      </Row>
+      </Row> */}
 
       {/* Filters */}
       <Card className="bg-white border border-neutral-30 rounded-12 box-shadow-sm mb-24">
@@ -237,9 +238,10 @@ const TeacherClasses = () => {
                 className="radius-8"
               >
                 <option value="all">Tất cả trạng thái</option>
+                <option value="pending">Chờ khai giảng</option>
                 <option value="active">Đang dạy</option>
-                <option value="upcoming">Sắp mở</option>
-                <option value="completed">Đã kết thúc</option>
+                <option value="completed">Đã hoàn thành</option>
+                <option value="disable">Vô hiệu hóa</option>
               </Form.Select>
             </Col>
             <Col md={5} className="text-end">
@@ -300,7 +302,7 @@ const TeacherClasses = () => {
                     </div>
 
                     {/* Progress */}
-                    <div className="mb-16">
+                    {/* <div className="mb-16">
                       <div className="d-flex justify-content-between align-items-center mb-8">
                         <span className="text-neutral-700 text-13 fw-medium">Tiến độ giảng dạy</span>
                         <span className="text-main-600 fw-bold text-13">{progress}%</span>
@@ -311,10 +313,10 @@ const TeacherClasses = () => {
                       <div className="text-neutral-500 text-12 mt-4">
                         {cls.completedLessons}/{cls.totalLessons} buổi học
                       </div>
-                    </div>
+                    </div> */}
 
                     {/* Stats */}
-                    <Row className="g-2 mb-16">
+                    {/* <Row className="g-2 mb-16">
                       <Col xs={6}>
                         <div className="bg-success-25 border border-success-100 rounded-8 p-12 text-center">
                           <div className="text-success-600 fw-bold text-16">{attendanceRate}%</div>
@@ -327,7 +329,7 @@ const TeacherClasses = () => {
                           <div className="text-neutral-600 text-11">Chưa chấm</div>
                         </div>
                       </Col>
-                    </Row>
+                    </Row> */}
 
                     {/* Next Lesson */}
                     {cls.nextLesson && (

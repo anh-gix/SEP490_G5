@@ -522,7 +522,7 @@ exports.getScheduleById = async (req, res) => {
           { path: 'students', select: 'username email' },
           { 
             path: 'course', 
-            select: 'name type level band materials',
+            select: 'name type level band materials clos',
             populate: { path: 'program', select: 'program_name name' }
           }
         ]
@@ -531,11 +531,7 @@ exports.getScheduleById = async (req, res) => {
       .populate('room', 'room_name location capacity')
       .populate({
         path: 'session',
-        select: 'title order description content clos',
-        populate: {
-          path: 'clos',
-          select: 'code name detail documentUrl documentPath'
-        }
+        select: 'title order description content clos learningType'
       })
       .populate('createdBy', 'username email');
     
@@ -544,6 +540,17 @@ exports.getScheduleById = async (req, res) => {
         success: false,
         message: 'Không tìm thấy lịch học'
       });
+    }
+    
+    // Nếu có session và session.clos, lấy CLOs từ course.clos dựa vào _id
+    if (schedule.session && schedule.session.clos && schedule.session.clos.length > 0 && schedule.class && schedule.class.course) {
+      const closIds = schedule.session.clos.map(id => id.toString());
+      const courseClos = schedule.class.course.clos || [];
+      
+      // Lọc CLOs từ course.clos theo closIds trong session.clos
+      schedule.session.clos = courseClos.filter(clo => 
+        closIds.includes(clo._id.toString())
+      );
     }
     
     res.status(200).json({

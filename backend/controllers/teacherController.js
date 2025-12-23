@@ -818,8 +818,13 @@ exports.getMyClasses = async (req, res) => {
 
     // Build query
     let query = { teacher: teacherId };
+    
+    // Mặc định chỉ hiển thị lớp active và pending
     if (status && status !== 'all') {
       query.status = status;
+    } else if (!status) {
+      // Mặc định filter active và pending
+      query.status = { $in: ['active', 'pending'] };
     }
 
     // Find all classes taught by this teacher
@@ -1362,7 +1367,7 @@ exports.getLessonDetail = async (req, res) => {
         populate: [
           {
             path: 'course',
-            select: 'name description'
+            select: 'name description clos'
           },
           {
             path: 'teacher',
@@ -1376,7 +1381,7 @@ exports.getLessonDetail = async (req, res) => {
       })
       .populate('teacher', 'username email') // Thêm populate cho teacher của ClassSchedule
       .populate('room', 'room_name location capacity')
-      .populate('session', 'title order content learningType')
+      .populate('session', 'title order content learningType clos')
       .lean();
 
     if (!schedule) {
@@ -1405,6 +1410,18 @@ exports.getLessonDetail = async (req, res) => {
         success: false,
         message: 'Bạn không có quyền xem buổi học này'
       });
+    }
+
+    // Lấy CLOs từ course.clos dựa vào session.clos (array of ObjectIds)
+    let sessionClos = [];
+    if (schedule.session && schedule.session.clos && schedule.session.clos.length > 0 && schedule.class && schedule.class.course) {
+      const closIds = schedule.session.clos.map(id => id.toString());
+      const courseClos = schedule.class.course.clos || [];
+      
+      // Lọc CLOs từ course.clos theo closIds trong session.clos
+      sessionClos = courseClos.filter(clo => 
+        closIds.includes(clo._id.toString())
+      );
     }
 
     // Get attendance data for all students in this class
@@ -1493,6 +1510,7 @@ exports.getLessonDetail = async (req, res) => {
       sessionOrder: schedule.session?.order,
       sessionContent: schedule.session?.content,
       learningType: schedule.session?.learningType,
+      sessionClos: sessionClos, // Thêm CLOs đã lọc từ course
       
       // Room info
       roomName: schedule.room?.room_name,

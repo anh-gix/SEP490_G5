@@ -130,7 +130,7 @@ const OnlineCourseList = () => {
           <div>
             <h3 className="mb-8">Khóa học bổ trợ online</h3>
             <p className="text-neutral-500">
-              Khóa học online bổ trợ kiến thức cho học viên
+              Khóa học online bổ trợ kiến thức cho học viên 
             </p>
           </div>
           <div className="d-flex gap-12 align-items-center">

@@ -81,9 +81,10 @@ const MyClasses = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      pending: { bg: 'bg-warning-600', text: 'Chờ khai giảng', icon: 'fa-clock' },
+      pending: { bg: 'bg-info-600', text: 'Chờ khai giảng', icon: 'fa-clock' },
       active: { bg: 'bg-success-600', text: 'Đang học', icon: 'fa-play-circle' },
-      completed: { bg: 'bg-neutral-600', text: 'Đã hoàn thành', icon: 'fa-check-circle' }
+      completed: { bg: 'bg-neutral-600', text: 'Đã hoàn thành', icon: 'fa-check-circle' },
+      disable: { bg: 'bg-danger-600', text: 'Vô hiệu hóa', icon: 'fa-ban' }
     };
 
     const config = statusConfig[status] || statusConfig.active;
@@ -104,12 +105,10 @@ const MyClasses = () => {
   }, [filterStatus]);
 
   const filteredClasses = classes.filter(cls => {
-    // Only show active, pending, or completed classes (exclude disabled)
-    const isActiveClass = cls.status === 'pending' || cls.status === 'active' || cls.status === 'completed';
     const matchesSearch = cls.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          cls.level.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          cls.teacher.toLowerCase().includes(searchTerm.toLowerCase());
-    return isActiveClass && matchesSearch;
+    return matchesSearch;
   });
 
   const renderGridView = () => {
@@ -186,14 +185,14 @@ const MyClasses = () => {
                   </div>
 
                   {/* Stats */}
-                  <Row className="g-2 mb-16">
+                  {/* <Row className="g-2 mb-16">
                     <Col xs={12}>
                       <div className="bg-success-25 border border-success-100 rounded-8 p-12 text-center">
                         <div className="text-success-600 fw-bold text-16">{cls.attendanceRate}%</div>
                         <div className="text-neutral-600 text-11">Chuyên cần</div>
                       </div>
                     </Col>
-                  </Row>
+                  </Row> */}
 
                   {/* Next Lesson */}
                   {cls.nextLesson && (
@@ -411,19 +410,20 @@ const MyClasses = () => {
 
             <Col lg={4}>
               {/* Filter by Status */}
-              <Form.Group>
+              {/* <Form.Group>
                 <Form.Select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
                   className="border-neutral-30 radius-8 px-16 py-10 text-13"
                 >
                   <option value="all">Tất cả trạng thái</option>
-                  <option value="pending">Chờ khai giảng</option>
                   <option value="active">Đang học</option>
                   <option value="completed">Đã hoàn thành</option>
+                  <option value="paused">Tạm dừng</option>
                 </Form.Select>
-              </Form.Group>
+              </Form.Group> */}
             </Col>
+
 
             <Col lg={4}>
               {/* View Toggle */}
@@ -453,7 +453,7 @@ const MyClasses = () => {
       </Card>
 
       {/* Summary Stats */}
-      <Row className="g-3 mb-24">
+      {/* <Row className="g-3 mb-24">
         <Col md={4}>
           <Card className="bg-main-25 border border-main-200 rounded-12 style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}">
             <Card.Body className="p-20">
@@ -496,7 +496,7 @@ const MyClasses = () => {
               <div className="d-flex justify-content-between align-items-center">
                 <div>
                   <div className="text-warning-600 text-24 fw-bold">
-                    {classes.filter(c => c.status === 'pending' || c.status === 'active' || c.status === 'completed').reduce((sum, c) => sum + c.pendingAssignments, 0)}
+                    {classes.reduce((sum, c) => sum + c.pendingAssignments, 0)}
                   </div>
                   <div className="text-neutral-700 text-13">Bài tập chưa nộp</div>
                 </div>
@@ -508,7 +508,7 @@ const MyClasses = () => {
             </Card.Body>
           </Card>
         </Col>
-      </Row>
+      </Row> */}
 
       {/* Loading State */}
       {loading && (

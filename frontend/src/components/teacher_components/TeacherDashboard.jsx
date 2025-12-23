@@ -86,6 +86,22 @@ const TeacherDashboard = () => {
     }
   };
 
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      pending: { bg: 'bg-info-600', text: 'Chờ khai giảng', icon: 'fa-clock' },
+      active: { bg: 'bg-success-600', text: 'Đang dạy', icon: 'fa-play-circle' },
+      completed: { bg: 'bg-neutral-600', text: 'Đã hoàn thành', icon: 'fa-check-circle' },
+      disable: { bg: 'bg-danger-600', text: 'Vô hiệu hóa', icon: 'fa-ban' }
+    };
+    const config = statusConfig[status] || statusConfig.active;
+    return (
+      <Badge className={`${config.bg} text-white px-8 py-4 text-10`}>
+        <i className={`fas ${config.icon} me-1`}></i>
+        {config.text}
+      </Badge>
+    );
+  };
+
   if (loading) {
     return (
       <Container fluid className="py-24 px-24" style={{ backgroundColor: '#F5F7FA' }}>
@@ -108,7 +124,7 @@ const TeacherDashboard = () => {
       </div>
 
       {/* Stats Cards */}
-      <Row className="g-3 mb-24">
+      {/* <Row className="g-3 mb-24">
         <Col md={3}>
           <Card className="bg-white border-0 rounded-12 h-100" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
             <Card.Body className="p-16">
@@ -200,7 +216,7 @@ const TeacherDashboard = () => {
             </Card.Body>
           </Card>
         </Col>
-      </Row>
+      </Row> */}
 
       <Row className="g-3">
         {/* Upcoming Schedule - Left Side */}
@@ -349,6 +365,7 @@ const TeacherDashboard = () => {
                       </div>
                       <div className="d-flex gap-12 align-items-center">
                         <Badge className="bg-main-100 text-main-600 px-8 py-4 text-11">{classItem.level}</Badge>
+                        {classItem.status && getStatusBadge(classItem.status)}
                         <span className="text-neutral-600 text-12">
                           <i className="fas fa-users me-1" style={{ fontSize: '10px' }}></i>
                           {classItem.students} học viên
@@ -370,7 +387,7 @@ const TeacherDashboard = () => {
                       />
                     </div>
 
-                    <div className="d-flex flex-column gap-8">
+                    {/* <div className="d-flex flex-column gap-8">
                       <div className="d-flex align-items-start gap-8">
                         <i className="fas fa-file-alt text-warning-600 mt-1" style={{ fontSize: '11px' }}></i>
                         <div className="flex-grow-1">
@@ -385,7 +402,7 @@ const TeacherDashboard = () => {
                           <div className="text-neutral-500 text-11">Hạn: {classItem.assignmentDeadline}</div>
                         </div>
                       </div>
-                    </div>
+                    </div> */}
                   </div>
                 ))}
               </div>

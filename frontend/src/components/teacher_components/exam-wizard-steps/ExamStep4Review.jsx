@@ -41,6 +41,7 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
     const totalDuration = sections.reduce((sum, s) => sum + (s.duration || 0), 0);
     const totalQuestions = sections.reduce((sum, s) => sum + (s.questionCount || 0), 0);
     const totalAnswerKeys = sections.reduce((sum, s) => sum + (s.answerKey?.length || 0), 0);
+    const totalMaxScore = sections.reduce((sum, s) => sum + (s.maxScore || 0), 0);
     const totalFiles = sections.reduce((sum, s) => {
       let count = 0;
       if (s.fileUrl) count++;
@@ -48,7 +49,7 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
       return sum + count;
     }, 0);
 
-    return { totalParts, totalDuration, totalQuestions, totalAnswerKeys, totalFiles };
+    return { totalParts, totalDuration, totalQuestions, totalAnswerKeys, totalMaxScore, totalFiles };
   };
 
   const getValidationStatus = () => {
@@ -57,7 +58,7 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
     // Check basic info
     checks.push({
       label: 'Tất cả thông tin cơ bản đã điền đầy đủ',
-      status: examData.title && examData.examType && examData.level && examData.totalDuration
+      status: examData.title && examData.examType && examData.totalDuration
     });
 
     // Check sections
@@ -217,6 +218,7 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
                   • {summary.totalParts} {summary.totalParts > 1 ? 'parts' : 'part'}
                   • {summary.totalQuestions} questions
                   • {summary.totalDuration} minutes
+                  • {summary.totalMaxScore} points
                 </span>
               </div>
               <div className="d-flex align-items-center gap-2">
@@ -245,6 +247,7 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
                         <th>Duration</th>
                         <th>Questions</th>
                         <th>Answer Keys</th>
+                        <th>Max Score</th>
                         <th>Files</th>
                       </tr>
                     </thead>
@@ -265,6 +268,11 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
                                 {section.answerKey?.length || 0}
                               </span>
                             )}
+                          </td>
+                          <td>
+                            <span className="badge bg-secondary">
+                              {section.maxScore || 0} points
+                            </span>
                           </td>
                           <td>
                             {section.fileUrl && (
@@ -309,7 +317,7 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
 
           {validation.allPassed && (
             <div className="alert alert-success mb-0 mt-3">
-              <strong>🎉 Đề thi đã sẵn sàng để submit!</strong>
+              <strong> Đề thi đã sẵn sàng để submit!</strong>
             </div>
           )}
         </div>
@@ -317,32 +325,13 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
 
       <hr className="my-4" />
 
-      {/* Next Steps */}
-      <h6 className="fw-semibold mb-3">📋 Next Steps</h6>
-
-      <div className="card border-0 shadow-sm mb-4">
-        <div className="card-body">
-          <p className="mb-2"><strong>Sau khi submit:</strong></p>
-          <ol className="mb-0">
-            <li>Đề thi sẽ chuyển sang trạng thái "Pending Approval"</li>
-            <li>Center Head sẽ nhận được thông báo để review</li>
-            <li>Center Head có thể:
-              <ul>
-                <li><strong>Approve</strong> → Đề thi được phê duyệt</li>
-                <li><strong>Request Revision</strong> → Yêu cầu chỉnh sửa</li>
-                <li><strong>Reject</strong> → Từ chối</li>
-              </ul>
-            </li>
-            <li>Nếu được approve, đề thi có thể được publish cho học viên</li>
-          </ol>
-        </div>
-      </div>
+     
 
       <div className="alert alert-warning">
         <i className="ph ph-warning-circle me-2"></i>
         <strong>Lưu ý quan trọng:</strong>
         <ul className="mb-0 mt-2">
-          <li>Sau khi submit, bạn KHÔNG THỂ chỉnh sửa đề thi cho đến khi Center Head review xong</li>
+          <li>Sau khi submit, bạn KHÔNG THỂ chỉnh sửa đề thi cho đến khi Trưởng trung tâm review xong</li>
           <li>Nếu cần thay đổi, hãy chọn "Save as Draft" và submit sau</li>
           <li>Đề thi draft có thể chỉnh sửa bất kỳ lúc nào</li>
         </ul>

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Dropdown } from 'react-bootstrap';
+import { getCookie, setCookie } from '../../utils/cookieUtils.js';
+import { useAuth } from '../../contexts/AuthContext';
 
 /**
  * Role Navigation Component
@@ -13,20 +15,32 @@ const RoleNavigation = ({
   userInfo
 }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    const saved = localStorage.getItem('sidebar-collapsed');
+    const saved = getCookie('sidebar-collapsed');
     return saved === 'true';
   });
 
   useEffect(() => {
-    localStorage.setItem('sidebar-collapsed', isCollapsed);
+    setCookie('sidebar-collapsed', isCollapsed.toString(), 30); // 30 days
   }, [isCollapsed]);
 
   const isActive = (path) =>
     location.pathname === path || location.pathname.startsWith(path + '/');
+
+  const handleLogout = async (event) => {
+    event.preventDefault();
+    try {
+      await logout();
+      navigate('/sign-in');
+    } catch (error) {
+      console.error('Logout failed', error);
+    }
+  };
 
   return (
     <>
@@ -250,7 +264,11 @@ const RoleNavigation = ({
             <Dropdown.Menu className="border-0 rounded-12 p-8 mt-2 w-100">
               <Dropdown.Item href="/profile">Thông tin cá nhân</Dropdown.Item>
               <Dropdown.Item href="/settings">Cài đặt</Dropdown.Item>
-              <Dropdown.Item href="/logout" className="text-danger">
+              <Dropdown.Item
+                as="button"
+                className="text-danger w-100 text-start"
+                onClick={handleLogout}
+              >
                 Đăng xuất
               </Dropdown.Item>
             </Dropdown.Menu>

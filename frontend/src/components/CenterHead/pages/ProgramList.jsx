@@ -11,6 +11,7 @@ import FilterBar from '../compo/FilterBar';
 import StatusBadge from '../compo/StatusBadge';
 import { formatDate } from '../../../helper/helper';
 import programService from '../../../services/programService';
+import centerHeadService from '../../../services/centerHeadService';
 
 const ProgramList = () => {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ const ProgramList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
+  const [togglingId, setTogglingId] = useState(null); // Track which program is being toggled
 
   const applyFilters = useCallback(() => {
     let filtered = [...programs];
@@ -102,27 +104,100 @@ const ProgramList = () => {
     setCurrentPage(1); // Reset to first page when items per page changes
   };
 
+  // Helper function để format ngày
+  const formatDateShort = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
   const handleToggleActive = async (programId, currentIsActive, e) => {
     e.stopPropagation(); // Prevent row click navigation
 
+    // Prevent double click
+    if (togglingId === programId) return;
+
     try {
+      setTogglingId(programId);
       const newIsActive = !currentIsActive;
-      await programService.toggleProgramActive(programId, newIsActive);
+
+      // Nếu đang tắt (deactivate), kiểm tra trước
+      if (!newIsActive) {
+        // Check xem có thể deactivate không
+        const checkResult = await centerHeadService.canDeactivateProgram(programId);
+
+        if (!checkResult.canDeactivate) {
+          // Hiển thị cảnh báo chi tiết về các course đang active
+          const activeCourses = checkResult.activeCourses || [];
+
+          // Tạo message chi tiết
+          let warningMessage = `Không thể tạm dừng chương trình!\n\n`;
+          warningMessage += `Còn ${activeCourses.length} khóa học đang hoạt động:\n`;
+
+          activeCourses.forEach((course, index) => {
+            if (index < 3) { // Chỉ hiển thị 3 course đầu
+              warningMessage += `• ${course.name || course.courseCode}`;
+              if (course.activeClassCount > 0) {
+                warningMessage += ` (${course.activeClassCount} lớp`;
+                if (course.estimatedEndDate) {
+                  warningMessage += ` - đến ${formatDateShort(course.estimatedEndDate)}`;
+                }
+                warningMessage += `)`;
+              }
+              warningMessage += `\n`;
+            }
+          });
+
+          if (activeCourses.length > 3) {
+            warningMessage += `... và ${activeCourses.length - 3} khóa học khác`;
+          }
+
+          toast.warning(warningMessage, {
+            position: 'top-right',
+            autoClose: 8000,
+            style: { whiteSpace: 'pre-line' }
+          });
+
+          setTogglingId(null);
+          return;
+        }
+
+        // Có thể deactivate, tiến hành
+        await centerHeadService.deactivateProgram(programId);
+      } else {
+        // Activate program
+        await centerHeadService.activateProgram(programId);
+      }
+
+      // Cập nhật state trực tiếp thay vì fetch lại toàn bộ
+      setPrograms(prevPrograms =>
+        prevPrograms.map(program =>
+          program._id === programId
+            ? { ...program, isActive: newIsActive }
+            : program
+        )
+      );
+
+      // Cập nhật stats
+      setStats(prevStats => ({
+        ...prevStats,
+        active: newIsActive ? prevStats.active + 1 : prevStats.active - 1
+      }));
 
       toast.success(
         newIsActive
-          ? 'Đã mở chương trình cho đăng ký'
-          : 'Đã tạm dừng chương trình',
+          ? 'Đã kích hoạt chương trình thành công'
+          : 'Đã vô hiệu hóa chương trình thành công',
         { position: 'top-right' }
       );
-
-      // Refresh programs list
-      fetchPrograms();
     } catch (error) {
       console.error('Error toggling program active status:', error);
-      toast.error(error.message || 'Không thể thay đổi trạng thái hoạt động', {
-        position: 'top-right'
-      });
+      toast.error(
+        error.response?.data?.message || error.message || 'Không thể thay đổi trạng thái hoạt động',
+        { position: 'top-right' }
+      );
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -192,13 +267,6 @@ const ProgramList = () => {
       },
     },
     {
-      header: 'PLOs',
-      field: 'plos',
-      render: (row) => (
-        <span className="text-neutral-700" style={{ fontSize: '0.875rem' }}>{row.plos?.length || 0} PLOs</span>
-      ),
-    },
-    {
       header: 'Khóa học',
       field: 'courseCount',
       render: (row) => (
@@ -237,18 +305,26 @@ const ProgramList = () => {
           );
         }
 
+        const isToggling = togglingId === row._id;
+
         return (
-          <div className="form-check form-switch d-flex justify-content-center">
-            <input
-              className="form-check-input"
-              type="checkbox"
-              role="switch"
-              checked={row.isActive || false}
-              onChange={(e) => handleToggleActive(row._id, row.isActive, e)}
-              onClick={(e) => e.stopPropagation()}
-              style={{ cursor: 'pointer' }}
-              title={row.isActive ? 'Tạm dừng chương trình' : 'Mở chương trình'}
-            />
+          <div className="form-check form-switch d-flex justify-content-center align-items-center">
+            {isToggling ? (
+              <div className="spinner-border spinner-border-sm text-primary" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </div>
+            ) : (
+              <input
+                className="form-check-input"
+                type="checkbox"
+                role="switch"
+                checked={row.isActive || false}
+                onChange={(e) => handleToggleActive(row._id, row.isActive, e)}
+                onClick={(e) => e.stopPropagation()}
+                style={{ cursor: 'pointer' }}
+                title={row.isActive ? 'Tạm dừng chương trình' : 'Mở chương trình'}
+              />
+            )}
           </div>
         );
       },
@@ -297,25 +373,25 @@ const ProgramList = () => {
       {/* Stats */}
       <div className="row g-4 mb-24">
         <div className="col-md-3">
-          <Card>
+          <Card variant="shadow">
             <h6 className="text-neutral-600 mb-8">Tổng Programs</h6>
             <h4 className="text-neutral-900 fw-bold mb-0">{stats.total}</h4>
           </Card>
         </div>
         <div className="col-md-3">
-          <Card>
+          <Card variant="shadow">
             <h6 className="text-neutral-600 mb-8">Đang hoạt động</h6>
             <h4 className="text-success-600 fw-bold mb-0">{stats.active}</h4>
           </Card>
         </div>
         <div className="col-md-3">
-          <Card>
+          <Card variant="shadow">
             <h6 className="text-neutral-600 mb-8">Bản nháp</h6>
             <h4 className="text-warning-600 fw-bold mb-0">{stats.draft}</h4>
           </Card>
         </div>
         <div className="col-md-3">
-          <Card>
+          <Card variant="shadow">
             <h6 className="text-neutral-600 mb-8">Đã lưu trữ</h6>
             <h4 className="text-neutral-600 fw-bold mb-0">{stats.archived}</h4>
           </Card>
@@ -323,7 +399,7 @@ const ProgramList = () => {
       </div>
 
       {/* Search & Filter */}
-      <Card className="mb-24">
+      <Card variant="shadow" className="mb-24">
         <div className="d-flex gap-3 align-items-center justify-content-between">
           <SearchBox
             placeholder="Tìm kiếm chương trình..."
@@ -340,7 +416,7 @@ const ProgramList = () => {
       </Card>
 
       {/* Table */}
-      <Card>
+      <Card variant="shadow">
         <Table
           columns={columns}
           data={paginatedPrograms}

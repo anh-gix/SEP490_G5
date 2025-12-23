@@ -71,6 +71,22 @@ const StudentDashboard = () => {
     });
   };
 
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      pending: { bg: 'bg-info-600', text: 'Chờ khai giảng', icon: 'fa-clock' },
+      active: { bg: 'bg-success-600', text: 'Đang học', icon: 'fa-play-circle' },
+      completed: { bg: 'bg-neutral-600', text: 'Đã hoàn thành', icon: 'fa-check-circle' },
+      disable: { bg: 'bg-danger-600', text: 'Vô hiệu hóa', icon: 'fa-ban' }
+    };
+    const config = statusConfig[status] || statusConfig.active;
+    return (
+      <Badge className={`${config.bg} text-white px-8 py-4 text-11`}>
+        <i className={`fas ${config.icon} me-1`}></i>
+        {config.text}
+      </Badge>
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-vh-100" style={{ backgroundColor: '#F5F7FA' }}>
@@ -284,12 +300,12 @@ const StudentDashboard = () => {
                                   }`} style={{ fontSize: '24px' }}>
                                     {result.type === 'toeic' ? result.total : 
                                      result.type === 'ielts' ? result.overallBand :
-                                     result.total}
+                                     result.shields || 0}
                                   </div>
                                   <div className="text-neutral-600 text-12">
                                     {result.type === 'toeic' ? '/ 990' : 
                                      result.type === 'ielts' ? 'Band' :
-                                     '/ 100'}
+                                     'Shields'}
                                   </div>
                                 </div>
                               </div>
@@ -318,25 +334,33 @@ const StudentDashboard = () => {
                               <Col xs={6}>
                                 <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
                                   <div className="text-purple-600 fw-bold text-12">{result.listening || 0}</div>
-                                  <div className="text-neutral-600 text-12">Listening</div>
+                                  <div className="text-neutral-600 text-10">Listening</div>
                                 </div>
                               </Col>
                               <Col xs={6}>
                                 <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
                                   <div className="text-purple-600 fw-bold text-12">{result.reading || 0}</div>
-                                  <div className="text-neutral-600 text-12">Reading</div>
+                                  <div className="text-neutral-600 text-10">Reading</div>
                                 </div>
                               </Col>
                               <Col xs={6}>
                                 <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-                                  <div className="text-purple-600 fw-bold text-12">{result.writing || 0}</div>
-                                  <div className="text-neutral-600 text-12">Writing</div>
+                                  <div className="text-neutral-500 fw-bold text-10">
+                                    {result.writing !== null && result.writing !== undefined && result.writing > 0 
+                                      ? result.writing 
+                                      : 'Chưa chấm'}
+                                  </div>
+                                  <div className="text-neutral-600 text-10">Writing</div>
                                 </div>
                               </Col>
                               <Col xs={6}>
                                 <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-                                  <div className="text-purple-600 fw-bold text-12">{result.speaking || 0}</div>
-                                  <div className="text-neutral-600 text-12">Speaking</div>
+                                  <div className="text-neutral-500 fw-bold text-10">
+                                    {result.speaking !== null && result.speaking !== undefined && result.speaking > 0 
+                                      ? result.speaking 
+                                      : 'Chưa chấm'}
+                                  </div>
+                                  <div className="text-neutral-600 text-10">Speaking</div>
                                 </div>
                               </Col>
                             </Row>
@@ -344,26 +368,14 @@ const StudentDashboard = () => {
                             <Row className="g-2">
                               <Col xs={6}>
                                 <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+                                  <div className="text-warning-600 fw-bold text-12">{result.readingWriting || 0}</div>
+                                  <div className="text-neutral-600 text-9">Reading & Writing</div>
+                                </div>
+                              </Col>
+                              <Col xs={6}>
+                                <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
                                   <div className="text-warning-600 fw-bold text-12">{result.listening || 0}</div>
-                                  <div className="text-neutral-600 text-12">Listening</div>
-                                </div>
-                              </Col>
-                              <Col xs={6}>
-                                <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-                                  <div className="text-warning-600 fw-bold text-12">{result.reading || 0}</div>
-                                  <div className="text-neutral-600 text-12">Reading</div>
-                                </div>
-                              </Col>
-                              <Col xs={6}>
-                                <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-                                  <div className="text-warning-600 fw-bold text-12">{result.writing || 0}</div>
-                                  <div className="text-neutral-600 text-12">Writing</div>
-                                </div>
-                              </Col>
-                              <Col xs={6}>
-                                <div className="bg-white rounded-6 p-6 text-center" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-                                  <div className="text-warning-600 fw-bold text-12">{result.speaking || 0}</div>
-                                  <div className="text-neutral-600 text-12">Speaking</div>
+                                  <div className="text-neutral-600 text-10">Listening</div>
                                 </div>
                               </Col>
                             </Row>
@@ -426,6 +438,7 @@ const StudentDashboard = () => {
                                 <Badge className="bg-success-100 text-success-600 text-10 fw-semibold">
                                   {cls.course}
                                 </Badge>
+                                {cls.status && getStatusBadge(cls.status)}
                               </div>
                             </div>
                             <div className="text-end ms-2">

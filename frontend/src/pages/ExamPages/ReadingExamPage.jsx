@@ -4,6 +4,8 @@ import Animation from "../../helper/Animation";
 import Preloader from "../../helper/Preloader";
 import { examService } from "../../services/examService";
 import { useAuth } from "../../contexts/AuthContext";
+import Swal from "sweetalert2";
+import logo from "../../assets/CamQuiz_img/LOGO.png";
 
 const ReadingExamPage = () => {
   const { examId, submissionId } = useParams();
@@ -119,6 +121,23 @@ const ReadingExamPage = () => {
     [submitting, answers, examId, submissionId, navigate, getQuestionData, isMultipleChoiceType, sectionData]
   );
 
+  const handleSubmitWithConfirmation = useCallback(async () => {
+    const result = await Swal.fire({
+      title: "Xác nhận nộp bài",
+      text: "Bạn có chắc chắn muốn nộp bài? Sau khi nộp bài, bạn sẽ không thể chỉnh sửa lại.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Có, nộp bài",
+      cancelButtonText: "Hủy",
+    });
+
+    if (result.isConfirmed) {
+      handleSubmit();
+    }
+  }, [handleSubmit]);
+
   // Fetch section + initialize state
   useEffect(() => {
     // Đợi AuthContext hoàn thành việc kiểm tra authentication trước khi redirect
@@ -192,8 +211,35 @@ const ReadingExamPage = () => {
       }
       // Auto submit if not already submitting
       if (!submitting) {
-        // call handleSubmit but allow submission even if submitting flag is stale
-        handleSubmit(true);
+        // Check if there are any answers (with actual values, not empty arrays or empty strings)
+        const hasAnyAnswer = sectionData?.parts?.some((partData) => {
+          const partAnswers = answers[`part_${partData.part}`] || {};
+          return Object.keys(partAnswers).some((qNum) => {
+            const answerValue = partAnswers[qNum];
+            // Check if answer has actual value: not empty array, not empty string, not null/undefined
+            if (Array.isArray(answerValue)) {
+              return answerValue.length > 0;
+            }
+            return answerValue && answerValue !== "";
+          });
+        });
+
+        if (hasAnyAnswer) {
+          // call handleSubmit but allow submission even if submitting flag is stale
+          handleSubmit(true);
+        } else {
+          // Show alert if no answers
+          Swal.fire({
+            title: "Đã hết thời gian!!",
+            text: "chúng tôi vẫn chưa ghi nhận được bất cứ câu trả lời nào của bạn",
+            icon: "warning",
+            confirmButtonText: "Đã hiểu",
+            confirmButtonColor: "#3085d6",
+          }).then(() => {
+            // Navigate to result page even without answers
+            navigate(`/student/exams/${examId}`);
+          });
+        }
       }
       return;
     }
@@ -209,7 +255,7 @@ const ReadingExamPage = () => {
     // Cleanup on unmount is handled in the separate effect below.
 
     // No cleanup here to avoid clearing interval each second (which would stop the timer)
-  }, [timeRemaining, submitting, handleSubmit]);
+  }, [timeRemaining, submitting, handleSubmit, answers, sectionData, examId, navigate]);
 
   // Clear interval on unmount to avoid leaks
   useEffect(() => {
@@ -512,7 +558,7 @@ const ReadingExamPage = () => {
         <div className="reading-exam-header">
           <div className="logo">
             <Link to="/" className="link">
-              <img src="assets/images/logo/logo.png" alt="Logo" />
+              <img src={logo} alt="Logo" />
             </Link>
           </div>
           
@@ -533,12 +579,19 @@ const ReadingExamPage = () => {
               {isFullscreen ? "Thoát" : "Toàn màn hình"}
             </button>
             <button
-              onClick={() => handleSubmit()}
+              onClick={handleSubmitWithConfirmation}
               disabled={submitting || (() => {
-                // Check if at least one part has answers
+                // Check if at least one part has answers (with actual values, not empty arrays or empty strings)
                 return !sectionData?.parts?.some((partData) => {
                   const partAnswers = answers[`part_${partData.part}`] || {};
-                  return Object.keys(partAnswers).length > 0;
+                  return Object.keys(partAnswers).some((qNum) => {
+                    const answerValue = partAnswers[qNum];
+                    // Check if answer has actual value: not empty array, not empty string, not null/undefined
+                    if (Array.isArray(answerValue)) {
+                      return answerValue.length > 0;
+                    }
+                    return answerValue && answerValue !== "";
+                  });
                 });
               })()}
               className="btn btn-main rounded-pill px-32 py-12 flex-align gap-8"

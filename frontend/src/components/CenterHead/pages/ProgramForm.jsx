@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { getCookie } from '../../../utils/cookieUtils.js';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
@@ -51,21 +52,31 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
     { label: isEdit ? 'Chỉnh sửa chương trình' : 'Tạo chương trình mới' }
   ];
 
+  // Track if type was changed by user (not initial load)
+  const [typeChangedByUser, setTypeChangedByUser] = useState(false);
+
   // Load band mapping when component mounts or type changes
   useEffect(() => {
     const fetchBandMapping = async () => {
       if (formData.type) {
         try {
           const response = await programService.getBandOptions(formData.type);
-          const mapping = response.data || {};
+          // API returns { success, data: { type, bandOptions } }
+          const mapping = response.data?.bandOptions || response.data || {};
           setBandMapping(mapping);
 
           // Auto-fill band based on current level
-          if (formData.level && mapping[formData.level]) {
+          // - Always auto-fill when creating new program
+          // - Auto-fill when user changes type in edit mode
+          if (formData.level && mapping[formData.level] && (!isEdit || typeChangedByUser)) {
             setFormData(prev => ({
               ...prev,
               band: mapping[formData.level]
             }));
+            // Reset the flag after auto-filling
+            if (typeChangedByUser) {
+              setTypeChangedByUser(false);
+            }
           }
         } catch (error) {
           console.error('Error loading band mapping:', error);
@@ -122,6 +133,8 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
       }));
     } else if (name === 'type') {
       // Reset band when type changes (will be auto-filled when mapping loads)
+      // Set flag to indicate user changed the type
+      setTypeChangedByUser(true);
       setFormData(prev => ({
         ...prev,
         [name]: value,
@@ -195,11 +208,17 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
       return;
     }
 
+    // Validate at least 1 PLO is required
+    if (formData.plos.length === 0) {
+      toast.warning('Chương trình cần có ít nhất 1 PLO!', { position: 'top-right' });
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Get userId from localStorage
-      const user = JSON.parse(localStorage.getItem('user'));
+      // Get userId from cookie
+      const user = JSON.parse(getCookie('user'));
       const userId = user?._id || user?.id;
 
       if (!userId && !isEdit) {
@@ -395,15 +414,28 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
               <label className="form-label fw-semibold text-neutral-900">
                 Band/Score Range
               </label>
-              <input
-                type="text"
-                name="band"
-                className="form-control bg-light"
-                placeholder="Tự động điền theo level"
-                value={formData.band}
-                onChange={handleInputChange}
-                readOnly
-              />
+              <div className="position-relative">
+                <input
+                  type="text"
+                  name="band"
+                  className="form-control bg-light"
+                  placeholder="Tự động điền theo level"
+                  value={formData.band}
+                  onChange={handleInputChange}
+                  readOnly
+                />
+                {formData.band && (
+                  <span
+                    className={`position-absolute top-50 end-0 translate-middle-y me-3 badge ${
+                      formData.type === 'ielts' ? 'bg-danger' :
+                      formData.type === 'toeic' ? 'bg-primary' :
+                      'bg-success'
+                    }`}
+                  >
+                    {formData.type?.toUpperCase()}
+                  </span>
+                )}
+              </div>
               <small className="text-muted">
                 <i className="ph ph-info me-1"></i>
                 Tự động ánh xạ theo Type và Level
@@ -432,10 +464,10 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
             <div>
               <h5 className="mb-2">
                 <i className="ph ph-target me-2"></i>
-                Program Learning Outcomes (PLO)
+                Program Learning Outcomes (PLO) <span className="text-danger">*</span>
               </h5>
               <p className="text-neutral-600 text-sm mb-0">
-                Chuẩn đầu ra của chương trình
+                Chuẩn đầu ra của chương trình (ít nhất 1 PLO)
               </p>
             </div>
             <Button

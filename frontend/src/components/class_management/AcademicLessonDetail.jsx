@@ -62,11 +62,7 @@ const AcademicLessonDetail = ({ lessonId, onBack }) => {
         status: schedule.status || 'fixed',
         type: schedule.type || 'regular',
         description: schedule.session?.description || schedule.session?.content || schedule.topic || 'Chưa có mô tả',
-        objectives: schedule.session?.clos?.map(clo => clo.detail || clo.name) || [
-          'Nắm vững kiến thức bài học',
-          'Hoàn thành bài tập thực hành',
-          'Áp dụng kiến thức vào thực tế'
-        ],
+        // CLOs đã được populate từ backend (từ course.clos dựa vào session.clos ObjectIds)
         clos: schedule.session?.clos || [],
         materials: schedule.class?.course?.materials || [],
         homework: schedule.session?.homework || 'Chưa có bài tập về nhà',
@@ -273,105 +269,6 @@ const AcademicLessonDetail = ({ lessonId, onBack }) => {
           )}
         </Card.Body>
       </Card>
-
-      {/* Materials Card */}
-      <Card className="bg-white border-0 rounded-12 mb-24" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-        <Card.Header className="bg-white border-0 pt-20 px-20 pb-16">
-          <h5 className="text-neutral-900 fw-bold mb-0">Tài liệu học tập</h5>
-        </Card.Header>
-        <Card.Body className="p-20">
-          {lessonData.materials && lessonData.materials.length > 0 ? (
-            <div className="d-flex flex-column gap-12">
-              {lessonData.materials.map((material, index) => {
-                // Course materials is array of strings (URLs)
-                const materialUrl = typeof material === 'string' ? material : (material.url || null);
-                // Extract filename from URL or use default name
-                const materialName = typeof material === 'string' 
-                  ? (material.split('/').pop() || 'Tài liệu')
-                  : (material.name || 'Tài liệu');
-                
-                return (
-                  <div 
-                    key={index} 
-                    className="border border-neutral-100 rounded-12 p-16 d-flex align-items-center gap-12 transition-2"
-                    style={{ cursor: materialUrl ? 'pointer' : 'default' }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F8F9FA'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                  >
-                    <div 
-                      className="rounded-8 d-flex align-items-center justify-content-center"
-                      style={{ width: '40px', height: '40px', backgroundColor: '#FFF4E6', flexShrink: 0 }}
-                    >
-                      <i className="fas fa-file-pdf text-warning-600"></i>
-                    </div>
-                    <div className="flex-grow-1">
-                      <div className="text-neutral-900 fw-semibold text-14">{materialName}</div>
-                    </div>
-                    {materialUrl && (
-                      <Button 
-                        className="btn-outline-main text-12 px-12 py-6 radius-6"
-                        onClick={() => window.open(materialUrl, '_blank')}
-                      >
-                        <i className="fas fa-download me-2"></i>
-                        Tải xuống
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-4 text-neutral-500">
-              Chưa có tài liệu học tập
-            </div>
-          )}
-        </Card.Body>
-      </Card>
-
-      {/* Homework & Notes Row */}
-      <Row className="g-3">
-        <Col md={6}>
-          {/* Homework Card */}
-          <Card className="bg-white border-0 rounded-12 h-100" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-            <Card.Header className="bg-white border-0 pt-20 px-20 pb-16">
-              <h5 className="text-neutral-900 fw-bold mb-0">Bài tập về nhà</h5>
-            </Card.Header>
-            <Card.Body className="p-20">
-              <div className="bg-warning-50 border border-warning-200 rounded-12 p-16 mb-16">
-                <div className="d-flex align-items-start gap-12 mb-12">
-                  <i className="fas fa-tasks text-warning-600 mt-1"></i>
-                  <div className="flex-grow-1">
-                    <div className="text-neutral-900 fw-semibold text-14 mb-8">
-                      {lessonData.homework}
-                    </div>
-                    <div className="text-neutral-600 text-12">
-                      <i className="fas fa-calendar-alt me-2"></i>
-                      Hạn nộp: {lessonData.homeworkDeadline}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col md={6}>
-          {/* Notes Card */}
-          <Card className="bg-white border-0 rounded-12 h-100" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-            <Card.Header className="bg-white border-0 pt-20 px-20 pb-16">
-              <h5 className="text-neutral-900 fw-bold mb-0">Ghi chú</h5>
-            </Card.Header>
-            <Card.Body className="p-20">
-              <div className="bg-info-50 border border-info-200 rounded-12 p-16 mb-16">
-                <div className="d-flex align-items-start gap-12">
-                  <i className="fas fa-sticky-note text-info-600 mt-1"></i>
-                  <div className="text-neutral-700 text-13">{lessonData.notes}</div>
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
     </Container>
   );
 };

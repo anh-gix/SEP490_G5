@@ -70,12 +70,12 @@ const ClassLessons = ({ classInfo }) => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      upcoming: { bg: 'bg-info-500', text: 'Sắp diễn ra' },
-      completed: { bg: 'bg-neutral-600', text: 'Đã học' },
+      completed: { bg: 'bg-success-600', text: 'Đã diễn ra' },
+      scheduled: { bg: 'bg-neutral-400', text: 'Đã lên lịch' },
       cancelled: { bg: 'bg-danger-600', text: 'Đã hủy' }
     };
 
-    const config = statusConfig[status] || statusConfig.upcoming;
+    const config = statusConfig[status] || statusConfig.scheduled;
     return (
       <Badge className={`${config.bg} text-white px-12 py-6 text-12`}>
         {config.text}

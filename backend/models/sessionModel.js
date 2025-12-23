@@ -21,8 +21,14 @@ const sessionSchema = new Schema({
     },
 
     // Lưu _id của CLO trong course (CLO là embedded trong Course)
+    // LƯU Ý: CLOs trong Course là embedded documents, KHÔNG thể dùng ref + populate thông thường
+    // Để lấy CLO details, cần:
+    // 1. Populate course.clos (lấy toàn bộ CLOs từ Course)
+    // 2. Filter thủ công dựa trên session.clos ObjectIds
+    // VD: course.clos.filter(clo => session.clos.map(id => id.toString()).includes(clo._id.toString()))
     clos: [{
         type: Schema.Types.ObjectId
+        // Không thể ref: 'Course.clos' vì CLO là embedded, không phải collection
     }],
 }, { timestamps: true });
 

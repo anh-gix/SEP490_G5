@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { getCookie } from '../../../utils/cookieUtils.js';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
@@ -25,8 +26,8 @@ const CourseDetails = ({ viewMode = 'center-head' }) => {
   // Determine base path
   const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
 
-  // Get user role from localStorage
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  // Get user role from cookie
+  const user = JSON.parse(getCookie('user') || '{}');
   const userRole = user.roleId?.name || user.role;
 
   // Center Head should not see edit/delete buttons
@@ -560,9 +561,10 @@ console.log(response.data);
           >
             Quay lại
           </Button>
-          {/* Edit and Delete buttons - only for non-Center Head */}
-          {!isViewOnly && (
-            <>
+          {/* Edit button - only when program is draft/needs_revision AND course is not active */}
+          {!isViewOnly &&
+            (course.program?.status === 'draft' || course.program?.status === 'needs_revision') &&
+            !course.isActive && (
               <Button
                 variant="primary"
                 icon="ph ph-pencil"
@@ -573,21 +575,23 @@ console.log(response.data);
               >
                 Sửa
               </Button>
-              <Button
-                variant="danger"
-                icon="ph ph-trash"
-                onClick={handleDeleteCourse}
-                disabled={deleteLoading}
-              >
-                {deleteLoading ? 'Đang xóa...' : 'Xóa'}
-              </Button>
-            </>
+          )}
+          {/* Delete button - only for non-Center Head */}
+          {!isViewOnly && (
+            <Button
+              variant="danger"
+              icon="ph ph-trash"
+              onClick={handleDeleteCourse}
+              disabled={deleteLoading}
+            >
+              {deleteLoading ? 'Đang xóa...' : 'Xóa'}
+            </Button>
           )}
         </div>
       </div>
 
       {/* Tabs */}
-      <Card>
+      <Card variant="shadow">
         <Tabs tabs={tabs} />
       </Card>
 

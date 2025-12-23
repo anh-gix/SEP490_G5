@@ -1,10 +1,11 @@
 import axios from 'axios';
+import { getCookie } from '../utils/cookieUtils.js';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
 // Helper to get auth token
 const getAuthHeader = () => {
-  const token = localStorage.getItem('token');
+  const token = getCookie('token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 

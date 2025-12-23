@@ -4606,6 +4606,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                     }}
                     onDeleteSchedule={() => {}} // Read-only in this context
                     showLegend={false}
+                    showTeacherName={true}
                   />
                 ) : (
                   <ScheduleWeekly
@@ -6133,8 +6134,6 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       return;
                     }
 
-                    console.log(`Tìm thấy ${matchingSchedules.length} buổi học có cùng pattern`);
-
                     // Validate từng buổi matching
                     const allConflicts = [];
                     let hasAnyConflict = false;
@@ -6175,6 +6174,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                           startTime: editedSchedule.startTime,
                           endTime: editedSchedule.endTime,
                           room: roomId,
+                          teacher: editedSchedule.teacherId, // Thêm teacher để kiểm tra xung đột
                           excludeScheduleId: scheduleIdToExclude
                         });
 

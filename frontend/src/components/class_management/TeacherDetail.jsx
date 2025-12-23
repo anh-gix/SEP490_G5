@@ -925,6 +925,7 @@ const TeacherDetail = ({ teacherId, onBack }) => {
                       }}
                       onAssignSubstitute={handleAssignSubstitute}
                       readOnly={!isEditMode}
+                      showTeacherName={false}
                     />
                   )}
                 </>

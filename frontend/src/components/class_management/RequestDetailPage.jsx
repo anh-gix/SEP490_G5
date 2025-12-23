@@ -1138,6 +1138,7 @@ const RequestDetailPage = ({
                             endTime: sch.endTime || ''
                           };
                         })}
+                        showTeacherName={false}
                       />
                     </div>
                   )}

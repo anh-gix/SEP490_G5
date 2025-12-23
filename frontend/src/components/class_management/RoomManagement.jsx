@@ -750,6 +750,7 @@ const RoomManagement = () => {
                     onDeleteSchedule={() => {}}
                     onCreateMakeup={() => {}}
                     readOnly={true}
+                    showTeacherName={false}
                   />
                 </>
               ) : (

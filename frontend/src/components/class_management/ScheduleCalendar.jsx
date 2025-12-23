@@ -3,18 +3,19 @@ import { Card, Button, Badge, Dropdown } from 'react-bootstrap';
 import { formatDateToYYYYMMDD } from '../../helper/helper';
 import { classScheduleService } from '../../services/classScheduleService';
 
-const ScheduleCalendar = ({ 
-  schedules, 
-  onDeleteSchedule, 
-  onCreateMakeup, 
-  onAssignSubstitute, 
-  classService, 
-  studentSchedule = [], 
-  readOnly = false, 
+const ScheduleCalendar = ({
+  schedules,
+  onDeleteSchedule,
+  onCreateMakeup,
+  onAssignSubstitute,
+  classService,
+  studentSchedule = [],
+  readOnly = false,
   showLegend = true,
   selectedMonth,  // Thêm prop này
   onMonthChange,    // Thêm prop này
-  onLessonClick     // Thêm prop này để handle click vào schedule card
+  onLessonClick,    // Thêm prop này để handle click vào schedule card
+  showTeacherName = false  // Thêm prop này để kiểm soát hiển thị tên GV hay tên lớp
 }) => {
   // Sử dụng selectedMonth từ props, nếu không có thì dùng current date
   const [currentDate, setCurrentDate] = useState(selectedMonth || new Date());
@@ -421,13 +422,13 @@ const ScheduleCalendar = ({
                         let tooltipText = 'Buổi chưa học';
                         if (schedule.isOldClassSchedule) {
                           tooltipText = schedule.isTeacherChange
-                            ? `GV cũ: ${schedule.teacherName}`
+                            ? `${showTeacherName ? 'GV cũ' : 'Lớp'}: ${showTeacherName ? schedule.teacherName : schedule.className}`
                             : schedule.isRoomChangeOnly
                             ? `Phòng cũ: ${schedule.roomName}`
                             : `Buổi lớp cũ: ${schedule.className}`;
                         } else if (schedule.isNewClassSchedule) {
                           tooltipText = schedule.isTeacherChange
-                            ? `GV mới: ${schedule.teacherName}`
+                            ? `${showTeacherName ? 'GV mới' : 'Lớp'}: ${showTeacherName ? schedule.teacherName : schedule.className}`
                             : schedule.isRoomChangeOnly
                             ? `Phòng mới: ${schedule.roomName}`
                             : `Buổi lớp mới: ${schedule.className}`;
@@ -508,8 +509,8 @@ const ScheduleCalendar = ({
                                     <span className="text-truncate">{schedule.roomName || 'Chưa có phòng'}</span>
                                   </div>
                                   <div className="d-flex align-items-center gap-1">
-                                    <i className="fas fa-user" style={{ fontSize: '8px' }}></i>
-                                    <span className="text-truncate">{schedule.teacherName || 'Chưa có GV'}</span>
+                                    <i className={showTeacherName ? "fas fa-user" : "fas fa-graduation-cap"} style={{ fontSize: '8px' }}></i>
+                                    <span className="text-truncate">{showTeacherName ? (schedule.teacherName || 'Chưa có GV') : (schedule.className || 'Chưa có lớp')}</span>
                                   </div>
                                 </>
                               ) : (
@@ -520,21 +521,21 @@ const ScheduleCalendar = ({
                                       <span className="text-truncate">{schedule.roomName || 'Chưa có phòng'}</span>
                                     </div>
                                     <div className="d-flex align-items-center gap-1">
-                                      <i className="fas fa-user" style={{ fontSize: '8px' }}></i>
-                                      <span className="text-truncate">{schedule.teacherName || 'Chưa có GV'}</span>
+                                      <i className={showTeacherName ? "fas fa-user" : "fas fa-graduation-cap"} style={{ fontSize: '8px' }}></i>
+                                      <span className="text-truncate">{showTeacherName ? (schedule.teacherName || 'Chưa có GV') : (schedule.className || 'Chưa có lớp')}</span>
                                     </div>
                                   </>
                                 )
                               )}
                               {schedule.isOldClassSchedule && (
                                 <Badge bg="secondary" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#9C27B0' }}>
-                                  {schedule.isTeacherChange ? `GV cũ: ${schedule.teacherName || 'Chưa có'}` : 
+                                  {schedule.isTeacherChange ? `${showTeacherName ? 'GV cũ' : 'Lớp'}: ${showTeacherName ? (schedule.teacherName || 'Chưa có') : (schedule.className || 'Chưa có')}` :
                                    schedule.isRoomChangeOnly ? `Phòng cũ: ${schedule.roomName || 'Chưa có phòng'}` : 'Lớp cũ'}
                                 </Badge>
                               )}
                               {schedule.isNewClassSchedule && (
                                 <Badge bg="primary" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#2196F3' }}>
-                                  {schedule.isTeacherChange ? `GV mới: ${schedule.teacherName || 'Chưa có'}` : 
+                                  {schedule.isTeacherChange ? `${showTeacherName ? 'GV mới' : 'Lớp'}: ${showTeacherName ? (schedule.teacherName || 'Chưa có') : (schedule.className || 'Chưa có')}` :
                                    schedule.isRoomChangeOnly ? `Phòng mới: ${schedule.roomName || 'Chưa có phòng'}` : 'Lớp mới'}
                                 </Badge>
                               )}

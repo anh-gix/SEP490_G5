@@ -1052,6 +1052,7 @@ const StudentDetail = ({ studentId, onBack }) => {
                         }}
                         onCreateMakeup={handleCreateMakeup}
                         readOnly={!isEditMode}
+                        showTeacherName={false}
                       />
                     )}
                   </>

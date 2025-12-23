@@ -510,13 +510,6 @@ exports.getLevelsByType = async (req, res) => {
             status: 'approved'
         });
 
-        // Debug logging
-        console.log(`[getLevelsByType] Type: ${type}, Found levels:`, levels);
-
-        // Also log the programs for this type to verify
-        const programsCount = await Program.countDocuments({ type: type, status: 'approved' });
-        console.log(`[getLevelsByType] Total approved programs for ${type}:`, programsCount);
-
         // Sort levels in order
         const levelOrder = ['Pre-A1', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
         const sortedLevels = levels.sort((a, b) => {

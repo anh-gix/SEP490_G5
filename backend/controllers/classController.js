@@ -1034,9 +1034,7 @@ exports.checkTeacherRoomConflicts = async (req, res) => {
         weekOffset++;
       }
     }
-    
-    console.log('  - Đã tạo', classSchedules.length, 'buổi học để kiểm tra');
-    
+
     // Validate conflicts (only teacher and room, not students)
     if (classSchedules.length > 0) {
       const classDataForValidation = {
@@ -1047,12 +1045,7 @@ exports.checkTeacherRoomConflicts = async (req, res) => {
       };
       
       const conflictResult = await validateClassSchedulesConflicts(classSchedules, classDataForValidation);
-      
-      console.log('  - Kết quả kiểm tra:');
-      console.log('    + Teacher conflicts:', conflictResult.teacher?.length || 0);
-      console.log('    + Room conflicts:', conflictResult.room?.length || 0);
-      console.log('  ============================================\n');
-      
+
       // Format conflicts for frontend
       const teacherConflicts = (conflictResult.teacher || []).map(c => ({
         teacherId: c.teacherId || teacherId?.toString() || '',

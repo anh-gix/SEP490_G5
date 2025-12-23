@@ -603,6 +603,7 @@ const StudentDetailModal = ({
                           // Optional: Handle create makeup if needed
                           console.log('Create makeup:', schedule);
                         }}
+                        showTeacherName={false}
                       />
                     )}
                   </>

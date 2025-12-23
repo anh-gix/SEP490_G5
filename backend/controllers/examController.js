@@ -186,25 +186,64 @@ exports.getExamByIdForManagement = async (req, res) => {
 // ================== 5. TẠO ĐỀ THI MỚI ==================
 exports.createExamForManagement = async (req, res) => {
   try {
-    const { title, description, examType, level, totalDuration, sections } = req.body;
+    const { title, description, examType, totalDuration, sections } = req.body;
     const createdBy = req.user?._id || req.body.createdBy;
 
-    // Validation - only require title and level
-    if (!title || !level) {
+    // Validation - only require title
+    if (!title) {
       return res.status(400).json({
         success: false,
-        message: 'Tiêu đề và cấp độ là bắt buộc'
+        message: 'Tiêu đề là bắt buộc'
       });
     }
 
     // Sections can be empty initially (will be added in step 2)
-    // But if sections are provided, validate them
+    // But if sections are provided, validate them thoroughly
     if (sections && sections.length > 0) {
-      const invalidSections = sections.filter(s => !s.type);
-      if (invalidSections.length > 0) {
+      const validationErrors = [];
+
+      sections.forEach((section, index) => {
+        const sectionLabel = `${section.type?.charAt(0).toUpperCase() + section.type?.slice(1) || 'Unknown'} Part ${section.part || index + 1}`;
+
+        // Check required fields
+        if (!section.type) {
+          validationErrors.push(`${sectionLabel}: Thiếu loại section (type)`);
+        }
+        if (!section.part) {
+          validationErrors.push(`${sectionLabel}: Thiếu part number`);
+        }
+        if (!section.duration || section.duration <= 0) {
+          validationErrors.push(`${sectionLabel}: Thiếu thời gian hợp lệ`);
+        }
+        if (!section.questionCount || section.questionCount <= 0) {
+          validationErrors.push(`${sectionLabel}: Thiếu số câu hỏi hợp lệ`);
+        }
+
+        // Check answerKey count matches questionCount
+        const answerKeyCount = section.answerKey?.length || 0;
+        const requiredCount = section.questionCount || 0;
+        if (answerKeyCount !== requiredCount) {
+          validationErrors.push(`${sectionLabel}: Số câu hỏi tạo (${answerKeyCount}) phải bằng số câu hỏi quy định (${requiredCount})`);
+        }
+
+        // Check required files based on section type
+        if (section.type === 'listening') {
+          if (!section.audioUrls || section.audioUrls.length === 0) {
+            validationErrors.push(`${sectionLabel}: Thiếu file audio`);
+          }
+        } else if (section.type === 'reading' || section.type === 'writing') {
+          if (!section.fileUrl) {
+            validationErrors.push(`${sectionLabel}: Thiếu file PDF đề thi`);
+          }
+        }
+        // Speaking doesn't require files
+      });
+
+      if (validationErrors.length > 0) {
         return res.status(400).json({
           success: false,
-          message: 'Tất cả các section phải có loại (type)'
+          message: 'Các section có dữ liệu thiếu hoặc không hợp lệ',
+          errors: validationErrors
         });
       }
     }
@@ -214,7 +253,6 @@ exports.createExamForManagement = async (req, res) => {
       description,
       createdBy,
       examType: examType || 'practice',
-      level,
       totalDuration: totalDuration || 0,
       sections: sections || [],
       isPublished: false
@@ -259,6 +297,56 @@ exports.updateExamForManagement = async (req, res) => {
       });
     }
 
+    // Validate sections if they are being updated
+    if (updates.sections && updates.sections.length > 0) {
+      const validationErrors = [];
+
+      updates.sections.forEach((section, index) => {
+        const sectionLabel = `${section.type?.charAt(0).toUpperCase() + section.type?.slice(1) || 'Unknown'} Part ${section.part || index + 1}`;
+
+        // Check required fields
+        if (!section.type) {
+          validationErrors.push(`${sectionLabel}: Thiếu loại section (type)`);
+        }
+        if (!section.part) {
+          validationErrors.push(`${sectionLabel}: Thiếu part number`);
+        }
+        if (!section.duration || section.duration <= 0) {
+          validationErrors.push(`${sectionLabel}: Thiếu thời gian hợp lệ`);
+        }
+        if (!section.questionCount || section.questionCount <= 0) {
+          validationErrors.push(`${sectionLabel}: Thiếu số câu hỏi hợp lệ`);
+        }
+
+        // Check answerKey count matches questionCount
+        const answerKeyCount = section.answerKey?.length || 0;
+        const requiredCount = section.questionCount || 0;
+        if (answerKeyCount !== requiredCount) {
+          validationErrors.push(`${sectionLabel}: Số câu hỏi tạo (${answerKeyCount}) phải bằng số câu hỏi quy định (${requiredCount})`);
+        }
+
+        // Check required files based on section type
+        if (section.type === 'listening') {
+          if (!section.audioUrls || section.audioUrls.length === 0) {
+            validationErrors.push(`${sectionLabel}: Thiếu file audio`);
+          }
+        } else if (section.type === 'reading' || section.type === 'writing') {
+          if (!section.fileUrl) {
+            validationErrors.push(`${sectionLabel}: Thiếu file PDF đề thi`);
+          }
+        }
+        // Speaking doesn't require files
+      });
+
+      if (validationErrors.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Các section có dữ liệu thiếu hoặc không hợp lệ',
+          errors: validationErrors
+        });
+      }
+    }
+
     Object.assign(exam, updates);
     await exam.save();
 
@@ -276,7 +364,232 @@ exports.updateExamForManagement = async (req, res) => {
   }
 };
 
-// ================== 7. UPLOAD ĐÁP ÁN TỪ FILE CSV/EXCEL ==================
+// ================== 7. UPLOAD FILE ĐỀ THI (PDF, AUDIO) CHO SECTION ==================
+exports.uploadExamFileForManagement = async (req, res) => {
+  try {
+    const { examId, sectionIndex, fileType } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không có file được upload'
+      });
+    }
+
+    if (!examId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu examId'
+      });
+    }
+
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+      // Delete uploaded file
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bài thi'
+      });
+    }
+
+    // Try to find section by index first, fallback to finding/creating by type and part
+    let sectionIdx = parseInt(sectionIndex);
+    let targetSection = null;
+
+    console.log('🔍 Upload Debug:', {
+      sectionIndex: sectionIndex,
+      parsedSectionIdx: sectionIdx,
+      examSectionsLength: exam.sections.length,
+      sections: exam.sections.map((s, i) => ({ index: i, type: s.type, part: s.part }))
+    });
+
+    // If sectionIndex is valid array index, use it
+    if (!isNaN(sectionIdx) && sectionIdx >= 0 && sectionIdx < exam.sections.length) {
+      targetSection = exam.sections[sectionIdx];
+      console.log('✅ Found section by index:', { sectionIdx, targetSection: { type: targetSection.type, part: targetSection.part } });
+    } else {
+      // If not valid index, try to interpret sectionIndex as "type-part" format
+      // e.g., "listening-1" means listening part 1
+      const parts = sectionIndex.toString().split('-');
+      if (parts.length === 2) {
+        const [type, part] = parts;
+        const partNum = parseInt(part);
+
+        // First try to find existing section
+        targetSection = exam.sections.find(s => s.type === type && s.part === partNum);
+
+        if (targetSection) {
+          sectionIdx = exam.sections.indexOf(targetSection);
+          console.log('✅ Found existing section by type-part:', { type, part: partNum, sectionIdx });
+        } else {
+          // If not found, create new section
+          console.log('🆕 Creating new section:', { type, part: partNum });
+
+          const newSection = {
+            type: type,
+            part: partNum,
+            instructions: '',
+            duration: type === 'listening' ? 10 : type === 'reading' ? 20 : type === 'writing' ? 30 : 15,
+            questionCount: type === 'writing' ? 1 : 10,
+            answerKey: [],
+            fileUrl: '',
+            audioUrls: []
+          };
+
+          exam.sections.push(newSection);
+          targetSection = newSection;
+          sectionIdx = exam.sections.length - 1;
+
+          console.log('✅ Created new section:', { sectionIdx, targetSection: { type: targetSection.type, part: targetSection.part } });
+        }
+      }
+    }
+
+    if (!targetSection) {
+      // Delete uploaded file
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(400).json({
+        success: false,
+        message: `Không tìm thấy hoặc tạo được section. Index: ${sectionIndex}, Total sections: ${exam.sections.length}`
+      });
+    }
+
+    // Get the file URL path (relative to backend)
+    const fileUrl = `/uploads/${req.file.filename}`;
+    const fileName = req.file.originalname;
+
+    // Update section based on file type
+    if (fileType === 'pdf') {
+      targetSection.fileUrl = fileUrl;
+      targetSection.fileName = fileName;
+    } else if (fileType === 'audio') {
+      // For audio, append to audioUrls array
+      if (!targetSection.audioUrls) {
+        targetSection.audioUrls = [];
+      }
+      if (!targetSection.audioFileNames) {
+        targetSection.audioFileNames = [];
+      }
+      targetSection.audioUrls.push(fileUrl);
+      targetSection.audioFileNames.push(fileName);
+    } else {
+      // Default: treat as PDF
+      targetSection.fileUrl = fileUrl;
+      targetSection.fileName = fileName;
+    }
+
+    await exam.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Upload ${fileType || 'file'} thành công`,
+      data: {
+        fileUrl,
+        fileName,
+        sectionIndex: sectionIdx,
+        fileType: fileType || 'pdf'
+      }
+    });
+  } catch (err) {
+    // Delete uploaded file on error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi upload file',
+      error: err.message
+    });
+  }
+};
+
+// ================== 7.1. XÓA FILE ĐỀ THI (PDF, AUDIO) TỪ SECTION ==================
+exports.deleteExamFileForManagement = async (req, res) => {
+  try {
+    const { examId, sectionIndex, fileType, audioIndex } = req.body;
+
+    if (!examId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu examId'
+      });
+    }
+
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bài thi'
+      });
+    }
+
+    const sectionIdx = parseInt(sectionIndex);
+    if (isNaN(sectionIdx) || sectionIdx < 0 || sectionIdx >= exam.sections.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Section index không hợp lệ'
+      });
+    }
+
+    let deletedFileUrl = null;
+
+    if (fileType === 'pdf') {
+      // Delete PDF file from disk
+      const fileUrl = exam.sections[sectionIdx].fileUrl;
+      if (fileUrl) {
+        const filePath = path.join(__dirname, '..', fileUrl);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+        deletedFileUrl = fileUrl;
+      }
+      exam.sections[sectionIdx].fileUrl = '';
+      exam.sections[sectionIdx].fileName = '';
+    } else if (fileType === 'audio') {
+      // Delete specific audio file
+      const audioIdx = parseInt(audioIndex);
+      if (!isNaN(audioIdx) && exam.sections[sectionIdx].audioUrls && audioIdx < exam.sections[sectionIdx].audioUrls.length) {
+        const audioUrl = exam.sections[sectionIdx].audioUrls[audioIdx];
+        if (audioUrl) {
+          const filePath = path.join(__dirname, '..', audioUrl);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+          deletedFileUrl = audioUrl;
+        }
+        exam.sections[sectionIdx].audioUrls.splice(audioIdx, 1);
+        if (exam.sections[sectionIdx].audioFileNames) {
+          exam.sections[sectionIdx].audioFileNames.splice(audioIdx, 1);
+        }
+      }
+    }
+
+    await exam.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Xóa ${fileType || 'file'} thành công`,
+      data: {
+        deletedFileUrl,
+        sectionIndex: sectionIdx,
+        fileType
+      }
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi xóa file',
+      error: err.message
+    });
+  }
+};
+
+// ================== 8. UPLOAD ĐÁP ÁN TỪ FILE CSV/EXCEL ==================
 exports.uploadAnswerKeyForManagement = async (req, res) => {
   try {
     const { examId, sectionId } = req.body;
@@ -1428,9 +1741,9 @@ exports.submitReadingAnswers = async (req, res) => {
 
     // Kiểm tra xem tất cả các section (của tất cả các type) đã được nộp chưa
     const allSectionsSubmitted = submission.sections.every(
-      (section) => section.submittedAt !== null
+      (section) => section.submittedAt instanceof Date
     );
-    submission.status = allSectionsSubmitted ? "completed" : "partially-submitted";
+    submission.status = allSectionsSubmitted ? "completed" : "in-progress";
 
     await submission.save();
 
@@ -1569,9 +1882,9 @@ exports.submitListeningAnswers = async (req, res) => {
 
     // Kiểm tra xem tất cả các section (của tất cả các type) đã được nộp chưa
     const allSectionsSubmitted = submission.sections.every(
-      (section) => section.submittedAt !== null
+      (section) => section.submittedAt instanceof Date
     );
-    submission.status = allSectionsSubmitted ? "completed" : "partially-submitted";
+    submission.status = allSectionsSubmitted ? "completed" : "in-progress";
 
     await submission.save();
 
@@ -1699,9 +2012,9 @@ exports.submitWritingAnswers = async (req, res) => {
 
     // Kiểm tra xem tất cả các section (của tất cả các type) đã được nộp chưa
     const allSectionsSubmitted = submission.sections.every(
-      (section) => section.submittedAt !== null
+      (section) => section.submittedAt instanceof Date
     );
-    submission.status = allSectionsSubmitted ? "completed" : "partially-submitted";
+    submission.status = allSectionsSubmitted ? "completed" : "in-progress";
 
     await submission.save();
 
@@ -1864,9 +2177,9 @@ exports.submitSpeakingAnswers = async (req, res) => {
 
     // Kiểm tra xem tất cả các section (của tất cả các type) đã được nộp chưa
     const allSectionsSubmitted = submission.sections.every(
-      (section) => section.submittedAt !== null
+      (section) => section.submittedAt instanceof Date
     );
-    submission.status = allSectionsSubmitted ? "completed" : "partially-submitted";
+    submission.status = allSectionsSubmitted ? "completed" : "in-progress";
 
     await submission.save();
 

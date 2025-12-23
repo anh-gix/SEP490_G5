@@ -7,13 +7,18 @@ import { useAuth } from "../../contexts/AuthContext";
 const SpeakingResultPage = () => {
   const { examId, submissionId } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedBandScore, setSelectedBandScore] = useState(null);
 
   useEffect(() => {
+    // Đợi auth context hoàn thành việc check authentication
+    if (authLoading) {
+      return;
+    }
+
     if (!isAuthenticated) {
       navigate("/sign-in");
       return;
@@ -33,11 +38,11 @@ const SpeakingResultPage = () => {
     };
 
     fetchResult();
-  }, [examId, submissionId, isAuthenticated, navigate]);
+  }, [examId, submissionId, isAuthenticated, authLoading, navigate]);
 
   // Initialize selected band score when result changes
   useEffect(() => {
-    if (result && result.maxScore > 0) {
+    if (result) {
       const bandScore = getBandScore();
       if (bandScore !== null) {
         setSelectedBandScore(bandScore);
@@ -91,7 +96,8 @@ const SpeakingResultPage = () => {
   };
 
   const getBandScore = () => {
-    if (!result || !result.maxScore || result.maxScore === 0) return null;
+    if (!result) return null;
+    if (!result.maxScore || result.maxScore === 0) return null; // Need maxScore to calculate
     const percentage = getScorePercentage();
     const correctAnswers = Math.round((result.sectionScore / result.maxScore) * 40); // Assuming max 40 questions
     
@@ -111,7 +117,7 @@ const SpeakingResultPage = () => {
     return 3;
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <>
       
@@ -128,124 +134,162 @@ const SpeakingResultPage = () => {
     <>
     
 
-      <section className="py-120">
+      <section className="pt-40 pb-120">
         <div className="container">
           {error ? (
-            <div className="alert alert-danger rounded-12 p-24 mb-40" role="alert">
-              <i className="ph ph-warning me-8" />
+            <div className="alert alert-danger rounded-12 p-16 mb-24 text-13" role="alert">
+              <i className="ph ph-warning me-6" />
               {error}
             </div>
           ) : result ? (
             <>
               {/* Section Heading */}
-              <div className="section-heading text-center mb-40">
-                <div className="flex-align d-inline-flex gap-8 mb-16">
-                  <span className="text-main-600 text-2xl d-flex">
+              <div className="section-heading text-center mb-24">
+                <div className="flex-align d-inline-flex gap-8 mb-12">
+                  <span className="text-main-600 text-16 d-flex">
                     <i className="ph-bold ph-microphone" />
                   </span>
-                  <h5 className="text-main-600 mb-0">Kết quả thi</h5>
+                  <h6 className="text-main-600 mb-0 text-14">Kết quả thi</h6>
                 </div>
-                <h2 className="mb-16">Kết quả phần Speaking</h2>
+                <h4 className="mb-12 text-20">Kết quả phần Speaking</h4>
                 {result.submittedAt && (
-                  <p className="text-neutral-600 mb-0">
-                    <i className="ph ph-clock me-8" />
+                  <p className="text-neutral-600 mb-0 text-13">
+                    <i className="ph ph-clock me-6" />
                     Nộp bài lúc: {new Date(result.submittedAt).toLocaleString("vi-VN")}
                   </p>
                 )}
               </div>
 
               {/* Score Summary */}
-              <div className="row gy-4 mb-40">
+              <div className="row gy-3 mb-24 justify-content-center">
                 <div className="col-md-4">
-                  <div className="bg-white box-shadow-md rounded-16 p-32 border border-neutral-30 text-center h-100">
-                    <div className="w-60 h-60 flex-center bg-main-25 text-main-600 text-28 rounded-circle mx-auto mb-16">
+                  <div className="bg-white box-shadow-md rounded-12 p-20 border border-neutral-30 text-center h-100">
+                    <div className="w-48 h-48 flex-center bg-main-25 text-main-600 text-20 rounded-circle mx-auto mb-12">
                       <i className="ph-bold ph-check-circle" />
                     </div>
-                    <p className="text-neutral-600 text-sm mb-8 fw-medium">Điểm số</p>
-                    <h3 className={`text-${getScoreColor()}-600 mb-0 fw-bold`}>
+                    <p className="text-neutral-600 text-13 mb-6 fw-medium">Điểm số</p>
+                    <h5 className={`text-${getScoreColor()}-600 mb-0 fw-bold text-18`}>
                       {result.sectionScore} / {result.maxScore || "Chưa chấm"}
-                    </h3>
+                    </h5>
+                    
+                      <p className="text-neutral-600 text-12 mb-0 mt-8">
+                        Bài Speaking sẽ được chấm sau
+                      </p>
+                    
                   </div>
                 </div>
               </div>
               {result.sectionScore === 0 && result.maxScore === 0 && (
-                <div className="mb-40">
-                  <div className="alert alert-info rounded-12 p-24 mb-0 box-shadow-sm">
-                    <i className="ph ph-info me-8" />
+                <div className="mb-24">
+                  <div className="alert alert-info rounded-12 p-16 mb-0 box-shadow-sm text-13">
+                    <i className="ph ph-info me-6" />
                     Bài làm của bạn đã được nộp. Giáo viên sẽ chấm điểm và cập nhật kết quả sau.
                   </div>
                 </div>
               )}
 
               {/* Band Score Section */}
-              {result.maxScore > 0 && (() => {
+              {(() => {
                 const currentBandScore = getBandScore();
                 const bandScores = [9, 8.5, 8, 7.5, 7, 6.5, 6, 5.5, 5, 4.5, 4, 3.5, 3];
                 const displayBandScore = selectedBandScore !== null ? selectedBandScore : currentBandScore;
                 return (
-                  <div className="bg-white rounded-16 p-32 mb-40 border border-neutral-30 box-shadow-sm">
-                    <div className="flex-align gap-12 mb-24">
-                      <span className="text-main-600 text-xl">
+                  <div className="bg-white rounded-12 p-20 mb-24 border border-neutral-30 box-shadow-sm">
+                    <div className="flex-align gap-8 mb-16">
+                      <span className="text-main-600 text-16">
                         <i className="ph-bold ph-medal" />
                       </span>
-                      <h3 className="mb-0">Band Score</h3>
+                      <h5 className="mb-0 text-16">Band Score</h5>
                     </div>
                     
                     {/* Band Score Scale */}
-                    <div className="mb-24">
-                      <div className="d-flex flex-wrap gap-8 justify-content-center align-items-center">
-                        {bandScores.map((band) => (
-                          <span
-                            key={band}
-                            onClick={() => setSelectedBandScore(band)}
-                            className={`text-main-600 fw-semibold ${
-                              displayBandScore === band ? "text-decoration-underline" : ""
-                            }`}
-                            style={{
-                              fontSize: "18px",
-                              cursor: "pointer",
-                              textDecorationColor: displayBandScore === band ? "var(--main-600)" : "transparent",
-                              textDecorationThickness: "2px",
-                              textUnderlineOffset: "4px",
-                              transition: "all 0.2s ease",
-                              padding: "4px 8px",
-                              borderRadius: "4px"
-                            }}
-                            onMouseEnter={(e) => {
-                              if (displayBandScore !== band) {
-                                e.target.style.backgroundColor = "var(--main-25)";
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = "transparent";
-                            }}
-                          >
-                            {band}
-                          </span>
-                        ))}
+                    <div className="mb-16">
+                      <p className="text-neutral-600 text-13 mb-8 text-center fw-medium">
+                        Band Score của bạn: {currentBandScore !== null ? <span className="fw-bold text-main-600">{currentBandScore}</span> : "N/A"}
+                      </p>
+                      <div className="d-flex flex-wrap gap-6 justify-content-center align-items-center">
+                        {bandScores.map((band) => {
+                          const isCurrentBand = currentBandScore === band;
+                          const isSelectedBand = selectedBandScore === band;
+                          const isDisplayBand = displayBandScore === band;
+                          
+                          let className = "fw-semibold text-main-600 bg-transparent border-neutral-30";
+                          if (isCurrentBand && isSelectedBand) {
+                            // Band của người dùng và đang được chọn
+                            className = "bg-main-600 text-white border-main-600";
+                          } else if (isCurrentBand) {
+                            // Band của người dùng (nhưng không được chọn)
+                            className = "bg-main-25 text-main-600 border-main-600";
+                          } else if (isSelectedBand || isDisplayBand) {
+                            // Band được chọn (không phải của người dùng)
+                            className = "bg-main-600 text-white border-main-600";
+                          }
+                          
+                          return (
+                            <span
+                              key={band}
+                              onClick={() => setSelectedBandScore(band)}
+                              className={className}
+                              style={{
+                                fontSize: "14px",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                padding: "6px 12px",
+                                borderRadius: "6px",
+                                border: "2px solid",
+                                display: "inline-block"
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isCurrentBand && !isSelectedBand) {
+                                  e.target.style.backgroundColor = "var(--main-25)";
+                                  e.target.style.borderColor = "var(--main-600)";
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isCurrentBand && !isSelectedBand) {
+                                  e.target.style.backgroundColor = "transparent";
+                                  e.target.style.borderColor = "var(--neutral-30)";
+                                }
+                              }}
+                            >
+                              {band}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
 
                     {/* Band Score Details */}
                     {displayBandScore && bandScoreData[displayBandScore] && (
-                      <div className="border-top border-neutral-30 pt-24">
-                        <div className="row gy-3">
+                      <div className={`border-top border-neutral-30 pt-16 px-16 pb-16 ${
+                        selectedBandScore === displayBandScore 
+                          ? (currentBandScore === displayBandScore 
+                              ? "bg-main-25 border-main-600" 
+                              : "bg-success-25 border-main-600")
+                          : ""
+                      }`} style={{
+                        borderRadius: "8px",
+                        borderWidth: selectedBandScore === displayBandScore ? "2px" : "1px",
+                        borderStyle: "solid",
+                        transition: "all 0.2s ease"
+                      }}>
+                        <div className="row gy-2">
                           <div className="col-md-4">
-                            <div className="border-bottom border-neutral-30 pb-12">
-                              <p className="text-neutral-600 text-sm mb-4 fw-semibold">Correct Answers:</p>
-                              <p className="text-neutral-700 mb-0 fw-medium">{bandScoreData[displayBandScore].correctAnswers}</p>
+                            <div className="border-bottom border-neutral-30 pb-8 px-4">
+                              <p className="text-neutral-600 text-12 mb-2 fw-semibold">Correct Answers:</p>
+                              <p className="text-neutral-700 mb-0 fw-medium text-13">{bandScoreData[displayBandScore].correctAnswers}</p>
                             </div>
                           </div>
                           <div className="col-md-4">
-                            <div className="border-bottom border-neutral-30 pb-12">
-                              <p className="text-neutral-600 text-sm mb-4 fw-semibold">Skill Level:</p>
-                              <p className="text-neutral-700 mb-0 fw-medium">{bandScoreData[displayBandScore].skillLevel}</p>
+                            <div className="border-bottom border-neutral-30 pb-8 px-4">
+                              <p className="text-neutral-600 text-12 mb-2 fw-semibold">Skill Level:</p>
+                              <p className="text-neutral-700 mb-0 fw-medium text-13">{bandScoreData[displayBandScore].skillLevel}</p>
                             </div>
                           </div>
                           <div className="col-md-12">
-                            <div className="pt-12">
-                              <p className="text-neutral-600 text-sm mb-4 fw-semibold">Description:</p>
-                              <p className="text-neutral-700 mb-0" style={{ lineHeight: "1.8" }}>
+                            <div className="pt-8 px-4">
+                              <p className="text-neutral-600 text-12 mb-2 fw-semibold">Description:</p>
+                              <p className="text-neutral-700 mb-0 text-13" style={{ lineHeight: "1.6" }}>
                                 {bandScoreData[displayBandScore].description}
                               </p>
                             </div>
@@ -258,51 +302,49 @@ const SpeakingResultPage = () => {
               })()}
 
               {/* Detailed Results */}
-              <div className="bg-white rounded-16 p-32 mb-40 border border-neutral-30 box-shadow-sm">
-                <div className="flex-align gap-12 mb-24">
-                  <span className="text-main-600 text-xl">
+              <div className="bg-white rounded-12 p-20 mb-24 border border-neutral-30 box-shadow-sm">
+                <div className="flex-align gap-8 mb-16">
+                  <span className="text-main-600 text-16">
                     <i className="ph-bold ph-list-bullets" />
                   </span>
-                  <h3 className="mb-0">Chi tiết bài làm</h3>
+                  <h5 className="mb-0 text-16">Chi tiết bài làm</h5>
                 </div>
                 {result.parts?.map((partData, partIndex) => (
-                  <div key={partIndex} className={partIndex > 0 ? "mt-32 pt-32 border-top border-neutral-30" : ""}>
-                    {result.parts.length > 1 && (
-                      <div className="mb-24">
-                        <h4 className="text-main-600 fw-semibold">Part {partData.part}</h4>
-                      </div>
-                    )}
-                    <div className="row gy-4">
+                  <div key={partIndex} className={partIndex > 0 ? "mt-20 pt-20 border-top border-neutral-30" : ""}>
+                    <div className="mb-16">
+                      <h6 className="text-main-600 fw-semibold text-14">Part {partData.part}</h6>
+                    </div>
+                    <div className="row gy-3">
                       {partData.results?.map((item, index) => {
                         const recordingUrl = getRecordingUrl(item.recordingUrl);
                         return (
                           <div key={index} className="col-12">
-                            <div className="rounded-16 p-24 border border-neutral-30 box-shadow-sm">
-                              <div className="flex-between gap-16 mb-16 flex-wrap">
-                                <div className="flex-align gap-12">
-                                  <span className="w-40 h-40 flex-center bg-main-25 text-main-600 rounded-circle flex-shrink-0">
+                            <div className="rounded-12 p-16 border border-neutral-30 box-shadow-sm">
+                              <div className="flex-between gap-12 mb-12 flex-wrap">
+                                <div className="flex-align gap-8">
+                                  <span className="w-32 h-32 flex-center bg-main-25 text-main-600 rounded-circle flex-shrink-0 text-14">
                                     <i className="ph-bold ph-question" />
                                   </span>
-                                  <span className="fw-semibold text-neutral-700 text-lg">
+                                  <span className="fw-semibold text-neutral-700 text-14">
                                     Câu {item.questionNumber}
                                   </span>
                                 </div>
-                                <div className="flex-align gap-16">
+                                <div className="flex-align gap-12">
                                   {item.score > 0 && (
-                                    <span className="badge bg-success text-white px-16 py-6 rounded-pill">
-                                      <i className="ph ph-check-circle me-4" />
+                                    <span className="badge bg-success text-white px-12 py-4 rounded-8 text-12">
+                                      <i className="ph ph-check-circle me-3" />
                                       Đã chấm: {item.score} điểm
                                     </span>
                                   )}
                                   {item.score === 0 && (
-                                    <span className="badge bg-warning text-white px-16 py-6 rounded-pill">
-                                      <i className="ph ph-clock me-4" />
+                                    <span className="badge bg-warning text-white px-12 py-4 rounded-8 text-12">
+                                      <i className="ph ph-clock me-3" />
                                       Chờ chấm
                                     </span>
                                   )}
                                   {recordingUrl && (
-                                    <span className="badge bg-main-600 text-white px-16 py-6 rounded-pill">
-                                      <i className="ph ph-microphone me-4" />
+                                    <span className="badge bg-main-600 text-white px-12 py-4 rounded-8 text-12">
+                                      <i className="ph ph-microphone me-3" />
                                       Đã ghi âm
                                     </span>
                                   )}
@@ -311,48 +353,27 @@ const SpeakingResultPage = () => {
 
                               {/* Question Title */}
                               {item.questionTitle && (
-                                <div className="mb-16">
-                                  <p className="text-neutral-700 fw-semibold mb-0">{item.questionTitle}</p>
+                                <div className="mb-12">
+                                  <p className="text-neutral-700 fw-semibold mb-0 text-13">{item.questionTitle}</p>
                                 </div>
                               )}
 
                               {/* Recording Player */}
                               {recordingUrl && (
-                                <div className="mb-16">
-                                  <p className="text-neutral-600 text-sm mb-12 fw-semibold">
-                                    <i className="ph ph-microphone me-8" />
+                                <div className="mb-12">
+                                  <p className="text-neutral-600 text-12 mb-8 fw-semibold">
+                                    <i className="ph ph-microphone me-6" />
                                     Recording của bạn:
                                   </p>
-                                  <div className="bg-main-25 rounded-12 p-16 border border-neutral-30">
+                                  <div className="bg-main-25 rounded-8 p-12 border border-neutral-30">
                                     <audio src={recordingUrl} controls className="w-100" />
                                   </div>
                                 </div>
                               )}
 
-                              {/* Text Answer (if any) */}
-                              {item.studentAnswer && (
-                                <div className="mb-16">
-                                  <p className="text-neutral-600 text-sm mb-12 fw-semibold">
-                                    <i className="ph ph-note me-8" />
-                                    Ghi chú của bạn:
-                                  </p>
-                                  <div className="bg-main-25 rounded-12 p-16 border border-neutral-30">
-                                    <p
-                                      className="text-neutral-700 mb-0"
-                                      style={{
-                                        whiteSpace: "pre-wrap",
-                                        lineHeight: "1.8",
-                                      }}
-                                    >
-                                      {item.studentAnswer}
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
-
                               {item.score > 0 && (
-                                <div className="pt-16 border-top border-neutral-30">
-                                  <span className="text-neutral-600 text-sm">
+                                <div className="pt-12 border-top border-neutral-30">
+                                  <span className="text-neutral-600 text-13">
                                     Điểm: <span className="fw-bold text-main-600">{item.score}</span> /{" "}
                                     {item.maxScore || "N/A"}
                                   </span>
@@ -369,20 +390,20 @@ const SpeakingResultPage = () => {
 
               {/* Feedback - Show feedback from all parts */}
               {result.parts?.some((part) => part.feedback) && (
-                <div className="bg-warning-25 rounded-16 p-32 mb-40 border border-warning box-shadow-sm">
-                  <div className="flex-align gap-12 mb-16">
-                    <span className="text-warning-600 text-xl">
+                <div className="bg-warning-25 rounded-12 p-20 mb-24 border border-warning box-shadow-sm">
+                  <div className="flex-align gap-8 mb-12">
+                    <span className="text-warning-600 text-16">
                       <i className="ph-bold ph-chat-circle-text" />
                     </span>
-                    <h4 className="mb-0">Nhận xét từ giáo viên</h4>
+                    <h5 className="mb-0 text-16">Nhận xét từ giáo viên</h5>
                   </div>
                   {result.parts.map((partData, index) => (
                     partData.feedback && (
-                      <div key={index} className={index > 0 ? "mt-16 pt-16 border-top border-warning" : ""}>
+                      <div key={index} className={index > 0 ? "mt-12 pt-12 border-top border-warning" : ""}>
                         {result.parts.length > 1 && (
-                          <p className="fw-semibold text-warning-600 mb-8">Part {partData.part}:</p>
+                          <p className="fw-semibold text-warning-600 mb-6 text-13">Part {partData.part}:</p>
                         )}
-                        <p className="text-neutral-700 mb-0" style={{ whiteSpace: "pre-wrap", lineHeight: "1.8" }}>
+                        <p className="text-neutral-700 mb-0 text-13" style={{ whiteSpace: "pre-wrap", lineHeight: "1.6" }}>
                           {partData.feedback}
                         </p>
                       </div>
@@ -395,16 +416,16 @@ const SpeakingResultPage = () => {
               <div className="text-center">
                 <Link
                   to={`/student/exams/${examId}`}
-                  className="btn btn-main px-40 py-16 rounded-pill me-16"
+                  className="btn btn-main px-24 py-10 rounded-8 me-12 text-13"
                 >
-                  <i className="ph ph-arrow-left me-8" />
+                  <i className="ph ph-arrow-left me-6" />
                   Quay lại bài thi
                 </Link>
                 <Link
                   to={"/student/practice-exams"}
-                  className="btn btn-outline-main px-40 py-16 rounded-pill"
+                  className="btn btn-outline-main px-24 py-10 rounded-8 text-13"
                 >
-                  <i className="ph ph-list me-8" />
+                  <i className="ph ph-list me-6" />
                   Danh sách bài thi
                 </Link>
               </div>

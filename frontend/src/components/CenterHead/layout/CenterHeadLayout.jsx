@@ -29,7 +29,7 @@ const CenterHeadLayout = ({ children }) => {
       color: 'main'
     },
     {
-      title: 'Yêu cầu phê duyệt',
+      title: 'Quản lý yêu cầu',
       icon: 'fa-clipboard-check',
       path: '/center-head/approval-requests',
       color: 'main'

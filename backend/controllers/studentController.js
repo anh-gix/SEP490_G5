@@ -100,8 +100,13 @@ exports.getMyClasses = async (req, res) => {
     // MongoDB automatically searches in array when using { students: studentId }
     // But we can also use $in to be explicit: { students: { $in: [studentObjectId] } }
     let query = { students: studentObjectId };
+    
+    // Mặc định chỉ hiển thị lớp active và pending
     if (status && status !== 'all') {
       query.status = status;
+    } else if (!status) {
+      // Mặc định filter active và pending
+      query.status = { $in: ['active', 'pending'] };
     }
 
 
@@ -529,7 +534,7 @@ exports.getLessonDetail = async (req, res) => {
 
 const makeup_class = await ClassSchedule.findById(scheduleId)
       .populate('room', 'room_name location')
-      .populate('session', 'title order content objectives')
+      .populate('session', 'title order content objectives clos')
       .populate('teacher', 'username email')
       .lean();
 
@@ -539,14 +544,14 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       .populate({
         path: 'class',
         populate: [
-          { path: 'course', select: 'name description level' },
+          { path: 'course', select: 'name description level clos' },
           { path: 'teacher', select: 'username email' }
         ]
       })
       .populate('teacher', 'username email') // Populate teacher của ClassSchedule
       .populate('substituteTeacher', 'username email') // Populate substituteTeacher của ClassSchedule
       .populate('room', 'room_name location')
-      .populate('session', 'title order content objectives')
+      .populate('session', 'title order content objectives clos')
       .lean();
 
 
@@ -607,6 +612,18 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       classSchedule: scheduleId
     }).lean();
 
+    // Lấy CLOs từ course.clos dựa vào session.clos (array of ObjectIds)
+    let sessionClos = [];
+    if (classSchedule.session && classSchedule.session.clos && classSchedule.session.clos.length > 0 && classSchedule.class && classSchedule.class.course) {
+      const closIds = classSchedule.session.clos.map(id => id.toString());
+      const courseClos = classSchedule.class.course.clos || [];
+      
+      // Lọc CLOs từ course.clos theo closIds trong session.clos
+      sessionClos = courseClos.filter(clo => 
+        closIds.includes(clo._id.toString())
+      );
+    }
+
     // Format the lesson detail
     const lessonDetail = {
       _id: classSchedule._id,
@@ -624,7 +641,7 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       topic: classSchedule.session?.title || classSchedule.topic || 'Chưa có chủ đề',
       lessonNumber: classSchedule.session?.order || 0,
       description: classSchedule.session?.content || classSchedule.description || '',
-      objectives: classSchedule.session?.objectives || [],
+      objectives: sessionClos, // Sử dụng sessionClos thay vì session.objectives
       
       // Teacher info
       // Ưu tiên: substituteTeacher > teacher (ClassSchedule) > class.teacher
@@ -1235,12 +1252,12 @@ exports.getDashboardData = async (req, res) => {
 
     const activeClasses = await Class.find({
       students: studentId,
-      status: 'active'
+      status: { $in: ['active', 'pending'] } // Lấy cả active và pending
     })
       .populate('course', 'name')
       .populate('teacher', 'username')
       .populate('room', 'room_name')
-      .select('name course teacher room startDate endDate')
+      .select('name course teacher room startDate endDate status')
       .lean();
 
     const classIds = activeClasses.map(cls => cls._id);
@@ -1371,42 +1388,61 @@ exports.getDashboardData = async (req, res) => {
 
     const practiceTests = submissions
       .filter(sub => {
-        const hasExam = sub.examId && sub.totalScore !== undefined;
+        const hasExam = sub.examId && sub.sections && sub.sections.length > 0;
         return hasExam;
       })
       .map((sub, index) => {
         const exam = sub.examId;
+        const examType = (exam.examType || exam.type || 'toeic').toLowerCase();
         
         const result = {
           id: sub._id.toString(),
           testName: exam.title,
           date: sub.createdAt,
-          type: exam.examType || exam.type || 'toeic'
+          type: examType
         };
 
-        // Calculate scores by section type
-        if (exam.type === 'toeic' || exam.examType === 'toeic') {
-          const listeningSection = sub.sections?.find(s => s.sectionType === 'listening');
-          const readingSection = sub.sections?.find(s => s.sectionType === 'reading');
-          const writingSection = sub.sections?.find(s => s.sectionType === 'writing');
-          const speakingSection = sub.sections?.find(s => s.sectionType === 'speaking');
+        // Tính điểm từng kỹ năng bằng cách cộng sectionScore của sections cùng sectionType
+        const skillScores = {
+          listening: 0,
+          reading: 0,
+          writing: 0,
+          speaking: 0
+        };
 
-          result.listening = listeningSection?.sectionScore || 0;
-          result.reading = readingSection?.sectionScore || 0;
-          result.writing = writingSection?.sectionScore || 0;
-          result.speaking = speakingSection?.sectionScore || 0;
-          result.total = sub.totalScore || 0;
-        } else if (exam.type === 'ielts' || exam.examType === 'ielts') {
-          const listeningSection = sub.sections?.find(s => s.sectionType === 'listening');
-          const readingSection = sub.sections?.find(s => s.sectionType === 'reading');
-          const writingSection = sub.sections?.find(s => s.sectionType === 'writing');
-          const speakingSection = sub.sections?.find(s => s.sectionType === 'speaking');
+        // Duyệt qua tất cả sections và cộng điểm theo sectionType
+        if (sub.sections && Array.isArray(sub.sections)) {
+          sub.sections.forEach(section => {
+            const skillType = section.sectionType?.toLowerCase();
+            if (skillType && skillScores.hasOwnProperty(skillType)) {
+              skillScores[skillType] += (section.sectionScore || 0);
+            }
+          });
+        }
 
-          result.listening = listeningSection?.sectionScore || 0;
-          result.reading = readingSection?.sectionScore || 0;
-          result.writing = writingSection?.sectionScore || 0;
-          result.speaking = speakingSection?.sectionScore || 0;
-          result.overallBand = sub.bandScore || 0;
+        // Format kết quả theo loại đề thi
+        if (examType === 'toeic') {
+          // TOEIC: Chỉ hiển thị Listening và Reading
+          result.listening = skillScores.listening;
+          result.reading = skillScores.reading;
+          result.total = skillScores.listening + skillScores.reading;
+        } else if (examType === 'ielts') {
+          // IELTS: Hiển thị Listening, Reading và "chưa chấm" cho Writing, Speaking
+          result.listening = skillScores.listening;
+          result.reading = skillScores.reading;
+          result.writing = skillScores.writing > 0 ? skillScores.writing : null; // null = chưa chấm
+          result.speaking = skillScores.speaking > 0 ? skillScores.speaking : null; // null = chưa chấm
+          // Calculate overall band (trung bình 4 kỹ năng nếu có đủ)
+          const scoredSkills = [skillScores.listening, skillScores.reading, skillScores.writing, skillScores.speaking].filter(s => s > 0);
+          result.overallBand = scoredSkills.length > 0 
+            ? Math.round((scoredSkills.reduce((a, b) => a + b, 0) / scoredSkills.length) * 10) / 10
+            : 0;
+        } else if (examType === 'cambridge') {
+          // Cambridge: Reading & Writing (dùng score từ reading), Listening
+          result.readingWriting = skillScores.reading; // Tận dụng sectionType reading
+          result.listening = skillScores.listening;
+          result.total = skillScores.reading + skillScores.listening;
+          result.shields = Math.round(result.total / 15); // Giả sử tổng điểm tối đa là 150, mỗi shield = 15 điểm
         }
 
         return result;

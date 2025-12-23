@@ -228,6 +228,71 @@ export const courseService = {
       throw error.response?.data || { message: 'Cập nhật PLO mapping thất bại' };
     }
   },
+
+  // ===== ACTIVATION/DEACTIVATION =====
+
+  /**
+   * Check if course can be deactivated
+   * @param {string} courseId - Course ID
+   * @returns {Promise<{canDeactivate: boolean, message: string, activeClasses?: array, upcomingSchedules?: array, estimatedEndDate?: Date}>}
+   */
+  canDeactivateCourse: async (courseId) => {
+    try {
+      const response = await api.get(`/${courseId}/can-deactivate`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể kiểm tra trạng thái khóa học' };
+    }
+  },
+
+  /**
+   * Deactivate a course
+   * @param {string} courseId - Course ID
+   * @param {boolean} force - Force deactivate even if there are active classes
+   */
+  deactivateCourse: async (courseId, force = false) => {
+    try {
+      const response = await api.patch(`/${courseId}/deactivate`, { force });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể vô hiệu hóa khóa học' };
+    }
+  },
+
+  /**
+   * Activate a course
+   * @param {string} courseId - Course ID
+   */
+  activateCourse: async (courseId) => {
+    try {
+      const response = await api.patch(`/${courseId}/activate`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể kích hoạt khóa học' };
+    }
+  },
+
+  /**
+   * Upload material file
+   * @param {File} file - File to upload
+   * @returns {Promise<{url: string}>}
+   */
+  uploadMaterialFile: async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append('material', file);
+
+      const response = await axios.post(`${API_BASE_URL}/upload-material`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Upload file thất bại' };
+    }
+  },
 };
 
 export default courseService;

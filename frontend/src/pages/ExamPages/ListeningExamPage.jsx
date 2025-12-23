@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import Animation from "../../helper/Animation";
-import Preloader from "../../helper/Preloader";
 import { examService } from "../../services/examService";
 import { useAuth } from "../../contexts/AuthContext";
+import Swal from "sweetalert2";
+import logo from "../../assets/CamQuiz_img/LOGO.png";
+
 
 const ListeningExamPage = () => {
   const { examId, submissionId } = useParams();
@@ -44,12 +45,6 @@ const ListeningExamPage = () => {
     [sectionData]
   );
   
-  const getQuestionType = useCallback(
-    (questionNumber) => {
-      return getQuestionData(questionNumber).questionType;
-    },
-    [getQuestionData]
-  );
   
   const isMultipleChoiceType = (questionType) => {
     return questionType === "multiple_choice";
@@ -128,6 +123,23 @@ const ListeningExamPage = () => {
     [submitting, answers, examId, submissionId, navigate, getQuestionData, isMultipleChoiceType, sectionData]
   );
 
+  const handleSubmitWithConfirmation = useCallback(async () => {
+    const result = await Swal.fire({
+      title: "Xác nhận nộp bài",
+      text: "Bạn có chắc chắn muốn nộp bài? Sau khi nộp bài, bạn sẽ không thể chỉnh sửa lại.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Có, nộp bài",
+      cancelButtonText: "Hủy",
+    });
+
+    if (result.isConfirmed) {
+      handleSubmit();
+    }
+  }, [handleSubmit]);
+
   // Fetch section + initialize state
   useEffect(() => {
     // Đợi AuthContext hoàn thành việc kiểm tra authentication trước khi redirect
@@ -201,8 +213,35 @@ const ListeningExamPage = () => {
       }
       // Auto submit if not already submitting
       if (!submitting) {
-        // call handleSubmit but allow submission even if submitting flag is stale
-        handleSubmit(true);
+        // Check if there are any answers (with actual values, not empty arrays or empty strings)
+        const hasAnyAnswer = sectionData?.parts?.some((partData) => {
+          const partAnswers = answers[`part_${partData.part}`] || {};
+          return Object.keys(partAnswers).some((qNum) => {
+            const answerValue = partAnswers[qNum];
+            // Check if answer has actual value: not empty array, not empty string, not null/undefined
+            if (Array.isArray(answerValue)) {
+              return answerValue.length > 0;
+            }
+            return answerValue && answerValue !== "";
+          });
+        });
+
+        if (hasAnyAnswer) {
+          // call handleSubmit but allow submission even if submitting flag is stale
+          handleSubmit(true);
+        } else {
+          // Show alert if no answers
+          Swal.fire({
+            title: "Đã hết thời gian!!",
+            text: "chúng tôi vẫn chưa ghi nhận được bất cứ câu trả lời nào của bạn",
+            icon: "warning",
+            confirmButtonText: "Đã hiểu",
+            confirmButtonColor: "#3085d6",
+          }).then(() => {
+            // Navigate to result page even without answers
+            navigate(`/student/exams/${examId}`);
+          });
+        }
       }
       return;
     }
@@ -218,7 +257,7 @@ const ListeningExamPage = () => {
     // Cleanup on unmount is handled in the separate effect below.
 
     // No cleanup here to avoid clearing interval each second (which would stop the timer)
-  }, [timeRemaining, submitting, handleSubmit]);
+  }, [timeRemaining, submitting, handleSubmit, answers, sectionData, examId, navigate]);
 
   // Clear interval on unmount to avoid leaks
   useEffect(() => {
@@ -445,8 +484,6 @@ const ListeningExamPage = () => {
   if (authLoading || loading) {
     return (
       <>
-        <Preloader />
-        <Animation />
         <div className="text-center py-80">
           <div className="spinner-border text-main-600" role="status">
             <span className="visually-hidden">Loading...</span>
@@ -458,9 +495,6 @@ const ListeningExamPage = () => {
 
   return (
     <>
-      <Preloader />
-      <Animation />
-      
       <div className="listening-exam-container" style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
         <style>{`
           .hide-scrollbar::-webkit-scrollbar {
@@ -476,12 +510,13 @@ const ListeningExamPage = () => {
           .listening-exam-header {
             background: white;
             border-bottom: 1px solid hsl(var(--border-color));
-            padding: 16px 24px;
+            padding: 12px 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             flex-shrink: 0;
             z-index: 10;
+            gap: 16px;
           }
           .listening-exam-header .logo img {
             height: 40px;
@@ -573,20 +608,56 @@ const ListeningExamPage = () => {
           }
         `}</style>
 
-        {/* Header: Logo, Timer, Submit Button */}
+        {/* Header: Logo, Timer, Audio Player, Submit Button */}
         <div className="listening-exam-header">
           <div className="logo">
             <Link to="/" className="link">
-              <img src="assets/images/logo/logo.png" alt="Logo" />
+              <img src={logo} alt="Logo" />
             </Link>
           </div>
           
-          {timeRemaining !== null && (
-            <div className={`listening-exam-timer ${timeRemaining < 300 ? "danger" : ""}`}>
-              <i className="ph ph-clock" style={{ fontSize: "20px" }}></i>
-              <span>{formatTime(timeRemaining)}</span>
-            </div>
-          )}
+          <div className="flex-align gap-16" style={{ flex: 1, justifyContent: "center" }}>
+            {timeRemaining !== null && (
+              <div className={`listening-exam-timer ${timeRemaining < 300 ? "danger" : ""}`}>
+                <i className="ph ph-clock" style={{ fontSize: "20px" }}></i>
+                <span>{formatTime(timeRemaining)}</span>
+              </div>
+            )}
+            
+            {/* Audio Player in Header */}
+            {audioUrls.length > 0 && (
+              <div className="flex-align gap-8">
+                {audioUrls.length > 1 && (
+                  <div className="d-flex gap-6 align-items-center">
+                    {audioUrls.map((url, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleAudioChange(index)}
+                        className={`btn ${
+                          currentAudioIndex === index ? "btn-main" : "btn-outline-main"
+                        } px-8 py-4 rounded-8 text-xs`}
+                        style={{ minWidth: "30px" }}
+                      >
+                        Audio {index + 1}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="bg-main-25 rounded-8 p-8 border border-neutral-30" style={{ minWidth: "400px", maxWidth: "500px" }}>
+                  <audio
+                    ref={audioRef}
+                    src={getAudioUrl(currentPart, currentAudioUrl)}
+                    onEnded={handleAudioEnded}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    className="w-100"
+                    controls
+                    style={{ height: "40px", width: "100%" }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
           
           <div className="flex-align gap-16">
             <button
@@ -598,12 +669,19 @@ const ListeningExamPage = () => {
               {isFullscreen ? "Thoát" : "Toàn màn hình"}
             </button>
             <button
-              onClick={() => handleSubmit()}
+              onClick={handleSubmitWithConfirmation}
               disabled={submitting || (() => {
-                // Check if at least one part has answers
+                // Check if at least one part has answers (with actual values, not empty arrays or empty strings)
                 return !sectionData?.parts?.some((partData) => {
                   const partAnswers = answers[`part_${partData.part}`] || {};
-                  return Object.keys(partAnswers).length > 0;
+                  return Object.keys(partAnswers).some((qNum) => {
+                    const answerValue = partAnswers[qNum];
+                    // Check if answer has actual value: not empty array, not empty string, not null/undefined
+                    if (Array.isArray(answerValue)) {
+                      return answerValue.length > 0;
+                    }
+                    return answerValue && answerValue !== "";
+                  });
                 });
               })()}
               className="btn btn-main rounded-pill px-32 py-12 flex-align gap-8"
@@ -623,69 +701,26 @@ const ListeningExamPage = () => {
           </div>
         </div>
 
-        {/* Part Selector and Audio Player Section */}
+        {/* Part Selector Section */}
         {sectionData?.parts && sectionData.parts.length > 1 && (
           <div className="bg-white border-bottom border-neutral-30 px-24 py-16 flex-shrink-0">
-            <div className="mb-12">
-              <div className="d-flex flex-wrap gap-8 align-items-center">
-                <span className="fw-semibold text-neutral-700 text-sm mb-0">Chọn phần:</span>
-                {sectionData.parts.map((partData) => (
-                  <button
-                    key={partData.part}
-                    onClick={() => {
-                      setCurrentPart(partData.part);
-                      setCurrentAudioIndex(0);
-                      setCurrentQuestion(1);
-                    }}
-                    className={`btn ${
-                      currentPart === partData.part ? "btn-main" : "btn-outline-main"
-                    } px-12 py-4 rounded-pill text-sm`}
-                  >
-                    Part {partData.part}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Audio Player Section */}
-        {audioUrls.length > 0 && (
-          <div className="bg-white border-bottom border-neutral-30 px-24 py-16 flex-shrink-0">
-            {audioUrls.length > 1 && (
-              <div className="mb-12">
-                <div className="d-flex flex-wrap gap-8 align-items-center">
-                  <span className="fw-semibold text-neutral-700 text-sm mb-0">Chọn audio:</span>
-                  {audioUrls.map((url, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleAudioChange(index)}
-                      className={`btn ${
-                        currentAudioIndex === index ? "btn-main" : "btn-outline-main"
-                      } px-12 py-4 rounded-pill text-sm`}
-                    >
-                      Audio {index + 1}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="bg-main-25 rounded-12 p-12 border border-neutral-30">
-              <div className="text-center mb-6">
-                <h6 className="mb-0 text-sm fw-semibold">
-                  {audioUrls.length > 1 ? `Audio ${currentAudioIndex + 1}` : "Audio"}
-                </h6>
-              </div>
-              <audio
-                ref={audioRef}
-                src={getAudioUrl(currentPart, currentAudioUrl)}
-                onEnded={handleAudioEnded}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                className="w-100"
-                controls
-                style={{ height: "40px" }}
-              />
+            <div className="d-flex flex-wrap gap-8 align-items-center">
+              <span className="fw-semibold text-neutral-700 text-sm mb-0">Chọn phần:</span>
+              {sectionData.parts.map((partData) => (
+                <button
+                  key={partData.part}
+                  onClick={() => {
+                    setCurrentPart(partData.part);
+                    setCurrentAudioIndex(0);
+                    setCurrentQuestion(1);
+                  }}
+                  className={`btn ${
+                    currentPart === partData.part ? "btn-main" : "btn-outline-main"
+                  } px-12 py-4 rounded-pill text-sm`}
+                >
+                  Part {partData.part}
+                </button>
+              ))}
             </div>
           </div>
         )}

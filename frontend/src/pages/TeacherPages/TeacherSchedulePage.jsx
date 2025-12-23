@@ -13,7 +13,7 @@ const TeacherSchedulePage = () => {
       <TeacherNavigation />
 
       {/* Main Content */}
-      <div className="flex-grow-1" style={{ backgroundColor: '#f8f9fa' }}>
+      <div className="flex-grow-1 py-24 px-24" style={{ backgroundColor: '#f8f9fa' }}>
         <TeacherSchedule />
       </div>
     </div>

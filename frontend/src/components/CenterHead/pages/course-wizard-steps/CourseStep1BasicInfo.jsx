@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { toast } from 'react-toastify';
 import Button from '../../compo/Button';
 import courseService from '../../../../services/courseService';
 
 const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEdit }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -41,13 +43,24 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
       return;
     }
 
+    // Show confirmation modal only when creating new course (first time)
+    if (!courseData._id) {
+      setShowConfirmModal(true);
+      return;
+    }
+
+    // If course already exists, proceed with update
+    await saveAndProceed();
+  };
+
+  const saveAndProceed = async () => {
     try {
       setLoading(true);
 
       // Get user ID
       const userStr = localStorage.getItem('user');
       if (!userStr) {
-        alert('Không tìm thấy thông tin user!');
+        toast.error('Không tìm thấy thông tin user!');
         return;
       }
       const user = JSON.parse(userStr);
@@ -101,7 +114,7 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
 
       // Show appropriate message based on whether we created or updated
       const isUpdate = courseData._id !== null;
-      alert(isUpdate ? 'Cập nhật thông tin học phần thành công!' : 'Tạo học phần thành công!');
+      toast.success(isUpdate ? 'Cập nhật thông tin học phần thành công!' : 'Tạo học phần thành công!');
       onNext();
     } catch (error) {
       console.error('Error saving course:', error);
@@ -109,9 +122,9 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
 
       // Show more detailed error for duplicate courseCode
       if (errorMsg.includes('Mã môn học đã tồn tại')) {
-        alert(` Lỗi: Mã môn học "${courseData.courseCode}" đã tồn tại trong hệ thống!\n\nVui lòng sử dụng mã môn học khác.`);
+        toast.error(`Mã môn học "${courseData.courseCode}" đã tồn tại trong hệ thống! Vui lòng sử dụng mã môn học khác.`);
       } else {
-        alert(errorMsg);
+        toast.error(errorMsg);
       }
     } finally {
       setLoading(false);
@@ -120,12 +133,71 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
 
   return (
     <div>
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header bg-warning-50">
+                <h5 className="modal-title">
+                  <i className="ph ph-warning-circle text-warning-600 me-2"></i>
+                  Xác nhận tạo khóa học
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowConfirmModal(false)}
+                  disabled={loading}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="alert alert-warning mb-3">
+                  <i className="ph ph-info me-2"></i>
+                  <strong>Lưu ý quan trọng:</strong> Các thông tin sau đây sẽ <strong>không thể thay đổi</strong> sau khi tạo khóa học.
+                </div>
+
+                <div className="border rounded p-3 bg-neutral-50">
+                  <div className="mb-3">
+                    <span className="text-muted">Mã khóa học:</span>
+                    <div className="fw-bold text-primary-600 fs-5">{courseData.courseCode}</div>
+                  </div>
+                  <div>
+                    <span className="text-muted">Số lượng buổi học:</span>
+                    <div className="fw-bold text-primary-600 fs-5">{courseData.numberOfSessions} buổi</div>
+                  </div>
+                </div>
+
+                <p className="mt-3 mb-0 text-center">
+                  Bạn có chắc chắn muốn tiếp tục?
+                </p>
+              </div>
+              <div className="modal-footer">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowConfirmModal(false)}
+                  disabled={loading}
+                >
+                  Quay lại chỉnh sửa
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={async () => {
+                    setShowConfirmModal(false);
+                    await saveAndProceed();
+                  }}
+                  disabled={loading}
+                  icon={loading ? 'ph ph-spinner-gap spinner' : 'ph ph-check'}
+                >
+                  {loading ? 'Đang tạo...' : 'Xác nhận & Tiếp tục'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Section 1: Basic Information */}
       <div className="mb-32">
-        <h6 className="text-lg fw-bold text-neutral-900 mb-16 pb-8 border-bottom">
-          <i className="ph ph-info-circle me-2"></i>
-          Thông tin cơ bản
-        </h6>
         <div className="row gy-3">
           {/* Mã học phần */}
           <div className="col-md-6">
@@ -164,7 +236,7 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
           </div>
 
           {/* Số lượng buổi học */}
-          <div className="col-md-4">
+          <div className={program?.type === 'cam' ? 'col-md-4' : 'col-md-6'}>
             <label className="form-label fw-semibold text-neutral-900 mb-2">
               Số lượng buổi học <span className="text-danger-600">*</span>
             </label>
@@ -176,46 +248,35 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
               className={`form-control radius-8 ${errors.numberOfSessions ? 'is-invalid' : ''}`}
               placeholder="30"
               min="1"
+              disabled={courseData._id !== null}
               style={{ height: '44px' }}
             />
             {errors.numberOfSessions && <div className="invalid-feedback">{errors.numberOfSessions}</div>}
-            <small className="text-muted">Tổng số buổi học trong học phần</small>
+            {courseData._id ? (
+              <small className="text-muted">Số lượng buổi học không thể thay đổi sau khi đã tạo</small>
+            ) : (
+              <small className="text-muted">Tổng số buổi học trong học phần</small>
+            )}
           </div>
 
-          {/* Loại hình học */}
-          <div className="col-md-4">
-            <label className="form-label fw-semibold text-neutral-900 mb-2">
-              Loại hình học <span className="text-danger-600">*</span>
-            </label>
-            <select
-              name="learningType"
-              value={courseData.learningType}
-              onChange={handleInputChange}
-              className="form-select radius-8"
-              style={{ height: '44px' }}
-            >
-              <option value="offline">Offline (Học trực tiếp)</option>
-              <option value="online">Online (Học trực tuyến)</option>
-              <option value="hybrid">Hybrid (Kết hợp)</option>
-            </select>
-          </div>
-
-          {/* Điều kiện tiên quyết */}
-          <div className="col-md-4">
-            <label className="form-label fw-semibold text-neutral-900 mb-2">
-              Điều kiện tiên quyết
-            </label>
-            <input
-              type="text"
-              name="preRequisite"
-              value={courseData.preRequisite}
-              onChange={handleInputChange}
-              className="form-control radius-8"
-              placeholder="Ví dụ: Hoàn thành IELTS A2"
-              style={{ height: '44px' }}
-            />
-            <small className="text-muted">Để trống hoặc nhập "None" nếu không có</small>
-          </div>
+          {/* Loại hình học - Chỉ hiển thị khi program.type = 'cam' */}
+          {program?.type === 'cam' && (
+            <div className="col-md-4">
+              <label className="form-label fw-semibold text-neutral-900 mb-2">
+                Loại hình học <span className="text-danger-600">*</span>
+              </label>
+              <select
+                name="learningType"
+                value={courseData.learningType}
+                onChange={handleInputChange}
+                className="form-select radius-8"
+                style={{ height: '44px' }}
+              >
+                <option value="offline">Offline (Học trực tiếp)</option>
+                <option value="online">Online (Học trực tuyến)</option>
+              </select>
+            </div>
+          )}
 
           {/* Phân bổ thời gian */}
           <div className="col-12">
@@ -257,7 +318,6 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
               placeholder="Nhập mô tả chi tiết về học phần: mục tiêu, nội dung chính, phương pháp giảng dạy..."
               style={{ resize: 'vertical' }}
             />
-            <small className="text-muted">Mô tả tổng quan về học phần</small>
           </div>
 
           {/* Nhiệm vụ sinh viên */}
@@ -274,7 +334,6 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
               placeholder="Nhập nhiệm vụ của sinh viên: bài tập, dự án, thuyết trình, bài kiểm tra..."
               style={{ resize: 'vertical' }}
             />
-            <small className="text-muted">Các yêu cầu và nhiệm vụ sinh viên cần hoàn thành</small>
           </div>
         </div>
       </div>

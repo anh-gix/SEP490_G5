@@ -271,7 +271,22 @@ const StudentLessonDetail = () => {
                   >
                     <i className="fas fa-check text-main-600" style={{ fontSize: '10px' }}></i>
                   </div>
-                  <div className="text-neutral-900 text-14">{objective}</div>
+                  <div className="flex-grow-1">
+                    {objective.code ? (
+                      // Nếu là CLO object (có code, name, detail)
+                      <>
+                        <div className="text-neutral-900 text-14 fw-semibold mb-2">
+                          {objective.code}: {objective.name}
+                        </div>
+                        <div className="text-neutral-700 text-13">
+                          {objective.detail}
+                        </div>
+                      </>
+                    ) : (
+                      // Nếu là string (fallback)
+                      <div className="text-neutral-900 text-14">{objective}</div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -280,111 +295,6 @@ const StudentLessonDetail = () => {
           )}
         </Card.Body>
       </Card>
-
-      {/* Materials */}
-      <Card className="bg-white border-0 rounded-12 mb-24" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-        <Card.Header className="bg-white border-0 pt-20 px-20 pb-16">
-          <h5 className="text-neutral-900 fw-bold mb-0">Tài liệu học tập</h5>
-        </Card.Header>
-        <Card.Body className="p-20">
-          {lessonData.materials && lessonData.materials.length > 0 ? (
-            <div className="d-flex flex-column gap-12">
-              {lessonData.materials.map((material, index) => (
-                <div 
-                  key={index} 
-                  className="border border-neutral-100 rounded-12 p-16 d-flex align-items-center gap-12 transition-2"
-                  style={{ cursor: 'pointer' }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F8F9FA'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                >
-                  <div 
-                    className="rounded-8 d-flex align-items-center justify-content-center"
-                    style={{ width: '40px', height: '40px', backgroundColor: '#FFF4E6', flexShrink: 0 }}
-                  >
-                    <i className="fas fa-file-pdf text-warning-600"></i>
-                  </div>
-                  <div className="flex-grow-1">
-                    <div className="text-neutral-900 fw-semibold text-14">{material.title || material.file || `Tài liệu ${index + 1}`}</div>
-                  </div>
-                  <Button 
-                    className="btn-outline-main text-12 px-12 py-6 radius-6"
-                    onClick={() => material.file && window.open(material.file, '_blank')}
-                  >
-                    <i className="fas fa-download me-2"></i>
-                    Tải xuống
-                  </Button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-neutral-500 text-14 mb-0">Chưa có tài liệu học tập</p>
-          )}
-        </Card.Body>
-      </Card>
-
-      {/* Homework and Notes */}
-      <Row className="g-3">
-        <Col md={6}>
-          {/* Homework */}
-          <Card className="bg-white border-0 rounded-12 h-100" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-            <Card.Header className="bg-white border-0 pt-20 px-20 pb-16">
-              <h5 className="text-neutral-900 fw-bold mb-0">Bài tập về nhà</h5>
-            </Card.Header>
-            <Card.Body className="p-20">
-              {lessonData.homework && lessonData.homework.length > 0 ? (
-                <div className="d-flex flex-column gap-12">
-                  {lessonData.homework.map((hw, index) => (
-                    <div key={index} className="bg-warning-50 border border-warning-200 rounded-12 p-16">
-                      <div className="d-flex align-items-start gap-12">
-                        <i className="fas fa-tasks text-warning-600 mt-1"></i>
-                        <div className="flex-grow-1">
-                          <div className="text-neutral-900 fw-semibold text-14 mb-8">
-                            {hw.assignment?.title || `Bài tập ${index + 1}`}
-                          </div>
-                          {hw.assignment?.description && (
-                            <div className="text-neutral-700 text-13 mb-8">
-                              {hw.assignment.description}
-                            </div>
-                          )}
-                          {hw.assignment?.deadline && (
-                            <div className="text-neutral-600 text-12">
-                              <i className="fas fa-calendar-alt me-2"></i>
-                              Hạn nộp: {new Date(hw.assignment.deadline).toLocaleDateString('vi-VN')}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-neutral-500 text-14 mb-0">Chưa có bài tập về nhà</p>
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col md={6}>
-          {/* Notes */}
-          <Card className="bg-white border-0 rounded-12 h-100" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
-            <Card.Header className="bg-white border-0 pt-20 px-20 pb-16">
-              <h5 className="text-neutral-900 fw-bold mb-0">Ghi chú từ giảng viên</h5>
-            </Card.Header>
-            <Card.Body className="p-20">
-              {lessonData.notes ? (
-                <div className="bg-info-50 border border-info-200 rounded-12 p-16">
-                  <div className="d-flex align-items-start gap-12">
-                    <i className="fas fa-sticky-note text-info-600 mt-1"></i>
-                    <div className="text-neutral-700 text-13">{lessonData.notes}</div>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-neutral-500 text-14 mb-0">Chưa có ghi chú</p>
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
     </Container>
   );
 };

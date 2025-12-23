@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
+import { toast } from 'react-toastify';
+import { examService } from '../../../services/examService';
 
 const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) => {
   const [activeSkill, setActiveSkill] = useState(() => {
@@ -8,6 +10,7 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
     return existingTypes.length > 0 ? existingTypes[0] : 'listening';
   });
   const [previewFile, setPreviewFile] = useState(null);
+  const [uploadingFiles, setUploadingFiles] = useState({}); // Track uploading state per section
 
   const skillsConfig = {
     listening: {
@@ -71,32 +74,164 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
     });
   };
 
-  const handleFileUpload = (sectionIndex, file, fileType) => {
+  const handleFileUpload = async (sectionIndex, file, fileType) => {
     if (!file) return;
 
-    // Create mock URL for preview
-    const fileUrl = URL.createObjectURL(file);
+    // Validate file before upload
+    const maxSize = fileType === 'pdf' ? 10 * 1024 * 1024 : 50 * 1024 * 1024; // 10MB for PDF, 50MB for audio
+    if (file.size > maxSize) {
+      toast.error(`File quá lớn! Kích thước tối đa: ${maxSize / (1024 * 1024)}MB`, {
+        position: 'top-right',
+        autoClose: 4000,
+      });
+      return;
+    }
 
-    setExamData(prev => {
-      const newSections = [...prev.sections];
-      if (fileType === 'pdf') {
-        newSections[sectionIndex] = {
-          ...newSections[sectionIndex],
-          fileUrl: fileUrl,
-          fileName: file.name
-        };
-      } else if (fileType === 'audio') {
-        newSections[sectionIndex] = {
-          ...newSections[sectionIndex],
-          audioUrls: [...(newSections[sectionIndex].audioUrls || []), fileUrl],
-          audioFileNames: [...(newSections[sectionIndex].audioFileNames || []), file.name]
-        };
-      }
-      return { ...prev, sections: newSections };
+    // Validate file type
+    if (fileType === 'pdf' && !file.type.includes('pdf')) {
+      toast.error('Chỉ chấp nhận file PDF!', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+
+    if (fileType === 'audio' && !file.type.startsWith('audio/')) {
+      toast.error('Chỉ chấp nhận file audio!', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+
+    // Check if exam has been saved (has _id)
+    if (!examData._id) {
+      toast.warning('Vui lòng lưu thông tin cơ bản trước khi upload file!', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+
+    const uploadKey = `${sectionIndex}-${fileType}`;
+    setUploadingFiles(prev => ({ ...prev, [uploadKey]: true }));
+
+    console.log('🚀 Starting file upload:', {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      sectionIndex,
+      fileType: fileType,
+      examId: examData._id
     });
+
+    try {
+      // Get section data for more reliable identification
+      const section = examData.sections[sectionIndex];
+      if (!section) {
+        toast.error('Không tìm thấy section để upload file!', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+        return;
+      }
+
+      console.log('🚀 Frontend Upload Debug:', {
+        sectionIndex: sectionIndex,
+        sectionType: section.type,
+        sectionPart: section.part,
+        examId: examData._id,
+        fileType: fileType,
+        sectionsLength: examData.sections.length
+      });
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('examId', examData._id);
+      formData.append('sectionIndex', `${section.type}-${section.part}`); // Send as "type-part" format
+      formData.append('fileType', fileType);
+
+      const response = await examService.uploadExamFileForManagement(formData);
+
+      if (response.success) {
+        console.log('✅ File uploaded successfully:', {
+          fileType,
+          fileUrl: response.data.fileUrl,
+          fileName: response.data.fileName,
+          sectionIndex,
+          examId: examData._id
+        });
+
+        // Verify file URL contains uploads path
+        if (!response.data.fileUrl.includes('/uploads/')) {
+          console.warn('⚠️ File URL does not contain /uploads/ path:', response.data.fileUrl);
+        }
+
+        // Update local state with server response
+        setExamData(prev => {
+          const newSections = [...prev.sections];
+          if (fileType === 'pdf') {
+            newSections[sectionIndex] = {
+              ...newSections[sectionIndex],
+              fileUrl: response.data.fileUrl,
+              fileName: response.data.fileName
+            };
+          } else if (fileType === 'audio') {
+            newSections[sectionIndex] = {
+              ...newSections[sectionIndex],
+              audioUrls: [...(newSections[sectionIndex].audioUrls || []), response.data.fileUrl],
+              audioFileNames: [...(newSections[sectionIndex].audioFileNames || []), response.data.fileName]
+            };
+          }
+          return { ...prev, sections: newSections };
+        });
+
+        toast.success(`Upload ${fileType === 'pdf' ? 'PDF' : 'audio'} thành công!`, {
+          position: 'top-right',
+          autoClose: 2000,
+        });
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error(error.message || 'Lỗi khi upload file!', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    } finally {
+      setUploadingFiles(prev => ({ ...prev, [uploadKey]: false }));
+    }
   };
 
-  const handleRemoveFile = (sectionIndex, fileType, audioIndex = null) => {
+  const handleRemoveFile = async (sectionIndex, fileType, audioIndex = null) => {
+    // If exam has been saved, call API to delete file from server
+    if (examData._id) {
+      try {
+        await examService.deleteExamFileForManagement({
+          examId: examData._id,
+          sectionIndex,
+          fileType,
+          audioIndex
+        });
+
+        toast.success(`Xóa ${fileType === 'pdf' ? 'PDF' : 'audio'} thành công!`, {
+          position: 'top-right',
+          autoClose: 2000,
+        });
+
+        // Show warning if section now missing required files
+        const updatedSection = newSections[sectionIndex];
+        setTimeout(() => showSectionFileWarning(updatedSection, 'remove'), 500);
+      } catch (error) {
+        console.error('Delete file error:', error);
+        toast.error(error.message || 'Lỗi khi xóa file!', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+        return;
+      }
+    }
+
+    // Update local state
     setExamData(prev => {
       const newSections = [...prev.sections];
       if (fileType === 'pdf') {
@@ -137,7 +272,6 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
       sections: [...prev.sections, {
         type: activeSkill,
         part: newPartNumber,
-        title: `Part ${newPartNumber}`,
         instructions: '',
         duration: activeSkill === 'listening' ? 10 : activeSkill === 'reading' ? 20 : activeSkill === 'writing' ? 30 : 15,
         questionCount: activeSkill === 'writing' ? 1 : 10,
@@ -173,7 +307,7 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
 
   const getSectionsByType = (type) => {
     return examData.sections
-      .map((section, index) => ({ ...section, originalIndex: index }))
+      .map((section, index) => ({ ...section, arrayIndex: index })) // Use actual array index
       .filter(section => section.type === type)
       .sort((a, b) => a.part - b.part);
   };
@@ -187,27 +321,140 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
     return { totalParts, totalDuration, totalQuestions };
   };
 
+  const validateSectionFiles = (section) => {
+    const warnings = [];
+
+    if (section.type === 'listening') {
+      if (!section.audioUrls || section.audioUrls.length === 0) {
+        warnings.push('Thiếu file audio');
+      }
+    } else if (section.type === 'reading' || section.type === 'writing') {
+      if (!section.fileUrl) {
+        warnings.push('Thiếu file PDF đề thi');
+      }
+    }
+
+    return warnings;
+  };
+
+  const showSectionFileWarning = (section, action = 'change') => {
+    const warnings = validateSectionFiles(section);
+    if (warnings.length > 0) {
+      const partLabel = `${section.type.charAt(0).toUpperCase() + section.type.slice(1)} Part ${section.part}`;
+
+      toast.warning(
+        <div>
+          <div className="d-flex align-items-center mb-1">
+            <i className="ph ph-info fs-4 me-2"></i>
+            <strong>{partLabel}:</strong>
+          </div>
+          <ul className="mb-0 ps-3">
+            {warnings.map((warning, index) => (
+              <li key={index} className="text-warning small">{warning}</li>
+            ))}
+          </ul>
+        </div>,
+        {
+          position: 'top-right',
+          autoClose: 4000,
+          hideProgressBar: true,
+        }
+      );
+    }
+  };
+
   const validateAndNext = () => {
+    const missingFields = [];
+
     if (examData.sections.length === 0) {
-      alert('Vui lòng tạo ít nhất 1 section!');
+      toast.error(
+        <div>
+          <div className="d-flex align-items-center">
+            <i className="ph ph-x-circle fs-4 me-2"></i>
+            <span>Vui lòng tạo ít nhất 1 section!</span>
+          </div>
+        </div>,
+        {
+          position: 'top-right',
+          autoClose: 4000,
+        }
+      );
       return;
     }
 
-    // Check if all sections have valid data
-    const hasInvalidSection = examData.sections.some(section =>
-      !section.title || !section.duration || !section.questionCount
-    );
+    // Check each section for missing data
+    examData.sections.forEach((section, index) => {
+      const partLabel = `${section.type.charAt(0).toUpperCase() + section.type.slice(1)} Part ${section.part || index + 1}`;
 
-    if (hasInvalidSection) {
-      alert('Vui lòng điền đầy đủ thông tin cho tất cả các sections!');
-      return;
+      // Check required fields: part, duration, questionCount
+      if (!section.part) {
+        missingFields.push(`${partLabel}: Thiếu part number`);
+      }
+      if (!section.duration || section.duration <= 0) {
+        missingFields.push(`${partLabel}: Thiếu thời gian`);
+      }
+      if (!section.questionCount || section.questionCount <= 0) {
+        missingFields.push(`${partLabel}: Thiếu số câu hỏi`);
+      }
+
+      // Check required files based on section type
+      if (section.type === 'listening') {
+        if (!section.audioUrls || section.audioUrls.length === 0) {
+          missingFields.push(`${partLabel}: Thiếu file audio`);
+        }
+      } else if (section.type === 'reading' || section.type === 'writing') {
+        if (!section.fileUrl) {
+          missingFields.push(`${partLabel}: Thiếu file PDF đề thi`);
+        }
+      }
+      // Speaking doesn't require files
+    });
+
+    // Show toastify for missing data if any
+    if (missingFields.length > 0) {
+      toast.error(
+        <div>
+          <div className="d-flex align-items-center mb-2">
+            <i className="ph ph-x-circle fs-4 me-2"></i>
+            <strong>Thiếu dữ liệu:</strong>
+          </div>
+          <ul className="mb-0 ps-3 mt-1" style={{ maxHeight: '200px', overflow: 'auto' }}>
+            {missingFields.slice(0, 5).map((field, index) => (
+              <li key={index} className="text-danger">{field}</li>
+            ))}
+            {missingFields.length > 5 && (
+              <li className="text-danger">... và {missingFields.length - 5} mục khác</li>
+            )}
+          </ul>
+        </div>,
+        {
+          position: 'top-right',
+          autoClose: 6000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          style: { minWidth: '350px' }
+        }
+      );
+      return; // Block proceeding if there are missing fields
     }
+
+    // Proceed to next step only if no missing data
+    proceedToNext();
+  };
+
+  const proceedToNext = () => {
 
     // Update lastCompletedStep
     setExamData(prev => ({
       ...prev,
       lastCompletedStep: 2
     }));
+
+    toast.success('Cấu hình sections đã được lưu!', {
+      position: 'top-right',
+      autoClose: 2000,
+    });
 
     onNext();
   };
@@ -233,7 +480,7 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
             <div className="modal-body" style={{ height: '70vh' }}>
               {isPdf ? (
                 <iframe
-                  src={fileUrl}
+                  src={fileUrl.startsWith('/uploads') ? `http://localhost:${import.meta.env.VITE_API_PORT}${fileUrl}` : fileUrl}
                   style={{ width: '100%', height: '100%', border: 'none' }}
                   title="PDF Preview"
                 />
@@ -241,7 +488,7 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
                 <div className="text-center p-5">
                   <i className="ph ph-file fs-1 mb-3 text-muted"></i>
                   <p>Preview không khả dụng cho file này</p>
-                  <a href={fileUrl} download={fileName} className="btn btn-primary">
+                  <a href={fileUrl.startsWith('/uploads') ? `http://localhost:${import.meta.env.VITE_API_PORT}${fileUrl}` : fileUrl} download={fileName} className="btn btn-primary">
                     <i className="ph ph-download me-2"></i>
                     Download file
                   </a>
@@ -338,14 +585,14 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
                 ) : (
                   <div className="parts-list">
                     {sections.map((section, idx) => (
-                    <div key={section.originalIndex} className="part-card mb-3 border rounded">
+                    <div key={section.arrayIndex} className="part-card mb-3 border rounded">
                       <div className={`part-header bg-${config.color} bg-opacity-10 p-3 d-flex justify-content-between align-items-center`}>
                         <div className="d-flex align-items-center gap-3">
                           <div className={`part-badge bg-${config.color} text-white rounded-circle d-flex align-items-center justify-content-center`} style={{ width: '40px', height: '40px' }}>
                             <strong>{section.part}</strong>
                           </div>
                           <div>
-                            <h6 className="mb-0 fw-semibold">{section.title || `Part ${section.part}`}</h6>
+                            <h6 className="mb-0 fw-semibold">Part {section.part}</h6>
                             <small className="text-muted">
                               <i className="ph ph-clock me-1"></i>{section.duration} phút
                               <i className="ph ph-question ms-3 me-1"></i>{section.questionCount} câu
@@ -354,7 +601,7 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
                         </div>
                         <button
                           className="btn btn-sm btn-outline-danger"
-                          onClick={() => handleRemovePart(section.originalIndex)}
+                          onClick={() => handleRemovePart(section.arrayIndex)}
                           title="Xóa part này"
                         >
                           <i className="ph ph-trash"></i>
@@ -362,52 +609,7 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
                       </div>
                       <div className="part-body p-3">
                         <div className="row g-3">
-                          <div className="col-md-6">
-                            <label className="form-label fw-semibold mb-1">
-                              <i className="ph ph-text-aa me-1"></i>
-                              Tên/Tiêu đề Part
-                            </label>
-                            <input
-                              type="text"
-                              className="form-control"
-                              value={section.title}
-                              onChange={(e) => handlePartChange(section.originalIndex, 'title', e.target.value)}
-                              placeholder={`VD: Social & Daily Conversation`}
-                            />
-                          </div>
-
-                          <div className="col-md-2">
-                            <label className="form-label fw-semibold mb-1">
-                              <i className="ph ph-clock me-1"></i>
-                              Thời gian
-                            </label>
-                            <div className="input-group">
-                              <input
-                                type="number"
-                                className="form-control"
-                                value={section.duration}
-                                onChange={(e) => handlePartChange(section.originalIndex, 'duration', parseInt(e.target.value))}
-                                min="1"
-                              />
-                              <span className="input-group-text">phút</span>
-                            </div>
-                          </div>
-
-                          <div className="col-md-2">
-                            <label className="form-label fw-semibold mb-1">
-                              <i className="ph ph-question me-1"></i>
-                              Số câu hỏi
-                            </label>
-                            <input
-                              type="number"
-                              className="form-control"
-                              value={section.questionCount}
-                              onChange={(e) => handlePartChange(section.originalIndex, 'questionCount', parseInt(e.target.value))}
-                              min="1"
-                            />
-                          </div>
-
-                          <div className="col-md-2">
+                          <div className="col-md-3">
                             <label className="form-label fw-semibold mb-1">
                               <i className="ph ph-hash me-1"></i>
                               Part số
@@ -416,8 +618,43 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
                               type="number"
                               className="form-control"
                               value={section.part}
-                              onChange={(e) => handlePartChange(section.originalIndex, 'part', parseInt(e.target.value))}
+                              readOnly
+                              disabled
+                              title="Part số tự động tăng, không thể chỉnh sửa"
+                            />
+                            <small className="text-muted text-xs">Tự động</small>
+                          </div>
+
+                          <div className="col-md-4">
+                            <label className="form-label fw-semibold mb-1">
+                              <i className="ph ph-clock me-1"></i>
+                              Thời gian <span className="text-danger">*</span>
+                            </label>
+                            <div className="input-group">
+                              <input
+                                type="number"
+                                className="form-control"
+                                value={section.duration}
+                                onChange={(e) => handlePartChange(section.arrayIndex, 'duration', parseInt(e.target.value))}
+                                min="1"
+                                max="120"
+                              />
+                              <span className="input-group-text">phút</span>
+                            </div>
+                          </div>
+
+                          <div className="col-md-4">
+                            <label className="form-label fw-semibold mb-1">
+                              <i className="ph ph-question me-1"></i>
+                              Số câu hỏi <span className="text-danger">*</span>
+                            </label>
+                            <input
+                              type="number"
+                              className="form-control"
+                              value={section.questionCount}
+                              onChange={(e) => handlePartChange(section.arrayIndex, 'questionCount', parseInt(e.target.value))}
                               min="1"
+                              max="100"
                             />
                           </div>
 
@@ -429,7 +666,7 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
                             <textarea
                               className="form-control"
                               value={section.instructions}
-                              onChange={(e) => handlePartChange(section.originalIndex, 'instructions', e.target.value)}
+                              onChange={(e) => handlePartChange(section.arrayIndex, 'instructions', e.target.value)}
                               rows="3"
                               placeholder="VD: You will hear a conversation between two people. Listen carefully and answer questions 1-10..."
                             />
@@ -450,15 +687,16 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
                                     <small className="text-muted">PDF đã upload</small>
                                   </div>
                                   <button
-                                    className="btn btn-sm btn-outline-primary"
+                                    className="btn btn-sm btn-outline-primary p-1"
                                     onClick={() => handlePreviewFile(section.fileUrl, section.fileName)}
+                                    title="Xem trước PDF"
+                                    style={{ width: '32px', height: '32px' }}
                                   >
-                                    <i className="ph ph-eye me-1"></i>
-                                    Preview
+                                    <i className="ph ph-eye"></i>
                                   </button>
                                   <button
                                     className="btn btn-sm btn-outline-danger"
-                                    onClick={() => handleRemoveFile(section.originalIndex, 'pdf')}
+                                    onClick={() => handleRemoveFile(section.arrayIndex, 'pdf')}
                                   >
                                     <i className="ph ph-trash"></i>
                                   </button>
@@ -469,81 +707,158 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
                                     type="file"
                                     accept=".pdf"
                                     className="d-none"
-                                    id={`pdf-upload-${section.originalIndex}`}
+                                    id={`pdf-upload-${section.arrayIndex}`}
                                     onChange={(e) => {
                                       const file = e.target.files[0];
-                                      if (file) handleFileUpload(section.originalIndex, file, 'pdf');
+                                      if (file) handleFileUpload(section.arrayIndex, file, 'pdf');
                                     }}
+                                    disabled={uploadingFiles[`${section.arrayIndex}-pdf`]}
                                   />
                                   <label
-                                    htmlFor={`pdf-upload-${section.originalIndex}`}
-                                    className="file-upload-label d-flex flex-column align-items-center justify-content-center p-4 border border-2 border-dashed rounded cursor-pointer"
+                                    htmlFor={`pdf-upload-${section.arrayIndex}`}
+                                    className={`file-upload-label d-flex flex-column align-items-center justify-content-center p-4 border border-2 border-dashed rounded cursor-pointer ${uploadingFiles[`${section.arrayIndex}-pdf`] ? 'opacity-50' : ''}`}
                                   >
-                                    <i className="ph ph-upload fs-2 mb-2 text-primary"></i>
-                                    <span className="fw-semibold">Click để upload file PDF</span>
-                                    <small className="text-muted">Chọn file đề thi dạng PDF</small>
+                                    {uploadingFiles[`${section.arrayIndex}-pdf`] ? (
+                                      <>
+                                        <div className="spinner-border spinner-border-sm text-primary mb-2"></div>
+                                        <span className="fw-semibold">Đang upload...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <i className="ph ph-upload fs-2 mb-2 text-primary"></i>
+                                        <span className="fw-semibold">Click để upload file PDF</span>
+                                        <small className="text-muted">PDF ≤ 10MB • Định dạng: .pdf</small>
+                                      </>
+                                    )}
                                   </label>
                                 </div>
                               )}
                             </div>
                           )}
 
-                          {/* File Upload - Audio for Listening */}
+                          {/* File Upload - Audio and PDF for Listening */}
                           {section.type === 'listening' && (
-                            <div className="col-12">
-                              <label className="form-label fw-semibold mb-1">
-                                <i className="ph ph-file-audio me-1"></i>
-                                Upload file âm thanh
-                              </label>
-
-                              {/* Show uploaded audio files */}
-                              {section.audioUrls && section.audioUrls.length > 0 && (
-                                <div className="mb-2">
-                                  {section.audioUrls.map((audioUrl, audioIdx) => (
-                                    <div key={audioIdx} className="d-flex align-items-center gap-2 p-2 border rounded bg-light mb-2">
-                                      <i className="ph ph-file-audio fs-4 text-primary"></i>
-                                      <div className="flex-grow-1">
-                                        <div className="fw-semibold text-sm">
-                                          {section.audioFileNames?.[audioIdx] || `audio-${audioIdx + 1}.mp3`}
-                                        </div>
-                                        <audio controls className="w-100 mt-1" style={{ height: '30px' }}>
-                                          <source src={audioUrl} />
-                                        </audio>
-                                      </div>
-                                      <button
-                                        className="btn btn-sm btn-outline-danger"
-                                        onClick={() => handleRemoveFile(section.originalIndex, 'audio', audioIdx)}
-                                      >
-                                        <i className="ph ph-trash"></i>
-                                      </button>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-
-                              {/* Upload new audio */}
-                              <div className="file-upload-area">
-                                <input
-                                  type="file"
-                                  accept="audio/*,.mp3,.wav"
-                                  className="d-none"
-                                  id={`audio-upload-${section.originalIndex}`}
-                                  onChange={(e) => {
-                                    const file = e.target.files[0];
-                                    if (file) handleFileUpload(section.originalIndex, file, 'audio');
-                                    e.target.value = ''; // Reset input
-                                  }}
-                                />
-                                <label
-                                  htmlFor={`audio-upload-${section.originalIndex}`}
-                                  className="file-upload-label d-flex flex-column align-items-center justify-content-center p-3 border border-2 border-dashed rounded cursor-pointer"
-                                >
-                                  <i className="ph ph-upload fs-4 mb-1 text-primary"></i>
-                                  <span className="fw-semibold text-sm">Click để upload file audio</span>
-                                  <small className="text-muted">MP3, WAV (có thể upload nhiều file)</small>
+                            <>
+                              {/* PDF Upload for Listening */}
+                              <div className="col-md-6">
+                                <label className="form-label fw-semibold mb-1">
+                                  <i className="ph ph-file-pdf me-1"></i>
+                                  Upload đề thi (PDF)
                                 </label>
+                                {section.fileUrl ? (
+                                  <div className="d-flex align-items-center gap-2 p-3 border rounded bg-light">
+                                    <i className="ph ph-file-pdf fs-4 text-danger"></i>
+                                    <div className="flex-grow-1">
+                                      <div className="fw-semibold text-sm">{section.fileName || 'exam.pdf'}</div>
+                                      <small className="text-muted">PDF đã upload</small>
+                                    </div>
+                                    <button
+                                      className="btn btn-sm btn-outline-danger"
+                                      onClick={() => handleRemoveFile(section.arrayIndex, 'pdf')}
+                                    >
+                                      <i className="ph ph-trash"></i>
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="file-upload-area">
+                                    <input
+                                      type="file"
+                                      accept=".pdf"
+                                      className="d-none"
+                                      id={`listening-pdf-upload-${section.arrayIndex}`}
+                                      onChange={(e) => {
+                                        const file = e.target.files[0];
+                                        if (file) handleFileUpload(section.arrayIndex, file, 'pdf');
+                                      }}
+                                      disabled={uploadingFiles[`${section.arrayIndex}-pdf`]}
+                                    />
+                                    <label
+                                      htmlFor={`listening-pdf-upload-${section.arrayIndex}`}
+                                      className={`file-upload-label d-flex flex-column align-items-center justify-content-center p-3 border border-2 border-dashed rounded cursor-pointer ${uploadingFiles[`${section.originalIndex}-pdf`] ? 'opacity-50' : ''}`}
+                                    >
+                                      {uploadingFiles[`${section.arrayIndex}-pdf`] ? (
+                                        <>
+                                          <div className="spinner-border spinner-border-sm text-primary mb-1"></div>
+                                          <span className="fw-semibold text-sm">Đang upload...</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <i className="ph ph-upload fs-4 mb-1 text-primary"></i>
+                                          <span className="fw-semibold text-sm">Click để upload PDF</span>
+                                          <small className="text-muted">Đề thi dạng PDF</small>
+                                        </>
+                                      )}
+                                    </label>
+                                  </div>
+                                )}
                               </div>
-                            </div>
+
+                              {/* Audio Upload for Listening */}
+                              <div className="col-md-6">
+                                <label className="form-label fw-semibold mb-1">
+                                  <i className="ph ph-file-audio me-1"></i>
+                                  Upload file âm thanh
+                                </label>
+
+                                {/* Show uploaded audio files */}
+                                {section.audioUrls && section.audioUrls.length > 0 && (
+                                  <div className="mb-2">
+                                    {section.audioUrls.map((audioUrl, audioIdx) => (
+                                      <div key={audioIdx} className="d-flex align-items-center gap-2 p-2 border rounded bg-light mb-2">
+                                        <i className="ph ph-file-audio fs-4 text-primary"></i>
+                                        <div className="flex-grow-1">
+                                          <div className="fw-semibold text-sm">
+                                            {section.audioFileNames?.[audioIdx] || `audio-${audioIdx + 1}.mp3`}
+                                          </div>
+                                          <audio controls className="w-100 mt-1" style={{ height: '30px' }}>
+                                            <source src={audioUrl.startsWith('/uploads') ? `http://localhost:${import.meta.env.VITE_API_PORT}${audioUrl}` : audioUrl} />
+                                          </audio>
+                                        </div>
+                                        <button
+                                          className="btn btn-sm btn-outline-danger"
+                                          onClick={() => handleRemoveFile(section.arrayIndex, 'audio', audioIdx)}
+                                        >
+                                          <i className="ph ph-trash"></i>
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Upload new audio */}
+                                <div className="file-upload-area">
+                                  <input
+                                    type="file"
+                                    accept="audio/*,.mp3,.wav"
+                                    className="d-none"
+                                    id={`audio-upload-${section.arrayIndex}`}
+                                    onChange={(e) => {
+                                      const file = e.target.files[0];
+                                      if (file) handleFileUpload(section.arrayIndex, file, 'audio');
+                                      e.target.value = ''; // Reset input
+                                    }}
+                                    disabled={uploadingFiles[`${section.arrayIndex}-audio`]}
+                                  />
+                                  <label
+                                    htmlFor={`audio-upload-${section.arrayIndex}`}
+                                    className={`file-upload-label d-flex flex-column align-items-center justify-content-center p-3 border border-2 border-dashed rounded cursor-pointer ${uploadingFiles[`${section.arrayIndex}-audio`] ? 'opacity-50' : ''}`}
+                                  >
+                                    {uploadingFiles[`${section.arrayIndex}-audio`] ? (
+                                      <>
+                                        <div className="spinner-border spinner-border-sm text-primary mb-1"></div>
+                                        <span className="fw-semibold text-sm">Đang upload...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <i className="ph ph-upload fs-4 mb-1 text-primary"></i>
+                                        <span className="fw-semibold text-sm">Click để upload audio</span>
+                                        <small className="text-muted">MP3, WAV ≤ 50MB • Nhiều file được phép</small>
+                                      </>
+                                    )}
+                                  </label>
+                                </div>
+                              </div>
+                            </>
                           )}
                         </div>
                       </div>
@@ -566,6 +881,20 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
           </span>
         </div>
       )}
+
+      <div className="alert alert-info d-flex align-items-start gap-2 mb-4">
+        <i className="ph ph-info fs-5"></i>
+        <div className="text-sm">
+          <strong>Yêu cầu file cho từng kỹ năng:</strong>
+          <ul className="mb-0 ps-3 mt-2">
+            <li><strong>Listening:</strong> Bắt buộc upload file audio (MP3, WAV, etc.)</li>
+            <li><strong>Reading:</strong> Bắt buộc upload file PDF đề thi</li>
+            <li><strong>Writing:</strong> Bắt buộc upload file PDF đề thi</li>
+            <li><strong>Speaking:</strong> Không yêu cầu file (có thể bỏ trống)</li>
+            <li>File sẽ được lưu vào thư mục uploads trên server</li>
+          </ul>
+        </div>
+      </div>
 
       <div className="d-flex justify-content-between gap-3 mt-4 pt-4 border-top">
         <button className="btn btn-outline-secondary" onClick={onPrevious}>

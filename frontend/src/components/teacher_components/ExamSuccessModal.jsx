@@ -75,14 +75,7 @@ const ExamSuccessModal = ({ show, examData, onViewExam, onCreateAnother, onGoToE
 
             <hr className="my-4" />
 
-            {/* Status Message */}
-            <div className="alert alert-success text-start mb-4">
-              <i className="ph ph-check-circle fs-5 me-2"></i>
-              <strong>✅ Yêu cầu công việc đã hoàn thành</strong>
-              <p className="mb-0 mt-2 text-sm">
-                Đề thi đã được gửi đến Center Head để duyệt. Bạn sẽ nhận được thông báo khi Center Head review xong.
-              </p>
-            </div>
+
 
             <hr className="my-4" />
 

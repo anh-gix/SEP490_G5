@@ -153,6 +153,30 @@ exports.updateHomework = async (req, res) => {
         },
         { $set: updateFields }
       );
+
+      // If deadline was updated, recalculate status for all submitted assignments
+      if (deadline) {
+        const newDeadline = new Date(deadline);
+        
+        // Find all submitted assignments for this homework
+        const submittedAssignments = await HomeworkSubmission.find({
+          classSchedule: scheduleId,
+          homeworkId: homeworkId,
+          submittedAt: { $exists: true, $ne: null }
+        });
+
+        // Update status based on new deadline
+        for (const submission of submittedAssignments) {
+          const isLate = submission.submittedAt > newDeadline;
+          const newStatus = isLate ? 'late' : 'submitted';
+          
+          // Only update if status changed
+          if (submission.status !== newStatus) {
+            submission.status = newStatus;
+            await submission.save();
+          }
+        }
+      }
     }
 
     res.status(200).json({

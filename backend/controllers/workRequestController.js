@@ -25,7 +25,7 @@ const validateProgramBeforeSubmit = async (programId) => {
   // Check có ít nhất 1 course
   const courseCount = await Course.countDocuments({ program: programId });
   if (courseCount === 0) {
-    throw new Error('Program must have at least one course');
+    throw new Error('Chương trình cần ít nhất một khóa học');
   }
 
   // Check TẤT CẢ courses phải completed
@@ -116,7 +116,6 @@ exports.submitProgram = async (req, res) => {
       // Program was assigned by Center Head to Subject Leader
       // Update the existing top-down request to pending_approval
       // ========================================
-      console.log('✅ Found top-down in_progress request - updating to pending_approval');
 
       // Update Program status
       await Program.findByIdAndUpdate(
@@ -146,7 +145,6 @@ exports.submitProgram = async (req, res) => {
         { session, new: true }
       );
 
-      console.log('✅ Updated top-down request to pending_approval:', workRequest._id);
     } else {
       // ========================================
       // SCENARIO 2: Bottom-Up Workflow
@@ -187,7 +185,6 @@ exports.submitProgram = async (req, res) => {
 
       if (rejectedRequest) {
         // Resubmit - update rejected request
-        console.log('✅ Found rejected bottom-up request - updating to pending');
         workRequest = await WorkRequest.findByIdAndUpdate(
           rejectedRequest._id,
           {
@@ -212,7 +209,6 @@ exports.submitProgram = async (req, res) => {
         );
       } else {
         // Submit lần đầu - tạo mới bottom-up request
-        console.log('✅ Creating new bottom-up request');
         const newRequest = await WorkRequest.create([{
           direction: 'bottom_up',
           requestType: 'program',
@@ -431,6 +427,8 @@ exports.getAllRequests = async (req, res) => {
         .populate('assignedTo', 'name email username')
         .populate('processedBy', 'name email username')
         .populate('entityId')
+        .populate('history.performedBy', 'name email username')
+        .populate('revocation.revokedBy', 'name email username')
         .sort({ requestedAt: -1 })
         .skip(skip)
         .limit(limitNum),
@@ -484,6 +482,8 @@ exports.getMyRequests = async (req, res) => {
       .populate('processedBy', 'name email username')
       .populate('assignedTo', 'name email username')
       .populate('entityId')
+      .populate('history.performedBy', 'name email username')
+      .populate('revocation.revokedBy', 'name email username')
       .sort({ requestedAt: -1 });
 
     res.status(200).json({
@@ -533,6 +533,8 @@ exports.getAssignedToMe = async (req, res) => {
       .populate('assignedTo', 'name email username')
       .populate('processedBy', 'name email username')
       .populate('entityId')
+      .populate('history.performedBy', 'name email username')
+      .populate('revocation.revokedBy', 'name email username')
       .sort({ requestedAt: -1 });
 
     res.status(200).json({
@@ -562,7 +564,9 @@ exports.getRequestById = async (req, res) => {
       .populate('requestedBy', 'name email username')
       .populate('assignedTo', 'name email username')
       .populate('processedBy', 'name email username')
-      .populate('entityId');
+      .populate('entityId')
+      .populate('history.performedBy', 'name email username')
+      .populate('revocation.revokedBy', 'name email username');
 
     if (!request) {
       return res.status(404).json({
@@ -992,10 +996,9 @@ exports.cancelRequest = async (req, res) => {
           if (['draft', 'needs_revision'].includes(entity.status)) {
             await Model.findByIdAndDelete(request.entityId, { session });
             deletedEntity = true;
-            console.log(`✅ Deleted linked ${request.entityType}:`, request.entityId);
           } else {
             // Entity không thể xóa vì status không phù hợp
-            console.warn(`⚠️ Cannot delete ${request.entityType} with status: ${entity.status}`);
+            console.warn(`Cannot delete ${request.entityType} with status: ${entity.status}`);
           }
         }
       } else {
@@ -1187,15 +1190,6 @@ exports.createTopDownRequest = async (req, res) => {
       requestedBy
     } = req.body;
 
-    // Debug logging
-    console.log('📝 Create Work Request - Received data:', {
-      requestType,
-      assignedTo,
-      requestedBy,
-      hasFiles: !!req.files,
-      files: req.files ? Object.keys(req.files) : []
-    });
-
     // Validation
     if (!requestType || !assignedTo || !requestedBy) {
       await session.abortTransaction();
@@ -1206,7 +1200,7 @@ exports.createTopDownRequest = async (req, res) => {
       });
     }
 
-    const validTopDownTypes = ['create_program', 'edit_course', 'create_exam', 'assign_students'];
+    const validTopDownTypes = ['create_program', 'edit_program', 'edit_course', 'create_exam', 'assign_students'];
     if (!validTopDownTypes.includes(requestType)) {
       await session.abortTransaction();
       return res.status(400).json({
@@ -1258,6 +1252,64 @@ exports.createTopDownRequest = async (req, res) => {
           workRequestData.changeDetails = { description: changeDetails };
         }
       }
+    }
+
+    // For edit_program, add entity reference and check for existing active request
+    if (requestType === 'edit_program') {
+      if (!entityId) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'entityId (programId) is required for edit_program'
+        });
+      }
+
+      // Verify program exists and is approved
+      const program = await Program.findById(entityId).session(session);
+      if (!program) {
+        await session.abortTransaction();
+        return res.status(404).json({
+          success: false,
+          message: 'Program not found'
+        });
+      }
+
+      if (program.status !== 'approved') {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: `Cannot create edit request: Program status must be 'approved' (current: ${program.status})`
+        });
+      }
+
+      // Check for existing active edit_program request
+      const existingEditRequest = await WorkRequest.findOne({
+        entityId: entityId,
+        entityType: 'Program',
+        requestType: 'edit_program',
+        status: { $in: ['pending', 'in_progress', 'pending_approval'] }
+      }).session(session);
+
+      if (existingEditRequest) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          success: false,
+          message: 'Program already has an active edit request. Please wait for it to complete or cancel it first.',
+          existingRequestId: existingEditRequest._id,
+          existingRequestStatus: existingEditRequest.status
+        });
+      }
+
+      // Get current course IDs to store as original courses
+      const existingCourses = await Course.find({ program: entityId }).select('_id').session(session);
+      const originalCourseIds = existingCourses.map(c => c._id.toString());
+
+      workRequestData.entityType = 'Program';
+      workRequestData.entityId = entityId;
+      workRequestData.changeDetails = {
+        ...workRequestData.changeDetails,
+        originalCourseIds: originalCourseIds
+      };
     }
 
     // Handle file uploads (if using multer)
@@ -1388,7 +1440,6 @@ exports.startProcessing = async (req, res) => {
       entityId = program[0]._id;
       entityType = 'Program';
 
-      console.log('✅ Created draft program:', entityId, 'for request:', id);
     } else if (request.requestType === 'create_exam') {
       // Tạo exam draft từ thông tin trong request
       const examData = {
@@ -1408,7 +1459,6 @@ exports.startProcessing = async (req, res) => {
       entityId = exam[0]._id;
       entityType = 'Exam';
 
-      console.log('✅ Created draft exam:', entityId, 'for request:', id);
     }
 
     // Update work request status
@@ -1546,7 +1596,6 @@ exports.recreateEntity = async (req, res) => {
       const program = await Program.create([programData], { session });
       newEntityId = program[0]._id;
 
-      console.log('✅ Recreated program:', newEntityId, 'for request:', id);
     } else if (request.requestType === 'create_exam') {
       // Similar logic for exam if needed
       const examData = {
@@ -1560,7 +1609,6 @@ exports.recreateEntity = async (req, res) => {
       const exam = await Exam.create([examData], { session });
       newEntityId = exam[0]._id;
 
-      console.log('✅ Recreated exam:', newEntityId, 'for request:', id);
     } else {
       await session.abortTransaction();
       return res.status(400).json({
@@ -1776,15 +1824,12 @@ exports.completeRequest = async (req, res) => {
         { status: 'pending_approval' },
         { session }
       );
-      console.log('✅ Updated program status to pending_approval after completion');
     } else if (request.entityId && request.requestType === 'create_exam') {
-      const Exam = require('../models/Exam');
       await Exam.findByIdAndUpdate(
         request.entityId,
         { status: 'pending_approval' },
         { session }
       );
-      console.log('✅ Updated exam status to pending_approval after completion');
     }
 
     await session.commitTransaction();
@@ -1817,27 +1862,56 @@ exports.getWorkRequestStats = async (req, res) => {
       });
     }
 
-    const query = {
-      assignedTo: userId,
+    // Query for top-down requests created by this center head
+    const baseQuery = {
+      requestedBy: userId,
       direction: 'top_down'
     };
 
     // Add status filter if provided and not 'all'
     if (status && status !== 'all') {
-      query.status = status;
+      baseQuery.status = status;
     }
 
-    const stats = {
-      assign_students: await WorkRequest.countDocuments({ ...query, requestType: 'assign_students' }),
-      create_program: await WorkRequest.countDocuments({ ...query, requestType: 'create_program' }),
-      edit_course: await WorkRequest.countDocuments({ ...query, requestType: 'edit_course' }),
-      create_exam: await WorkRequest.countDocuments({ ...query, requestType: 'create_exam' }),
-      total: await WorkRequest.countDocuments(query)
+    // Get stats by status
+    const stats = await WorkRequest.aggregate([
+      { $match: baseQuery },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Transform to expected format
+    const result = {
+      pending: 0,
+      in_progress: 0,
+      pending_approval: 0,
+      approved: 0,
+      rejected: 0,
+      completed: 0,
+      need_revision: 0,
+      total: 0
     };
 
+    stats.forEach(item => {
+      const statusKey = item._id;
+      if (result[statusKey] !== undefined) {
+        result[statusKey] = item.count;
+        result.total += item.count;
+      }
+    });
+
+    // Return data in the format expected by frontend
     res.status(200).json({
       success: true,
-      stats
+      data: {
+        byDirection: {
+          top_down: result
+        }
+      }
     });
 
   } catch (error) {
@@ -1845,6 +1919,782 @@ exports.getWorkRequestStats = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error getting stats'
+    });
+  }
+};
+
+// =========================
+// WITHDRAW SUBMISSION (Subject Leader)
+// Rút lại yêu cầu phê duyệt khi program/exam đang pending_approval
+// =========================
+
+/**
+ * Withdraw program submission (Hủy nộp)
+ * POST /api/work-requests/withdraw/program/:programId
+ * Body: { userId, note }
+ *
+ * Use case: Subject Leader muốn rút lại yêu cầu phê duyệt để sửa đổi program/courses
+ * trước khi Center Head duyệt
+ */
+exports.withdrawProgramSubmission = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { programId } = req.params;
+    const { userId, note } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    // Tìm program
+    const program = await Program.findById(programId).session(session);
+
+    if (!program) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Program not found'
+      });
+    }
+
+    // Kiểm tra program phải đang pending_approval
+    if (program.status !== 'pending_approval') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot withdraw: Program is not pending approval (current status: ${program.status})`
+      });
+    }
+
+    // Tìm work request liên quan (có thể là bottom_up hoặc top_down)
+    const workRequest = await WorkRequest.findOne({
+      entityId: programId,
+      entityType: 'Program',
+      status: { $in: ['pending', 'pending_approval'] }
+    }).session(session);
+
+    if (!workRequest) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'No pending work request found for this program'
+      });
+    }
+
+    // Kiểm tra quyền: Chỉ người nộp (requestedBy cho bottom-up) hoặc assignedTo (cho top-down) mới được rút
+    const isBottomUp = workRequest.direction === 'bottom_up';
+    const canWithdraw = isBottomUp
+      ? workRequest.requestedBy.toString() === userId.toString()
+      : workRequest.assignedTo?.toString() === userId.toString();
+
+    if (!canWithdraw) {
+      await session.abortTransaction();
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to withdraw this submission'
+      });
+    }
+
+    // Xác định status mới cho work request và program
+    let newWorkRequestStatus;
+    let newProgramStatus;
+
+    if (isBottomUp) {
+      // Bottom-up: Xóa work request, program về draft/needs_revision
+      // Nếu có rejectionReason trước đó thì giữ nguyên needs_revision
+      newProgramStatus = program.rejectionReason ? 'needs_revision' : 'draft';
+
+      // Thêm history trước khi xóa
+      await WorkRequest.findByIdAndUpdate(workRequest._id, {
+        $push: {
+          history: {
+            action: 'withdrawn',
+            performedBy: userId,
+            performedAt: new Date(),
+            note: note || 'Submission withdrawn by requester',
+            previousStatus: workRequest.status
+          }
+        }
+      }, { session });
+
+      // Xóa work request (bottom-up có thể xóa vì chưa được xử lý)
+      await WorkRequest.findByIdAndDelete(workRequest._id, { session });
+
+    } else {
+      // Top-down: Chuyển work request về in_progress, program về draft
+      newWorkRequestStatus = 'in_progress';
+      newProgramStatus = 'draft';
+
+      await WorkRequest.findByIdAndUpdate(workRequest._id, {
+        status: newWorkRequestStatus,
+        $push: {
+          history: {
+            action: 'withdrawn',
+            performedBy: userId,
+            performedAt: new Date(),
+            note: note || 'Submission withdrawn for revision',
+            previousStatus: workRequest.status
+          }
+        }
+      }, { session });
+    }
+
+    // Cập nhật program status
+    await Program.findByIdAndUpdate(programId, {
+      status: newProgramStatus
+    }, { session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: 'Đã hủy nộp thành công. Bạn có thể chỉnh sửa và nộp lại sau.',
+      data: {
+        programId,
+        newProgramStatus,
+        workRequestDeleted: isBottomUp,
+        newWorkRequestStatus: isBottomUp ? null : newWorkRequestStatus
+      }
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error withdrawing program submission:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error withdrawing submission'
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+/**
+ * Withdraw exam submission (Hủy nộp đề thi)
+ * POST /api/work-requests/withdraw/exam/:examId
+ * Body: { userId, note }
+ */
+exports.withdrawExamSubmission = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { examId } = req.params;
+    const { userId, note } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    // Tìm exam
+    const exam = await Exam.findById(examId).session(session);
+
+    if (!exam) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Exam not found'
+      });
+    }
+
+    // Kiểm tra exam phải đang pending_approval
+    if (exam.status !== 'pending_approval') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot withdraw: Exam is not pending approval (current status: ${exam.status})`
+      });
+    }
+
+    // Tìm work request liên quan
+    const workRequest = await WorkRequest.findOne({
+      entityId: examId,
+      entityType: 'Exam',
+      status: { $in: ['pending', 'pending_approval'] }
+    }).session(session);
+
+    if (!workRequest) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'No pending work request found for this exam'
+      });
+    }
+
+    // Kiểm tra quyền
+    const isBottomUp = workRequest.direction === 'bottom_up';
+    const canWithdraw = isBottomUp
+      ? workRequest.requestedBy.toString() === userId.toString()
+      : workRequest.assignedTo?.toString() === userId.toString();
+
+    if (!canWithdraw) {
+      await session.abortTransaction();
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to withdraw this submission'
+      });
+    }
+
+    // Xác định status mới
+    let newWorkRequestStatus;
+    let newExamStatus;
+
+    if (isBottomUp) {
+      newExamStatus = exam.rejectionReason ? 'needs_revision' : 'draft';
+
+      await WorkRequest.findByIdAndUpdate(workRequest._id, {
+        $push: {
+          history: {
+            action: 'withdrawn',
+            performedBy: userId,
+            performedAt: new Date(),
+            note: note || 'Submission withdrawn by requester',
+            previousStatus: workRequest.status
+          }
+        }
+      }, { session });
+
+      await WorkRequest.findByIdAndDelete(workRequest._id, { session });
+
+    } else {
+      newWorkRequestStatus = 'in_progress';
+      newExamStatus = 'draft';
+
+      await WorkRequest.findByIdAndUpdate(workRequest._id, {
+        status: newWorkRequestStatus,
+        $push: {
+          history: {
+            action: 'withdrawn',
+            performedBy: userId,
+            performedAt: new Date(),
+            note: note || 'Submission withdrawn for revision',
+            previousStatus: workRequest.status
+          }
+        }
+      }, { session });
+    }
+
+    // Cập nhật exam status
+    await Exam.findByIdAndUpdate(examId, {
+      status: newExamStatus
+    }, { session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: 'Đã hủy nộp đề thi thành công. Bạn có thể chỉnh sửa và nộp lại sau.',
+      data: {
+        examId,
+        newExamStatus,
+        workRequestDeleted: isBottomUp,
+        newWorkRequestStatus: isBottomUp ? null : newWorkRequestStatus
+      }
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error withdrawing exam submission:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error withdrawing submission'
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+// =========================
+// EDIT PROGRAM WORKFLOW
+// =========================
+
+/**
+ * Check if program has active edit request
+ * GET /api/work-requests/program/:programId/edit-status
+ *
+ * Returns: { hasActiveEditRequest, activeRequest (if exists) }
+ */
+exports.checkProgramEditStatus = async (req, res) => {
+  try {
+    const { programId } = req.params;
+
+    // Check for active edit_program request
+    const activeEditRequest = await WorkRequest.findOne({
+      entityId: programId,
+      entityType: 'Program',
+      requestType: 'edit_program',
+      status: { $in: ['pending', 'in_progress', 'pending_approval'] }
+    })
+      .populate('assignedTo', 'name email username')
+      .populate('requestedBy', 'name email username');
+
+    if (activeEditRequest) {
+      return res.status(200).json({
+        success: true,
+        hasActiveEditRequest: true,
+        activeRequest: {
+          _id: activeEditRequest._id,
+          status: activeEditRequest.status,
+          requestNote: activeEditRequest.requestNote,
+          assignedTo: activeEditRequest.assignedTo,
+          requestedBy: activeEditRequest.requestedBy,
+          requestedAt: activeEditRequest.requestedAt
+        }
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      hasActiveEditRequest: false,
+      activeRequest: null
+    });
+
+  } catch (error) {
+    console.error('Error checking program edit status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error checking program edit status'
+    });
+  }
+};
+
+/**
+ * Start processing edit_program request (Subject Leader accepts the task)
+ * POST /api/work-requests/:id/start-edit-program
+ * Body: { userId }
+ */
+exports.startEditProgram = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    const request = await WorkRequest.findById(id).session(session);
+
+    if (!request) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Work request not found'
+      });
+    }
+
+    // Validate: must be edit_program type
+    if (request.requestType !== 'edit_program') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'This API is only for edit_program requests'
+      });
+    }
+
+    // Validate: only assignee can start
+    if (request.assignedTo.toString() !== userId.toString()) {
+      await session.abortTransaction();
+      return res.status(403).json({
+        success: false,
+        message: 'You are not assigned to this request'
+      });
+    }
+
+    // Validate: request must be pending
+    if (request.status !== 'pending') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot start: request is ${request.status}`
+      });
+    }
+
+    // Update work request status to in_progress
+    await WorkRequest.findByIdAndUpdate(id, {
+      status: 'in_progress',
+      $push: {
+        history: {
+          action: 'in_progress',
+          performedBy: userId,
+          performedAt: new Date(),
+          note: 'Started editing program',
+          previousStatus: 'pending'
+        }
+      }
+    }, { session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: 'Started processing edit program request',
+      programId: request.entityId
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error starting edit program:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error starting edit program request'
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+/**
+ * Submit edit_program for approval (Subject Leader completes editing)
+ * POST /api/work-requests/:id/submit-edit-program
+ * Body: { userId, note }
+ *
+ * Use case: Subject Leader đã thêm course mới, submit để Center Head duyệt
+ */
+exports.submitEditProgram = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { userId, note } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    const request = await WorkRequest.findById(id).session(session);
+
+    if (!request) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Work request not found'
+      });
+    }
+
+    // Validate: must be edit_program type
+    if (request.requestType !== 'edit_program') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'This API is only for edit_program requests'
+      });
+    }
+
+    // Validate: only assignee can submit
+    if (request.assignedTo.toString() !== userId.toString()) {
+      await session.abortTransaction();
+      return res.status(403).json({
+        success: false,
+        message: 'You are not assigned to this request'
+      });
+    }
+
+    // Validate: request must be in_progress
+    if (request.status !== 'in_progress') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot submit: request must be in_progress (current: ${request.status})`
+      });
+    }
+
+    // Optional: Validate that program has new courses added
+    const program = await Program.findById(request.entityId).session(session);
+    if (!program) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Program not found'
+      });
+    }
+
+    // Check if there are any courses in the program
+    const courseCount = await Course.countDocuments({ program: request.entityId }).session(session);
+    if (courseCount === 0) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Chương trình cần ít nhất một khóa học trước khi nộp.'
+      });
+    }
+
+    // Update work request status to pending_approval
+    await WorkRequest.findByIdAndUpdate(id, {
+      status: 'pending_approval',
+      processedBy: userId,
+      processedAt: new Date(),
+      responseNote: note,
+      $push: {
+        history: {
+          action: 'pending_approval',
+          performedBy: userId,
+          performedAt: new Date(),
+          note: note || 'Submitted edit program for approval',
+          previousStatus: 'in_progress'
+        }
+      }
+    }, { session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: 'Edit program submitted for approval successfully'
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error submitting edit program:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error submitting edit program request'
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+/**
+ * Approve edit_program request (Center Head approves the changes)
+ * POST /api/work-requests/:id/approve-edit-program
+ * Body: { userId, note }
+ */
+exports.approveEditProgram = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { userId, note } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    const request = await WorkRequest.findById(id).session(session);
+
+    if (!request) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Work request not found'
+      });
+    }
+
+    // Validate: must be edit_program type
+    if (request.requestType !== 'edit_program') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'This API is only for edit_program requests'
+      });
+    }
+
+    // Validate: request must be pending_approval
+    if (request.status !== 'pending_approval') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot approve: request must be pending_approval (current: ${request.status})`
+      });
+    }
+
+    // Update work request status to completed
+    await WorkRequest.findByIdAndUpdate(id, {
+      status: 'completed',
+      processedBy: userId,
+      processedAt: new Date(),
+      responseNote: note,
+      $push: {
+        history: {
+          action: 'approved',
+          performedBy: userId,
+          performedAt: new Date(),
+          note: note || 'Edit program approved',
+          previousStatus: 'pending_approval'
+        }
+      }
+    }, { session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: 'Edit program approved successfully'
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error approving edit program:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error approving edit program request'
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+/**
+ * Reject edit_program request (Center Head rejects the changes)
+ * POST /api/work-requests/:id/reject-edit-program
+ * Body: { userId, rejectionReason }
+ */
+exports.rejectEditProgram = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { userId, rejectionReason } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    if (!rejectionReason || rejectionReason.trim() === '') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Rejection reason is required'
+      });
+    }
+
+    const request = await WorkRequest.findById(id).session(session);
+
+    if (!request) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Work request not found'
+      });
+    }
+
+    // Validate: must be edit_program type
+    if (request.requestType !== 'edit_program') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'This API is only for edit_program requests'
+      });
+    }
+
+    // Validate: request must be pending_approval
+    if (request.status !== 'pending_approval') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot reject: request must be pending_approval (current: ${request.status})`
+      });
+    }
+
+    // Update work request status back to in_progress (Subject Leader needs to fix)
+    await WorkRequest.findByIdAndUpdate(id, {
+      status: 'in_progress',
+      rejectionReason: rejectionReason,
+      $push: {
+        history: {
+          action: 'rejected',
+          performedBy: userId,
+          performedAt: new Date(),
+          note: rejectionReason,
+          previousStatus: 'pending_approval'
+        }
+      }
+    }, { session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: 'Edit program rejected. Subject Leader can revise and resubmit.'
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error rejecting edit program:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error rejecting edit program request'
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+/**
+ * Get rejection info for a program (for needs_revision status)
+ * GET /api/work-requests/program/:programId/rejection-info
+ */
+exports.getProgramRejectionInfo = async (req, res) => {
+  try {
+    const { programId } = req.params;
+
+    // Find the most recent work request with rejection reason for this program
+    const request = await WorkRequest.findOne({
+      entityType: 'Program',
+      entityId: programId,
+      rejectionReason: { $exists: true, $ne: null, $ne: '' }
+    })
+      .populate('processedBy', 'name email username')
+      .populate('requestedBy', 'name email username')
+      .sort({ processedAt: -1, updatedAt: -1 });
+
+    if (!request) {
+      return res.status(200).json({
+        success: true,
+        hasRejection: false,
+        data: null
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      hasRejection: true,
+      data: {
+        rejectionReason: request.rejectionReason,
+        rejectedBy: request.processedBy,
+        rejectedAt: request.processedAt || request.updatedAt,
+        requestType: request.requestType,
+        responseNote: request.responseNote
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting program rejection info:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error getting program rejection info'
     });
   }
 };

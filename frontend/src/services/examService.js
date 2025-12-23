@@ -160,16 +160,36 @@ export const examService = {
     }
   },
 
+  // Upload exam file (PDF, audio) for section
+  uploadExamFileForManagement: async (formData) => {
+    try {
+      const response = await api.post('/management/upload-exam-file', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể upload file đề thi' };
+    }
+  },
+
+  // Delete exam file (PDF, audio) from section
+  deleteExamFileForManagement: async (data) => {
+    try {
+      const response = await api.post('/management/delete-exam-file', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể xóa file' };
+    }
+  },
+
   // Validate exam data trước khi gửi
   validateExamData: (examData) => {
     const errors = [];
 
     if (!examData.title || examData.title.trim() === '') {
       errors.push('Tiêu đề đề thi không được để trống');
-    }
-
-    if (!examData.level) {
-      errors.push('Cấp độ đề thi không được để trống');
     }
 
     if (examData.sections && examData.sections.length > 0) {
@@ -198,7 +218,6 @@ export const examService = {
       title: examData.title?.trim(),
       description: examData.description?.trim() || '',
       examType: examData.examType || 'cambridge', // Default to cambridge
-      level: examData.level,
       totalDuration: parseInt(examData.totalDuration) || 0,
       sections: formattedSections,
       isPublished: examData.isPublished || false,

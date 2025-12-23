@@ -3,6 +3,8 @@ const Course = require('../models/courseModel');
 const Session = require('../models/sessionModel');
 const CamSession = require('../models/camSession');
 const WorkRequest = require('../models/workRequestModel');
+const Class = require('../models/classModel');
+const ClassSchedule = require('../models/classScheduleModel');
 const { getBandByTypeAndLevel, getBandOptionsByType } = require('../utils/programBandMapper');
 
 // =========================
@@ -125,7 +127,7 @@ const getProgramById = async (req, res) => {
     const courses = await Course.find({ program: id })
       .populate('createdBy', 'username email')
       .populate('sessions', 'title order')
-      .select('_id courseCode name description status createdAt updatedAt clos sessions mappedPLOs');
+      .select('_id courseCode name description status isActive learningType createdAt updatedAt clos sessions mappedPLOs');
 
     // Get work request info if exists (use WorkRequest model)
     const workRequest = await WorkRequest.findOne({
@@ -342,30 +344,48 @@ const deleteProgram = async (req, res) => {
       });
     }
 
-    // Check if program is linked to any active work requests
-    const activeWorkRequest = await WorkRequest.findOne({
-      entityType: 'Program',
-      entityId: id,
-      status: { $in: ['pending', 'in_progress', 'pending_approval'] }
-    }).populate('requestedBy', 'username email');
-
-    if (activeWorkRequest) {
+    // Chỉ cho phép xóa program ở trạng thái draft
+    if (program.status !== 'draft') {
       const statusLabels = {
-        'pending': 'Chờ xử lý',
-        'in_progress': 'Đang xử lý',
-        'pending_approval': 'Chờ phê duyệt'
+        'pending_approval': 'Chờ phê duyệt',
+        'approved': 'Đã duyệt',
+        'needs_revision': 'Cần chỉnh sửa',
+        'archived': 'Đã lưu trữ'
       };
 
       return res.status(400).json({
         success: false,
-        message: `Không thể xóa chương trình này vì đang có work request liên quan!\n\n` +
-                 `• Loại request: ${activeWorkRequest.requestType === 'create_program' ? 'Tạo chương trình' : activeWorkRequest.requestType}\n` +
-                 `• Trạng thái: ${statusLabels[activeWorkRequest.status] || activeWorkRequest.status}\n` +
-                 `• Người yêu cầu: ${activeWorkRequest.requestedBy?.username || 'N/A'}\n\n` +
-                 `Vui lòng hoàn thành hoặc hủy work request trước khi xóa chương trình.`,
-        workRequestId: activeWorkRequest._id,
-        workRequestStatus: activeWorkRequest.status
+        message: `Không thể xóa chương trình này vì đang ở trạng thái "${statusLabels[program.status] || program.status}".\n\n` +
+                 `Chỉ có thể xóa chương trình ở trạng thái "Bản nháp" (draft).`,
+        programStatus: program.status
       });
+    }
+
+    // Check if program is linked to any work requests (any status except completed/approved/rejected)
+    const linkedWorkRequest = await WorkRequest.findOne({
+      entityType: 'Program',
+      entityId: id,
+      status: { $in: ['pending', 'in_progress', 'pending_approval', 'need_revision'] }
+    }).populate('requestedBy', 'username email');
+
+    // Nếu có work request liên kết, unlink program khỏi work request thay vì chặn xóa
+    if (linkedWorkRequest) {
+      console.log(`Unlinking program ${id} from work request ${linkedWorkRequest._id}`);
+
+      // Set entityId = null để work request vẫn còn nhưng không liên kết với program
+      await WorkRequest.findByIdAndUpdate(linkedWorkRequest._id, {
+        entityId: null,
+        $push: {
+          history: {
+            action: 'entity_deleted',
+            performedBy: req.body.userId || null,
+            performedAt: new Date(),
+            note: `Chương trình "${program.program_name}" đã bị xóa. Có thể tạo lại chương trình mới cho request này.`
+          }
+        }
+      });
+
+      console.log(`✅ Unlinked work request ${linkedWorkRequest._id} from deleted program`);
     }
 
     console.log(`Starting CASCADE deletion for program: ${program.program_name} (${id})`);
@@ -668,6 +688,256 @@ const getBandOptions = async (req, res) => {
   }
 };
 
+// =========================
+// PROGRAM ACTIVATION/DEACTIVATION
+// =========================
+
+/**
+ * Check if a program can be deactivated
+ * GET /api/programs/:id/can-deactivate
+ *
+ * Logic: Program chỉ có thể deactivate khi TẤT CẢ courses của nó đã inactive
+ * (không còn course nào có isActive = true)
+ */
+const canDeactivateProgram = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const program = await Program.findById(id);
+    if (!program) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy chương trình đào tạo'
+      });
+    }
+
+    // Nếu program đã inactive rồi
+    if (!program.isActive) {
+      return res.status(200).json({
+        success: true,
+        canDeactivate: true,
+        message: 'Chương trình đào tạo đã ở trạng thái inactive'
+      });
+    }
+
+    // Tìm tất cả courses của program còn active
+    const activeCourses = await Course.find({
+      program: id,
+      isActive: true
+    }).select('_id courseCode name status isActive');
+
+    if (activeCourses.length === 0) {
+      return res.status(200).json({
+        success: true,
+        canDeactivate: true,
+        message: 'Có thể deactivate chương trình - tất cả khóa học đã inactive'
+      });
+    }
+
+    // Có courses còn active, kiểm tra chi tiết từng course
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const courseDetails = await Promise.all(
+      activeCourses.map(async (course) => {
+        // Tìm các class đang dùng course này
+        const activeClasses = await Class.find({
+          course: course._id,
+          status: { $in: ['pending', 'active'] }
+        }).select('_id name');
+
+        let futureScheduleCount = 0;
+        let estimatedEndDate = null;
+
+        if (activeClasses.length > 0) {
+          const classIds = activeClasses.map(c => c._id);
+
+          futureScheduleCount = await ClassSchedule.countDocuments({
+            class: { $in: classIds },
+            date: { $gte: today },
+            status: { $in: ['temporary', 'fixed'] }
+          });
+
+          if (futureScheduleCount > 0) {
+            const lastSchedule = await ClassSchedule.findOne({
+              class: { $in: classIds },
+              status: { $in: ['temporary', 'fixed'] }
+            })
+            .sort({ date: -1 })
+            .select('date');
+            estimatedEndDate = lastSchedule?.date;
+          }
+        }
+
+        return {
+          _id: course._id,
+          courseCode: course.courseCode,
+          name: course.name,
+          status: course.status,
+          isActive: course.isActive,
+          activeClassCount: activeClasses.length,
+          futureScheduleCount,
+          estimatedEndDate
+        };
+      })
+    );
+
+    return res.status(200).json({
+      success: true,
+      canDeactivate: false,
+      message: `Không thể deactivate - còn ${activeCourses.length} khóa học đang active`,
+      activeCourses: courseDetails
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi kiểm tra trạng thái chương trình',
+      error: err.message
+    });
+  }
+};
+
+/**
+ * Deactivate a program
+ * PATCH /api/programs/:id/deactivate
+ *
+ * Logic:
+ * - Check canDeactivate trước (tất cả courses phải inactive)
+ * - Nếu OK thì set isActive = false
+ */
+const deactivateProgram = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { force = false } = req.body;
+
+    const program = await Program.findById(id);
+    if (!program) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy chương trình đào tạo'
+      });
+    }
+
+    // Nếu program đã inactive rồi
+    if (!program.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Chương trình đào tạo đã ở trạng thái inactive'
+      });
+    }
+
+    // Tìm courses còn active
+    const activeCourses = await Course.find({
+      program: id,
+      isActive: true
+    }).select('_id courseCode name');
+
+    if (activeCourses.length > 0 && !force) {
+      return res.status(400).json({
+        success: false,
+        message: `Không thể deactivate - còn ${activeCourses.length} khóa học đang active`,
+        activeCourses: activeCourses.map(c => ({
+          _id: c._id,
+          courseCode: c.courseCode,
+          name: c.name
+        })),
+        hint: 'Vui lòng deactivate tất cả khóa học trước, hoặc sử dụng force=true'
+      });
+    }
+
+    // Nếu force = true, deactivate tất cả courses trước
+    if (force && activeCourses.length > 0) {
+      await Course.updateMany(
+        { program: id, isActive: true },
+        {
+          isActive: false,
+          status: 'available'
+        }
+      );
+
+      // Cập nhật các class thành completed
+      const courseIds = activeCourses.map(c => c._id);
+      await Class.updateMany(
+        {
+          course: { $in: courseIds },
+          status: { $in: ['pending', 'active'] }
+        },
+        { status: 'completed' }
+      );
+    }
+
+    // Deactivate program
+    const updatedProgram = await Program.findByIdAndUpdate(
+      id,
+      { isActive: false },
+      { new: true }
+    ).select('_id code program_name status isActive');
+
+    res.status(200).json({
+      success: true,
+      message: 'Đã deactivate chương trình đào tạo thành công',
+      program: updatedProgram,
+      coursesDeactivated: force ? activeCourses.length : 0
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi deactivate chương trình',
+      error: err.message
+    });
+  }
+};
+
+/**
+ * Activate a program
+ * PATCH /api/programs/:id/activate
+ *
+ * Logic: Chỉ cho phép activate nếu program status là 'approved'
+ */
+const activateProgram = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const program = await Program.findById(id);
+    if (!program) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy chương trình đào tạo'
+      });
+    }
+
+    // Chỉ cho phép activate nếu program đã approved
+    if (program.status !== 'approved') {
+      return res.status(400).json({
+        success: false,
+        message: `Không thể activate chương trình ở trạng thái "${program.status}". Chỉ có thể activate chương trình đã được phê duyệt.`
+      });
+    }
+
+    // Activate program
+    const updatedProgram = await Program.findByIdAndUpdate(
+      id,
+      { isActive: true },
+      { new: true }
+    ).select('_id code program_name status isActive');
+
+    res.status(200).json({
+      success: true,
+      message: 'Đã activate chương trình đào tạo thành công',
+      program: updatedProgram
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi activate chương trình',
+      error: err.message
+    });
+  }
+};
+
 module.exports = {
   getAllPrograms,
   getMyPrograms,
@@ -679,5 +949,8 @@ module.exports = {
   getProgramSubmissionStatus,
   updateProgramActiveStatus,
   archiveProgram,
-  getBandOptions
+  getBandOptions,
+  canDeactivateProgram,
+  deactivateProgram,
+  activateProgram
 };

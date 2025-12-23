@@ -89,8 +89,7 @@ const TeacherClassDetailLayout = () => {
 
   const getLessonStatusBadge = (status) => {
     const statusConfig = {
-      completed: { bg: 'bg-success-600', text: 'Đã học' },
-      upcoming: { bg: 'bg-warning-600', text: 'Sắp diễn ra' },
+      completed: { bg: 'bg-success-600', text: 'Đã diễn ra' },
       scheduled: { bg: 'bg-neutral-400', text: 'Đã lên lịch' }
     };
     const config = statusConfig[status] || statusConfig.scheduled;

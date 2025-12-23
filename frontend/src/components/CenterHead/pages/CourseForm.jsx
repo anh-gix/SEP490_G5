@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import Swal from 'sweetalert2';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { getCookie } from '../../../utils/cookieUtils.js';
 import Breadcrumb from "../compo/Breadcrumb";
 import Card from "../compo/Card";
 import Button from "../compo/Button";
@@ -829,9 +830,9 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
         materials: formData.materials,
       };
 
-      // Thêm createdBy khi tạo mới (lấy từ localStorage)
+      // Thêm createdBy khi tạo mới (lấy từ cookie)
       if (!isEdit) {
-        const userStr = localStorage.getItem('user');
+        const userStr = getCookie('user');
 
         if (userStr) {
           try {
@@ -840,19 +841,19 @@ const CourseFormNew = ({ viewMode = 'center-head' }) => {
             if (userId) {
               courseData.createdBy = userId;
             } else {
-              console.error('No user ID found in localStorage');
+              console.error('No user ID found in cookie');
               toast.error('Không tìm thấy thông tin user. Vui lòng đăng nhập lại!');
               setLoading(false);
               return;
             }
           } catch (e) {
-            console.error('Error parsing user from localStorage:', e);
+            console.error('Error parsing user from cookie:', e);
             toast.error('Lỗi đọc thông tin user. Vui lòng đăng nhập lại!');
             setLoading(false);
             return;
           }
         } else {
-          console.error('No user found in localStorage');
+          console.error('No user found in cookie');
           toast.error('Vui lòng đăng nhập trước khi tạo course!');
           setLoading(false);
           return;

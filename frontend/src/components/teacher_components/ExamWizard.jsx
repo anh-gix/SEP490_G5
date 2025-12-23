@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { examService } from '../../services/examService';
 import { workRequestService } from '../../services/workRequestService';
+import { getCookie } from '../../utils/cookieUtils.js';
 
 // Import step components
 import ExamWizardIntro from './ExamWizardIntro';
@@ -98,7 +99,7 @@ const ExamWizard = ({ viewMode = 'teacher' }) => {
 
         // Try to fetch associated work request
         try {
-          const user = JSON.parse(localStorage.getItem('user') || '{}');
+          const user = JSON.parse(getCookie('user') || '{}');
           const requestsResponse = await workRequestService.getAssignedToMe({
             userId: user._id,
             requestType: 'create_exam',

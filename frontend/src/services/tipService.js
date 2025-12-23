@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getCookie } from '../utils/cookieUtils.js';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
@@ -6,7 +7,15 @@ const tipService = {
   // Get all tips (có thể filter theo section)
   getAllTips: async (params = {}) => {
     try {
-      const response = await axios.get(`${API_URL}/tips`, { params });
+      const token = getCookie('token');
+      const response = await axios.get(`${API_URL}/tips`, {
+        params,
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`
+            }
+          : {}
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -16,7 +25,14 @@ const tipService = {
   // Get tips by section (General, Toeic, Ielts)
   getTipsBySection: async (section) => {
     try {
-      const response = await axios.get(`${API_URL}/tips/section/${section}`);
+      const token = getCookie('token');
+      const response = await axios.get(`${API_URL}/tips/section/${section}`, {
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`
+            }
+          : {}
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -26,7 +42,14 @@ const tipService = {
   // Get tips statistics
   getTipsStatistics: async () => {
     try {
-      const response = await axios.get(`${API_URL}/tips/statistics`);
+      const token = getCookie('token');
+      const response = await axios.get(`${API_URL}/tips/statistics`, {
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`
+            }
+          : {}
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -36,7 +59,7 @@ const tipService = {
   // Create new tip
   createTip: async (tipData) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getCookie('token');
       const response = await axios.post(`${API_URL}/tips`, tipData, {
         headers: {
           Authorization: `Bearer ${token}`
@@ -51,7 +74,7 @@ const tipService = {
   // Update tip
   updateTip: async (tipId, tipData) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getCookie('token');
       const response = await axios.put(`${API_URL}/tips/${tipId}`, tipData, {
         headers: {
           Authorization: `Bearer ${token}`
@@ -66,7 +89,7 @@ const tipService = {
   // Delete tip
   deleteTip: async (tipId) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getCookie('token');
       const response = await axios.delete(`${API_URL}/tips/${tipId}`, {
         headers: {
           Authorization: `Bearer ${token}`
@@ -81,7 +104,7 @@ const tipService = {
   // Add video to category
   addVideoToCategory: async (section, categoryName, videoData, videoFile = null) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getCookie('token');
       const formData = new FormData();
 
       formData.append('categoryName', categoryName);
@@ -112,7 +135,7 @@ const tipService = {
   // Update video
   updateVideo: async (section, videoId, videoData, videoFile = null) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getCookie('token');
       const formData = new FormData();
 
       formData.append('title', videoData.title);
@@ -146,7 +169,7 @@ const tipService = {
   // Delete video
   deleteVideo: async (section, videoId) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getCookie('token');
       const response = await axios.delete(
         `${API_URL}/tips/${section}/videos/${videoId}`,
         {

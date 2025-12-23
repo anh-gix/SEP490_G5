@@ -1,10 +1,11 @@
 import axios from 'axios';
 import api from './api.js';
+import { getCookie } from '../utils/cookieUtils.js';
 const API_BASE_URL = 'http://localhost:8080/api/users';
 
 // Helper to get auth token
 const getAuthHeader = () => {
-  const token = localStorage.getItem('token');
+  const token = getCookie('token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 

@@ -4,6 +4,7 @@ import bulkUserService from '../services/bulkUserService';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import { getCookie } from '../utils/cookieUtils.js';
 
 const BulkUserUploadPage = () => {
   const [file, setFile] = useState(null);
@@ -24,7 +25,7 @@ const BulkUserUploadPage = () => {
   React.useEffect(() => {
     const fetchRoles = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = getCookie('token');
         const response = await axios.get('http://localhost:8080/api/roles', {
           headers: {
             Authorization: `Bearer ${token}`,

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getCookie } from '../utils/cookieUtils.js';
 const API_PORT = import.meta.env.VITE_API_PORT || 8080;
 
 const API_BASE_URL = `http://localhost:${API_PORT}/api/schedules`;
@@ -12,7 +13,7 @@ const api = axios.create({
 // Interceptor để thêm token vào headers
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = getCookie('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -36,7 +37,7 @@ export const bulkUserService = {
         {
           headers: {
             'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${getCookie('token')}`,
           },
           timeout: 30000, // 30 seconds timeout
         }

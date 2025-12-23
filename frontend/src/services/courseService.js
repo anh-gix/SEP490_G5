@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getCookie } from '../utils/cookieUtils.js';
 
 const API_BASE_URL = 'http://localhost:8080/api/courses';
 
@@ -13,7 +14,7 @@ const api = axios.create({
 // Interceptor to add token to headers
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = getCookie('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -285,7 +286,7 @@ export const courseService = {
       const response = await axios.post(`${API_BASE_URL}/upload-material`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${getCookie('token')}`
         }
       });
       return response.data;

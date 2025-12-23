@@ -1,15 +1,16 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const roomController = require('../controllers/roomController');
+const roomController = require("../controllers/roomController");
+const { verifyToken } = require("../middlewares/verifyToken");
 
 // Room CRUD
-router.get('/', roomController.getAllRooms);
-router.get('/stats', roomController.getRoomStats);
-router.get('/today-usage', roomController.getTodayRoomUsage);
-router.get('/:id', roomController.getRoomById);
-router.get('/:id/schedule', roomController.getRoomSchedule);
-router.post('/', roomController.createRoom);
-router.put('/:id', roomController.updateRoom);
-router.delete('/:id', roomController.deleteRoom);
+router.get("/", verifyToken, roomController.getAllRooms);
+router.get("/stats", verifyToken, roomController.getRoomStats);
+router.get("/today-usage", verifyToken, roomController.getTodayRoomUsage);
+router.get("/:id", verifyToken, roomController.getRoomById);
+router.get("/:id/schedule", verifyToken, roomController.getRoomSchedule);
+router.post("/", verifyToken, roomController.createRoom);
+router.put("/:id", verifyToken, roomController.updateRoom);
+router.delete("/:id", verifyToken, roomController.deleteRoom);
 
 module.exports = router;

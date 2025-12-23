@@ -2082,6 +2082,89 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     return filtered;
   }, [teachers, effectiveGeneratedSessions, conflictingTeacherIds]);
 
+  // Filter teachers available for the schedule being edited
+  const availableTeachersForSchedule = useMemo(() => {
+    // If no schedule selected or no date/time, return all teachers
+    if (!editedSchedule?.date || !editedSchedule?.startTime || !editedSchedule?.endTime) {
+      return teachers;
+    }
+
+    const conflicts = new Set();
+    
+    // Reuse time overlap logic
+    const hasTimeOverlap = (startA, endA, startB, endB) => {
+      const timeToMinutes = (timeStr) => {
+        if (!timeStr) return 0;
+        const parts = timeStr.split(':');
+        if (parts.length !== 2) return 0;
+        return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+      };
+      const startAMin = timeToMinutes(startA);
+      const endAMin = timeToMinutes(endA);
+      const startBMin = timeToMinutes(startB);
+      const endBMin = timeToMinutes(endB);
+      return startAMin < endBMin && endAMin > startBMin;
+    };
+
+    // Format date helper
+    const formatDateToYYYYMMDD = (dateInput) => {
+      if (!dateInput) return null;
+      if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+        return dateInput;
+      }
+      const date = new Date(dateInput);
+      if (isNaN(date.getTime())) return null;
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    // Check conflicts using existing teacherSchedules
+    Object.entries(teacherSchedules).forEach(([teacherId, schedules]) => {
+      if (!schedules || schedules.length === 0) return;
+      
+      schedules.forEach((schedule) => {
+        const scheduleDate = schedule.date || schedule.scheduleDate || schedule.classDate;
+        if (!scheduleDate) return;
+        
+        // Compare dates
+        const normalizedScheduleDate = formatDateToYYYYMMDD(scheduleDate);
+        if (normalizedScheduleDate !== editedSchedule.date) return;
+        
+        // Skip the schedule being edited
+        const scheduleId = schedule._id || schedule.id;
+        if (String(scheduleId) === String(selectedScheduleDetail?.id)) return;
+        
+        // Check time overlap
+        const scheduleStart = schedule.startTime || schedule.start_time;
+        const scheduleEnd = schedule.endTime || schedule.end_time;
+        
+        if (hasTimeOverlap(
+          editedSchedule.startTime, 
+          editedSchedule.endTime,
+          scheduleStart, 
+          scheduleEnd
+        )) {
+          conflicts.add(teacherId);
+        }
+      });
+    });
+
+    // Filter out conflicting teachers
+    return teachers.filter(teacher => {
+      const teacherId = String(teacher._id || teacher.id);
+      return !conflicts.has(teacherId);
+    });
+  }, [
+    teachers, 
+    teacherSchedules, 
+    editedSchedule?.date, 
+    editedSchedule?.startTime, 
+    editedSchedule?.endTime, 
+    selectedScheduleDetail?.id
+  ]);
+
   // Get current class schedules for use in render
   const currentClassSchedulesForRender = useMemo(() => {
     const classSchedules = fullClassData?.schedules || [];
@@ -3332,23 +3415,23 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       // Parse date only for time calculations, not for date string
       const date = scheduleDate ? new Date(scheduleDate) : null;
       
-      // Get teacher name
-      const teacherName = schedule.teacher?.fullName || 
-                         schedule.teacher?.name || 
+      // Prioritize substitute teacher first
+      const substituteTeacherName = schedule.substituteTeacher?.username ||
+                                   teachers.find(t => {
+                                     const teacherId = t._id || t.id;
+                                     const substituteId = schedule.substituteTeacher?._id || schedule.substituteTeacher?.id || schedule.substituteTeacher;
+                                     return substituteId && String(teacherId) === String(substituteId);
+                                   })?.username;
+
+      // Fallback to regular teacher if no substitute
+      const teacherName = substituteTeacherName ||
+                         schedule.teacher?.username ||
                          schedule.teacherName ||
-                         (schedule.teacher?.firstName && schedule.teacher?.lastName 
-                           ? `${schedule.teacher.firstName} ${schedule.teacher.lastName}` 
-                           : null) ||
                          teachers.find(t => {
                            const teacherId = t._id || t.id;
                            const scheduleTeacherId = schedule.teacher?._id || schedule.teacher?.id || schedule.teacher;
                            return String(teacherId) === String(scheduleTeacherId);
-                         })?.fullName || 
-                         teachers.find(t => {
-                           const teacherId = t._id || t.id;
-                           const scheduleTeacherId = schedule.teacher?._id || schedule.teacher?.id || schedule.teacher;
-                           return String(teacherId) === String(scheduleTeacherId);
-                         })?.name ||
+                         })?.username ||
                          'Chưa có';
       
       // Get room name
@@ -3414,6 +3497,10 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       });
       const roomStatus = roomData?.status || schedule.room?.status || 'available';
 
+      // Extract teacher IDs for modal initialization
+      const substituteTeacherId = schedule.substituteTeacher?._id || schedule.substituteTeacher?.id || schedule.substituteTeacher;
+      const regularTeacherId = schedule.teacher?._id || schedule.teacher?.id || schedule.teacher;
+
       return {
         id: scheduleId,
         date: dateStr, // Use formatted string directly, not from Date object
@@ -3421,6 +3508,12 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         endTime: endTime,
         className: formData.name || 'Chưa có tên lớp',
         teacherName: teacherName,
+        isSubstituteTeacher: !!substituteTeacherName,
+        // Add teacher IDs for modal dropdown initialization
+        teacherId: regularTeacherId,
+        substituteTeacherId: substituteTeacherId,
+        teacher: schedule.teacher, // Keep original teacher object
+        substituteTeacher: schedule.substituteTeacher, // Keep original substituteTeacher object
         roomName: roomName,
         roomId: scheduleRoomId, // Add roomId for modal initialization
         roomStatus: roomStatus, // Add room status
@@ -4089,7 +4182,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Tên lớp <span className="text-danger-600">*</span>
                   </Form.Label>
-                  {fullClassData?.status === 'disable' ? (
+                  {formData.status === 'disable' ? (
                     <Form.Control
                       type="text"
                       name="name"
@@ -5182,7 +5275,14 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
               date: selectedScheduleDetail.date,
               startTime: selectedScheduleDetail.startTime,
               endTime: selectedScheduleDetail.endTime,
-              roomId: selectedScheduleDetail.roomId || selectedScheduleDetail.room?._id || selectedScheduleDetail.room?.id || formData.roomId
+              roomId: selectedScheduleDetail.roomId || selectedScheduleDetail.room?._id || selectedScheduleDetail.room?.id || formData.roomId,
+              teacherId: selectedScheduleDetail.substituteTeacherId || 
+                         selectedScheduleDetail.substituteTeacher?._id || 
+                         selectedScheduleDetail.substituteTeacher?.id || 
+                         selectedScheduleDetail.teacherId || 
+                         selectedScheduleDetail.teacher?._id || 
+                         selectedScheduleDetail.teacher?.id || 
+                         ''
             });
             
             // Check if schedule has attendance (buổi đã học)
@@ -5476,16 +5576,60 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 </div>
               )}
 
-              {selectedScheduleDetail.teacherName && selectedScheduleDetail.teacherName !== 'Chưa có' && (
-                <div>
-                  <div className="text-neutral-600 text-13 fw-medium mb-8">
+              <div>
+                <Form.Group>
+                  <Form.Label className="text-neutral-600 text-13 fw-medium mb-8">
                     Giáo viên
-                  </div>
-                  <div className="text-neutral-900 text-15">
-                    {selectedScheduleDetail.teacherName}
-                  </div>
-                </div>
-              )}
+                    {selectedScheduleDetail.isSubstituteTeacher && (
+                      <Badge bg="info" className="ms-2 text-11 px-8 py-4">
+                        <i className="fas fa-user-check me-1"></i>
+                        Giáo viên dạy thay
+                      </Badge>
+                    )}
+                  </Form.Label>
+                  {(hasAttendance || isPastSchedule) ? (
+                    <div className="text-neutral-900 text-15">
+                      {selectedScheduleDetail.teacherName || 'Chưa có'}
+                    </div>
+                  ) : (
+                    <>
+                      <Form.Select
+                        value={editedSchedule?.teacherId || ''}
+                        onChange={(e) => {
+                          setEditedSchedule(prev => ({
+                            ...prev,
+                            teacherId: e.target.value
+                          }));
+                        }}
+                        className="border-neutral-30 radius-8 px-16 py-10"
+                        disabled={hasAttendance || fullClassData?.status === 'completed'}
+                      >
+                        <option value="">-- Chọn giáo viên --</option>
+                        {availableTeachersForSchedule.map(teacher => {
+                          const teacherId = teacher._id || teacher.id;
+                          const teacherName = teacher.username || teacher.name || `Giáo viên ${teacherId}`;
+                          return (
+                            <option key={teacherId} value={teacherId}>
+                              {teacherName}
+                            </option>
+                          );
+                        })}
+                      </Form.Select>
+                      {availableTeachersForSchedule.length === 0 && (
+                        <Form.Text className="text-danger text-12 mt-4">
+                          <i className="fas fa-exclamation-triangle me-1"></i>
+                          Không có giáo viên khả dụng trong khung giờ này
+                        </Form.Text>
+                      )}
+                      {availableTeachersForSchedule.length > 0 && (
+                        <Form.Text className="text-neutral-500 text-12 mt-4">
+                          Có {availableTeachersForSchedule.length} giáo viên khả dụng
+                        </Form.Text>
+                      )}
+                    </>
+                  )}
+                </Form.Group>
+              </div>
 
               <div>
                 <Form.Group>

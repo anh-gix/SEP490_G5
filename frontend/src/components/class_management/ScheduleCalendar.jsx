@@ -473,7 +473,7 @@ const ScheduleCalendar = ({
                             }}
                           >
                             <div className="fw-bold d-flex align-items-center justify-content-between">
-                              <span>{schedule.startTime}</span>
+                              <span>{schedule.startTime} - {schedule.endTime}</span>
                               {(schedule.isOldClassSchedule || schedule.isNewClassSchedule || schedule.isCancelled || schedule.isAbsentSchedule || schedule.status === 'absent' || schedule.scheduleStatus === 'cancelled' || isMakeup || timeStatus || hasAttendance) && (
                                 <i 
                                   className={`fas ${
@@ -495,11 +495,32 @@ const ScheduleCalendar = ({
                                 ></i>
                               )}
                             </div>
-                            <div className="text-truncate d-flex align-items-center gap-1 flex-wrap">
-                              {!schedule.isRoomChangeOnly && (
-                                <span>
-                                  {schedule.className}
-                                </span>
+                            <div className="text-truncate d-flex flex-column gap-0" style={{ fontSize: '9px' }}>
+                              {/* Always show room and teacher info for room management context */}
+                              {readOnly ? (
+                                <>
+                                  <div className="d-flex align-items-center gap-1">
+                                    <i className="fas fa-door-open" style={{ fontSize: '8px' }}></i>
+                                    <span className="text-truncate">{schedule.roomName || 'Chưa có phòng'}</span>
+                                  </div>
+                                  <div className="d-flex align-items-center gap-1">
+                                    <i className="fas fa-user" style={{ fontSize: '8px' }}></i>
+                                    <span className="text-truncate">{schedule.teacherName || 'Chưa có GV'}</span>
+                                  </div>
+                                </>
+                              ) : (
+                                !schedule.isRoomChangeOnly && (
+                                  <>
+                                    <div className="d-flex align-items-center gap-1">
+                                      <i className="fas fa-door-open" style={{ fontSize: '8px' }}></i>
+                                      <span className="text-truncate">{schedule.roomName || 'Chưa có phòng'}</span>
+                                    </div>
+                                    <div className="d-flex align-items-center gap-1">
+                                      <i className="fas fa-user" style={{ fontSize: '8px' }}></i>
+                                      <span className="text-truncate">{schedule.teacherName || 'Chưa có GV'}</span>
+                                    </div>
+                                  </>
+                                )
                               )}
                               {schedule.isOldClassSchedule && (
                                 <Badge bg="secondary" style={{ fontSize: '8px', padding: '2px 4px', backgroundColor: '#9C27B0' }}>

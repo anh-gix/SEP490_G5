@@ -1793,6 +1793,7 @@ exports.createStudent = async (req, res) => {
     
     // Validate phone number length (10 digits only)
     // Allow duplicate phone numbers
+    let normalizedPhone = phone;
     if (phone) {
       const phoneDigits = phone.replace(/\D/g, '');
       // Validate BEFORE adding leading zero
@@ -1803,7 +1804,7 @@ exports.createStudent = async (req, res) => {
         });
       }
       
-      let normalizedPhone = phoneDigits;
+      normalizedPhone = phoneDigits;
       if (phoneDigits[0] === '0') {
         // Has leading zero: must be exactly 10 digits
         if (phoneDigits.length !== 10) {
@@ -1823,8 +1824,6 @@ exports.createStudent = async (req, res) => {
         // Add leading zero to normalize to 10 digits
         normalizedPhone = '0' + phoneDigits;
       }
-      // Update phone with normalized value
-      phone = normalizedPhone;
     }
     
     // Create student
@@ -1832,7 +1831,7 @@ exports.createStudent = async (req, res) => {
       email,
       password: password || '123456', // Default password nếu không có
       username,
-      phone,
+      phone: normalizedPhone,
       address,
       roleId: studentRole._id
     });

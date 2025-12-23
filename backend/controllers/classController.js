@@ -161,6 +161,8 @@ exports.getClassById = async (req, res) => {
     const schedules = await ClassSchedule.find({ class: id })
       .populate('room', 'room_name location capacity')
       .populate('session', 'title order')
+      .populate('teacher', 'username email phone')
+      .populate('substituteTeacher', 'username email phone')
       .sort({ date: 1 });
 
 

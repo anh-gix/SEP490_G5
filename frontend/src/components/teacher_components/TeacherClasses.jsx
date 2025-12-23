@@ -64,10 +64,13 @@ const TeacherClasses = () => {
   };
 
   const filteredClasses = classes.filter(cls => {
+    // Chỉ hiển thị lớp pending hoặc active, không hiển thị completed và disable
+    const isActiveClass = cls.status === 'pending' || cls.status === 'active';
+
     const matchesStatus = filterStatus === 'all' || cls.status === filterStatus;
     const matchesSearch = cls.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          cls.level.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesSearch;
+    return isActiveClass && matchesStatus && matchesSearch;
   });
 
   return (

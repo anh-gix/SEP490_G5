@@ -45,6 +45,9 @@ const uploadWorkRequestFiles = upload.fields([
   { name: 'attachmentFile', maxCount: 1 }
 ]);
 
+// Middleware for output files (multiple files)
+const uploadOutputFiles = upload.array('outputFiles', 10);
+
 router.get('/stats', workRequestController.getWorkRequestStats);
 
 // Create top-down work request (task assignment)
@@ -132,13 +135,30 @@ router.post(
 
 router.post(
   '/:id/upload-output',
-  upload.single('outputFile'),
+  uploadOutputFiles, // Allow up to 10 outputFiles
   workRequestController.uploadOutputFile
 );
 
 router.post(
   '/:id/complete',
   workRequestController.completeRequest
+);
+
+// Assign Students Workflow Routes
+router.post(
+  '/:id/need-revision',
+  workRequestController.needRevisionRequest
+);
+
+router.post(
+  '/:id/approve-assign-students',
+  workRequestController.approveAssignStudentsRequest
+);
+
+router.post(
+  '/:id/resubmit-assign-students',
+  uploadOutputFiles, // Allow up to 10 outputFiles
+  workRequestController.resubmitAssignStudentsRequest
 );
 
 module.exports = router;

@@ -430,6 +430,7 @@ exports.getAllRequests = async (req, res) => {
         .populate('requestedBy', 'name email username')
         .populate('assignedTo', 'name email username')
         .populate('processedBy', 'name email username')
+        .populate('history.performedBy', 'name email username')
         .populate('entityId')
         .sort({ requestedAt: -1 })
         .skip(skip)
@@ -562,6 +563,7 @@ exports.getRequestById = async (req, res) => {
       .populate('requestedBy', 'name email username')
       .populate('assignedTo', 'name email username')
       .populate('processedBy', 'name email username')
+      .populate('history.performedBy', 'name email username')
       .populate('entityId');
 
     if (!request) {
@@ -735,7 +737,7 @@ exports.rejectRequest = async (req, res) => {
 
     // 1. Update WorkRequest
     await WorkRequest.findByIdAndUpdate(id, {
-      status: 'rejected',
+      status: 'need_revision',
       processedBy: centerHeadId,
       processedAt: new Date(),
       rejectionReason: rejectionReason,
@@ -767,7 +769,7 @@ exports.rejectRequest = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: `${request.requestType} rejected successfully`
+      message: `${request.requestType} marked as need_revision successfully`
     });
 
   } catch (error) {
@@ -776,6 +778,320 @@ exports.rejectRequest = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error rejecting request'
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+// =========================
+// NEED REVISION (Center Head) - YÊU CẦU CHỈNH SỬA
+// =========================
+
+/**
+ * Mark request as need_revision (Center Head requests changes)
+ * POST /api/work-requests/:id/need-revision
+ * Body: { userId, revisionReason, responseNote }
+ */
+exports.needRevisionRequest = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { userId, revisionReason, responseNote } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    if (!revisionReason || revisionReason.trim() === '') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'revisionReason is required and cannot be empty'
+      });
+    }
+
+    const centerHeadId = userId;
+
+    const request = await WorkRequest.findById(id).session(session);
+
+    if (!request) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Work request not found'
+      });
+    }
+
+    // Validate status: only pending_approval can be marked as need_revision
+    if (request.status !== 'pending_approval') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot mark as need_revision: request must be pending_approval (current: ${request.status})`
+      });
+    }
+
+    // Validate request type: only assign_students supports need_revision for now
+    if (request.requestType !== 'assign_students') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `need_revision not supported for requestType: ${request.requestType}`
+      });
+    }
+
+    const previousStatus = request.status;
+
+    // Update WorkRequest to need_revision
+    await WorkRequest.findByIdAndUpdate(id, {
+      status: 'need_revision',
+      processedBy: centerHeadId,
+      processedAt: new Date(),
+      responseNote: responseNote,
+      rejectionReason: revisionReason, // Use rejectionReason field for revision reason
+      $push: {
+        history: {
+          action: 'need_revision',
+          performedBy: centerHeadId,
+          performedAt: new Date(),
+          note: revisionReason,
+          previousStatus: previousStatus
+        }
+      }
+    }, { session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: `${request.requestType} marked as need_revision successfully`
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error marking request as need_revision:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error marking request as need_revision'
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+// =========================
+// APPROVE ASSIGN STUDENTS REQUEST (Center Head)
+// =========================
+
+/**
+ * Approve assign_students request (Center Head)
+ * POST /api/work-requests/:id/approve-assign-students
+ * Body: { userId, note }
+ */
+exports.approveAssignStudentsRequest = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { userId, note } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    const centerHeadId = userId;
+
+    const request = await WorkRequest.findById(id).session(session);
+
+    if (!request) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Work request not found'
+      });
+    }
+
+    // Validate request type and status
+    if (request.requestType !== 'assign_students') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'This approval method is only for assign_students requests'
+      });
+    }
+
+    if (request.status !== 'pending_approval') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot approve: request must be pending_approval (current: ${request.status})`
+      });
+    }
+
+    const previousStatus = request.status;
+
+    // Update WorkRequest to completed
+    await WorkRequest.findByIdAndUpdate(id, {
+      status: 'completed',
+      processedBy: centerHeadId,
+      processedAt: new Date(),
+      responseNote: note,
+      $push: {
+        history: {
+          action: 'approved',
+          performedBy: centerHeadId,
+          performedAt: new Date(),
+          note: note,
+          previousStatus: previousStatus
+        }
+      }
+    }, { session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: 'assign_students request approved and completed successfully'
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error approving assign_students request:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error approving assign_students request'
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+// =========================
+// RESUBMIT ASSIGN STUDENTS REQUEST (Academic Staff)
+// =========================
+
+/**
+ * Resubmit assign_students request after need_revision (Academic Staff)
+ * POST /api/work-requests/:id/resubmit-assign-students
+ * Body: { userId, note }
+ * Files: outputFiles[] (multipart/form-data, multiple files allowed)
+ */
+exports.resubmitAssignStudentsRequest = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { userId, note } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    const academicStaffId = userId;
+
+    const request = await WorkRequest.findById(id).session(session);
+
+    if (!request) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Work request not found'
+      });
+    }
+
+    // Validate request type and status
+    if (request.requestType !== 'assign_students') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'This resubmit method is only for assign_students requests'
+      });
+    }
+
+    if (request.status !== 'need_revision') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot resubmit: request must be need_revision (current: ${request.status})`
+      });
+    }
+
+    // Validate: assignedTo phải là người resubmit
+    if (request.assignedTo.toString() !== academicStaffId) {
+      await session.abortTransaction();
+      return res.status(403).json({
+        success: false,
+        message: 'Only the assigned staff can resubmit this request'
+      });
+    }
+
+    const previousStatus = request.status;
+
+    // Prepare update data
+    const updateData = {
+      status: 'pending_approval',
+      processedBy: null, // Reset processedBy
+      processedAt: null, // Reset processedAt
+      responseNote: note,
+      rejectionReason: null, // Clear revision reason
+      outputFiles: [], // Clear old files
+      $push: {
+        history: {
+          action: 'submitted',
+          performedBy: academicStaffId,
+          performedAt: new Date(),
+          note: note,
+          previousStatus: previousStatus
+        }
+      }
+    };
+
+    // Handle file upload if provided (support multiple files)
+    if (req.files && req.files.length > 0) {
+      updateData.outputFiles = req.files.map(file => ({
+        fileName: file.originalname,
+        fileUrl: `/uploads/work-requests/${file.filename}`,
+        uploadedAt: new Date(),
+        uploadedBy: academicStaffId
+      }));
+    } else {
+      // If no new files uploaded, keep old files (shouldn't happen in resubmit case)
+      delete updateData.outputFiles;
+    }
+
+    // Update WorkRequest
+    await WorkRequest.findByIdAndUpdate(id, updateData, { session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: 'assign_students request resubmitted successfully'
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error resubmitting assign_students request:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error resubmitting assign_students request'
     });
   } finally {
     session.endSession();
@@ -1414,6 +1730,8 @@ exports.startProcessing = async (req, res) => {
     // Update work request status
     const updateData = {
       status: 'in_progress',
+      processedBy: userId,
+      processedAt: new Date(),
       $push: {
         history: {
           action: 'in_progress',
@@ -1610,14 +1928,23 @@ exports.recreateEntity = async (req, res) => {
 };
 
 /**
- * Upload output file
+ * Upload output files (supports multiple files)
  * POST /api/work-requests/:id/upload-output
- * Body: { userId } + file upload
+ * Body: { userId } + files upload
  */
 exports.uploadOutputFile = async (req, res) => {
   try {
     const { id } = req.params;
     const { userId } = req.body;
+
+    console.log('Upload debug:', {
+      userId,
+      reqFiles: req.files,
+      reqFilesType: typeof req.files,
+      reqFilesLength: req.files ? req.files.length : 'undefined',
+      reqBody: req.body,
+      contentType: req.headers['content-type']
+    });
 
     if (!userId) {
       return res.status(400).json({
@@ -1626,10 +1953,11 @@ exports.uploadOutputFile = async (req, res) => {
       });
     }
 
-    if (!req.file) {
+    // Check for files from multer array()
+    if (!req.files || req.files.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'No file uploaded'
+        message: 'No files uploaded'
       });
     }
 
@@ -1657,27 +1985,29 @@ exports.uploadOutputFile = async (req, res) => {
       });
     }
 
-    if (request.status !== 'in_progress') {
+    if (!['in_progress', 'need_revision'].includes(request.status)) {
       return res.status(400).json({
         success: false,
-        message: `Cannot upload file: request must be in_progress (current: ${request.status})`
+        message: `Cannot upload file: request must be in_progress or need_revision (current: ${request.status})`
       });
     }
 
-    // Update outputFile
-    const outputFile = {
-      fileName: req.file.originalname,
-      fileUrl: `/uploads/work-requests/${req.file.filename}`,
+    // Update outputFiles (support multiple files)
+    const outputFiles = req.files.map(file => ({
+      fileName: file.originalname,
+      fileUrl: `/uploads/work-requests/${file.filename}`,
       uploadedAt: new Date(),
       uploadedBy: userId
-    };
+    }));
 
-    await WorkRequest.findByIdAndUpdate(id, { outputFile });
+    await WorkRequest.findByIdAndUpdate(id, {
+      $push: { outputFiles: { $each: outputFiles } }
+    });
 
     res.status(200).json({
       success: true,
-      message: 'Output file uploaded successfully',
-      file: outputFile
+      message: `${outputFiles.length} output file(s) uploaded successfully`,
+      files: outputFiles
     });
 
   } catch (error) {
@@ -1740,12 +2070,12 @@ exports.completeRequest = async (req, res) => {
       });
     }
 
-    // Validate: phải có outputFile (cho assign_students)
-    if (request.requestType === 'assign_students' && !request.outputFile) {
+    // Validate: phải có outputFiles (cho assign_students)
+    if (request.requestType === 'assign_students' && (!request.outputFiles || request.outputFiles.length === 0)) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
-        message: 'Must upload output file before completing'
+        message: 'Must upload at least one output file before completing'
       });
     }
 

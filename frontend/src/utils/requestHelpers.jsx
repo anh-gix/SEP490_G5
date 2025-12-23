@@ -10,8 +10,10 @@ export const getStatusBadge = (status) => {
     pending: { variant: 'warning', text: 'Chờ duyệt' },
     approved: { variant: 'success', text: 'Đã duyệt' },
     rejected: { variant: 'danger', text: 'Từ chối' },
+    need_revision: { variant: 'secondary', text: 'Yêu cầu chỉnh sửa' },
     in_progress: { variant: 'info', text: 'Đang xử lý' },
     completed: { variant: 'success', text: 'Hoàn thành' },
+    pending_approval: { variant: 'primary', text: 'Chờ duyệt' },
     cancelled: { variant: 'secondary', text: 'Đã hủy' }
   };
   const config = statusConfig[status] || { variant: 'secondary', text: status };

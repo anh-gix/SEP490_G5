@@ -234,7 +234,13 @@ const TeacherDashboard = () => {
             </Card.Header>
             <Card.Body className="p-20">
               <div className="d-flex flex-column gap-12">
-                {dashboardData.upcomingSchedule.map(schedule => {
+                {dashboardData.upcomingSchedule
+                  .filter(schedule => {
+                    // Chỉ hiển thị schedule của lớp pending hoặc active, không hiển thị completed và disable
+                    const classStatus = schedule.class?.status;
+                    return !classStatus || classStatus === 'pending' || classStatus === 'active';
+                  })
+                  .map(schedule => {
                   const isToday = schedule.isToday;
                   return (
                     <div 
@@ -313,7 +319,12 @@ const TeacherDashboard = () => {
             </Card.Header>
             <Card.Body className="p-20">
               <div className="d-flex flex-column gap-12">
-                {dashboardData.classesSummary.map(classItem => (
+                {dashboardData.classesSummary
+                  .filter(classItem => {
+                    // Chỉ hiển thị lớp pending hoặc active, không hiển thị completed và disable
+                    return classItem.status === 'pending' || classItem.status === 'active';
+                  })
+                  .map(classItem => (
                   <div 
                     key={classItem.id}
                     className="border border-neutral-100 rounded-12 p-16 transition-2"

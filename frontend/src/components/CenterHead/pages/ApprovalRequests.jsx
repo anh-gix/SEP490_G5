@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
 import { workRequestService } from '../../../services/workRequestService';
+import { academicWorkRequestService } from '../../../services/academicWorkRequestService';
 import { formatDate } from '../../../helper/helper';
 import CreateWorkRequestModal from '../compo/CreateWorkRequestModal';
 import userService from '../../../services/userService';
@@ -181,7 +182,9 @@ const ApprovalRequests = () => {
       });
 
       if (response.success) {
-        alert('Đã duyệt yêu cầu thành công!');
+        toast.success('Đã duyệt yêu cầu thành công!', {
+          position: 'top-right'
+        });
         setShowApproveModal(false);
         setShowDetailModal(false);
         setApproveNote('');
@@ -191,7 +194,9 @@ const ApprovalRequests = () => {
       }
     } catch (error) {
       console.error('Error approving request:', error);
-      alert(error.message || 'Có lỗi xảy ra khi duyệt yêu cầu');
+      toast.error(error.message || 'Có lỗi xảy ra khi duyệt yêu cầu', {
+        position: 'top-right'
+      });
     } finally {
       setActionLoading(false);
     }
@@ -199,7 +204,9 @@ const ApprovalRequests = () => {
 
   const handleReject = async () => {
     if (!selectedRequest || !rejectReason.trim()) {
-      alert('Vui lòng nhập lý do từ chối');
+      toast.warning('Vui lòng nhập lý do yêu cầu chỉnh sửa', {
+        position: 'top-right'
+      });
       return;
     }
 
@@ -211,7 +218,9 @@ const ApprovalRequests = () => {
       });
 
       if (response.success) {
-        alert('Đã từ chối yêu cầu');
+        toast.success('Đã yêu cầu chỉnh sửa thành công!', {
+          position: 'top-right'
+        });
         setShowRejectModal(false);
         setShowDetailModal(false);
         setRejectReason('');
@@ -222,7 +231,9 @@ const ApprovalRequests = () => {
       }
     } catch (error) {
       console.error('Error rejecting request:', error);
-      alert(error.message || 'Có lỗi xảy ra khi từ chối yêu cầu');
+      toast.error(error.message || 'Có lỗi xảy ra khi yêu cầu chỉnh sửa', {
+        position: 'top-right'
+      });
     } finally {
       setActionLoading(false);
     }
@@ -230,7 +241,9 @@ const ApprovalRequests = () => {
 
   const handleRevoke = async () => {
     if (!selectedRequest || !revokeReason.trim()) {
-      alert('Vui lòng nhập lý do thu hồi phê duyệt');
+      toast.warning('Vui lòng nhập lý do thu hồi phê duyệt', {
+        position: 'top-right'
+      });
       return;
     }
 
@@ -241,7 +254,9 @@ const ApprovalRequests = () => {
       });
 
       if (response.success) {
-        alert('Đã thu hồi phê duyệt thành công! Yêu cầu đã chuyển về trạng thái chờ duyệt.');
+        toast.success('Đã thu hồi phê duyệt thành công! Yêu cầu đã chuyển về trạng thái chờ duyệt.', {
+          position: 'top-right'
+        });
         setShowRevokeModal(false);
         setShowDetailModal(false);
         setRevokeReason('');
@@ -251,7 +266,9 @@ const ApprovalRequests = () => {
       }
     } catch (error) {
       console.error('Error revoking approval:', error);
-      alert(error.message || 'Có lỗi xảy ra khi thu hồi phê duyệt');
+      toast.error(error.message || 'Có lỗi xảy ra khi thu hồi phê duyệt', {
+        position: 'top-right'
+      });
     } finally {
       setActionLoading(false);
     }
@@ -1153,6 +1170,43 @@ const ApprovalRequests = () => {
                   </div>
                 )}
 
+                {/* Output Files */}
+                {selectedRequest.outputFiles && selectedRequest.outputFiles.length > 0 && (
+                  <div className="mb-4 pb-4 border-bottom">
+                    <h6 className="fw-semibold mb-3">
+                      <i className="ph ph-files me-2"></i>
+                      File báo cáo từ giáo vụ ({selectedRequest.outputFiles.length})
+                    </h6>
+                    <div className="row g-2">
+                      {selectedRequest.outputFiles.map((file, index) => (
+                        <div key={index} className="col-md-6">
+                          <div className="border border-neutral-200 rounded-8 p-12 bg-light">
+                            <div className="d-flex align-items-center gap-8">
+                              <i className="fas fa-file text-primary" style={{ fontSize: '20px' }}></i>
+                              <div className="flex-grow-1">
+                                <div className="text-neutral-900 fw-medium text-truncate" title={file.fileName}>
+                                  {file.fileName}
+                                </div>
+                                <small className="text-muted">
+                                  {(file.fileSize / 1024).toFixed(2)} KB • {formatDate(file.uploadedAt)}
+                                </small>
+                              </div>
+                              <Button
+                                variant="outline-primary"
+                                size="sm"
+                                onClick={() => academicWorkRequestService.downloadFile(file.fileUrl)}
+                                title="Tải xuống"
+                              >
+                                <i className="fas fa-download"></i>
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* History */}
                 {selectedRequest.history && selectedRequest.history.length > 0 && (
                   <div>
@@ -1211,7 +1265,7 @@ const ApprovalRequests = () => {
                     }}
                   >
                     <i className="ph ph-x me-2"></i>
-                    Từ chối
+                    Yêu cầu chỉnh sửa
                   </Button>
                 </div>
               )}
@@ -1387,7 +1441,7 @@ const ApprovalRequests = () => {
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Từ chối yêu cầu</h5>
+                <h5 className="modal-title">Yêu cầu chỉnh sửa</h5>
                 <button
                   type="button"
                   className="btn-close"
@@ -1402,11 +1456,11 @@ const ApprovalRequests = () => {
               </div>
               <div className="modal-body">
                 <div className="mb-3">
-                  <label className="form-label text-danger">Lý do từ chối *</label>
+                  <label className="form-label text-danger">Lý do yêu cầu chỉnh sửa *</label>
                   <textarea
                     className="form-control"
                     rows="3"
-                    placeholder="Nhập lý do từ chối..."
+                    placeholder="Nhập lý do yêu cầu chỉnh sửa..."
                     value={rejectReason}
                     onChange={(e) => setRejectReason(e.target.value)}
                     disabled={actionLoading}
@@ -1442,7 +1496,7 @@ const ApprovalRequests = () => {
                   onClick={handleReject}
                   disabled={actionLoading || !rejectReason.trim()}
                 >
-                  {actionLoading ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+                  {actionLoading ? 'Đang xử lý...' : 'Yêu cầu chỉnh sửa'}
                 </Button>
               </div>
             </div>

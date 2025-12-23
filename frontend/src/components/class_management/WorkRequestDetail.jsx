@@ -9,8 +9,35 @@ const WorkRequestDetail = ({ requestId, onBack }) => {
   const [request, setRequest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [uploadFile, setUploadFile] = useState(null);
-  const [completionNote, setCompletionNote] = useState('');
+  const [uploadFiles, setUploadFiles] = useState([]);
+
+  // Remove file from selection
+  const removeFile = (fileIndex) => {
+    const updatedFiles = uploadFiles.filter((_, index) => index !== fileIndex);
+    setUploadFiles(updatedFiles);
+  };
+
+  // Add more files to existing selection
+  const addMoreFiles = (newFiles) => {
+    const newFileArray = Array.from(newFiles);
+    const currentFileNames = uploadFiles.map(file => file.name);
+
+    // Filter out duplicate files
+    const uniqueNewFiles = newFileArray.filter(newFile => {
+      if (currentFileNames.includes(newFile.name)) {
+        toast.warning(`File "${newFile.name}" đã tồn tại trong danh sách!`);
+        return false;
+      }
+      return true;
+    });
+
+    if (uniqueNewFiles.length > 0) {
+      setUploadFiles([...uploadFiles, ...uniqueNewFiles]);
+      if (uniqueNewFiles.length < newFileArray.length) {
+        toast.info(`Đã thêm ${uniqueNewFiles.length} file mới, ${newFileArray.length - uniqueNewFiles.length} file bị trùng đã bỏ qua.`);
+      }
+    }
+  };
 
   useEffect(() => {
     fetchRequestDetail();
@@ -43,15 +70,34 @@ const WorkRequestDetail = ({ requestId, onBack }) => {
   };
 
   const handleUploadOutput = async () => {
-    if (!uploadFile) {
-      toast.warning('Vui lòng chọn file!');
+    if (!uploadFiles || uploadFiles.length === 0) {
+      toast.warning('Vui lòng chọn ít nhất một file!');
       return;
     }
     try {
       setProcessing(true);
-      await academicWorkRequestService.uploadOutputFile(requestId, user._id, uploadFile);
-      toast.success('Upload thành công!');
-      setUploadFile(null);
+
+      if (request.status === 'need_revision') {
+        // For need_revision: Resubmit with new files (clears old files)
+        await academicWorkRequestService.resubmitAssignStudentsRequest(
+          requestId,
+          user._id,
+          uploadFiles,
+          'Đã chỉnh sửa và gửi lại báo cáo'
+        );
+        toast.success(`Gửi lại ${uploadFiles.length} file báo cáo mới thành công!`);
+      } else {
+        // For in_progress: Upload files and complete
+        // Step 1: Upload files
+        await academicWorkRequestService.uploadOutputFile(requestId, user._id, uploadFiles);
+
+        // Step 2: Complete the request (submit for approval)
+        await academicWorkRequestService.completeRequest(requestId, user._id, 'Đã hoàn thành và gửi báo cáo');
+
+        toast.success(`Upload ${uploadFiles.length} file và gửi báo cáo thành công!`);
+      }
+
+      setUploadFiles([]);
       fetchRequestDetail(); // Refresh
     } catch (error) {
       toast.error(error.message || 'Có lỗi xảy ra');
@@ -60,18 +106,6 @@ const WorkRequestDetail = ({ requestId, onBack }) => {
     }
   };
 
-  const handleComplete = async () => {
-    try {
-      setProcessing(true);
-      await academicWorkRequestService.completeRequest(requestId, user._id, completionNote);
-      toast.success('Hoàn thành!');
-      onBack();
-    } catch (error) {
-      toast.error(error.message || 'Có lỗi xảy ra');
-    } finally {
-      setProcessing(false);
-    }
-  };
 
   const getRequestTypeName = (type) => {
     const names = {
@@ -89,6 +123,7 @@ const WorkRequestDetail = ({ requestId, onBack }) => {
       in_progress: 'Đang xử lý',
       completed: 'Hoàn thành',
       rejected: 'Từ chối',
+      need_revision: 'Yêu cầu chỉnh sửa',
       cancelled: 'Đã hủy'
     };
     return labels[status] || status;
@@ -100,6 +135,7 @@ const WorkRequestDetail = ({ requestId, onBack }) => {
       in_progress: 'info',
       completed: 'success',
       rejected: 'danger',
+      need_revision: 'secondary',
       cancelled: 'secondary'
     };
     return variants[status] || 'secondary';
@@ -258,79 +294,289 @@ const WorkRequestDetail = ({ requestId, onBack }) => {
             </div>
           )}
 
-          {request.status === 'in_progress' && (
+              {request.status === 'in_progress' && (
             <div className="border-top pt-16">
-              <h6 className="text-neutral-900 fw-bold mb-12">Upload kết quả</h6>
-              {request.outputFile ? (
+              <h6 className="text-neutral-900 fw-bold mb-12">Gửi báo cáo hoàn thành</h6>
+              {request.outputFiles && request.outputFiles.length > 0 ? (
                 <Alert variant="success" className="mb-12">
                   <i className="fas fa-check-circle me-2"></i>
-                  Đã upload: <strong>{request.outputFile.fileName}</strong>
+                  Đã gửi báo cáo với <strong>{request.outputFiles.length} file</strong>
+                  {request.outputFiles.map((file, index) => (
+                    <div key={index} className="mt-2">
+                      • {file.fileName}
+                    </div>
+                  ))}
                 </Alert>
               ) : (
                 <div className="mb-16">
+                  <Alert variant="info" className="mb-12">
+                    <i className="fas fa-info-circle me-2"></i>
+                    Upload file và gửi báo cáo hoàn thành cùng lúc. Sau khi gửi, trạng thái sẽ chuyển sang "Chờ duyệt".
+                  </Alert>
                   <Form.Group className="mb-12">
-                    <Form.Label className="text-neutral-700">Chọn file kết quả (.xlsx, .xls, .csv):</Form.Label>
-                    <Form.Control 
-                      type="file" 
-                      accept=".xlsx,.xls,.csv"
-                      onChange={(e) => setUploadFile(e.target.files[0])}
-                    />
+                    <Form.Label className="text-neutral-700">Chọn file kết quả (.xlsx, .xls, .csv, .pdf, .doc, .docx, .zip, .rar):</Form.Label>
+                    {/* File Input */}
+                    <div className="d-flex gap-2 align-items-end">
+                      <div className="flex-grow-1">
+                        <Form.Control
+                          type="file"
+                          accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,.zip,.rar"
+                          multiple
+                          onChange={(e) => {
+                            if (uploadFiles.length === 0) {
+                              // First selection - replace all
+                              setUploadFiles(Array.from(e.target.files));
+                            } else {
+                              // Add more files to existing selection
+                              addMoreFiles(e.target.files);
+                            }
+                          }}
+                        />
+                      </div>
+                      {uploadFiles.length > 0 && (
+                        <Button
+                          variant="outline-secondary"
+                          size="sm"
+                          onClick={() => document.querySelector('input[type="file"]').click()}
+                          title="Thêm file"
+                        >
+                          <i className="fas fa-plus"></i>
+                        </Button>
+                      )}
+                    </div>
+                    <Form.Text className="text-muted">
+                      Chọn nhiều file cùng lúc hoặc nhấn "+" để thêm file
+                    </Form.Text>
+
+                    {/* File Preview Table */}
+                    {uploadFiles.length > 0 && (
+                      <div className="mt-16">
+                        <h6 className="text-neutral-900 fw-bold mb-12">
+                          File đã chọn ({uploadFiles.length})
+                          <Button
+                            variant="outline-danger"
+                            size="sm"
+                            className="ms-2"
+                            onClick={() => setUploadFiles([])}
+                            title="Xóa tất cả"
+                          >
+                            <i className="fas fa-trash-alt"></i>
+                          </Button>
+                        </h6>
+                        <div className="table-responsive">
+                          <table className="table table-sm table-bordered">
+                            <thead className="table-light">
+                              <tr>
+                                <th className="text-center" style={{ width: '60px' }}>STT</th>
+                                <th>Tên file</th>
+                                <th className="text-center" style={{ width: '80px' }}>Thao tác</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {uploadFiles.map((file, index) => (
+                                <tr key={index}>
+                                  <td className="text-center fw-medium text-neutral-700">
+                                    {index + 1}
+                                  </td>
+                                  <td className="text-neutral-900">
+                                    {file.name}
+                                  </td>
+                                  <td className="text-center">
+                                    <Button
+                                      variant="outline-danger"
+                                      size="sm"
+                                      onClick={() => removeFile(index)}
+                                      title="Xóa file này"
+                                    >
+                                      <i className="fas fa-trash-alt"></i>
+                                    </Button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </Form.Group>
-                  <Button 
-                    variant="primary" 
+                  <Button
+                    variant="primary"
                     onClick={handleUploadOutput}
-                    disabled={processing || !uploadFile}
+                    disabled={processing || !uploadFiles || uploadFiles.length === 0}
                     className="d-flex align-items-center gap-2"
                   >
                     {processing ? (
                       <>
                         <span className="spinner-border spinner-border-sm me-2"></span>
-                        Đang upload...
+                        Đang gửi báo cáo...
                       </>
                     ) : (
                       <>
                         <i className="fas fa-upload"></i>
-                        Upload kết quả
+                        {uploadFiles.length > 0
+                          ? `Gửi ${uploadFiles.length} file báo cáo`
+                          : 'Gửi báo cáo'
+                        }
                       </>
                     )}
                   </Button>
                 </div>
               )}
 
-              {/* Hoàn thành */}
-              {request.outputFile && (
-                <div className="mt-16 pt-16 border-top">
-                  <h6 className="text-neutral-900 fw-bold mb-12">Hoàn thành công việc</h6>
-                  <Form.Group className="mb-12">
-                    <Form.Label className="text-neutral-700">Ghi chú hoàn thành:</Form.Label>
-                    <Form.Control 
-                      as="textarea" 
-                      rows={3}
-                      value={completionNote}
-                      onChange={(e) => setCompletionNote(e.target.value)}
-                      placeholder="Nhập ghi chú về kết quả (tùy chọn)..."
-                    />
-                  </Form.Group>
-                  <Button 
-                    variant="success" 
-                    onClick={handleComplete}
-                    disabled={processing}
-                    className="d-flex align-items-center gap-2"
-                  >
-                    {processing ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm me-2"></span>
-                        Đang xử lý...
-                      </>
-                    ) : (
-                      <>
-                        <i className="fas fa-check"></i>
-                        Hoàn thành
-                      </>
+            </div>
+          )}
+
+          {request.status === 'need_revision' && (
+            <div className="border-top pt-16">
+              <h6 className="text-neutral-900 fw-bold mb-12">Gửi lại báo cáo sau chỉnh sửa</h6>
+              <Alert variant="warning" className="mb-12">
+                <i className="fas fa-exclamation-triangle me-2"></i>
+                <strong>Yêu cầu chỉnh sửa:</strong> {request.rejectionReason || 'Vui lòng chỉnh sửa và gửi lại báo cáo.'}
+              </Alert>
+
+              {/* File Preview Table */}
+              <div className="mb-16">
+                <Form.Group className="mb-12">
+                  <Form.Label className="text-neutral-700">Chọn file báo cáo mới (.xlsx, .xls, .csv, .pdf, .doc, .docx, .zip, .rar):</Form.Label>
+                  {/* File Input */}
+                  <div className="d-flex gap-2 align-items-end">
+                    <div className="flex-grow-1">
+                      <Form.Control
+                        type="file"
+                        accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,.zip,.rar"
+                        multiple
+                        onChange={(e) => setUploadFiles(Array.from(e.target.files))}
+                      />
+                    </div>
+                    {uploadFiles.length > 0 && (
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        onClick={() => document.querySelectorAll('input[type="file"]')[1].click()}
+                        title="Thêm file"
+                      >
+                        <i className="fas fa-plus"></i>
+                      </Button>
                     )}
-                  </Button>
-                </div>
-              )}
+                  </div>
+                  <Form.Text className="text-muted">
+                    Chọn nhiều file cùng lúc hoặc nhấn "+" để thêm file
+                  </Form.Text>
+                </Form.Group>
+
+                {/* File Preview Table */}
+                {uploadFiles.length > 0 && (
+                  <div className="mt-16">
+                    <h6 className="text-neutral-900 fw-bold mb-12">
+                      File đã chọn ({uploadFiles.length})
+                      <Button
+                        variant="outline-danger"
+                        size="sm"
+                        className="ms-2"
+                        onClick={() => setUploadFiles([])}
+                        title="Xóa tất cả"
+                      >
+                        <i className="fas fa-trash-alt"></i>
+                      </Button>
+                    </h6>
+                    <div className="table-responsive">
+                      <table className="table table-sm table-bordered">
+                        <thead className="table-light">
+                          <tr>
+                            <th className="text-center" style={{ width: '60px' }}>STT</th>
+                            <th>Tên file</th>
+                            <th className="text-center" style={{ width: '80px' }}>Thao tác</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {uploadFiles.map((file, index) => (
+                            <tr key={index}>
+                              <td className="text-center fw-medium text-neutral-700">
+                                {index + 1}
+                              </td>
+                              <td className="text-neutral-900">
+                                {file.name}
+                              </td>
+                              <td className="text-center">
+                                <Button
+                                  variant="outline-danger"
+                                  size="sm"
+                                  onClick={() => {
+                                    const updatedFiles = uploadFiles.filter((_, i) => i !== index);
+                                    setUploadFiles(updatedFiles);
+                                  }}
+                                  title="Xóa file này"
+                                >
+                                  <i className="fas fa-trash-alt"></i>
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  variant="primary"
+                  onClick={handleUploadOutput}
+                  disabled={processing || !uploadFiles || uploadFiles.length === 0}
+                  className="d-flex align-items-center gap-2"
+                >
+                  {processing ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2"></span>
+                      Đang gửi báo cáo...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-upload"></i>
+                      {uploadFiles.length > 0
+                        ? `Gửi ${uploadFiles.length} file báo cáo mới`
+                        : 'Gửi báo cáo mới'
+                      }
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Hiển thị files đã gửi nếu có (chỉ ở trạng thái chưa hoàn thành) */}
+          {request.outputFiles && request.outputFiles.length > 0 && request.status !== 'completed' && (
+            <div className="border-top pt-16">
+              <h6 className="text-neutral-900 fw-bold mb-12">
+                <i className="fas fa-file-alt me-2"></i>
+                File báo cáo đã gửi ({request.outputFiles.length})
+              </h6>
+              <div className="row g-2">
+                {request.outputFiles.map((file, index) => (
+                  <div key={index} className="col-md-6">
+                    <div className="border border-neutral-200 rounded-8 p-12 bg-light">
+                      <div className="d-flex align-items-center gap-8">
+                        <i className="fas fa-file text-primary" style={{ fontSize: '20px' }}></i>
+                        <div className="flex-grow-1">
+                          <div className="text-neutral-900 fw-medium text-truncate" title={file.fileName}>
+                            {file.fileName}
+                          </div>
+                          <small className="text-muted">
+                            {(file.fileSize / 1024).toFixed(2)} KB
+                          </small>
+                        </div>
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => academicWorkRequestService.downloadFile(file.fileUrl)}
+                          title="Tải xuống"
+                        >
+                          <i className="fas fa-download"></i>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -346,17 +592,21 @@ const WorkRequestDetail = ({ requestId, onBack }) => {
                         <strong>Ghi chú:</strong> {request.responseNote}
                       </p>
                     )}
-                    {request.outputFile && (
+                    {request.outputFiles && request.outputFiles.length > 0 && (
                       <div className="mt-12">
-                        <Button
-                          variant="outline-success"
-                          size="sm"
-                          onClick={() => academicWorkRequestService.downloadFile(request.outputFile.fileUrl)}
-                          className="d-flex align-items-center gap-2"
-                        >
-                          <i className="fas fa-download"></i>
-                          Tải xuống file kết quả
-                        </Button>
+                        <div className="mb-8 text-neutral-700 fw-medium">File kết quả:</div>
+                        {request.outputFiles.map((file, index) => (
+                          <Button
+                            key={index}
+                            variant="outline-success"
+                            size="sm"
+                            onClick={() => academicWorkRequestService.downloadFile(file.fileUrl)}
+                            className="d-flex align-items-center gap-2 me-2 mb-2"
+                          >
+                            <i className="fas fa-download"></i>
+                            {file.fileName}
+                          </Button>
+                        ))}
                       </div>
                     )}
                   </div>

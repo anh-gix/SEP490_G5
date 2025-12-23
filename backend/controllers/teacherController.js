@@ -525,6 +525,28 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
     };
     
     // Filter by date range if provided
+    // Add status to class populate for filtering
+    const schedules = await ClassSchedule.find(query)
+      .populate('class', 'name course startDate endDate status')
+      .populate({
+        path: 'class',
+        populate: {
+          path: 'course',
+          select: 'name program',
+          populate: {
+            path: 'program',
+            select: 'type'
+          }
+        }
+      })
+      .populate('room', 'room_name location')
+      .populate('session', 'title order content')
+      .populate('teacher', 'username email')
+      .populate('substituteTeacher', 'username email')
+      .sort({ date: 1, startTime: 1 })
+      .lean();
+
+    // Filter by date range if provided
     if (startDate && endDate) {
       // Parse dates carefully to avoid timezone issues
       // Expecting YYYY-MM-DD format from frontend
@@ -578,27 +600,7 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
         console.warn('Invalid date range provided:', { startDate, endDate });
       }
     }
-    
-    const schedules = await ClassSchedule.find(query)
-      .populate('class', 'name course startDate endDate')
-      .populate({
-        path: 'class',
-        populate: {
-          path: 'course',
-          select: 'name program',
-          populate: {
-            path: 'program',
-            select: 'type'
-          }
-        }
-      })
-      .populate('room', 'room_name location')
-      .populate('session', 'title order content')
-      .populate('teacher', 'username email')
-      .populate('substituteTeacher', 'username email')
-      .sort({ date: 1, startTime: 1 })
-      .lean();
-    
+
     // For makeup classes (no class), find course from session
     const Course = require('../models/courseModel');
     for (let schedule of schedules) {

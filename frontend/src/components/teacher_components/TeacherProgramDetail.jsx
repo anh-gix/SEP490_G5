@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { getCookie } from '../../utils/cookieUtils.js';
+import { getDecryptedCookie } from '../../utils/cookieUtils.js';
 import Breadcrumb from '../CenterHead/compo/Breadcrumb';
 import Card from '../CenterHead/compo/Card';
 import Button from '../CenterHead/compo/Button';
@@ -45,7 +45,7 @@ const TeacherProgramDetail = () => {
   const [rejectionInfo, setRejectionInfo] = useState(null);
 
   // Get current user
-  const user = JSON.parse(getCookie('user') || '{}');
+  const user = JSON.parse(getDecryptedCookie('user') || '{}');
 
   const basePath = '/teacher';
 

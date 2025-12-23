@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { getCookie } from '../../../utils/cookieUtils.js';
+import { getDecryptedCookie } from '../../../utils/cookieUtils.js';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
@@ -27,7 +27,7 @@ const CourseDetails = ({ viewMode = 'center-head' }) => {
   const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
 
   // Get user role from cookie
-  const user = JSON.parse(getCookie('user') || '{}');
+  const user = JSON.parse(getDecryptedCookie('user') || '{}');
   const userRole = user.roleId?.name || user.role;
 
   // Center Head should not see edit/delete buttons

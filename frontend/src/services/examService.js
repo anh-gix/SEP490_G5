@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getCookie } from '../utils/cookieUtils.js';
+import { getCookie, getDecryptedCookie } from '../utils/cookieUtils.js';
 const API_PORT = import.meta.env.VITE_API_PORT;
 
 const API_BASE_URL = `http://localhost:${API_PORT}/api/exams`;
@@ -115,8 +115,8 @@ export const examService = {
   // Submit exam for approval
   submitExamForApproval: async (examId, submissionNote) => {
     try {
-      // Lấy user info từ cookie
-      const userStr = getCookie('user');
+      // Lấy user info từ cookie (decrypted)
+      const userStr = getDecryptedCookie('user');
       let submittedBy = null;
       if (userStr) {
         try {

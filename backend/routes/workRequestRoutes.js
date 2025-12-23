@@ -159,8 +159,8 @@ router.get(
   workRequestController.getAssignedToMe
 );
 
-// Get work request statistics
-router.get("/stats", verifyToken, workRequestController.getStats);
+// Note: /stats route is already defined above (line 65) as getWorkRequestStats
+// This duplicate route is removed to avoid conflicts
 
 // Get request by ID
 router.get("/:id", verifyToken, workRequestController.getRequestById);
@@ -193,21 +193,24 @@ router.post(
   workRequestController.uploadOutputFile
 );
 
-router.post("/:id/complete", workRequestController.completeRequest);
+router.post("/:id/complete", verifyToken, workRequestController.completeRequest);
 
 // Assign Students Workflow Routes
 router.post(
   '/:id/need-revision',
+  verifyToken,
   workRequestController.needRevisionRequest
 );
 
 router.post(
   '/:id/approve-assign-students',
+  verifyToken,
   workRequestController.approveAssignStudentsRequest
 );
 
 router.post(
   '/:id/resubmit-assign-students',
+  verifyToken,
   uploadOutputFiles, // Allow up to 10 outputFiles
   workRequestController.resubmitAssignStudentsRequest
 );

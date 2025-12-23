@@ -998,7 +998,7 @@ const ApprovalRequests = () => {
       {/* Detail Modal */}
       {showDetailModal && selectedRequest && (
         <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+          <div className="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
             <div className="modal-content">
               {/* Modal Header */}
               <div className="modal-header border-bottom">
@@ -1177,23 +1177,38 @@ const ApprovalRequests = () => {
                       <i className="ph ph-files me-2"></i>
                       File báo cáo từ giáo vụ ({selectedRequest.outputFiles.length})
                     </h6>
-                    <div className="row g-2">
+                    <div className="row g-3">
                       {selectedRequest.outputFiles.map((file, index) => (
-                        <div key={index} className="col-md-6">
-                          <div className="border border-neutral-200 rounded-8 p-12 bg-light">
-                            <div className="d-flex align-items-center gap-8">
-                              <i className="fas fa-file text-primary" style={{ fontSize: '20px' }}></i>
-                              <div className="flex-grow-1">
-                                <div className="text-neutral-900 fw-medium text-truncate" title={file.fileName}>
+                        <div key={index} className="col-md-6 col-lg-4">
+                          <div className="border border-neutral-200 rounded p-3 bg-light h-100">
+                            <div className="d-flex align-items-start" style={{ width: '100%' }}>
+                              <i className="fas fa-file text-primary mt-1 me-2" style={{ fontSize: '18px', flexShrink: 0, width: '20px' }}></i>
+                              <div style={{ flex: '1 1 auto', minWidth: 0, maxWidth: 'calc(100% - 60px)' }}>
+                                <div 
+                                  className="text-neutral-900 fw-medium" 
+                                  title={file.fileName}
+                                  style={{ 
+                                    overflow: 'hidden', 
+                                    textOverflow: 'ellipsis', 
+                                    whiteSpace: 'nowrap',
+                                    lineHeight: '1.4'
+                                  }}
+                                >
                                   {file.fileName}
                                 </div>
-                                <small className="text-muted">
+                                <small className="text-muted d-block" style={{ 
+                                  overflow: 'hidden', 
+                                  textOverflow: 'ellipsis', 
+                                  whiteSpace: 'nowrap'
+                                }}>
                                   {(file.fileSize / 1024).toFixed(2)} KB • {formatDate(file.uploadedAt)}
                                 </small>
                               </div>
                               <Button
                                 variant="outline-primary"
                                 size="sm"
+                                className="ms-2"
+                                style={{ flexShrink: 0, width: '32px', height: '32px', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                 onClick={() => academicWorkRequestService.downloadFile(file.fileUrl)}
                                 title="Tải xuống"
                               >

@@ -4,7 +4,7 @@ import Button from '../compo/Button';
 import { workRequestService } from '../../../services/workRequestService';
 import { userService } from '../../../services/userService';
 import { courseService } from '../../../services/courseService';
-import { getCookie } from '../../../utils/cookieUtils.js';
+import { getDecryptedCookie } from '../../../utils/cookieUtils.js';
 
 const CreateWorkRequestModal = ({ show, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -171,7 +171,7 @@ const CreateWorkRequestModal = ({ show, onClose, onSuccess }) => {
       setLoading(true);
 
       // Get current user (Center Head)
-      const currentUser = JSON.parse(getCookie('user') || '{}');
+      const currentUser = JSON.parse(getDecryptedCookie('user') || '{}');
       if (!currentUser._id) {
         toast.error('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.');
         setLoading(false);

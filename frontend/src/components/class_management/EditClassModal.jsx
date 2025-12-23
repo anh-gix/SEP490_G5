@@ -4663,7 +4663,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
               <div className="col-md-6">
                 <Form.Group>
                   <Form.Label className="text-neutral-700 fw-medium mb-8">Phòng học</Form.Label>
-                  {fullClassData?.status !== 'disable' ? (
+                  {fullClassData?.status === 'completed' ? (
                     <>
                       <div className="radius-8 px-16 py-10 text-neutral-700" style={{ lineHeight: '1.5' }}>
                         {rooms.find(r => (r._id || r.id) === formData.roomId)?.room_name ||
@@ -4671,7 +4671,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                          'Chưa chọn phòng học'}
                       </div>
                       <Form.Text className="text-neutral-500 text-12">
-                        Chỉ có thể sửa phòng học khi lớp ở trạng thái "Vô hiệu hóa".
+                        Không thể sửa phòng học khi lớp đã hoàn thành.
                       </Form.Text>
                     </>
                   ) : (
@@ -5350,7 +5350,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                         })}
                         min={new Date().toISOString().split('T')[0]}
                         className="border-neutral-30 radius-8 px-16 py-10"
-                        disabled={hasAttendance || checkingAttendance || fullClassData?.status !== 'disable'}
+                        disabled={hasAttendance || checkingAttendance || fullClassData?.status === 'completed'}
                       />
                     )}
                   </Form.Group>
@@ -5405,7 +5405,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                             });
                           }}
                           className="border-neutral-30 radius-8 px-16 py-10"
-                          disabled={hasAttendance || checkingAttendance || fullClassData?.status !== 'disable'}
+                          disabled={hasAttendance || checkingAttendance || fullClassData?.status === 'completed'}
                         />
                         {editedSchedule.startTime && editedSchedule.endTime && editedSchedule.startTime >= editedSchedule.endTime && (
                           <Form.Text className="text-danger text-12 mt-1">
@@ -5451,7 +5451,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                             });
                           }}
                           className="border-neutral-30 radius-8 px-16 py-10"
-                          disabled={hasAttendance || checkingAttendance || fullClassData?.status !== 'disable'}
+                          disabled={hasAttendance || checkingAttendance || fullClassData?.status === 'completed'}
                         />
                         {editedSchedule.startTime && editedSchedule.endTime && editedSchedule.endTime <= editedSchedule.startTime && (
                           <Form.Text className="text-danger text-12 mt-1">
@@ -5506,7 +5506,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                         }));
                       }}
                       className="border-neutral-30 radius-8 px-16 py-10"
-                      disabled={hasAttendance || fullClassData?.status !== 'disable'}
+                      disabled={hasAttendance || fullClassData?.status === 'completed'}
                     >
                       <option value="">-- Chọn phòng học --</option>
                       {filteredRooms.map(room => {
@@ -5541,7 +5541,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
           {!isPastSchedule && (
           <Button
             className="btn-main text-15 fw-semibold px-24 py-10 radius-8"
-            disabled={!hasScheduleChanges || hasAttendance || checkingAttendance || savingSchedule || validatingScheduleEdit || fullClassData?.status !== 'disable' ||
+            disabled={!hasScheduleChanges || hasAttendance || checkingAttendance || savingSchedule || validatingScheduleEdit || fullClassData?.status === 'completed' ||
               (scheduleValidationResult?.conflicts?.hasConflict === true &&
                ((scheduleValidationResult.conflicts.teacher && scheduleValidationResult.conflicts.teacher.length > 0) ||
                 (scheduleValidationResult.conflicts.room && scheduleValidationResult.conflicts.room.filter(c => !c.isCurrentClass).length > 0) ||
@@ -6290,7 +6290,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 onChange={(e) => setNewScheduleData({ ...newScheduleData, day: e.target.value })}
                 className="border-neutral-30 radius-8 px-16 py-10"
                 required
-                disabled={fullClassData?.status !== 'disable'}
+                disabled={fullClassData?.status === 'completed'}
               >
                 <option value="">-- Chọn thứ --</option>
                 {daysOfWeek.map(option => (
@@ -6313,7 +6313,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                     onChange={(e) => setNewScheduleData({ ...newScheduleData, startTime: e.target.value })}
                     className="border-neutral-30 radius-8 px-16 py-10"
                     required
-                    disabled={fullClassData?.status !== 'disable'}
+                    disabled={fullClassData?.status === 'completed'}
                   />
                 </Form.Group>
               </div>
@@ -6329,7 +6329,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                     onChange={(e) => setNewScheduleData({ ...newScheduleData, endTime: e.target.value })}
                     className="border-neutral-30 radius-8 px-16 py-10"
                     required
-                    disabled={fullClassData?.status !== 'disable'}
+                    disabled={fullClassData?.status === 'completed'}
                   />
                 </Form.Group>
               </div>
@@ -6343,7 +6343,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 checked={newScheduleData.repeatWeekly}
                 onChange={(e) => setNewScheduleData({ ...newScheduleData, repeatWeekly: e.target.checked })}
                 className="text-neutral-700"
-                disabled={fullClassData?.status !== 'disable'}
+                disabled={fullClassData?.status === 'completed'}
               />
             </Form.Group>
           </Form>
@@ -6438,7 +6438,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
           <Button
             variant="primary"
             className="btn-main text-14 fw-medium px-20 py-10"
-            disabled={savingSchedule || validatingSchedule || (validationResult?.conflicts?.hasConflict === true) || fullClassData?.status !== 'disable'}
+            disabled={savingSchedule || validatingSchedule || (validationResult?.conflicts?.hasConflict === true) || fullClassData?.status === 'completed'}
             onClick={async () => {
               if (!newScheduleData.day || !newScheduleData.startTime || !newScheduleData.endTime) {
                 return;

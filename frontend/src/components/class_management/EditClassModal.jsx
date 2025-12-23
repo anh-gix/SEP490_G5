@@ -143,6 +143,16 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
     return String(currentTeacherId) !== String(originalTeacherId);
   }, [formData.teacherId, fullClassData?.teacher]);
 
+  // Check if class room has been changed
+  const hasClassRoomChanged = useMemo(() => {
+    if (!formData.roomId || !fullClassData?.room) return false;
+    
+    const originalRoomId = fullClassData.room._id || fullClassData.room.id || fullClassData.room;
+    const currentRoomId = formData.roomId;
+    
+    return String(currentRoomId) !== String(originalRoomId);
+  }, [formData.roomId, fullClassData?.room]);
+
   // Validation states for "Xác nhận chỉnh sửa" modal
   const [confirmUpdateValidationResult, setConfirmUpdateValidationResult] = useState(null); // Validation result for confirm update modal
   const [validatingConfirmUpdate, setValidatingConfirmUpdate] = useState(false); // Loading state for confirm update validation
@@ -162,6 +172,21 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       if (!oldTeacherId || !newTeacherId) return false;
       
       return String(oldTeacherId) !== String(newTeacherId);
+    });
+  }, [pendingScheduleChanges]);
+
+  // Check if there are pending schedule changes with room modifications
+  const hasPendingRoomChanges = useMemo(() => {
+    if (!pendingScheduleChanges || pendingScheduleChanges.length === 0) return false;
+    
+    // Check if any pending change has room modification
+    return pendingScheduleChanges.some(change => {
+      const oldRoomId = change.oldSchedule?.roomId;
+      const newRoomId = change.newSchedule?.roomId;
+      
+      if (!oldRoomId || !newRoomId) return false;
+      
+      return String(oldRoomId) !== String(newRoomId);
     });
   }, [pendingScheduleChanges]);
 
@@ -3989,6 +4014,18 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       }
     }
 
+    // Check: Không cho phép thay đổi giáo viên của lớp VÀ giáo viên của buổi học riêng lẻ cùng lúc
+    if (hasClassTeacherChanged && hasPendingTeacherChanges) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Không thể thực hiện',
+        html: `Bạn không thể thay đổi cả giáo viên của lớp và giáo viên của các buổi học riêng lẻ cùng lúc.<br/><br/>Vui lòng chọn một trong hai:<br/>- Chỉ thay đổi giáo viên của lớp<br/>- Hoặc chỉ thay đổi giáo viên của các buổi học riêng lẻ`,
+        confirmButtonText: 'Đã hiểu',
+        confirmButtonColor: '#0d6efd'
+      });
+      return;
+    }
+
     // Check for teacher conflicts before submitting
     if (teacherRoomConflicts.teacherConflicts.length > 0) {
       const conflictCount = teacherRoomConflicts.teacherConflicts.length;
@@ -4006,6 +4043,18 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       if (!result.isConfirmed) {
         return;
       }
+    }
+
+    // Check: Không cho phép thay đổi phòng học của lớp VÀ phòng học của buổi học riêng lẻ cùng lúc
+    if (hasClassRoomChanged && hasPendingRoomChanges) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Không thể thực hiện',
+        html: `Bạn không thể thay đổi cả phòng học của lớp và phòng học của các buổi học riêng lẻ cùng lúc.<br/><br/>Vui lòng chọn một trong hai:<br/>- Chỉ thay đổi phòng học của lớp<br/>- Hoặc chỉ thay đổi phòng học của các buổi học riêng lẻ`,
+        confirmButtonText: 'Đã hiểu',
+        confirmButtonColor: '#0d6efd'
+      });
+      return;
     }
 
     // Check for room conflicts before submitting
@@ -4057,35 +4106,23 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
       return;
     }
 
-    // Check if class room has changed
+    // Check if class room has changed (for priority logic)
     const initialRoomId = fullClassData?.room?._id || fullClassData?.room?.id || fullClassData?.room;
-    const hasClassRoomChanged = formData.roomId && String(formData.roomId) !== String(initialRoomId);
-
-    console.log('=== ROOM CHANGE CHECK ===');
-    console.log('Initial room ID:', initialRoomId);
-    console.log('Current room ID:', formData.roomId);
-    console.log('Has class room changed:', hasClassRoomChanged);
-    console.log('Has pending schedule changes:', pendingScheduleChanges.length > 0);
+    const hasClassRoomChangedInForm = formData.roomId && String(formData.roomId) !== String(initialRoomId);
 
     // Priority logic:
-    // 1. If class room changed → submit form to update all schedules at once (ignore individual schedule changes)
+    // 1. If class room changed → submit form to update all schedules at once (ignore non-room schedule changes)
     // 2. If class room NOT changed → process individual schedule changes
 
-    if (hasClassRoomChanged) {
-      console.log('→ Ưu tiên cập nhật phòng học của lớp (sẽ update tất cả buổi học)');
+    if (hasClassRoomChangedInForm) {
       // Clear pending schedule changes since class room update will override them
-      if (pendingScheduleChanges.length > 0) {
-        console.log('→ Bỏ qua các thay đổi lịch học riêng lẻ vì phòng học của lớp đã thay đổi');
+      if (pendingScheduleChanges.length > 0 && !hasPendingRoomChanges) {
         setPendingScheduleChanges([]);
       }
       // Continue to submit form below
     } else if (pendingScheduleChanges.length > 0) {
-      console.log('→ Xử lý các thay đổi lịch học riêng lẻ');
       // Apply pending schedule changes before submitting
       try {
-        console.log('\n=== BẮT ĐẦU CẬP NHẬT LỊCH HỌC ===');
-        console.log(`Tổng số buổi cần update: ${pendingScheduleChanges.length}\n`);
-
         // Apply all pending schedule changes
         for (const change of pendingScheduleChanges) {
           const updateData = {
@@ -4097,22 +4134,13 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
             updateScope: change.updateScope
           };
 
-          console.log(`\n📝 Đang cập nhật buổi học ID: ${change.scheduleId}`);
-          console.log(`   Scope: ${change.updateScope}`);
-          console.log(`   Old: ${change.oldSchedule.date} ${change.oldSchedule.startTime}-${change.oldSchedule.endTime} (Phòng: ${change.oldSchedule.roomId}, GV: ${change.oldSchedule.teacherId})`);
-          console.log(`   New: ${change.newSchedule.date} ${change.newSchedule.startTime}-${change.newSchedule.endTime} (Phòng: ${change.newSchedule.roomId}, GV: ${change.newSchedule.teacherId})`);
-
           try {
             await classScheduleService.updateClassSchedule(change.scheduleId, updateData);
-            console.log(`   ✅ Cập nhật thành công`);
           } catch (error) {
-            console.error(`   ❌ Cập nhật thất bại:`, error);
+            console.error('Error updating schedule:', error);
             throw error;
           }
         }
-
-        console.log('\n─────────────────────────────────');
-        console.log('🔄 Đang refresh dữ liệu lớp học...\n');
 
         // Refresh class data to get updated schedules
         const classId = formData.id || formData._id;
@@ -4121,20 +4149,12 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
             const response = await classService.getClassById(classId);
 
             if (response && response.success && response.class) {
-              // Log một vài buổi để kiểm tra
-              if (response.class.schedules && response.class.schedules.length > 0) {
-                const updatedSchedule = response.class.schedules.find(s =>
-                  String(s._id || s.id) === String(pendingScheduleChanges[0].scheduleId)
-                );
-              }
-
               setFullClassData(response.class);
             } else if (response && response.data) {
-
               setFullClassData(response.data);
             }
           } catch (error) {
-            console.error('❌ LỖI khi refresh:', error);
+            console.error('Error refreshing class data:', error);
           }
         }
 
@@ -4829,7 +4849,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                         value={formData.roomId}
                         onChange={handleInputChange}
                         className="border-neutral-30 radius-8 px-16 py-10"
-                        disabled={roomLoading}
+                        disabled={roomLoading || hasPendingRoomChanges}
                       >
                         <option value="">
                           {roomLoading ? 'Đang kiểm tra phòng trống...' : '-- Chọn phòng học --'}
@@ -4845,13 +4865,20 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                           );
                         })}
                       </Form.Select>
-                      <Form.Text className="text-neutral-500 text-12">
-                        {checkingTeacherRoomConflicts
-                          ? 'Đang kiểm tra xung đột...'
-                          : rooms.length === 0
-                          ? 'Đang tải danh sách phòng học...'
-                          : `Có ${filteredRooms.length} phòng học. ${effectiveGeneratedSessions.length > 0 ? 'Chọn phòng học để kiểm tra xung đột lịch học.' : 'Chọn lịch học để kiểm tra xung đột.'}`}
-                      </Form.Text>
+                      {hasPendingRoomChanges ? (
+                        <Form.Text className="text-warning-600 text-12">
+                          <i className="fas fa-exclamation-triangle me-1"></i>
+                          Không thể chỉnh sửa phòng học cho lớp vì có thay đổi phòng học đang chờ lưu cho các buổi học
+                        </Form.Text>
+                      ) : (
+                        <Form.Text className="text-neutral-500 text-12">
+                          {checkingTeacherRoomConflicts
+                            ? 'Đang kiểm tra xung đột...'
+                            : rooms.length === 0
+                            ? 'Đang tải danh sách phòng học...'
+                            : `Có ${filteredRooms.length} phòng học. ${effectiveGeneratedSessions.length > 0 ? 'Chọn phòng học để kiểm tra xung đột lịch học.' : 'Chọn lịch học để kiểm tra xung đột.'}`}
+                        </Form.Text>
+                      )}
                     </>
                   )}
                   {teacherRoomConflicts.roomConflicts.length > 0 && formData.roomId && 
@@ -5702,29 +5729,37 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       {selectedScheduleDetail.roomName || 'Chưa có'}
                     </div>
                   ) : (
-                    <Form.Select
-                      value={editedSchedule?.roomId || ''}
-                      onChange={(e) => {
-                        setEditedSchedule(prev => ({
-                          ...prev,
-                          roomId: e.target.value
-                        }));
-                      }}
-                      className="border-neutral-30 radius-8 px-16 py-10"
-                      disabled={hasAttendance || fullClassData?.status === 'completed'}
-                    >
-                      <option value="">-- Chọn phòng học --</option>
-                      {filteredRooms.map(room => {
-                        const roomId = room._id || room.id;
-                        const roomName = room.name || room.roomName || room.room_name || `Phòng ${roomId}`;
-                        const capacity = room.capacity || room.maxCapacity || room.maxStudents || 'N/A';
-                        return (
-                          <option key={roomId} value={roomId}>
-                            {roomName} (Sức chứa: {capacity})
-                          </option>
-                        );
-                      })}
-                    </Form.Select>
+                    <>
+                      <Form.Select
+                        value={editedSchedule?.roomId || ''}
+                        onChange={(e) => {
+                          setEditedSchedule(prev => ({
+                            ...prev,
+                            roomId: e.target.value
+                          }));
+                        }}
+                        className="border-neutral-30 radius-8 px-16 py-10"
+                        disabled={hasAttendance || fullClassData?.status === 'completed' || hasClassRoomChanged}
+                      >
+                        <option value="">-- Chọn phòng học --</option>
+                        {filteredRooms.map(room => {
+                          const roomId = room._id || room.id;
+                          const roomName = room.name || room.roomName || room.room_name || `Phòng ${roomId}`;
+                          const capacity = room.capacity || room.maxCapacity || room.maxStudents || 'N/A';
+                          return (
+                            <option key={roomId} value={roomId}>
+                              {roomName} (Sức chứa: {capacity})
+                            </option>
+                          );
+                        })}
+                      </Form.Select>
+                      {hasClassRoomChanged && (
+                        <Form.Text className="text-warning-600 text-12 mt-4">
+                          <i className="fas fa-exclamation-triangle me-1"></i>
+                          Không thể chỉnh sửa phòng học cho buổi học vì phòng học của lớp đã thay đổi
+                        </Form.Text>
+                      )}
+                    </>
                   )}
                 </Form.Group>
               </div>

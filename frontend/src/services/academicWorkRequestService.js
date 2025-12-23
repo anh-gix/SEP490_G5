@@ -22,11 +22,13 @@ export const academicWorkRequestService = {
 
   /**
    * Get work request stats
-   * @param {object} params - { userId }
+   * @param {object} params - { userId, status }
    */
   getStats: async (params = {}) => {
     try {
-      const response = await api.get('/work-requests/stats', { params });
+      // Add flag to indicate this is for academic staff (query by assignedTo)
+      const queryParams = { ...params, forAcademicStaff: 'true' };
+      const response = await api.get('/work-requests/stats', { params: queryParams });
       return response.data;
     } catch (error) {
       console.error('Error fetching work request stats:', error);

@@ -299,6 +299,11 @@ const RequestManagement = () => {
       const workParams = { userId: user._id };
       if (filterStatus && filterStatus !== 'all') workParams.status = filterStatus;
       
+      // Always filter assign_students requests for academic staff
+      if (filterType === 'assign_students' || !filterType || filterType === 'all') {
+        workParams.requestType = 'assign_students';
+      }
+      
       // Fetch both ChangeRequests and WorkRequests in parallel
       const [changeResponse, workResponse] = await Promise.all([
         changeRequestService.getAllChangeRequests(changeParams).catch(err => {

@@ -32,6 +32,7 @@ const TeacherManagement = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [selectedStatCard, setSelectedStatCard] = useState('total'); // 'total' or 'inactive'
+  const [editingTeacher, setEditingTeacher] = useState(null);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -166,10 +167,18 @@ const TeacherManagement = () => {
     
     try {
       setLoading(true);
-      await teacherService.createTeacher(formData);
+      
+      if (editingTeacher) {
+        // Update existing teacher
+        await teacherService.updateTeacher(editingTeacher._id, formData);
+        toast.success('Cập nhật thông tin giảng viên thành công!');
+      } else {
+        // Create new teacher
+        await teacherService.createTeacher(formData);
+        toast.success('Thêm giảng viên thành công!');
+      }
       
       // Success - close modal and refresh
-      toast.success('Thêm giảng viên thành công!');
       handleCloseModal();
       fetchTeachers();
       fetchStats();
@@ -184,8 +193,21 @@ const TeacherManagement = () => {
     }
   };
 
+  const handleEdit = (teacher) => {
+    setEditingTeacher(teacher);
+    setFormData({
+      username: teacher.username,
+      email: teacher.email,
+      password: '', // Leave empty for update
+      phone: teacher.phone || '',
+      address: teacher.address || ''
+    });
+    setShowModal(true);
+  };
+
   const handleCloseModal = () => {
     setShowModal(false);
+    setEditingTeacher(null);
     setFormData({
       username: '',
       email: '',
@@ -617,6 +639,7 @@ const TeacherManagement = () => {
               <TeacherGridView
                 teachers={filteredTeachers}
                 onViewDetail={handleViewDetail}
+                onEdit={handleEdit}
               />
             )}
 
@@ -627,6 +650,7 @@ const TeacherManagement = () => {
                 page={page}
                 totalPages={totalPages}
                 onViewDetail={handleViewDetail}
+                onEdit={handleEdit}
                 onPageChange={setPage}
               />
             )}
@@ -634,7 +658,7 @@ const TeacherManagement = () => {
         );
       })()}
 
-      {/* Add Teacher Modal */}
+      {/* Add/Edit Teacher Modal */}
       <AddTeacherModal
         show={showModal}
         onHide={handleCloseModal}
@@ -643,6 +667,7 @@ const TeacherManagement = () => {
         loading={loading}
         onSubmit={handleSubmit}
         onInputChange={handleInputChange}
+        editingTeacher={editingTeacher}
       />
 
       {/* Import Teacher Modal */}

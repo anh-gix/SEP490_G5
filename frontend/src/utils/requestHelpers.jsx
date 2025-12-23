@@ -3,11 +3,19 @@ import { Badge } from 'react-bootstrap';
 /**
  * Helper function to get status badge
  * @param {string} status - Request status
+ * @param {string} requestType - Optional: Request type (e.g., 'assign_students', 'makeup_class')
  * @returns {JSX.Element} Badge component
  */
-export const getStatusBadge = (status) => {
+export const getStatusBadge = (status, requestType = null) => {
+  // Special handling for assign_students: pending = "Chờ xử lý" instead of "Chờ duyệt"
+  const isAssignStudents = requestType === 'assign_students';
+  const isChangeRequest = requestType && ['makeup_class', 'request_replace_teacher', 'change_class'].includes(requestType);
+  
   const statusConfig = {
-    pending: { variant: 'warning', text: 'Chờ duyệt' },
+    pending: { 
+      variant: 'warning', 
+      text: (isAssignStudents || (!isChangeRequest && requestType)) ? 'Chờ xử lý' : 'Chờ duyệt' 
+    },
     approved: { variant: 'success', text: 'Đã duyệt' },
     rejected: { variant: 'danger', text: 'Từ chối' },
     need_revision: { variant: 'secondary', text: 'Yêu cầu chỉnh sửa' },

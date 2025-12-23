@@ -1875,7 +1875,7 @@ exports.completeRequest = async (req, res) => {
 
 exports.getWorkRequestStats = async (req, res) => {
   try {
-    const { userId, status } = req.query;
+    const { userId, status, userRole, forAcademicStaff } = req.query;
 
     if (!userId) {
       return res.status(400).json({
@@ -1884,96 +1884,161 @@ exports.getWorkRequestStats = async (req, res) => {
       });
     }
 
-    // Get bottom-up stats (requests pending approval from this center head)
-    const bottomUpQuery = {
-      direction: 'bottom_up',
-      status: { $in: ['pending', 'pending_approval'] }
-    };
-    
-    if (status && status !== 'all') {
-      bottomUpQuery.status = status;
+    // Determine if this is a center head (requestedBy) or academic staff (assignedTo)
+    // If forAcademicStaff=true in query, or userRole is not Center Head, treat as academic staff
+    const isCenterHead = (userRole === 'Center Head' && forAcademicStaff !== 'true') || (!forAcademicStaff && !userRole);
+
+    let statsQuery;
+    let byTypeStats;
+
+    if (isCenterHead) {
+      // For Center Head: Get bottom-up stats (requests pending approval) and top-down stats (requests created by them)
+      
+      // Get bottom-up stats (requests pending approval from this center head)
+      const bottomUpQuery = {
+        direction: 'bottom_up',
+        status: { $in: ['pending', 'pending_approval'] }
+      };
+      
+      if (status && status !== 'all') {
+        bottomUpQuery.status = status;
+      }
+
+      const bottomUpStats = await WorkRequest.aggregate([
+        { $match: bottomUpQuery },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+
+      // Get top-down stats (requests created by this center head)
+      const topDownQuery = {
+        requestedBy: userId,
+        direction: 'top_down'
+      };
+
+      if (status && status !== 'all') {
+        topDownQuery.status = status;
+      }
+
+      const topDownStats = await WorkRequest.aggregate([
+        { $match: topDownQuery },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+
+      // Transform bottom-up stats
+      const bottomUpResult = {
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+        need_revision: 0,
+        total: 0
+      };
+
+      bottomUpStats.forEach(item => {
+        const statusKey = item._id;
+        if (bottomUpResult[statusKey] !== undefined) {
+          bottomUpResult[statusKey] = item.count;
+          bottomUpResult.total += item.count;
+        } else if (statusKey === 'pending' || statusKey === 'pending_approval') {
+          bottomUpResult.pending += item.count;
+          bottomUpResult.total += item.count;
+        }
+      });
+
+      // Transform top-down stats
+      const topDownResult = {
+        pending: 0,
+        in_progress: 0,
+        pending_approval: 0,
+        approved: 0,
+        rejected: 0,
+        completed: 0,
+        need_revision: 0,
+        total: 0
+      };
+
+      topDownStats.forEach(item => {
+        const statusKey = item._id;
+        if (topDownResult[statusKey] !== undefined) {
+          topDownResult[statusKey] = item.count;
+          topDownResult.total += item.count;
+        }
+      });
+
+      // Return data in the format expected by frontend (Center Head)
+      return res.status(200).json({
+        success: true,
+        data: {
+          byDirection: {
+            bottom_up: bottomUpResult,
+            top_down: topDownResult
+          }
+        }
+      });
+
+    } else {
+      // For Academic Staff: Only get assign_students requests assigned to them
+      const statsQuery = {
+        assignedTo: userId,
+        direction: 'top_down',
+        requestType: 'assign_students' // Only assign_students requests
+      };
+
+      if (status && status !== 'all') {
+        statsQuery.status = status;
+      }
+
+      // Get stats by status for assign_students requests only
+      const statsByStatus = await WorkRequest.aggregate([
+        { $match: statsQuery },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+
+      // Get total count of assign_students requests
+      const assignStudentsCount = await WorkRequest.countDocuments(statsQuery);
+
+      // Transform stats by status
+      const statsResult = {
+        pending: 0,
+        in_progress: 0,
+        pending_approval: 0,
+        approved: 0,
+        rejected: 0,
+        completed: 0,
+        need_revision: 0,
+        total: assignStudentsCount
+      };
+
+      statsByStatus.forEach(item => {
+        const statusKey = item._id;
+        if (statsResult[statusKey] !== undefined) {
+          statsResult[statusKey] = item.count;
+        }
+      });
+
+      // Return data in the format expected by frontend (Academic Staff)
+      return res.status(200).json({
+        success: true,
+        stats: {
+          ...statsResult,
+          assign_students: assignStudentsCount
+        }
+      });
     }
-
-    const bottomUpStats = await WorkRequest.aggregate([
-      { $match: bottomUpQuery },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
-    // Get top-down stats (requests created by this center head)
-    const topDownQuery = {
-      requestedBy: userId,
-      direction: 'top_down'
-    };
-
-    if (status && status !== 'all') {
-      topDownQuery.status = status;
-    }
-
-    const topDownStats = await WorkRequest.aggregate([
-      { $match: topDownQuery },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
-    // Transform bottom-up stats
-    const bottomUpResult = {
-      pending: 0,
-      approved: 0,
-      rejected: 0,
-      need_revision: 0,
-      total: 0
-    };
-
-    bottomUpStats.forEach(item => {
-      const statusKey = item._id;
-      if (bottomUpResult[statusKey] !== undefined) {
-        bottomUpResult[statusKey] = item.count;
-        bottomUpResult.total += item.count;
-      } else if (statusKey === 'pending' || statusKey === 'pending_approval') {
-        bottomUpResult.pending += item.count;
-        bottomUpResult.total += item.count;
-      }
-    });
-
-    // Transform top-down stats
-    const topDownResult = {
-      pending: 0,
-      in_progress: 0,
-      pending_approval: 0,
-      approved: 0,
-      rejected: 0,
-      completed: 0,
-      need_revision: 0,
-      total: 0
-    };
-
-    topDownStats.forEach(item => {
-      const statusKey = item._id;
-      if (topDownResult[statusKey] !== undefined) {
-        topDownResult[statusKey] = item.count;
-        topDownResult.total += item.count;
-      }
-    });
-
-    // Return data in the format expected by frontend
-    res.status(200).json({
-      success: true,
-      data: {
-        byDirection: {
-          bottom_up: bottomUpResult,
-          top_down: topDownResult
-        }
-      }
-    });
 
   } catch (error) {
     res.status(500).json({

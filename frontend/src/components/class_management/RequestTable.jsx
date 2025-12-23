@@ -85,7 +85,7 @@ const RequestTable = ({
                     {formatDate(request.createdAt)}
                   </td>
                   <td className="px-20 py-16">
-                    {getStatusBadge(request.status)}
+                    {getStatusBadge(request.status, request.type)}
                   </td>
                   <td className="px-20 py-16 text-neutral-600 text-13">
                     {request.approver?.username || '-'}

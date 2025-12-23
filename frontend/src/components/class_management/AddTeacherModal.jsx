@@ -12,12 +12,13 @@ const AddTeacherModal = ({
   formErrors,
   loading,
   onSubmit,
-  onInputChange
+  onInputChange,
+  editingTeacher
 }) => {
   return (
     <Modal show={show} onHide={onHide} size="lg">
       <Modal.Header closeButton>
-        <Modal.Title>Thêm Giảng viên mới</Modal.Title>
+        <Modal.Title>{editingTeacher ? 'Chỉnh sửa Giảng viên' : 'Thêm Giảng viên mới'}</Modal.Title>
       </Modal.Header>
       <Form onSubmit={onSubmit}>
         <Modal.Body>
@@ -38,6 +39,7 @@ const AddTeacherModal = ({
                   placeholder="Nhập tên đăng nhập"
                   required
                   minLength={3}
+                  disabled={!!editingTeacher}
                   isInvalid={!!formErrors.username}
                 />
                 {formErrors.username && (
@@ -104,7 +106,7 @@ const AddTeacherModal = ({
                     name="password"
                     value={formData.password}
                     onChange={onInputChange}
-                    placeholder="Để trống sẽ dùng mật khẩu mặc định: 123456"
+                    placeholder={editingTeacher ? "Để trống nếu không đổi" : "Để trống sẽ dùng mật khẩu mặc định: 123456"}
                     isInvalid={!!formErrors.password}
                   />
                   {formErrors.password && (
@@ -112,9 +114,11 @@ const AddTeacherModal = ({
                       {formErrors.password}
                     </Form.Control.Feedback>
                   )}
-                  <Form.Text className="text-muted">
-                    Nếu không nhập, mật khẩu mặc định sẽ là: <strong>123456</strong>
-                  </Form.Text>
+                  {!editingTeacher && (
+                    <Form.Text className="text-muted">
+                      Nếu không nhập, mật khẩu mặc định sẽ là: <strong>123456</strong>
+                    </Form.Text>
+                  )}
               </Form.Group>
             </Col>
 
@@ -139,7 +143,7 @@ const AddTeacherModal = ({
             Hủy
           </Button>
           <Button variant="primary" type="submit" disabled={loading}>
-            {loading ? 'Đang lưu...' : 'Thêm mới'}
+            {loading ? 'Đang lưu...' : editingTeacher ? 'Cập nhật' : 'Thêm mới'}
           </Button>
         </Modal.Footer>
       </Form>

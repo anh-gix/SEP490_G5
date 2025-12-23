@@ -1852,11 +1852,11 @@ exports.createStudent = async (req, res) => {
           });
         }
       } else {
-        // No leading zero (Excel removed it): must be exactly 9 digits
+        // No leading zero: must be exactly 9 digits (user can input without leading zero)
         if (phoneDigits.length !== 9) {
           return res.status(400).json({
             success: false,
-            message: 'Số điện thoại phải có 9 chữ số (thiếu số 0 ở đầu do Excel)'
+            message: 'Số điện thoại phải có 10 chữ số (bắt đầu bằng 0) hoặc 9 chữ số (sẽ tự động thêm số 0)'
           });
         }
         // Add leading zero to normalize to 10 digits

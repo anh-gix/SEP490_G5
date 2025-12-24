@@ -9,6 +9,7 @@ import Button from '../CenterHead/compo/Button';
 import Badge from '../CenterHead/compo/Badge';
 import Tabs from '../CenterHead/compo/Tabs';
 import Modal from '../CenterHead/compo/Modal';
+import CourseMaterialsManager from '../common/CourseMaterialsManager';
 import { courseService } from '../../services/courseService';
 import { formatDate } from '../../helper/helper';
 
@@ -511,10 +512,20 @@ const TeacherCourseDetail = () => {
     </div>
   );
 
+  // Tab 4: Materials Management (luôn cho phép CRUD bất kể trạng thái)
+  const materialsTab = (
+    <CourseMaterialsManager
+      courseId={id}
+      courseName={course.name}
+      readOnly={false}
+    />
+  );
+
   const tabs = [
     { label: 'Thông tin chung', icon: 'ph ph-info', content: generalInfoTab },
     { label: 'Buổi học', icon: 'ph ph-book-open', content: syllabusTab },
     { label: 'CLO/PLO', icon: 'ph ph-target', content: cloTab },
+    { label: 'Quản lý tài liệu', icon: 'ph ph-books', content: materialsTab },
   ];
 
   return (

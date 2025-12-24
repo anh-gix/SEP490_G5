@@ -9,6 +9,7 @@ import Button from '../compo/Button';
 import Badge from '../compo/Badge';
 import Tabs from '../compo/Tabs';
 import Modal from '../compo/Modal';
+import CourseMaterialsManager from '../../common/CourseMaterialsManager';
 import { courseService } from '../../../services/courseService';
 import { formatDate } from '../../../helper/helper';
 
@@ -529,10 +530,21 @@ console.log(response.data);
     </div>
   );
 
+  // Tab 4: Materials Management
+  // Center Head có thể xem và quản lý tài liệu (readOnly dựa vào viewMode)
+  const materialsTab = (
+    <CourseMaterialsManager
+      courseId={id}
+      courseName={course.name}
+      readOnly={isViewOnly}
+    />
+  );
+
   const tabs = [
     { label: 'Thông tin chung', icon: 'ph ph-info', content: generalInfoTab },
     { label: 'Đề cương', icon: 'ph ph-book-open', content: syllabusTab },
     { label: 'CLO/PLO', icon: 'ph ph-target', content: cloTab },
+    { label: 'Quản lý tài liệu', icon: 'ph ph-books', content: materialsTab },
   ];
 
   return (

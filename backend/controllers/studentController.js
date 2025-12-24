@@ -124,7 +124,15 @@ exports.getMyClasses = async (req, res) => {
     });
 
     const classes = await Class.find(query)
-      .populate('course', 'name description')
+      .populate({
+        path: 'course',
+        populate: [
+          { path: 'program', select: 'name description plos' },
+          { path: 'sessions' },
+          { path: 'camSessions' },
+          { path: 'createdBy', select: 'username email' }
+        ]
+      })
       .populate('teacher', 'username email')
       .populate('room', 'room_name')
       .sort({ startDate: -1 })
@@ -223,11 +231,12 @@ exports.getMyClassDetail = async (req, res) => {
     const classData = await Class.findById(classId)
       .populate({
         path: 'course',
-        select: 'name description program mocktestSessionOrders',
-        populate: {
-          path: 'program',
-          select: 'name type'
-        }
+        populate: [
+          { path: 'program', select: 'name type description plos' },
+          { path: 'sessions' },
+          { path: 'camSessions' },
+          { path: 'createdBy', select: 'username email' }
+        ]
       })
       .populate('teacher', 'username email')
       .populate('room', 'room_name')

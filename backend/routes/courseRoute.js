@@ -79,8 +79,13 @@ router.get('/:id/program-plos', courseController.getProgramPLOs);
 router.put('/:id/map-plos', courseController.updateCoursePLOMapping);
 
 // MATERIALS ROUTES - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
+// Upload file tài liệu
 router.post('/upload-material', materialUpload.single('material'), courseController.uploadMaterialFile);
+// CRUD materials - cho phép thao tác bất kể trạng thái course
 router.get('/:courseId/materials', courseController.getCourseMaterials);
+router.post('/:courseId/materials', courseController.addCourseMaterial);
+router.put('/:courseId/materials/:materialId', courseController.updateCourseMaterial);
+router.delete('/:courseId/materials/:materialId', courseController.deleteCourseMaterial);
 
 // ACTIVATION/DEACTIVATION ROUTES - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
 router.get('/:id/can-deactivate', courseController.canDeactivateCourse);

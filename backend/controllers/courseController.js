@@ -929,7 +929,7 @@ exports.getCourseMaterials = async (req, res) => {
     try {
         const { courseId } = req.params;
 
-        const course = await Course.findById(courseId).select('materials name');
+        const course = await Course.findById(courseId).select('materials name status isActive');
 
         if (!course) {
             return res.status(404).json({
@@ -938,26 +938,195 @@ exports.getCourseMaterials = async (req, res) => {
             });
         }
 
-        // Format materials array (if it's an array of URLs)
-        const formattedMaterials = (course.materials || []).map((materialUrl, index) => ({
-            id: `course-${courseId}-${index}`,
-            title: `Tài liệu ${index + 1}`,
-            url: materialUrl,
-            type: 'course',
-            uploadDate: null // Course materials may not have upload dates
-        }));
-
         res.status(200).json({
             success: true,
             message: 'Lấy tài liệu khóa học thành công',
             courseName: course.name,
-            total: formattedMaterials.length,
-            materials: formattedMaterials
+            courseStatus: course.status,
+            courseIsActive: course.isActive,
+            total: (course.materials || []).length,
+            materials: course.materials || []
         });
     } catch (err) {
         res.status(500).json({
             success: false,
             message: 'Lỗi server khi lấy tài liệu khóa học',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Add material to course (independent of course status)
+ * POST /api/courses/:courseId/materials
+ *
+ * Cho phép thêm tài liệu bất kể trạng thái course
+ */
+exports.addCourseMaterial = async (req, res) => {
+    try {
+        const { courseId } = req.params;
+        const { description, author, publisher, publishedDate, onlineUrl, documentUpload, note } = req.body;
+
+        // Validate required field
+        if (!description || !description.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Mô tả tài liệu là bắt buộc'
+            });
+        }
+
+        const course = await Course.findById(courseId);
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy khóa học'
+            });
+        }
+
+        // Create new material object
+        const newMaterial = {
+            description: description.trim(),
+            author: author?.trim() || '',
+            publisher: publisher?.trim() || '',
+            publishedDate: publishedDate?.trim() || '',
+            onlineUrl: onlineUrl?.trim() || '',
+            documentUpload: documentUpload?.trim() || '',
+            note: note?.trim() || ''
+        };
+
+        // Add to materials array
+        course.materials.push(newMaterial);
+        await course.save();
+
+        // Get the newly added material (last item)
+        const addedMaterial = course.materials[course.materials.length - 1];
+
+        res.status(201).json({
+            success: true,
+            message: 'Thêm tài liệu thành công',
+            material: addedMaterial,
+            totalMaterials: course.materials.length
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server khi thêm tài liệu',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Update material in course (independent of course status)
+ * PUT /api/courses/:courseId/materials/:materialId
+ *
+ * Cho phép sửa tài liệu bất kể trạng thái course
+ */
+exports.updateCourseMaterial = async (req, res) => {
+    try {
+        const { courseId, materialId } = req.params;
+        const { description, author, publisher, publishedDate, onlineUrl, documentUpload, note } = req.body;
+
+        // Validate required field
+        if (!description || !description.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Mô tả tài liệu là bắt buộc'
+            });
+        }
+
+        const course = await Course.findById(courseId);
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy khóa học'
+            });
+        }
+
+        // Find material by _id
+        const materialIndex = course.materials.findIndex(
+            m => m._id.toString() === materialId
+        );
+
+        if (materialIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy tài liệu'
+            });
+        }
+
+        // Update material
+        course.materials[materialIndex] = {
+            ...course.materials[materialIndex].toObject(),
+            description: description.trim(),
+            author: author?.trim() || '',
+            publisher: publisher?.trim() || '',
+            publishedDate: publishedDate?.trim() || '',
+            onlineUrl: onlineUrl?.trim() || '',
+            documentUpload: documentUpload?.trim() || '',
+            note: note?.trim() || ''
+        };
+
+        await course.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Cập nhật tài liệu thành công',
+            material: course.materials[materialIndex]
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server khi cập nhật tài liệu',
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Delete material from course (independent of course status)
+ * DELETE /api/courses/:courseId/materials/:materialId
+ *
+ * Cho phép xóa tài liệu bất kể trạng thái course
+ */
+exports.deleteCourseMaterial = async (req, res) => {
+    try {
+        const { courseId, materialId } = req.params;
+
+        const course = await Course.findById(courseId);
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy khóa học'
+            });
+        }
+
+        // Find material index by _id
+        const materialIndex = course.materials.findIndex(
+            m => m._id.toString() === materialId
+        );
+
+        if (materialIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: 'Không tìm thấy tài liệu'
+            });
+        }
+
+        // Remove material
+        const deletedMaterial = course.materials.splice(materialIndex, 1)[0];
+        await course.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Xóa tài liệu thành công',
+            deletedMaterial,
+            totalMaterials: course.materials.length
+        });
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: 'Lỗi server khi xóa tài liệu',
             error: err.message
         });
     }

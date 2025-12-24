@@ -10,26 +10,28 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
  * Class Materials Component for Student
  * Danh sách tài liệu học tập của lớp - View only (similar to teacher design)
  */
-const ClassMaterials = () => {
+const ClassMaterials = ({ classInfo }) => {
   const { classId } = useParams();
-  const [courseMaterials, setCourseMaterials] = useState([]);
   const [classMaterials, setClassMaterials] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Get course materials from classInfo (passed from parent)
+  const courseMaterials = classInfo?.course?.materials || [];
+
   useEffect(() => {
     if (classId) {
-      fetchMaterials();
+      fetchClassMaterials();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
 
-  const fetchMaterials = async () => {
+  const fetchClassMaterials = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch class materials
+      // Fetch class-specific materials (materials added by teacher for this class)
       try {
         const response = await studentService.getClassMaterials(classId);
         setClassMaterials(response.materials || []);
@@ -37,13 +39,8 @@ const ClassMaterials = () => {
         console.error('Error fetching class materials:', classErr);
         setClassMaterials([]);
       }
-
-      // Fetch course materials if available
-      // Note: May need to implement studentService.getCourseMaterials
-      // For now, using empty array
-      setCourseMaterials([]);
     } catch (err) {
-      console.error('Unexpected error in fetchMaterials:', err);
+      console.error('Unexpected error in fetchClassMaterials:', err);
       if (!err.message?.includes('Route not found') && !err.message?.includes('404')) {
         setError('Không thể tải danh sách tài liệu');
       }
@@ -179,45 +176,77 @@ const ClassMaterials = () => {
           </div>
         ) : (
           <Row className="g-3">
-            {courseMaterials.map((material, index) => (
-              <Col md={4} key={`course-${index}`}>
-                <Card className="border border-neutral-100 rounded-12 hover-shadow transition-2 h-100">
-                  <Card.Body className="p-20">
-                    <div className="d-flex align-items-start gap-12 mb-12">
-                      <div className={`rounded-8 d-flex align-items-center justify-content-center ${getFileIconColor(material.url)}`}
-                           style={{ width: '40px', height: '40px', backgroundColor: '#F1F3F5' }}>
-                        <i className={`fas ${getFileIcon(material.url)}`} style={{ fontSize: '20px' }}></i>
-                      </div>
-                      <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                        <div className="text-neutral-900 fw-semibold text-14 mb-4"
-                             style={{ 
-                               overflow: 'hidden', 
-                               textOverflow: 'ellipsis',
-                               display: '-webkit-box',
-                               WebkitLineClamp: 2,
-                               WebkitBoxOrient: 'vertical'
-                             }}>
-                          {material.title || getFileName(material.url)}
-                        </div>
-                        <Badge bg="secondary" className="text-10 px-8 py-4">
-                          Tài liệu khóa học
-                        </Badge>
-                      </div>
-                    </div>
+            {courseMaterials.map((material, index) => {
+              // Get URL from documentUpload or onlineUrl
+              const materialUrl = material.documentUpload || material.onlineUrl;
+              const isExternalLink = material.onlineUrl && !material.documentUpload;
 
-                    <div className="d-flex gap-8">
-                      <Button 
-                        className="btn-outline-main flex-grow-1 text-12 px-12 py-6 radius-6"
-                        onClick={() => handleDownloadMaterial(material.url, material.title)}
-                      >
-                        <i className="fas fa-eye me-1"></i>
-                        Xem
-                      </Button>
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-            ))}
+              return (
+                <Col md={4} key={`course-${material._id || index}`}>
+                  <Card className="border border-neutral-100 rounded-12 hover-shadow transition-2 h-100">
+                    <Card.Body className="p-20">
+                      <div className="d-flex align-items-start gap-12 mb-12">
+                        <div className={`rounded-8 d-flex align-items-center justify-content-center ${isExternalLink ? 'text-info-600' : getFileIconColor(materialUrl)}`}
+                             style={{ width: '40px', height: '40px', backgroundColor: '#F1F3F5' }}>
+                          <i className={`fas ${isExternalLink ? 'fa-link' : getFileIcon(materialUrl)}`} style={{ fontSize: '20px' }}></i>
+                        </div>
+                        <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                          <div className="text-neutral-900 fw-semibold text-14 mb-4"
+                               style={{
+                                 overflow: 'hidden',
+                                 textOverflow: 'ellipsis',
+                                 display: '-webkit-box',
+                                 WebkitLineClamp: 2,
+                                 WebkitBoxOrient: 'vertical'
+                               }}>
+                            {material.description || 'Tài liệu khóa học'}
+                          </div>
+                          {material.author && (
+                            <div className="text-neutral-500 text-12 mb-4">
+                              <i className="fas fa-user me-1"></i> {material.author}
+                            </div>
+                          )}
+                          {material.publisher && (
+                            <div className="text-neutral-500 text-11 mb-4">
+                              <i className="fas fa-building me-1"></i> {material.publisher}
+                              {material.publishedDate && ` (${material.publishedDate})`}
+                            </div>
+                          )}
+                          <Badge bg="secondary" className="text-10 px-8 py-4">
+                            Tài liệu khóa học
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {material.note && (
+                        <div className="text-neutral-500 text-12 mb-12 fst-italic">
+                          <i className="fas fa-sticky-note me-1"></i> {material.note}
+                        </div>
+                      )}
+
+                      <div className="d-flex gap-8">
+                        {materialUrl && (
+                          <Button
+                            className="btn-outline-main flex-grow-1 text-12 px-12 py-6 radius-6"
+                            onClick={() => {
+                              if (isExternalLink) {
+                                window.open(materialUrl, '_blank');
+                                toast.info(`Đang mở link: ${material.description}`, { position: 'top-right', autoClose: 2000 });
+                              } else {
+                                handleDownloadMaterial(materialUrl, material.description);
+                              }
+                            }}
+                          >
+                            <i className={`fas ${isExternalLink ? 'fa-external-link-alt' : 'fa-eye'} me-1`}></i>
+                            {isExternalLink ? 'Mở link' : 'Xem'}
+                          </Button>
+                        )}
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              );
+            })}
           </Row>
         )}
       </div>

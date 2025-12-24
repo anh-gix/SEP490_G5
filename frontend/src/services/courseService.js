@@ -293,6 +293,64 @@ export const courseService = {
       throw error.response?.data || { message: 'Upload file thất bại' };
     }
   },
+
+  // ===== MATERIALS CRUD (Independent of course status) =====
+
+  /**
+   * Get all materials of a course
+   * @param {string} courseId - Course ID
+   */
+  getCourseMaterials: async (courseId) => {
+    try {
+      const response = await api.get(`/${courseId}/materials`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy danh sách tài liệu' };
+    }
+  },
+
+  /**
+   * Add material to course (works regardless of course status)
+   * @param {string} courseId - Course ID
+   * @param {object} materialData - { description, author, publisher, publishedDate, onlineUrl, documentUpload, note }
+   */
+  addCourseMaterial: async (courseId, materialData) => {
+    try {
+      const response = await api.post(`/${courseId}/materials`, materialData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Thêm tài liệu thất bại' };
+    }
+  },
+
+  /**
+   * Update material in course (works regardless of course status)
+   * @param {string} courseId - Course ID
+   * @param {string} materialId - Material ID
+   * @param {object} materialData - { description, author, publisher, publishedDate, onlineUrl, documentUpload, note }
+   */
+  updateCourseMaterial: async (courseId, materialId, materialData) => {
+    try {
+      const response = await api.put(`/${courseId}/materials/${materialId}`, materialData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Cập nhật tài liệu thất bại' };
+    }
+  },
+
+  /**
+   * Delete material from course (works regardless of course status)
+   * @param {string} courseId - Course ID
+   * @param {string} materialId - Material ID
+   */
+  deleteCourseMaterial: async (courseId, materialId) => {
+    try {
+      const response = await api.delete(`/${courseId}/materials/${materialId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Xóa tài liệu thất bại' };
+    }
+  },
 };
 
 export default courseService;

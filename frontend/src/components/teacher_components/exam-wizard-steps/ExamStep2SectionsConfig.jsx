@@ -119,7 +119,7 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
     console.log('🚀 Starting file upload:', {
       fileName: file.name,
       fileSize: file.size,
-      fileType: file.type,
+      fileMimeType: file.type,
       sectionIndex,
       fileType: fileType,
       examId: examData._id

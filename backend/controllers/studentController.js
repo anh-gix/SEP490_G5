@@ -412,7 +412,7 @@ exports.getMySchedule = async (req, res) => {
         populate: [
           {
             path: 'class',
-            select: 'name course',
+            select: 'name course status',
             populate: {
               path: 'course',
               select: 'name'
@@ -552,6 +552,7 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
     const classSchedule = await ClassSchedule.findById(scheduleId)
       .populate({
         path: 'class',
+        select: 'name status students',
         populate: [
           { path: 'course', select: 'name description level clos' },
           { path: 'teacher', select: 'username email' }
@@ -642,6 +643,7 @@ const makeup_class = await ClassSchedule.findById(scheduleId)
       
       // Class info
       className: classSchedule.class?.name || 'Lớp học bù',
+      classStatus: classSchedule.class?.status,
       level: classSchedule.class?.course?.level,
       courseName: classSchedule.class?.course?.name,
       courseDescription: classSchedule.class?.course?.description,
@@ -1838,6 +1840,7 @@ exports.createStudent = async (req, res) => {
     
     // Validate phone number length (10 digits only)
     // Allow duplicate phone numbers
+    let normalizedPhone = phone;
     if (phone) {
       const phoneDigits = phone.replace(/\D/g, '');
       // Validate BEFORE adding leading zero
@@ -1848,7 +1851,7 @@ exports.createStudent = async (req, res) => {
         });
       }
       
-      let normalizedPhone = phoneDigits;
+      normalizedPhone = phoneDigits;
       if (phoneDigits[0] === '0') {
         // Has leading zero: must be exactly 10 digits
         if (phoneDigits.length !== 10) {
@@ -1858,18 +1861,16 @@ exports.createStudent = async (req, res) => {
           });
         }
       } else {
-        // No leading zero (Excel removed it): must be exactly 9 digits
+        // No leading zero: must be exactly 9 digits (user can input without leading zero)
         if (phoneDigits.length !== 9) {
           return res.status(400).json({
             success: false,
-            message: 'Số điện thoại phải có 9 chữ số (thiếu số 0 ở đầu do Excel)'
+            message: 'Số điện thoại phải có 10 chữ số (bắt đầu bằng 0) hoặc 9 chữ số (sẽ tự động thêm số 0)'
           });
         }
         // Add leading zero to normalize to 10 digits
         normalizedPhone = '0' + phoneDigits;
       }
-      // Update phone with normalized value
-      phone = normalizedPhone;
     }
     
     // Create student
@@ -1877,7 +1878,7 @@ exports.createStudent = async (req, res) => {
       email,
       password: password || '123456', // Default password nếu không có
       username,
-      phone,
+      phone: normalizedPhone,
       address,
       roleId: studentRole._id
     });
@@ -1901,14 +1902,115 @@ exports.createStudent = async (req, res) => {
 };
 
 // =========================
-// ✏️ CẬP NHẬT HỌC VIÊN - ĐÃ VÔ HIỆU HÓA
+// ✏️ CẬP NHẬT HỌC VIÊN
 // =========================
 exports.updateStudent = async (req, res) => {
-  // Không cho phép cập nhật thông tin học viên
-  return res.status(403).json({
-    success: false,
-    message: 'Không được phép cập nhật thông tin học viên'
-  });
+  try {
+    const { id } = req.params;
+    const { username, email, password, phone, address } = req.body;
+    
+    // Find Student role
+    const studentRole = await Role.findOne({ name: 'Student' });
+    if (!studentRole) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy role học viên'
+      });
+    }
+    
+    // Find student and verify it's a student
+    const student = await User.findById(id);
+    
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy học viên'
+      });
+    }
+    
+    // Verify the user is a student
+    if (student.roleId && student.roleId.toString() !== studentRole._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Người dùng này không phải là học viên'
+      });
+    }
+    
+    // Validate phone number if provided
+    let normalizedPhone = phone;
+    if (phone) {
+      const phoneDigits = phone.replace(/\D/g, '');
+      if (phoneDigits.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Số điện thoại không được để trống'
+        });
+      }
+      
+      if (phoneDigits[0] === '0') {
+        // Has leading zero: must be exactly 10 digits
+        if (phoneDigits.length !== 10) {
+          return res.status(400).json({
+            success: false,
+            message: 'Số điện thoại phải có 10 chữ số'
+          });
+        }
+        normalizedPhone = phoneDigits;
+      } else {
+        // No leading zero: must be exactly 9 digits
+        if (phoneDigits.length !== 9) {
+          return res.status(400).json({
+            success: false,
+            message: 'Số điện thoại phải có 10 chữ số (bắt đầu bằng 0) hoặc 9 chữ số (sẽ tự động thêm số 0)'
+          });
+        }
+        normalizedPhone = '0' + phoneDigits;
+      }
+    }
+    
+    // Check if new email already exists (excluding current student)
+    if (email && email !== student.email) {
+      const existingEmail = await User.findOne({ 
+        email: email.toLowerCase(),
+        _id: { $ne: id } 
+      });
+      if (existingEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email đã tồn tại trong hệ thống'
+        });
+      }
+    }
+    
+    // Update fields
+    if (username) student.username = username;
+    if (email) student.email = email.toLowerCase();
+    if (normalizedPhone) student.phone = normalizedPhone;
+    if (address) student.address = address;
+    if (password && password.trim()) {
+      student.password = password; // Will be hashed by pre-save hook
+    }
+    
+    await student.save();
+    
+    // Remove sensitive data
+    const studentResponse = await User.findById(student._id)
+      .select('-password -token')
+      .populate('roleId', 'name');
+    
+    res.status(200).json({
+      success: true,
+      message: 'Cập nhật thông tin học viên thành công',
+      student: studentResponse
+    });
+  } catch (error) {
+    console.error('Error updating student:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi cập nhật học viên',
+      error: error.message
+    });
+  }
 };
 
 exports.deleteStudent = async (req, res) => {

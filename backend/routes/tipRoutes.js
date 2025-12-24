@@ -1,18 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const tipController = require('../controllers/tipController');
-const { verifyToken } = require('../middlewares/verifyToken');
+const { verifyToken} = require('../middlewares/verifyToken');
 const videoUpload = require('../middlewares/videoUpload');
 
 
 // Get all tips (có thể filter theo section)
-router.get('/', tipController.getAllTips);
+router.get('/',verifyToken,  tipController.getAllTips);
 
 // Get tips by section (General, Toeic, Ielts)
-router.get('/section/:section', tipController.getTipsBySection);
+router.get('/section/:section',verifyToken, tipController.getTipsBySection);
 
 // Get tips statistics
-router.get('/statistics', tipController.getTipsStatistics);
+router.get('/statistics', verifyToken, tipController.getTipsStatistics);
 
 // Create new tip
 router.post('/', verifyToken, tipController.createTip);

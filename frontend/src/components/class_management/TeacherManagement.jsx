@@ -32,6 +32,7 @@ const TeacherManagement = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [selectedStatCard, setSelectedStatCard] = useState('total'); // 'total' or 'inactive'
+  const [editingTeacher, setEditingTeacher] = useState(null);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -166,10 +167,18 @@ const TeacherManagement = () => {
     
     try {
       setLoading(true);
-      await teacherService.createTeacher(formData);
+      
+      if (editingTeacher) {
+        // Update existing teacher
+        await teacherService.updateTeacher(editingTeacher._id, formData);
+        toast.success('Cập nhật thông tin giảng viên thành công!');
+      } else {
+        // Create new teacher
+        await teacherService.createTeacher(formData);
+        toast.success('Thêm giảng viên thành công!');
+      }
       
       // Success - close modal and refresh
-      toast.success('Thêm giảng viên thành công!');
       handleCloseModal();
       fetchTeachers();
       fetchStats();
@@ -184,8 +193,21 @@ const TeacherManagement = () => {
     }
   };
 
+  const handleEdit = (teacher) => {
+    setEditingTeacher(teacher);
+    setFormData({
+      username: teacher.username,
+      email: teacher.email,
+      password: '', // Leave empty for update
+      phone: teacher.phone || '',
+      address: teacher.address || ''
+    });
+    setShowModal(true);
+  };
+
   const handleCloseModal = () => {
     setShowModal(false);
+    setEditingTeacher(null);
     setFormData({
       username: '',
       email: '',
@@ -354,12 +376,9 @@ const TeacherManagement = () => {
 
       // Check for duplicates within the Excel file
       const emailMap = new Map();
-      const phoneMap = new Map();
       
       previewData.forEach((item, index) => {
         const email = item.email.toLowerCase();
-        // Normalize phone before checking duplicates
-        const phone = normalizePhone(item.phone);
         
         // Check duplicate email in file
         if (email && emailMap.has(email)) {
@@ -376,20 +395,7 @@ const TeacherManagement = () => {
           emailMap.set(email, index);
         }
         
-        // Check duplicate phone in file
-        if (phone && phoneMap.has(phone)) {
-          const firstIndex = phoneMap.get(phone);
-          if (!previewData[firstIndex].errors.includes('Số điện thoại trùng lặp trong file Excel')) {
-            previewData[firstIndex].errors.push('Số điện thoại trùng lặp trong file Excel');
-            previewData[firstIndex].hasError = true;
-          }
-          if (!item.errors.includes('Số điện thoại trùng lặp trong file Excel')) {
-            item.errors.push('Số điện thoại trùng lặp trong file Excel');
-            item.hasError = true;
-          }
-        } else if (phone) {
-          phoneMap.set(phone, index);
-        }
+        // Phone can be duplicate, no need to check
       });
 
       // Check for duplicates with existing data in database
@@ -406,25 +412,17 @@ const TeacherManagement = () => {
         
         const existingEmails = new Set(allUsers.map(u => u.email?.toLowerCase()).filter(Boolean));
         
-        const existingPhones = new Set(
-          allUsers
-            .map(u => normalizePhone(u.phone))
-            .filter(Boolean)
-        );
+        // Phone can be duplicate, no need to check
         
         previewData.forEach((item) => {
           const email = item.email.toLowerCase();
-          const phone = normalizePhone(item.phone);
           
           if (email && existingEmails.has(email)) {
             item.errors.push('Email đã tồn tại trong hệ thống');
             item.hasError = true;
           }
           
-          if (phone && existingPhones.has(phone)) {
-            item.errors.push('Số điện thoại đã tồn tại trong hệ thống');
-            item.hasError = true;
-          }
+          // Phone can be duplicate, no need to check
         });
       } catch (err) {
         console.error('Error checking existing users:', err);
@@ -641,6 +639,7 @@ const TeacherManagement = () => {
               <TeacherGridView
                 teachers={filteredTeachers}
                 onViewDetail={handleViewDetail}
+                onEdit={handleEdit}
               />
             )}
 
@@ -651,6 +650,7 @@ const TeacherManagement = () => {
                 page={page}
                 totalPages={totalPages}
                 onViewDetail={handleViewDetail}
+                onEdit={handleEdit}
                 onPageChange={setPage}
               />
             )}
@@ -658,7 +658,7 @@ const TeacherManagement = () => {
         );
       })()}
 
-      {/* Add Teacher Modal */}
+      {/* Add/Edit Teacher Modal */}
       <AddTeacherModal
         show={showModal}
         onHide={handleCloseModal}
@@ -667,6 +667,7 @@ const TeacherManagement = () => {
         loading={loading}
         onSubmit={handleSubmit}
         onInputChange={handleInputChange}
+        editingTeacher={editingTeacher}
       />
 
       {/* Import Teacher Modal */}

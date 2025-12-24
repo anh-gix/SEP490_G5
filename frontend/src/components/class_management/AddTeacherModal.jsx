@@ -12,12 +12,13 @@ const AddTeacherModal = ({
   formErrors,
   loading,
   onSubmit,
-  onInputChange
+  onInputChange,
+  editingTeacher
 }) => {
   return (
     <Modal show={show} onHide={onHide} size="lg">
       <Modal.Header closeButton>
-        <Modal.Title>Thêm Giảng viên mới</Modal.Title>
+        <Modal.Title>{editingTeacher ? 'Chỉnh sửa Giảng viên' : 'Thêm Giảng viên mới'}</Modal.Title>
       </Modal.Header>
       <Form onSubmit={onSubmit}>
         <Modal.Body>
@@ -29,27 +30,22 @@ const AddTeacherModal = ({
           <Row className="g-3">
             <Col md={6}>
               <Form.Group>
-                <Form.Label>Số điện thoại <span className="text-danger">*</span></Form.Label>
+                <Form.Label>Họ và tên <span className="text-danger">*</span></Form.Label>
                 <Form.Control
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
+                  type="text"
+                  name="username"
+                  value={formData.username}
                   onChange={onInputChange}
-                  placeholder="0123456789"
+                  placeholder="Nhập họ và tên"
                   required
-                  pattern="[0-9]{10,11}"
-                  minLength={10}
-                  maxLength={11}
-                  isInvalid={!!formErrors.phone}
+                  minLength={3}
+                  isInvalid={!!formErrors.username}
                 />
-                {formErrors.phone && (
+                {formErrors.username && (
                   <Form.Control.Feedback type="invalid">
-                    {formErrors.phone}
+                    {formErrors.username}
                   </Form.Control.Feedback>
                 )}
-                <Form.Text className="text-muted">
-                  Số điện thoại phải có 10 hoặc 11 chữ số
-                </Form.Text>
               </Form.Group>
             </Col>
 
@@ -75,6 +71,29 @@ const AddTeacherModal = ({
 
             <Col md={6}>
               <Form.Group>
+                <Form.Label>Số điện thoại <span className="text-danger">*</span></Form.Label>
+                <Form.Control
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={onInputChange}
+                  placeholder="0123456789"
+                  required
+                  pattern="[0-9]{10,11}"
+                  minLength={10}
+                  maxLength={11}
+                  isInvalid={!!formErrors.phone}
+                />
+                {formErrors.phone && (
+                  <Form.Control.Feedback type="invalid">
+                    {formErrors.phone}
+                  </Form.Control.Feedback>
+                )}
+              </Form.Group>
+            </Col>
+
+            <Col md={6}>
+              <Form.Group>
                 <Form.Label>
                     Mật khẩu
                     <span className="text-muted" style={{ fontSize: '12px', fontWeight: 'normal' }}>
@@ -86,7 +105,7 @@ const AddTeacherModal = ({
                     name="password"
                     value={formData.password}
                     onChange={onInputChange}
-                    placeholder="Để trống sẽ dùng mật khẩu mặc định: 123456"
+                    placeholder={editingTeacher ? "Để trống nếu không đổi" : "Để trống sẽ dùng mật khẩu mặc định: 123456"}
                     isInvalid={!!formErrors.password}
                   />
                   {formErrors.password && (
@@ -94,9 +113,11 @@ const AddTeacherModal = ({
                       {formErrors.password}
                     </Form.Control.Feedback>
                   )}
-                  <Form.Text className="text-muted">
-                    Nếu không nhập, mật khẩu mặc định sẽ là: <strong>123456</strong>
-                  </Form.Text>
+                  {!editingTeacher && (
+                    <Form.Text className="text-muted">
+                      Nếu không nhập, mật khẩu mặc định sẽ là: <strong>123456</strong>
+                    </Form.Text>
+                  )}
               </Form.Group>
             </Col>
 
@@ -121,7 +142,7 @@ const AddTeacherModal = ({
             Hủy
           </Button>
           <Button variant="primary" type="submit" disabled={loading}>
-            {loading ? 'Đang lưu...' : 'Thêm mới'}
+            {loading ? 'Đang lưu...' : editingTeacher ? 'Cập nhật' : 'Thêm mới'}
           </Button>
         </Modal.Footer>
       </Form>

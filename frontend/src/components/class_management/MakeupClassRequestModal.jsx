@@ -4,6 +4,7 @@ import { classScheduleService } from '../../services/classScheduleService';
 import roomService from '../../services/roomService';
 import teacherService from '../../services/teacherService';
 import studentScheduleService from '../../services/studentScheduleService';
+import { getCookie } from '../../utils/cookieUtils.js';
 
 const MakeupClassRequestModal = ({ 
   show,
@@ -374,7 +375,7 @@ const MakeupClassRequestModal = ({
 
           const response = await fetch(apiUrl, {
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Authorization': `Bearer ${getCookie('token')}`,
               'Content-Type': 'application/json'
             }
           });
@@ -661,7 +662,7 @@ const MakeupClassRequestModal = ({
             `http://localhost:${apiPort}/api/student-schedules/student/${targetStudentId}/schedule`,
             {
               headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Authorization': `Bearer ${getCookie('token')}`,
                 'Content-Type': 'application/json'
               }
             }
@@ -715,7 +716,7 @@ const MakeupClassRequestModal = ({
               `http://localhost:${apiPort}/api/class-schedules/by-session?sessionOrder=${sessionOrder}&dateAfter=${today}`,
               {
                 headers: {
-                  'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                  'Authorization': `Bearer ${getCookie('token')}`,
                   'Content-Type': 'application/json'
                 }
               }
@@ -762,7 +763,7 @@ const MakeupClassRequestModal = ({
         `http://localhost:${apiPort}/api/class-schedules/by-session?sessionId=${sessionIdToUse}&dateAfter=${today}`,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${getCookie('token')}`,
             'Content-Type': 'application/json'
           }
         }
@@ -1083,6 +1084,10 @@ const MakeupClassRequestModal = ({
           // AcademicStaff format
           const newMakeupSessionId = originalScheduleInfo?.sessionId || null;
 
+          // For new makeup classes, className should always be "Lớp học bù" (no class)
+          // Only for existing makeup classes (when selecting existing schedule) should we use the class name
+          const className = makeupOption === 'new' ? 'Lớp học bù' : (originalScheduleInfo?.className || 'Lớp học bù');
+
           onSubmit({
             absentScheduleId: studentScheduleId,
             isSubstituteClass: false,
@@ -1101,7 +1106,7 @@ const MakeupClassRequestModal = ({
               order: originalScheduleInfo?.sessionOrder || null
             },
             makeupClassInfo: {
-              className: originalScheduleInfo?.className || 'Lớp học bù'
+              className: className
             }
           });
         } else {

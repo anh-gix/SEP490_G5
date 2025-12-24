@@ -232,7 +232,7 @@ exports.getRoomSchedule = async (req, res) => {
         select: 'name subject teacherId',
         populate: [
           {
-            path: 'teacherId',
+            path: 'teacher',
             select: 'username email'
           },
           {
@@ -246,6 +246,8 @@ exports.getRoomSchedule = async (req, res) => {
         ]
       })
       .populate('session', 'title order')
+      .populate('teacher', 'username email') // Populate teacher
+      .populate('substituteTeacher', 'username email') // Populate substitute teacher
       .sort({ date: 1, startTime: 1 })
       .lean();
     

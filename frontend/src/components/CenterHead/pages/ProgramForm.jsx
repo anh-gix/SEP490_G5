@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { getDecryptedCookie } from '../../../utils/cookieUtils.js';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
@@ -216,8 +217,8 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
     setLoading(true);
 
     try {
-      // Get userId from localStorage
-      const user = JSON.parse(localStorage.getItem('user'));
+      // Get userId from cookie
+      const user = JSON.parse(getDecryptedCookie('user'));
       const userId = user?._id || user?.id;
 
       if (!userId && !isEdit) {

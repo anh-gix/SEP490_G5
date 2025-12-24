@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { toast } from 'react-toastify';
 import Button from '../../compo/Button';
 import courseService from '../../../../services/courseService';
+import { getDecryptedCookie } from '../../../../utils/cookieUtils.js';
 
 const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEdit }) => {
   const [loading, setLoading] = useState(false);
@@ -58,7 +59,7 @@ const CourseStep1BasicInfo = ({ courseData, setCourseData, program, onNext, isEd
       setLoading(true);
 
       // Get user ID
-      const userStr = localStorage.getItem('user');
+      const userStr = getDecryptedCookie('user');
       if (!userStr) {
         toast.error('Không tìm thấy thông tin user!');
         return;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table, Spinner, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table, Spinner, Alert, Pagination } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import studentService from '../../services/studentService';
@@ -18,6 +18,10 @@ const StudentSchedule = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Pagination state for list view
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   useEffect(() => {
     if (user && user._id) {
@@ -25,6 +29,11 @@ const StudentSchedule = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?._id]); // Chỉ fetch khi user._id thay đổi
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus]);
 
   // Không cần fetch lại khi selectedWeek hoặc filterStatus thay đổi vì đã có dữ liệu
 
@@ -167,7 +176,7 @@ const StudentSchedule = () => {
       if (response.success && response.schedules && Array.isArray(response.schedules)) {
         const transformed = transformScheduleData(response.schedules);
         
-        // Filter out cancelled schedules
+        // Filter out cancelled schedules and schedules from disabled classes
         const activeSchedules = transformed.filter(schedule => {
           const rawData = schedule.rawData;
           if (!rawData) return true;
@@ -179,7 +188,11 @@ const StudentSchedule = () => {
             rawData.status === 'cancelled' || 
             rawData.status === 'canceled';
           
-          return !isCancelled;
+          // Filter out schedules from disabled classes (but keep makeup classes which have no class)
+          const classStatus = rawData.class?.status;
+          const isDisabledClass = classStatus === 'disable';
+          
+          return !isCancelled && !isDisabledClass;
         });
         
         setSchedules(activeSchedules);
@@ -615,6 +628,13 @@ const StudentSchedule = () => {
   };
 
   const renderListView = () => {
+    // Pagination calculation
+    const totalSchedules = filteredSchedules.length;
+    const totalPages = Math.ceil(totalSchedules / pageSize);
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedSchedules = filteredSchedules.slice(startIndex, endIndex);
+
     return (
       <Card className="bg-white border-0 rounded-12" style={{ boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)' }}>
         <Card.Body className="p-0">
@@ -655,8 +675,8 @@ const StudentSchedule = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredSchedules.length > 0 ? (
-                  filteredSchedules.map((schedule) => (
+                {paginatedSchedules.length > 0 ? (
+                  paginatedSchedules.map((schedule) => (
                     <tr key={schedule.id} className="transition-2">
                       <td className="px-20 py-16 text-neutral-700 text-13">
                         {formatDate(schedule.date)}
@@ -724,16 +744,55 @@ const StudentSchedule = () => {
           </div>
         </Card.Body>
 
-        {/* Summary Footer */}
+        {/* Summary Footer with Pagination */}
         {filteredSchedules.length > 0 && (
           <Card.Footer className="bg-main-25 border-main-100 p-16">
-            <Row>
-              <Col md={6}>
+            <Row className="align-items-center">
+              <Col md={4}>
                 <div className="text-neutral-700 text-13">
-                  Tổng số: <span className="fw-semibold text-neutral-900">{filteredSchedules.length}</span> buổi học
+                  Hiển thị <span className="fw-semibold text-neutral-900">{startIndex + 1}-{Math.min(endIndex, totalSchedules)}</span> của <span className="fw-semibold text-neutral-900">{totalSchedules}</span> buổi học
                 </div>
               </Col>
-              <Col md={6} className="text-md-end">
+              <Col md={4} className="text-center">
+                {totalPages > 1 && (
+                  <Pagination className="mb-0 justify-content-center">
+                    <Pagination.Prev 
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    />
+                    
+                    {/* Page numbers */}
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <Pagination.Item
+                          key={pageNum}
+                          active={pageNum === currentPage}
+                          onClick={() => setCurrentPage(pageNum)}
+                        >
+                          {pageNum}
+                        </Pagination.Item>
+                      );
+                    })}
+                    
+                    <Pagination.Next 
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    />
+                  </Pagination>
+                )}
+              </Col>
+              <Col md={4} className="text-md-end">
                 <div className="text-neutral-700 text-13">
                   Đã học: <span className="fw-semibold text-success-600">
                     {filteredSchedules.filter(s => s.attendanceStatus === 'present').length}

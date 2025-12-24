@@ -737,15 +737,21 @@ exports.rejectRequest = async (req, res) => {
 
     const previousStatus = request.status;
 
+    // Determine final status based on request type
+    // For assign_students: use 'need_revision' so staff can resubmit
+    // For other types: use 'rejected'
+    const finalStatus = request.requestType === 'assign_students' ? 'need_revision' : 'rejected';
+    const actionName = request.requestType === 'assign_students' ? 'need_revision' : 'rejected';
+
     // 1. Update WorkRequest
     await WorkRequest.findByIdAndUpdate(id, {
-      status: 'rejected',
+      status: finalStatus,
       processedBy: centerHeadId,
       processedAt: new Date(),
       rejectionReason: rejectionReason,
       $push: {
         history: {
-          action: 'rejected',
+          action: actionName,
           performedBy: centerHeadId,
           performedAt: new Date(),
           note: rejectionReason,
@@ -754,24 +760,31 @@ exports.rejectRequest = async (req, res) => {
       }
     }, { session });
 
-    // 2. Update entity status → needs_revision and add rejectionReason
-    const Model = request.entityType === 'Program' ? Program : Exam;
-    await Model.findByIdAndUpdate(
-      request.entityId,
-      {
-        status: 'needs_revision',
-        rejectionReason: rejectionReason,
-        rejectedBy: centerHeadId,
-        rejectedAt: new Date()
-      },
-      { session }
-    );
+    // 2. Update entity status → needs_revision (only if entity exists)
+    // Note: assign_students requests may not have entityId
+    if (request.entityId && request.entityType) {
+      const Model = request.entityType === 'Program' ? Program : Exam;
+      await Model.findByIdAndUpdate(
+        request.entityId,
+        {
+          status: 'needs_revision',
+          rejectionReason: rejectionReason,
+          rejectedBy: centerHeadId,
+          rejectedAt: new Date()
+        },
+        { session }
+      );
+    }
 
     await session.commitTransaction();
 
+    const successMessage = request.requestType === 'assign_students' 
+      ? 'Yêu cầu đã được yêu cầu chỉnh sửa. Giáo vụ có thể chỉnh sửa và gửi lại báo cáo.'
+      : `${request.requestType} rejected successfully`;
+
     res.status(200).json({
       success: true,
-      message: `${request.requestType} rejected successfully`
+      message: successMessage
     });
 
   } catch (error) {
@@ -1346,6 +1359,8 @@ exports.createTopDownRequest = async (req, res) => {
       .populate('requestedBy', 'username email name')
       .populate('assignedTo', 'username email name');
 
+    console.log('✅ Work request created successfully:', populatedRequest._id);
+    
     res.status(201).json({
       success: true,
       message: 'Work request created successfully',
@@ -1354,7 +1369,6 @@ exports.createTopDownRequest = async (req, res) => {
 
   } catch (error) {
     await session.abortTransaction();
-    console.error('Error creating top-down request:', error);
     res.status(500).json({
       success: false,
       message: 'Error creating work request',
@@ -1674,10 +1688,11 @@ exports.uploadOutputFile = async (req, res) => {
       });
     }
 
-    if (!req.file) {
+    // Check req.files (array) instead of req.file (single)
+    if (!req.files || req.files.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'No file uploaded'
+        message: 'No file uploaded. Please select at least one file.'
       });
     }
 
@@ -1712,27 +1727,34 @@ exports.uploadOutputFile = async (req, res) => {
       });
     }
 
-    // Update outputFile
-    const outputFile = {
-      fileName: req.file.originalname,
-      fileUrl: `/uploads/work-requests/${req.file.filename}`,
+    // Process multiple files - save to outputFiles array
+    const outputFiles = req.files.map(file => ({
+      fileName: file.originalname,
+      fileUrl: `/uploads/work-requests/${file.filename}`,
+      fileSize: file.size,
       uploadedAt: new Date(),
       uploadedBy: userId
-    };
+    }));
 
-    await WorkRequest.findByIdAndUpdate(id, { outputFile });
+    // Update work request with outputFiles array
+    // Also keep backward compatibility by setting outputFile to the first file
+    await WorkRequest.findByIdAndUpdate(id, {
+      outputFiles: outputFiles,
+      outputFile: outputFiles.length > 0 ? outputFiles[0] : null
+    });
 
     res.status(200).json({
       success: true,
-      message: 'Output file uploaded successfully',
-      file: outputFile
+      message: `Successfully uploaded ${outputFiles.length} file(s)`,
+      files: outputFiles,
+      fileCount: outputFiles.length
     });
 
   } catch (error) {
-    console.error('Error uploading output file:', error);
     res.status(500).json({
       success: false,
-      message: 'Error uploading output file'
+      message: 'Error uploading output file',
+      error: error.message
     });
   }
 };
@@ -1853,7 +1875,7 @@ exports.completeRequest = async (req, res) => {
 
 exports.getWorkRequestStats = async (req, res) => {
   try {
-    const { userId, status } = req.query;
+    const { userId, status, userRole, forAcademicStaff } = req.query;
 
     if (!userId) {
       return res.status(400).json({
@@ -1862,60 +1884,163 @@ exports.getWorkRequestStats = async (req, res) => {
       });
     }
 
-    // Query for top-down requests created by this center head
-    const baseQuery = {
-      requestedBy: userId,
-      direction: 'top_down'
-    };
+    // Determine if this is a center head (requestedBy) or academic staff (assignedTo)
+    // If forAcademicStaff=true in query, or userRole is not Center Head, treat as academic staff
+    const isCenterHead = (userRole === 'Center Head' && forAcademicStaff !== 'true') || (!forAcademicStaff && !userRole);
 
-    // Add status filter if provided and not 'all'
-    if (status && status !== 'all') {
-      baseQuery.status = status;
+    let statsQuery;
+    let byTypeStats;
+
+    if (isCenterHead) {
+      // For Center Head: Get bottom-up stats (requests pending approval) and top-down stats (requests created by them)
+      
+      // Get bottom-up stats (requests pending approval from this center head)
+      const bottomUpQuery = {
+        direction: 'bottom_up',
+        status: { $in: ['pending', 'pending_approval'] }
+      };
+      
+      if (status && status !== 'all') {
+        bottomUpQuery.status = status;
+      }
+
+      const bottomUpStats = await WorkRequest.aggregate([
+        { $match: bottomUpQuery },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+
+      // Get top-down stats (requests created by this center head)
+      const topDownQuery = {
+        requestedBy: userId,
+        direction: 'top_down'
+      };
+
+      if (status && status !== 'all') {
+        topDownQuery.status = status;
+      }
+
+      const topDownStats = await WorkRequest.aggregate([
+        { $match: topDownQuery },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+
+      // Transform bottom-up stats
+      const bottomUpResult = {
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+        need_revision: 0,
+        total: 0
+      };
+
+      bottomUpStats.forEach(item => {
+        const statusKey = item._id;
+        if (bottomUpResult[statusKey] !== undefined) {
+          bottomUpResult[statusKey] = item.count;
+          bottomUpResult.total += item.count;
+        } else if (statusKey === 'pending' || statusKey === 'pending_approval') {
+          bottomUpResult.pending += item.count;
+          bottomUpResult.total += item.count;
+        }
+      });
+
+      // Transform top-down stats
+      const topDownResult = {
+        pending: 0,
+        in_progress: 0,
+        pending_approval: 0,
+        approved: 0,
+        rejected: 0,
+        completed: 0,
+        need_revision: 0,
+        total: 0
+      };
+
+      topDownStats.forEach(item => {
+        const statusKey = item._id;
+        if (topDownResult[statusKey] !== undefined) {
+          topDownResult[statusKey] = item.count;
+          topDownResult.total += item.count;
+        }
+      });
+
+      // Return data in the format expected by frontend (Center Head)
+      return res.status(200).json({
+        success: true,
+        data: {
+          byDirection: {
+            bottom_up: bottomUpResult,
+            top_down: topDownResult
+          }
+        }
+      });
+
+    } else {
+      // For Academic Staff: Only get assign_students requests assigned to them
+      const statsQuery = {
+        assignedTo: userId,
+        direction: 'top_down',
+        requestType: 'assign_students' // Only assign_students requests
+      };
+
+      if (status && status !== 'all') {
+        statsQuery.status = status;
+      }
+
+      // Get stats by status for assign_students requests only
+      const statsByStatus = await WorkRequest.aggregate([
+        { $match: statsQuery },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+
+      // Get total count of assign_students requests
+      const assignStudentsCount = await WorkRequest.countDocuments(statsQuery);
+
+      // Transform stats by status
+      const statsResult = {
+        pending: 0,
+        in_progress: 0,
+        pending_approval: 0,
+        approved: 0,
+        rejected: 0,
+        completed: 0,
+        need_revision: 0,
+        total: assignStudentsCount
+      };
+
+      statsByStatus.forEach(item => {
+        const statusKey = item._id;
+        if (statsResult[statusKey] !== undefined) {
+          statsResult[statusKey] = item.count;
+        }
+      });
+
+      // Return data in the format expected by frontend (Academic Staff)
+      return res.status(200).json({
+        success: true,
+        stats: {
+          ...statsResult,
+          assign_students: assignStudentsCount
+        }
+      });
     }
 
-    // Get stats by status
-    const stats = await WorkRequest.aggregate([
-      { $match: baseQuery },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
-    // Transform to expected format
-    const result = {
-      pending: 0,
-      in_progress: 0,
-      pending_approval: 0,
-      approved: 0,
-      rejected: 0,
-      completed: 0,
-      need_revision: 0,
-      total: 0
-    };
-
-    stats.forEach(item => {
-      const statusKey = item._id;
-      if (result[statusKey] !== undefined) {
-        result[statusKey] = item.count;
-        result.total += item.count;
-      }
-    });
-
-    // Return data in the format expected by frontend
-    res.status(200).json({
-      success: true,
-      data: {
-        byDirection: {
-          top_down: result
-        }
-      }
-    });
-
   } catch (error) {
-    console.error('❌ Error getting WorkRequest stats:', error);
     res.status(500).json({
       success: false,
       message: 'Error getting stats'
@@ -2696,6 +2821,315 @@ exports.getProgramRejectionInfo = async (req, res) => {
       success: false,
       message: 'Error getting program rejection info'
     });
+  }
+};
+
+// =========================
+// ASSIGN STUDENTS WORKFLOW
+// =========================
+
+/**
+ * Mark assign_students request as needing revision (Center Head)
+ * POST /api/work-requests/:id/need-revision
+ * Body: { userId, revisionNote }
+ */
+exports.needRevisionRequest = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { userId, revisionNote } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    if (!revisionNote || revisionNote.trim() === '') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Revision note is required'
+      });
+    }
+
+    const request = await WorkRequest.findById(id).session(session);
+
+    if (!request) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Work request not found'
+      });
+    }
+
+    // Validate: request must be pending_approval
+    if (request.status !== 'pending_approval') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot mark as need revision: request must be pending_approval (current: ${request.status})`
+      });
+    }
+
+    // Validate: should be assign_students type
+    if (request.requestType !== 'assign_students') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'This endpoint is only for assign_students requests'
+      });
+    }
+
+    // Update work request status back to need_revision
+    await WorkRequest.findByIdAndUpdate(id, {
+      status: 'need_revision',
+      rejectionReason: revisionNote,
+      processedBy: userId,
+      processedAt: new Date(),
+      $push: {
+        history: {
+          action: 'need_revision',
+          performedBy: userId,
+          performedAt: new Date(),
+          note: revisionNote,
+          previousStatus: 'pending_approval'
+        }
+      }
+    }, { session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: 'Work request marked as needing revision. Staff can revise and resubmit.'
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error marking request as need revision:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error marking request as need revision',
+      error: error.message
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+/**
+ * Approve assign_students request (Center Head)
+ * POST /api/work-requests/:id/approve-assign-students
+ * Body: { userId, note }
+ */
+exports.approveAssignStudentsRequest = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { userId, note } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    const request = await WorkRequest.findById(id).session(session);
+
+    if (!request) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Work request not found'
+      });
+    }
+
+    // Validate: request must be pending_approval
+    if (request.status !== 'pending_approval') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot approve: request must be pending_approval (current: ${request.status})`
+      });
+    }
+
+    // Validate: should be assign_students type
+    if (request.requestType !== 'assign_students') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'This endpoint is only for assign_students requests'
+      });
+    }
+
+    // Validate: must have output file
+    if (!request.outputFile && (!request.outputFiles || request.outputFiles.length === 0)) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot approve: no output file uploaded'
+      });
+    }
+
+    // Update work request status to completed
+    await WorkRequest.findByIdAndUpdate(id, {
+      status: 'completed',
+      processedBy: userId,
+      processedAt: new Date(),
+      responseNote: note,
+      $push: {
+        history: {
+          action: 'approved',
+          performedBy: userId,
+          performedAt: new Date(),
+          note: note || 'Assign students request approved',
+          previousStatus: 'pending_approval'
+        }
+      }
+    }, { session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: 'Assign students request approved successfully'
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error approving assign students request:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error approving assign students request',
+      error: error.message
+    });
+  } finally {
+    session.endSession();
+  }
+};
+
+/**
+ * Resubmit assign_students request after revision (Staff)
+ * POST /api/work-requests/:id/resubmit-assign-students
+ * Body: { userId, note } + files (outputFiles)
+ */
+exports.resubmitAssignStudentsRequest = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { userId, note } = req.body;
+
+    if (!userId) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'userId is required in request body'
+      });
+    }
+
+    const request = await WorkRequest.findById(id).session(session);
+
+    if (!request) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        message: 'Work request not found'
+      });
+    }
+
+    // Validate: request must be need_revision
+    if (request.status !== 'need_revision') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot resubmit: request must be need_revision (current: ${request.status})`
+      });
+    }
+
+    // Validate: should be assign_students type
+    if (request.requestType !== 'assign_students') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'This endpoint is only for assign_students requests'
+      });
+    }
+
+    // Validate: only assignedTo can resubmit
+    if (request.assignedTo.toString() !== userId.toString()) {
+      await session.abortTransaction();
+      return res.status(403).json({
+        success: false,
+        message: 'You are not assigned to this request'
+      });
+    }
+
+    // Handle new output files if uploaded
+    const updateData = {
+      status: 'pending_approval',
+      responseNote: note,
+      rejectionReason: null, // Clear previous rejection reason
+      $push: {
+        history: {
+          action: 'resubmitted',
+          performedBy: userId,
+          performedAt: new Date(),
+          note: note || 'Resubmitted after revision',
+          previousStatus: 'need_revision'
+        }
+      }
+    };
+
+    // Handle multiple output files (req.files from multer array)
+    if (req.files && req.files.length > 0) {
+      const outputFiles = req.files.map(file => ({
+        fileName: file.originalname,
+        fileUrl: `/uploads/work-requests/${file.filename}`,
+        fileSize: file.size,
+        uploadedAt: new Date(),
+        uploadedBy: userId
+      }));
+      updateData.outputFiles = outputFiles;
+    } else if (!request.outputFile && (!request.outputFiles || request.outputFiles.length === 0)) {
+      // If no new files and no existing files
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        message: 'At least one output file is required'
+      });
+    }
+
+    // Update work request
+    await WorkRequest.findByIdAndUpdate(id, updateData, { session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({
+      success: true,
+      message: 'Work request resubmitted successfully for approval'
+    });
+
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error resubmitting assign students request:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error resubmitting assign students request',
+      error: error.message
+    });
+  } finally {
+    session.endSession();
   }
 };
 

@@ -5,7 +5,7 @@ import { Row, Col, Card, Button, Badge } from 'react-bootstrap';
  * TeacherGridView Component
  * Component hiển thị grid view của giảng viên
  */
-const TeacherGridView = ({ teachers, onViewDetail }) => {
+const TeacherGridView = ({ teachers, onViewDetail, onEdit }) => {
   const getStatusBadge = (status) => {
     const config = {
       active: { bg: 'bg-success-600', text: 'Hoạt động', icon: 'fa-check-circle' },
@@ -64,6 +64,15 @@ const TeacherGridView = ({ teachers, onViewDetail }) => {
               </div>
 
               <div className="d-flex gap-8">
+                <Button
+                  variant="outline-warning"
+                  size="sm"
+                  onClick={() => onEdit(teacher)}
+                  className="flex-grow-1"
+                >
+                  <i className="fas fa-edit me-1"></i>
+                  Chỉnh sửa
+                </Button>
                 <Button
                   variant="outline-primary"
                   size="sm"

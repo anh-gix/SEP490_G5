@@ -6,7 +6,16 @@ require('./models');
 require('dotenv').config();
 const path = require('path');
 const app = express();
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Serve static files with proper headers for downloads
+app.use('/uploads', (req, res, next) => {
+  // Set headers for file downloads
+  const fileName = req.path.split('/').pop();
+  if (fileName) {
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  }
+  // Continue to static file serving
+  express.static(path.join(__dirname, 'uploads'))(req, res, next);
+});
 
 // Middleware
 app.use(cors());

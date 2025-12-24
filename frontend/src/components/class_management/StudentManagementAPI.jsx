@@ -20,7 +20,7 @@ const StudentManagementAPI = () => {
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('list');
   const [showModal, setShowModal] = useState(false);
-  const [editingStudent, setEditingStudent] = useState(null); // Always null - editing disabled
+  const [editingStudent, setEditingStudent] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [programType, setProgramType] = useState('');
   const [level, setLevel] = useState('');
@@ -213,21 +213,23 @@ const StudentManagementAPI = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Chỉ cho phép tạo mới, không cho phép cập nhật
-    if (editingStudent) {
-      setFormErrors({ submit: 'Không được phép cập nhật thông tin học viên' });
-      return;
-    }
-    
     // Clear previous errors
     setFormErrors({});
     
     try {
       setLoading(true);
-      await studentService.createStudent(formData);
+      
+      if (editingStudent) {
+        // Update existing student
+        await studentService.updateStudent(editingStudent._id, formData);
+        toast.success('Cập nhật thông tin học viên thành công!');
+      } else {
+        // Create new student
+        await studentService.createStudent(formData);
+        toast.success('Thêm học viên thành công!');
+      }
       
       // Success - close modal and refresh
-      toast.success('Thêm học viên thành công!');
       handleCloseModal();
       fetchStudents();
       fetchStats();
@@ -242,18 +244,17 @@ const StudentManagementAPI = () => {
     }
   };
 
-  // Disabled: Không cho phép chỉnh sửa thông tin học viên
-  // const handleEdit = (student) => {
-  //   setEditingStudent(student);
-  //   setFormData({
-  //     username: student.username,
-  //     email: student.email,
-  //     password: '', // Leave empty for update
-  //     phone: student.phone || '',
-  //     address: student.address || ''
-  //   });
-  //   setShowModal(true);
-  // };
+  const handleEdit = (student) => {
+    setEditingStudent(student);
+    setFormData({
+      username: student.username,
+      email: student.email,
+      password: '', // Leave empty for update
+      phone: student.phone || '',
+      address: student.address || ''
+    });
+    setShowModal(true);
+  };
 
   // Disabled: Không cho phép xóa thông tin học viên
   // const handleDelete = async (studentId) => {
@@ -568,6 +569,15 @@ const StudentManagementAPI = () => {
 
                   <div className="d-flex gap-8">
                     <Button
+                      variant="outline-warning"
+                      size="sm"
+                      onClick={() => handleEdit(student)}
+                      className="flex-grow-1"
+                    >
+                      <i className="fas fa-edit me-1"></i>
+                      Chỉnh sửa
+                    </Button>
+                    <Button
                       variant="outline-primary"
                       size="sm"
                       onClick={() => handleViewDetail(student)}
@@ -626,6 +636,14 @@ const StudentManagementAPI = () => {
                     </td>
                     <td className="px-20 py-16">
                       <div className="d-flex gap-8">
+                        <Button
+                          variant="outline-warning"
+                          size="sm"
+                          onClick={() => handleEdit(student)}
+                        >
+                          <i className="fas fa-edit me-1"></i>
+                          Chỉnh sửa
+                        </Button>
                         <Button
                           variant="outline-info"
                           size="sm"
@@ -693,10 +711,10 @@ const StudentManagementAPI = () => {
         </Card>
       )}
 
-      {/* Add Modal - Chỉ cho phép thêm mới */}
+      {/* Add/Edit Modal */}
       <Modal show={showModal} onHide={handleCloseModal} size="lg">
         <Modal.Header closeButton>
-          <Modal.Title>Thêm Học viên mới</Modal.Title>
+          <Modal.Title>{editingStudent ? 'Chỉnh sửa Học viên' : 'Thêm Học viên mới'}</Modal.Title>
         </Modal.Header>
         <Form onSubmit={handleSubmit}>
           <Modal.Body>
@@ -708,15 +726,14 @@ const StudentManagementAPI = () => {
             <Row className="g-3">
               <Col md={6}>
                 <Form.Group>
-                  <Form.Label>Tên đăng nhập <span className="text-danger">*</span></Form.Label>
+                  <Form.Label>Họ và tên <span className="text-danger">*</span></Form.Label>
                   <Form.Control
                     type="text"
                     name="username"
                     value={formData.username}
                     onChange={handleInputChange}
-                    placeholder="Username"
+                    placeholder="Nhập họ và tên"
                     required
-                    disabled={!!editingStudent}
                     isInvalid={!!formErrors.username}
                   />
                   {formErrors.username && (
@@ -819,7 +836,7 @@ const StudentManagementAPI = () => {
               Hủy
             </Button>
             <Button variant="primary" type="submit" disabled={loading}>
-              {loading ? 'Đang lưu...' : 'Thêm mới'}
+              {loading ? 'Đang lưu...' : editingStudent ? 'Cập nhật' : 'Thêm mới'}
             </Button>
           </Modal.Footer>
         </Form>

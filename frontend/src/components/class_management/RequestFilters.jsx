@@ -32,6 +32,19 @@ const getStatusOptions = (filterType) => {
   } else if (workRequestTypes.includes(filterType)) {
     // WorkRequest types (including assign_students): all 7 WorkRequest statuses
     // Note: pending label is "Chờ xử lý" for WorkRequest (different from ChangeRequest)
+
+    // Special handling for assign_students: only 5 specific statuses
+    if (filterType === 'assign_students') {
+      return [
+        { value: 'pending', label: statusLabels.pending }, // "Chờ xử lý"
+        { value: 'in_progress', label: statusLabels.in_progress }, // "Đang xử lý"
+        { value: 'pending_approval', label: statusLabels.pending_approval }, // "Chờ duyệt"
+        { value: 'need_revision', label: statusLabels.need_revision }, // "Yêu cầu chỉnh sửa"
+        { value: 'completed', label: statusLabels.completed } // "Hoàn thành"
+      ];
+    }
+
+    // Other WorkRequest types: include all statuses
     return [
       { value: 'pending', label: statusLabels.pending }, // "Chờ xử lý"
       { value: 'in_progress', label: statusLabels.in_progress }, // "Đang xử lý"

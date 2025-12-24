@@ -524,7 +524,7 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
       ]
     };
     
-    // Filter by date range if provided
+    // Filter by date range if provided (MUST be before query execution)
     if (startDate && endDate) {
       // Parse dates carefully to avoid timezone issues
       // Expecting YYYY-MM-DD format from frontend
@@ -568,19 +568,17 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
       if (start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
         start.setUTCHours(0, 0, 0, 0);
         end.setUTCHours(23, 59, 59, 999);
-        
+
         query.date = {
           $gte: start,
           $lte: end
         };
-      } else {
-        // Log error but don't throw - just skip date filter
-        console.warn('Invalid date range provided:', { startDate, endDate });
       }
     }
-    
+
+    // Execute query AFTER date filter is applied
     const schedules = await ClassSchedule.find(query)
-      .populate('class', 'name course startDate endDate')
+      .populate('class', 'name course startDate endDate status')
       .populate({
         path: 'class',
         populate: {
@@ -598,7 +596,7 @@ exports.getCurrentTeacherSchedule = async (req, res) => {
       .populate('substituteTeacher', 'username email')
       .sort({ date: 1, startTime: 1 })
       .lean();
-    
+
     // For makeup classes (no class), find course from session
     const Course = require('../models/courseModel');
     for (let schedule of schedules) {
@@ -1365,7 +1363,7 @@ exports.getLessonDetail = async (req, res) => {
     const schedule = await ClassSchedule.findById(scheduleId)
       .populate({
         path: 'class',
-        select: 'name course teacher students startDate endDate',
+        select: 'name course teacher students startDate endDate status',
         populate: [
           {
             path: 'course',
@@ -1501,6 +1499,7 @@ exports.getLessonDetail = async (req, res) => {
       
       // Class info
       className: schedule.class?.name || 'Lớp học bù',
+      classStatus: schedule.class?.status,
       courseName: schedule.class?.course?.name,
       courseDescription: schedule.class?.course?.description,
       classStartDate: formatDateToVN(schedule.class?.startDate),

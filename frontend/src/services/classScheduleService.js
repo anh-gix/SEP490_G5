@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getCookie } from '../utils/cookieUtils.js';
 const API_PORT = import.meta.env.VITE_API_PORT;
 // Tạo axios instance với base URL cho class schedule API
 const API_BASE_URL = `http://localhost:${API_PORT}/api/class-schedules`;
@@ -12,7 +13,7 @@ const api = axios.create({
 // Interceptor để thêm token vào headers
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = getCookie('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -161,7 +162,7 @@ export const classScheduleService = {
   // Cập nhật buổi học (date, time, room, scope)
   updateClassSchedule: async (scheduleId, updateData) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getCookie('token');
       const response = await axios.put(
         `http://localhost:${API_PORT}/api/schedules/${scheduleId}`,
         updateData,

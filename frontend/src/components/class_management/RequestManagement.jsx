@@ -43,7 +43,7 @@ const RequestManagement = () => {
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('pending');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [sortBy, setSortBy] = useState('oldest');
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -298,6 +298,11 @@ const RequestManagement = () => {
       
       const workParams = { userId: user._id };
       if (filterStatus && filterStatus !== 'all') workParams.status = filterStatus;
+      
+      // Always filter assign_students requests for academic staff
+      if (filterType === 'assign_students' || !filterType || filterType === 'all') {
+        workParams.requestType = 'assign_students';
+      }
       
       // Fetch both ChangeRequests and WorkRequests in parallel
       const [changeResponse, workResponse] = await Promise.all([

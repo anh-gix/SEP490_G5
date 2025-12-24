@@ -1,4 +1,11 @@
 import axios from 'axios';
+import {
+  getCookie,
+  setCookie,
+  removeCookie,
+  setEncryptedCookie,
+  getDecryptedCookie
+} from '../utils/cookieUtils.js';
 const API_PORT = import.meta.env.VITE_API_PORT;
 // Tạo axios instance với base URL
 const API_BASE_URL = `http://localhost:${API_PORT}/api/auth`;
@@ -12,7 +19,7 @@ const api = axios.create({
 // Interceptor để thêm token vào headers
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = getCookie('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -62,25 +69,25 @@ export const authService = {
   logout: async () => {
     try {
       await api.post('/logout');
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      removeCookie('token');
+      removeCookie('user');
     } catch (error) {
       // Ngay cả khi API call thất bại, vẫn xóa token local
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      removeCookie('token');
+      removeCookie('user');
       throw error.response?.data || { message: 'Đăng xuất thất bại' };
     }
   },
 
   // Kiểm tra token có hợp lệ không
   isAuthenticated: () => {
-    const token = localStorage.getItem('token');
+    const token = getCookie('token');
     return !!token;
   },
 
-  // Lấy token từ localStorage
+  // Lấy token từ cookie
   getToken: () => {
-    return localStorage.getItem('token');
+    return getCookie('token');
   },
 
   // Đổi mật khẩu
@@ -113,15 +120,16 @@ export const authService = {
     }
   },
 
-  // Lưu user data vào localStorage
+  // Lưu user data vào cookie
   saveUserData: (userData) => {
-    localStorage.setItem('token', userData.token);
-    localStorage.setItem('user', JSON.stringify(userData));
+    // Token được lưu với secure flag
+    setCookie('token', userData.token, 7, true); // 7 ngày, secure
+    setEncryptedCookie('user', JSON.stringify(userData), 7, true); // 7 ngày, secure + mã hóa
   },
 
-  // Lấy user data từ localStorage
+  // Lấy user data từ cookie
   getUserData: () => {
-    const userData = localStorage.getItem('user');
+    const userData = getDecryptedCookie('user');
     return userData ? JSON.parse(userData) : null;
   }
 };

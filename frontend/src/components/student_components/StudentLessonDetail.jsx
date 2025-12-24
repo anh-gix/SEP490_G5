@@ -158,7 +158,7 @@ const StudentLessonDetail = () => {
             )}
           </div>
           <div className="d-flex gap-12">
-            {lessonData.status === 'upcoming' && (
+            {lessonData.status === 'upcoming' && lessonData.classStatus === 'active' && (
               <Button 
                 onClick={handleRequestAbsence}
                 className="btn-outline-warning text-13 px-16 py-8 radius-8"
@@ -167,10 +167,6 @@ const StudentLessonDetail = () => {
                 Xin nghỉ
               </Button>
             )}
-            <Button className="btn-main text-13 px-16 py-8 radius-8">
-              <i className="fas fa-chalkboard-teacher me-2"></i>
-              Vào lớp
-            </Button>
           </div>
         </div>
       </div>

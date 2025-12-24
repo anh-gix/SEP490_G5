@@ -149,6 +149,17 @@ const workRequestSchema = new Schema({
   },
 
   // File từ Academic Staff gửi lại Center Head (đã tạo tài khoản & xếp lớp)
+  outputFiles: [{
+    fileName: String,
+    fileUrl: String,
+    uploadedAt: Date,
+    uploadedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  }],
+
+  // Backward compatibility - single file (deprecated)
   outputFile: {
     fileName: String,
     fileUrl: String,

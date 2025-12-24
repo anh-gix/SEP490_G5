@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, ButtonGroup, Form, Table, Pagination } from 'react-bootstrap';
 import teacherService from '../../services/teacherService';
 import { useAuth } from '../../contexts/AuthContext';
 import changeRequestService from '../../services/changeRequestService';
@@ -25,6 +25,10 @@ const TeacherSchedule = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
   
   // Recent applications preview
   const [recentApplications, setRecentApplications] = useState([]);
@@ -87,6 +91,7 @@ const TeacherSchedule = () => {
             material: schedule.material || [],
             mocktest: schedule.mocktest,
             status: schedule.status,
+            class: schedule.class, // Keep full class object for status access
             // Determine schedule status for filtering
             scheduleStatus: getScheduleStatus(schedule.date, schedule.startTime)
           };
@@ -315,11 +320,26 @@ const TeacherSchedule = () => {
   };
 
   const filteredSchedules = schedules.filter(schedule => {
-    if (filterStatus === 'all') return true;
-    if (filterStatus === 'upcoming') return schedule.scheduleStatus === 'upcoming';
-    if (filterStatus === 'completed') return schedule.scheduleStatus === 'completed';
-    return true;
+    // Chỉ hiển thị schedule của lớp pending hoặc active, không hiển thị completed và disable
+    const classStatus = schedule.class?.status;
+    const isActiveClass = !classStatus || classStatus === 'pending' || classStatus === 'active';
+
+    if (filterStatus === 'all') return isActiveClass;
+    if (filterStatus === 'upcoming') return isActiveClass && schedule.scheduleStatus === 'upcoming';
+    if (filterStatus === 'completed') return isActiveClass && schedule.scheduleStatus === 'completed';
+    return isActiveClass;
   });
+
+  // Pagination logic
+  const totalSchedules = filteredSchedules.length;
+  const totalPages = Math.ceil(totalSchedules / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedSchedules = filteredSchedules.slice(startIndex, startIndex + pageSize);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus, viewMode, selectedWeek, selectedMonth]);
 
   const renderWeekView = () => {
     const weekDays = getWeekDays();
@@ -716,8 +736,8 @@ const TeacherSchedule = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredSchedules.length > 0 ? (
-                  filteredSchedules.map((schedule) => (
+                {paginatedSchedules.length > 0 ? (
+                  paginatedSchedules.map((schedule) => (
                     <tr key={schedule._id} className="transition-2" style={{ cursor: 'pointer' }}>
                       <td className="px-20 py-16 text-neutral-700 text-13">
                         <Link to={`/teacher/lessons/${schedule._id}`} className="text-decoration-none text-neutral-700">
@@ -776,6 +796,60 @@ const TeacherSchedule = () => {
               </tbody>
             </Table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="d-flex justify-content-between align-items-center mt-16 pb-16 px-20">
+              <div className="text-neutral-600 text-13">
+                Hiển thị {startIndex + 1}-{Math.min(startIndex + pageSize, totalSchedules)} của {totalSchedules} buổi học
+              </div>
+
+              <Pagination className="mb-0">
+                <Pagination.Prev
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                />
+
+                {/* First page */}
+                {currentPage > 3 && (
+                  <>
+                    <Pagination.Item onClick={() => setCurrentPage(1)}>1</Pagination.Item>
+                    {currentPage > 4 && <Pagination.Ellipsis />}
+                  </>
+                )}
+
+                {/* Page numbers around current page */}
+                {Array.from({ length: 5 }, (_, i) => {
+                  const pageNum = currentPage - 2 + i;
+                  if (pageNum >= 1 && pageNum <= totalPages) {
+                    return (
+                      <Pagination.Item
+                        key={pageNum}
+                        active={pageNum === currentPage}
+                        onClick={() => setCurrentPage(pageNum)}
+                      >
+                        {pageNum}
+                      </Pagination.Item>
+                    );
+                  }
+                  return null;
+                }).filter(Boolean)}
+
+                {/* Last page */}
+                {currentPage < totalPages - 2 && (
+                  <>
+                    {currentPage < totalPages - 3 && <Pagination.Ellipsis />}
+                    <Pagination.Item onClick={() => setCurrentPage(totalPages)}>{totalPages}</Pagination.Item>
+                  </>
+                )}
+
+                <Pagination.Next
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                />
+              </Pagination>
+            </div>
+          )}
         </Card.Body>
       </Card>
     );

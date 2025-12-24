@@ -79,6 +79,7 @@ const ClassDetail = ({ classId, onBack }) => {
             _id: student._id,
             name: student.username || student.name || 'N/A',
             email: student.email || 'N/A',
+            phone: student.phone || 'N/A',
             attendanceRate: student.attendance || 0,
             attendanceCount: student.attendanceCount || 0,
             totalLessons: classData.totalSchedules || 0,
@@ -325,7 +326,7 @@ const ClassDetail = ({ classId, onBack }) => {
               }
             >
               <div className="p-24">
-                <ClassOverview classInfo={classInfo} />
+                <ClassOverview classInfo={classInfo} students={students} lessons={lessons} />
               </div>
             </Tab>
 

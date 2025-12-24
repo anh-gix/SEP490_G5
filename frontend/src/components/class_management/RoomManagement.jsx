@@ -8,7 +8,6 @@ import { formatDateToYYYYMMDD } from '../../helper/helper';
 
 /**
  * Room Management Component
- * Quản lý phòng học đầy đủ chức năng
  */
 const RoomManagement = () => {
   const [rooms, setRooms] = useState([]);
@@ -214,7 +213,13 @@ const RoomManagement = () => {
       // Extract program type: ưu tiên schedule.programType (từ backend cho buổi học bù),
       // sau đó mới fallback về schedule.class?.course?.program?.type
       const programType = schedule.programType || schedule.class?.course?.program?.type || schedule._course?.program?.type || null;
-      
+
+      // Priority: substituteTeacher first, then teacher
+      const displayTeacher = schedule.substituteTeacher?.username ||
+                           schedule.teacher?.username ||
+                           schedule.class?.teacher?.username ||
+                           'N/A';
+
       return {
         id: schedule._id || schedule.id,
         date: dateStr,
@@ -222,11 +227,14 @@ const RoomManagement = () => {
         endTime: schedule.endTime || '',
         className: className,
         topic: schedule.session?.title || schedule.topic || 'N/A',
+        teacherName: displayTeacher,
+        roomName: selectedRoom?.room_name || 'N/A',
+        isSubstitute: !!schedule.substituteTeacher,
         status: schedule.status || 'fixed',
         programType: programType
       };
     });
-  }, [roomSchedule]);
+  }, [roomSchedule, selectedRoom]);
 
   const filteredRooms = useMemo(() => {
     return rooms.filter(room => {
@@ -619,35 +627,55 @@ const RoomManagement = () => {
                           <th className="px-16 py-12 text-13">Thời gian</th>
                           <th className="px-16 py-12 text-13">Lớp học</th>
                           <th className="px-16 py-12 text-13">Chủ đề</th>
+                          <th className="px-16 py-12 text-13">Giáo viên</th>
                           <th className="px-16 py-12 text-13">Trạng thái</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {paginatedSchedules.map((schedule, index) => (
-                          <tr key={index}>
-                            <td className="px-16 py-12">
-                              <div className="text-14">
-                                {new Date(schedule.date).toLocaleDateString('vi-VN')}
-                              </div>
-                              <div className="text-13 text-muted">
-                                {schedule.startTime} - {schedule.endTime}
-                              </div>
-                            </td>
-                            <td className="px-16 py-12">
-                              {schedule.status === 'temporary' && !schedule.class?.name 
-                                ? 'Lớp học bù' 
-                                : (schedule.class?.name || 'N/A')}
-                            </td>
-                            <td className="px-16 py-12">
-                              {schedule.session?.title || schedule.topic || 'N/A'}
-                            </td>
-                            <td className="px-16 py-12">
-                              <Badge bg={schedule.status === 'fixed' ? 'success' : schedule.status === 'temporary' ? 'warning' : 'secondary'}>
-                                {schedule.status === 'fixed' ? 'Buổi cố định' : schedule.status === 'temporary' ? 'Buổi tạm' : schedule.status}
-                              </Badge>
-                            </td>
-                          </tr>
-                        ))}
+                        {paginatedSchedules.map((schedule, index) => {
+                          // Priority: substituteTeacher first, then teacher
+                          const displayTeacher = schedule.substituteTeacher?.username ||
+                                               schedule.teacher?.username ||
+                                               schedule.class?.teacherId?.username ||
+                                               'N/A';
+
+                          return (
+                            <tr key={index}>
+                              <td className="px-16 py-12">
+                                <div className="text-14">
+                                  {new Date(schedule.date).toLocaleDateString('vi-VN')}
+                                </div>
+                                <div className="text-13 text-muted">
+                                  {schedule.startTime} - {schedule.endTime}
+                                </div>
+                              </td>
+                              <td className="px-16 py-12">
+                                {schedule.status === 'temporary' && !schedule.class?.name
+                                  ? 'Lớp học bù'
+                                  : (schedule.class?.name || 'N/A')}
+                              </td>
+                              <td className="px-16 py-12">
+                                {schedule.session?.title || schedule.topic || 'N/A'}
+                              </td>
+                              <td className="px-16 py-12">
+                                <div className="text-14 text-neutral-900">
+                                  {displayTeacher}
+                                </div>
+                                {schedule.substituteTeacher && (
+                                  <div className="text-12 text-warning">
+                                    <i className="fas fa-exchange-alt me-1"></i>
+                                    Giáo viên dạy thay
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-16 py-12">
+                                <Badge bg={schedule.status === 'fixed' ? 'success' : schedule.status === 'temporary' ? 'warning' : 'secondary'}>
+                                  {schedule.status === 'fixed' ? 'Buổi cố định' : schedule.status === 'temporary' ? 'Buổi tạm' : schedule.status}
+                                </Badge>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </Table>
                     
@@ -722,6 +750,7 @@ const RoomManagement = () => {
                     onDeleteSchedule={() => {}}
                     onCreateMakeup={() => {}}
                     readOnly={true}
+                    showTeacherName={false}
                   />
                 </>
               ) : (

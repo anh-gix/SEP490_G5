@@ -6,6 +6,7 @@ import { formatDateToYYYYMMDD, parseDateString } from '../../helper/helper';
 import classService from '../../services/classService';
 import { studentScheduleService } from '../../services/studentScheduleService';
 import academicStaffService from '../../services/academicStaffService';
+import roomService from '../../services/roomService';
 
 const RequestDetailPage = ({
   selectedRequest,
@@ -30,9 +31,63 @@ const RequestDetailPage = ({
   const [resolvedStudentScheduleIds, setResolvedStudentScheduleIds] = useState({}); // Map session index -> studentScheduleId
   const [replaceTeacherStudentScheduleId, setReplaceTeacherStudentScheduleId] = useState(null); // studentScheduleId cho đơn request_replace_teacher
   const [loadingReplaceTeacherScheduleId, setLoadingReplaceTeacherScheduleId] = useState(false); // Loading state cho request_replace_teacher
+  const [roomsMap, setRoomsMap] = useState(new Map()); // Map roomId -> room object để lookup room name
 
   const isStudent = senderRole === 'Student';
   const isTeacher = senderRole === 'Teacher';
+
+  // Fetch rooms list to lookup room names
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        const response = await roomService.getAllRooms();
+        
+        // Handle both response.success.rooms and response.rooms formats
+        const rooms = response.success?.rooms || response.rooms || response.data?.rooms || (Array.isArray(response) ? response : []);
+        
+        if (rooms && Array.isArray(rooms) && rooms.length > 0) {
+          const map = new Map();
+          rooms.forEach(room => {
+            const roomId = room._id || room.id;
+            if (roomId) {
+              map.set(roomId.toString(), room);
+            }
+          });
+          setRoomsMap(map);
+        }
+      } catch (error) {
+        // Silent fail - rooms map will remain empty
+      }
+    };
+
+    fetchRooms();
+  }, []);
+  
+  // Fetch rooms again when pendingMakeupClasses changes (in case rooms weren't loaded yet)
+  useEffect(() => {
+    if (pendingMakeupClasses && pendingMakeupClasses.length > 0 && roomsMap.size === 0) {
+      const fetchRooms = async () => {
+        try {
+          const response = await roomService.getAllRooms();
+          // Handle both response.success.rooms and response.rooms formats
+          const rooms = response.success?.rooms || response.rooms || response.data?.rooms || (Array.isArray(response) ? response : []);
+          if (rooms && Array.isArray(rooms) && rooms.length > 0) {
+            const map = new Map();
+            rooms.forEach(room => {
+              const roomId = room._id || room.id;
+              if (roomId) {
+                map.set(roomId.toString(), room);
+              }
+            });
+            setRoomsMap(map);
+          }
+        } catch (error) {
+          // Silent fail
+        }
+      };
+      fetchRooms();
+    }
+  }, [pendingMakeupClasses, roomsMap.size]);
 
   const studentClasses = useMemo(() => {
     if (!senderSchedule || senderSchedule.length === 0) {
@@ -455,13 +510,13 @@ const RequestDetailPage = ({
         className = 'N/A';
       }
       
-      return {
+      const result = {
         id: scheduleId,
         date: dateStr,
         startTime: schedule.startTime || '',
         endTime: schedule.endTime || '',
         className: className,
-        roomName: schedule.room?.room_name || 'N/A',
+        roomName: schedule.room?.room_name || schedule.roomName || 'N/A',
         topic: schedule.topic || '',
         status: displayStatus,
         scheduleStatus: isMakeupFromThisRequest ? scheduleStatus : (scheduleStatus === 'rescheduled' ? 'scheduled' : scheduleStatus), // 🆕 Đổi rescheduled thành scheduled nếu không phải của đơn
@@ -482,6 +537,8 @@ const RequestDetailPage = ({
         isNewClassSchedule: false,
         programType: schedule.class?.course?.program?.type || schedule.programType || schedule.sessionCourse?.program?.type || null
       };
+      
+      return result;
       })
       .filter(Boolean); // 🆕 Filter ra các null (buổi cancelled không thuộc đơn)
     
@@ -511,29 +568,52 @@ const RequestDetailPage = ({
         
         const dateStr = formatDateToYYYYMMDD(makeup.makeupSchedule.date);
         
-        return {
+        // Get room name from newMakeupRoomId or makeupSchedule.room
+        let roomName = 'N/A';
+        if (makeup.newMakeupRoomId) {
+          const roomIdStr = makeup.newMakeupRoomId.toString();
+          const room = roomsMap.get(roomIdStr);
+          if (room) {
+            roomName = room.room_name || 'N/A';
+          } else {
+            // Keep as 'N/A' for now, will be updated when roomsMap is populated
+            roomName = 'N/A';
+          }
+        } else if (makeup.makeupSchedule?.room?.room_name) {
+          roomName = makeup.makeupSchedule.room.room_name;
+        } else if (makeup.makeupSchedule?.roomName) {
+          roomName = makeup.makeupSchedule.roomName;
+        }
+        
+        // Get teacher name from newMakeupTeacherId
+        let teacherName = 'N/A';
+        // TODO: Add teacher lookup if needed
+        
+        const result = {
           id: `makeup-pending-${index}-${makeupScheduleId}`,
           date: dateStr,
           startTime: makeup.makeupSchedule.startTime || '',
           endTime: makeup.makeupSchedule.endTime || '',
           className: makeup.makeupClassInfo?.className || 'Lớp học bù',
-          roomName: makeup.makeupSchedule.roomName || 'N/A',
+          roomName: roomName,
           topic: makeup.makeupSchedule.title || '',
           status: 'makeup',
           scheduleStatus: 'rescheduled', // Đánh dấu là rescheduled
           attendanceStatus: null,
           hasAttendance: false,
-          teacherName: 'N/A',
+          teacherName: teacherName,
           lessonNumber: makeup.makeupSchedule.order || '',
           lessonTopic: makeup.makeupSchedule.title || '',
           isMakeupSchedule: true,
           programType: makeup.makeupClassInfo?.programType || makeup.makeupSchedule?.class?.course?.program?.type || makeup.makeupSchedule?.programType || makeup.makeupSchedule?.sessionCourse?.program?.type || null
         };
+        
+        return result;
       })
       .filter(Boolean);
     
     return [...schedules, ...makeupSchedules];
-  }, [senderSchedule, pendingMakeupClasses, selectedRequest]);
+  }, [senderSchedule, pendingMakeupClasses, selectedRequest, roomsMap]);
 
   // Handler để hoàn tác đơn
   const handleRevert = async () => {
@@ -1138,6 +1218,7 @@ const RequestDetailPage = ({
                             endTime: sch.endTime || ''
                           };
                         })}
+                        showTeacherName={false}
                       />
                     </div>
                   )}

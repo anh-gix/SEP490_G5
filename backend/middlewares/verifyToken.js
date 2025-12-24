@@ -146,8 +146,6 @@ const hasAllRoles = (...roles) => {
     };
 };
 
-// Admin role check (backward compatibility)
-const isAdmin = hasRole('admin');
 
 // Common role checks
 const isStudent = hasRole('Student');
@@ -161,7 +159,6 @@ const isTeacherOrSubjectLeader = hasAnyRole('Teacher', 'Subject Leader');
 
 module.exports = {
     verifyToken,
-    isAdmin,
     hasRole,
     hasAnyRole,
     hasAllRoles,

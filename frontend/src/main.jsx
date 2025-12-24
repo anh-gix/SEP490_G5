@@ -12,6 +12,8 @@ import "slick-carousel/slick/slick-theme.css";
 import "animate.css/animate.css";
 
 import "./globals.css";
+// Initialize global axios interceptors (auth headers, 401 handling)
+import "./services/api";
 
 createRoot(document.getElementById("root")).render(
   <>

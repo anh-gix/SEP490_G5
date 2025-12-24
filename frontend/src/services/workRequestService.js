@@ -1,4 +1,5 @@
 import api from './api';
+import { getDecryptedCookie } from '../utils/cookieUtils.js';
 
 /**
  * Work Request Service - Handles all work request operations
@@ -28,7 +29,17 @@ export const workRequestService = {
     try {
       // Auto-add requestedBy if not provided
       if (!formData.get('requestedBy')) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const userCookie = getDecryptedCookie('user');
+        let user;
+        try {
+          user = JSON.parse(userCookie || '{}');
+        } catch (parseError) {
+          throw new Error('Dữ liệu người dùng không hợp lệ. Vui lòng đăng nhập lại.');
+        }
+        if (!user || !user._id) {
+          throw new Error('User ID không tồn tại. Vui lòng đăng nhập lại.');
+        }
+        
         formData.append('requestedBy', user._id);
       }
 
@@ -55,7 +66,7 @@ export const workRequestService = {
   submitProgram: async (programId, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -74,7 +85,7 @@ export const workRequestService = {
   submitExam: async (examId, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -117,7 +128,7 @@ export const workRequestService = {
   getMyRequests: async (params = {}) => {
     try {
       if (!params.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         params.userId = user._id;
       }
 
@@ -135,7 +146,7 @@ export const workRequestService = {
   getAssignedToMe: async (params = {}) => {
     try {
       if (!params.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         params.userId = user._id;
       }
 
@@ -161,10 +172,18 @@ export const workRequestService = {
 
   /**
    * Get statistics
-   * @param {object} params - { direction: 'bottom_up' | 'top_down' }
+   * @param {object} params - { direction: 'bottom_up' | 'top_down', userId?: string }
    */
   getStats: async (params = {}) => {
     try {
+      // Auto-add userId if not provided (for center head stats)
+      if (!params.userId) {
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
+        if (user._id) {
+          params.userId = user._id;
+        }
+      }
+
       const response = await api.get('/work-requests/stats', { params });
       return response.data;
     } catch (error) {
@@ -184,7 +203,7 @@ export const workRequestService = {
   approveRequest: async (id, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -203,7 +222,7 @@ export const workRequestService = {
   rejectRequest: async (id, data) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -222,7 +241,7 @@ export const workRequestService = {
   revokeApproval: async (id, data) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -245,7 +264,7 @@ export const workRequestService = {
   cancelRequest: async (id, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -269,7 +288,7 @@ export const workRequestService = {
   withdrawProgramSubmission: async (programId, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -289,7 +308,7 @@ export const workRequestService = {
   withdrawExamSubmission: async (examId, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -312,7 +331,7 @@ export const workRequestService = {
   startProcessing: async (id, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -331,7 +350,7 @@ export const workRequestService = {
   completeRequest: async (id, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -350,7 +369,7 @@ export const workRequestService = {
   recreateEntity: async (id, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -397,7 +416,7 @@ export const workRequestService = {
    */
   createEditProgramRequest: async (data) => {
     try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const user = JSON.parse(getDecryptedCookie('user') || '{}');
       const formData = new FormData();
       formData.append('requestType', 'edit_program');
       formData.append('entityId', data.entityId);
@@ -426,7 +445,7 @@ export const workRequestService = {
   startEditProgram: async (id, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -445,7 +464,7 @@ export const workRequestService = {
   submitEditProgram: async (id, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -464,7 +483,7 @@ export const workRequestService = {
   approveEditProgram: async (id, data = {}) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         data.userId = user._id;
       }
 
@@ -483,7 +502,7 @@ export const workRequestService = {
   rejectEditProgram: async (id, data) => {
     try {
       if (!data.userId) {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const user = JSON.parse(getDecryptedCookie('user') || '{}');
         data.userId = user._id;
       }
 

@@ -753,12 +753,13 @@ const ScheduleManagement = () => {
 
       <div>
         {viewMode === 'calendar' ? (
-          <ScheduleCalendar 
+          <ScheduleCalendar
             schedules={schedules}
             onDeleteSchedule={handleDeleteSchedule}
             selectedMonth={selectedMonth}
             onMonthChange={setSelectedMonth}
             onLessonClick={handleLessonClick}
+            showTeacherName={false}
           />
         ) : viewMode === 'weekly' ? (
           <ScheduleWeekly 

@@ -45,7 +45,7 @@ exports.getAllClasses = async (req, res) => {
       // user model uses 'username' rather than firstName/lastName/fullName
       .populate('teacher', 'username email phone')
       .populate('students', 'username email')
-      .populate('room', 'room_name location capacity')
+      .populate('room', 'room_name location capacity status')
       .populate({ 
         path: 'course', 
         select: 'name',
@@ -89,7 +89,8 @@ exports.getAllClasses = async (req, res) => {
             courseType: cls.course?.program?.type || 'N/A',
             // Add room info
             roomName: cls.room?.room_name || 'N/A',
-            roomLocation: cls.room?.location || 'N/A'
+            roomLocation: cls.room?.location || 'N/A',
+            roomStatus: cls.room?.status || 'available'
           };
       })
     );
@@ -159,8 +160,11 @@ exports.getClassById = async (req, res) => {
     
     // Get schedules for this class
     const schedules = await ClassSchedule.find({ class: id })
-      .populate('room', 'room_name location capacity')
+      // Bao gồm status của phòng để frontend biết buổi nào đang dùng phòng bảo trì
+      .populate('room', 'room_name location capacity status')
       .populate('session', 'title order')
+      .populate('teacher', 'username email phone')
+      .populate('substituteTeacher', 'username email phone')
       .sort({ date: 1 });
 
 
@@ -1032,9 +1036,7 @@ exports.checkTeacherRoomConflicts = async (req, res) => {
         weekOffset++;
       }
     }
-    
-    console.log('  - Đã tạo', classSchedules.length, 'buổi học để kiểm tra');
-    
+
     // Validate conflicts (only teacher and room, not students)
     if (classSchedules.length > 0) {
       const classDataForValidation = {
@@ -1045,12 +1047,7 @@ exports.checkTeacherRoomConflicts = async (req, res) => {
       };
       
       const conflictResult = await validateClassSchedulesConflicts(classSchedules, classDataForValidation);
-      
-      console.log('  - Kết quả kiểm tra:');
-      console.log('    + Teacher conflicts:', conflictResult.teacher?.length || 0);
-      console.log('    + Room conflicts:', conflictResult.room?.length || 0);
-      console.log('  ============================================\n');
-      
+
       // Format conflicts for frontend
       const teacherConflicts = (conflictResult.teacher || []).map(c => ({
         teacherId: c.teacherId || teacherId?.toString() || '',

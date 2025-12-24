@@ -265,6 +265,38 @@ const WorkRequestDetail = ({ requestId, onBack }) => {
             </div>
           )}
 
+          {/* Attachment File - Tài liệu đính kèm từ trưởng trung tâm */}
+          {request.attachmentFile && (
+            <div className="border-top pt-16 mb-16">
+              <h6 className="text-neutral-900 fw-bold mb-12">
+                <i className="fas fa-paperclip me-2"></i>
+                Tài liệu đính kèm từ trưởng trung tâm
+              </h6>
+              <div className="border border-neutral-100 rounded-12 p-16 bg-white">
+                <div className="d-flex align-items-center gap-12">
+                  <i className="fas fa-file text-primary" style={{ fontSize: '24px' }}></i>
+                  <div className="flex-grow-1">
+                    <div className="text-neutral-900 fw-medium mb-2">
+                      {request.attachmentFile.fileName}
+                    </div>
+                    <div className="text-neutral-600 text-13 mb-8">
+                      Kích thước: {(request.attachmentFile.fileSize / 1024).toFixed(2)} KB
+                    </div>
+                    <Button 
+                      variant="outline-primary"
+                      size="sm"
+                      onClick={() => academicWorkRequestService.downloadFile(request.attachmentFile.fileUrl)}
+                      className="d-flex align-items-center gap-2"
+                    >
+                      <i className="fas fa-download"></i>
+                      Tải xuống
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Các hành động dựa trên trạng thái */}
           {request.status === 'pending' && (
             <div className="border-top pt-16">

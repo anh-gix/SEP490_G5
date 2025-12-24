@@ -340,21 +340,43 @@ const RequestManagement = () => {
           });
         }
         
-        // Merge requests
-        let merged = [...changeReqs, ...workReqs];
-        
+        // Merge requests - ưu tiên workRequest trước
+        let merged = [...workReqs, ...changeReqs];
+
         // Sort by sender on frontend if needed
         if (needsSenderSort) {
           merged = merged.sort((a, b) => {
+            // Ưu tiên workRequest trước changeRequest
+            if (a.requestType !== b.requestType) {
+              // workRequest (có requestType) sẽ đứng trước changeRequest (không có requestType)
+              if (a.requestType) return -1;
+              if (b.requestType) return 1;
+            }
             const nameA = a.sender?.username || a.sender?.fullName || a.sender?.name || '';
             const nameB = b.sender?.username || b.sender?.fullName || b.sender?.name || '';
             const comparison = naturalCompare(nameA, nameB);
             return sortBy === 'sender-desc' ? -comparison : comparison;
           });
         } else if (sortBy === 'newest') {
-          merged = merged.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          merged = merged.sort((a, b) => {
+            // Ưu tiên workRequest trước changeRequest
+            if (a.requestType !== b.requestType) {
+              if (a.requestType) return -1;
+              if (b.requestType) return 1;
+            }
+            // Sau đó sort theo thời gian
+            return new Date(b.createdAt) - new Date(a.createdAt);
+          });
         } else if (sortBy === 'oldest') {
-          merged = merged.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+          merged = merged.sort((a, b) => {
+            // Ưu tiên workRequest trước changeRequest
+            if (a.requestType !== b.requestType) {
+              if (a.requestType) return -1;
+              if (b.requestType) return 1;
+            }
+            // Sau đó sort theo thời gian
+            return new Date(a.createdAt) - new Date(b.createdAt);
+          });
         }
         
         setChangeRequests(changeReqs);

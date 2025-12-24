@@ -527,7 +527,7 @@ const ApprovalRequests = () => {
                   }}
                 >
                   <i className="ph ph-users me-2"></i>
-                  Cấp tài khoản
+                  Tạo lớp
                 </button>
               </li>
             </ul>

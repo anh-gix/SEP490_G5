@@ -121,10 +121,8 @@ beforeEach(async () => {
     ]);
 });
 
-// TEST: getAllCourses
 describe('GET /api/courses (getAllCourse)', () => {
 
-    // Test 1: Lấy tất cả khóa học (Không filter)
     test('should return all courses when no filter provided', async () => {
         const res = await request(app).get('/api/courses');
 
@@ -134,7 +132,6 @@ describe('GET /api/courses (getAllCourse)', () => {
         expect(res.body.data.length).toBe(3);
     });
 
-    // Test 2: Filter theo Status
     test('should filter courses by status', async () => {
         const res = await request(app).get('/api/courses').query({ status: 'draft' });
 

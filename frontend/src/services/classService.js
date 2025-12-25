@@ -9,7 +9,6 @@ const classService = {
       const response = await axios.get(`${API_URL}/classes`, { params });
       return response.data;
     } catch (error) {
-      console.error('Error fetching classes:', error);
       throw error.response?.data || error;
     }
   },
@@ -20,7 +19,6 @@ const classService = {
       const response = await axios.get(`${API_URL}/classes/${id}`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching class:', error);
       throw error.response?.data || error;
     }
   },
@@ -31,7 +29,6 @@ const classService = {
       const response = await axios.get(`${API_URL}/classes/stats`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching class stats:', error);
       throw error.response?.data || error;
     }
   },
@@ -42,7 +39,6 @@ const classService = {
       const response = await axios.post(`${API_URL}/classes`, classData);
       return response.data;
     } catch (error) {
-      console.error('Error creating class:', error);
       throw error.response?.data || error;
     }
   },
@@ -53,7 +49,6 @@ const classService = {
       const response = await axios.put(`${API_URL}/classes/${id}`, classData);
       return response.data;
     } catch (error) {
-      console.error('Error updating class:', error);
       throw error.response?.data || error;
     }
   },
@@ -64,7 +59,6 @@ const classService = {
       const response = await axios.delete(`${API_URL}/classes/${id}`);
       return response.data;
     } catch (error) {
-      console.error('Error deleting class:', error);
       throw error.response?.data || error;
     }
   },
@@ -77,7 +71,6 @@ const classService = {
       });
       return response.data;
     } catch (error) {
-      console.error('Error fetching class schedules:', error);
       throw error.response?.data || error;
     }
   },
@@ -88,7 +81,6 @@ const classService = {
       const response = await axios.post(`${API_URL}/classes/${classId}/check-teacher-room-conflicts`, conflictData);
       return response.data;
     } catch (error) {
-      console.error('Error checking teacher/room conflicts:', error);
       throw error.response?.data || error;
     }
   },
@@ -99,7 +91,16 @@ const classService = {
       const response = await axios.post(`${API_URL}/classes/validate-conflicts`, classData);
       return response.data;
     } catch (error) {
-      console.error('Error validating conflicts:', error);
+      throw error.response?.data || error;
+    }
+  },
+
+  // Check if class has room maintenance issues
+  checkClassRoomMaintenanceStatus: async (classId) => {
+    try {
+      const response = await axios.get(`${API_URL}/class-schedules/class/${classId}/room-maintenance-status`);
+      return response.data;
+    } catch (error) {
       throw error.response?.data || error;
     }
   }

@@ -36,15 +36,16 @@ const ClassManagement = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const params = {};
       if (filters.level) params.level = filters.level;
       if (filters.status) params.status = filters.status;
       if (filters.search) params.search = filters.search;
-      
+
       const response = await classService.getAllClasses(params);
-      
-      const transformedClasses = response.classes.map(cls => ({
+
+      // Transform classes data
+      let transformedClasses = response.classes.map(cls => ({
         id: cls._id,
         name: cls.name,
         level: cls.level || cls.course?.level || 'N/A', // Level từ course
@@ -69,8 +70,32 @@ const ClassManagement = () => {
         totalLessons: cls.totalSchedules || 0, // Tổng số buổi
         completionRate: typeof cls.completionRate !== 'undefined' ? cls.completionRate : (cls.stats?.completionRate || 0)
       }));
-      
-      setClasses(transformedClasses);
+
+      // Check room maintenance status for each class
+      const classesWithMaintenanceStatus = await Promise.all(
+        transformedClasses.map(async (cls) => {
+          try {
+            const maintenanceStatus = await classService.checkClassRoomMaintenanceStatus(cls.id);
+            return {
+              ...cls,
+              hasRoomMaintenance: maintenanceStatus.hasRoomMaintenance,
+              maintenanceCount: maintenanceStatus.maintenanceCount || 0,
+              maintenanceRooms: maintenanceStatus.maintenanceRooms || []
+            };
+          } catch (error) {
+            console.warn(`Could not check room maintenance for class ${cls.id}:`, error);
+            // Fallback to no maintenance issues
+            return {
+              ...cls,
+              hasRoomMaintenance: false,
+              maintenanceCount: 0,
+              maintenanceRooms: []
+            };
+          }
+        })
+      );
+
+      setClasses(classesWithMaintenanceStatus);
     } catch (err) {
       console.error('Error fetching classes:', err);
       setError(err.message || 'Không thể tải danh sách lớp học');

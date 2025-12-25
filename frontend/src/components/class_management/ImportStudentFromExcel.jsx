@@ -767,7 +767,7 @@ const ImportStudentFromExcel = ({ onBack }) => {
             // Add error if program is approved but not active
             if (inactiveCodes.length > 0) {
               inactiveCodes.forEach(code => {
-                const errorMsg = `Mã chương trình "${code}" đã được phê duyệt nhưng chưa được kích hoạt (isActive = false)`;
+                const errorMsg = `Mã chương trình "${code}" đã được phê duyệt nhưng chưa được kích hoạt`;
                 if (!item.errors.includes(errorMsg)) {
                   item.errors.push(errorMsg);
                   item.hasError = true;

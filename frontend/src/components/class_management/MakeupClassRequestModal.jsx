@@ -4,7 +4,6 @@ import { classScheduleService } from '../../services/classScheduleService';
 import roomService from '../../services/roomService';
 import teacherService from '../../services/teacherService';
 import studentScheduleService from '../../services/studentScheduleService';
-import { getCookie } from '../../utils/cookieUtils.js';
 
 const MakeupClassRequestModal = ({ 
   show,
@@ -347,7 +346,7 @@ const MakeupClassRequestModal = ({
       if (makeupOption === 'new' && isDateTimeSelected && formData.date && formData.startTime && formData.endTime) {
         try {
           let targetStudentId = null;
-          
+
           // Determine student ID based on mode
           if (isStudentMode && studentId) {
             targetStudentId = studentId;
@@ -367,21 +366,14 @@ const MakeupClassRequestModal = ({
           if (!targetStudentId) {
             return;
           }
-          
-          // Get student schedule for the selected date
-          // Use the same date for startDate and endDate to get schedules for that specific day
-          const apiPort = import.meta.env.VITE_API_PORT || 8080;
-          const apiUrl = `http://localhost:${apiPort}/api/student-schedules/student/${targetStudentId}/schedule?startDate=${formData.date}&endDate=${formData.date}`;
 
-          const response = await fetch(apiUrl, {
-            headers: {
-              'Authorization': `Bearer ${getCookie('token')}`,
-              'Content-Type': 'application/json'
-            }
+          // Get student schedule for the selected date using service
+          const data = await studentScheduleService.getStudentSchedule(targetStudentId, {
+            startDate: formData.date,
+            endDate: formData.date
           });
 
-          if (response.ok) {
-            const data = await response.json();
+          if (data) {
             
             // API returns schedules array directly, not wrapped in success field
             if (data.schedules && Array.isArray(data.schedules)) {
@@ -425,11 +417,6 @@ const MakeupClassRequestModal = ({
                 }
               }
             }
-          } else {
-            const errorText = await response.text();
-            console.error('[DEBUG] API error:', response.status, errorText);
-            // Clear conflict on error
-            setStudentScheduleConflict(null);
           }
         } catch (error) {
           console.error('[DEBUG] Error in logStudentSchedule:', error);
@@ -655,30 +642,18 @@ const MakeupClassRequestModal = ({
         const response = await studentScheduleService.getClassScheduleByStudentScheduleId(studentScheduleId);
         if (response.success && response.studentSchedule?.student) {
           const targetStudentId = response.studentSchedule.student._id || response.studentSchedule.student;
-          
-          // Fetch full student schedule for conflict checking
-          const apiPort = import.meta.env.VITE_API_PORT || 8080;
-          const scheduleResponse = await fetch(
-            `http://localhost:${apiPort}/api/student-schedules/student/${targetStudentId}/schedule`,
-            {
-              headers: {
-                'Authorization': `Bearer ${getCookie('token')}`,
-                'Content-Type': 'application/json'
-              }
-            }
-          );
-          
-          if (scheduleResponse.ok) {
-            const scheduleData = await scheduleResponse.json();
-            if (scheduleData.schedules && Array.isArray(scheduleData.schedules)) {
-              // Convert to format compatible with hasConflictWithSchedule
-              studentScheduleForConflict = scheduleData.schedules.map(s => ({
-                date: s.date,
-                startTime: s.startTime,
-                endTime: s.endTime,
-                scheduleStatus: s.scheduleStatus
-              }));
-            }
+
+          // Fetch full student schedule for conflict checking using service
+          const scheduleData = await studentScheduleService.getStudentSchedule(targetStudentId);
+
+          if (scheduleData.schedules && Array.isArray(scheduleData.schedules)) {
+            // Convert to format compatible with hasConflictWithSchedule
+            studentScheduleForConflict = scheduleData.schedules.map(s => ({
+              date: s.date,
+              startTime: s.startTime,
+              endTime: s.endTime,
+              scheduleStatus: s.scheduleStatus
+            }));
           }
         }
       } catch (error) {
@@ -710,20 +685,15 @@ const MakeupClassRequestModal = ({
         if (sessionOrder) {
           try {
             setLoadingSchedules(true);
-            const apiPort = import.meta.env.VITE_API_PORT || 8080;
             const today = new Date().toISOString();
-            const response = await fetch(
-              `http://localhost:${apiPort}/api/class-schedules/by-session?sessionOrder=${sessionOrder}&dateAfter=${today}`,
-              {
-                headers: {
-                  'Authorization': `Bearer ${getCookie('token')}`,
-                  'Content-Type': 'application/json'
-                }
-              }
-            );
 
-            if (response.ok) {
-              const data = await response.json();
+            // Use service instead of fetch
+            const data = await classScheduleService.getClassSchedulesBySession({
+              sessionOrder,
+              dateAfter: today
+            });
+
+            if (data) {
               const filtered = (data.classSchedules || []).filter(schedule => {
                 const scheduleId = (schedule._id || schedule.id)?.toString();
                 if (currentClassScheduleId && scheduleId === currentClassScheduleId.toString()) {
@@ -738,8 +708,6 @@ const MakeupClassRequestModal = ({
                 return true;
               });
               setAvailableSchedules(filtered);
-            } else {
-              setAvailableSchedules([]);
             }
           } catch (error) {
             console.error('Error fetching available schedules:', error);
@@ -756,21 +724,16 @@ const MakeupClassRequestModal = ({
     
     try {
       setLoadingSchedules(true);
-      
-      const apiPort = import.meta.env.VITE_API_PORT || 8080;
-      const today = new Date().toISOString();
-      const response = await fetch(
-        `http://localhost:${apiPort}/api/class-schedules/by-session?sessionId=${sessionIdToUse}&dateAfter=${today}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${getCookie('token')}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
 
-      if (response.ok) {
-        const data = await response.json();
+      const today = new Date().toISOString();
+
+      // Use service instead of fetch
+      const data = await classScheduleService.getClassSchedulesBySession({
+        sessionId: sessionIdToUse,
+        dateAfter: today
+      });
+
+      if (data) {
         const classSchedules = data.classSchedules || [];
         
         // Filter to exclude current schedule and conflicts
@@ -820,10 +783,8 @@ const MakeupClassRequestModal = ({
           
           return true;
         });
-        
+
         setAvailableSchedules(filtered);
-      } else {
-        setAvailableSchedules([]);
       }
     } catch (error) {
       console.error('Error fetching available schedules:', error);

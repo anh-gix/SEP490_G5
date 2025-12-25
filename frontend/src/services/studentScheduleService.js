@@ -28,9 +28,9 @@ api.interceptors.request.use(
 // Student Schedule service functions
 export const studentScheduleService = {
   // Lấy lịch học của học sinh
-  getStudentSchedule: async (studentId) => {
+  getStudentSchedule: async (studentId, params = {}) => {
     try {
-      const response = await api.get(`/student/${studentId}/schedule`);
+      const response = await api.get(`/student/${studentId}/schedule`, { params });
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy lịch học của học sinh' };

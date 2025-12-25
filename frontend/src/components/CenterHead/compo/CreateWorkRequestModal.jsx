@@ -118,7 +118,7 @@ const CreateWorkRequestModal = ({
       case 'create_exam':
         return 'Tạo yêu cầu: Tạo đề thi mới';
       case 'assign_students':
-        return 'Tạo yêu cầu: Cấp tài khoản';
+        return 'Tạo yêu cầu: Tạo lớp';
       default:
         return 'Tạo yêu cầu mới';
     }

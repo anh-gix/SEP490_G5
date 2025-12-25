@@ -58,7 +58,7 @@ const ViewRequestModal = ({ show, onClose, request, onRequestUpdated }) => {
       'create_program': 'Tạo chương trình mới',
       'edit_course': 'Chỉnh sửa khóa học',
       'create_exam': 'Tạo đề thi mới',
-      'assign_students': 'Cấp tài khoản học viên'
+      'assign_students': 'Tạo lớp'
     };
     return types[type] || type;
   };

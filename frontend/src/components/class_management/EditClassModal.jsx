@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Container, Card, Modal, Button, Form, Alert, ButtonGroup, Badge } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
+import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import classService from '../../services/classService';
 import teacherService from '../../services/teacherService';
@@ -4169,13 +4170,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
         setPendingScheduleChanges([]);
 
         // Hiển thị thông báo thành công
-        await Swal.fire({
-          icon: 'success',
-          title: 'Thành công',
-          text: 'Đã cập nhật lịch học thành công!',
-          timer: 2000,
-          showConfirmButton: false
-        });
+        toast.success('Đã cập nhật lịch học thành công!');
 
         // RETURN để KHÔNG submit form (không gọi onSubmit)
         return;
@@ -4256,7 +4251,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Tên lớp <span className="text-danger-600">*</span>
                   </Form.Label>
-                  {formData.status === 'disable' ? (
+                  {fullClassData?.status !== 'pending' && formData.status === 'disable' ? (
                     <Form.Control
                       type="text"
                       name="name"
@@ -4302,7 +4297,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Chương trình <span className="text-danger-600">*</span>
                   </Form.Label>
-                  {formData.status === 'disable' ? (
+                  {fullClassData?.status !== 'pending' && formData.status === 'disable' ? (
                     <Form.Select
                       name="program"
                       value={typeToProgramMap[formData.program] || ''}
@@ -4314,6 +4309,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                       }}
                       required
                       className="border-neutral-30 radius-8 px-16 py-10"
+                      disabled={pendingScheduleChanges.length > 0}
                     >
                       <option value="">-- Chọn chương trình --</option>
                       {availablePrograms.length > 0 ? (
@@ -4342,14 +4338,14 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Cấp độ <span className="text-danger-600">*</span>
                   </Form.Label>
-                  {formData.status === 'disable' ? (
+                  {fullClassData?.status !== 'pending' && formData.status === 'disable' ? (
                     <Form.Select
                       name="level"
                       value={formData.level || ''}
                       onChange={handleInputChange}
                       required
                       className="border-neutral-30 radius-8 px-16 py-10"
-                      disabled={!formData.program}
+                      disabled={!formData.program || pendingScheduleChanges.length > 0}
                     >
                       <option value="">-- Chọn cấp độ --</option>
                       {availableLevels.length > 0 ? (
@@ -4382,12 +4378,13 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Program
                   </Form.Label>
-                  {formData.status === 'disable' ? (
+                  {fullClassData?.status !== 'pending' && formData.status === 'disable' ? (
                     <Form.Select
                       name="programId"
                       value={formData.programId}
                       onChange={handleInputChange}
                       className="border-neutral-30 radius-8 px-16 py-10"
+                      disabled={pendingScheduleChanges.length > 0}
                     >
                       <option value="">-- Tất cả programs --</option>
                       {(formData.program || formData.level ? filteredProgramsFromDB : allProgramsFromDB).map(prog => (
@@ -4408,6 +4405,15 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   )}
                 </Form.Group>
               </div>
+
+              <div className="col-md-6">
+                <Form.Group>
+                  <Form.Label className="text-neutral-700 fw-medium mb-8">Band</Form.Label>
+                  <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
+                    {formData.band || '--'}
+                  </div>
+                </Form.Group>
+              </div>
             </div>
 
             <div className="row g-3 mb-16">
@@ -4416,14 +4422,14 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   <Form.Label className="text-neutral-700 fw-medium mb-8">
                     Course <span className="text-danger-600">*</span>
                   </Form.Label>
-                  {formData.status === 'disable' ? (
+                  {fullClassData?.status !== 'pending' && formData.status === 'disable' ? (
                     <Form.Select
                       name="course"
                       value={formData.course}
                       onChange={handleInputChange}
                       required
                       className="border-neutral-30 radius-8 px-16 py-10"
-                      disabled={coursesLoading}
+                      disabled={coursesLoading || pendingScheduleChanges.length > 0}
                     >
                       <option value="">
                         {coursesLoading ? 'Đang tải...' : '-- Chọn course --'}
@@ -4449,15 +4455,16 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   )}
                 </Form.Group>
               </div>
-
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="text-neutral-700 fw-medium mb-8">Band</Form.Label>
-                  <div className="d-flex align-items-center text-neutral-900 fw-medium" style={{ minHeight: '38px', paddingLeft: '4px' }}>
-                    {formData.band || '--'}
+              {pendingScheduleChanges.length > 0 && (
+                <div className="col-md-6">
+                  <div className="d-flex align-items-start" style={{ minHeight: '38px', paddingTop: '32px' }}>
+                    <Alert variant="warning" className="mb-0 text-13">
+                      <i className="fas fa-exclamation-triangle me-2"></i>
+                      Không thể thay đổi chương trình học của lớp khi đang chỉnh sửa lịch học. Vui lòng hủy thay đổi lịch trước.
+                    </Alert>
                   </div>
-                </Form.Group>
-              </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -6391,11 +6398,7 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                   }];
                 });
 
-                await Swal.fire({
-                  icon: 'success',
-                  title: 'Đã lưu tạm thời',
-                  text: 'Thay đổi đã được lưu tạm thời. Vui lòng bấm "Lưu thay đổi" ở form chính để áp dụng.'
-                });
+                toast.success('Thay đổi đã được lưu tạm thời. Vui lòng bấm "Lưu thay đổi" ở form chính để áp dụng.');
                 setShowConfirmUpdateModal(false);
                 setShowScheduleDetailModal(false);
                 setSelectedScheduleDetail(null);
@@ -6718,17 +6721,9 @@ const EditClassForm = ({ classData, onSubmit, onDelete, classId, onBack }) => {
                 // Hiển thị thông báo thành công
                 const message = response.message || 'Đã tạo buổi học thành công!';
                 if (response.cleanupInfo && response.cleanupInfo.deletedCount > 0) {
-                  await Swal.fire({
-                    icon: 'success',
-                    title: 'Thành công',
-                    html: `${message}<br/><br/>Đã xóa ${response.cleanupInfo.deletedCount} buổi học thừa để đảm bảo số buổi đúng với numberOfSessions.`
-                  });
+                  toast.success(`${message}\nĐã xóa ${response.cleanupInfo.deletedCount} buổi học thừa để đảm bảo số buổi đúng với numberOfSessions.`);
                 } else {
-                  await Swal.fire({
-                    icon: 'success',
-                    title: 'Thành công',
-                    text: message
-                  });
+                  toast.success(message);
                 }
                 
                 // Đóng modal

@@ -47,6 +47,19 @@ const MaterialModal = ({ show, onHide, onSuccess, classId }) => {
       setError('Chỉ được upload tối đa 10 files');
       return;
     }
+    
+    // Check file size (50MB = 50 * 1024 * 1024 bytes)
+    const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+    const oversizedFiles = selectedFiles.filter(file => file.size > maxSize);
+    
+    if (oversizedFiles.length > 0) {
+      const fileNames = oversizedFiles.map(f => f.name).join(', ');
+      setError(`File vượt quá 50MB: ${fileNames}. Vui lòng chọn file nhỏ hơn 50MB.`);
+      // Clear the input
+      e.target.value = '';
+      return;
+    }
+    
     // Create objects with file and default title (filename without extension)
     const fileObjects = selectedFiles.map(file => ({
       file: file,
@@ -76,6 +89,15 @@ const MaterialModal = ({ show, onHide, onSuccess, classId }) => {
 
     if (files.length === 0) {
       setError('Vui lòng chọn ít nhất 1 file');
+      return;
+    }
+
+    // Double check file size before submit (safety measure)
+    const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+    const oversizedFiles = files.filter(item => item.file.size > maxSize);
+    if (oversizedFiles.length > 0) {
+      const fileNames = oversizedFiles.map(item => item.file.name).join(', ');
+      setError(`File vượt quá 50MB: ${fileNames}. Vui lòng chọn file nhỏ hơn 50MB.`);
       return;
     }
 

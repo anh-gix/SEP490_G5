@@ -284,7 +284,7 @@ const RequestManagement = () => {
       
       const changeParams = {
         page,
-        limit: 10,
+        limit: 1000, // Increase limit to get all requests (frontend will handle pagination/sorting)
         sortBy: backendSortBy
       };
       if (debouncedSearchTerm) changeParams.search = debouncedSearchTerm;
@@ -313,7 +313,14 @@ const RequestManagement = () => {
           throw err;
         })
       ]);
-      
+
+      // Debug: log params and responses
+      console.log('API PARAMS:', { changeParams, workParams });
+      console.log('API RESPONSES:', {
+        changeRequests: changeResponse.changeRequests?.map(r => ({ status: r.status, type: r.type })),
+        workRequests: workResponse.data?.map(r => ({ status: r.status, type: r.requestType }))
+      });
+
       if (changeResponse.success && workResponse.success) {
         let changeReqs = (changeResponse.changeRequests || []).map(req => 
           normalizeRequest(req, 'changeRequest')
@@ -343,41 +350,105 @@ const RequestManagement = () => {
         // Merge requests - ưu tiên workRequest trước
         let merged = [...workReqs, ...changeReqs];
 
-        // Sort by sender on frontend if needed
-        if (needsSenderSort) {
-          merged = merged.sort((a, b) => {
-            // Ưu tiên workRequest trước changeRequest
-            if (a.requestType !== b.requestType) {
-              // workRequest (có requestType) sẽ đứng trước changeRequest (không có requestType)
-              if (a.requestType) return -1;
-              if (b.requestType) return 1;
+        // Helper function to get sender role priority
+        // Dựa vào type của đơn để xác định role
+        // Trưởng trung tâm (center_head) > Giáo viên (teacher) > Học viên (student)
+        const getRolePriority = (request) => {
+          const type = request.type || request.requestType || '';
+
+          // Ưu tiên dựa vào loại đơn
+          if (type === 'assign_students') {
+            return 1; // Center Head - Sắp xếp học viên (chỉ trưởng trung tâm mới làm được)
+          }
+          if (type === 'request_replace_teacher') {
+            return 2; // Teacher - Xin giáo viên dạy thay
+          }
+          if (type === 'makeup_class') {
+            return 3; // Student - Học bù
+          }
+
+          // Fallback: thử check từ sender.role nếu có
+          const role = request.sender?.role?.roleName || request.sender?.role?.name || '';
+          if (role.toLowerCase().includes('center') || role.toLowerCase().includes('head')) {
+            return 1;
+          }
+          if (role.toLowerCase().includes('teacher') || role.toLowerCase().includes('giáo viên')) {
+            return 2;
+          }
+          if (role.toLowerCase().includes('student') || role.toLowerCase().includes('học viên')) {
+            return 3;
+          }
+
+          return 4; // Unknown roles last
+        };
+
+        // Helper function to check if request is processed
+        const isProcessed = (status) => {
+          const statusLower = status?.toLowerCase();
+          return statusLower === 'approved' || statusLower === 'rejected' || statusLower === 'completed';
+        };
+
+        // Pre-calculate sort keys for each request (for stable sort)
+        merged = merged.map(req => {
+          const processed = isProcessed(req.status);
+          const rolePriority = getRolePriority(req);
+
+          return {
+            ...req,
+            _sortKey: {
+              isProcessed: processed,
+              rolePriority: rolePriority,
+              createdAtTime: new Date(req.createdAt).getTime(),
+              senderName: req.sender?.username || req.sender?.fullName || req.sender?.name || ''
             }
-            const nameA = a.sender?.username || a.sender?.fullName || a.sender?.name || '';
-            const nameB = b.sender?.username || b.sender?.fullName || b.sender?.name || '';
-            const comparison = naturalCompare(nameA, nameB);
+          };
+        });
+
+        // Debug: Log BEFORE sorting
+        console.log('BEFORE SORT:', merged.map(r => ({
+          sender: r.sender?.username,
+          status: r.status,
+          isProcessed: r._sortKey.isProcessed,
+          rolePriority: r._sortKey.rolePriority
+        })));
+
+        // Sort with multi-level priority using pre-calculated keys
+        merged.sort((a, b) => {
+          // Level 1: Đơn chưa xử lý (pending) lên trước, đã xử lý xuống dưới
+          if (a._sortKey.isProcessed !== b._sortKey.isProcessed) {
+            return a._sortKey.isProcessed ? 1 : -1; // Pending first, processed last
+          }
+
+          // Level 2: Trong cùng nhóm (pending hoặc processed), ưu tiên theo role
+          if (a._sortKey.rolePriority !== b._sortKey.rolePriority) {
+            return a._sortKey.rolePriority - b._sortKey.rolePriority; // Lower number = higher priority
+          }
+
+          // Level 3: Cùng role, sort theo user choice (sortBy)
+          if (sortBy === 'sender' || sortBy === 'sender-desc') {
+            const comparison = naturalCompare(a._sortKey.senderName, b._sortKey.senderName);
             return sortBy === 'sender-desc' ? -comparison : comparison;
-          });
-        } else if (sortBy === 'newest') {
-          merged = merged.sort((a, b) => {
-            // Ưu tiên workRequest trước changeRequest
-            if (a.requestType !== b.requestType) {
-              if (a.requestType) return -1;
-              if (b.requestType) return 1;
-            }
-            // Sau đó sort theo thời gian
-            return new Date(b.createdAt) - new Date(a.createdAt);
-          });
-        } else if (sortBy === 'oldest') {
-          merged = merged.sort((a, b) => {
-            // Ưu tiên workRequest trước changeRequest
-            if (a.requestType !== b.requestType) {
-              if (a.requestType) return -1;
-              if (b.requestType) return 1;
-            }
-            // Sau đó sort theo thời gian
-            return new Date(a.createdAt) - new Date(b.createdAt);
-          });
-        }
+          } else if (sortBy === 'newest') {
+            return b._sortKey.createdAtTime - a._sortKey.createdAtTime;
+          } else { // 'oldest' hoặc default
+            // Đơn lâu nhất lên trước (ngày gửi sớm nhất)
+            return a._sortKey.createdAtTime - b._sortKey.createdAtTime;
+          }
+        });
+
+        // Debug: Log AFTER sorting
+        console.log('AFTER SORT:', merged.map(r => ({
+          sender: r.sender?.username,
+          status: r.status,
+          isProcessed: r._sortKey.isProcessed,
+          rolePriority: r._sortKey.rolePriority
+        })));
+
+        // Remove temporary sort keys
+        merged = merged.map(req => {
+          const { _sortKey, ...rest } = req;
+          return rest;
+        });
         
         setChangeRequests(changeReqs);
         setWorkRequests(workReqs);

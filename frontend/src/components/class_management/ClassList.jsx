@@ -12,35 +12,57 @@ const ClassList = ({ classes, onEdit, onViewDetails }) => {
     return statusMap[status] || status;
   };
 
+  const getMaintenanceBadgeText = (classItem) => {
+    const count = classItem.maintenanceCount || classItem.maintenanceRooms?.length || 0;
+    return `Có ${count} buổi sắp tới sử dụng phòng đang bảo trì`;
+  };
+
+  const getMaintenanceTooltip = (classItem) => {
+    if (!classItem.hasRoomMaintenance || !classItem.maintenanceRooms?.length) return '';
+
+    const count = classItem.maintenanceCount || classItem.maintenanceRooms.length;
+    if (count === 1) {
+      const room = classItem.maintenanceRooms[0];
+      const date = new Date(room.scheduleDate).toLocaleDateString('vi-VN');
+      return `Có 1 buổi sắp tới sử dụng phòng đang bảo trì: ${room.roomName} vào ${date} (${room.startTime}-${room.endTime})`;
+    } else {
+      const uniqueRooms = [...new Set(classItem.maintenanceRooms.map(r => r.roomName))];
+      const roomText = uniqueRooms.length === 1 ? uniqueRooms[0] : `${uniqueRooms.length} phòng khác nhau`;
+      return `Có ${count} buổi sắp tới sử dụng phòng đang bảo trì (${roomText})`;
+    }
+  };
+
   return (
     <div className="row g-3">
       {classes.length > 0 ? (
         classes.map(classItem => {
-          const isRoomMaintenance = classItem.roomStatus === 'maintenance';
+          const hasMaintenanceIssue = classItem.hasRoomMaintenance;
           return (
           <div key={classItem.id} className="col-md-6 col-lg-4">
-            <Card className={`h-100 bg-white border ${isRoomMaintenance ? 'border-danger border-danger-600' : 'border-neutral-30'} rounded-12 box-shadow-sm transition-2 item-hover`} style={isRoomMaintenance ? { borderWidth: '2px', boxShadow: '0 0 0 0.2rem rgba(220, 53, 69, 0.25)' } : {}}>
-              <Card.Header className={`${isRoomMaintenance ? 'bg-danger-50' : 'bg-main-25'} border-0 d-flex justify-content-between align-items-start p-16`}>
+            <Card className={`h-100 bg-white border ${hasMaintenanceIssue ? 'border-danger border-danger-600' : 'border-neutral-30'} rounded-12 box-shadow-sm transition-2 item-hover`} style={hasMaintenanceIssue ? { borderWidth: '2px', boxShadow: '0 0 0 0.2rem rgba(220, 53, 69, 0.25)' } : {}}>
+              <Card.Header className="bg-main-25 border-0 d-flex justify-content-between align-items-start p-16">
                 <div className="flex-grow-1">
                   <div className="d-flex align-items-center gap-8 mb-8">
                     <h5 className="mb-0 text-neutral-700">{classItem.name}</h5>
-                    {isRoomMaintenance && (
-                      <Badge bg="" className="bg-danger-600 text-white px-8 py-4" title="Phòng đang bảo trì - Vui lòng đổi phòng">
+                  </div>
+                  <div className="d-flex align-items-center gap-8">
+                    <Badge
+                      bg=""
+                      className={`${
+                        classItem.status === 'pending' ? 'bg-warning-600 text-white' :
+                        classItem.status === 'active' ? 'bg-success-600 text-white' :
+                        classItem.status === 'completed' ? 'bg-main-600 text-white' : 'bg-danger-600 text-white'
+                      } px-12 py-6`}
+                    >
+                      {getStatusText(classItem.status)}
+                    </Badge>
+                    {hasMaintenanceIssue && (
+                      <Badge bg="" className="bg-danger-600 text-white px-8 py-4" title={getMaintenanceTooltip(classItem)}>
                         <i className="fas fa-exclamation-triangle me-1"></i>
-                        Bảo trì
+                        {getMaintenanceBadgeText(classItem)}
                       </Badge>
                     )}
                   </div>
-                  <Badge 
-                    bg=""
-                    className={`${
-                      classItem.status === 'pending' ? 'bg-warning-600 text-white' :
-                      classItem.status === 'active' ? 'bg-success-600 text-white' :
-                      classItem.status === 'completed' ? 'bg-main-600 text-white' : 'bg-danger-600 text-white'
-                    } px-12 py-6`}
-                  >
-                    {getStatusText(classItem.status)}
-                  </Badge>
                 </div>
                 <Badge bg="" className="bg-info-500 text-white px-12 py-6 ms-2">{classItem.level}</Badge>
               </Card.Header>
@@ -60,10 +82,9 @@ const ClassList = ({ classes, onEdit, onViewDetails }) => {
                     <span className="text-neutral-700">{classItem.teacherName}</span>
                   </div>
                   <div className="flex-align gap-8">
-                    <i className={`fas fa-door-open ${isRoomMaintenance ? 'text-danger-600' : 'text-neutral-500'}`} style={{ width: '20px' }}></i>
-                    <span className={isRoomMaintenance ? 'text-danger-600 fw-semibold' : 'text-neutral-700'}>
+                    <i className="fas fa-door-open text-neutral-500" style={{ width: '20px' }}></i>
+                    <span className="text-neutral-700">
                       {classItem.roomName}
-                      {isRoomMaintenance && <span className="ms-1">(Đang bảo trì)</span>}
                     </span>
                   </div>
                   <div className="flex-align gap-8">

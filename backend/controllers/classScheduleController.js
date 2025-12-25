@@ -36,11 +36,58 @@ exports.getSchedulesByClass = async (req, res) => {
     }
 
     console.log(schedules);
-    
+
     res.status(200).json(schedules);
   } catch (error) {
     console.error(" Lỗi khi lấy lịch học:", error);
     res.status(500).json({ message: "Lỗi server khi lấy lịch học." });
+  }
+};
+
+exports.getClassRoomMaintenanceStatus = async (req, res) => {
+  try {
+    const { classId } = req.params;
+
+    // Lấy ngày hiện tại (đầu ngày để so sánh)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Lấy tất cả ClassSchedule của lớp từ ngày hiện tại trở đi với thông tin room và status
+    const schedules = await ClassSchedule.find({
+      class: classId,
+      date: { $gte: today }
+    })
+      .select("room date startTime endTime")
+      .populate("room", "room_name status")
+      .sort({ date: 1 });
+
+    // Đếm số buổi học sắp tới sử dụng phòng đang bảo trì
+    const upcomingMaintenanceSchedules = schedules.filter(schedule =>
+      schedule.room && schedule.room.status === 'maintenance'
+    );
+
+    const hasRoomMaintenance = upcomingMaintenanceSchedules.length > 0;
+    const maintenanceCount = upcomingMaintenanceSchedules.length;
+
+    // Lấy danh sách các phòng đang bảo trì (nếu có)
+    const maintenanceRooms = upcomingMaintenanceSchedules.map(schedule => ({
+      roomId: schedule.room._id,
+      roomName: schedule.room.room_name,
+      scheduleDate: schedule.date,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime
+    }));
+
+    res.status(200).json({
+      classId,
+      hasRoomMaintenance,
+      maintenanceCount,
+      maintenanceRooms: hasRoomMaintenance ? maintenanceRooms : []
+    });
+
+  } catch (error) {
+    console.error("Lỗi khi kiểm tra phòng bảo trì của lớp:", error);
+    res.status(500).json({ message: "Lỗi server khi kiểm tra phòng bảo trì." });
   }
 };
 

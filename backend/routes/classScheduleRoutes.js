@@ -25,6 +25,13 @@ router.get(
   classScheduleController.getSchedulesByClass
 );
 
+//  Kiểm tra trạng thái phòng bảo trì của lớp
+router.get(
+  "/class/:classId/room-maintenance-status",
+  verifyToken,
+  classScheduleController.getClassRoomMaintenanceStatus
+);
+
 //  Validate: Kiểm tra conflict trước khi thêm buổi học
 router.post(
   "/validate",

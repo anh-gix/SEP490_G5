@@ -1,10 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { Container, Row, Col, Card, Button, Form, Table, Alert, Spinner, Badge, Modal } from 'react-bootstrap';
 import bulkUserService from '../services/bulkUserService';
-import axios from 'axios';
+import roleService from '../services/roleService';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
-import { getCookie } from '../utils/cookieUtils.js';
 
 const BulkUserUploadPage = () => {
   const [file, setFile] = useState(null);
@@ -25,13 +24,8 @@ const BulkUserUploadPage = () => {
   React.useEffect(() => {
     const fetchRoles = async () => {
       try {
-        const token = getCookie('token');
-        const response = await axios.get('http://localhost:8080/api/roles', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        setRoles(response.data);
+        const data = await roleService.getAllRoles();
+        setRoles(data);
       } catch (error) {
         console.error('Error fetching roles:', error);
       }

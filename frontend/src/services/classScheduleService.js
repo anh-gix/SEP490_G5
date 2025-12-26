@@ -177,6 +177,16 @@ export const classScheduleService = {
     } catch (error) {
       throw error.response?.data || { message: 'Không thể cập nhật buổi học' };
     }
+  },
+
+  // Lấy class schedules theo sessionId hoặc sessionOrder
+  getClassSchedulesBySession: async (params = {}) => {
+    try {
+      const response = await api.get('/by-session', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Không thể lấy danh sách buổi học theo session' };
+    }
   }
 };
 

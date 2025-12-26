@@ -1166,7 +1166,57 @@ exports.createClass = async (req, res) => {
     });
     
     await newClass.save({ session });
-    
+
+    // ============================================
+    // AUTO-ENROLL STUDENTS TO COURSE
+    // ============================================
+    if (course && students && students.length > 0) {
+      // Get current course enrollments
+      const courseData = await Course.findById(course)
+        .select('studentEnrollments status name')
+        .session(session)
+        .lean();
+
+      if (courseData) {
+        const enrolledStudentIds = (courseData.studentEnrollments || []).map(id => id.toString());
+        const newStudentIds = students.map(id => id.toString());
+
+        // Find students not yet enrolled
+        const studentsToEnroll = newStudentIds.filter(
+          studentId => !enrolledStudentIds.includes(studentId)
+        );
+
+        if (studentsToEnroll.length > 0) {
+          console.log(`Auto-enrolling ${studentsToEnroll.length} students to course ${course}`);
+
+          // Add students to course.studentEnrollments using $addToSet (prevents duplicates)
+          await Course.updateOne(
+            { _id: course },
+            {
+              $addToSet: {
+                studentEnrollments: {
+                  $each: studentsToEnroll.map(id => new mongoose.Types.ObjectId(id))
+                }
+              }
+            },
+            { session }
+          );
+
+          // If course status is 'completed', change to 'active' (course now has students)
+          if (courseData.status === 'completed') {
+            await Course.updateOne(
+              { _id: course },
+              { $set: { status: 'active' } },
+              { session }
+            );
+            console.log(`Updated course ${course} status from 'completed' to 'active'`);
+          }
+        } else {
+          console.log('All students already enrolled in course');
+        }
+      }
+    }
+
     // Generate ClassSchedule entries only if all required fields are available
     // ClassSchedule requires: teacher, room, createdBy (from req.user or teacher)
     if (scheduleEntries && scheduleEntries.length > 0 && course && startDate && teacher && room) {
@@ -1639,36 +1689,33 @@ exports.updateClass = async (req, res) => {
           const notEnrolledStudentIds = newlyAddedStudentIds.filter(
             studentId => !enrolledStudentIds.includes(studentId)
           );
-          
-          // If there are students not enrolled, return error with details
+
+          // Auto-enroll students not yet enrolled in the course
           if (notEnrolledStudentIds.length > 0) {
-            // Get student information for error message
-            const studentInfo = await User.find({
-              _id: { $in: notEnrolledStudentIds.map(id => new mongoose.Types.ObjectId(id)) }
-            })
-              .select('_id username fullName name email')
-              .session(session)
-              .lean();
-            
-            const invalidStudents = studentInfo.map(student => {
-              const studentIdStr = student._id.toString();
-              const studentName = student.fullName || student.name || student.username || student.email?.split('@')[0] || `Học viên ${studentIdStr}`;
-              return {
-                studentId: studentIdStr,
-                studentName: studentName,
-                reason: 'Học viên chưa có trong danh sách đăng ký khóa học'
-              };
-            });
-            
-            await session.abortTransaction();
-            session.endSession();
-            
-            return res.status(400).json({
-              success: false,
-              message: 'Một số học viên chưa đăng ký khóa học',
-              invalidStudents: invalidStudents,
-              courseName: courseData.name || 'N/A'
-            });
+            console.log(`Auto-enrolling ${notEnrolledStudentIds.length} students to course during class update`);
+
+            // Add students to course.studentEnrollments
+            await Course.updateOne(
+              { _id: finalCourseId },
+              {
+                $addToSet: {
+                  studentEnrollments: {
+                    $each: notEnrolledStudentIds.map(id => new mongoose.Types.ObjectId(id))
+                  }
+                }
+              },
+              { session }
+            );
+
+            // If course status is 'completed', change to 'active'
+            if (courseData.status === 'completed') {
+              await Course.updateOne(
+                { _id: finalCourseId },
+                { $set: { status: 'active' } },
+                { session }
+              );
+              console.log(`Updated course ${finalCourseId} status from 'completed' to 'active'`);
+            }
           }
         }
       }

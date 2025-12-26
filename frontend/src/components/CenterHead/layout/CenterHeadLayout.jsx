@@ -64,6 +64,12 @@ const CenterHeadLayout = ({ children }) => {
       path: '/center-head/class-management',
       color: 'main'
     },
+    {
+      title: 'Quản lý đơn',
+      icon: 'fa-file-alt',
+      path: '/center-head/request-management',
+      color: 'main'
+    },
     // {
     //   title: 'Báo cáo',
     //   icon: 'fa-chart-bar',

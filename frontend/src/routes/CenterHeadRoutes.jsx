@@ -13,6 +13,7 @@ import RoomManagementPage from "../pages/CenterHead/RoomManagementPage.jsx";
 import TeacherManagementPage from "../pages/CenterHead/TeacherManagementPage.jsx";
 import StudentManagementPage from "../pages/CenterHead/StudentManagementPage.jsx";
 import ClassManagementPage from "../pages/CenterHead/ClassManagementPage.jsx";
+import RequestManagementPage from "../pages/CenterHead/RequestManagementPage.jsx";
 
 /**
  * CenterHeadRoutes
@@ -54,5 +55,8 @@ export const centerHeadRoutes = [
 
   // VIII. Class Management
   { path: '/center-head/class-management', element: <ClassManagementPage /> },
+
+  // IX. Request Management
+  { path: '/center-head/request-management', element: <RequestManagementPage /> },
 
 ];

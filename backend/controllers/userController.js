@@ -97,8 +97,8 @@ const createUser = async (req, res) => {
 // Update User
 const updateUser = async (req, res) => {
   try {
-    const { email, password, username, phone, address, roleId } = req.body;
-    
+    const { email, password, username, phone, address, roleId, isActive } = req.body;
+
     const user = await User.findById(req.params.id);
     if (user) {
       user.email = email || user.email;
@@ -106,7 +106,12 @@ const updateUser = async (req, res) => {
       user.phone = phone || user.phone;
       user.address = address || user.address;
       user.roleId = roleId || user.roleId;
-      
+
+      // Cập nhật isActive nếu được truyền vào (cho phép cả true và false)
+      if (typeof isActive === 'boolean') {
+        user.isActive = isActive;
+      }
+
       if (password) {
         user.password = password;
       }

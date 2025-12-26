@@ -21,7 +21,9 @@ import FilterBar from '../compo/FilterBar';
 import StatusBadge from '../compo/StatusBadge';
 import UserDetailModal from '../compo/UserDetailModal';
 import EditUserModal from '../compo/EditUserModal';
-import { mockUsers, mockRoles, mockRoleStats, simulateApiDelay } from '../../../helper/mockdataExtended';
+import { userService } from '../../../services/userService';
+import { roleService } from '../../../services/roleService';
+import { authService } from '../../../services/authService';
 
 // Register Chart.js components
 ChartJS.register(
@@ -35,13 +37,18 @@ ChartJS.register(
   Filler
 );
 
-// Mock data cho biểu đồ học viên mới theo tháng
-const monthlyStudentData = {
-  labels: ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'],
+// Helper function to get month labels in Vietnamese
+const getMonthLabels = () => {
+  return ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'];
+};
+
+// Helper function to create chart data structure
+const createChartData = (monthlyData) => ({
+  labels: getMonthLabels(),
   datasets: [
     {
       label: 'Học viên mới',
-      data: [245, 312, 289, 356, 423, 398, 267, 445, 512, 489, 534, 456],
+      data: monthlyData,
       borderColor: 'rgba(93, 135, 255, 1)',
       backgroundColor: 'rgba(93, 135, 255, 0.1)',
       borderWidth: 2,
@@ -54,12 +61,12 @@ const monthlyStudentData = {
       pointBorderWidth: 2,
     }
   ]
-};
+});
 
 // Component thống kê tóm tắt học viên - Thiết kế tối giản
 const StudentSummaryStats = ({ studentStats }) => {
-  const { total } = studentStats;
-  const newStudentsThisMonth = 116;
+  const { total = 0, newThisMonth = 0 } = studentStats || {};
+  const newStudentsThisMonth = newThisMonth;
 
   const stats = [
     {
@@ -107,7 +114,7 @@ const StudentSummaryStats = ({ studentStats }) => {
 };
 
 // Component biểu đồ xu hướng tăng trưởng học viên
-const StudentGrowthChart = () => {
+const StudentGrowthChart = ({ chartData, loading }) => {
   const options = {
     responsive: true,
     maintainAspectRatio: false,
@@ -178,45 +185,54 @@ const StudentGrowthChart = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div style={{ height: '400px', width: '100%', padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Đang tải...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ height: '400px', width: '100%', padding: '20px' }}>
-      <Line data={monthlyStudentData} options={options} />
+      <Line data={chartData} options={options} />
     </div>
   );
 };
 
 // Component thống kê tóm tắt nhân sự - Thiết kế đơn giản
-const StaffSummaryStats = () => {
+const StaffSummaryStats = ({ staffStats }) => {
   const roleConfigs = {
-    centerHead: {
+    'Center Head': {
       label: 'Trưởng trung tâm',
       icon: 'ph ph-crown',
     },
-    teacher: {
+    'Teacher': {
       label: 'Giáo viên',
       icon: 'ph ph-chalkboard-teacher',
     },
-    subjectLeader: {
+    'Subject Leader': {
       label: 'Trưởng môn',
       icon: 'ph ph-medal',
     },
-    giaovu: {
+    'Academic Staff': {
       label: 'Giáo vụ',
       icon: 'ph ph-clipboard-text',
     }
   };
 
-  const filteredRoleStats = Object.entries(mockRoleStats)
-    .filter(([key]) => ['centerHead', 'teacher', 'subjectLeader', 'giaovu'].includes(key));
+  const filteredRoleStats = staffStats || [];
 
   return (
     <div className="row g-3">
-      {filteredRoleStats.map(([key, stats]) => {
-        const config = roleConfigs[key];
+      {filteredRoleStats.map((stat) => {
+        const config = roleConfigs[stat.roleName];
         if (!config) return null;
 
         return (
-          <div key={key} className="col-md-6 col-lg-3">
+          <div key={stat.roleName} className="col-md-6 col-lg-3">
             <Card className="h-100">
               <div className="p-3">
                 <div className="d-flex align-items-center gap-3 mb-3">
@@ -231,7 +247,7 @@ const StaffSummaryStats = () => {
                     <i className={`${config.icon} fs-4 text-primary`}></i>
                   </div>
                   <div>
-                    <div className="fs-4 fw-bold text-neutral-900">{stats.total}</div>
+                    <div className="fs-4 fw-bold text-neutral-900">{stat.total}</div>
                     <div className="text-neutral-500 small">tài khoản</div>
                   </div>
                 </div>
@@ -241,11 +257,11 @@ const StaffSummaryStats = () => {
                 <div className="d-flex gap-3 text-xs">
                   <div className="text-success">
                     <i className="ph ph-check-circle me-1"></i>
-                    {stats.active} hoạt động
+                    {stat.active} hoạt động
                   </div>
                   <div className="text-neutral-400">
                     <i className="ph ph-x-circle me-1"></i>
-                    {stats.inactive} không hoạt động
+                    {stat.inactive} không hoạt động
                   </div>
                 </div>
               </div>
@@ -260,12 +276,19 @@ const StaffSummaryStats = () => {
 const UserList = () => {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [filterValues, setFilterValues] = useState({});
   const [activeTab, setActiveTab] = useState('students'); // 'students' or 'staff'
+
+  // Stats states
+  const [studentStats, setStudentStats] = useState({ total: 0, newThisMonth: 0 });
+  const [staffStats, setStaffStats] = useState([]);
+  const [chartData, setChartData] = useState(createChartData([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
+  const [chartLoading, setChartLoading] = useState(true);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -278,13 +301,27 @@ const UserList = () => {
 
   useEffect(() => {
     fetchUsers();
+    fetchRoles();
   }, []);
+
+  const fetchRoles = async () => {
+    try {
+      const data = await roleService.getAllRoles();
+      setRoles(data);
+    } catch (err) {
+      console.error('Error fetching roles:', err);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      await simulateApiDelay(600);
-      setUsers(mockUsers);
+      const data = await userService.getAllUsers();
+      setUsers(data);
+
+      // Calculate stats from real data
+      calculateStats(data);
+
       setError(null);
     } catch (err) {
       console.error('Error fetching users:', err);
@@ -294,16 +331,93 @@ const UserList = () => {
     }
   };
 
+  const calculateStats = (usersData) => {
+    // Calculate student stats
+    const students = usersData.filter(user =>
+      user.roleId?.name === 'Student' || user.roleId === 'Student'
+    );
+    const activeStudents = students.filter(s => s.isActive === true).length;
+
+    // Calculate new students this month
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+
+    const newStudentsThisMonth = students.filter(student => {
+      if (!student.createdAt) return false;
+      const createdDate = new Date(student.createdAt);
+      return createdDate.getMonth() === currentMonth && createdDate.getFullYear() === currentYear;
+    }).length;
+
+    setStudentStats({
+      total: students.length,
+      active: activeStudents,
+      inactive: students.length - activeStudents,
+      newThisMonth: newStudentsThisMonth
+    });
+
+    // Calculate monthly student growth for chart (last 12 months)
+    calculateMonthlyChartData(students);
+
+    // Calculate staff stats by role
+    const staffRoles = ['Center Head', 'Teacher', 'Subject Leader', 'Academic Staff'];
+    const staffStatsData = staffRoles.map(roleName => {
+      const roleUsers = usersData.filter(user =>
+        user.roleId?.name === roleName || user.roleId === roleName
+      );
+      const active = roleUsers.filter(u => u.isActive === true).length;
+      return {
+        roleName,
+        total: roleUsers.length,
+        active,
+        inactive: roleUsers.length - active
+      };
+    }).filter(stat => stat.total > 0);
+
+    setStaffStats(staffStatsData);
+  };
+
+  const calculateMonthlyChartData = (students) => {
+    setChartLoading(true);
+
+    const currentYear = new Date().getFullYear();
+
+    // Initialize array with 12 months (0 for each month)
+    const monthlyData = new Array(12).fill(0);
+
+    // Count students created in each month of current year
+    students.forEach(student => {
+      if (!student.createdAt) return;
+
+      const createdDate = new Date(student.createdAt);
+      const createdYear = createdDate.getFullYear();
+      const createdMonth = createdDate.getMonth(); // 0-11
+
+      // Only count students from current year
+      if (createdYear === currentYear) {
+        monthlyData[createdMonth]++;
+      }
+    });
+
+    setChartData(createChartData(monthlyData));
+    setChartLoading(false);
+  };
+
   const applyFilters = useCallback(() => {
     let filtered = [...users];
 
-    // Filter by tab
+    // Filter by tab - handle both populated roleId object and string roleId
     if (activeTab === 'students') {
-      filtered = filtered.filter(user => user.roleId === 'role005');
+      filtered = filtered.filter(user => {
+        const roleName = user.roleId?.name || user.role?.name || '';
+        return roleName === 'Student';
+      });
     } else {
-      filtered = filtered.filter(user =>
-        ['role001', 'role002', 'role003', 'role004'].includes(user.roleId)
-      );
+      const staffRoleNames = ['Center Head', 'Teacher', 'Subject Leader', 'Academic Staff'];
+      filtered = filtered.filter(user => {
+        const roleName = user.roleId?.name || user.role?.name || '';
+        return staffRoleNames.includes(roleName);
+      });
     }
 
     // Search filter
@@ -319,12 +433,16 @@ const UserList = () => {
 
     // Role filter
     if (filterValues.role && filterValues.role !== "all") {
-      filtered = filtered.filter(user => user.roleId === filterValues.role);
+      filtered = filtered.filter(user => {
+        const roleId = user.roleId?._id || user.roleId;
+        return roleId === filterValues.role;
+      });
     }
 
-    // Status filter
+    // Status filter (using isActive)
     if (filterValues.status && filterValues.status !== "all") {
-      filtered = filtered.filter(user => user.status === filterValues.status);
+      const isActiveFilter = filterValues.status === "active";
+      filtered = filtered.filter(user => user.isActive === isActiveFilter);
     }
 
     setFilteredUsers(filtered);
@@ -372,21 +490,59 @@ const UserList = () => {
     setSelectedUser(null);
   };
 
-  const handleSaveUser = (updatedData) => {
-    console.log('Saving user data:', updatedData);
-    // Implement save logic here
-    // Update users list and refresh
-    alert('Cập nhật tài khoản thành công!');
-    setIsEditModalOpen(false);
-    setSelectedUser(null);
-    fetchUsers();
+  const handleSaveUser = async (updatedData) => {
+    try {
+      if (!selectedUser?._id) {
+        alert('Không tìm thấy thông tin người dùng');
+        return;
+      }
+
+      await userService.updateUser(selectedUser._id, updatedData);
+      alert('Cập nhật tài khoản thành công!');
+      setIsEditModalOpen(false);
+      setSelectedUser(null);
+      fetchUsers();
+    } catch (error) {
+      console.error('Error updating user:', error);
+      alert(error.message || 'Có lỗi xảy ra khi cập nhật tài khoản');
+    }
   };
 
-  const handleBlockUser = (user) => {
-    if (window.confirm(`Bạn có chắc chắn muốn ${user.status === 'active' ? 'khóa' : 'mở khóa'} tài khoản "${user.fullname}"?`)) {
-      console.log('Block/Unblock user:', user._id);
-      // Implement block/unblock logic
-      // Update user status and refresh data
+  const handleToggleActive = async (user) => {
+    const isCurrentlyActive = user.isActive !== false; // default true if undefined
+
+    // Chỉ kiểm tra khi vô hiệu hóa (không kiểm tra khi kích hoạt lại)
+    if (isCurrentlyActive) {
+      // Lấy thông tin user đang đăng nhập
+      const currentUser = authService.getUserData();
+
+      // Không cho phép vô hiệu hóa tài khoản của chính mình
+      if (currentUser && currentUser._id === user._id) {
+        alert('Bạn không thể vô hiệu hóa tài khoản của chính mình!');
+        return;
+      }
+
+      // Không cho phép vô hiệu hóa tài khoản Center Head
+      const roleName = user.roleId?.name || user.role?.name || '';
+      if (roleName === 'Center Head') {
+        alert('Không thể vô hiệu hóa tài khoản Trưởng trung tâm (Center Head)!');
+        return;
+      }
+    }
+
+    const actionText = isCurrentlyActive ? 'vô hiệu hóa' : 'kích hoạt';
+    const actionTextSuccess = isCurrentlyActive ? 'Vô hiệu hóa' : 'Kích hoạt';
+
+    if (window.confirm(`Bạn có chắc chắn muốn ${actionText} tài khoản "${user.fullname || user.username}"?`)) {
+      try {
+        const newIsActive = !isCurrentlyActive;
+        await userService.updateUser(user._id, { isActive: newIsActive });
+        alert(`${actionTextSuccess} tài khoản thành công!`);
+        fetchUsers();
+      } catch (error) {
+        console.error('Error toggling user active status:', error);
+        alert(error.message || 'Có lỗi xảy ra khi thay đổi trạng thái tài khoản');
+      }
     }
   };
 
@@ -403,14 +559,13 @@ const UserList = () => {
           label: "Trạng thái",
           options: [
             { value: "active", label: "Đang hoạt động" },
-            { value: "inactive", label: "Không hoạt động" },
+            { value: "inactive", label: "Vô hiệu hóa" },
           ]
         }
       ];
     } else {
-      const staffRoles = mockRoles.filter(role =>
-        ['role001', 'role002', 'role003', 'role004'].includes(role._id)
-      );
+      const staffRoleNames = ['Center Head', 'Teacher', 'Subject Leader', 'Academic Staff'];
+      const staffRoles = roles.filter(role => staffRoleNames.includes(role.name));
 
       return [
         {
@@ -426,7 +581,7 @@ const UserList = () => {
           label: "Trạng thái",
           options: [
             { value: "active", label: "Đang hoạt động" },
-            { value: "inactive", label: "Không hoạt động" },
+            { value: "inactive", label: "Vô hiệu hóa" },
           ]
         }
       ];
@@ -450,7 +605,7 @@ const UserList = () => {
       field: 'role',
       render: (row) => (
         <span className="badge bg-primary-50 text-primary-600 fw-medium">
-          {row.role?.name || 'N/A'}
+          {row.roleId?.name || row.role?.name || 'N/A'}
         </span>
       ),
     },
@@ -468,7 +623,7 @@ const UserList = () => {
       header: 'Trạng thái',
       field: 'status',
       render: (row) => (
-        <StatusBadge status={row.status} size="sm" />
+        <StatusBadge status={row.isActive !== false ? 'active' : 'inactive'} size="sm" />
       ),
     },
   ];
@@ -490,16 +645,17 @@ const UserList = () => {
       header: 'Vai trò',
       field: 'role',
       render: (row) => {
+        const roleName = row.roleId?.name || row.role?.name || '';
         const roleColors = {
-          'role001': 'danger',
-          'role002': 'success',
-          'role003': 'warning',
-          'role004': 'info'
+          'Center Head': 'danger',
+          'Subject Leader': 'success',
+          'Academic Staff': 'warning',
+          'Teacher': 'info'
         };
-        const color = roleColors[row.roleId] || 'secondary';
+        const color = roleColors[roleName] || 'secondary';
         return (
           <span className={`badge bg-${color}-50 text-${color}-600 fw-medium`}>
-            {row.role?.name || 'N/A'}
+            {roleName || 'N/A'}
           </span>
         );
       },
@@ -518,7 +674,7 @@ const UserList = () => {
       header: 'Trạng thái',
       field: 'status',
       render: (row) => (
-        <StatusBadge status={row.status} size="sm" />
+        <StatusBadge status={row.isActive !== false ? 'active' : 'inactive'} size="sm" />
       ),
     },
     {
@@ -551,14 +707,14 @@ const UserList = () => {
             <li><hr className="dropdown-divider" /></li>
             <li>
               <button
-                className={`dropdown-item ${row.status === 'active' ? 'text-warning' : 'text-success'}`}
+                className={`dropdown-item ${row.isActive !== false ? 'text-warning' : 'text-success'}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleBlockUser(row);
+                  handleToggleActive(row);
                 }}
               >
-                <i className={`ph ${row.status === 'active' ? 'ph-lock' : 'ph-lock-open'} me-2`}></i>
-                {row.status === 'active' ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
+                <i className={`ph ${row.isActive !== false ? 'ph-prohibit' : 'ph-check-circle'} me-2`}></i>
+                {row.isActive !== false ? 'Vô hiệu hóa' : 'Kích hoạt'}
               </button>
             </li>
           </ul>
@@ -738,12 +894,12 @@ const UserList = () => {
           {/* Summary Stats */}
           <div className="mb-24">
             <h5 className="mb-3 text-neutral-900 fw-semibold">Tóm tắt học viên</h5>
-            <StudentSummaryStats studentStats={mockRoleStats.student} />
+            <StudentSummaryStats studentStats={studentStats} />
           </div>
 
           {/* Student Growth Trend Chart */}
           <Card className="mb-24">
-            <StudentGrowthChart />
+            <StudentGrowthChart chartData={chartData} loading={chartLoading} />
           </Card>
 
           {/* Search & Filter */}
@@ -797,7 +953,7 @@ const UserList = () => {
           {/* Staff Summary Statistics */}
           <div className="mb-24">
             <h5 className="mb-3 text-neutral-900 fw-semibold">Tóm tắt nhân sự</h5>
-            <StaffSummaryStats />
+            <StaffSummaryStats staffStats={staffStats} />
           </div>
 
           {/* Search & Filter */}

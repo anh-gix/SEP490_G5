@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Breadcrumb from '../compo/Breadcrumb';
 import Card from '../compo/Card';
 import Button from '../compo/Button';
-import { mockRoles } from '../../../helper/mockdataExtended';
+import { userService } from '../../../services/userService';
+import { roleService } from '../../../services/roleService';
 
 const CreateUser = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [roles, setRoles] = useState([]);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -20,8 +22,21 @@ const CreateUser = () => {
 
   const [errors, setErrors] = useState({});
 
+  useEffect(() => {
+    fetchRoles();
+  }, []);
+
+  const fetchRoles = async () => {
+    try {
+      const data = await roleService.getAllRoles();
+      setRoles(data);
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+    }
+  };
+
   // Filter roles - exclude student role for now (can be adjusted)
-  const availableRoles = mockRoles.filter(role => role._id !== 'role005');
+  const availableRoles = roles.filter(role => role.name !== 'Student');
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -98,19 +113,28 @@ const CreateUser = () => {
 
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Prepare user data for API
+      const userData = {
+        email: formData.email,
+        password: formData.password,
+        username: formData.username,
+        fullname: formData.fullname,
+        phone: formData.phone,
+        address: formData.address,
+        roleId: formData.roleIds[0], // If API accepts single role, use first selected
+        // If API accepts multiple roles, use: roleIds: formData.roleIds
+      };
 
-      console.log('Creating user with data:', formData);
+      await userService.createUser(userData);
 
-      // Show success message (you can use a toast notification library)
+      // Show success message
       alert('Tạo tài khoản thành công!');
 
       // Navigate back to user list
       navigate('/center-head/users');
     } catch (error) {
       console.error('Error creating user:', error);
-      alert('Có lỗi xảy ra khi tạo tài khoản!');
+      alert(error.message || 'Có lỗi xảy ra khi tạo tài khoản!');
     } finally {
       setLoading(false);
     }

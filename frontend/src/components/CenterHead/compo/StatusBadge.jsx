@@ -11,7 +11,7 @@ const StatusBadge = ({ status, label, size = "md" }) => {
   const statusConfig = {
     // User & General
     active: { variant: "success", icon: "ph-check-circle", text: "Đang hoạt động" },
-    inactive: { variant: "danger", icon: "ph-x-circle", text: "Không hoạt động" },
+    inactive: { variant: "danger", icon: "ph-prohibit", text: "Vô hiệu hóa" },
     pending: { variant: "warning", icon: "ph-clock", text: "Chờ xử lý" },
 
     // Course & Program

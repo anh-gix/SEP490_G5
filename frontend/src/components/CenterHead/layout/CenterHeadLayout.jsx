@@ -40,6 +40,30 @@ const CenterHeadLayout = ({ children }) => {
       path: '/center-head/exams',
       color: 'main'
     },
+    {
+      title: 'Quản lý phòng học',
+      icon: 'fa-door-open',
+      path: '/center-head/room-management',
+      color: 'main'
+    },
+    {
+      title: 'Quản lý giáo viên',
+      icon: 'fa-chalkboard-teacher',
+      path: '/center-head/teacher-management',
+      color: 'main'
+    },
+    {
+      title: 'Quản lý học viên',
+      icon: 'fa-user-graduate',
+      path: '/center-head/student-management',
+      color: 'main'
+    },
+    {
+      title: 'Quản lý lớp học',
+      icon: 'fa-users',
+      path: '/center-head/class-management',
+      color: 'main'
+    },
     // {
     //   title: 'Báo cáo',
     //   icon: 'fa-chart-bar',

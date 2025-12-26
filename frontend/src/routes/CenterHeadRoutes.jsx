@@ -9,6 +9,10 @@ import CenterHeadCourseDetailPage from "../pages/CenterHead/CenterHeadCourseDeta
 import ApprovalRequestsPage from "../pages/CenterHead/ApprovalRequestsPage.jsx";
 import CenterHeadExamListPage from "../pages/CenterHead/CenterHeadExamListPage.jsx";
 import CenterHeadExamDetailPage from "../pages/CenterHead/CenterHeadExamDetailPage.jsx";
+import RoomManagementPage from "../pages/CenterHead/RoomManagementPage.jsx";
+import TeacherManagementPage from "../pages/CenterHead/TeacherManagementPage.jsx";
+import StudentManagementPage from "../pages/CenterHead/StudentManagementPage.jsx";
+import ClassManagementPage from "../pages/CenterHead/ClassManagementPage.jsx";
 
 /**
  * CenterHeadRoutes
@@ -38,5 +42,17 @@ export const centerHeadRoutes = [
   // IV. Exam Management
   { path: '/center-head/exams', element: <CenterHeadExamListPage /> },
   { path: '/center-head/exams/:id/details', element: <CenterHeadExamDetailPage /> },
+
+  // V. Room Management
+  { path: '/center-head/room-management', element: <RoomManagementPage /> },
+
+  // VI. Teacher Management
+  { path: '/center-head/teacher-management', element: <TeacherManagementPage /> },
+
+  // VII. Student Management
+  { path: '/center-head/student-management', element: <StudentManagementPage /> },
+
+  // VIII. Class Management
+  { path: '/center-head/class-management', element: <ClassManagementPage /> },
 
 ];

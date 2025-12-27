@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Button, Form, Alert } from 'react-bootstrap';
+import { Modal, Button, Form, Alert, Badge } from 'react-bootstrap';
 import studentService from '../../services/studentService';
 import courseService from '../../services/courseService';
 
@@ -12,6 +12,7 @@ const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents 
   const [studentSchedules, setStudentSchedules] = useState({}); // Map studentId -> schedules
   const [enrolledStudentIds, setEnrolledStudentIds] = useState([]);
   const [courseEnrollmentsLoading, setCourseEnrollmentsLoading] = useState(false);
+  const [showOnlyEnrolled, setShowOnlyEnrolled] = useState(false);
 
   // Update selected students when initialSelectedStudents changes
   useEffect(() => {
@@ -285,28 +286,32 @@ const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents 
   }, [generatedSessions, studentSchedules, currentClassId, currentClassName]);
 
   const filteredStudentList = useMemo(() => {
-    // First filter by enrollment
-    let enrolledStudents = students.filter(student => {
-      const studentId = String(student._id || student.id);
-      return enrolledStudentIds.includes(studentId);
-    });
+    let filteredStudents = students;
 
-    // Then filter by search term
-    if (!studentSearchTerm) {
-      return enrolledStudents;
+    // Apply enrollment filter if enabled
+    if (showOnlyEnrolled) {
+      filteredStudents = filteredStudents.filter(student => {
+        const studentId = String(student._id || student.id);
+        return enrolledStudentIds.includes(studentId);
+      });
     }
 
-    const searchLower = studentSearchTerm.toLowerCase();
-    return enrolledStudents.filter(student => {
-      const fullName = (student.fullName || '').toLowerCase();
-      const email = (student.email || '').toLowerCase();
-      const username = (student.username || '').toLowerCase();
-      
-      return fullName.includes(searchLower) || 
-             email.includes(searchLower) || 
-             username.includes(searchLower);
-    });
-  }, [students, studentSearchTerm, enrolledStudentIds]);
+    // Apply search filter
+    if (studentSearchTerm) {
+      const searchLower = studentSearchTerm.toLowerCase();
+      filteredStudents = filteredStudents.filter(student => {
+        const fullName = (student.fullName || '').toLowerCase();
+        const email = (student.email || '').toLowerCase();
+        const username = (student.username || '').toLowerCase();
+
+        return fullName.includes(searchLower) ||
+               email.includes(searchLower) ||
+               username.includes(searchLower);
+      });
+    }
+
+    return filteredStudents;
+  }, [students, studentSearchTerm, enrolledStudentIds, showOnlyEnrolled]);
 
   const handleStudentToggle = (studentId) => {
     setSelectedStudents(prev => {
@@ -393,9 +398,25 @@ const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents 
             className="border-neutral-30 radius-8 px-16 py-10 mb-12"
           />
 
-          <div 
+          <div className="d-flex align-items-center gap-8 mb-12 p-12 bg-neutral-50 rounded-8">
+            <Form.Check
+              type="checkbox"
+              id="filter-enrolled"
+              label="Chỉ hiển thị học viên đã đăng ký khóa học"
+              checked={showOnlyEnrolled}
+              onChange={(e) => setShowOnlyEnrolled(e.target.checked)}
+              className="text-14"
+            />
+            {showOnlyEnrolled && enrolledStudentIds.length > 0 && (
+              <Badge bg="info" className="ms-2">
+                {enrolledStudentIds.length} học viên đã đăng ký
+              </Badge>
+            )}
+          </div>
+
+          <div
             className="border border-neutral-100 rounded-12 p-16"
-            style={{ maxHeight: '400px', overflowY: 'auto' }}
+            style={{ maxHeight: '310px', overflowY: 'auto' }}
           >
             {studentsLoading || courseEnrollmentsLoading ? (
               <div className="text-center text-neutral-500 py-20">
@@ -413,13 +434,13 @@ const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents 
               <div className="text-center text-neutral-500 py-20">
                 Vui lòng chọn course trước khi thêm học viên
               </div>
-            ) : enrolledStudentIds.length === 0 ? (
-              <div className="text-center text-neutral-500 py-20">
-                Course này chưa có học sinh đăng ký
-              </div>
             ) : filteredStudentList.length === 0 ? (
               <div className="text-center text-neutral-500 py-20">
-                {studentSearchTerm ? 'Không tìm thấy học viên nào phù hợp với từ khóa tìm kiếm' : 'Không có học viên nào trong danh sách đăng ký'}
+                {studentSearchTerm
+                  ? 'Không tìm thấy học viên nào phù hợp với từ khóa tìm kiếm'
+                  : showOnlyEnrolled
+                    ? 'Không có học viên nào đã đăng ký khóa học này'
+                    : 'Không có học viên nào trong hệ thống'}
               </div>
             ) : (
               <div className="d-flex flex-column gap-8">
@@ -453,12 +474,36 @@ const SelectStudentModal = ({ show, onClose, onConfirm, initialSelectedStudents 
                         onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex-grow-1">
-                        <div className="d-flex align-items-center gap-8">
+                        <div className="d-flex align-items-center gap-8 flex-wrap">
                           <div className="fw-medium text-neutral-900 text-14">
                             {displayName}
                           </div>
+
+                          {/* Enrollment status badge */}
+                          {(() => {
+                            const studentIdStr = String(studentId);
+                            const isEnrolled = enrolledStudentIds.includes(studentIdStr);
+                            return isEnrolled ? (
+                              <span
+                                className="badge bg-success-600 text-white px-8 py-4 radius-4 text-11 fw-semibold"
+                                title="Học viên đã đăng ký khóa học này"
+                              >
+                                <i className="fas fa-check-circle me-1"></i>
+                                Đã đăng ký
+                              </span>
+                            ) : (
+                              <span
+                                className="badge bg-warning-600 text-white px-8 py-4 radius-4 text-11 fw-semibold"
+                                title="Học viên sẽ được tự động đăng ký khóa học khi tạo lớp"
+                              >
+                                <i className="fas fa-info-circle me-1"></i>
+                                Chưa đăng ký
+                              </span>
+                            );
+                          })()}
+
                           {hasConflict && (
-                            <span 
+                            <span
                               className="badge bg-danger-600 text-white px-8 py-4 radius-4 text-11 fw-semibold"
                               title="Học viên này có lịch học trùng giờ với lớp đang tạo"
                             >

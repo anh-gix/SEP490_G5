@@ -19,8 +19,9 @@ import { formatDate, naturalCompare } from '../../utils/requestHelpers';
 /**
  * RequestManagement Component
  * Component chính quản lý đơn xin đổi buổi/lớp học
+ * @param {boolean} excludeWorkRequests - If true, excludes WorkRequests (assign_students) from fetching and display
  */
-const RequestManagement = () => {
+const RequestManagement = ({ excludeWorkRequests = false }) => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -120,27 +121,44 @@ const RequestManagement = () => {
       // Fetch ChangeRequest stats
       const changeResponse = await changeRequestService.getStats(params);
       
-      // Fetch WorkRequest stats
-      const workParams = { userId: user._id };
-      if (filterStatus && filterStatus !== 'all') {
-        workParams.status = filterStatus;
-      }
-      const workResponse = await academicWorkRequestService.getStats(workParams);
+      let newStats = {
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+        makeupClass: 0,
+        requestReplaceTeacher: 0,
+        assignStudents: 0
+      };
       
-      if (changeResponse.success && workResponse.success) {
+      if (changeResponse.success) {
         const changeStats = changeResponse.stats || {};
-        const workStats = workResponse.stats || {};
-        
-        const newStats = {
-          pending: (changeStats.pending || 0) + (workStats.pending || 0),
+        newStats = {
+          pending: changeStats.pending || 0,
           approved: changeStats.approved || 0,
-          rejected: (changeStats.rejected || 0) + (workStats.rejected || 0),
+          rejected: changeStats.rejected || 0,
           makeupClass: changeStats.makeupClass || 0,
           requestReplaceTeacher: changeStats.requestReplaceTeacher || 0,
-          assignStudents: workStats.assign_students || 0
+          assignStudents: 0
         };
-        setStats(newStats);
       }
+      
+      // Fetch WorkRequest stats only if not excluded
+      if (!excludeWorkRequests) {
+        const workParams = { userId: user._id };
+        if (filterStatus && filterStatus !== 'all') {
+          workParams.status = filterStatus;
+        }
+        const workResponse = await academicWorkRequestService.getStats(workParams);
+        
+        if (workResponse.success) {
+          const workStats = workResponse.stats || {};
+          newStats.pending = newStats.pending + (workStats.pending || 0);
+          newStats.rejected = newStats.rejected + (workStats.rejected || 0);
+          newStats.assignStudents = workStats.assign_students || 0;
+        }
+      }
+      
+      setStats(newStats);
     } catch (err) {
       // Error handling - keep silent or use non-debug logging if needed
     }
@@ -296,32 +314,47 @@ const RequestManagement = () => {
         changeParams.type = filterType;
       }
       
-      const workParams = { userId: user._id };
-      if (filterStatus && filterStatus !== 'all') workParams.status = filterStatus;
+      let changeResponse;
+      let workResponse = { success: true, data: [] };
+      let workParams = null;
       
-      // Always filter assign_students requests for academic staff
-      if (filterType === 'assign_students' || !filterType || filterType === 'all') {
-        workParams.requestType = 'assign_students';
+      // Fetch WorkRequests only if not excluded
+      if (!excludeWorkRequests) {
+        workParams = { userId: user._id };
+        if (filterStatus && filterStatus !== 'all') workParams.status = filterStatus;
+        
+        // Always filter assign_students requests for academic staff
+        if (filterType === 'assign_students' || !filterType || filterType === 'all') {
+          workParams.requestType = 'assign_students';
+        }
+        
+        // Fetch both ChangeRequests and WorkRequests in parallel
+        const [changeResp, workResp] = await Promise.all([
+          changeRequestService.getAllChangeRequests(changeParams).catch(err => {
+            throw err;
+          }),
+          academicWorkRequestService.getAssignedRequests(workParams).catch(err => {
+            throw err;
+          })
+        ]);
+        
+        changeResponse = changeResp;
+        workResponse = workResp;
+      } else {
+        // Only fetch ChangeRequests
+        changeResponse = await changeRequestService.getAllChangeRequests(changeParams).catch(err => {
+          throw err;
+        });
       }
-      
-      // Fetch both ChangeRequests and WorkRequests in parallel
-      const [changeResponse, workResponse] = await Promise.all([
-        changeRequestService.getAllChangeRequests(changeParams).catch(err => {
-          throw err;
-        }),
-        academicWorkRequestService.getAssignedRequests(workParams).catch(err => {
-          throw err;
-        })
-      ]);
 
       // Debug: log params and responses
-      console.log('API PARAMS:', { changeParams, workParams });
+      console.log('API PARAMS:', { changeParams, workParams: excludeWorkRequests ? 'excluded' : workParams });
       console.log('API RESPONSES:', {
         changeRequests: changeResponse.changeRequests?.map(r => ({ status: r.status, type: r.type })),
-        workRequests: workResponse.data?.map(r => ({ status: r.status, type: r.requestType }))
+        workRequests: excludeWorkRequests ? 'excluded' : workResponse.data?.map(r => ({ status: r.status, type: r.requestType }))
       });
 
-      if (changeResponse.success && workResponse.success) {
+      if (changeResponse.success && (excludeWorkRequests || workResponse.success)) {
         let changeReqs = (changeResponse.changeRequests || []).map(req => 
           normalizeRequest(req, 'changeRequest')
         );
@@ -913,6 +946,7 @@ const RequestManagement = () => {
       <RequestStats
         stats={stats}
         filterType={filterType}
+        excludeWorkRequests={excludeWorkRequests}
         onFilterTypeChange={(type) => {
           setFilterType(type);
           // Bỏ dòng này: setFilterStatus('all'); // Reset status when changing type

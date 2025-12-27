@@ -17,6 +17,11 @@ import CourseFormPage from "../pages/CenterHead/CourseFormPage.jsx";
 // CAM Session Management
 import CamSessionPage from "../pages/CenterHead/CamSessionPage.jsx";
 import CamSessionEditPage from "../pages/CenterHead/CamSessionEditPage.jsx";
+import RoomManagementPage from "../pages/CenterHead/RoomManagementPage.jsx";
+import TeacherManagementPage from "../pages/CenterHead/TeacherManagementPage.jsx";
+import StudentManagementPage from "../pages/CenterHead/StudentManagementPage.jsx";
+import ClassManagementPage from "../pages/CenterHead/ClassManagementPage.jsx";
+import RequestManagementPage from "../pages/CenterHead/RequestManagementPage.jsx";
 
 /**
  * CenterHeadRoutes
@@ -58,5 +63,20 @@ export const centerHeadRoutes = [
   { path: '/center-head/exams/create', element: <CenterHeadExamFormPage /> },
   { path: '/center-head/exams/:examId/edit', element: <CenterHeadExamFormPage /> },
   { path: '/center-head/exams/:id/details', element: <CenterHeadExamDetailPage /> },
+
+  // V. Room Management
+  { path: '/center-head/room-management', element: <RoomManagementPage /> },
+
+  // VI. Teacher Management
+  { path: '/center-head/teacher-management', element: <TeacherManagementPage /> },
+
+  // VII. Student Management
+  { path: '/center-head/student-management', element: <StudentManagementPage /> },
+
+  // VIII. Class Management
+  { path: '/center-head/class-management', element: <ClassManagementPage /> },
+
+  // IX. Request Management
+  { path: '/center-head/request-management', element: <RequestManagementPage /> },
 
 ];

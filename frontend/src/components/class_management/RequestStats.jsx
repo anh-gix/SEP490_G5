@@ -4,8 +4,9 @@ import { Card, Row, Col } from 'react-bootstrap';
 /**
  * RequestStats Component
  * Hiển thị 5 stats cards cho quản lý đơn
+ * @param {boolean} excludeWorkRequests - If true, hides assign_students stat card
  */
-const RequestStats = ({ stats, filterType, onFilterTypeChange }) => {
+const RequestStats = ({ stats, filterType, onFilterTypeChange, excludeWorkRequests = false }) => {
   return (
     <Row className="g-3 mb-24" style={{ display: 'flex', flexWrap: 'wrap' }}>
       {/* Tổng số đơn */}
@@ -37,7 +38,7 @@ const RequestStats = ({ stats, filterType, onFilterTypeChange }) => {
               <div>
                 <div className="text-neutral-500 text-13 mb-4">Tổng số đơn</div>
                 <div className="text-neutral-900 fw-bold text-32">
-                  {(stats.makeupClass || 0) + (stats.requestReplaceTeacher || 0) + (stats.assignStudents || 0)}
+                  {(stats.makeupClass || 0) + (stats.requestReplaceTeacher || 0) + (excludeWorkRequests ? 0 : (stats.assignStudents || 0))}
                 </div>
               </div>
             </div>
@@ -150,40 +151,42 @@ const RequestStats = ({ stats, filterType, onFilterTypeChange }) => {
         </Card>
       </Col>
 
-      {/* Sắp xếp học viên */}
-      <Col xs={12} sm={6} md={4} lg style={{ flex: '1', minWidth: '200px' }}>
-        <Card 
-          className="bg-white rounded-12 box-shadow-sm"
-          style={{ 
-            cursor: 'pointer',
-            border: filterType === 'assign_students' ? '3px solid #10B981' : '2px solid #E5E7EB',
-            boxShadow: filterType === 'assign_students' ? '0 4px 16px rgba(16, 185, 129, 0.4)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-            transition: 'all 0.2s ease'
-          }}
-          onClick={() => {
-            onFilterTypeChange(filterType === 'assign_students' ? 'all' : 'assign_students');
-          }}
-        >
-          <Card.Body className="p-20">
-            <div className="d-flex align-items-center gap-16">
-              <div 
-                className="rounded-12 d-flex align-items-center justify-content-center"
-                style={{ 
-                  width: '56px',
-                  height: '56px',
-                  background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
-                }}
-              >
-                <i className="fas fa-user-graduate text-white" style={{ fontSize: '24px' }}></i>
+      {/* Sắp xếp học viên - Only show if not excluded */}
+      {!excludeWorkRequests && (
+        <Col xs={12} sm={6} md={4} lg style={{ flex: '1', minWidth: '200px' }}>
+          <Card 
+            className="bg-white rounded-12 box-shadow-sm"
+            style={{ 
+              cursor: 'pointer',
+              border: filterType === 'assign_students' ? '3px solid #10B981' : '2px solid #E5E7EB',
+              boxShadow: filterType === 'assign_students' ? '0 4px 16px rgba(16, 185, 129, 0.4)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+              transition: 'all 0.2s ease'
+            }}
+            onClick={() => {
+              onFilterTypeChange(filterType === 'assign_students' ? 'all' : 'assign_students');
+            }}
+          >
+            <Card.Body className="p-20">
+              <div className="d-flex align-items-center gap-16">
+                <div 
+                  className="rounded-12 d-flex align-items-center justify-content-center"
+                  style={{ 
+                    width: '56px',
+                    height: '56px',
+                    background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
+                  }}
+                >
+                  <i className="fas fa-user-graduate text-white" style={{ fontSize: '24px' }}></i>
+                </div>
+                <div>
+                  <div className="text-neutral-500 text-13 mb-4">Sắp xếp học viên</div>
+                  <div className="text-neutral-900 fw-bold text-32">{stats.assignStudents || 0}</div>
+                </div>
               </div>
-              <div>
-                <div className="text-neutral-500 text-13 mb-4">Sắp xếp học viên</div>
-                <div className="text-neutral-900 fw-bold text-32">{stats.assignStudents || 0}</div>
-              </div>
-            </div>
-          </Card.Body>
-        </Card>
-      </Col>
+            </Card.Body>
+          </Card>
+        </Col>
+      )}
     </Row>
   );
 };

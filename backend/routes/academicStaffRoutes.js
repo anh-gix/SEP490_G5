@@ -2,11 +2,11 @@ const express = require('express');
 const router = express.Router();
 const academicStaffController = require('../controllers/academicStaffController');
 const academicDashboardController = require('../controllers/academicDashboardController');
-const { verifyToken, isAcademicStaff } = require('../middlewares/verifyToken');
+const { verifyToken, isAcademicStaffOrCenterHead } = require('../middlewares/verifyToken');
 
-// All routes are protected
+// All routes are protected - allow both Academic Staff and Center Head
 router.use(verifyToken);
-router.use(isAcademicStaff);
+router.use(isAcademicStaffOrCenterHead);
 
 // Dashboard
 router.get('/dashboard', academicDashboardController.getDashboardData);

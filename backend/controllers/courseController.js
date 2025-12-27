@@ -609,7 +609,8 @@ exports.getCoursesByProgram = async (req, res) => {
 exports.getCoursesByProgramId = async (req, res) => {
     try {
         const { programIds } = req.query;
-
+        console.log(programIds);
+        
         if (!programIds) {
             return res.status(400).json({
                 success: false,
@@ -631,12 +632,13 @@ exports.getCoursesByProgramId = async (req, res) => {
         // Get courses with status 'completed' or 'active' (courses ready to use)
         const courses = await Course.find({
             program: { $in: programIdArray },
-            status: { $in: ['completed', 'active'] }
+            status: { $in: ['completed', 'active', 'available'] }
         })
         .populate('program', 'program_name code type level')
         .select('name description program status isActive')
         .sort({ name: 1 });
-
+        console.log(courses);
+        
         res.status(200).json({
             success: true,
             courses: courses

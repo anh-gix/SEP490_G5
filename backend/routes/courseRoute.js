@@ -76,7 +76,6 @@ router.get("/by-program", verifyToken, courseController.getCoursesByProgram);
 // Lấy danh sách courses theo program ID(s) - PHẢI ĐẶT TRƯỚC route /:id để tránh conflict
 router.get(
   "/by-program-id",
-  verifyToken,
   courseController.getCoursesByProgramId
 );
 

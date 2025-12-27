@@ -583,7 +583,7 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
             (course.status === 'completed' || course.status === 'active') &&
             course.isActive !== false &&
             course.program?.isActive !== false
-          );
+          ); 
           setAllCourses(validCourses);
           setCourses(validCourses); // Initially show only completed/active courses
         }
@@ -1052,6 +1052,8 @@ const CreateClassModal = ({ onClose, onSubmit }) => {
       // Fetch courses for this program
       try {
         const response = await courseService.getCoursesByProgramId(formData.programId);
+        console.log(response);
+        
         if (response?.success && response.courses) {
           const activeCourses = response.courses.filter(course => course.isActive === true);
           setCourses(activeCourses);

@@ -115,11 +115,7 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
       return;
     }
 
-    // Validate CLO must be mapped to at least 1 PLO
-    if (!cloForm.mappedPLOs || cloForm.mappedPLOs.length === 0) {
-      toast.error('CLO phải được ánh xạ với ít nhất 1 PLO!');
-      return;
-    }
+    // PLO mapping không bắt buộc - CLO có thể không ánh xạ với PLO nào
 
     try {
       setLoading(true);
@@ -193,20 +189,7 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
   };
 
   const handleSaveAndNext = async () => {
-    if (clos.length === 0) {
-      toast.error('Vui lòng thêm ít nhất 1 CLO!');
-      return;
-    }
-
-    const unmappedCLOs = clos.filter(c => !c.mappedPLOs || c.mappedPLOs.length === 0);
-    if (unmappedCLOs.length > 0) {
-      const confirm = window.confirm(
-        `Có ${unmappedCLOs.length} CLO chưa được ánh xạ với PLO nào. Bạn có muốn tiếp tục?`
-      );
-      if (!confirm) {
-        return;
-      }
-    }
+    // CLO không bắt buộc - có thể tiếp tục mà không cần tạo CLO
 
     try {
       await courseService.updateCourse(courseData._id, {
@@ -381,7 +364,7 @@ const CourseStep3CLOMapping = ({ courseData, setCourseData, program, onNext, onP
                   </div>
                   <div className="col-12">
                     <label className="form-label fw-semibold mb-3">
-                      Ánh xạ với PLO <span className="text-danger">*</span>
+                      Ánh xạ với PLO <span className="text-muted">(không bắt buộc)</span>
                     </label>
                     {program?.plos && program.plos.length > 0 ? (
                       <div className="border rounded p-3 bg-light">

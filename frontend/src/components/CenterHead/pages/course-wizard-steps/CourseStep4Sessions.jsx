@@ -293,8 +293,8 @@ const CourseStep4Sessions = ({ courseData, onPrevious, navigate, basePath = '/ce
   const checkSessionsCompleteness = () => {
     return sessions.every(session => {
       const hasContent = session.content && session.content.trim().length > 0;
-      const hasCLOs = session.clos && session.clos.length > 0;
-      return hasContent && hasCLOs;
+      // CLO mapping không bắt buộc - chỉ cần có nội dung là đủ
+      return hasContent;
     });
   };
 
@@ -599,14 +599,13 @@ const CourseStep4Sessions = ({ courseData, onPrevious, navigate, basePath = '/ce
                   <p className="mb-0">
                     <strong>Đã hoàn thiện: {sessions.filter(session => {
                       const hasContent = session.content && session.content.trim().length > 0;
-                      const hasCLOs = session.clos && session.clos.length > 0;
-                      return hasContent && hasCLOs;
+                      return hasContent;
                     }).length} / {sessions.length} buổi học</strong>
                   </p>
                 </div>
                 <div className="alert alert-info">
                   <i className="ph ph-info me-2"></i>
-                  Để hoàn thành học phần, tất cả buổi học cần có nội dung và được mapping với ít nhất một CLO.
+                  Để hoàn thành học phần, tất cả buổi học cần có nội dung.
                   Bạn có thể <strong>lưu tạm</strong> và tiếp tục chỉnh sửa sau.
                 </div>
               </div>

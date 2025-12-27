@@ -53,10 +53,7 @@ const CourseStep2PLOMapping = ({ courseData, setCourseData, program, onNext, onP
   };
 
   const handleSaveAndNext = async () => {
-    if (selectedPLOs.length === 0) {
-      toast.error('Vui lòng chọn ít nhất 1 PLO để mapping!');
-      return;
-    }
+    // PLO mapping không bắt buộc - có thể tiếp tục mà không cần chọn PLO
 
     try {
       setLoading(true);
@@ -180,7 +177,7 @@ const CourseStep2PLOMapping = ({ courseData, setCourseData, program, onNext, onP
         <Button
           variant="primary"
           onClick={handleSaveAndNext}
-          disabled={loading || selectedPLOs.length === 0}
+          disabled={loading}
           icon={loading ? 'ph ph-spinner-gap spinner' : 'ph ph-arrow-right'}
           iconPosition="right"
         >

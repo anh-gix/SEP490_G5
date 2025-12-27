@@ -266,11 +266,7 @@ const CenterHeadProgramForm = () => {
 
     if (!validateForm()) return;
 
-    // Khi hoàn thành, bắt buộc phải có ít nhất 1 PLO
-    if (formData.plos.length === 0) {
-      toast.warning('Chương trình cần có ít nhất 1 PLO để hoàn thành!', { position: 'top-right' });
-      return;
-    }
+    // PLO không bắt buộc - có thể hoàn thành chương trình mà không cần PLO
 
     setLoading(true);
 

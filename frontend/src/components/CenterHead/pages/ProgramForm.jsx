@@ -208,11 +208,7 @@ const ProgramFormNew = ({ viewMode = 'center-head' }) => {
       return;
     }
 
-    // Validate at least 1 PLO is required
-    if (formData.plos.length === 0) {
-      toast.warning('Chương trình cần có ít nhất 1 PLO!', { position: 'top-right' });
-      return;
-    }
+    // PLO không bắt buộc - có thể tạo chương trình mà không cần PLO
 
     setLoading(true);
 

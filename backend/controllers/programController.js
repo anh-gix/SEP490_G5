@@ -1112,13 +1112,7 @@ const completeProgram = async (req, res) => {
       });
     }
 
-    // Kiểm tra phải có ít nhất 1 PLO
-    if (!program.plos || program.plos.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Chương trình cần có ít nhất 1 PLO để hoàn thành'
-      });
-    }
+    // PLO không bắt buộc - có thể hoàn thành chương trình mà không cần PLO
 
     // Cập nhật program
     program.status = 'approved';

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 
 const EditUserModal = ({ user, isOpen, onClose, onSave }) => {
   const [formData, setFormData] = useState({
-    fullname: '',
+    username: '',
     phone: '',
     address: '',
     changePassword: false,
@@ -12,7 +12,7 @@ const EditUserModal = ({ user, isOpen, onClose, onSave }) => {
   useEffect(() => {
     if (user) {
       setFormData({
-        fullname: user.fullname || '',
+        username: user.username || '',
         phone: user.phone || '',
         address: user.address || '',
         changePassword: false,
@@ -102,8 +102,8 @@ const EditUserModal = ({ user, isOpen, onClose, onSave }) => {
                     <input
                       type="text"
                       className="form-control"
-                      name="fullname"
-                      value={formData.fullname}
+                      name="username"
+                      value={formData.username}
                       onChange={handleInputChange}
                       required
                     />

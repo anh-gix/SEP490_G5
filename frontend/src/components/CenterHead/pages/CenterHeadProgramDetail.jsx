@@ -114,11 +114,7 @@ const CenterHeadProgramDetail = () => {
   // Hoàn thành program (chuyển từ draft sang approved) - CenterHead có toàn quyền
   // Đồng thời approve và active tất cả courses trong program
   const handleCompleteProgram = async () => {
-    // Kiểm tra phải có ít nhất 1 PLO
-    if (!program.plos || program.plos.length === 0) {
-      toast.warning('Chương trình cần có ít nhất 1 PLO để hoàn thành!', { position: 'top-right' });
-      return;
-    }
+    // PLO không bắt buộc - có thể hoàn thành chương trình mà không cần PLO
 
     const courseCount = courses.length;
     const result = await Swal.fire({

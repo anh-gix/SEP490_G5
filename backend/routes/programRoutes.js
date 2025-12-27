@@ -27,13 +27,16 @@ router.get(
 );
 
 // PROGRAM MANAGEMENT ROUTES
-// NOTE: Submit/Approve/Reject are now handled by /api/work-requests routes
 router.patch(
   "/:id/active",
   verifyToken,
   programController.updateProgramActiveStatus
 ); // Set isActive (body: { isActive: boolean })
 router.patch("/:id/archive", verifyToken, programController.archiveProgram);
+
+// APPROVAL ROUTES - CenterHead approve/reject programs from teachers
+router.patch("/:id/approve", verifyToken, programController.approveProgram);
+router.patch("/:id/reject", verifyToken, programController.rejectProgram);
 
 // PROGRAM ACTIVATION/DEACTIVATION ROUTES (với check logic)
 router.get(
@@ -47,5 +50,8 @@ router.patch(
   programController.deactivateProgram
 );
 router.patch("/:id/activate", verifyToken, programController.activateProgram);
+
+// COMPLETE PROGRAM - CenterHead hoàn thành program draft
+router.patch("/:id/complete", verifyToken, programController.completeProgram);
 
 module.exports = router;

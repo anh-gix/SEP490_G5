@@ -297,8 +297,11 @@ exports.updateExamForManagement = async (req, res) => {
       });
     }
 
-    // Validate sections if they are being updated
-    if (updates.sections && updates.sections.length > 0) {
+    // Validate sections ONLY when finalizing (lastCompletedStep >= 3)
+    // Skip strict validation during auto-save in wizard steps
+    const isFinalizing = updates.lastCompletedStep >= 3;
+
+    if (isFinalizing && updates.sections && updates.sections.length > 0) {
       const validationErrors = [];
 
       updates.sections.forEach((section, index) => {
@@ -2624,9 +2627,94 @@ exports.getSpeakingResult = async (req, res) => {
   }
 };
 
+// ================== CENTER HEAD - COMPLETE EXAM ==================
+/**
+ * Complete exam - CenterHead hoàn thành exam draft
+ * Chuyển exam từ draft sang approved
+ * PATCH /api/exams/management/:id/complete
+ */
+exports.completeExam = async (req, res) => {
+  try {
+    const { id } = req.params;
 
+    const exam = await Exam.findById(id);
+    if (!exam) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy đề thi'
+      });
+    }
 
+    // Chỉ cho phép complete exam đang draft
+    if (exam.status !== 'draft') {
+      return res.status(400).json({
+        success: false,
+        message: 'Chỉ có thể hoàn thành đề thi đang ở trạng thái bản nháp'
+      });
+    }
 
+    // Kiểm tra phải có ít nhất 1 section
+    if (!exam.sections || exam.sections.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Đề thi cần có ít nhất 1 section để hoàn thành'
+      });
+    }
+
+    // Cập nhật exam
+    exam.status = 'approved';
+    await exam.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Hoàn thành đề thi thành công!',
+      data: exam
+    });
+  } catch (err) {
+    console.error('Error completing exam:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi hoàn thành đề thi',
+      error: err.message
+    });
+  }
+};
+
+/**
+ * Get my exams for CenterHead
+ * GET /api/exams/management/my-exams
+ */
+exports.getMyExamsForCenterHead = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.query.userId;
+
+    if (!userId) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        count: 0,
+        message: 'Chưa có thông tin người dùng để lọc'
+      });
+    }
+
+    const exams = await Exam.find({ createdBy: userId })
+      .populate('createdBy', 'username email name')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: exams,
+      count: exams.length
+    });
+  } catch (err) {
+    console.error('Error getting my exams for center head:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách đề thi của tôi',
+      error: err.message
+    });
+  }
+};
 
 
 

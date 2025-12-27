@@ -2,7 +2,7 @@ import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { toast } from 'react-toastify';
 
-const ExamStep1BasicInfo = ({ examData, setExamData, onNext }) => {
+const CenterHeadExamStep1BasicInfo = ({ examData, setExamData, onNext }) => {
   const [errors, setErrors] = useState({});
 
   const validateField = (name, value) => {
@@ -349,10 +349,10 @@ const ExamStep1BasicInfo = ({ examData, setExamData, onNext }) => {
   );
 };
 
-ExamStep1BasicInfo.propTypes = {
+CenterHeadExamStep1BasicInfo.propTypes = {
   examData: PropTypes.object.isRequired,
   setExamData: PropTypes.func.isRequired,
   onNext: PropTypes.func.isRequired,
 };
 
-export default ExamStep1BasicInfo;
+export default CenterHeadExamStep1BasicInfo;

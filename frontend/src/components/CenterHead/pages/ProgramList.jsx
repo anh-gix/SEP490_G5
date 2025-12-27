@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Breadcrumb from '../compo/Breadcrumb';
@@ -15,20 +15,27 @@ import centerHeadService from '../../../services/centerHeadService';
 
 const ProgramList = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Tab state - default to 'my-programs' if coming from create, otherwise 'all'
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'all');
+
   const [programs, setPrograms] = useState([]);
+  const [myPrograms, setMyPrograms] = useState([]); // State to store my programs separately
   const [filteredPrograms, setFilteredPrograms] = useState([]);
   const [paginatedPrograms, setPaginatedPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [filterValues, setFilterValues] = useState({});
-  const [stats, setStats] = useState({ total: 0, active: 0, draft: 0, archived: 0 });
+  const [stats, setStats] = useState({ total: 0, approved: 0, draft: 0, archived: 0, myPrograms: 0, myApproved: 0, myDraft: 0 });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
   const [togglingId, setTogglingId] = useState(null); // Track which program is being toggled
 
   const applyFilters = useCallback(() => {
-    let filtered = [...programs];
+    // Use myPrograms for "my-programs" tab, otherwise use all programs
+    let filtered = activeTab === 'my-programs' ? [...myPrograms] : [...programs];
 
     if (searchKeyword) {
       const keyword = searchKeyword.toLowerCase();
@@ -48,7 +55,7 @@ const ProgramList = () => {
 
     setFilteredPrograms(filtered);
     setCurrentPage(1); // Reset to first page when filters change
-  }, [programs, searchKeyword, filterValues]);
+  }, [programs, myPrograms, searchKeyword, filterValues, activeTab]);
 
   const applyPagination = useCallback(() => {
     const totalItems = filteredPrograms.length;
@@ -62,37 +69,41 @@ const ProgramList = () => {
     setPaginatedPrograms(paginatedData);
   }, [filteredPrograms, currentPage, itemsPerPage]);
 
-  const fetchPrograms = async () => {
+  const fetchPrograms = useCallback(async () => {
     try {
       setLoading(true);
 
-      const response = await programService.getAllPrograms();
-      const programsData = response.data || [];
+      // Fetch both all programs and my programs in parallel
+      const [allResponse, myResponse] = await Promise.all([
+        programService.getAllPrograms(),
+        programService.getMyPrograms()
+      ]);
 
-      setPrograms(programsData);
+      const allProgramsData = allResponse.data || [];
+      const myProgramsData = myResponse.data || [];
 
-      // Set stats from API response
-      if (response.stats) {
-        setStats(response.stats);
-      } else {
-        // Calculate stats if not provided by API
-        const calculatedStats = {
-          total: programsData.length,
-          active: programsData.filter(p => p.status === 'active').length,
-          draft: programsData.filter(p => p.status === 'draft').length,
-          archived: programsData.filter(p => p.status === 'archived').length
-        };
-        setStats(calculatedStats);
-      }
+      setPrograms(allProgramsData);
+      setMyPrograms(myProgramsData);
 
-      console.log('Programs loaded from API:', programsData);
+      // Calculate stats
+      const calculatedStats = {
+        total: allProgramsData.length,
+        approved: allProgramsData.filter(p => p.status === 'approved').length,
+        draft: myProgramsData.filter(p => p.status === 'draft').length,
+        archived: allProgramsData.filter(p => p.status === 'archived').length,
+        myPrograms: myProgramsData.length,
+        myApproved: myProgramsData.filter(p => p.status === 'approved').length,
+        myDraft: myProgramsData.filter(p => p.status === 'draft').length
+      };
+      setStats(calculatedStats);
+
     } catch (err) {
       console.error('Error fetching programs:', err);
       toast.error('Không thể tải danh sách chương trình!', { position: 'top-right' });
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -203,11 +214,11 @@ const ProgramList = () => {
 
   useEffect(() => {
     fetchPrograms();
-  }, []);
+  }, [fetchPrograms]);
 
   useEffect(() => {
     applyFilters();
-  }, [searchKeyword, filterValues, programs, applyFilters]);
+  }, [searchKeyword, filterValues, programs, myPrograms, applyFilters, activeTab]);
 
   useEffect(() => {
     applyPagination();
@@ -222,11 +233,15 @@ const ProgramList = () => {
     {
       key: "status",
       label: "Trạng thái",
-      options: [
-        { value: "active", label: "Đang hoạt động" },
-        { value: "draft", label: "Bản nháp" },
-        { value: "archived", label: "Đã lưu trữ" },
-      ]
+      options: activeTab === 'my-programs'
+        ? [
+            { value: "draft", label: "Bản nháp" },
+            { value: "approved", label: "Hoàn thành" },
+          ]
+        : [
+            { value: "approved", label: "Hoàn thành" },
+            { value: "archived", label: "Đã lưu trữ" },
+          ]
     },
     {
       key: "type",
@@ -343,8 +358,7 @@ const ProgramList = () => {
               navigate(`/center-head/programs/${row._id}`);
             }}
           >
-            <span className="d-none d-md-inline">Xem</span>
-            <span className="d-inline d-md-none">👁</span>
+            Xem
           </Button>
         </div>
       ),
@@ -359,6 +373,15 @@ const ProgramList = () => {
     );
   }
 
+  // Handle tab change
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+    setSearchKeyword("");
+    setFilterValues({});
+    setCurrentPage(1);
+  };
+
   return (
     <div className="program-list-container">
       <Breadcrumb items={breadcrumbItems} />
@@ -366,28 +389,74 @@ const ProgramList = () => {
       <div className="d-flex justify-content-between align-items-center mb-24">
         <div>
           <h4 className="mb-8 text-neutral-900 fw-bold">Chương trình đào tạo</h4>
-          <p className="text-neutral-600 mb-0">Xem tất cả các chương trình trong hệ thống</p>
+          <p className="text-neutral-600 mb-0">Quản lý tất cả các chương trình trong hệ thống</p>
         </div>
+        {/* Nút tạo chương trình chỉ hiển thị ở tab "Chương trình của tôi" */}
+        {activeTab === 'my-programs' && (
+          <div className="d-flex gap-2">
+            <Button
+              variant="primary"
+              icon="ph ph-plus"
+              onClick={() => navigate('/center-head/programs/create')}
+            >
+              Tạo chương trình mới
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="mb-24">
+        <ul className="nav nav-tabs">
+          <li className="nav-item">
+            <button
+              className={`nav-link ${activeTab === 'all' ? 'active' : ''}`}
+              onClick={() => handleTabChange('all')}
+            >
+              <i className="ph ph-list me-2"></i>
+              Tất cả chương trình
+              <span className="badge bg-neutral-200 text-neutral-700 ms-2">{stats.total}</span>
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              className={`nav-link ${activeTab === 'my-programs' ? 'active' : ''}`}
+              onClick={() => handleTabChange('my-programs')}
+            >
+              <i className="ph ph-user me-2"></i>
+              Chương trình của tôi
+              <span className="badge bg-primary-100 text-primary-600 ms-2">{stats.myPrograms}</span>
+            </button>
+          </li>
+        </ul>
       </div>
 
       {/* Stats */}
       <div className="row g-4 mb-24">
         <div className="col-md-3">
           <Card variant="shadow">
-            <h6 className="text-neutral-600 mb-8">Tổng Programs</h6>
-            <h4 className="text-neutral-900 fw-bold mb-0">{stats.total}</h4>
+            <h6 className="text-neutral-600 mb-8">
+              {activeTab === 'my-programs' ? 'Chương trình của tôi' : 'Tổng chương trình'}
+            </h6>
+            <h4 className="text-neutral-900 fw-bold mb-0">
+              {activeTab === 'my-programs' ? stats.myPrograms : stats.total}
+            </h4>
           </Card>
         </div>
         <div className="col-md-3">
           <Card variant="shadow">
-            <h6 className="text-neutral-600 mb-8">Đang hoạt động</h6>
-            <h4 className="text-success-600 fw-bold mb-0">{stats.active}</h4>
+            <h6 className="text-neutral-600 mb-8">Hoàn thành</h6>
+            <h4 className="text-success-600 fw-bold mb-0">
+              {activeTab === 'my-programs' ? stats.myApproved : stats.approved}
+            </h4>
           </Card>
         </div>
         <div className="col-md-3">
           <Card variant="shadow">
             <h6 className="text-neutral-600 mb-8">Bản nháp</h6>
-            <h4 className="text-warning-600 fw-bold mb-0">{stats.draft}</h4>
+            <h4 className="text-warning-600 fw-bold mb-0">
+              {activeTab === 'my-programs' ? stats.myDraft : stats.draft}
+            </h4>
           </Card>
         </div>
         <div className="col-md-3">

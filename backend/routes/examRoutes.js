@@ -6,6 +6,8 @@ const { verifyToken, isStudent, isSubjectLeader,   } = require("../middlewares/v
 
 // ================== CENTER HEAD - EXAM MANAGEMENT ROUTES ==================
 router.get("/management", verifyToken,  examController.getAllExamsForManagement);
+// My exams route for CenterHead - MUST be before :id route to avoid conflict
+router.get("/management/my-exams", verifyToken, examController.getMyExamsForCenterHead);
 router.get("/management/:id", verifyToken,   examController.getExamByIdForManagement);
 router.post("/management", verifyToken,   examController.createExamForManagement);
 router.put("/management/:id", verifyToken,   examController.updateExamForManagement);
@@ -15,6 +17,8 @@ router.post("/management/:id/unpublish", verifyToken,  examController.unpublishE
 router.post("/management/upload-answer-key", verifyToken,   upload.single("file"), examController.uploadAnswerKeyForManagement);
 router.post("/management/upload-exam-file", verifyToken,   upload.single("file"), examController.uploadExamFileForManagement);
 router.post("/management/delete-exam-file", verifyToken,   examController.deleteExamFileForManagement);
+// Complete exam - CenterHead hoàn thành exam draft
+router.patch("/management/:id/complete", verifyToken, examController.completeExam);
 
 // Helper route to check exam submission status
 router.get("/management/:id/submission-status", verifyToken,   examController.getExamSubmissionStatus);

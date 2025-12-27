@@ -1,5 +1,5 @@
 import CenterHeadLayout from '../../components/CenterHead/layout/CenterHeadLayout';
-import CenterHeadExamDetail from '../../components/CenterHead/pages/CenterHeadExamDetail';
+import CenterHeadExamDetail from '../../components/CenterHead/pages/exam/CenterHeadExamDetail';
 
 const CenterHeadExamDetailPage = () => {
   return (

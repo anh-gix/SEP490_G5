@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { toast } from 'react-toastify';
-import { examService } from '../../../services/examService';
+import { examService } from '../../../../../services/examService';
 
-const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) => {
+const CenterHeadExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) => {
   const [activeSkill, setActiveSkill] = useState(() => {
     // Initialize to first skill that has sections, or default to listening
     const existingTypes = [...new Set(examData.sections.map(s => s.type))];
@@ -959,11 +959,11 @@ const ExamStep2SectionsConfig = ({ examData, setExamData, onNext, onPrevious }) 
   );
 };
 
-ExamStep2SectionsConfig.propTypes = {
+CenterHeadExamStep2SectionsConfig.propTypes = {
   examData: PropTypes.object.isRequired,
   setExamData: PropTypes.func.isRequired,
   onNext: PropTypes.func.isRequired,
   onPrevious: PropTypes.func.isRequired,
 };
 
-export default ExamStep2SectionsConfig;
+export default CenterHeadExamStep2SectionsConfig;

@@ -11,7 +11,6 @@ import TeacherApplicationsPage from "../pages/TeacherPages/TeacherApplicationsPa
 // Program & Course Management
 import TeacherProgramListPage from "../pages/TeacherPages/TeacherProgramListPage.jsx";
 import TeacherProgramDetailPage from "../pages/TeacherPages/TeacherProgramDetailPage.jsx";
-import TeacherProgramFormPage from "../pages/TeacherPages/TeacherProgramFormPage.jsx";
 import TeacherCourseWizardPage from "../pages/TeacherPages/TeacherCourseWizardPage.jsx";
 import TeacherCourseDetailPage from "../pages/TeacherPages/TeacherCourseDetailPage.jsx";
 import TeacherCourseFormPage from "../pages/TeacherPages/TeacherCourseFormPage.jsx";
@@ -77,8 +76,6 @@ export const teacherRoutes = [
   // { path: '/teacher/materials', element: <TeacherMaterialsPage /> },
   // VII. Program & Course Management
   { path: '/teacher/programs', element: <TeacherProgramListPage /> },
-  { path: '/teacher/programs/create', element: <TeacherProgramFormPage /> },
-  { path: '/teacher/programs/:id/edit', element: <TeacherProgramFormPage /> },
   { path: '/teacher/programs/:id', element: <TeacherProgramDetailPage /> },
 
   // Course Management

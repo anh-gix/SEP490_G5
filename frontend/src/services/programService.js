@@ -165,6 +165,17 @@ export const programService = {
       throw error.response?.data || { message: 'Không thể lấy band options' };
     }
   },
+
+  // Complete program - CenterHead hoàn thành program draft
+  // Chuyển program và tất cả courses sang approved, isActive = true
+  completeProgram: async (id) => {
+    try {
+      const response = await api.patch(`/${id}/complete`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Hoàn thành chương trình thất bại' };
+    }
+  },
 };
 
 export default programService;

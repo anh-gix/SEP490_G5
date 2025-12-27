@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { toast } from 'react-toastify';
-import { examService } from '../../../services/examService';
+import { examService } from '../../../../../services/examService';
 
-const ExamStep3UploadAnswerKeys = ({ examData, setExamData, onNext, onPrevious }) => {
+const CenterHeadExamStep3UploadAnswerKeys = ({ examData, setExamData, onNext, onPrevious }) => {
   const [activeSkill, setActiveSkill] = useState(() => {
     // Initialize to first skill that has sections
     const existingTypes = [...new Set(examData.sections.map(s => s.type))];
@@ -741,11 +741,11 @@ QuestionModal.propTypes = {
   onClose: PropTypes.func.isRequired,
 };
 
-ExamStep3UploadAnswerKeys.propTypes = {
+CenterHeadExamStep3UploadAnswerKeys.propTypes = {
   examData: PropTypes.object.isRequired,
   setExamData: PropTypes.func.isRequired,
   onNext: PropTypes.func.isRequired,
   onPrevious: PropTypes.func.isRequired,
 };
 
-export default ExamStep3UploadAnswerKeys;
+export default CenterHeadExamStep3UploadAnswerKeys;

@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Program = require('../models/programModel');
 const Course = require('../models/courseModel');
 const Session = require('../models/sessionModel');
@@ -112,6 +113,14 @@ const getMyPrograms = async (req, res) => {
 const getProgramById = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Validate ObjectId format to avoid CastError
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID chương trình không hợp lệ'
+      });
+    }
 
     const program = await Program.findById(id)
       .populate('createdBy', 'username email');
@@ -938,6 +947,213 @@ const activateProgram = async (req, res) => {
   }
 };
 
+/**
+ * Approve program - CenterHead phê duyệt program từ teacher
+ * PATCH /api/programs/:id/approve
+ */
+const approveProgram = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { note } = req.body;
+
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID chương trình không hợp lệ'
+      });
+    }
+
+    const program = await Program.findById(id);
+    if (!program) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy chương trình'
+      });
+    }
+
+    // Chỉ cho phép duyệt program đang pending_approval
+    if (program.status !== 'pending_approval') {
+      return res.status(400).json({
+        success: false,
+        message: 'Chỉ có thể duyệt chương trình đang chờ phê duyệt'
+      });
+    }
+
+    // Cập nhật program
+    program.status = 'approved';
+    program.isActive = true;
+    await program.save();
+
+    // Cập nhật tất cả courses thuộc program này sang approved
+    const coursesUpdateResult = await Course.updateMany(
+      { program: id },
+      {
+        $set: {
+          status: 'approved',
+          isActive: true
+        }
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Duyệt chương trình thành công! Chương trình và tất cả khóa học đã được kích hoạt.',
+      data: {
+        program: program,
+        coursesUpdated: coursesUpdateResult.modifiedCount,
+        note: note || null
+      }
+    });
+  } catch (err) {
+    console.error('Error approving program:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi duyệt chương trình',
+      error: err.message
+    });
+  }
+};
+
+/**
+ * Reject program - CenterHead từ chối program từ teacher
+ * PATCH /api/programs/:id/reject
+ */
+const rejectProgram = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID chương trình không hợp lệ'
+      });
+    }
+
+    // Yêu cầu phải có lý do từ chối
+    if (!reason || reason.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp lý do từ chối'
+      });
+    }
+
+    const program = await Program.findById(id);
+    if (!program) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy chương trình'
+      });
+    }
+
+    // Chỉ cho phép từ chối program đang pending_approval
+    if (program.status !== 'pending_approval') {
+      return res.status(400).json({
+        success: false,
+        message: 'Chỉ có thể từ chối chương trình đang chờ phê duyệt'
+      });
+    }
+
+    // Cập nhật program về trạng thái needs_revision
+    program.status = 'needs_revision';
+    program.rejectionReason = reason;
+    await program.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Đã từ chối chương trình. Teacher sẽ cần chỉnh sửa và nộp lại.',
+      data: {
+        program: program,
+        reason: reason
+      }
+    });
+  } catch (err) {
+    console.error('Error rejecting program:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi từ chối chương trình',
+      error: err.message
+    });
+  }
+};
+
+/**
+ * Complete program - CenterHead hoàn thành program draft
+ * Chuyển program và tất cả courses sang status approved, isActive = true
+ * PATCH /api/programs/:id/complete
+ */
+const completeProgram = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID chương trình không hợp lệ'
+      });
+    }
+
+    const program = await Program.findById(id);
+    if (!program) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy chương trình'
+      });
+    }
+
+    // Chỉ cho phép complete program đang draft
+    if (program.status !== 'draft') {
+      return res.status(400).json({
+        success: false,
+        message: 'Chỉ có thể hoàn thành chương trình đang ở trạng thái bản nháp'
+      });
+    }
+
+    // Kiểm tra phải có ít nhất 1 PLO
+    if (!program.plos || program.plos.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Chương trình cần có ít nhất 1 PLO để hoàn thành'
+      });
+    }
+
+    // Cập nhật program
+    program.status = 'approved';
+    program.isActive = true;
+    await program.save();
+
+    // Cập nhật tất cả courses thuộc program này
+    const coursesUpdateResult = await Course.updateMany(
+      { program: id },
+      {
+        $set: {
+          status: 'approved',
+          isActive: true
+        }
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Hoàn thành chương trình thành công! Chương trình và tất cả khóa học đã được kích hoạt.',
+      data: {
+        program: program,
+        coursesUpdated: coursesUpdateResult.modifiedCount
+      }
+    });
+  } catch (err) {
+    console.error('Error completing program:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi hoàn thành chương trình',
+      error: err.message
+    });
+  }
+};
+
 module.exports = {
   getAllPrograms,
   getMyPrograms,
@@ -952,5 +1168,8 @@ module.exports = {
   getBandOptions,
   canDeactivateProgram,
   deactivateProgram,
-  activateProgram
+  activateProgram,
+  approveProgram,
+  rejectProgram,
+  completeProgram
 };

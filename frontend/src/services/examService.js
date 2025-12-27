@@ -40,10 +40,18 @@ export const examService = {
   // Lấy exam của tôi (created by current user) - dùng cho teacher exam list
   getMyExams: async (params = {}) => {
     try {
-      const response = await api.get('/my-exams', { params });
+      // First try the management endpoint (for CenterHead)
+      // Falls back to the subject leader endpoint
+      const response = await api.get('/management/my-exams', { params });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { message: 'Không thể lấy danh sách exam của bạn' };
+      // Fallback to subject leader endpoint if management endpoint fails
+      try {
+        const fallbackResponse = await api.get('/my-exams', { params });
+        return fallbackResponse.data;
+      } catch (fallbackError) {
+        throw fallbackError.response?.data || { message: 'Không thể lấy danh sách exam của bạn' };
+      }
     }
   },
 
@@ -414,6 +422,18 @@ export const examService = {
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'Không thể lấy lịch sử bài làm' };
+    }
+  },
+
+  // ================== CENTER HEAD - COMPLETE EXAM ==================
+  // Complete exam - CenterHead hoàn thành exam draft
+  // Chuyển exam sang approved
+  completeExam: async (examId) => {
+    try {
+      const response = await api.patch(`/management/${examId}/complete`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Hoàn thành đề thi thất bại' };
     }
   },
 };

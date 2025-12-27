@@ -17,13 +17,19 @@ import CourseStep4CLOMapping from './course-wizard-steps/CourseStep3CLOMapping';
 import CourseStep5Sessions from './course-wizard-steps/CourseStep4Sessions';
 import CamSession from './CamSession';
 
-const CourseWizard = ({ viewMode = 'center-head' }) => {
+/**
+ * CourseWizard - Wizard tạo/sửa Course riêng cho CenterHead
+ * - Không sử dụng viewMode prop
+ * - Hardcode basePath = '/center-head'
+ * - Thuần CRUD, không có logic approval
+ */
+const CourseWizard = () => {
   const navigate = useNavigate();
   const { programId, courseId } = useParams();
   const isEdit = Boolean(courseId);
 
-  // Determine base path
-  const basePath = viewMode === 'teacher' ? '/teacher' : '/center-head';
+  // Base path cho CenterHead
+  const basePath = '/center-head';
 
   // Safe toast utility to prevent timing issues
   const safeToast = {
@@ -295,7 +301,7 @@ const CourseWizard = ({ viewMode = 'center-head' }) => {
                 isWizardMode={true}
                 courseData={courseData}
                 setCourseData={setCourseData}
-                viewMode={viewMode}
+                viewMode="center-head"
                 programId={programId}
               />
               {/* Custom navigation for wizard mode */}

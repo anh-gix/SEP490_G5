@@ -158,20 +158,37 @@ const ExamWizard = ({ viewMode = 'teacher' }) => {
     navigate(`${basePath}/exams`);
   };
 
-  // Auto-save function
+  // Auto-save function - creates exam if not exists, updates if exists
   const autoSaveExam = async () => {
-    if (!examData._id) return;
-
     try {
       setAutoSaveStatus('saving');
       const formattedData = examService.formatExamData(examData);
-      await examService.updateExamForManagement(examData._id, formattedData);
-      setAutoSaveStatus('saved');
-      console.log('✅ Auto-saved exam');
+
+      if (!examData._id) {
+        // Create new exam if no _id exists
+        console.log('📝 Creating new exam...');
+        const response = await examService.createExamForManagement(formattedData);
+        if (response.success && response.data) {
+          // Update examData with the new _id
+          setExamData(prev => ({
+            ...prev,
+            _id: response.data._id
+          }));
+          setAutoSaveStatus('saved');
+          console.log('✅ Created new exam with ID:', response.data._id);
+          return response.data._id;
+        }
+      } else {
+        // Update existing exam
+        await examService.updateExamForManagement(examData._id, formattedData);
+        setAutoSaveStatus('saved');
+        console.log('✅ Auto-saved exam');
+      }
     } catch (error) {
       console.error('Error auto-saving exam:', error);
       setAutoSaveStatus('error');
     }
+    return examData._id;
   };
 
   // Auto-save when examData changes (debounced)
@@ -191,11 +208,18 @@ const ExamWizard = ({ viewMode = 'teacher' }) => {
   const handleNext = async () => {
     if (currentStep < steps.length) {
       // Auto-save before moving to next step
-      await autoSaveExam();
+      const savedId = await autoSaveExam();
+
+      // If exam was just created, wait a bit for state to update
+      if (!examData._id && savedId) {
+        console.log('📝 Exam created, waiting for state update...');
+        // State will be updated by setExamData in autoSaveExam
+      }
 
       // Update lastCompletedStep if current step is completed
       const updatedData = {
         ...examData,
+        _id: savedId || examData._id, // Ensure _id is set
         lastCompletedStep: Math.max(examData.lastCompletedStep, currentStep)
       };
       setExamData(updatedData);
@@ -476,14 +500,14 @@ const ExamWizard = ({ viewMode = 'teacher' }) => {
       </div>
 
       {/* Custom Styles */}
-      <style jsx>{`
-        @keyframes spin {
+      <style>{`
+        @keyframes exam-wizard-spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
 
-        .spinner {
-          animation: spin 1s linear infinite;
+        .exam-wizard-spinner {
+          animation: exam-wizard-spin 1s linear infinite;
         }
 
         .wizard-step {
@@ -515,19 +539,19 @@ const ExamWizard = ({ viewMode = 'teacher' }) => {
         }
 
         .wizard-step.active .step-circle {
-          animation: pulse 2s ease-in-out infinite;
+          animation: exam-wizard-pulse 2s ease-in-out infinite;
         }
 
-        @keyframes pulse {
+        @keyframes exam-wizard-pulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
           50% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
         }
 
         .wizard-header {
-          animation: slideDown 0.3s ease-out;
+          animation: exam-wizard-slideDown 0.3s ease-out;
         }
 
-        @keyframes slideDown {
+        @keyframes exam-wizard-slideDown {
           from {
             opacity: 0;
             transform: translateY(-20px);

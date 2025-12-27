@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 
-const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath, navigate }) => {
+const CenterHeadExamStep4Review = ({ examData, setExamData, onPrevious, onSaveDraft, onComplete, basePath, navigate }) => {
   const [expandedSections, setExpandedSections] = useState({});
   const [saving, setSaving] = useState(false);
 
@@ -110,10 +110,8 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
         lastCompletedStep: 4
       }));
 
-      // Save will be handled by parent component (ExamWizard)
-      // Just navigate back to exam list
-      alert('✅ Đề thi đã được lưu dưới dạng Draft!');
-      navigate(`${basePath}/exams`);
+      // Call parent save draft handler
+      await onSaveDraft();
     } catch (error) {
       console.error('Error saving draft:', error);
       alert(error.message || 'Không thể lưu draft!');
@@ -122,35 +120,32 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
     }
   };
 
-  const handleSubmitForApproval = async () => {
+  const handleComplete = async () => {
     const validation = getValidationStatus();
     if (!validation.allPassed) {
-      alert('Vui lòng hoàn thành tất cả các bước trước khi submit!');
+      alert('Vui lòng hoàn thành tất cả các bước trước khi hoàn thành!');
       return;
     }
 
-    if (!window.confirm('Bạn có chắc muốn submit đề thi này để Center Head duyệt?\n Sau khi submit, đề thi sẽ chuyển sang trạng thái "Chờ duyệt" và bạn sẽ không thể chỉnh sửa cho đến khi Center Head review xong.\n\nẤn OK để tiếp tục submit.')) {
+    if (!window.confirm('Bạn có chắc muốn hoàn thành đề thi này?\n\nSau khi hoàn thành, đề thi sẽ chuyển sang trạng thái "Đã duyệt" và có thể được công khai.\n\nẤn OK để tiếp tục.')) {
       return;
     }
 
     try {
       setSaving(true);
 
-      // Update exam data status
+      // Update exam data status to approved (CenterHead has full authority)
       setExamData(prev => ({
         ...prev,
-        status: 'pending_approval',
+        status: 'approved',
         lastCompletedStep: 4
       }));
 
-      // Call parent submit handler which will:
-      // 1. Save exam data
-      // 2. Complete work request
-      // 3. Show success modal
-      await onSubmit();
+      // Call parent complete handler
+      await onComplete();
     } catch (error) {
-      console.error('Error submitting exam:', error);
-      alert(error.message || 'Không thể submit đề thi!');
+      console.error('Error completing exam:', error);
+      alert(error.message || 'Không thể hoàn thành đề thi!');
       setSaving(false);
     }
   };
@@ -198,7 +193,7 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
       <hr className="my-4" />
 
       {/* Sections Overview */}
-      <h6 className="fw-semibold mb-3">📊 Sections Overview</h6>
+      <h6 className="fw-semibold mb-3">Sections Overview</h6>
 
       {Object.entries(sectionsByType).map(([type, sections]) => {
         const isExpanded = expandedSections[type];
@@ -298,7 +293,7 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
       <hr className="my-4" />
 
       {/* Validation Checklist */}
-      <h6 className="fw-semibold mb-3">✅ Validation Checklist</h6>
+      <h6 className="fw-semibold mb-3">Validation Checklist</h6>
 
       <div className={`card border-0 shadow-sm mb-4 ${validation.allPassed ? 'bg-success-subtle' : 'bg-warning-subtle'}`}>
         <div className="card-body">
@@ -317,7 +312,7 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
 
           {validation.allPassed && (
             <div className="alert alert-success mb-0 mt-3">
-              <strong> Đề thi đã sẵn sàng để submit!</strong>
+              <strong>Đề thi đã sẵn sàng để hoàn thành!</strong>
             </div>
           )}
         </div>
@@ -325,15 +320,15 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
 
       <hr className="my-4" />
 
-     
 
-      <div className="alert alert-warning">
-        <i className="ph ph-warning-circle me-2"></i>
-        <strong>Lưu ý quan trọng:</strong>
+
+      <div className="alert alert-info">
+        <i className="ph ph-info me-2"></i>
+        <strong>Lưu ý:</strong>
         <ul className="mb-0 mt-2">
-          <li>Sau khi submit, bạn KHÔNG THỂ chỉnh sửa đề thi cho đến khi Trưởng trung tâm review xong</li>
-          <li>Nếu cần thay đổi, hãy chọn "Save as Draft" và submit sau</li>
-          <li>Đề thi draft có thể chỉnh sửa bất kỳ lúc nào</li>
+          <li>Với vai trò Trưởng trung tâm, bạn có toàn quyền tạo và duyệt đề thi</li>
+          <li>Đề thi "Draft" có thể chỉnh sửa bất kỳ lúc nào</li>
+          <li>Đề thi "Hoàn thành" sẽ được đánh dấu là đã duyệt và có thể công khai</li>
         </ul>
       </div>
 
@@ -362,19 +357,19 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
             )}
           </button>
           <button
-            className="btn btn-primary"
-            onClick={handleSubmitForApproval}
+            className="btn btn-success"
+            onClick={handleComplete}
             disabled={!validation.allPassed || saving}
           >
             {saving ? (
               <>
                 <span className="spinner-border spinner-border-sm me-2"></span>
-                Đang nộp...
+                Đang xử lý...
               </>
             ) : (
               <>
-                <i className="ph ph-paper-plane-tilt me-2"></i>
-                Nộp để duyệt
+                <i className="ph ph-check-circle me-2"></i>
+                Hoàn thành đề thi
               </>
             )}
           </button>
@@ -390,13 +385,14 @@ const ExamStep4Review = ({ examData, setExamData, onPrevious, onSubmit, basePath
   );
 };
 
-ExamStep4Review.propTypes = {
+CenterHeadExamStep4Review.propTypes = {
   examData: PropTypes.object.isRequired,
   setExamData: PropTypes.func.isRequired,
   onPrevious: PropTypes.func.isRequired,
-  onSubmit: PropTypes.func.isRequired,
+  onSaveDraft: PropTypes.func.isRequired,
+  onComplete: PropTypes.func.isRequired,
   basePath: PropTypes.string.isRequired,
   navigate: PropTypes.func.isRequired,
 };
 
-export default ExamStep4Review;
+export default CenterHeadExamStep4Review;

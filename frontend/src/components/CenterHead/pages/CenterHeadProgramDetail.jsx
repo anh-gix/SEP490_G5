@@ -17,8 +17,8 @@ import { formatDate } from '../../../helper/helper';
 
 /**
  * CenterHeadProgramDetail - Trang chi tiết Program cho Center Head
- * Chỉ có quyền xem, duyệt/từ chối, toggle active
- * Không có quyền edit/create/delete
+ * - Nếu program đang draft: có quyền edit thông tin, CRUD course, hoàn thành
+ * - Nếu program đã approved: có quyền xem, toggle active, yêu cầu chỉnh sửa
  */
 const CenterHeadProgramDetail = () => {
   const { id } = useParams();
@@ -33,8 +33,9 @@ const CenterHeadProgramDetail = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [togglingCourseId, setTogglingCourseId] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
-  // Edit Program Request states
+  // Edit Program Request states (for programs NOT created by current user)
   const [showEditRequestModal, setShowEditRequestModal] = useState(false);
   const [editRequestNote, setEditRequestNote] = useState('');
   const [selectedSubjectLeader, setSelectedSubjectLeader] = useState('');
@@ -48,16 +49,33 @@ const CenterHeadProgramDetail = () => {
 
   const basePath = '/center-head';
 
+  // Get current user ID from cookie
+  useEffect(() => {
+    try {
+      const userCookie = document.cookie.split('; ').find(row => row.startsWith('user='));
+      if (userCookie) {
+        const userStr = decodeURIComponent(userCookie.split('=')[1]);
+        const user = JSON.parse(userStr);
+        setCurrentUserId(user._id || user.id);
+      }
+    } catch (error) {
+      console.error('Error getting current user:', error);
+    }
+  }, []);
+
+  // Check if program is created by current user
+  const isMyProgram = program?.createdBy?._id === currentUserId || program?.createdBy === currentUserId;
+
   useEffect(() => {
     fetchProgramDetail();
   }, [id]);
 
-  // Fetch edit request status when program is loaded
+  // Fetch edit request status when program is loaded (only for non-owned approved programs)
   useEffect(() => {
-    if (program && program.status === 'approved') {
+    if (program && program.status === 'approved' && !isMyProgram) {
       fetchEditRequestStatus();
     }
-  }, [program?.status]);
+  }, [program?.status, isMyProgram]);
 
   // Filter courses based on learningType
   useEffect(() => {
@@ -92,6 +110,93 @@ const CenterHeadProgramDetail = () => {
   };
 
   // ===== PROGRAM WORKFLOW HANDLERS =====
+
+  // Hoàn thành program (chuyển từ draft sang approved) - CenterHead có toàn quyền
+  // Đồng thời approve và active tất cả courses trong program
+  const handleCompleteProgram = async () => {
+    // Kiểm tra phải có ít nhất 1 PLO
+    if (!program.plos || program.plos.length === 0) {
+      toast.warning('Chương trình cần có ít nhất 1 PLO để hoàn thành!', { position: 'top-right' });
+      return;
+    }
+
+    const courseCount = courses.length;
+    const result = await Swal.fire({
+      title: 'Hoàn thành chương trình',
+      html: `Bạn có chắc chắn muốn hoàn thành chương trình này?<br><br>
+        <strong>Lưu ý:</strong> Sau khi hoàn thành:
+        <ul style="text-align: left; margin-top: 10px;">
+          <li>Chương trình sẽ được kích hoạt</li>
+          ${courseCount > 0 ? `<li><strong>${courseCount}</strong> khóa học sẽ được kích hoạt</li>` : ''}
+          <li>Có thể sử dụng ngay</li>
+        </ul>`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#10b981',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Hoàn thành',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      const response = await programService.completeProgram(id);
+
+      // Hiển thị thông báo thành công với số courses đã được kích hoạt
+      const coursesUpdated = response.data?.coursesUpdated || 0;
+      let successMessage = 'Hoàn thành chương trình thành công!';
+      if (coursesUpdated > 0) {
+        successMessage += ` Đã kích hoạt ${coursesUpdated} khóa học.`;
+      }
+
+      toast.success(successMessage, {
+        position: 'top-right',
+        autoClose: 5000
+      });
+
+      fetchProgramDetail();
+    } catch (err) {
+      console.error('Error completing program:', err);
+      toast.error(err.message || 'Có lỗi xảy ra khi hoàn thành chương trình', { position: 'top-right' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Xóa program draft
+  const handleDeleteProgram = async () => {
+    const result = await Swal.fire({
+      title: 'Xóa chương trình',
+      html: 'Bạn có chắc chắn muốn xóa chương trình này?<br><br><strong class="text-danger">Lưu ý:</strong> Hành động này không thể hoàn tác!',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await programService.deleteProgram(id);
+      toast.success('Đã xóa chương trình thành công!', { position: 'top-right' });
+      navigate(`${basePath}/programs?tab=my-programs`);
+    } catch (err) {
+      console.error('Error deleting program:', err);
+      toast.error(err.message || 'Có lỗi xảy ra khi xóa chương trình', { position: 'top-right' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleApproveProgram = async () => {
     const result = await Swal.fire({
       title: 'Xác nhận duyệt chương trình',
@@ -111,7 +216,7 @@ const CenterHeadProgramDetail = () => {
     try {
       setActionLoading(true);
       await programService.approveProgram(id, {
-        approvalNote: 'Đã được phê duyệt bởi Center Head'
+        note: 'Đã được phê duyệt bởi Center Head'
       });
       toast.success('Đã duyệt chương trình và toàn bộ khóa học thành công!', { position: 'top-right' });
       fetchProgramDetail();
@@ -136,7 +241,7 @@ const CenterHeadProgramDetail = () => {
     try {
       setActionLoading(true);
       await programService.rejectProgram(id, {
-        rejectionReason
+        reason: rejectionReason
       });
       toast.success('Đã từ chối chương trình thành công!', { position: 'top-right' });
       setShowRejectProgramModal(false);
@@ -245,7 +350,7 @@ const CenterHeadProgramDetail = () => {
     }
   };
 
-  // ===== EDIT PROGRAM REQUEST HANDLERS =====
+  // ===== EDIT PROGRAM REQUEST HANDLERS (for programs NOT created by current user) =====
   const fetchEditRequestStatus = async () => {
     try {
       const result = await workRequestService.checkProgramEditStatus(id);
@@ -505,7 +610,6 @@ const CenterHeadProgramDetail = () => {
       field: 'actions',
       render: (row) => (
         <div className="d-flex flex-wrap gap-2">
-          {/* View button only */}
           <Button
             variant="outline"
             size="sm"
@@ -517,6 +621,22 @@ const CenterHeadProgramDetail = () => {
           >
             Xem
           </Button>
+          {/* Edit & Delete buttons - chỉ hiển thị khi program đang draft */}
+          {program?.status === 'draft' && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                icon="ph ph-pencil-simple"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`${basePath}/programs/${id}/courses/${row._id}/edit`);
+                }}
+              >
+                Sửa
+              </Button>
+            </>
+          )}
         </div>
       ),
     },
@@ -563,6 +683,36 @@ const CenterHeadProgramDetail = () => {
           </div>
         </div>
         <div className="d-flex flex-wrap gap-2">
+          {/* Draft: CenterHead can edit, delete, complete */}
+          {program.status === 'draft' && (
+            <>
+              <Button
+                variant="outline"
+                icon="ph ph-pencil-simple"
+                onClick={() => navigate(`${basePath}/programs/${id}/edit`)}
+                disabled={actionLoading}
+              >
+                Chỉnh sửa
+              </Button>
+              <Button
+                variant="danger"
+                icon="ph ph-trash"
+                onClick={handleDeleteProgram}
+                disabled={actionLoading}
+              >
+                Xóa
+              </Button>
+              <Button
+                variant="success"
+                icon="ph ph-check-circle"
+                onClick={handleCompleteProgram}
+                disabled={actionLoading}
+              >
+                Hoàn thành
+              </Button>
+            </>
+          )}
+
           {/* Pending Approval: Center Head can approve/reject */}
           {program.status === 'pending_approval' && (
             <>
@@ -585,11 +735,23 @@ const CenterHeadProgramDetail = () => {
             </>
           )}
 
-          {/* Edit Program Request Button - For Approved programs */}
-          {program.status === 'approved' && !activeEditRequest && (
+          {/* Edit Button - For Approved programs */}
+          {/* isMyProgram: Direct edit (no approval needed) */}
+          {/* !isMyProgram: Request edit (need Subject Leader to handle) */}
+          {program.status === 'approved' && isMyProgram && (
             <Button
               variant="outline"
               icon="ph ph-pencil-simple"
+              onClick={() => navigate(`${basePath}/programs/${id}/edit`)}
+              disabled={actionLoading}
+            >
+              Chỉnh sửa
+            </Button>
+          )}
+          {program.status === 'approved' && !isMyProgram && !activeEditRequest && (
+            <Button
+              variant="outline"
+              icon="ph ph-paper-plane-tilt"
               onClick={handleOpenEditRequestModal}
               disabled={actionLoading}
             >
@@ -599,41 +761,43 @@ const CenterHeadProgramDetail = () => {
         </div>
       </div>
 
-      {/* Active Edit Request Alert */}
-      {program.status === 'approved' && activeEditRequest && (
-        <div
-          className="alert mb-24"
-          role="alert"
-          style={{
-            borderLeft: `4px solid ${activeEditRequest.status === 'pending_approval' ? '#8b5cf6' : '#3b82f6'}`,
-            backgroundColor: activeEditRequest.status === 'pending_approval' ? '#f5f3ff' : '#eff6ff'
-          }}
-        >
+      {/* Draft Program Alert */}
+      {program.status === 'draft' && (
+        <div className="alert alert-info mb-24" role="alert" style={{ borderLeft: '4px solid #3b82f6' }}>
+          <div className="d-flex align-items-start">
+            <i className="ph ph-pencil-circle" style={{ fontSize: '24px', marginRight: '12px', color: '#3b82f6' }}></i>
+            <div>
+              <h6 className="mb-2 fw-bold">Chương trình đang ở trạng thái Bản nháp</h6>
+              <p className="mb-0">
+                Bạn có thể chỉnh sửa thông tin chương trình, thêm/sửa khóa học.
+                Khi hoàn tất, nhấn <strong>"Hoàn thành"</strong> để kích hoạt chương trình.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* Active Edit Request Alert - For programs NOT created by current user */}
+      {!isMyProgram && activeEditRequest && (
+        <div className="alert alert-info mb-24" role="alert" style={{ borderLeft: '4px solid #8b5cf6' }}>
           <div className="d-flex align-items-start justify-content-between">
             <div className="d-flex align-items-start">
-              <i
-                className={`ph ${activeEditRequest.status === 'pending_approval' ? 'ph-clock-countdown' : 'ph-pencil-circle'}`}
-                style={{ fontSize: '24px', marginRight: '12px', color: activeEditRequest.status === 'pending_approval' ? '#8b5cf6' : '#3b82f6' }}
-              ></i>
+              <i className="ph ph-pencil-circle" style={{ fontSize: '24px', marginRight: '12px', color: '#8b5cf6' }}></i>
               <div>
-                <div className="d-flex align-items-center gap-2 mb-2">
-                  <h6 className="mb-0 fw-bold">
-                    {activeEditRequest.status === 'pending_approval'
-                      ? 'Yêu cầu chỉnh sửa đang chờ duyệt'
-                      : 'Đang có yêu cầu chỉnh sửa chương trình'}
-                  </h6>
+                <h6 className="mb-2 fw-bold d-flex align-items-center gap-2">
+                  Yêu cầu chỉnh sửa đang xử lý
                   {getEditRequestStatusBadge(activeEditRequest.status)}
-                </div>
+                </h6>
                 <p className="mb-1"><strong>Giao cho:</strong> {activeEditRequest.assignedTo?.name || activeEditRequest.assignedTo?.username || 'N/A'}</p>
-                {activeEditRequest.requestNote && (
-                  <p className="mb-1"><strong>Nội dung:</strong> {activeEditRequest.requestNote}</p>
-                )}
+                <p className="mb-1"><strong>Nội dung:</strong> {activeEditRequest.requestNote || 'Không có nội dung'}</p>
                 <p className="mb-0 text-sm text-muted">
-                  Tạo lúc: {formatDate(activeEditRequest.requestedAt)}
+                  Tạo ngày: {formatDate(activeEditRequest.createdAt)}
                 </p>
               </div>
             </div>
             <div className="d-flex gap-2">
+              {/* Show Approve/Reject buttons if status is pending_approval */}
               {activeEditRequest.status === 'pending_approval' && (
                 <>
                   <Button
@@ -656,11 +820,12 @@ const CenterHeadProgramDetail = () => {
                   </Button>
                 </>
               )}
-              {['pending', 'in_progress'].includes(activeEditRequest.status) && (
+              {/* Show Cancel button if status is pending or in_progress */}
+              {(activeEditRequest.status === 'pending' || activeEditRequest.status === 'in_progress') && (
                 <Button
                   variant="outline"
                   size="sm"
-                  icon="ph ph-x"
+                  icon="ph ph-x-circle"
                   onClick={handleCancelEditRequest}
                   disabled={actionLoading}
                 >
@@ -770,6 +935,16 @@ const CenterHeadProgramDetail = () => {
               Các khóa học thuộc chương trình này
             </p>
           </div>
+          {/* Nút thêm khóa học - chỉ hiển thị khi program đang draft */}
+          {program.status === 'draft' && (
+            <Button
+              variant="primary"
+              icon="ph ph-plus"
+              onClick={() => navigate(`${basePath}/programs/${id}/courses/create`)}
+            >
+              Thêm khóa học
+            </Button>
+          )}
         </div>
 
         {/* Course Filters */}

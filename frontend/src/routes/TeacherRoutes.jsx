@@ -14,6 +14,7 @@ import TeacherProgramDetailPage from "../pages/TeacherPages/TeacherProgramDetail
 import TeacherCourseWizardPage from "../pages/TeacherPages/TeacherCourseWizardPage.jsx";
 import TeacherCourseDetailPage from "../pages/TeacherPages/TeacherCourseDetailPage.jsx";
 import TeacherCourseFormPage from "../pages/TeacherPages/TeacherCourseFormPage.jsx";
+import TeacherProgramFormPage from "../pages/TeacherPages/TeacherProgramFormPage.jsx";
 import TeacherCamSessionPage from "../pages/TeacherPages/TeacherCamSessionPage.jsx";
 import TeacherCamSessionEditPage from "../pages/TeacherPages/TeacherCamSessionEditPage.jsx";
 
@@ -77,6 +78,7 @@ export const teacherRoutes = [
   // VII. Program & Course Management
   { path: '/teacher/programs', element: <TeacherProgramListPage /> },
   { path: '/teacher/programs/:id', element: <TeacherProgramDetailPage /> },
+  { path: '/teacher/programs/:id/edit', element: <TeacherProgramFormPage /> },
 
   // Course Management
   { path: '/teacher/programs/:programId/courses/create', element: <TeacherCourseWizardPage /> },
